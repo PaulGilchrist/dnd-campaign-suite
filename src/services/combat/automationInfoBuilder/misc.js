@@ -26,6 +26,24 @@ export const miscHandlers = {
         }
     },
 
+    'survive_and_heal': (feature, playerStats) => {
+        const auto = feature.automation
+        const maxHp = playerStats.hitPoints?.max || playerStats.level || 1
+        const healAmount = auto.healExpression === 'half_max_hp'
+            ? Math.floor(maxHp / 2)
+            : (auto.healExpression ? parseInt(auto.healExpression, 10) : Math.floor(maxHp / 2))
+        return {
+            type: 'survive_and_heal',
+            name: feature.name,
+            trigger: auto.trigger || 'reduced_to_0_hp',
+            effect: auto.effect || 'survive_and_heal',
+            minHp: auto.minHp || 1,
+            healAmount,
+            recharge: auto.recharge || 'long_rest',
+            hasAutomation: true
+        }
+    },
+
     'auto_reroll': (feature, _playerStats) => {
         const auto = feature.automation
         return {
@@ -42,6 +60,7 @@ export const miscHandlers = {
             bonusExpression: auto.bonusExpression || '',
             oncePerRage: !!auto.oncePerRage,
             oncePerTurn: !!auto.oncePerTurn,
+            oncePer: auto.oncePer || '',
             hasAutomation: true
         }
     },
@@ -317,6 +336,20 @@ export const miscHandlers = {
             name: feature.name,
             target: auto.target || 'd20',
             recharge: auto.recharge || 'short_or_long_rest',
+            hasAutomation: true
+        }
+    },
+
+    'modify_d20_roll': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'modify_d20_roll',
+            name: feature.name,
+            modifier: auto.modifier || '2d4',
+            range: auto.range || '60 ft',
+            canBeBonusOrPenalty: !!auto.canBeBonusOrPenalty,
+            recharge: auto.recharge || 'initiative_or_short_or_long_rest',
+            casting_time: auto.casting_time || '1 bonus action',
             hasAutomation: true
         }
     },
@@ -645,6 +678,18 @@ export const miscHandlers = {
             name: feature.name,
             range: auto.range || 'Touch',
             duration: auto.duration || '1 hour',
+            casting_time: auto.casting_time || '1 action',
+            hasAutomation: true
+        }
+    },
+
+    'sentinel': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'sentinel',
+            name: feature.name,
+            effect: auto.effect || 'speed_0_on_oa_hit',
+            duration: auto.duration || 'end_of_turn',
             casting_time: auto.casting_time || '1 action',
             hasAutomation: true
         }

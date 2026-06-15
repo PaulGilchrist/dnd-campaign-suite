@@ -26,7 +26,7 @@ import {
 import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
 import { getCombatContext } from '../services/rules/combat/damageUtils.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/spells/postCastRiderService.js';
-import { playerIsImmuneToCondition } from '../services/combat/automationService.js';
+import { playerIsImmuneToCondition, hasIgnoreResistance, hasMinDamage } from '../services/combat/automationService.js';
 import { endInvisibilityOnHostileAction } from '../services/rules/features/invisibilityService.js';
 
 function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {
@@ -65,6 +65,17 @@ function hasSoulstitchProtection(targetName, playerName, campaignName) {
     return protectedList.includes(targetName);
 }
 
+function applyMinDamageAdjustment(rawDamage, rolls, playerStats, damageType) {
+    if (!playerStats || !damageType || !rolls || !Array.isArray(rolls) || rolls.length === 0) {
+        return rawDamage;
+    }
+    const hasMin = hasMinDamage(playerStats, damageType);
+    if (!hasMin) return rawDamage;
+    const onesCount = rolls.filter(r => r === 1).length;
+    if (onesCount === 0) return rawDamage;
+    return rawDamage + onesCount;
+}
+
 export default function useLoggedDiceRoll(characterName, campaignName, options = {}) {
   const { popupHtml, setPopupHtml } = useDiceRoll();
   const { autoDamageRoll, characters } = options;
@@ -101,17 +112,26 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
         });
       const hasEvasion = hasOwnEvasion || hasSharedEvasion;
-      const finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(
+      let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(
         e.detail.rawDamage, e.detail.success, e.detail.dcSuccess, hasEvasion
       );
+
+      const interveneShieldActive = getRuntimeValue(e.detail.targetName, 'interveneShieldActive', pending.campaignName);
+      if (interveneShieldActive && e.detail.saveType === 'DEX' && e.detail.dcSuccess === 'half') {
+          if (e.detail.success) {
+              finalDamage = 0;
+          }
+          setRuntimeValue(e.detail.targetName, 'interveneShieldActive', null, pending.campaignName);
+      }
       const pendingTargetName = pending.targetName;
       let targetMaxHp = 0;
       if (combatSummary) {
         const t = combatSummary.creatures.find(c => c.name === pendingTargetName);
         if (t) targetMaxHp = t.type === 'player' ? (getRuntimeValue(t.name, 'hitPoints') ?? 0) : t.maxHp;
        }
+        const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
         const applyResult = applyDamageToTarget(
-          combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null, false, pending.attackerName || characterName
+          combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null, ignoreResistance, pending.attackerName || characterName
            );
 
         if (applyResult && applyResult.finalDamage > 0) {
@@ -343,7 +363,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
       }
 
-        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) : undefined;
+        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) : undefined;
         let hit = isAutoMiss ? false : (target ? (effectiveD20 + bonus >= effectiveAc) : undefined);
        const targetName = target?.name || context?.targetName;
        const attackerName = context?.attackerName || characterName;
@@ -406,11 +426,74 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                           resolve();
                       }
                   }, 30000);
-              });
-          }
-      }
+               });
+           }
+       }
 
-       const criticalRange = context?.criticalRange;
+        // Veer (Mounted Combatant feat): redirect attack from mount to rider
+        if (hit && target && rollType === 'attack') {
+            const riderName = getRuntimeValue(target.name, 'mountedBy', campaignName);
+            if (riderName) {
+                const veerActive = getRuntimeValue(riderName, 'veerActive', campaignName);
+                if (veerActive) {
+                    const mountCreature = combatSummary?.creatures?.find(c => c.name === target.name);
+                    const mountNotIncapacitated = mountCreature ? !mountCreature.conditions?.some(c => {
+                        const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
+                        return ['incapacitated'].includes(cStr.toLowerCase());
+                    }) : true;
+                    const riderNotIncapacitated = !getRuntimeValue(riderName, 'activeConditions', campaignName)?.some(c => {
+                        const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
+                        return ['incapacitated'].includes(cStr.toLowerCase());
+                    });
+                    if (mountNotIncapacitated && riderNotIncapacitated) {
+                        logEntry({
+                            type: 'ability_use',
+                            characterName: riderName,
+                            abilityName: 'Veer',
+                            description: `${riderName} uses Veer to redirect the attack from ${target.name} to themselves.`,
+                        });
+                        await setRuntimeValue(riderName, 'veerActive', null, campaignName);
+                        hit = false;
+                        isAutoMiss = true;
+                        let veerResultResolved = false;
+                        const redirectResult = await new Promise((resolve) => {
+                            const handler = (event) => {
+                                if (event.detail.promptId !== `veer-${target.name}`) return;
+                                window.removeEventListener('veer-confirm', handler);
+                                veerResultResolved = true;
+                                resolve(event.detail.confirm);
+                            };
+                            window.addEventListener('veer-confirm', handler);
+                            setTimeout(() => {
+                                if (!veerResultResolved) {
+                                    window.removeEventListener('veer-confirm', handler);
+                                    resolve(true);
+                                }
+                            }, 15000);
+                        });
+                        if (redirectResult) {
+                            hit = true;
+                            isAutoMiss = false;
+                            logEntry({
+                                type: 'ability_use',
+                                characterName: riderName,
+                                abilityName: 'Veer',
+                                description: `${riderName} redirects the attack — it now hits ${riderName} instead of ${target.name}.`,
+                            });
+                        } else {
+                            logEntry({
+                                type: 'ability_use',
+                                characterName: riderName,
+                                abilityName: 'Veer',
+                                description: `${riderName} declined to use Veer. Attack hits ${target.name}.`,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        const criticalRange = context?.criticalRange;
        let rollsInCriticalRange = false;
        if (criticalRange) {
            const match = criticalRange.match(/^(\d+)-(\d+)$/);
@@ -462,37 +545,39 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             coverAcBonus: context?.coverAcBonus,
             coverReason: context?.coverReason,
                });
-         setPopupHtml({
-            type: 'd20',
-            rollType,
-            name,
-            rolls: [r1, r2],
-            bonus,
-            targetName,
-            targetAc,
-            hit,
-            isAutoMiss,
-            rangeReason: context?.rangeReason,
-            resistanceNotice: context?.resistanceNotice,
-            hunterLoreNotice: context?.hunterLoreNotice,
-           coverLevel: context?.coverLevel,
-           coverAcBonus: context?.coverAcBonus,
-           coverReason: context?.coverReason,
-          forcedMode: context?.forcedMode,
-          isAutoCrit: context?.isAutoCrit,
-          isCrit,
-          autoDamage,
-           autoReroll: context?.autoReroll,
-           autoRerollBonus: context?.autoRerollBonus,
-            strSaveReplace: context?.strSaveReplace,
-            strScore: context?.strScore,
-             strCheckReplace: context?.strCheckReplace,
-            reliableTalent: context?.reliableTalent,
-              wisCheckReplace: context?.wisCheckReplace,
-             wisCheckMinBonus: context?.wisCheckMinBonus,
-            gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
-            d20Floor10: context?.d20Floor10,
-          });
+          setPopupHtml({
+             type: 'd20',
+             rollType,
+             name,
+             rolls: [r1, r2],
+             bonus,
+             targetName,
+             targetAc,
+             hit,
+             isAutoMiss,
+             rangeReason: context?.rangeReason,
+             resistanceNotice: context?.resistanceNotice,
+             hunterLoreNotice: context?.hunterLoreNotice,
+            coverLevel: context?.coverLevel,
+            coverAcBonus: context?.coverAcBonus,
+            coverReason: context?.coverReason,
+           forcedMode: context?.forcedMode,
+           isAutoCrit: context?.isAutoCrit,
+           isCrit,
+           isNatural20: r1 === 20,
+           autoDamage,
+            autoReroll: context?.autoReroll,
+            autoRerollBonus: context?.autoRerollBonus,
+             strSaveReplace: context?.strSaveReplace,
+             strScore: context?.strScore,
+              strCheckReplace: context?.strCheckReplace,
+             reliableTalent: context?.reliableTalent,
+               wisCheckReplace: context?.wisCheckReplace,
+              wisCheckMinBonus: context?.wisCheckMinBonus,
+              gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
+              defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
+              d20Floor10: context?.d20Floor10,
+           });
 
        if (rollType === 'attack') {
            setRuntimeValue(characterName, 'lastAttackRoll', {
@@ -535,24 +620,26 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                }
            }
 
-            // Potent Cantrip: on miss, deal half damage for cantrips
-            const potentPlayerStats = context?.playerStats;
-            const hasPotentCantripFlag = hasPotentCantrip(potentPlayerStats);
-            if (hasPotentCantripFlag && !hit && !isAutoMiss && autoDamage) {
-                let potentFormula = autoDamage.formula;
-                const hasEmpoweredEvoc = hasEmpoweredEvocation(potentPlayerStats);
-                const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
-                const spellSchool = (autoDamage.spellSchool || '').toLowerCase();
-                const isEvocation = spellSchool === 'evocation';
-                const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
-                if (shouldApplyEmpoweredEvoc) {
-                    potentFormula = `${potentFormula} + ${empEvocIntMod}[Empowered Evocation]`;
-                }
-                const damageResult = rollExpression(potentFormula);
-                if (damageResult) {
-                    const halfDamage = Math.floor(damageResult.total / 2);
-                    const combatSummary2 = await loadCombatSummary(campaignName);
-                    const applyResult = applyDamageToTarget(combatSummary2, targetName, halfDamage, [autoDamage.damageType], campaignName, null, false, autoDamage.attackerName || characterName);
+             // Potent Cantrip: on miss, deal half damage for cantrips
+             const potentPlayerStats = context?.playerStats;
+             const hasPotentCantripFlag = hasPotentCantrip(potentPlayerStats);
+             if (hasPotentCantripFlag && !hit && !isAutoMiss && autoDamage) {
+                 let potentFormula = autoDamage.formula;
+                 const hasEmpoweredEvoc = hasEmpoweredEvocation(potentPlayerStats);
+                 const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
+                 const spellSchool = (autoDamage.spellSchool || '').toLowerCase();
+                 const isEvocation = spellSchool === 'evocation';
+                 const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+                 if (shouldApplyEmpoweredEvoc) {
+                     potentFormula = `${potentFormula} + ${empEvocIntMod}[Empowered Evocation]`;
+                 }
+                 const damageResult = rollExpression(potentFormula);
+                 if (damageResult) {
+                     const adjustedPotentTotal = applyMinDamageAdjustment(damageResult.total, damageResult.rolls, context?.playerStats, autoDamage.damageType);
+                     const halfDamage = Math.floor(adjustedPotentTotal / 2);
+                     const combatSummary2 = await loadCombatSummary(campaignName);
+                     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, autoDamage.damageType)) || false;
+                     const applyResult = applyDamageToTarget(combatSummary2, targetName, halfDamage, [autoDamage.damageType], campaignName, null, ignoreResistance, autoDamage.attackerName || characterName);
                     const missTargetMaxHp = target?.type === 'player'
                         ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
                         : target?.maxHp ?? 0;
@@ -638,9 +725,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         }
      }
 
-   async function logDamageAndShow(name, formula, total, rolls, modifier, context) {
-      const { saveDc, saveType, dcSuccess, damageType, attackerName, isAutoMiss, rangeReason } = context || {};
-      const combatSummary = await loadCombatSummary(campaignName);
+    async function logDamageAndShow(name, formula, total, rolls, modifier, context) {
+       const { saveDc, saveType, dcSuccess, damageType, attackerName, isAutoMiss, rangeReason } = context || {};
+       const adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
+       const combatSummary = await loadCombatSummary(campaignName);
 
       if (isAutoMiss) {
         logEntry({
@@ -676,10 +764,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         if (aoeCtx && combatSummary) {
           const { overlay, players, npcs } = aoeCtx;
           const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
-          const npcResults = saveDc && saveType
-              ? processAoeNpcs(combatSummary, affected, total, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName || characterName)
-               : affected.map(({ creature }) => {
-                  const applyResult = applyDamageToTarget(combatSummary, creature.name, total, [damageType], campaignName, null, false, attackerName || characterName);
+           const npcResults = saveDc && saveType
+               ? processAoeNpcs(combatSummary, affected, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName || characterName)
+                : affected.map(({ creature }) => {
+                   const applyResult = applyDamageToTarget(combatSummary, creature.name, adjustedTotal, [damageType], campaignName, null, false, attackerName || characterName);
                   if (applyResult && applyResult.finalDamage > 0) {
                     endInvisibilityOnHostileAction(attackerName || characterName, campaignName);
                   }
@@ -708,17 +796,18 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           }
 
           if (playersNeedingSave.length && saveDc && saveType) {
-            const playerPrompts = sendAoePlayerSaves(playersNeedingSave, total, damageType, saveDc, saveType, dcSuccess, campaignName, name, casterName, rolls, formula);
+             const playerPrompts = sendAoePlayerSaves(playersNeedingSave, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, name, casterName, rolls, formula);
             for (const pp of playerPrompts) {
               pendingSaves[pp.promptId] = {
-                 targetName: pp.targetName, rawDamage: total, saveDc, saveType, dcSuccess,
-                 damageType, attackerName: attackerName || characterName,
-                 name, formula, modifier, rolls, campaignName, setPopupHtml, isAoe: true,
-                 isCantrip: context?.isCantrip || false,
-                 overchannelActive: context?.overchannelActive || false,
-                 overchannelUseCount: context?.overchannelUseCount || 0,
-                 overchannelSpellLevel: context?.overchannelSpellLevel || 1,
-                };
+                  targetName: pp.targetName, rawDamage: adjustedTotal, saveDc, saveType, dcSuccess,
+                  damageType, attackerName: attackerName || characterName,
+                  name, formula, modifier, rolls, campaignName, setPopupHtml, isAoe: true,
+                  isCantrip: context?.isCantrip || false,
+                  overchannelActive: context?.overchannelActive || false,
+                  overchannelUseCount: context?.overchannelUseCount || 0,
+                  overchannelSpellLevel: context?.overchannelSpellLevel || 1,
+                  playerStats: context?.playerStats,
+                 };
               }
             }
           const overlayLabel = overlay.label || overlay.shape || 'AoE';
@@ -733,7 +822,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           const pendingList = playersNeedingSave.length
              ? `<div class="aoe-pending"><i class="fa-solid fa-spinner fa-spin"></i> Waiting for saves: ${playersNeedingSave.map(a => a.creature.name).join(', ')}</div>`
              : '';
-          const html = `<div class="aoe-summary"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${overlayLabel} — ${name}</h3><div class="aoe-damage-info">${formula}: <strong>${total}</strong> ${damageType || 'untyped'}${saveDc ? ` — ${saveType ? saveType.toUpperCase() : ''} save DC ${saveDc}` : ''}</div><div class="aoe-results">${npcResultRows || '<em>No creatures affected</em>'}</div>${pendingList}</div>`;
+           const displayTotal = adjustedTotal !== total ? `${total} (+${adjustedTotal - total} Elemental Adept)` : String(total);
+           const html = `<div class="aoe-summary"><h3><i class="fa-solid fa-wand-magic-sparkles"></i> ${overlayLabel} — ${name}</h3><div class="aoe-damage-info">${formula}: <strong>${displayTotal}</strong> ${damageType || 'untyped'}${saveDc ? ` — ${saveType ? saveType.toUpperCase() : ''} save DC ${saveDc}` : ''}</div><div class="aoe-results">${npcResultRows || '<em>No creatures affected</em>'}</div>${pendingList}</div>`;
           logEntry({
             type: 'aoe-damage',
             characterName,
@@ -802,14 +892,15 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           if (target.type === 'npc') {
             const disadvantage = context?.metamagicHeighten || false;
             const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
-            const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
-            let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(total, saveResult.success, dcSuccess);
-            const isCantripFlag = context?.isCantrip || false;
-            const hasPotentFlag = hasPotentCantrip(context?.playerStats);
-            if (!isSoulstitchProtected && hasPotentFlag && isCantripFlag && saveResult.success && dcSuccess === 'none') {
-              finalDamage = Math.floor(total / 2);
-            }
-             const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, false, characterName);
+             const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
+             let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(adjustedTotal, saveResult.success, dcSuccess);
+             const isCantripFlag = context?.isCantrip || false;
+             const hasPotentFlag = hasPotentCantrip(context?.playerStats);
+             if (!isSoulstitchProtected && hasPotentFlag && isCantripFlag && saveResult.success && dcSuccess === 'none') {
+               finalDamage = Math.floor(adjustedTotal / 2);
+             }
+               const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+               const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, ignoreResistance, characterName);
 
             if (applyResult && applyResult.finalDamage > 0) {
               endInvisibilityOnHostileAction(characterName, campaignName);
@@ -922,7 +1013,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               targetName: target.name,
               spellName: name,
               damageFormula: formula,
-              rawDamage: total,
+              rawDamage: adjustedTotal,
               damageType,
               saveDc,
               saveType,
@@ -943,7 +1034,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                if (hasPotentFlag && isCantripFlag && twinSaveResult.success && dcSuccess === 'none') {
                  twinFinalDamage = Math.floor(total / 2);
                }
-                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, false, characterName);
+                const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+                 const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, ignoreResistance, characterName);
                if (twinApplyResult && twinApplyResult.finalDamage > 0) {
                  endInvisibilityOnHostileAction(characterName, campaignName);
                }
@@ -1019,7 +1111,8 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                     : (getRuntimeValue(multiTarget.name, 'hitPoints') ?? 0),
                 }));
               } else {
-                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, false, characterName);
+                const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, ignoreResistance, characterName);
                 if (multiApplyResult && multiApplyResult.finalDamage > 0) {
                   endInvisibilityOnHostileAction(characterName, campaignName);
                 }
@@ -1042,11 +1135,12 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
           return;
           }
 
-        if (target.type === 'player') {
-          const isCarefulAlly = context?.metamagicCareful || false;
-          if (isCarefulAlly) {
-            const carefulDamage = computeDamageAfterSave(total, true, dcSuccess);
-             const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null, false, characterName);
+         if (target.type === 'player') {
+           const isCarefulAlly = context?.metamagicCareful || false;
+           if (isCarefulAlly) {
+             const carefulDamage = computeDamageAfterSave(adjustedTotal, true, dcSuccess);
+                const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+               const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null, ignoreResistance, characterName);
              if (applyResult && applyResult.finalDamage > 0) {
                endInvisibilityOnHostileAction(characterName, campaignName);
              }
@@ -1073,7 +1167,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               targetName: target.name,
               spellName: name,
               damageFormula: formula,
-              rawDamage: total,
+              rawDamage: adjustedTotal,
               damageType,
               saveDc,
               saveType,
@@ -1110,8 +1204,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             p => p.type === 'passive_rule' && p.effect === 'contact_patron_auto_save'
           );
           if (hasContactPatron && name === 'Contact Other Plane' && target.name === characterName) {
-            const successfulSave = computeDamageAfterSave(total, true, dcSuccess);
-             const applyResult = applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, false, characterName);
+            const successfulSave = computeDamageAfterSave(adjustedTotal, true, dcSuccess);
+              const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+              const applyResult = applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, ignoreResistance, characterName);
              if (applyResult && applyResult.finalDamage > 0) {
                endInvisibilityOnHostileAction(characterName, campaignName);
              }
@@ -1156,17 +1251,18 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             });
             return;
           }
-          const promptId = utils.guid();
-           pendingSaves[promptId] = {
-               targetName: target.name, rawDamage: total, saveDc, saveType, dcSuccess,
-               damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
-               metamagicHeighten: context?.metamagicHeighten || false,
-               isCantrip: context?.isCantrip || false,
-               overchannelActive: context?.overchannelActive || false,
-               overchannelUseCount: context?.overchannelUseCount || 0,
-               overchannelSpellLevel: context?.overchannelSpellLevel || 1,
-               statusEffects: context?.statusEffects || [],
-              };
+           const promptId = utils.guid();
+             pendingSaves[promptId] = {
+                 targetName: target.name, rawDamage: adjustedTotal, saveDc, saveType, dcSuccess,
+                damageType, attackerName: attackerName || characterName, name, formula, modifier, rolls, campaignName, setPopupHtml,
+                metamagicHeighten: context?.metamagicHeighten || false,
+                isCantrip: context?.isCantrip || false,
+                overchannelActive: context?.overchannelActive || false,
+                overchannelUseCount: context?.overchannelUseCount || 0,
+                overchannelSpellLevel: context?.overchannelSpellLevel || 1,
+                statusEffects: context?.statusEffects || [],
+                playerStats: context?.playerStats,
+               };
 
           sendSavePrompt(campaignName, {
             promptId,
@@ -1178,11 +1274,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             damageType,
             sourceName: name,
             sourceAttackerName: attackerName || characterName,
-            rawDamage: total,
+            rawDamage: adjustedTotal,
             disadvantage: context?.metamagicHeighten || false,
            });
 
-          logEntry({
+           logEntry({
             type: 'roll',
             characterName,
             rollType: 'save-prompt',
@@ -1212,11 +1308,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
              saveDc,
              saveType,
              dcSuccess,
-             waitingForPlayerSave: true,
-             promptId,
-             rawDamage: total,
-             attackerName: attackerName || characterName,
-            });
+              waitingForPlayerSave: true,
+              promptId,
+              rawDamage: adjustedTotal,
+              attackerName: attackerName || characterName,
+             });
 
             // Overchannel self-damage (2nd+ use before Long Rest) - apply immediately
             if (context?.overchannelActive && context?.overchannelUseCount > 1) {
@@ -1264,9 +1360,31 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            }
          }
 
-       let applyResult = null;
-        if (target) {
-          // Ray of Enfeeblement: attacker with debuff subtracts 1d8 from damage
+        let applyResult = null;
+         if (target) {
+           // Sentinel Halt: when player hits with an OA, target's Speed becomes 0 for rest of turn
+           const lastAttack = getRuntimeValue(characterName, 'lastAttackRoll', campaignName);
+           const attackHit = context?.isOpportunityAttack && lastAttack?.hit === true;
+           if (attackHit) {
+             const playerCharacter = (characters || []).find(c => c.name === characterName || c.name.startsWith(characterName + ' '));
+             const computed = playerCharacter?.computedStats || playerCharacter;
+             const allFeatures = computed?.characterAdvancement || [];
+             const hasSentinel = allFeatures.some(f => f.name === 'Sentinel');
+             if (hasSentinel) {
+               const sentinelStoredEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+               const newEffect = {
+                 target: target.name,
+                 source: 'Sentinel',
+                 option: 'Halt',
+                 effect: 'speed_zero',
+                 value: null,
+                 duration: 'end_of_turn',
+               };
+               const updatedEffects = [...sentinelStoredEffects, newEffect];
+               setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+             }
+           }
+           // Ray of Enfeeblement: attacker with debuff subtracts 1d8 from damage
           let rayReduction = 0;
           const rayTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
           const rayDebuffActive = rayTargetEffects.some(te => te.effect === 'ray_of_enfeeble_debuff' && te.source === (attackerName || characterName));
@@ -1274,8 +1392,9 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             const rayRoll = rollExpression('1d8');
             rayReduction = rayRoll?.total || 0;
           }
-          const reducedTotal = Math.max(0, total - rayReduction);
-          applyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, null);
+            const reducedTotal = Math.max(0, adjustedTotal - rayReduction);
+            const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+            applyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, null, ignoreResistance, characterName);
           if (rayReduction > 0) {
             applyResult = { ...applyResult, rayOfEnfeebleReduction: rayReduction };
           }
@@ -1293,9 +1412,10 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
          const dsSaveType = deathStrikeEffect.saveType;
          if (dsSaveDc && dsSaveType) {
            const dsSaveResult = rollSaveForCreature(target, dsSaveType, dsSaveDc, false);
-           if (!dsSaveResult.success) {
-             const doubledTotal = total * 2;
-              const dsApplyResult = applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, null, false, characterName);
+             if (!dsSaveResult.success) {
+               const doubledTotal = adjustedTotal * 2;
+               const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+                const dsApplyResult = applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, null, ignoreResistance || false, characterName);
              logEntry({
                type: 'roll',
                characterName,
@@ -1436,19 +1556,22 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            }
        }
 
-        const popupData = {
-         type: 'damage',
-         name,
-         formula,
-         rolls,
-         bonus: 0,
-         modifier,
-         dc: context?.dc,
-         dcType: context?.dcType,
-         dcSuccess: context?.dcSuccess,
-         damageType,
-         targetName: target?.name,
-       };
+         const popupData = {
+          type: 'damage',
+          name,
+          formula,
+          rolls,
+          bonus: 0,
+          modifier,
+          dc: context?.dc,
+          dcType: context?.dcType,
+          dcSuccess: context?.dcSuccess,
+          damageType,
+          targetName: target?.name,
+          total,
+          adjustedTotal: adjustedTotal,
+          elementalAdeptBonus: adjustedTotal > total ? adjustedTotal - total : 0,
+        };
 
        if (applyResult) {
           popupData.targetCurrentHp = applyResult.newHp;
@@ -1463,7 +1586,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
        if (context?.metamagicTwinTarget && target) {
         const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
         if (twinTarget && twinTarget.name !== target.name) {
-            const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, total, [damageType], campaignName, null, false, characterName);
+             const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, null, false, characterName);
            if (twinApplyResult && twinApplyResult.finalDamage > 0) {
              endInvisibilityOnHostileAction(characterName, campaignName);
            }
@@ -1558,6 +1681,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                 isCrit: false,
                 isAutoCrit: false,
                 gloriousDefenseBonus: 0,
+                defensiveDuelistBonus: 0,
                 popupMessage: `${characterName} has no uses remaining for Glorious Defense. Recharges on a Long Rest.`,
             });
             return;
@@ -1591,6 +1715,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                 isCrit: false,
                 isAutoCrit: false,
                 gloriousDefenseBonus: 0,
+                defensiveDuelistBonus: 0,
                 popupMessage: `${characterName} has no melee attack available.`,
             });
             return;
@@ -1630,12 +1755,22 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
       });
     const hasEvasion = hasOwnEvasion || hasSharedEvasion;
     let finalDamage = computeDamageAfterEvasion(pending.rawDamage, saveResult.success, pending.dcSuccess, hasEvasion);
+
+    const interveneShieldActive = getRuntimeValue(pending.targetName, 'interveneShieldActive', campaignName);
+    if (interveneShieldActive && pending.saveType === 'DEX' && pending.dcSuccess === 'half') {
+        if (saveResult.success) {
+            finalDamage = 0;
+        }
+        setRuntimeValue(pending.targetName, 'interveneShieldActive', null, campaignName);
+    }
+
     const isCantripFlag = pending.isCantrip || false;
     const hasPotentFlag = hasPotentCantrip(pending.context?.playerStats);
     if (hasPotentFlag && isCantripFlag && saveResult.success && pending.dcSuccess === 'none') {
       finalDamage = Math.floor(pending.rawDamage / 2);
     }
-    const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null, false, pending.attackerName || characterName);
+    const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
+    const applyResult = applyDamageToTarget(combatSummary, pending.targetName, finalDamage, [pending.damageType], campaignName, null, ignoreResistance, pending.attackerName || characterName);
 
     delete pendingSaves[promptId];
 

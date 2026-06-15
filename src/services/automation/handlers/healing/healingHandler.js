@@ -2,8 +2,9 @@ import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRolle
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
-import { resolveHealingBonuses, hasHealingMaximization } from '../../../combat/automationService.js';
+import { resolveHealingBonuses, hasHealingMaximization, hasRerollHealingOnes } from '../../../combat/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getHitDieSize, computeHitDieRecovery } from '../../../rules/effects/restRules.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -20,7 +21,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const wisModifier = wisdom?.bonus || 0;
 
         const maximize = hasHealingMaximization(playerStats);
-        const rollResult = maximize ? rollExpressionMaximized(`1d${martialArtsDie}`) : rollExpression(`1d${martialArtsDie}`);
+        const rerollOnes = hasRerollHealingOnes(playerStats);
+        const rollResult = maximize ? rollExpressionMaximized(`1d${martialArtsDie}`) : rerollOnes ? rollExpression(`1d${martialArtsDie}`, { rerollOnes: true }) : rollExpression(`1d${martialArtsDie}`);
         if (!rollResult) return null;
 
         const baseHeal = rollResult.total + wisModifier;
@@ -61,9 +63,28 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 targetCurrentHp: newHp,
                 targetMaxHp: maxHp,
                 hasPhysiciansTouch,
+                rerollOnes: rerollOnes && !maximize,
                 },
             };
       } else if (isSelf && auto.healExpression) {
+        const hitDiceCost = auto.hitDiceCost || 0;
+        const isHitDieRoll = auto.healExpression === 'hit_die_roll';
+
+        if (isHitDieRoll && hitDiceCost > 0) {
+            const storedHitDice = Number(getRuntimeValue(playerStats.name, 'shortRestHitDice', campaignName) ?? playerStats.level);
+            if (storedHitDice < hitDiceCost) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        automationType: auto.type,
+                        description: `${action.name} requires ${hitDiceCost} hit die(s) to use. You have ${storedHitDice} remaining.`,
+                    },
+                };
+            }
+        }
+
         const bloodiedOnly = !!auto.bloodiedOnly;
         if (bloodiedOnly) {
             const currentHp = playerStats.currentHitPoints ?? 0;
@@ -101,12 +122,24 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         let resolvedExpression = auto.healExpression
             .replace(/\bfighter level\b/gi, String(playerStats.level || 1));
 
+        if (isHitDieRoll) {
+            const hitDieSize = getHitDieSize(playerStats);
+            resolvedExpression = `1d${hitDieSize}`;
+        }
+
         const maximize = hasHealingMaximization(playerStats);
-        const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rollExpression(resolvedExpression);
+        const rerollOnes = hasRerollHealingOnes(playerStats);
+        const rollResult = maximize ? rollExpressionMaximized(resolvedExpression) : rerollOnes ? rollExpression(resolvedExpression, { rerollOnes: true }) : rollExpression(resolvedExpression);
         if (!rollResult) return null;
 
-        const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
-        const healAmount = rollResult.total + bonusHeal;
+        let healAmount;
+        if (isHitDieRoll) {
+            const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
+            healAmount = computeHitDieRecovery(rollResult.total, conBonus);
+        } else {
+            const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);
+            healAmount = rollResult.total + bonusHeal;
+        }
 
         const { newHp, maxHp, actualHeal } = applyHealingDirectly(playerStats, playerStats.name, healAmount, campaignName);
 
@@ -117,6 +150,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             newHp,
             maxHp,
         });
+
+        if (isHitDieRoll && hitDiceCost > 0) {
+            const currentHitDice = Number(getRuntimeValue(playerStats.name, 'shortRestHitDice', campaignName) ?? playerStats.level);
+            const newHitDice = Math.max(0, currentHitDice - hitDiceCost);
+            await setRuntimeValue(playerStats.name, 'shortRestHitDice', newHitDice, campaignName, true);
+        }
 
         await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName, true);
 
@@ -156,10 +195,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
          const targetInfo = await resolveTarget(campaignName, playerStats.name);
          const isSelf = !targetInfo?.target || targetInfo.target.name === playerStats.name;
 
-         if (isSelf && auto.healExpression) {
-             const expression = auto.healExpression || '';
-             const maximize = hasHealingMaximization(playerStats);
-             const rollResult = maximize ? rollExpressionMaximized(expression) : rollExpression(expression);
+          if (isSelf && auto.healExpression) {
+              const expression = auto.healExpression || '';
+              const maximize = hasHealingMaximization(playerStats);
+              const rerollOnes = hasRerollHealingOnes(playerStats);
+              const rollResult = maximize ? rollExpressionMaximized(expression) : rerollOnes ? rollExpression(expression, { rerollOnes: true }) : rollExpression(expression);
              if (!rollResult) return null;
 
              const bonusHeal = resolveHealingBonuses(playerStats, playerStats.proficiencyBonus || 0, playerStats.level || 1, slotLevel);

@@ -447,5 +447,150 @@ describe('saveModifierApplies with unknown conditions', () => {
       const effects = computeConditionEffects([], saveModifiers)
       expect(effects.reliableTalent).toBe(false)
     })
+
+    it('applies advantage to attack_rolls target', () => {
+      const saveModifiers = [{
+        source: 'Test Feature',
+        target: 'attack_rolls',
+        condition: '',
+        effect: 'advantage'
+      }]
+      const effects = computeConditionEffects([], saveModifiers)
+      expect(effects.attackAdvantageCount).toBe(1)
+    })
+
+    it('applies disadvantage to attack_rolls target', () => {
+      const saveModifiers = [{
+        source: 'Test Feature',
+        target: 'attack_rolls',
+        condition: '',
+        effect: 'disadvantage'
+      }]
+      const effects = computeConditionEffects([], saveModifiers)
+      expect(effects.attackDisadvantageCount).toBe(1)
+    })
+
+    it('applies advantage to attack_roll target (singular)', () => {
+      const saveModifiers = [{
+        source: 'Test Feature',
+        target: 'attack_roll',
+        condition: '',
+        effect: 'advantage'
+      }]
+      const effects = computeConditionEffects([], saveModifiers)
+      expect(effects.attackAdvantageCount).toBe(1)
+    })
+  })
+
+  describe('creature_grappled_by_you condition', () => {
+    it('returns false when combatContext is null', () => {
+      const saveModifiers = [{
+        source: 'Grappler',
+        target: 'attack_rolls',
+        condition: 'creature_grappled_by_you',
+        effect: 'advantage'
+      }]
+      const effects = computeConditionEffects([], saveModifiers, [], false, false, false, false, null)
+      expect(effects.attackAdvantageCount).toBe(0)
+    })
+
+    it('returns false when no activeCreatureName', () => {
+      const saveModifiers = [{
+        source: 'Grappler',
+        target: 'attack_rolls',
+        condition: 'creature_grappled_by_you',
+        effect: 'advantage'
+      }]
+      const combatContext = { creatures: [] }
+      const effects = computeConditionEffects([], saveModifiers, [], false, false, false, false, combatContext)
+      expect(effects.attackAdvantageCount).toBe(0)
+    })
+
+    it('returns false when attacker has no targetName', () => {
+      const saveModifiers = [{
+        source: 'Grappler',
+        target: 'attack_rolls',
+        condition: 'creature_grappled_by_you',
+        effect: 'advantage'
+      }]
+      const combatContext = {
+        activeCreatureName: 'Hero',
+        creatures: [{ name: 'Hero', targetName: null }]
+      }
+      const effects = computeConditionEffects([], saveModifiers, [], false, false, false, false, combatContext)
+      expect(effects.attackAdvantageCount).toBe(0)
+    })
+
+    it('returns advantage when target is grappled', () => {
+      const saveModifiers = [{
+        source: 'Grappler',
+        target: 'attack_rolls',
+        condition: 'creature_grappled_by_you',
+        effect: 'advantage'
+      }]
+      const combatContext = {
+        activeCreatureName: 'Hero',
+        creatures: [
+          { name: 'Hero', targetName: 'Orc' },
+          { name: 'Orc', conditions: [{ key: 'grappled', label: 'Grappled' }] }
+        ]
+      }
+      const effects = computeConditionEffects([], saveModifiers, [], false, false, false, false, combatContext)
+      expect(effects.attackAdvantageCount).toBe(1)
+    })
+
+    it('returns no advantage when target is not grappled', () => {
+      const saveModifiers = [{
+        source: 'Grappler',
+        target: 'attack_rolls',
+        condition: 'creature_grappled_by_you',
+        effect: 'advantage'
+      }]
+      const combatContext = {
+        activeCreatureName: 'Hero',
+        creatures: [
+          { name: 'Hero', targetName: 'Orc' },
+          { name: 'Orc', conditions: [{ key: 'frightened', label: 'Frightened' }] }
+        ]
+      }
+      const effects = computeConditionEffects([], saveModifiers, [], false, false, false, false, combatContext)
+      expect(effects.attackAdvantageCount).toBe(0)
+    })
+
+    it('works with string conditions array', () => {
+      const saveModifiers = [{
+        source: 'Grappler',
+        target: 'attack_rolls',
+        condition: 'creature_grappled_by_you',
+        effect: 'advantage'
+      }]
+      const combatContext = {
+        activeCreatureName: 'Hero',
+        creatures: [
+          { name: 'Hero', targetName: 'Orc' },
+          { name: 'Orc', conditions: ['grappled'] }
+        ]
+      }
+      const effects = computeConditionEffects([], saveModifiers, [], false, false, false, false, combatContext)
+      expect(effects.attackAdvantageCount).toBe(1)
+    })
+
+    it('uses attackerName fallback when activeCreatureName is absent', () => {
+      const saveModifiers = [{
+        source: 'Grappler',
+        target: 'attack_rolls',
+        condition: 'creature_grappled_by_you',
+        effect: 'advantage'
+      }]
+      const combatContext = {
+        attackerName: 'Hero',
+        creatures: [
+          { name: 'Hero', targetName: 'Orc' },
+          { name: 'Orc', conditions: [{ key: 'grappled', label: 'Grappled' }] }
+        ]
+      }
+      const effects = computeConditionEffects([], saveModifiers, [], false, false, false, false, combatContext)
+      expect(effects.attackAdvantageCount).toBe(1)
+    })
   })
 })

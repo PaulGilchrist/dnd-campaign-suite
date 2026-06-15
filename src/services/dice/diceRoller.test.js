@@ -112,4 +112,52 @@ describe('rollExpression', () => {
   it('returns null for invalid expression', () => {
     expect(rollExpression('xyz')).toBeNull();
   });
+
+  it('rerolls 1s when rerollOnes option is true', () => {
+    const originalRandom = Math.random;
+    let idx = 0;
+    const values = [0, 0, 0.5, 0.7];
+    Math.random = () => values[idx++] || 0.5;
+    try {
+      const result = rollExpression('2d6', { rerollOnes: true });
+      expect(result).not.toBeNull();
+      expect(result.rolls).toHaveLength(2);
+      expect(result.rolls[0]).toBeGreaterThanOrEqual(2);
+      expect(result.rolls[0]).toBeLessThanOrEqual(6);
+      expect(result.rolls[1]).toBeGreaterThanOrEqual(2);
+      expect(result.rolls[1]).toBeLessThanOrEqual(6);
+    } finally {
+      Math.random = originalRandom;
+    }
+  });
+
+  it('does not reroll 1s when rerollOnes option is false', () => {
+    const originalRandom = Math.random;
+    Math.random = () => 0.01;
+    try {
+      const result = rollExpression('1d20', { rerollOnes: false });
+      expect(result).not.toBeNull();
+      expect(result.rolls[0]).toBe(1);
+    } finally {
+      Math.random = originalRandom;
+    }
+  });
+
+  it('rerolls only 1s, not other values', () => {
+    const originalRandom = Math.random;
+    let idx = 0;
+    const values = [0.5, 0, 0.9];
+    Math.random = () => values[idx++] || 0.5;
+    try {
+      const result = rollExpression('3d6', { rerollOnes: true });
+      expect(result).not.toBeNull();
+      expect(result.rolls).toHaveLength(3);
+      expect(result.rolls[0]).toBe(4);
+      expect(result.rolls[1]).toBeGreaterThanOrEqual(2);
+      expect(result.rolls[1]).toBeLessThanOrEqual(6);
+      expect(result.rolls[2]).toBe(6);
+    } finally {
+      Math.random = originalRandom;
+    }
+  });
 });

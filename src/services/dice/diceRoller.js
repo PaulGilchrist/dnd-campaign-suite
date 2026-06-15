@@ -39,11 +39,15 @@ function parseExpression(formula) {
   };
 }
 
-function rollExpression(formula) {
+function rollExpression(formula, options = {}) {
   const parsed = parseExpression(formula);
   if (!parsed) return null;
   const { count, sides, modifier } = parsed;
   const { total, rolls } = rollDice(count, sides);
+  if (options.rerollOnes) {
+    const rerolledRolls = rolls.map(r => r === 1 ? Math.floor(Math.random() * sides) + 1 : r);
+    return { total: rerolledRolls.reduce((sum, r) => sum + r, 0) + modifier, rolls: rerolledRolls, modifier, formula };
+  }
   return { total: total + modifier, rolls, modifier, formula };
 }
 

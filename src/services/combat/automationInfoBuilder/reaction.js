@@ -38,6 +38,10 @@ export const reactionHandlers = {
                 }
             }
         }
+        let saveDc = auto.saveDc
+        if (auto.saveDcExpression && !saveDc) {
+            saveDc = evaluateAutoExpression(auto.saveDcExpression, playerStats)
+        }
         return {
             type: 'reaction_damage',
             name: feature.name,
@@ -47,12 +51,13 @@ export const reactionHandlers = {
             saveType: auto.saveType || null,
             saveDc: auto.saveDc === 'ability'
                 ? getSaveDc(playerStats, auto.saveAbility || 'WIS', prof)
-                : auto.saveDc || null,
+                : saveDc || null,
             saveAbility: auto.saveAbility || 'WIS',
             alsoInflicts: auto.alsoInflicts || null,
             resourceCost: auto.resourceCost || null,
             range: auto.range || '5_ft',
             casting_time: auto.casting_time || '1 reaction',
+            effect: auto.effect || null,
             hasAutomation: true
         }
     },
@@ -196,6 +201,37 @@ export const reactionHandlers = {
             saveBonus: 8 + chaBonus + prof,
             range: auto.range || '60 ft',
             casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
+    },
+
+    'lucky_point': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'lucky_point',
+            name: feature.name,
+            effect: auto.effect || 'advantage',
+            target: auto.target || 'd20',
+            cost: auto.cost || 1,
+            casting_time: auto.casting_time || 'reaction',
+            hasAutomation: true
+        }
+    },
+
+    'sentinel_guardian': (feature, playerStats) => {
+        const auto = feature.automation
+        const meleeAttacks = (playerStats.attacks || []).filter(
+            a => a.type === 'Action' && a.range === 'melee'
+        )
+        const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0]
+        return {
+            type: 'sentinel_guardian',
+            name: feature.name,
+            trigger: auto.trigger || 'creature_disengages_or_hits_other_within_5ft',
+            range: auto.range || '5_ft',
+            oaType: auto.oaType || 'any_attack_miss_or_disengage',
+            casting_time: auto.casting_time || '1 reaction',
+            attack: attack || null,
             hasAutomation: true
         }
     }

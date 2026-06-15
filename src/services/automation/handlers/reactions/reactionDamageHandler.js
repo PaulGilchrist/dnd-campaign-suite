@@ -7,6 +7,29 @@ import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/d
 import { evaluateAutoExpression } from '../../../combat/automationService.js';
 import { MELEE_REACH_FEET } from '../../../combat/baseCombatActions.js';
 
+const POLEARM_WEAPONS = ['Quarterstaff', 'Spear'];
+
+function hasPolearmWeapon(allEquipment, equippedWeapons) {
+    if (!allEquipment || !equippedWeapons) return false;
+    for (const equippedName of equippedWeapons) {
+        let baseName = equippedName;
+        if (equippedName && typeof equippedName === 'string' && equippedName.charAt(0) === '+') {
+            baseName = equippedName.substring(3);
+        }
+        const weapon = allEquipment.find(item => item.name === baseName);
+        if (!weapon) continue;
+        if (POLEARM_WEAPONS.some(pw => weapon.name === pw)) return true;
+        const props = weapon.properties || [];
+        if (props.includes('Heavy') && props.includes('Reach')) return true;
+    }
+    return false;
+}
+
+function getChosenResistanceTypes(playerName, campaignName) {
+    const stored = getRuntimeValue(playerName, '_Boon_Of_Energy_Resistance_chosenTypes', campaignName);
+    return Array.isArray(stored) ? stored : [];
+}
+
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
@@ -45,8 +68,38 @@ async function consumeResourceCost(auto, playerStats, campaignName, actionName) 
     return { ok: true };
 }
 
-export async function handle(action, playerStats, campaignName, _mapName) {
+export async function handle(action, playerStats, campaignName, mapName, allEquipment) {
     const auto = action.automation;
+
+    if (auto?.trigger === 'creature_enters_reach_while_holding_polearm') {
+        const hasWeapon = hasPolearmWeapon(allEquipment, playerStats.inventory?.equipped);
+        if (!hasWeapon) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name} requires you to be holding a Quarterstaff, Spear, or a weapon with the Heavy and Reach properties.`,
+                    automation: auto,
+                },
+            };
+        }
+    }
+
+    if (auto?.trigger === 'damage_taken_of_chosen_resistance_type') {
+        const chosenTypes = getChosenResistanceTypes(playerStats.name, campaignName);
+        if (!chosenTypes || chosenTypes.length === 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name} requires you to have chosen damage types for Energy Resistances.`,
+                    automation: auto,
+                },
+            };
+        }
+    }
 
     if (!auto.saveType) {
         const cs = await getCombatContext(campaignName);

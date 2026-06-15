@@ -26,6 +26,16 @@ function buildFormDataWithBuffs(prev, buffs) {
     }
   }
 
+  const allSkillProfs = (buffs.proficiencies || []).filter(p => p.name === 'all_skills' && p.type === 'skill');
+  if (allSkillProfs.length > 0) {
+    const existingSkills = new Set(prev.skillProficiencies || []);
+    const skillNames = ['Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception', 'History', 'Insight', 'Intimidation', 'Investigation', 'Medicine', 'Nature', 'Perception', 'Performance', 'Persuasion', 'Religion', 'Sleight of Hand', 'Stealth', 'Survival'];
+    const newSkills = skillNames.filter(s => !existingSkills.has(s));
+    if (newSkills.length > 0) {
+      next.skillProficiencies = [...(prev.skillProficiencies || []), ...newSkills];
+    }
+  }
+
   const existingActions = new Set(
     (prev.specialActions || []).map(a => (typeof a === 'string' ? a : a.name))
   );
@@ -41,6 +51,23 @@ function buildFormDataWithBuffs(prev, buffs) {
       existingActions.add(f.name);
     }
   });
+
+  const featProficiencies = (buffs.proficiencies || []).filter(
+    p => p.type === 'proficiency' && p.isChoice
+  );
+  if (featProficiencies.length > 0) {
+    const existingProfs = new Set(prev.proficiencies || []);
+    featProficiencies.forEach(fp => {
+      if (fp.choose && fp.from) {
+        const listName = fp.from[0];
+        const profName = `${fp.choose} from: ${listName}`;
+        if (!existingProfs.has(profName)) {
+          next.proficiencies = [...(prev.proficiencies || []), profName];
+          existingProfs.add(profName);
+        }
+      }
+    });
+  }
 
   return next;
 }

@@ -4,7 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
-import { getLastDamageEvent, getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastDamageEvent, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
 import { evaluateAutoExpression } from '../../../combat/automationService.js';
 
 const EVENT_STALENESS_MS = 60000;
@@ -228,10 +228,46 @@ async function applyImprovedWardingFlare(playerStats, defenderName, campaignName
     return amount;
 }
 
+function hasShield(playerStats) {
+    const equipped = playerStats.inventory?.equipped || [];
+    for (const itemName of equipped) {
+        if (!itemName || typeof itemName !== 'string') continue;
+        const { baseName } = parseMagicItemName(itemName);
+        const item = playerStats.equipment?.find(e => e.name === baseName);
+        if (item) {
+            if (item.equipment_category === 'Shield') return true;
+        }
+    }
+    return false;
+}
+
+function parseMagicItemName(itemName) {
+    if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
+        const magicBonus = Number(itemName.charAt(1));
+        return {
+            baseName: itemName.substring(3),
+            magicBonus: isNaN(magicBonus) ? 0 : magicBonus,
+        };
+    }
+    return { baseName: itemName, magicBonus: 0 };
+}
+
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
     const featureName = action.name || 'Feature';
+
+    if (auto.requiresShield && !hasShield(playerStats)) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName}: You must be holding a Shield to use this Reaction.`,
+                automation: auto,
+            },
+        };
+    }
 
     const usesKey = getRuntimeUsesKey(featureName);
     const usesMax = auto.uses_expression
@@ -312,6 +348,29 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const effect = auto.effect || '';
     let result;
 
+    if (effect === 'disadvantage_on_attacks_vs_ally') {
+        const defenderName = targetInfo.target.name;
+        const duration = auto.duration || 'until_start_of_next_turn';
+
+        await setRuntimeValue(defenderName, 'protectionBuff', {
+            source: playerName,
+            duration: duration,
+            timestamp: Date.now(),
+        }, campaignName);
+
+        const description = `<b>${action.name}</b><br/>You interpose your Shield. ${attackerName} and all other creatures have Disadvantage on attack rolls against ${defenderName} until the start of your next turn.`;
+
+        result = {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description,
+                automation: auto,
+            },
+        };
+    }
+
     if (effect === 'disadvantage_on_attack_roll') {
         const attackEvent = getLastAttackRoll(attackerName);
         if (!attackEvent || isStale(attackEvent)) {
@@ -363,6 +422,18 @@ export async function handle(action, playerStats, campaignName, mapName) {
     if (effectiveUsesMax > 0) {
         const currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? effectiveUsesMax);
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
+    }
+
+    if (effect === 'disadvantage_on_attacks_vs_ally') {
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: `${playerName} used ${featureName} to impose Disadvantage on attacks against ${targetInfo.target.name}.`,
+            targetName: targetInfo.target.name,
+            timestamp: Date.now(),
+        }).catch(() => {});
+        return result;
     }
 
     if (effect === 'disadvantage_on_attack_roll' && result?.defenderName) {

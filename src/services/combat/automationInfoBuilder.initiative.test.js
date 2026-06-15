@@ -97,11 +97,15 @@ describe('buildAttackInfo – passive_buff', () => {
             condition: '',
             conditionImmunity: '',
             resistances: [],
+            resistanceType: [],
+            validTypes: [],
             options: [],
             extraMastery: [],
             replaceMastery: [],
             grantsFlySpeed: false,
             grantsSwimSpeed: false,
+            amount: 0,
+            alsoSelfHealing: null,
             hasAutomation: true,
         })
     })

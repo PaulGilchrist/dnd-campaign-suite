@@ -349,7 +349,7 @@ describe('CharActions click handlers', () => {
       await act(async () => { render(<CharActions playerStats={stats} />); });
       const actionName = screen.getByText(/War Priest:/);
       await act(async () => { fireEvent.click(actionName); });
-      expect(executeHandler).toHaveBeenCalledWith(stats.actions[0], expect.anything(), undefined, undefined);
+      expect(executeHandler).toHaveBeenCalledWith(stats.actions[0], expect.anything(), undefined, undefined, stats.equipment);
     });
 
     it('should not call executeHandler when cannotAct is true', async () => {

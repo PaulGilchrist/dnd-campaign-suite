@@ -254,3 +254,26 @@ describe('processFeatureAutomation', () => {
     expect(allActions).toHaveLength(1) // should NOT add a duplicate
   })
 })
+
+// ── great_weapon_fighting automation ──────────────────────────────
+
+describe('collectAutomationFromFeatures – great_weapon_fighting', () => {
+  let playerStats
+
+  beforeEach(() => {
+    playerStats = makePlayerStats()
+  })
+
+  it('collects great_weapon_fighting passive from features', () => {
+    const features = [
+      makeFeature({ type: 'great_weapon_fighting' }, 'Great Weapon Fighting'),
+    ]
+
+    const result = collectAutomationFromFeatures(features, playerStats)
+
+    expect(result.passives).toHaveLength(1)
+    expect(result.passives[0].type).toBe('passive_rule')
+    expect(result.passives[0].effect).toBe('great_weapon_fighting')
+    expect(result.passives[0].name).toBe('Great Weapon Fighting')
+  })
+})

@@ -151,6 +151,12 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
           }
         }
       }
+      if (passive.type === 'passive_buff' && passive.effect === 'speed_increase' && passive.bonusExpression) {
+        const bonus = parseInt(passive.bonusExpression, 10);
+        if (!isNaN(bonus)) {
+          buffSpeedBonus += bonus;
+        }
+      }
     }
 
     speed = Math.max(0, speed - (5 * exhaustionLevel));

@@ -60,6 +60,7 @@ describe('buildAttackInfo – self_healing', () => {
             usesMax: 1,
             recharge: 'short_rest',
             bloodiedOnly: false,
+            hitDiceCost: 0,
             hasAutomation: true,
         })
     })

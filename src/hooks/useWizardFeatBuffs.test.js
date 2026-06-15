@@ -70,6 +70,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
         resistances: ['Fire'],
         features: [{ name: 'Extra Reach', description: '+5ft reach', type: 'passive' }],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -87,6 +88,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       renderHook(() =>
@@ -103,6 +105,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       const { rerender } = renderHook(
@@ -125,6 +128,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       const { rerender } = renderHook(
@@ -145,6 +149,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       const { rerender } = renderHook(
@@ -172,6 +177,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       const { rerender } = renderHook(
@@ -198,6 +204,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       const { rerender } = renderHook(
@@ -221,6 +228,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
         resistances: [],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -245,6 +253,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [{ name: 'any', amount: 1 }],
         resistances: [],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -270,6 +279,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: ['Fire', 'Cold'],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -401,6 +411,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
         resistances: [],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -422,6 +433,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: ['Fire'],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -466,6 +478,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       renderHook(() =>
@@ -495,6 +508,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       renderHook(() =>
@@ -518,6 +532,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       const { result } = renderHook(() =>
@@ -528,6 +543,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
     });
 
@@ -537,6 +553,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [{ name: 'strength', amount: 2 }],
         resistances: [],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -559,6 +576,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: ['Fire'],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -584,6 +602,7 @@ describe('useWizardFeatBuffs', () => {
         ],
         resistances: [],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -606,6 +625,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: ['Fire'],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -657,6 +677,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [{ name: 'Dexterity', amount: 2 }],
         resistances: [],
         features: [],
+        proficiencies: [],
       };
       computeAllFeatBuffs.mockReturnValue(mockBuffs);
 
@@ -686,6 +707,7 @@ describe('useWizardFeatBuffs', () => {
         abilityScoreIncreases: [],
         resistances: [],
         features: [],
+        proficiencies: [],
       });
 
       const { rerender } = renderHook(

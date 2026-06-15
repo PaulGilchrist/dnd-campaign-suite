@@ -16,7 +16,7 @@ import { getSpellAbilities as getSpellAbilities2024 } from './core/spellCalc2024
 import { getAttacks as getAttacks5e } from './core/attackCalc.js';
 import { getAttacks as getAttacks2024 } from './core/attackCalc2024.js';
 import { getSpellMaxLevel } from '../shared/spell-utils.js';
-import { loadFeatData } from '../ui/dataLoader.js';
+import { loadFeatData, loadSkills } from '../ui/dataLoader.js';
 import { computeAllFeatBuffs } from '../character/featBuffService.js';
 import {
     collectAutomationFromFeatures,
@@ -97,6 +97,25 @@ function applyUmbralSightDarkvision(playerStats, senses) {
 }
 
 /**
+ * Apply Truesight from passive_buff automation (e.g., Boon of Truesight feat).
+ * Adds Truesense with the specified range to player senses.
+ */
+function applyTruesightSenses(playerStats, senses) {
+    const passives = playerStats.automation?.passives || [];
+    const truesightPassive = passives.find(p => p.type === 'passive_buff' && p.effect === 'truesight');
+    if (!truesightPassive) return senses;
+
+    const rangeMatch = String(truesightPassive.range || '').match(/(\d+)\s*ft/i);
+    const range = rangeMatch ? `${rangeMatch[1]} ft.` : '60 ft.';
+
+    if (!senses.some(s => s.name === 'Truesight')) {
+        senses.push({ name: 'Truesight', value: range });
+    }
+
+    return senses;
+}
+
+/**
  * Apply Elfish Lineage Wood Elf speed bonus.
  * Adds 5 ft. to base speed when Wood Elf lineage is selected.
  */
@@ -104,6 +123,24 @@ function applyElfisLineageSpeed(playerStats, playerSummary) {
     const lineage = getElfisLineageSelection(playerStats, playerSummary?.campaignName);
     if (lineage === 'Wood Elf' && playerStats.speed != null) {
         return playerStats.speed + 5;
+    }
+    return playerStats.speed;
+}
+
+/**
+ * Apply speed increase bonuses from passive_buff features (e.g., Boon of Speed, Speedy feat).
+ */
+function applySpeedIncreasePassives(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    let bonus = 0;
+    for (const passive of passives) {
+        if (passive.type === 'passive_buff' && passive.effect === 'speed_increase' && passive.bonusExpression) {
+            const parsed = parseInt(passive.bonusExpression, 10);
+            if (!isNaN(parsed)) bonus += parsed;
+        }
+    }
+    if (bonus > 0 && playerStats.speed != null) {
+        return playerStats.speed + bonus;
     }
     return playerStats.speed;
 }
@@ -428,16 +465,59 @@ const rules = {
                       contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Charisma Bonus (${charisma.bonus})`];
                    }
                }
-               if (playerStats.class.name === 'Barbarian' && !armorName) {
-                  const barbarianAc = 10 + dexterity.bonus + constitution.bonus;
-                  if (barbarianAc > armorClass) {
-                      armorClass = barbarianAc;
-                      contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Constitution Bonus (${constitution.bonus})`];
-                   }
-               }
-           }
+                if (playerStats.class.name === 'Barbarian' && !armorName) {
+                   const barbarianAc = 10 + dexterity.bonus + constitution.bonus;
+                   if (barbarianAc > armorClass) {
+                       armorClass = barbarianAc;
+                       contributions = [`Unarmored AC (10) + Dexterity Bonus (${dexterity.bonus}) + Constitution Bonus (${constitution.bonus})`];
+                    }
+                }
+            }
 
-        return [armorClass, contributions.join(' + ')];
+          // 2024: Apply ac_bonus from passive_buff automation (e.g., Defense feat)
+          if (is2024(playerStats, playerSummary)) {
+              const passives = playerStats.automation?.passives || [];
+              for (const passive of passives) {
+                  if (passive.type === 'passive_buff' && passive.effect === 'ac_bonus' && passive.bonus) {
+                      const bonus = typeof passive.bonus === 'number' ? passive.bonus : parseInt(passive.bonus, 10);
+                      if (!isNaN(bonus) && bonus > 0) {
+                          const condition = passive.condition || '';
+                          if (condition === 'wearing_light_medium_or_heavy_armor') {
+                              if (armorName) {
+                                  const armor = allEquipment.find(item => item.name === parseMagicItemName(armorName).baseName);
+                                  if (armor && ['Light', 'Medium', 'Heavy'].includes(armor.armor_category)) {
+                                      armorClass += bonus;
+                                      contributions.push(`${passive.name || 'Defense'} (+${bonus})`);
+                                  }
+                              }
+                          } else if (!condition) {
+                              armorClass += bonus;
+                              contributions.push(`${passive.name || 'Passive Buff'} (+${bonus})`);
+                          }
+                      }
+                  }
+              }
+
+              // 2024: Medium Armor Master – increase medium armor dex bonus cap from 2 to 3 when Dex >= 16
+              const mediumArmorMasterPassive = passives.find(p => p.type === 'passive_buff' && p.effect === 'medium_armor_dex_bonus_increase');
+              if (mediumArmorMasterPassive && armorName) {
+                  const armor = allEquipment.find(item => item.name === parseMagicItemName(armorName).baseName);
+                  if (armor && armor.armor_category === 'Medium' && dexterity.totalScore >= 16) {
+                      const dexMod = dexterity.bonus;
+                      const currentMaxBonus = armor.armor_class.max_bonus != null ? armor.armor_class.max_bonus : 99;
+                      const bonusToAdd = parseInt(mediumArmorMasterPassive.bonusExpression || mediumArmorMasterPassive.bonus || '1', 10);
+                      const newMaxBonus = currentMaxBonus + bonusToAdd;
+                      const actualBonus = Math.min(dexMod, newMaxBonus);
+                      const originalBonus = Math.min(dexMod, currentMaxBonus);
+                      if (actualBonus > originalBonus) {
+                          armorClass += (actualBonus - originalBonus);
+                          contributions.push(`Medium Armor Master (+${actualBonus - originalBonus})`);
+                      }
+                  }
+              }
+          }
+
+          return [armorClass, contributions.join(' + ')];
      },
 
      // === SHARED: getLanguages (handles both rulesets internally) ===
@@ -588,10 +668,116 @@ const rules = {
             }
         });
 
+        // Apply all_skills proficiency feat buffs to skillProficiencies
+        const allSkillProfs = featBuffs.proficiencies.filter(p => p.name === 'all_skills' && p.type === 'skill');
+        if (allSkillProfs.length > 0) {
+            const skills = await loadSkills();
+            const allSkillNames = skills.map(s => s.name);
+            playerStats.skillProficiencies = [...new Set([...playerStats.skillProficiencies, ...allSkillNames])];
+        }
+
+        // Apply proficiency choice feat buffs (e.g., Crafter's 3 Artisan's Tools)
+        const featProficiencyChoices = featBuffs.proficiencies.filter(p => p.type === 'proficiency' && p.isChoice);
+        if (featProficiencyChoices.length > 0) {
+            const existingProfs = new Set(playerStats.proficiencies || []);
+            featProficiencyChoices.forEach(fp => {
+                if (fp.choose && fp.from) {
+                    const listName = fp.from[0];
+                    const profName = `${fp.choose} from: ${listName}`;
+                    if (!existingProfs.has(profName)) {
+                        playerStats.proficiencies = [...(playerStats.proficiencies || []), profName];
+                        existingProfs.add(profName);
+                    }
+                }
+            });
+        }
+
+        // Apply expertise feat buffs (e.g., Keen Mind Lore Knowledge, Observant's Keen Observer)
+        // When a player has a proficiency choice from a feat that grants expertise,
+        // mark any selected skill from that choice list as expertise
+        if (is2024(playerStats, playerSummary)) {
+            const expertiseSkills = new Set(playerStats.expertise || []);
+            featProficiencyChoices.forEach(fp => {
+                if (!fp.grantsExpertise) return;
+                if (fp.from) {
+                    const listName = fp.from[0];
+                    const profName = `${fp.choose} from: ${listName}`;
+                    const existingProfIdx = (playerStats.proficiencies || []).indexOf(profName);
+                    if (existingProfIdx !== -1) {
+                        const chosenSkills = (playerStats.proficiencies || []).filter(s => {
+                            if (typeof s !== 'string') return false;
+                            const match = s.match(/^(\d+) from: (.+)$/);
+                            if (!match) return false;
+                            return match[2] === listName;
+                        });
+                        chosenSkills.forEach(chosenSkill => {
+                            const skillMatch = chosenSkill.match(/^\d+ from: (.+)$/);
+                            if (skillMatch) {
+                                const skillName = skillMatch[1].trim();
+                                if (!expertiseSkills.has(skillName)) {
+                                    expertiseSkills.add(skillName);
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+            playerStats.expertise = Array.from(expertiseSkills);
+        }
+
+        // Apply non-choice, non-skill proficiency feat buffs (e.g., Heavily Armored → Heavy Armor)
+        const featNonChoiceProfs = featBuffs.proficiencies.filter(p => p.type === 'proficiency' && !p.isChoice);
+        if (featNonChoiceProfs.length > 0) {
+            const existingProfs = new Set(playerStats.proficiencies || []);
+            featNonChoiceProfs.forEach(fp => {
+                if (fp.name && !existingProfs.has(fp.name)) {
+                    playerStats.proficiencies = [...(playerStats.proficiencies || []), fp.name];
+                    existingProfs.add(fp.name);
+                }
+            });
+        }
+
+        // Merge feat features (passive_buffs, etc.) into specialActions for automation pipeline
+        const featFeatures = featBuffs.features || [];
+        if (featFeatures.length > 0) {
+            const existingActionNames = new Set(
+                [
+                    ...(playerStats.specialActions || []),
+                    ...(playerStats.actions || []),
+                    ...(playerStats.bonusActions || []),
+                    ...(playerStats.reactions || []),
+                ].map(a => (typeof a === 'string' ? a : a.name))
+            );
+            for (const featFeature of featFeatures) {
+                if (featFeature.name && !existingActionNames.has(featFeature.name)) {
+                    if (!playerStats.specialActions) playerStats.specialActions = [];
+                    playerStats.specialActions.push({
+                        name: featFeature.name,
+                        description: featFeature.description || '',
+                        type: featFeature.type || 'passive',
+                        source: 'feat',
+                        automation: featFeature.automation,
+                    });
+                    existingActionNames.add(featFeature.name);
+                    if (featFeature.isBonusAction) {
+                        if (!playerStats.bonusActions) playerStats.bonusActions = [];
+                        playerStats.bonusActions.push({
+                            name: featFeature.name,
+                            description: featFeature.description || '',
+                            type: featFeature.type || 'passive',
+                            source: 'feat',
+                            automation: featFeature.automation,
+                        });
+                    }
+                }
+            }
+        }
+
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
         playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
         playerStats.carryingCapacity = rules.getCarryingCapacity(playerStats);
         playerStats.speed = applyElfisLineageSpeed(playerStats, playerSummary);
+        playerStats.speed = applySpeedIncreasePassives(playerStats);
         const dexAbility = playerStats.abilities.find((ability) => ability.name === 'Dexterity');
         playerStats.initiative = dexAbility.bonus;
         // Add Dread Ambush initiative bonus (WIS modifier) for Gloom Stalkers
@@ -657,18 +843,22 @@ const rules = {
 
           // 2024-specific: senses set later (override), 5e-specific: immunities/resistances
           if (is2024(playerStats, playerSummary)) {
-              playerStats.senses = rr.getSenses(playerStats);
-              // Apply Umbral Sight darkvision enhancement for Gloom Stalkers
-              playerStats.senses = applyUmbralSightDarkvision(playerStats, playerStats.senses);
-              // Apply The Third Eye darkvision enhancement from active buffs
-              playerStats.senses = applyThirdEyeDarkvision(playerStats, playerStats.senses, playerSummary.campaignName);
-           } else {
-              playerStats.immunities = rr.getImmunities(playerSummary);
-              playerStats.resistances = rr.getResistances(playerSummary);
-              playerStats.senses = rr.getSenses(playerStats);
-              // Apply The Third Eye darkvision enhancement from active buffs (5e)
-              playerStats.senses = applyThirdEyeDarkvision(playerStats, playerStats.senses, playerSummary.campaignName);
-           }
+               playerStats.senses = rr.getSenses(playerStats);
+               // Apply Umbral Sight darkvision enhancement for Gloom Stalkers
+               playerStats.senses = applyUmbralSightDarkvision(playerStats, playerStats.senses);
+               // Apply The Third Eye darkvision enhancement from active buffs
+               playerStats.senses = applyThirdEyeDarkvision(playerStats, playerStats.senses, playerSummary.campaignName);
+               // Apply Truesight from passive_buff automation (e.g., Boon of Truesight)
+               playerStats.senses = applyTruesightSenses(playerStats, playerStats.senses);
+            } else {
+               playerStats.immunities = rr.getImmunities(playerSummary);
+               playerStats.resistances = rr.getResistances(playerSummary);
+               playerStats.senses = rr.getSenses(playerStats);
+               // Apply The Third Eye darkvision enhancement from active buffs (5e)
+               playerStats.senses = applyThirdEyeDarkvision(playerStats, playerStats.senses, playerSummary.campaignName);
+               // Apply Truesight from passive_buff automation (e.g., Boon of Truesight)
+               playerStats.senses = applyTruesightSenses(playerStats, playerStats.senses);
+            }
 
         return playerStats;
      }

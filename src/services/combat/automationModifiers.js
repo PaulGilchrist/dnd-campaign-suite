@@ -127,6 +127,16 @@ export function collectSaveModifiers(features) {
                     effect: 'stroke_of_luck',
                 })
             }
+            if (auto.type === 'modify_d20_roll') {
+                modifiers.push({
+                    source: feature.name,
+                    target: auto.target || 'd20',
+                    condition: '',
+                    effect: 'modify_d20_roll',
+                    diceExpression: auto.modifier || '2d4',
+                    canBeBonusOrPenalty: !!auto.canBeBonusOrPenalty,
+                })
+            }
             if (auto.type === 'use_magic_device') {
                 modifiers.push({
                     source: feature.name,
@@ -300,6 +310,15 @@ export function collectSaveModifiers(features) {
                     target: 'spell_component',
                     condition: '',
                     effect: 'illusory_reality',
+                })
+            }
+            if (auto.type === 'passive_rule' && auto.effect === 'concentration_disadvantage_on_damage_dealt') {
+                modifiers.push({
+                    source: feature.name,
+                    target: 'saving_throw',
+                    condition: 'concentration_breaker',
+                    effect: 'disadvantage',
+                    abilities: ['CON'],
                 })
             }
             if (auto.type === 'holy_aura') {

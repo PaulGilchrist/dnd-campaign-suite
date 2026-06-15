@@ -253,6 +253,14 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'healing_pool':
             case 'self_healing':
             case 'damage_bonus':
+                if (info.trigger && (info.trigger.includes('_crit') || info.trigger.includes('_critical'))) {
+                    result.passives.push(info)
+                } else if (info.action === 'bonus_action') {
+                    result.bonusActions.push(info)
+                } else {
+                    result.actions.push(info)
+                }
+                break
             case 'extra_action':
             case 'heroes_feast':
             case 'buff_ally':
@@ -316,7 +324,8 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'attack_rider':
                 // attack_rider with options (chooseOne) is a passive that triggers on hit
                 // attack_rider with oncePerTurn and passive casting_time is also a passive
-                if (info.chooseOne || info.maxEffects > 1 || (info.oncePerTurn && info.casting_time === 'passive')) {
+                // attack_rider with trigger-based auto-activation (piercing_damage_hit, etc.) is a passive
+                if (info.chooseOne || info.maxEffects > 1 || (info.oncePerTurn && info.casting_time === 'passive') || info.trigger) {
                     result.passives.push(info)
                 } else {
                     // Single-option attack_rider is an action
@@ -331,12 +340,17 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'psionic_sorcery':
             case 'psionic_spells_list':
             case 'psychic_spells':
-            case 'auto_effect': {
+            case 'auto_effect':
+            case 'healing_bonus': {
                 if (auto.effect === 'psychic_teleportation') {
                     result.bonusActions.push(info)
                 } else {
                     result.passives.push(info)
                 }
+                break
+            }
+            case 'survive_and_heal': {
+                result.passives.push(info)
                 break
             }
             case 'resource_restoration':
@@ -443,6 +457,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'glorious_defense':
             case 'relentless_avenger':
             case 'soul_of_vengeance':
+            case 'sentinel_guardian':
                 result.reactions.push(info)
                 break
             case 'living_legend':
@@ -597,6 +612,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'stroke_of_luck':
                 result.passives.push(info)
                 break
+            case 'lucky_point':
+                result.reactions.push(info)
+                break
+            case 'modify_d20_roll':
+                result.passives.push(info)
+                break
             case 'spell_thief':
                 result.reactions.push(info)
                 break
@@ -699,6 +720,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.reactions.push(info);
                 break;
             case 'spell_breaker':
+                result.passives.push(info);
+                break;
+            case 'magic_initiate':
+                result.passives.push(info);
+                break;
+            case 'sentinel':
                 result.passives.push(info);
                 break;
             case 'portent':

@@ -30,7 +30,7 @@ vi.mock('../../../ui/logService.js', () => ({
 
 // ── Imports (returned as mocked versions) ─────────────────────
 
-import { handle, grantTempHpOnRage } from './tempHpBuffHandler.js';
+import { handle, grantTempHpOnRage, craftBolsteringTreats } from './tempHpBuffHandler.js';
 import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
 import * as automationService from '../../../combat/automationService.js';
 import * as mapsService from '../../../maps/mapsService.js';
@@ -1013,5 +1013,531 @@ describe('grantTempHpOnRage', () => {
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
       'Grog', 'tempHp', 5, campaignName,
     );
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// handleBolsteringTreats — detects craftCount path
+// ────────────────────────────────────────────────────────────────
+
+describe('handle — Bolstering Treats detection', () => {
+  beforeEach(() => resetMocks());
+
+  it('delegates to Bolstering Treats when craftCount is present', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: 'proficiency_bonus',
+        action: 'bonus_action',
+      },
+    };
+    const ps = makePlayerStats({ proficiency: 2 });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'chefBolsteringTreats') return 2;
+      return null;
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Ate a bolstering treat');
+  });
+
+  it('does NOT delegate when craftCount is absent', async () => {
+    const action = makeAction({ tempHpExpression: '5' });
+    const ps = makePlayerStats();
+    automationService.evaluateAutoExpression.mockReturnValue(5);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Gained 5 temporary hit points');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// handleBolsteringTreats — no treats remaining
+// ────────────────────────────────────────────────────────────────
+
+describe('handleBolsteringTreats — no treats remaining', () => {
+  beforeEach(() => resetMocks());
+
+  it('returns popup when treat count is 0', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: 'proficiency_bonus',
+      },
+    };
+    const ps = makePlayerStats({ proficiency: 2 });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'chefBolsteringTreats') return 0;
+      return null;
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('No treats remaining');
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('returns popup when treat count is negative', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: 'proficiency_bonus',
+      },
+    };
+    const ps = makePlayerStats({ proficiency: 2 });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'chefBolsteringTreats') return -1;
+      return null;
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('No treats remaining');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// handleBolsteringTreats — successful treat consumption
+// ────────────────────────────────────────────────────────────────
+
+describe('handleBolsteringTreats — successful consumption', () => {
+  beforeEach(() => resetMocks());
+
+  it('decrements treat count and sets temp HP', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: 'proficiency_bonus',
+      },
+    };
+    const ps = makePlayerStats({ proficiency: 2 });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'chefBolsteringTreats') return 2;
+      return null;
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('2 temporary hit points');
+    expect(result.payload.description).toContain('1 treat');
+    const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
+    const treatCall = setCalls.find(c => c[1] === 'chefBolsteringTreats');
+    expect(treatCall).toBeDefined();
+    expect(treatCall[2]).toBe(1);
+    const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
+    expect(tempHpCall).toBeDefined();
+    expect(tempHpCall[2]).toBe(2);
+  });
+
+  it('uses proficiency_bonus for temp HP when tempHpExpression is "proficiency_bonus"', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: 'proficiency_bonus',
+      },
+    };
+    const ps = makePlayerStats({ proficiency: 3 });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'chefBolsteringTreats') return 3;
+      return null;
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.payload.description).toContain('3 temporary hit points');
+  });
+
+  it('uses evaluated expression when tempHpExpression is not "proficiency_bonus"', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: 'level + 5',
+      },
+    };
+    const ps = makePlayerStats({ level: 5, proficiency: 2 });
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    automationService.evaluateAutoExpression.mockReturnValue(10);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.payload.description).toContain('10 temporary hit points');
+  });
+
+  it('pluralizes "treats" correctly', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: 'proficiency_bonus',
+      },
+    };
+    const ps = makePlayerStats({ proficiency: 3 });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'chefBolsteringTreats') return 3;
+      return null;
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.payload.description).toContain('2 treats remaining');
+  });
+
+  it('returns popup when temp HP evaluates to non-number', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: 'invalid_expr',
+      },
+    };
+    const ps = makePlayerStats({ proficiency: 2 });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'chefBolsteringTreats') return 2;
+      return null;
+    });
+    automationService.evaluateAutoExpression.mockReturnValue('not-a-number');
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Could not calculate temp HP');
+  });
+
+  it('returns popup when temp HP evaluates to 0', async () => {
+    const action = {
+      name: 'Bolstering Treats',
+      automation: {
+        type: 'temp_hp_buff',
+        craftCount: 'proficiency_bonus',
+        tempHpExpression: '0',
+      },
+    };
+    const ps = makePlayerStats({ proficiency: 2 });
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'chefBolsteringTreats') return 2;
+      return null;
+    });
+    automationService.evaluateAutoExpression.mockReturnValue(0);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Could not calculate temp HP');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// craftBolsteringTreats — exported function
+// ────────────────────────────────────────────────────────────────
+
+describe('craftBolsteringTreats', () => {
+  beforeEach(() => resetMocks());
+
+  it('sets chefBolsteringTreats to proficiency_bonus', () => {
+    const ps = makePlayerStats({ proficiency: 2, name: 'Chef' });
+
+    craftBolsteringTreats(ps, campaignName);
+
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Chef', 'chefBolsteringTreats', 2, campaignName,
+    );
+  });
+
+  it('uses proficiency from playerStats', () => {
+    const ps = makePlayerStats({ proficiency: 6, name: 'TestChar' });
+
+    craftBolsteringTreats(ps, campaignName);
+
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'TestChar', 'chefBolsteringTreats', 6, campaignName,
+    );
+  });
+});
+
+// ────────────────────────────────────────────────────────────────
+// handleMultiTargetAllyTempHp — multi-target ally temp HP (Inspiring Leader)
+// ────────────────────────────────────────────────────────────────
+
+describe('handleMultiTargetAllyTempHp — basic evaluation', () => {
+  beforeEach(() => resetMocks());
+
+  it('delegates to multi-target when multiTargetAlly is true', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: 'level + 5',
+        range: '30 ft',
+        targets: 6,
+        includesSelf: true,
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats({ level: 5 });
+    automationService.evaluateAutoExpression.mockReturnValue(10);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('10 temporary hit points');
+    expect(result.payload.description).toContain('Bolstering Performance');
+  });
+
+  it('returns error popup when temp HP evaluates to non-number', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: 'invalid',
+        range: '30 ft',
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats();
+    automationService.evaluateAutoExpression.mockReturnValue('not-a-number');
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Could not calculate temp HP');
+  });
+
+  it('returns error popup when temp HP evaluates to 0', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: '0',
+        range: '30 ft',
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats();
+    automationService.evaluateAutoExpression.mockReturnValue(0);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Could not calculate temp HP');
+  });
+});
+
+describe('handleMultiTargetAllyTempHp — no map', () => {
+  beforeEach(() => resetMocks());
+
+  it('grants temp HP to self only when no map provided and includesSelf is true', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: 'level + 3',
+        range: '30 ft',
+        targets: 6,
+        includesSelf: true,
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats({ level: 5, name: 'Leader' });
+    automationService.evaluateAutoExpression.mockReturnValue(8);
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('8 temporary hit points');
+    expect(result.payload.description).toContain('1 creature');
+    expect(result.payload.description).toContain('Leader');
+    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Leader', 'tempHp', 8, campaignName,
+    );
+  });
+
+  it('returns error when includesSelf is false and no map', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: 'level + 3',
+        range: '30 ft',
+        targets: 6,
+        includesSelf: false,
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats({ level: 5, name: 'Leader' });
+    automationService.evaluateAutoExpression.mockReturnValue(8);
+
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Could not resolve allies without a map');
+  });
+});
+
+describe('handleMultiTargetAllyTempHp — with map and range', () => {
+  beforeEach(() => resetMocks());
+
+  it('resolves allies within range on map', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: 'level + 3',
+        range: '30 ft',
+        targets: 6,
+        includesSelf: true,
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats({ level: 5, name: 'Leader' });
+    automationService.evaluateAutoExpression.mockReturnValue(8);
+
+    const mapData = {
+      players: [
+        { name: 'Leader', gridX: 0, gridY: 0 },
+        { name: 'Ally1', gridX: 2, gridY: 0 },
+        { name: 'Ally2', gridX: 4, gridY: 0 },
+        { name: 'FarAlly', gridX: 50, gridY: 50 },
+      ],
+    };
+
+    rangeValidation.rangeToFeet.mockReturnValue(30);
+    mapsService.loadMapData.mockResolvedValue(mapData);
+    rangeValidation.getDistanceFeet
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce(20)
+      .mockReturnValueOnce(384);
+
+    const result = await handle(action, ps, campaignName, 'test-map');
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('3 creatures');
+    expect(result.payload.description).toContain('Leader, Ally1, Ally2');
+
+    const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
+    const tempHpTargets = setCalls.filter(c => c[1] === 'tempHp');
+    expect(tempHpTargets.length).toBe(3);
+  });
+
+  it('respects target limit', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: 'level + 3',
+        range: '30 ft',
+        targets: 2,
+        includesSelf: true,
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats({ level: 5, name: 'Leader' });
+    automationService.evaluateAutoExpression.mockReturnValue(8);
+
+    const mapData = {
+      players: [
+        { name: 'Leader', gridX: 0, gridY: 0 },
+        { name: 'Ally1', gridX: 2, gridY: 0 },
+        { name: 'Ally2', gridX: 4, gridY: 0 },
+      ],
+    };
+
+    rangeValidation.rangeToFeet.mockReturnValue(30);
+    mapsService.loadMapData.mockResolvedValue(mapData);
+    rangeValidation.getDistanceFeet
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce(20);
+
+    const result = await handle(action, ps, campaignName, 'test-map');
+
+    expect(result.payload.description).toContain('2 creatures');
+    const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
+    const tempHpTargets = setCalls.filter(c => c[1] === 'tempHp');
+    expect(tempHpTargets.length).toBe(2);
+  });
+
+  it('takes max of existing temp HP when setting', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: 'level + 3',
+        range: '30 ft',
+        targets: 6,
+        includesSelf: true,
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats({ level: 5, name: 'Leader' });
+    automationService.evaluateAutoExpression.mockReturnValue(8);
+
+    useRuntimeState.getRuntimeValue.mockImplementation((name, key, _campaign) => {
+      if (key === 'tempHp' && name === 'Ally1') return 15;
+      return 0;
+    });
+
+    const mapData = {
+      players: [
+        { name: 'Leader', gridX: 0, gridY: 0 },
+        { name: 'Ally1', gridX: 2, gridY: 0 },
+      ],
+    };
+
+    rangeValidation.rangeToFeet.mockReturnValue(30);
+    mapsService.loadMapData.mockResolvedValue(mapData);
+    rangeValidation.getDistanceFeet.mockReturnValue(10);
+
+    await handle(action, ps, campaignName, 'test-map');
+
+    const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
+    const tempHpCalls = setCalls.filter(c => c[1] === 'tempHp');
+    // Ally1 should get Math.max(15, 8) = 15, Leader should get 8
+    expect(tempHpCalls.length).toBe(2);
+    const ally1Call = tempHpCalls.find(c => c[0] === 'Ally1');
+    expect(ally1Call[2]).toBe(15);
+    const leaderCall = tempHpCalls.find(c => c[0] === 'Leader');
+    expect(leaderCall[2]).toBe(8);
+  });
+
+  it('does not enter map path when rangeToFeet returns null', async () => {
+    const action = {
+      name: 'Bolstering Performance',
+      automation: {
+        type: 'temp_hp_buff',
+        tempHpExpression: 'level + 3',
+        range: 'self',
+        includesSelf: true,
+        multiTargetAlly: true,
+      },
+    };
+    const ps = makePlayerStats({ level: 5, name: 'Leader' });
+    automationService.evaluateAutoExpression.mockReturnValue(8);
+    rangeValidation.rangeToFeet.mockReturnValue(null);
+
+    const result = await handle(action, ps, campaignName, 'test-map');
+
+    expect(mapsService.loadMapData).not.toHaveBeenCalled();
+    expect(result.payload.description).toContain('1 creature');
+    expect(result.payload.description).toContain('Leader');
   });
 });

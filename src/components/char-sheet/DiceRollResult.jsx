@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, isPotentCantrip }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -9,6 +9,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const [tacticalResult, setTacticalResult] = useState(null);
     const [strokeUsed, setStrokeUsed] = useState(false);
     const [strokeResult, setStrokeResult] = useState(null);
+    const [luckyAdvantageUsed, setLuckyAdvantageUsed] = useState(false);
+    const [luckyDisadvantageUsed, setLuckyDisadvantageUsed] = useState(false);
 
     const isD20 = type === 'd20';
 
@@ -137,11 +139,11 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               )}
 
             {showCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'} — damage dice doubled</div>}
-             {targetName && hit !== undefined && !isSaveDamageType && (
-                 <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
-                   {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (hit ? `✓ HIT (${displayTotal} vs AC ${targetAc ?? '—'})` : `✗ MISS (${displayTotal} vs AC ${targetAc ?? '—'})`)}
-                 </div>
-               )}
+              {targetName && hit !== undefined && !isSaveDamageType && (
+                  <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
+                    {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (hit ? `✓ HIT (${displayTotal} vs AC ${targetAc ?? '—'}${(gloriousDefenseBonus > 0 || defensiveDuelistBonus > 0) ? ` + ${Math.max(0, gloriousDefenseBonus) + Math.max(0, defensiveDuelistBonus)} reaction` : ''})` : `✗ MISS (${displayTotal} vs AC ${targetAc ?? '—'}${(gloriousDefenseBonus > 0 || defensiveDuelistBonus > 0) ? ` + ${Math.max(0, gloriousDefenseBonus) + Math.max(0, defensiveDuelistBonus)} reaction` : ''})`)}
+                  </div>
+                )}
 
              {targetName && gloriousDefenseBonus > 0 && onCounterAttack && !hit && !isAutoMiss && (
                  <div className="dice-roll-glorious-defense">
@@ -232,6 +234,22 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               <div className="dice-roll-reroll">
                 <button className="dice-roll-reroll-btn" onClick={() => { setStrokeResult({ roll: 20, total: 20 + bonus + modifier }); setStrokeUsed(true); if (onStrokeOfLuck) onStrokeOfLuck(); }} type="button">
                   <i className="fa-solid fa-star"></i> Stroke of Luck
+                </button>
+              </div>
+            )}
+
+            {luckyAdvantage && !luckyAdvantageUsed && isD20 && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={() => { setMode('advantage'); setLuckyAdvantageUsed(true); if (onLuckyAdvantage) onLuckyAdvantage(); }} type="button">
+                  <i className="fa-solid fa-eye"></i> Lucky: Advantage (1 LP)
+                </button>
+              </div>
+            )}
+
+            {luckyDisadvantage && !luckyDisadvantageUsed && isD20 && (
+              <div className="dice-roll-reroll">
+                <button className="dice-roll-reroll-btn" onClick={() => { setMode('disadvantage'); setLuckyDisadvantageUsed(true); if (onLuckyDisadvantage) onLuckyDisadvantage(); }} type="button">
+                  <i className="fa-solid fa-eye-slash"></i> Lucky: Disadvantage (1 LP)
                 </button>
               </div>
             )}

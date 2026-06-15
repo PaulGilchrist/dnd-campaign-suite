@@ -2,7 +2,7 @@ export const passiveHandlers = {
     'passive_buff': (feature, _playerStats) => {
         const auto = feature.automation
         return {
-            type: 'passive_buff',
+            type: auto.effect === 'max_hp_increase' ? 'passive_rule' : 'passive_buff',
             name: feature.name,
             target: auto.target || 'allies_in_range',
             range_expression: auto.range_expression || '10_ft',
@@ -16,6 +16,21 @@ export const passiveHandlers = {
             replaceMastery: auto.replaceMastery || [],
             grantsFlySpeed: !!auto.grantsFlySpeed,
             grantsSwimSpeed: !!auto.grantsSwimSpeed,
+            resistanceType: auto.resistanceType || [],
+            validTypes: auto.validTypes || [],
+            amount: auto.amount || 0,
+            alsoSelfHealing: auto.alsoSelfHealing || null,
+            hasAutomation: true
+        }
+    },
+
+    'ignore_resistance': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'ignore_resistance',
+            damageTypes: auto.damageTypes || [],
             hasAutomation: true
         }
     },
@@ -127,6 +142,17 @@ export const passiveHandlers = {
             type: 'empowered_evocation',
             name: feature.name,
             effect: 'empowered_evocation',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
+    'concentration_disadvantage_on_damage_dealt': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'concentration_disadvantage_on_damage_dealt',
             casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }

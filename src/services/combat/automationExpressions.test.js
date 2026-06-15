@@ -492,11 +492,46 @@ describe('evaluateAutoExpression', () => {
   it('handles case-insensitive class level replacements', () => {
     const stats = makePlayerStats()
     // '1CLERIC_LEVEL' → 'cleric_level' (case-insensitive) matches first → '15'
-    expect(evaluateAutoExpression('1CLERIC_LEVEL', stats)).toBe(15)
+    expect(resolveDiceExpression('1CLERIC_LEVEL', stats)).toBe('15')
     // '1CLERIC level' → 'cleric level' (case-insensitive) matches first → '15'
-    expect(evaluateAutoExpression('1CLERIC level', stats)).toBe(15)
+    expect(resolveDiceExpression('1CLERIC level', stats)).toBe('15')
     // '1DRUID_LEVEL' → 'druid_level' (case-insensitive) matches first → '15'
-    expect(evaluateAutoExpression('1DRUID_LEVEL', stats)).toBe(15)
+    expect(resolveDiceExpression('1DRUID_LEVEL', stats)).toBe('15')
+  })
+
+  it('replaces ally_hit_die with 4 for level 5', () => {
+    const stats = makePlayerStats({ level: 5 })
+    expect(resolveDiceExpression('ally_hit_die', stats, 1)).toBe('4')
+  })
+
+  it('replaces ally_hit_die with 6 for level 9', () => {
+    const stats = makePlayerStats({ level: 9 })
+    expect(resolveDiceExpression('ally_hit_die', stats, 1)).toBe('6')
+  })
+
+  it('replaces ally_hit_die with 8 for level 13', () => {
+    const stats = makePlayerStats({ level: 13 })
+    expect(resolveDiceExpression('ally_hit_die', stats, 1)).toBe('8')
+  })
+
+  it('replaces ally_hit_die with 10 for level 17', () => {
+    const stats = makePlayerStats({ level: 17 })
+    expect(resolveDiceExpression('ally_hit_die', stats, 1)).toBe('10')
+  })
+
+  it('replaces ally_hit_die with 12 for level 20', () => {
+    const stats = makePlayerStats({ level: 20 })
+    expect(resolveDiceExpression('ally_hit_die', stats, 1)).toBe('12')
+  })
+
+  it('replaces ally_hit_die with 4 for level 1 (below threshold)', () => {
+    const stats = makePlayerStats({ level: 1 })
+    expect(resolveDiceExpression('ally_hit_die', stats, 1)).toBe('4')
+  })
+
+  it('replaces ally_hit_die in combined expression', () => {
+    const stats = makePlayerStats({ level: 5 })
+    expect(resolveDiceExpression('ally_hit_die + proficiency_bonus', stats, 1)).toBe('4 + 4')
   })
 
   it('handles expressions with multiple _min_ patterns (only first matches)', () => {

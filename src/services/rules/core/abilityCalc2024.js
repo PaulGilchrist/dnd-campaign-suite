@@ -82,6 +82,13 @@ export function getHitPoints(playerStats) {
         hitPoints += playerStats.class.major.hit_point_bonus_per_level * playerStats.level;
      }
 
+    const passives = playerStats.automation?.passives || [];
+    for (const passive of passives) {
+        if (passive.type === 'passive_rule' && passive.effect === 'max_hp_increase' && passive.amount) {
+            hitPoints += passive.amount;
+        }
+    }
+
     return hitPoints;
 }
 

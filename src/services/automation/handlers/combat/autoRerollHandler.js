@@ -210,6 +210,75 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const playerName = playerStats.name;
 
     if (auto.target === 'saving_throw') {
+        if (auto.effect === 'override_fail_to_success' && auto.oncePer) {
+            const trackingKey = `_guardedMind_usedRest`;
+            const usedRest = getRuntimeValue(playerName, trackingKey, campaignName);
+            if (usedRest === 'rest') {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: `${action.name} can only be used once per Short or Long Rest.`,
+                        automation: auto,
+                    },
+                };
+            }
+
+            const saveEvent = getLastSaveRoll(playerName);
+            const saveFresh = saveEvent && !isStale(saveEvent);
+
+            if (!saveFresh) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: `No recent saving throw found for ${playerName}. This feature can only be used shortly after a saving throw.`,
+                        automation: auto,
+                    },
+                };
+            }
+
+            const { saveType } = saveEvent;
+            const validAbilities = ['Intelligence', 'Wisdom', 'Charisma'];
+            const abbr = saveType ? saveType.substring(0, 3).toUpperCase() : '';
+            const abilityAbbrMap = { INT: 'Intelligence', WIS: 'Wisdom', CHA: 'Charisma' };
+            const isValidSave = validAbilities.includes(saveType) || Object.keys(abilityAbbrMap).includes(abbr);
+
+            if (!isValidSave) {
+                return {
+                    type: 'popup',
+                    payload: {
+                        type: 'automation_info',
+                        name: action.name,
+                        description: `${action.name} only works on Intelligence, Wisdom, or Charisma saving throws.`,
+                        automation: auto,
+                    },
+                };
+            }
+
+            await setRuntimeValue(playerName, trackingKey, 'rest', campaignName);
+
+            const saveLabel = saveType ? saveType.toUpperCase() : 'Save';
+            const description = `<b>${action.name}</b><br/>` +
+                `${saveLabel}: d20(${saveEvent.d20}) + ${saveEvent.bonus} = ${saveEvent.d20 + saveEvent.bonus}` +
+                ` → <strong>SUCCESS (Guarded Mind)</strong>`;
+
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerName,
+                abilityName: action.name,
+                description: `${playerName} used ${action.name} to override a failed ${saveLabel} save.`,
+                timestamp: Date.now(),
+            }).catch(() => {});
+
+            return {
+                type: 'popup',
+                payload: { type: 'automation_info', name: action.name, description, automation: auto },
+            };
+        }
+
         const costError = await consumeResourceCost(auto, playerStats, campaignName);
         if (costError) return costError;
 

@@ -6,6 +6,7 @@ import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/saveP
 import { rollConcentrationSave } from '../../combat/concentrationRules.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
+import { getDamageReduction } from '../../combat/automationPassives.js';
 
 /**
  * Save the last damage event under the target's key so reaction features
@@ -84,7 +85,27 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
            }
        }
    }
-    const finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities, ignoreResistance);
+    let finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities, ignoreResistance);
+
+    // Apply damage reduction from features (e.g., Heavy Armor Master)
+    let damageReducedByFeature = 0;
+    if (isPlayer) {
+        const allEquipment = playerComputed?.equipment || playerStats?.equipment || [];
+        const equippedArmor = allEquipment.find(e => e.equipped);
+        const armorName = equippedArmor?.name;
+        let isWearingHeavyArmor = false;
+        if (armorName) {
+            const armor = allEquipment.find(e => e.name === armorName && e.equipped);
+            if (armor && ['Heavy', 'heavy'].includes(armor.armor_category)) {
+                isWearingHeavyArmor = true;
+            }
+        }
+        const reduction = getDamageReduction(playerComputed, damageTypes[0], isWearingHeavyArmor);
+        if (reduction !== null && reduction > 0) {
+            damageReducedByFeature = reduction;
+            finalDamage = Math.max(0, finalDamage - reduction);
+        }
+    }
 
     // Arcane Ward / Projected Ward: absorb damage before it hits HP
     let wardDamage = finalDamage;
@@ -309,12 +330,18 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
   let npcConcentrationBroken = false;
   let combatSummaryChanged = false;
-  if (creature.type === 'player') {
+    if (creature.type === 'player') {
     if (wasAlive && isNowUnconscious) {
       // Check for Undying Sentinel (Oath of Glory level 15)
       const undyingResult = checkUndyingSentinel(creature, playerComputed, campaignName);
       if (undyingResult.intercepted) {
         return undyingResult;
+      }
+
+      // Check for Boon of Recovery - Last Stand
+      const boonOfRecoveryResult = checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName);
+      if (boonOfRecoveryResult.intercepted) {
+        return boonOfRecoveryResult;
       }
 
       const promptId = utils.guid();
@@ -387,7 +414,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
   window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-  return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage };
+  return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage, damageReducedByFeature: damageReducedByFeature };
 }
 
 function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
@@ -485,6 +512,69 @@ function checkUndyingSentinel(creature, playerComputed, campaignName) {
         isHealing: true,
         isUnconscious: false,
         abilityName: 'Undying Sentinel',
+    });
+
+    window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+
+    return {
+        intercepted: true,
+        finalDamage: 0,
+        newHp,
+    };
+}
+
+function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
+    const allFeatures = playerComputed?.allFeatures || [];
+    let hasBoonOfRecovery = false;
+
+    for (const feature of allFeatures) {
+        if (feature?.name === 'Boon Of Recovery') {
+            hasBoonOfRecovery = true;
+            break;
+        }
+    }
+
+    if (!hasBoonOfRecovery) {
+        return { intercepted: false };
+    }
+
+    // Check if Last Stand has already been used this long rest
+    const lastStandUsed = getRuntimeValue(creature.name, 'boonOfRecoveryLastStandUsed', campaignName);
+    const lastRestTimestamp = getRuntimeValue(creature.name, 'boonOfRecoveryLastStandRestTimestamp', campaignName);
+    const now = Date.now();
+
+    if (lastStandUsed && (!lastRestTimestamp || now - lastRestTimestamp < 86400000)) {
+        return { intercepted: false };
+    }
+
+    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
+    const healAmount = Math.floor(maxHp / 2);
+    const newHp = Math.min(1 + healAmount, maxHp);
+
+    setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+    setRuntimeValue(creature.name, 'boonOfRecoveryLastStandUsed', true, campaignName);
+    setRuntimeValue(creature.name, 'boonOfRecoveryLastStandRestTimestamp', now, campaignName);
+
+    setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
+    setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
+
+    const conditions = getRuntimeValue(creature.name, 'activeConditions', campaignName) || [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
+    setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
+
+    if (creature.type === 'player') {
+        creature.currentHp = newHp;
+    }
+
+    postLogEntry(campaignName, {
+        type: 'heal',
+        targetName: creature.name,
+        delta: newHp,
+        currentHp: newHp,
+        maxHp,
+        isHealing: true,
+        isUnconscious: false,
+        abilityName: 'Boon Of Recovery - Last Stand',
     });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

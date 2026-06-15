@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeSt
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
+import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -58,6 +59,25 @@ export async function applyRiderOption(action, playerStats, campaignName, target
     const chosenOptions = names.map(name => options.find(o => o.name === name)).filter(Boolean);
     if (chosenOptions.length === 0) return null;
 
+    // Check oncePerTurn for Charger feat
+    if (auto.oncePerTurn) {
+        const currentRound = getCurrentCombatRound();
+        const usedKey = `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+        const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+        if (usedRound === currentRound) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name} can only be used once per turn.`,
+                    automation: auto,
+                },
+            };
+        }
+    }
+
     setRuntimeValue(playerStats.name, 'pendingRiderChoice', null, campaignName);
 
     // Validate prerequisites and size limits before applying
@@ -75,6 +95,13 @@ export async function applyRiderOption(action, playerStats, campaignName, target
                 },
             };
         }
+    }
+
+    // Mark oncePerTurn as used
+    if (auto.oncePerTurn) {
+        const currentRound = getCurrentCombatRound();
+        const usedKey = `_${action.name.replace(/\s+/g, '_')}_usedRound`;
+        await setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
     }
 
     // Calculate total cost for Cunning Strike (Sneak Attack dice to forgo)
@@ -140,6 +167,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         if (opt.noOpportunityAttacks) desc += ' — target cannot make Opportunity Attacks until the start of your next turn';
         if (opt.effect === 'next_attack_advantage') desc += ` — the next attack against ${targetName || 'target'} gains +${opt.value || '5'}`;
         if (opt.effect === 'push_15ft') desc += ' — target pushed 15 ft away';
+        if (opt.effect === 'push') desc += ` — target pushed ${opt.value || 10} ft away`;
         if (opt.effect === 'speed_reduction') desc += ' — target Speed reduced by 15 ft';
         if (opt.effect === 'sudden_strike') desc += ' — make another attack against a different creature within 5 ft';
         if (opt.effect === 'mass_fear') desc += ' — target and creatures within 10 ft make WIS save or be Frightened';
@@ -149,6 +177,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         if (opt.effect === 'unconscious') desc += ' — target has Unconscious condition (1 min, repeating CON save)';
         if (opt.effect === 'blinded') desc += ' — target has Blinded condition (until end of its next turn)';
         if (opt.effect === 'no_opportunity_attacks' && opt.movement) desc += ' — move up to half Speed without provoking Opportunity Attacks';
+        if (opt.effect === 'damage_bonus') desc += ` — ${opt.damageExpression || '1d6'} extra damage`;
         return desc;
     });
 
@@ -298,12 +327,16 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         desc += ' — target must make a Constitution save or be Unconscious for 1 minute (repeats save at end of each turn)';
     } else if (option.effect === 'blinded') {
         desc += ' — target must make a Dexterity save or be Blinded until end of its next turn';
+    } else if (option.effect === 'push') {
+        desc += ` — target pushed ${option.value || 10} ft away`;
     } else if (option.noOpportunityAttacks) {
         desc += ' — target cannot make Opportunity Attacks until the start of your next turn';
     } else if (option.effect === 'disadvantage_on_next_save') {
         desc += ' — target has Disadvantage on the next saving throw it makes';
     } else if (option.effect === 'next_attack_advantage') {
         desc += ` — the next attack against ${targetName} gains +${option.value || '5'}`;
+    } else if (option.effect === 'damage_bonus') {
+        desc += ` — ${option.damageExpression || '1d6'} extra damage`;
     }
 
     return {
@@ -351,6 +384,26 @@ function validateCunningStrikeOption(option, targetName, playerStats) {
             }
         }
         // If we can't determine size from combat context, allow it (default assumption: target is valid size)
+    }
+
+    // Check size limit for Charger push (one size larger than player)
+    if (option.sizeLimit === 'one_size_larger' && targetName) {
+        const playerSize = playerStats.size || 'Medium';
+        const combatContext = getCombatContextSync(targetName);
+        if (combatContext) {
+            const sizeOrder = ['Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
+            const playerSizeIndex = sizeOrder.indexOf(playerSize);
+            const targetSizeIndex = sizeOrder.indexOf(combatContext.size);
+            if (playerSizeIndex !== -1 && targetSizeIndex !== -1) {
+                const maxAllowedIndex = playerSizeIndex + 1;
+                if (targetSizeIndex > maxAllowedIndex) {
+                    return {
+                        valid: false,
+                        reason: `Target is ${combatContext.size} (too large for Charger push — only up to ${sizeOrder[maxAllowedIndex]} allowed when player is ${playerSize}).`,
+                    };
+                }
+            }
+        }
     }
 
     return { valid: true };

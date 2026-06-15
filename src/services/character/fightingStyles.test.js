@@ -5,7 +5,7 @@ describe('FIGHTING_STYLES', () => {
   it('exports Great Weapon Fighting style', () => {
     const style = FIGHTING_STYLES['Great Weapon Fighting']
     expect(style.name).toBe('Great Weapon Fighting')
-    expect(style.description).toContain('reroll')
+    expect(style.description).toContain('treat')
   })
 
   it('exports Protection style', () => {

@@ -102,6 +102,8 @@ describe('buildAttackInfo – damage_bonus', () => {
             maxDamage: '',
             extraVs: null,
             extraDamage: '',
+            extraDamageExpression: '',
+            extraDamageType: '',
             resourceType: 'spell_slot',
             oncePerTurn: false,
             options: [],
@@ -111,6 +113,7 @@ describe('buildAttackInfo – damage_bonus', () => {
             uses_expression: '',
             usesMax: 0,
             recharge: '',
+            abilityIncreased: '',
             hasAutomation: true,
         })
     })
@@ -213,6 +216,10 @@ describe('buildAttackInfo – damage_reduction', () => {
             redirectDamage: '',
             redirectSave: 'DEX',
             cost: null,
+            damageTypes: [],
+            condition: '',
+            effect: '',
+            requiresShield: false,
             hasAutomation: true,
         })
     })

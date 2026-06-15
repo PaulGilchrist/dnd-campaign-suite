@@ -326,6 +326,172 @@ describe('rules', () => {
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
       expect(ac).toBe(13); // 11 (leather) + 2 (dex), no Draconic bonus with armor
     });
+
+    it('should apply Defense feat ac_bonus when wearing light armor', () => {
+      const equipment = [
+        ...baseEquipment2024(),
+        { name: 'Leather', equipment_category: 'Armor', armor_category: 'Light', armor_class: { base: 11, dex_bonus: true, max_bonus: null } }
+      ];
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Fighter' },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: ['Leather'] },
+        automation: {
+          passives: [
+            { type: 'passive_buff', name: 'Defense', effect: 'ac_bonus', bonus: 1, condition: 'wearing_light_medium_or_heavy_armor' }
+          ]
+        }
+      };
+      const [ac, formula] = rules.getArmorClass(equipment, playerStats);
+      expect(ac).toBe(14); // 11 (leather) + 2 (dex) + 1 (Defense feat)
+      expect(formula).toContain('Defense (+1)');
+    });
+
+    it('should apply Defense feat ac_bonus when wearing medium armor', () => {
+      const equipment = [
+        ...baseEquipment2024(),
+        { name: 'Chain Mail', equipment_category: 'Armor', armor_category: 'Medium', armor_class: { base: 16, dex_bonus: false } }
+      ];
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Fighter' },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: ['Chain Mail'] },
+        automation: {
+          passives: [
+            { type: 'passive_buff', name: 'Defense', effect: 'ac_bonus', bonus: 1, condition: 'wearing_light_medium_or_heavy_armor' }
+          ]
+        }
+      };
+      const [ac] = rules.getArmorClass(equipment, playerStats);
+      expect(ac).toBe(17); // 16 (chain mail) + 1 (Defense feat)
+    });
+
+    it('should apply Defense feat ac_bonus when wearing heavy armor', () => {
+      const equipment = [
+        ...baseEquipment2024(),
+        { name: 'Plate', equipment_category: 'Armor', armor_category: 'Heavy', armor_class: { base: 18, dex_bonus: false } }
+      ];
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Fighter' },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: ['Plate'] },
+        automation: {
+          passives: [
+            { type: 'passive_buff', name: 'Defense', effect: 'ac_bonus', bonus: 1, condition: 'wearing_light_medium_or_heavy_armor' }
+          ]
+        }
+      };
+      const [ac] = rules.getArmorClass(equipment, playerStats);
+      expect(ac).toBe(19); // 18 (plate) + 1 (Defense feat)
+    });
+
+    it('should NOT apply Defense feat ac_bonus when unarmored', () => {
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Fighter' },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: [] },
+        automation: {
+          passives: [
+            { type: 'passive_buff', name: 'Defense', effect: 'ac_bonus', bonus: 1, condition: 'wearing_light_medium_or_heavy_armor' }
+          ]
+        }
+      };
+      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
+      expect(ac).toBe(12); // 10 (unarmored) + 2 (dex), no Defense bonus
+    });
+
+    it('should apply Medium Armor Master dex bonus increase when wearing medium armor and Dex >= 16', () => {
+      const equipment = [
+        ...baseEquipment2024(),
+        { name: 'Chain Shirt', equipment_category: 'Armor', armor_category: 'Medium', armor_class: { base: 13, dex_bonus: true, max_bonus: 2 } }
+      ];
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Dexterity', bonus: 3, totalScore: 16 },
+          { name: 'Constitution', bonus: 2 }
+        ],
+        inventory: { equipped: ['Chain Shirt'] },
+        automation: {
+          passives: [
+            { type: 'passive_buff', name: 'Medium Armor Master', effect: 'medium_armor_dex_bonus_increase', bonusExpression: '1' }
+          ]
+        }
+      };
+      const [ac, formula] = rules.getArmorClass(equipment, playerStats);
+      expect(ac).toBe(16); // 13 (chain shirt) + 3 (dex, increased from 2 to 3 by feat)
+      expect(formula).toContain('Medium Armor Master (+1)');
+    });
+
+    it('should NOT apply Medium Armor Master when Dex < 16', () => {
+      const equipment = [
+        ...baseEquipment2024(),
+        { name: 'Chain Shirt', equipment_category: 'Armor', armor_category: 'Medium', armor_class: { base: 13, dex_bonus: true, max_bonus: 2 } }
+      ];
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Fighter' },
+        abilities: [
+          { name: 'Dexterity', bonus: 2, totalScore: 14 },
+          { name: 'Constitution', bonus: 2 }
+        ],
+        inventory: { equipped: ['Chain Shirt'] },
+        automation: {
+          passives: [
+            { type: 'passive_buff', name: 'Medium Armor Master', effect: 'medium_armor_dex_bonus_increase', bonusExpression: '1' }
+          ]
+        }
+      };
+      const [ac] = rules.getArmorClass(equipment, playerStats);
+      expect(ac).toBe(15); // 13 (chain shirt) + 2 (dex, capped at 2, no Medium Armor Master bonus since dex mod already within cap)
+    });
+
+    it('should NOT apply Medium Armor Master when wearing light armor', () => {
+      const equipment = [
+        ...baseEquipment2024(),
+        { name: 'Studded Leather', equipment_category: 'Armor', armor_category: 'Light', armor_class: { base: 12, dex_bonus: true, max_bonus: null } }
+      ];
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Rogue' },
+        abilities: [
+          { name: 'Dexterity', bonus: 5, totalScore: 20 },
+          { name: 'Constitution', bonus: 2 }
+        ],
+        inventory: { equipped: ['Studded Leather'] },
+        automation: {
+          passives: [
+            { type: 'passive_buff', name: 'Medium Armor Master', effect: 'medium_armor_dex_bonus_increase', bonusExpression: '1' }
+          ]
+        }
+      };
+      const [ac] = rules.getArmorClass(equipment, playerStats);
+      expect(ac).toBe(17); // 12 (studded leather) + 5 (dex, no max cap for light armor)
+    });
+
+    it('should NOT apply Medium Armor Master when not wearing any armor', () => {
+      const playerStats = {
+        rules: '2024',
+        class: { name: 'Wizard' },
+        abilities: [
+          { name: 'Dexterity', bonus: 3, totalScore: 16 },
+          { name: 'Constitution', bonus: 2 }
+        ],
+        inventory: { equipped: [] },
+        automation: {
+          passives: [
+            { type: 'passive_buff', name: 'Medium Armor Master', effect: 'medium_armor_dex_bonus_increase', bonusExpression: '1' }
+          ]
+        }
+      };
+      const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
+      expect(ac).toBe(13); // 10 (unarmored) + 3 (dex), no medium armor master effect
+    });
   });
 
   describe('dispatch edge cases / Shield string variant in getArmorClass', () => {

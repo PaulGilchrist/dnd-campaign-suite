@@ -30,6 +30,8 @@ export const damageHandlers = {
             maxDamage: auto.maxDamage || '',
             extraVs: auto.extraVs || null,
             extraDamage: auto.extraDamage || '',
+            extraDamageExpression: auto.extraDamageExpression || '',
+            extraDamageType: auto.extraDamageType || '',
             resourceType: auto.resourceType || 'spell_slot',
             oncePerTurn: !!auto.oncePerTurn,
             options: auto.options || [],
@@ -39,6 +41,7 @@ export const damageHandlers = {
             uses_expression: auto.uses_expression || '',
             usesMax,
             recharge: auto.recharge || '',
+            abilityIncreased: auto.abilityIncreased || '',
             hasAutomation: true
         }
     },
@@ -74,6 +77,7 @@ export const damageHandlers = {
             damageTypes: auto.damageTypes || [],
             effect: auto.effect || '',
             casting_time: auto.casting_time || 'passive',
+            minDamage: !!auto.minDamage,
             hasAutomation: true
         }
     },
@@ -91,6 +95,10 @@ export const damageHandlers = {
             redirectDamage: auto.redirectDamage || '',
             redirectSave: auto.redirectSave || 'DEX',
             cost: auto.cost || null,
+            damageTypes: auto.damageTypes || [],
+            condition: auto.condition || '',
+            effect: auto.effect || '',
+            requiresShield: !!auto.requiresShield,
             hasAutomation: true
         }
     },
@@ -134,5 +142,35 @@ export const damageHandlers = {
             oncePerTurn: !!auto.oncePerTurn,
             hasAutomation: true
         }
+    },
+
+    'great_weapon_fighting': (feature, _playerStats) => {
+        return {
+            type: 'passive_rule',
+            effect: 'great_weapon_fighting',
+            name: feature.name,
+            hasAutomation: true
+        }
+    },
+
+    'reroll_damage_once_per_turn': (feature, _playerStats) => {
+        return {
+            type: 'passive_rule',
+            effect: 'reroll_damage_once_per_turn',
+            name: feature.name,
+            hasAutomation: true
+        }
+    },
+
+    'damage': (feature, _playerStats) => {
+        if (feature.type === 'damage' && feature.source === 'feat' && feature.automation?.type === 'great_weapon_fighting') {
+            return {
+                type: 'passive_rule',
+                effect: 'great_weapon_fighting',
+                name: feature.name,
+                hasAutomation: true
+            }
+        }
+        return null
     }
 }

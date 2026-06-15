@@ -130,4 +130,126 @@ describe('handle', () => {
 
     expect(result.payload.description).not.toContain('Trigger:');
   });
+
+  it('blocks when requiresShieldOrWeapon is true and no shield/weapon equipped', async () => {
+    const action = makeAction({
+      type: 'damage_reduction',
+      reductionExpression: '1d10 + proficiency_bonus',
+      trigger: 'creature_hits_ally_within_5ft',
+      reaction: true,
+      requiresShieldOrWeapon: true,
+      casting_time: '1 reaction',
+    });
+    const ps = makePlayerStats({
+      inventory: { equipped: [] },
+      equipment: [],
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.description).toContain('must be holding a Shield or a Simple or Martial weapon');
+    expect(automationService.evaluateAutoExpression).not.toHaveBeenCalled();
+  });
+
+  it('allows when requiresShieldOrWeapon is true and shield is equipped', async () => {
+    automationService.evaluateAutoExpression.mockReturnValue(12);
+    const action = makeAction({
+      type: 'damage_reduction',
+      reductionExpression: '1d10 + proficiency_bonus',
+      trigger: 'creature_hits_ally_within_5ft',
+      reaction: true,
+      requiresShieldOrWeapon: true,
+      casting_time: '1 reaction',
+    });
+    const ps = makePlayerStats({
+      inventory: { equipped: ['Shield'] },
+      equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Reduce damage by <strong>12</strong>');
+    expect(automationService.evaluateAutoExpression).toHaveBeenCalled();
+  });
+
+  it('allows when requiresShieldOrWeapon is true and martial weapon is equipped', async () => {
+    automationService.evaluateAutoExpression.mockReturnValue(12);
+    const action = makeAction({
+      type: 'damage_reduction',
+      reductionExpression: '1d10 + proficiency_bonus',
+      trigger: 'creature_hits_ally_within_5ft',
+      reaction: true,
+      requiresShieldOrWeapon: true,
+      casting_time: '1 reaction',
+    });
+    const ps = makePlayerStats({
+      inventory: { equipped: ['Longsword'] },
+      equipment: [{ name: 'Longsword', equipment_category: 'Weapon', weapon_range: 'Melee' }],
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Reduce damage by <strong>12</strong>');
+    expect(automationService.evaluateAutoExpression).toHaveBeenCalled();
+  });
+
+  it('allows when requiresShieldOrWeapon is true and simple weapon is equipped', async () => {
+    automationService.evaluateAutoExpression.mockReturnValue(12);
+    const action = makeAction({
+      type: 'damage_reduction',
+      reductionExpression: '1d10 + proficiency_bonus',
+      trigger: 'creature_hits_ally_within_5ft',
+      reaction: true,
+      requiresShieldOrWeapon: true,
+      casting_time: '1 reaction',
+    });
+    const ps = makePlayerStats({
+      inventory: { equipped: ['Dart'] },
+      equipment: [{ name: 'Dart', equipment_category: 'Weapon', weapon_range: 'Ranged' }],
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Reduce damage by <strong>12</strong>');
+  });
+
+  it('does not check shield/weapon when requiresShieldOrWeapon is false', async () => {
+    automationService.evaluateAutoExpression.mockReturnValue(15);
+    const action = makeAction({ requiresShieldOrWeapon: false });
+    const ps = makePlayerStats({
+      inventory: { equipped: [] },
+      equipment: [],
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Reduce damage by <strong>15</strong>');
+  });
+
+  it('handles magic shield (+1 Shield)', async () => {
+    automationService.evaluateAutoExpression.mockReturnValue(12);
+    const action = makeAction({
+      type: 'damage_reduction',
+      reductionExpression: '1d10 + proficiency_bonus',
+      trigger: 'creature_hits_ally_within_5ft',
+      reaction: true,
+      requiresShieldOrWeapon: true,
+      casting_time: '1 reaction',
+    });
+    const ps = makePlayerStats({
+      inventory: { equipped: ['+1 Shield'] },
+      equipment: [{ name: 'Shield', equipment_category: 'Shield' }],
+    });
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toContain('Reduce damage by <strong>12</strong>');
+  });
 });

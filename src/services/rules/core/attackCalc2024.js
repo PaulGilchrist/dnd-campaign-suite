@@ -55,7 +55,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         // Off-hand (2024: no ability bonus on off-hand damage, no Two-Weapon Fighting style)
         if (meleeWeaponNames.length > 1) {
             const offHandName = meleeWeaponNames[1];
-            const { baseName: offBaseName } = parseMagicItemName(offHandName);
+            const { baseName: offBaseName, magicBonus: offMagicBonus } = parseMagicItemName(offHandName);
             const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
             if (offHandWeapon) {
                 attacks.push(buildWeaponAttack({
@@ -68,6 +68,29 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                     weaponType: 'melee',
                     includeAbilityBonusInDamage: false,
                 }));
+
+                // Dual Wielder feat: extra bonus action attack beyond standard off-hand
+            const hasDualWielder = (playerStats.automation?.bonusActions || []).some(
+                a => a.type === 'bonus_attacks' && a.trigger === 'attack_action_with_light_weapon'
+            );
+            if (hasDualWielder) {
+                    const dmgFormula = `Damage Formula = ${offHandWeapon.damage.damage_dice}${offMagicBonus ? ` + Weapon Magic Bonus (${offMagicBonus})` : ''}`;
+                    const dmg = offMagicBonus ? `${offHandWeapon.damage.damage_dice}+${offMagicBonus}` : offHandWeapon.damage.damage_dice;
+                    attacks.push({
+                        name: 'Dual Wielder Extra Attack',
+                        attackType: 'melee',
+                        isRanged: false,
+                        range: '5_ft',
+                        toHit: bonus + proficiency,
+                        hitBonusFormula: `To Hit Bonus = ${abilityName} Modifier (${bonus}) + Proficiency (${proficiency})`,
+                        damageFormula: dmgFormula,
+                        damage: dmg,
+                        damageType: offHandWeapon.damage.damage_type,
+                        abilityName,
+                        actionType: 'Bonus Action',
+                        properties: ['Melee'],
+                    });
+                }
             }
         }
     }

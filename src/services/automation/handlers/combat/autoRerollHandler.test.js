@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './autoRerollHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/useMetamagic.js';
 import { automationInfoPopup } from '../../../shared/popupResponse.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
@@ -43,6 +43,12 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
     getCurrentCombatRound: vi.fn(() => 1),
 }));
 
+vi.mock('../../../../hooks/useMetamagic.js', () => ({
+    getLastAttackRoll: vi.fn(),
+    getLastAbilityCheck: vi.fn(),
+    getLastSaveRoll: vi.fn(),
+}));
+
 describe('autoRerollHandler.handle', () => {
     let playerStats;
     const campaignName = 'TestCampaign';
@@ -53,6 +59,7 @@ describe('autoRerollHandler.handle', () => {
 
         getLastAttackRoll.mockReturnValue(null);
         getLastAbilityCheck.mockReturnValue(null);
+        getLastSaveRoll.mockReturnValue(null);
         getRuntimeValue.mockReturnValue(undefined);
 
         playerStats = {
@@ -417,6 +424,163 @@ describe('autoRerollHandler.handle', () => {
 
             expect(setRuntimeValue).toHaveBeenCalledWith(playerStats.name, '_fearlessAim_usedRound', 7, campaignName);
             expect(result.payload.description).toContain('Miss converted to hit!');
+        });
+    });
+
+    describe('Guarded Mind (override_fail_to_success)', () => {
+        let guardedMindAction;
+        beforeEach(() => {
+            guardedMindAction = {
+                name: 'Guarded Mind',
+                automation: {
+                    type: 'auto_reroll',
+                    target: 'saving_throw',
+                    trigger: 'failed_int_wis_cha_save',
+                    effect: 'override_fail_to_success',
+                    oncePer: 'short_or_long_rest',
+                    casting_time: '1 action',
+                },
+            };
+        });
+
+        it('should block when already used this rest', async () => {
+            getRuntimeValue.mockReturnValue('rest');
+
+            const result = await handle(guardedMindAction, playerStats, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Guarded Mind',
+                    description: 'Guarded Mind can only be used once per Short or Long Rest.',
+                    automation: guardedMindAction.automation,
+                },
+            });
+        });
+
+        it('should fail when no recent saving throw found', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastSaveRoll.mockReturnValue(null);
+
+            const result = await handle(guardedMindAction, playerStats, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Guarded Mind',
+                    description: 'No recent saving throw found for Player. This feature can only be used shortly after a saving throw.',
+                    automation: guardedMindAction.automation,
+                },
+            });
+        });
+
+        it('should fail when save is stale', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastSaveRoll.mockReturnValue({ timestamp: Date.now() - 70000, saveType: 'Intelligence', d20: 5, bonus: 3 });
+
+            const result = await handle(guardedMindAction, playerStats, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Guarded Mind',
+                    description: 'No recent saving throw found for Player. This feature can only be used shortly after a saving throw.',
+                    automation: guardedMindAction.automation,
+                },
+            });
+        });
+
+        it('should fail for invalid save type (not INT/WIS/CHA)', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastSaveRoll.mockReturnValue({
+                timestamp: Date.now(),
+                saveType: 'Strength',
+                d20: 5,
+                bonus: 3,
+            });
+
+            const result = await handle(guardedMindAction, playerStats, campaignName, mapName);
+
+            expect(result).toEqual({
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: 'Guarded Mind',
+                    description: 'Guarded Mind only works on Intelligence, Wisdom, or Charisma saving throws.',
+                    automation: guardedMindAction.automation,
+                },
+            });
+        });
+
+        it('should succeed for Intelligence save', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastSaveRoll.mockReturnValue({
+                timestamp: Date.now(),
+                saveType: 'Intelligence',
+                d20: 5,
+                bonus: 3,
+            });
+
+            const result = await handle(guardedMindAction, playerStats, campaignName, mapName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(playerStats.name, '_guardedMind_usedRest', 'rest', campaignName);
+            expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Guarded Mind',
+            }));
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain('INT');
+            expect(result.payload.description).toContain('SUCCESS (Guarded Mind)');
+        });
+
+        it('should succeed for Wisdom save', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastSaveRoll.mockReturnValue({
+                timestamp: Date.now(),
+                saveType: 'Wisdom',
+                d20: 8,
+                bonus: 2,
+            });
+
+            const result = await handle(guardedMindAction, playerStats, campaignName, mapName);
+
+            expect(result.payload.description).toContain('WIS');
+            expect(result.payload.description).toContain('SUCCESS (Guarded Mind)');
+        });
+
+        it('should succeed for Charisma save', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastSaveRoll.mockReturnValue({
+                timestamp: Date.now(),
+                saveType: 'Charisma',
+                d20: 12,
+                bonus: 1,
+            });
+
+            const result = await handle(guardedMindAction, playerStats, campaignName, mapName);
+
+            expect(result.payload.description).toContain('CHA');
+            expect(result.payload.description).toContain('SUCCESS (Guarded Mind)');
+        });
+
+        it('should succeed for abbreviated save type (INT)', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            getLastSaveRoll.mockReturnValue({
+                timestamp: Date.now(),
+                saveType: 'INT',
+                d20: 7,
+                bonus: 4,
+            });
+
+            const result = await handle(guardedMindAction, playerStats, campaignName, mapName);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('SUCCESS (Guarded Mind)');
         });
     });
 });

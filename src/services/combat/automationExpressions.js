@@ -60,6 +60,16 @@ function getPsionicEnergyDieSize(playerStats) {
     return 6
 }
 
+function getAllyHitDieSize(playerStats) {
+    const level = playerStats?.level || 1
+    if (level >= 20) return 12
+    if (level >= 17) return 10
+    if (level >= 13) return 8
+    if (level >= 9) return 6
+    if (level >= 5) return 4
+    return 4
+}
+
 function resolveDiceExpression(expression, playerStats, slotLevel) {
     if (!expression) return expression
     const prof = playerStats?.proficiency || 0
@@ -71,6 +81,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
     const psionicEnergyDie = getPsionicEnergyDieSize(playerStats)
     const martialArtsDie = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats.level)?.martial_arts_die || 4
     const favoredEnemy = playerStats?.class?.class_levels?.find(cl => cl.level === playerStats.level)?.favored_enemy || 0
+    const allyHitDie = getAllyHitDieSize(playerStats)
     let expr = expression
         .replace(/bardic_inspiration_die/g, bardicDie)
         .replace(/proficiency_bonus_d4/g, `${Math.max(1, prof)}d4`)
@@ -92,6 +103,7 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
         .replace(/psionic_energy_die/g, psionicEnergyDie)
         .replace(/martial_arts_die/g, martialArtsDie)
         .replace(/favored_enemy/gi, favoredEnemy)
+        .replace(/ally_hit_die/g, allyHitDie)
         .replace(/rogue_level/gi, level)
         .replace(/warlock_level/gi, level)
         .replace(/warlock level/gi, level)

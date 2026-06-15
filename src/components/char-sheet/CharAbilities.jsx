@@ -105,10 +105,16 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
             if (conditionEffects?.reliableTalent) {
               return { ...ctx, reliableTalent: true }
             }
-             if (conditionEffects?.strokeOfLuck) {
-               return { ...ctx, strokeOfLuck: true }
-             }
-             if (conditionEffects?.d20Floor10) {
+              if (conditionEffects?.strokeOfLuck) {
+                return { ...ctx, strokeOfLuck: true }
+              }
+              if (conditionEffects?.luckyAdvantage) {
+                return { ...ctx, luckyAdvantage: true, luckyAdvantageType: 'advantage' }
+              }
+              if (conditionEffects?.luckyDisadvantage) {
+                return { ...ctx, luckyDisadvantage: true, luckyDisadvantageType: 'disadvantage' }
+              }
+              if (conditionEffects?.d20Floor10) {
                return { ...ctx, d20Floor10: true }
              }
              return ctx
@@ -130,10 +136,16 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
            if (conditionEffects?.autoReroll) {
              return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
            }
-           if (conditionEffects?.strokeOfLuck) {
-             return { forcedMode, autoFail: autoFail || undefined, strokeOfLuck: true }
-           }
-          if (conditionEffects?.strSaveReplace) {
+            if (conditionEffects?.strokeOfLuck) {
+              return { forcedMode, autoFail: autoFail || undefined, strokeOfLuck: true }
+            }
+            if (conditionEffects?.luckyAdvantage) {
+              return { forcedMode, autoFail: autoFail || undefined, luckyAdvantage: true }
+            }
+            if (conditionEffects?.luckyDisadvantage) {
+              return { forcedMode, autoFail: autoFail || undefined, luckyDisadvantage: true }
+            }
+           if (conditionEffects?.strSaveReplace) {
              const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
              return { forcedMode, autoFail: autoFail || undefined, strSaveReplace: true, strScore: strAbility?.totalScore || 10 }
            }

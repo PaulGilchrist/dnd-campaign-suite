@@ -1,4 +1,5 @@
 import { evaluateAutoExpression, resolveHealingPoolExpression } from '../automationExpressions.js'
+import { getHitDieSize } from '../../rules/effects/restRules.js'
 
 export const healingHandlers = {
     'healing': (feature, playerStats) => {
@@ -61,9 +62,15 @@ export const healingHandlers = {
         const auto = feature.automation
         const prof = playerStats.proficiency || 0
         const level = playerStats.level || 1
-        const healAmount = auto.healExpression
-            ? evaluateAutoExpression(auto.healExpression, playerStats, prof, level)
-            : 0
+        const hitDiceCost = auto.hitDiceCost || 0
+        const isHitDieRoll = auto.healExpression === 'hit_die_roll'
+        let healAmount = 0
+        if (isHitDieRoll) {
+            const hitDieSize = getHitDieSize(playerStats)
+            healAmount = hitDieSize
+        } else if (auto.healExpression) {
+            healAmount = evaluateAutoExpression(auto.healExpression, playerStats, prof, level)
+        }
         return {
             type: 'self_healing',
             name: feature.name,
@@ -74,6 +81,7 @@ export const healingHandlers = {
             usesMax: auto.uses ?? 1,
             recharge: auto.recharge || 'short_rest',
             bloodiedOnly: !!auto.bloodiedOnly,
+            hitDiceCost,
             hasAutomation: true
         }
     },
@@ -91,6 +99,24 @@ export const healingHandlers = {
             action: auto.action || 'bonus_action',
             usesMax,
             usesRecharge: auto.recharge || 'long_rest',
+            hasAutomation: true
+        }
+    },
+
+    'heroic_inspiration_buff': (feature, playerStats) => {
+        const auto = feature.automation
+        const usesMax = auto.uses_expression
+            ? evaluateAutoExpression(auto.uses_expression, playerStats)
+            : 0
+        return {
+            type: 'buff_ally',
+            name: feature.name,
+            buffExpression: auto.buffExpression || '',
+            range: auto.range || '60_ft',
+            action: auto.action || 'action',
+            usesMax,
+            usesRecharge: auto.recharge || 'short_or_long_rest',
+            targetsExpression: auto.targetsExpression || '',
             hasAutomation: true
         }
     },
@@ -166,6 +192,18 @@ export const healingHandlers = {
             maxTargets: auto.maxTargets || 12,
             duration: auto.duration || '24 hours',
             action: auto.action || 'action',
+            hasAutomation: true
+        }
+    },
+
+    'healing_bonus': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            effect: 'bonus_healing',
+            name: feature.name,
+            bonusExpression: auto.extraHealing || '0',
+            trigger: auto.trigger || '',
             hasAutomation: true
         }
     }

@@ -26,6 +26,18 @@ export async function handle(action, playerStats, campaignName, mapName) {
         return handleBendFate(action, playerStats, campaignName, mapName);
     }
 
+    if (auto.effect === 'ac_bonus') {
+        return handleAcBonus(action, playerStats, campaignName);
+    }
+
+    if (auto.effect === 'zero_on_success_half_on_fail_for_mount') {
+        return handleLeapAside(action, playerStats, campaignName);
+    }
+
+    if (auto.effect === 'redirect_attack_to_self') {
+        return handleVeer(action, playerStats, campaignName);
+    }
+
     return handleInspiringMovement(action, playerStats, campaignName, mapName);
 }
 
@@ -165,6 +177,59 @@ async function handleBendFate(action, playerStats, campaignName, mapName) {
     };
 }
 
+async function handleAcBonus(action, playerStats, campaignName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const prof = playerStats.proficiency || 0;
+
+    const activeKey = 'defensiveDuelistActive';
+    const wasActive = getRuntimeValue(playerName, activeKey, campaignName) === true;
+
+    if (wasActive) {
+        setRuntimeValue(playerName, activeKey, null, campaignName);
+        addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: action.name,
+            description: `${playerName} ended ${action.name}.`,
+        }).catch(() => {});
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: `${action.name} ended.`,
+                automation: auto,
+            },
+        };
+    }
+
+    setRuntimeValue(playerName, activeKey, true, campaignName);
+    setRuntimeValue(playerName, 'defensiveDuelistBonus', prof, campaignName);
+
+    const durationRounds = parseDurationRounds(auto.duration) || 1;
+    addExpiration(playerName, playerName, [
+        { type: 'defensive_duelist' }
+    ], campaignName, durationRounds);
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} activated ${action.name}. Proficiency bonus (+${prof}) added to AC as a Reaction.`,
+    }).catch(() => {});
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            description: `${action.name} activated! Add ${prof} (Proficiency Bonus) to AC until the start of your next turn or until used.`,
+            automation: auto,
+        },
+    };
+}
+
 async function handleUnbreakableMajesty(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -216,6 +281,130 @@ async function handleUnbreakableMajesty(action, playerStats, campaignName) {
             type: 'automation_info',
             name: action.name,
             description: `${action.name} activated. For ${auto.duration || '1 minute'}, the first attack per turn that hits you forces the attacker to make a CHA save (DC ${saveDc}) or the attack misses. Ends if you are Incapacitated.`,
+            automation: auto,
+        },
+    };
+}
+
+async function handleLeapAside(action, playerStats, campaignName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Leap Aside';
+
+    const mountName = getRuntimeValue(playerName, 'mountName', campaignName);
+    if (!mountName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} requires you to be mounted. No mount is currently active.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const isNotIncapacitated = !playerStats.conditions?.some(c => {
+        const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
+        return ['incapacitated'].includes(cStr.toLowerCase());
+    });
+    if (!isNotIncapacitated) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} requires you to not be Incapacitated.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const mountIsIncapacitated = getRuntimeValue(mountName, 'conditions', campaignName);
+    if (mountIsIncapacitated && mountIsIncapacitated.some(c => {
+        const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
+        return ['incapacitated'].includes(cStr.toLowerCase());
+    })) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} requires your mount to not be Incapacitated.`,
+                automation: auto,
+            },
+        };
+    }
+
+    setRuntimeValue(playerName, 'leapAsideActive', true, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} activated Leap Aside for ${mountName}. Mount takes no damage on Dex save success, half on fail.`,
+        timestamp: Date.now(),
+    }).catch(() => {});
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description: `${featureName} activated for ${mountName}. The mount takes no damage on a successful Dexterity saving throw, and only half damage on a failed save.`,
+            automation: auto,
+        },
+    };
+}
+
+async function handleVeer(action, playerStats, campaignName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+    const featureName = action.name || 'Veer';
+
+    const mountName = getRuntimeValue(playerName, 'mountName', campaignName);
+    if (!mountName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} requires you to be mounted. No mount is currently active.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const isNotIncapacitated = !playerStats.conditions?.some(c => {
+        const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
+        return ['incapacitated'].includes(cStr.toLowerCase());
+    });
+    if (!isNotIncapacitated) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: featureName,
+                description: `${featureName} requires you to not be Incapacitated.`,
+                automation: auto,
+            },
+        };
+    }
+
+    setRuntimeValue(playerName, 'veerActive', true, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${playerName} activated Veer for ${mountName}. Attacks hitting the mount can be redirected to you.`,
+        timestamp: Date.now(),
+    }).catch(() => {});
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: featureName,
+            description: `${featureName} activated for ${mountName}. When an attack hits your mount, you can use your Reaction to force the attack to hit you instead.`,
             automation: auto,
         },
     };

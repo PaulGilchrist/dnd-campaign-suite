@@ -153,6 +153,7 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
                             if (opt.noOpportunityAttacks && !opt.movement) effects.push('Cannot make Opportunity Attacks');
                             if (opt.effect === 'next_attack_advantage') effects.push(`+${opt.value || '5'} to next attack`);
                             if (opt.effect === 'push_15ft') effects.push('Push 15 ft');
+                            if (opt.effect === 'push') effects.push(`Push ${opt.value || 10} ft`);
                             if (opt.effect === 'speed_reduction') effects.push('Speed reduced by 15 ft');
                             if (opt.effect === 'sudden_strike') effects.push('Make another attack vs. different creature within 5 ft');
                             if (opt.effect === 'mass_fear') effects.push('Target + creatures within 10 ft make WIS save or be Frightened');
@@ -162,6 +163,7 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
                             if (opt.effect === 'daze') effects.push('Target makes CON save or on next turn can only do one of: move, action, or Bonus Action');
                             if (opt.effect === 'unconscious') effects.push('Target makes CON save or becomes Unconscious (1 min, repeating)');
                             if (opt.effect === 'blinded') effects.push('Target makes DEX save or becomes Blinded (until end of its next turn)');
+                            if (opt.effect === 'damage_bonus') effects.push(`${opt.damageExpression || '1d6'} damage`);
                             if (opt.cost) effects.push(`Cost: ${opt.cost} Sneak Attack dice`);
                             const isSelected = multiSelect ? selectedMulti.includes(opt.name) : selected === opt.name;
                             const inputType = multiSelect ? 'checkbox' : 'radio';

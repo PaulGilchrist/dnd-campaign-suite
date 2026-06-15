@@ -127,6 +127,8 @@ describe('buildAttackInfo – temp_hp_buff', () => {
             healingStartOfTurn: false,
             healingRange: '',
             casting_time: '1 bonus action',
+            includesSelf: false,
+            multiTargetAlly: false,
             hasAutomation: true,
         })
     })
@@ -148,6 +150,8 @@ describe('buildAttackInfo – temp_hp_buff', () => {
                 healingStartOfTurn: true,
                 healingRange: '10_ft',
                 casting_time: '1 action',
+                includesSelf: true,
+                multiTargetAlly: true,
             },
         }
         const result = buildAttackInfo(feature, BASE_STATS)
@@ -162,6 +166,8 @@ describe('buildAttackInfo – temp_hp_buff', () => {
         expect(result.ongoingHealingExpression).toBe('1d4')
         expect(result.healingStartOfTurn).toBe(true)
         expect(result.healingRange).toBe('10_ft')
+        expect(result.includesSelf).toBe(true)
+        expect(result.multiTargetAlly).toBe(true)
         expect(result.casting_time).toBe('1 action')
     })
 })

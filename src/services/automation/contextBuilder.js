@@ -11,6 +11,7 @@ import { getLionDisadvantageAgainst } from '../combat/lionAuraUtils.js';
 import { getCoronaSaveDisadvantage } from '../combat/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auraOfProtection.js';
 import { isActive as isAvengingAngelActive, isAuraTarget } from '../automation/handlers/class-cleric-paladin/avengingAngelHandler.js';
+import { hasProtectionBuff } from '../combat/protectionBuffUtils.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
@@ -175,6 +176,11 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
         if (forcedMode === undefined && targetName) {
+            if (hasProtectionBuff(targetName, campaignName)) {
+                forcedMode = 'disadvantage';
+            }
+        }
+        if (forcedMode === undefined && targetName) {
             const noMapCorona = getCoronaSaveDisadvantage({
                 targetName,
                 campaignName,
@@ -202,12 +208,26 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             gloriousDefenseBonus = Number(getRuntimeValue(playerName, 'gloriousDefenseBonus', campaignName) || 1);
         }
 
+        // Compute Defensive Duelist AC bonus (2024 rules)
+        let defensiveDuelistBonus = 0;
+        const defensiveDuelistActive = getRuntimeValue(playerName, 'defensiveDuelistActive', campaignName);
+        if (defensiveDuelistActive) {
+            defensiveDuelistBonus = Number(getRuntimeValue(playerName, 'defensiveDuelistBonus', campaignName) || 0);
+        }
+
         // Stroke of Luck: check if the player has the passive available
         const hasStrokeOfLuck = (playerStats.automation?.passives || []).some(
             p => p.type === 'stroke_of_luck'
         );
         const strokeOfLuckUsed = hasStrokeOfLuck ? getRuntimeValue(playerName, 'strokeOfLuckUsed', campaignName) : false;
         const strokeOfLuckAvailable = hasStrokeOfLuck && !strokeOfLuckUsed;
+
+        // Boon of Fate: check if the player has the passive available
+        const hasBoonOfFate = (playerStats.automation?.passives || []).some(
+            p => p.type === 'modify_d20_roll'
+        );
+        const boonOfFateUsed = hasBoonOfFate ? getRuntimeValue(playerName, 'boonOfFateUsed', campaignName) : false;
+        const boonOfFateAvailable = hasBoonOfFate && !boonOfFateUsed;
 
         return {
             damageType: attack.damageType,
@@ -229,7 +249,9 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             hitBonusFormula,
             sacredWeaponBonus,
             gloriousDefenseBonus,
+            defensiveDuelistBonus,
             strokeOfLuck: strokeOfLuckAvailable,
+            boonOfFate: boonOfFateAvailable,
             isPsychicBlade: attack.isPsychicBlade === true,
             playerStats,
         };
@@ -268,90 +290,100 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                       }
                   }
 
-                 if (targetPos && base.forcedMode === undefined) {
-                      const wolfResult = getWolfAdvantageAgainst({
-                          targetPos,
+                  if (targetPos && base.forcedMode === undefined) {
+                       const wolfResult = getWolfAdvantageAgainst({
+                           targetPos,
+                           attackerName: playerStats.name,
+                           campaignName,
+                           mapData,
+                       });
+                       if (wolfResult.advantage) {
+                           base.forcedMode = 'advantage';
+                       }
+                       if (base.forcedMode === undefined) {
+                           const duplicityResult = getDuplicityAdvantageAgainst({
+                               targetPos,
+                               attackerName: playerStats.name,
+                               campaignName,
+                               mapData,
+                           });
+                           if (duplicityResult.advantage) {
+                               base.forcedMode = 'advantage';
+                           }
+                       }
+                       const lionResult = getLionDisadvantageAgainst({
                           attackerName: playerStats.name,
                           campaignName,
                           mapData,
                       });
-                      if (wolfResult.advantage) {
-                          base.forcedMode = 'advantage';
+                      if (lionResult.disadvantage) {
+                          base.forcedMode = 'disadvantage';
                       }
-                      if (base.forcedMode === undefined) {
-                          const duplicityResult = getDuplicityAdvantageAgainst({
-                              targetPos,
-                              attackerName: playerStats.name,
-                              campaignName,
-                              mapData,
-                          });
-                          if (duplicityResult.advantage) {
-                              base.forcedMode = 'advantage';
+                      if (base.forcedMode === undefined && base.targetName) {
+                          if (hasProtectionBuff(base.targetName, campaignName)) {
+                              base.forcedMode = 'disadvantage';
                           }
                       }
-                      const lionResult = getLionDisadvantageAgainst({
-                         attackerName: playerStats.name,
-                         campaignName,
-                         mapData,
-                     });
-                     if (lionResult.disadvantage) {
-                         base.forcedMode = 'disadvantage';
-                     }
-                     const coronaResult = getCoronaSaveDisadvantage({
-                         targetName: base.targetName,
-                         campaignName,
-                         mapData,
-                         damageType: base.damageType,
-                     });
-                     if (coronaResult.disadvantage && base.forcedMode === undefined) {
-                         base.forcedMode = 'disadvantage';
-                     }
-                 }
+                      const coronaResult = getCoronaSaveDisadvantage({
+                          targetName: base.targetName,
+                          campaignName,
+                          mapData,
+                          damageType: base.damageType,
+                      });
+                      if (coronaResult.disadvantage && base.forcedMode === undefined) {
+                          base.forcedMode = 'disadvantage';
+                      }
+                  }
 
-                  // When map is active but target has no position, fall back to no-map aura checks
-                  if (!targetPos && base.forcedMode === undefined) {
-                      const noMapWolf = getWolfAdvantageAgainst({
+                   // When map is active but target has no position, fall back to no-map aura checks
+                   if (!targetPos && base.forcedMode === undefined) {
+                       const noMapWolf = getWolfAdvantageAgainst({
+                           attackerName: playerStats.name,
+                           campaignName,
+                           mapData,
+                           skipRangeCheck: true,
+                       });
+                       if (noMapWolf.advantage) {
+                           base.forcedMode = 'advantage';
+                       }
+                       if (base.forcedMode === undefined) {
+                           const noMapDuplicity = getDuplicityAdvantageAgainst({
+                               attackerName: playerStats.name,
+                               campaignName,
+                               mapData,
+                               skipRangeCheck: true,
+                           });
+                           if (noMapDuplicity.advantage) {
+                               base.forcedMode = 'advantage';
+                           }
+                       }
+                       const noMapLion = getLionDisadvantageAgainst({
                           attackerName: playerStats.name,
                           campaignName,
                           mapData,
                           skipRangeCheck: true,
                       });
-                      if (noMapWolf.advantage) {
-                          base.forcedMode = 'advantage';
+                      if (noMapLion.disadvantage) {
+                          base.forcedMode = 'disadvantage';
                       }
-                      if (base.forcedMode === undefined) {
-                          const noMapDuplicity = getDuplicityAdvantageAgainst({
-                              attackerName: playerStats.name,
-                              campaignName,
-                              mapData,
-                              skipRangeCheck: true,
-                          });
-                          if (noMapDuplicity.advantage) {
-                              base.forcedMode = 'advantage';
+                      if (base.forcedMode === undefined && base.targetName) {
+                          if (hasProtectionBuff(base.targetName, campaignName)) {
+                              base.forcedMode = 'disadvantage';
                           }
                       }
-                      const noMapLion = getLionDisadvantageAgainst({
-                         attackerName: playerStats.name,
-                         campaignName,
-                         mapData,
-                         skipRangeCheck: true,
-                     });
-                     if (noMapLion.disadvantage) {
-                         base.forcedMode = 'disadvantage';
-                     }
-                     if (base.forcedMode === undefined) {
-                         const noMapCorona = getCoronaSaveDisadvantage({
-                             targetName: base.targetName,
-                             campaignName,
-                             mapData,
-                             damageType: base.damageType,
-                             skipRangeCheck: true,
-                         });
-                         if (noMapCorona.disadvantage) {
-                             base.forcedMode = 'disadvantage';
-                         }
-                     }
-                 }
+                      if (base.forcedMode === undefined) {
+                          const noMapCorona = getCoronaSaveDisadvantage({
+                              targetName: base.targetName,
+                              campaignName,
+                              mapData,
+                              damageType: base.damageType,
+                              skipRangeCheck: true,
+                          });
+                          if (noMapCorona.disadvantage) {
+                              base.forcedMode = 'disadvantage';
+                          }
+                      }
+                  }
 
                 const numericRange = rangeToFeet(attack.range) || 0;
                 const isRanged = numericRange > 8;
@@ -385,10 +417,18 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                     const walls = mapData?.walls || new Set();
                     let coverResult = computeCover(
                          { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY },
-                          { gridX: targetPos.gridX, gridY: targetPos.gridY },
+                         { gridX: targetPos.gridX, gridY: targetPos.gridY },
                         walls,
                         mapData?.placedItems || [],
                       );
+
+                    // Check ignore_cover_ranged passive (e.g., Sharpshooter feat bypass cover)
+                    const hasIgnoreCoverRanged = (playerStats.automation?.passives || []).some(
+                        p => p.type === 'passive_rule' && p.effect === 'ignore_cover_ranged'
+                    );
+                    if (hasIgnoreCoverRanged) {
+                        coverResult = { level: 'none', acBonus: 0 };
+                    }
 
                     // Check Nature's Sanctuary half cover (15-ft cube = 3x3 grid centered on placement)
                     const sanctuaryActive = getRuntimeValue(playerStats.name, 'naturesSanctuaryActive', campaignName);
@@ -438,6 +478,15 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                                 const gloriousDefenseBonus = Number(getRuntimeValue(base.targetName, 'gloriousDefenseBonus', campaignName) || 1);
                                 coverResult.acBonus = Math.max(coverResult.acBonus, gloriousDefenseBonus);
                             }
+                        }
+                    }
+
+                    // Check Defensive Duelist AC bonus (2024 rules)
+                    const defensiveDuelistActive = getRuntimeValue(base.targetName, 'defensiveDuelistActive', campaignName);
+                    if (defensiveDuelistActive) {
+                        const defensiveDuelistBonus = Number(getRuntimeValue(base.targetName, 'defensiveDuelistBonus', campaignName) || 0);
+                        if (defensiveDuelistBonus > coverResult.acBonus) {
+                            coverResult.acBonus = defensiveDuelistBonus;
                         }
                     }
 

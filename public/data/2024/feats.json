@@ -1171,7 +1171,20 @@
             {
                 "name": "Energy Mastery",
                 "description": "Choose one of the following damage types: Acid, Cold, Fire, Lightning, or Thunder. Spells you cast ignore Resistance to damage of the chosen type. In addition, when you roll damage for a spell you cast that deals damage of that type, you can treat any 1 on a damage die as a 2.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "damage_type_choice",
+                    "damageTypes": [
+                        "Acid",
+                        "Cold",
+                        "Fire",
+                        "Lightning",
+                        "Thunder"
+                    ],
+                    "effect": "elemental_adept",
+                    "casting_time": "passive",
+                    "minDamage": true
+                }
             }
         ],
         "ability_score_increase": {
@@ -1207,7 +1220,16 @@
             {
                 "name": "Fey Magic",
                 "description": "Choose one level 1 spell from the Divination or Enchantment school of magic. You always have that spell and the Misty Step spell prepared. You can cast each of these spells without expending a spell slot. Once you cast either spell in this way, you can't cast that spell in this way again until you finish a Long Rest. You can also cast these spells using spell slots you have of the appropriate level. The spells' spellcasting ability is the ability increased by this feat.",
-                "type": "spell"
+                "type": "spell",
+                "automation": {
+                    "type": "free_spell",
+                    "spell": [
+                        "Misty Step"
+                    ],
+                    "perSpellTracking": true,
+                    "recharge": "long_rest",
+                    "casting_time": "1 bonus action"
+                }
             }
         ],
         "ability_score_increase": {
@@ -1271,7 +1293,12 @@
             {
                 "name": "Fast Wrestler",
                 "description": "Your Speed isn't halved when you move a creature Grappled by you if the creature is your size or smaller.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "passive_buff",
+                    "effect": "fast_wrestler",
+                    "casting_time": "passive"
+                }
             }
         ],
         "ability_score_increase": {
@@ -1340,8 +1367,8 @@
                 "type": "damage",
                 "automation": {
                     "type": "damage_bonus",
-                    "trigger": "heavy_weapon_hit_during_attack_action",
-                    "extraDamageExpression": "proficiency_bonus",
+                    "trigger": "melee_heavy_weapon_hit",
+                    "damageExpression": "proficiency_bonus",
                     "damageType": "same_as_weapon",
                     "casting_time": "1 action"
                 }
@@ -1396,7 +1423,11 @@
             {
                 "name": "Healing Rerolls",
                 "description": "Whenever you roll a die to determine the number of Hit Points you restore with a spell or with this feat's Battle Medic benefit, you can reroll the die if it rolls a 1, and you must use the new roll.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "passive_rule",
+                    "effect": "reroll_healing_ones"
+                }
             }
         ],
         "ability_score_increase": null,
@@ -1472,7 +1503,7 @@
                         "Slashing"
                     ],
                     "condition": "wearing_heavy_armor",
-                    "casting_time": "1 action"
+                    "casting_time": "1 reaction"
                 }
             }
         ],
@@ -1518,15 +1549,15 @@
             {
                 "name": "Bolstering Performance",
                 "description": "When you finish a Short or Long Rest, you can give an inspiring performance: a speech, song, or dance. When you do so, choose up to six allies (which can include yourself) within 30 feet of yourself who witness the performance. The chosen creatures each gain Temporary Hit Points equal to your character level plus the modifier of the ability you increased with this feat.",
-                "type": "passive",
+                "type": "special",
                 "automation": {
                     "type": "temp_hp_buff",
-                    "trigger": "after_short_or_long_rest",
-                    "tempHpExpression": "character_level + ability_modifier",
+                    "tempHpExpression": "level + cha_modifier",
                     "range": "30 ft",
                     "targets": 6,
                     "includesSelf": true,
-                    "casting_time": "1 bonus action"
+                    "casting_time": "1 bonus action",
+                    "multiTargetAlly": true
                 }
             }
         ],
@@ -1566,7 +1597,8 @@
                     "reaction": true,
                     "target": "ally",
                     "requiresShieldOrWeapon": true,
-                    "casting_time": "1 reaction"
+                    "casting_time": "1 reaction",
+                    "condition": "interception"
                 }
             }
         ],
@@ -1676,12 +1708,26 @@
             {
                 "name": "Advantage",
                 "description": "When you roll a d20 for a D20 Test, you can spend 1 Lucid Point to give yourself Advantage on the roll.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "lucky_point",
+                    "effect": "advantage",
+                    "target": "d20",
+                    "cost": 1,
+                    "casting_time": "reaction"
+                }
             },
             {
                 "name": "Disadvantage",
                 "description": "When a creature rolls a d20 for an attack roll against you, you can spend 1 Lucid Point to impose Disadvantage on that roll.",
-                "type": "utility"
+                "type": "utility",
+                "automation": {
+                    "type": "lucky_point",
+                    "effect": "disadvantage",
+                    "target": "attack_roll",
+                    "cost": 1,
+                    "casting_time": "reaction"
+                }
             }
         ],
         "ability_score_increase": null,
@@ -1761,7 +1807,15 @@
             {
                 "name": "Level 1 Spell",
                 "description": "Choose a level 1 spell from the same list you selected for this feat's cantrips. You always have that spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a Long Rest. You can also cast the spell using any spell slots you have.",
-                "type": "spell"
+                "type": "spell",
+                "automation": {
+                    "type": "free_spell",
+                    "spell": "",
+                    "uses": 1,
+                    "uses_expression": "1",
+                    "recharge": "long_rest",
+                    "action": "action"
+                }
             },
             {
                 "name": "Spell Change",
@@ -1843,6 +1897,14 @@
             ],
             "amount": 1,
             "max_value": 20
+        },
+        "automation": {
+            "type": "passive_buff",
+            "target": "self",
+            "effect": "medium_armor_dex_bonus_increase",
+            "bonusExpression": "1",
+            "condition": "wearing_medium_armor",
+            "casting_time": "passive"
         },
         "repeatable": false,
         "tags": [
@@ -1974,7 +2036,18 @@
             {
                 "name": "Encouraging Song",
                 "description": "As you finish a Short or Long Rest, you can play a song on a Musical Instrument with which you have proficiency and give Heroic Inspiration to allies who hear the song. The number of allies you can affect in this way equals your Proficiency Bonus.",
-                "type": "passive"
+                "type": "heroic_inspiration_buff",
+                "automation": {
+                    "type": "heroic_inspiration_buff",
+                    "effect": "heroic_inspiration",
+                    "action": "action",
+                    "range": "30_ft",
+                    "uses_expression": "proficiency_bonus",
+                    "recharge": "short_or_long_rest",
+                    "casting_time": "1 action",
+                    "buffExpression": "heroic_inspiration",
+                    "targetsExpression": "proficiency_bonus"
+                }
             }
         ],
         "ability_score_increase": null,
@@ -2112,7 +2185,11 @@
             {
                 "name": "Potent Poison",
                 "description": "When you make a damage roll that deals Poison damage, it ignores Resistance to Poison damage.",
-                "type": "passive"
+                "type": "passive",
+                "automation": {
+                    "type": "ignore_resistance",
+                    "damageTypes": ["Poison"]
+                }
             },
             {
                 "name": "Brew Poison",
@@ -2253,7 +2330,12 @@
             {
                 "name": "Saving Throw Proficiency",
                 "description": "You gain saving throw proficiency with the chosen ability.",
-                "type": "saving_throw"
+                "type": "saving_throw",
+                "automation": {
+                    "type": "save_proficiency",
+                    "saveType": "Strength",
+                    "fallbackTypes": ["Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma"]
+                }
             }
         ],
         "ability_score_increase": {
@@ -2285,7 +2367,10 @@
             {
                 "name": "Savage Strike",
                 "description": "Once per turn when you hit a target with a weapon, you can roll the weapon's damage dice twice and use either roll against the target.",
-                "type": "damage"
+                "type": "damage",
+                "automation": {
+                    "type": "reroll_damage_once_per_turn"
+                }
             }
         ],
         "ability_score_increase": null,
@@ -2378,7 +2463,16 @@
             {
                 "name": "Shadow Magic",
                 "description": "Choose one level 1 spell from the Illusion or Necromancy school of magic. You always have that spell and the Invisibility spell prepared. You can cast each of these spells without expending a spell slot. Once you cast either spell in this way, you can't cast that spell in this way again until you finish a Long Rest. You can also cast these spells using spell slots you have of the appropriate level. The spells' spellcasting ability is the ability increased by this feat.",
-                "type": "spell"
+                "type": "spell",
+                "automation": {
+                    "type": "free_spell",
+                    "spell": [
+                        "Invisibility"
+                    ],
+                    "perSpellTracking": true,
+                    "recharge": "long_rest",
+                    "casting_time": "1 action"
+                }
             }
         ],
         "ability_score_increase": {

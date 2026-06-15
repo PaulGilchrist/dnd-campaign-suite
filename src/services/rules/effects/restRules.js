@@ -256,6 +256,15 @@ export async function applyShortRest(playerStats, campaignName) {
       }
     }
 
+    // Chef: Bolstering Treats crafted on Short Rest (1 hour of work)
+    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(
+        p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
+    )
+    if (hasBolsteringTreats) {
+      const craftCount = playerStats.proficiency || 0
+      updates.chefBolsteringTreats = craftCount
+    }
+
    // Celestial Resilience: Grant temp HP on short rest for Celestial Patron
    if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
      const features = playerStats.characterAdvancement || []
@@ -408,4 +417,13 @@ export async function applyLongRest(playerStats, campaignName) {
     // Reset Stonecunning uses on long rest
     setRuntimeValue(name, 'stonecunningUses', null, campaignName, true)
     setRuntimeValue(name, 'stonecunningRestTimestamp', null, campaignName, true)
+
+    // Chef: Bolstering Treats crafted on Long Rest
+    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(
+        p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
+    )
+    if (hasBolsteringTreats) {
+        const craftCount = playerStats.proficiency || 0
+        setRuntimeValue(name, 'chefBolsteringTreats', craftCount, campaignName, true)
+    }
 }

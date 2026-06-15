@@ -10,6 +10,33 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeSt
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
 
+    // Handle dash_action trigger: apply speed bonus temporarily
+    if (auto?.trigger === 'dash_action' && auto?.effect === 'speed_bonus') {
+        const bonusMatch = String(auto.bonus || '0 ft').match(/(\d+)/);
+        const bonusAmount = bonusMatch ? parseInt(bonusMatch[1], 10) : 0;
+        if (bonusAmount > 0) {
+            const storedBuffs = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+            const buffs = Array.isArray(storedBuffs) ? storedBuffs : [];
+            const dashBuff = buffs.find(b => b.name === action.name && b.tempBuff);
+            if (!dashBuff) {
+                setRuntimeValue(playerStats.name, 'activeBuffs', [
+                    ...buffs,
+                    { name: action.name, tempBuff: true, speedBonus: bonusAmount, duration: auto.duration || 'same_action' },
+                ], campaignName);
+            }
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name}: +${bonusAmount} ft Speed for this Dash action.`,
+                    automation: auto,
+                },
+            };
+        }
+    }
+
     // Check requiredLevel before allowing the buff (e.g., Draconic Flight at level 5)
     if (auto?.requiredLevel && playerStats.level < auto.requiredLevel) {
         return {

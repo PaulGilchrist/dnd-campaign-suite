@@ -1,11 +1,11 @@
  
 import { useState, useCallback } from 'react';
-import useActionPopup from '../../hooks/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
 import { getFightingStyle } from '../../services/character/fightingStyles.js'
 import { executeHandler } from '../../services/automation/index.js';
 import { hasAutomation } from '../../services/combat/automationService.js';
+import TeleportModal from './TeleportModal.jsx';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const [popupHtml, setPopupHtml] = useState(null);
@@ -16,13 +16,22 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
         const result = await executeHandler(action, playerStats, campaignName, null);
         if (!result) return;
         if (result.type === 'popup') {
-            setPopupHtml(result.payload);
+            setPopupHtml(formatPopupPayload(result.payload));
         } else if (result.type === 'modal') {
             if (result.modalName === 'teleport') {
                 setTeleportModal(result.payload);
             }
         }
     }, [playerStats, campaignName, cannotAct]);
+
+    function formatPopupPayload(payload) {
+        if (!payload) return null;
+        if (typeof payload === 'string') return payload;
+        if (payload.type === 'automation_info') {
+            return `<b>${payload.name || ''}</b><br/>${payload.description || ''}`;
+        }
+        return String(payload);
+    }
 
     // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];
@@ -56,13 +65,33 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
            <div>
                <div className='sectionHeader'>Special Actions</div>
             {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
-               {uniqueActions.map((specialAction, index) => {
+            {teleportModal && (
+                <TeleportModal
+                    action={teleportModal.action}
+                    playerStats={teleportModal.playerStats}
+                    campaignName={teleportModal.campaignName}
+                    onClose={() => setTeleportModal(null)}
+                />
+            )}
+            {uniqueActions.map((specialAction, index) => {
+                const isClickable = specialAction.details ? true : hasAutomation(specialAction);
+                const handleClick = () => {
+                    if (isClickable && hasAutomation(specialAction)) {
+                        handleAutomationClick(specialAction);
+                    } else {
+                        if (specialAction.details) {
+                            setPopupHtml(`<b>${specialAction.name}</b><br/>${specialAction.description}<br/><br/>${specialAction.details}`);
+                        } else {
+                            setPopupHtml(`<b>${specialAction.name}</b><br/><br/>${specialAction.description}`);
+                        }
+                    }
+                };
                 return <div key={specialAction.name || `special-action-${index}`}>
-                        <b className={specialAction.details ? "clickable" : ""} onClick={() => showPopup(specialAction)}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: renderMarkdownInline(specialAction.description) }}></span>
+                        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: renderMarkdownInline(specialAction.description) }}></span>
                     </div>
                 })}
            </div>
-       )
+        )
 }
 
 export default CharSpecialActions

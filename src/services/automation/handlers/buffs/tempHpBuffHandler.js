@@ -24,8 +24,16 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
+    if (auto.craftCount && auto.tempHpExpression) {
+        return handleBolsteringTreats(action, playerStats, campaignName, mapName);
+    }
+
     if (auto.bonusMovement && auto.tempHpExpression && auto.tempHpExpression.includes('bardic_inspiration_die')) {
         return handleMantleOfInspiration(action, playerStats, campaignName, mapName);
+    }
+
+    if (auto.multiTargetAlly && auto.tempHpExpression) {
+        return handleMultiTargetAllyTempHp(action, playerStats, campaignName, mapName);
     }
 
     const tempHpExpression = auto.tempHpExpression || '';
@@ -62,6 +70,87 @@ export async function handle(action, playerStats, campaignName, mapName) {
     if (auto.ongoingHealingExpression) {
         description += ` At the start of each turn while raging, can grant temp HP to a creature within ${auto.healingRange || '10 ft'}.`;
     }
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description,
+            automation: auto,
+        },
+    };
+}
+
+async function handleMultiTargetAllyTempHp(action, playerStats, campaignName, mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+
+    const tempHpExpression = auto.tempHpExpression || '';
+    const amount = evaluateAutoExpression(tempHpExpression, playerStats);
+    if (typeof amount !== 'number' || amount <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Could not calculate temp HP (${tempHpExpression}).`,
+                automation: auto,
+            },
+        };
+    }
+
+    const maxTargets = auto.targets || 6;
+    const rangeFt = rangeToFeet(auto.range || '30 ft');
+    const allies = [];
+
+    if (mapName && rangeFt != null) {
+        const attackerPlayer = await loadMapData(campaignName, mapName).then(md => md?.players?.find(p => p.name === playerName));
+        if (attackerPlayer) {
+            const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
+            const mapPlayers = (await loadMapData(campaignName, mapName))?.players || [];
+            for (const p of mapPlayers) {
+                if (allies.length >= maxTargets) break;
+                if (auto.includesSelf && p.name === playerName) {
+                    allies.push(p.name);
+                    continue;
+                }
+                if (p.name === playerName) continue;
+                const pos = { gridX: p.gridX, gridY: p.gridY };
+                const dist = getDistanceFeet(attackerPos, pos);
+                if (dist != null && dist <= rangeFt) {
+                    allies.push(p.name);
+                    if (allies.length >= maxTargets) break;
+                }
+            }
+        }
+    } else if (!auto.includesSelf) {
+        if (!mapName) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    automationType: auto.type,
+                    description: `${action.name}: Could not resolve allies without a map.`,
+                    automation: auto,
+                },
+            };
+        }
+    } else if (auto.includesSelf) {
+        allies.push(playerName);
+    }
+
+    for (const targetName of allies) {
+        const existingTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) || 0);
+        const newTotal = Math.max(existingTempHp, amount);
+        setRuntimeValue(targetName, 'tempHp', newTotal, campaignName);
+    }
+
+    const targetList = allies.length > 0 ? allies.join(', ') : 'no targets available';
+    const description = `${action.name}: Granted ${amount} temporary hit points to ${allies.length} creature${allies.length !== 1 ? 's' : ''} (${targetList}).`;
 
     return {
         type: 'popup',
@@ -172,4 +261,70 @@ export function grantTempHpOnRage(action, playerStats, campaignName) {
     setRuntimeValue(playerStats.name, 'tempHp', newTotal, campaignName);
 
     return true;
+}
+
+async function handleBolsteringTreats(action, playerStats, campaignName, _mapName) {
+    const auto = action.automation;
+    const playerName = playerStats.name;
+
+    const treatUsesKey = 'chefBolsteringTreats';
+    const craftCount = auto.craftCount === 'proficiency_bonus'
+        ? (playerStats.proficiency || 0)
+        : evaluateAutoExpression(auto.craftCount, playerStats);
+
+    const tempHpAmount = auto.tempHpExpression === 'proficiency_bonus'
+        ? (playerStats.proficiency || 0)
+        : evaluateAutoExpression(auto.tempHpExpression, playerStats);
+
+    if (typeof tempHpAmount !== 'number' || tempHpAmount <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Could not calculate temp HP.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const currentTreats = Number(getRuntimeValue(playerName, treatUsesKey, campaignName) ?? craftCount);
+    if (currentTreats <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: No treats remaining. Craft more with 1 hour of work or after a Long Rest.`,
+                automation: auto,
+            },
+        };
+    }
+
+    await setRuntimeValue(playerName, treatUsesKey, currentTreats - 1, campaignName);
+
+    const existingTempHp = Number(getRuntimeValue(playerName, 'tempHp', campaignName) || 0);
+    const newTotal = Math.max(existingTempHp, tempHpAmount);
+    setRuntimeValue(playerName, 'tempHp', newTotal, campaignName);
+
+    const description = `${action.name}: Ate a bolstering treat, gaining ${tempHpAmount} temporary hit points. (${currentTreats - 1} treat${currentTreats - 1 !== 1 ? 's' : ''} remaining).`;
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description,
+            automation: auto,
+        },
+    };
+}
+
+export function craftBolsteringTreats(playerStats, campaignName) {
+    const treatUsesKey = 'chefBolsteringTreats';
+    const craftCount = playerStats.proficiency || 0;
+    setRuntimeValue(playerStats.name, treatUsesKey, craftCount, campaignName);
 }

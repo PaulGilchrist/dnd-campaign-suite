@@ -252,4 +252,98 @@ describe('DiceRollResult', () => {
             expect(screen.queryByText(/Save DC/)).not.toBeInTheDocument();
         });
     });
+
+    describe('lucky point buttons', () => {
+        it('shows Lucky Advantage button when luckyAdvantage is true', () => {
+            const onLuckyAdv = vi.fn();
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    luckyAdvantage={true}
+                    onLuckyAdvantage={onLuckyAdv}
+                />
+            );
+            expect(screen.getByText(/Lucky: Advantage/)).toBeInTheDocument();
+        });
+
+        it('shows Lucky Disadvantage button when luckyDisadvantage is true', () => {
+            const onLuckyDisadv = vi.fn();
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    luckyDisadvantage={true}
+                    onLuckyDisadvantage={onLuckyDisadv}
+                />
+            );
+            expect(screen.getByText(/Lucky: Disadvantage/)).toBeInTheDocument();
+        });
+
+        it('does not show Lucky buttons for non-d20 types', () => {
+            render(
+                <DiceRollResult
+                    name="Fireball"
+                    type="damage"
+                    rolls={[6, 5, 4]}
+                    bonus={0}
+                    luckyAdvantage={true}
+                    luckyDisadvantage={true}
+                />
+            );
+            expect(screen.queryByText(/Lucky: Advantage/)).not.toBeInTheDocument();
+            expect(screen.queryByText(/Lucky: Disadvantage/)).not.toBeInTheDocument();
+        });
+
+        it('does not show Lucky buttons when not provided', () => {
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                />
+            );
+            expect(screen.queryByText(/Lucky: Advantage/)).not.toBeInTheDocument();
+            expect(screen.queryByText(/Lucky: Disadvantage/)).not.toBeInTheDocument();
+        });
+
+        it('calls onLuckyAdvantage and sets advantage mode when Lucky Advantage is clicked', () => {
+            const onLuckyAdv = vi.fn();
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[8, 15]}
+                    bonus={3}
+                    luckyAdvantage={true}
+                    onLuckyAdvantage={onLuckyAdv}
+                />
+            );
+            expect(screen.getByText('11')).toBeInTheDocument(); // 8 + 3
+            fireEvent.click(screen.getByText(/Lucky: Advantage/));
+            expect(onLuckyAdv).toHaveBeenCalled();
+            expect(screen.getByText('18')).toBeInTheDocument(); // 15 + 3
+        });
+
+        it('does not show Lucky button again after Lucky Advantage is used', () => {
+            const onLuckyAdv = vi.fn();
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[8, 15]}
+                    bonus={3}
+                    luckyAdvantage={true}
+                    onLuckyAdvantage={onLuckyAdv}
+                />
+            );
+            fireEvent.click(screen.getByText(/Lucky: Advantage/));
+            expect(screen.queryByText(/Lucky: Advantage/)).not.toBeInTheDocument();
+        });
+    });
 });

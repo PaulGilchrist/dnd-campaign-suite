@@ -3,6 +3,7 @@ import { handle as handleSaveAttack } from './handlers/combat/saveAttackHandler.
 import { handle as handleHealing } from './handlers/healing/healingHandler.js';
 import { handle as handleBuff } from './handlers/buffs/buffHandler.js';
 import { handle as handleCondition } from './handlers/buffs/conditionHandler.js';
+import { handle as handleMagicInitiate } from './handlers/feats/magicInitiateHandler.js';
 import { handle as handleSorcery } from './handlers/resources/sorceryHandler.js';
 import { handle as handleSpellCast } from './handlers/spells/spellCastHandler.js';
 import { handle as handleInitiative } from './handlers/combat/initiativeHandler.js';
@@ -14,10 +15,15 @@ import { handle as handleSpellModifier } from './handlers/spells/spellModifierHa
 import { handle as handleCombatStance } from './handlers/combat/combatStanceHandler.js';
 import { handle as handleReactionDamage } from './handlers/reactions/reactionDamageHandler.js';
 import { handle as handleReactionDebuff } from './handlers/reactions/reactionDebuffHandler.js';
+import { handle as handleBoonOfEnergyResistance, applyTypeChoice as applyBoonOfEnergyResistance } from './handlers/reactions/boonOfEnergyResistanceHandler.js';
+import { handle as handleBoonOfFate } from './handlers/reactions/boonOfFateHandler.js';
+import { handle as handleBoonOfRecovery } from './handlers/reactions/boonOfRecoveryHandler.js';
+import { handle as handleLuckyPoint } from './handlers/reactions/luckyPointHandler.js';
 import { handle as handleAttackRider } from './handlers/combat/attackRiderHandler.js';
 import { handle as handleTempHpBuff } from './handlers/buffs/tempHpBuffHandler.js';
 import { handle as handleWeaponMastery } from './handlers/combat/weaponMasteryHandler.js';
 import { handle as handleBuffAlly } from './handlers/buffs/buffAllyHandler.js';
+import { handle as handleEncouragingSong } from './handlers/buffs/encouragingSongHandler.js';
 import { handle as handleRevivification } from './handlers/healing/revivificationHandler.js';
 import { handle as handleBardicInspiration } from './handlers/class-bard/bardicInspirationHandler.js';
 import { handle as handleAutoReroll } from './handlers/combat/autoRerollHandler.js';
@@ -169,6 +175,8 @@ import { handle as handleOttoDance } from './handlers/spells/ottosDanceHandler.j
 import { handle as handlePassWithoutTrace } from './handlers/buffs/passWithoutTraceHandler.js';
 import { handle as handleProtectionFromEvilAndGood, isProtectionFromEvilAndGoodActive, isCreatureWarded } from './handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import { handle as handleRayOfEnfeeblement, isRayOfEnfeeblementActive } from './handlers/spells/rayOfEnfeeblementHandler.js';
+import { handle as handleSentinelGuardian } from './handlers/combat/sentinelGuardianHandler.js';
+import { handle as handleSentinelHalt } from './handlers/combat/sentinelHaltHandler.js';
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -210,11 +218,13 @@ const HANDLER_MAP = {
     mastery_rider: handleWeaponMastery,
     revivification: handleRevivification,
      bardic_inspiration: handleBardicInspiration,
-     bardic_inspiration_use: handleBardicInspirationUse,
+       bardic_inspiration_use: handleBardicInspirationUse,
+      heroic_inspiration_buff: handleEncouragingSong,
      reaction_bonus: handleReactionBonus,
      post_cast_rider: handlePostCastRider,
-     post_cast_self_heal: handleGenericPopup,
-      bardic_inspiration_defense: handleBardicInspirationDefense,
+      post_cast_self_heal: handleGenericPopup,
+    healing_bonus: handleGenericPopup,
+       bardic_inspiration_defense: handleBardicInspirationDefense,
       bardic_inspiration_offense: handleBardicInspirationOffense,
         countercharm: handleCountercharm,
         font_of_inspiration: handleFontOfInspiration,
@@ -381,9 +391,16 @@ const HANDLER_MAP = {
         protection_from_energy: handleProtectionFromEnergy,
         protection_from_evil_and_good: handleProtectionFromEvilAndGood,
         protection_from_poison: handleProtectionFromPoison,
+        boon_of_energy_resistance: handleBoonOfEnergyResistance,
+        modify_d20_roll: handleBoonOfFate,
         ray_of_enfeeblement: handleRayOfEnfeeblement,
+        survive_and_heal: handleBoonOfRecovery,
+        lucky_point: handleLuckyPoint,
+        magic_initiate: handleMagicInitiate,
+        sentinel_guardian: handleSentinelGuardian,
+        sentinel: handleSentinelHalt,
 };
-export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive };
+export { applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect, applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler, applyBoonOfEnergyResistance, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive, isRayOfEnfeeblementActive };
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 

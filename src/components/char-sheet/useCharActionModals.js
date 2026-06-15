@@ -6,6 +6,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
 import { collectWeaponMastery, evaluateAutoExpression } from '../../services/combat/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
+import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { applyConstellationOption } from '../../services/automation/handlers/class-sorcerer/starryFormHandler.js';
 import { applyConstellationOption as twinklingApply } from '../../services/automation/handlers/class-sorcerer/twinklingConstellationHandler.js';
@@ -46,6 +47,7 @@ export default function useCharActionModals({
     const [bastionOfLawModal, setBastionOfLawModal] = useState(null);
     const [elementalAffinityModal, setElementalAffinityModal] = useState(null);
     const [fiendishResilienceModal, setFiendishResilienceModal] = useState(null);
+    const [boonOfEnergyResistanceModal, setBoonOfEnergyResistanceModal] = useState(null);
     const [dragonCompanionModal, setDragonCompanionModal] = useState(null);
     const [wildMagicDoubleRollModal, setWildMagicDoubleRollModal] = useState(null);
     const [wildMagicTamedModal, setWildMagicTamedModal] = useState(null);
@@ -93,6 +95,7 @@ export default function useCharActionModals({
         }
 
         const wasCrit = popupHtml?.isCrit;
+        const isNatural20 = popupHtml?.isNatural20 === true;
         if (wasCrit && setPopupHtml) setPopupHtml(null);
         const result = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
         if (!result) return;
@@ -101,6 +104,19 @@ export default function useCharActionModals({
         let total = result.total;
         let rolls = result.rolls;
         const modifier = result.modifier;
+
+        // Apply rider damage expressions from targetEffects (e.g., Charger feat damage bonus)
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const riderDamageEffects = storedEffects.filter(te => te.effect === 'damage_bonus' && te.damageExpression);
+        for (const te of riderDamageEffects) {
+            const riderResult = rollExpression(te.damageExpression);
+            if (riderResult) {
+                const dmgType = te.damageType || attack.damageType || 'same_as_weapon';
+                formula += ` + ${te.damageExpression}[${dmgType}]`;
+                total += riderResult.total;
+                rolls = [...rolls, ...riderResult.rolls];
+            }
+        }
 
         // Apply any melee_weapon_hit damage bonus automations (e.g. Radiant Strikes)
         const isMeleeOrUnarmed = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
@@ -129,6 +145,28 @@ export default function useCharActionModals({
                     formula += ` + ${bonus.damageExpression}[${damageType}]`;
                     total += bonusResult.total;
                     rolls = [...rolls, ...bonusResult.rolls];
+                }
+            }
+
+            // Apply Great Weapon Master Heavy Weapon Mastery damage bonus (melee_heavy_weapon_hit)
+            const gwmBonuses = isMeleeOrUnarmed ? playerStats.automation.actions.filter(
+                a => a.type === 'damage_bonus' && a.trigger === 'melee_heavy_weapon_hit'
+            ) : [];
+            if (gwmBonuses.length > 0) {
+                const weaponProperties = attack.properties || [];
+                if (weaponProperties.includes('Heavy')) {
+                    for (const bonus of gwmBonuses) {
+                        let dmgType = bonus.damageType || attack.damageType || 'same_as_weapon';
+                        if (dmgType === 'same_as_weapon') {
+                            dmgType = attack.damageType || 'Slashing';
+                        }
+                        const bonusResult = rollExpression(bonus.damageExpression);
+                        if (bonusResult) {
+                            formula += ` + ${bonus.damageExpression}[${dmgType}]`;
+                            total += bonusResult.total;
+                            rolls = [...rolls, ...bonusResult.rolls];
+                        }
+                    }
                 }
             }
 
@@ -283,6 +321,35 @@ export default function useCharActionModals({
             }
         }
 
+        // Apply natural_20_attack_roll damage bonus (e.g., Boon of Irresistible Offense - Overwhelming Strike)
+        if (isNatural20 && playerStats.automation?.actions) {
+            const natural20Bonuses = playerStats.automation.actions.filter(
+                a => a.type === 'damage_bonus' && a.trigger === 'natural_20_attack_roll'
+            );
+            for (const bonus of natural20Bonuses) {
+                const usedKey = `_${bonus.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                if (usedRound === currentRound) continue;
+                let extraDamageExpr = bonus.extraDamageExpression || '';
+                if (extraDamageExpr === 'increased_ability_score') {
+                    const abilityName = bonus.abilityIncreased || 'Strength';
+                    const ability = playerStats.abilities?.find(a => a.name === abilityName);
+                    extraDamageExpr = ability?.bonus || 0;
+                }
+                if (extraDamageExpr) {
+                    const extraDamageType = bonus.extraDamageType === 'same_as_attack' ? (attack.damageType || '') : (bonus.extraDamageType || bonus.damageType || '');
+                    const extraResult = rollExpression(String(extraDamageExpr));
+                    if (extraResult) {
+                        formula += ` + ${extraDamageExpr}[${extraDamageType || 'same_as_attack'}]`;
+                        total += extraResult.total;
+                        rolls = [...rolls, ...extraResult.rolls];
+                    }
+                }
+                setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+            }
+        }
+
         // Apply Celestial Revelation extra damage (once per turn, based on active transformation)
         if (playerStats.automation?.passives) {
             const celestialRiders = playerStats.automation.passives.filter(
@@ -426,6 +493,86 @@ export default function useCharActionModals({
                             const updatedEffects3 = [...storedEffects3, newEffect3];
                             setRuntimeValue(campaignName, 'targetEffects', updatedEffects3, campaignName);
                             await setRuntimeValue(playerStats.name, rendMindUsedKey, true, campaignName);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Apply Charger feat: Charge Attack (d8 damage or push 10ft, once per turn)
+        if (playerStats.automation?.passives) {
+            const chargerAttack = playerStats.automation.passives.find(
+                a => a.type === 'attack_rider' && a.trigger === 'melee_hit_after_10ft_charge' && a.chooseOne
+            );
+            if (chargerAttack) {
+                const usedKey = `_${chargerAttack.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                if (!usedRound || usedRound !== currentRound) {
+                    const cs = await getCombatContext(campaignName);
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    const targetName = target?.name || null;
+                    if (targetName && chargerAttack.options?.length > 0) {
+                        const option = chargerAttack.options[0];
+                        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                        const newEffect = {
+                            target: targetName,
+                            source: chargerAttack.name,
+                            option: option.name,
+                            effect: option.effect,
+                            value: option.value || null,
+                            sizeLimit: option.sizeLimit || null,
+                            noOpportunityAttacks: option.noOpportunityAttacks || false,
+                            duration: 'until_start_of_next_turn',
+                        };
+                        const updatedEffects = [...storedEffects, newEffect];
+                        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                        setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                    }
+                }
+            }
+        }
+
+        // Apply Shield Master: Shield Bash (push or prone on melee hit with shield equipped, once per turn)
+        if (playerStats.automation?.passives) {
+            const shieldBashAttack = playerStats.automation.passives.find(
+                a => a.type === 'attack_rider' && a.trigger === 'melee_hit_with_shield_equipped' && a.options?.length > 0
+            );
+            if (shieldBashAttack) {
+                const hasShield = playerStats.inventory?.equipped?.some(itemName => {
+                    const { baseName } = parseMagicItemName(itemName);
+                    const item = playerStats.equipment?.find(e => e.name === baseName);
+                    return item && item.equipment_category === 'Shield';
+                });
+                if (hasShield) {
+                    const usedKey = `_${shieldBashAttack.name.replace(/\s+/g, '_')}_usedRound`;
+                    const currentRound = getCurrentCombatRound();
+                    const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                    if (!usedRound || usedRound !== currentRound) {
+                        const cs = await getCombatContext(campaignName);
+                        const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                        const targetName = target?.name || null;
+                        if (targetName && shieldBashAttack.options?.length > 0) {
+                            const option = shieldBashAttack.options[0];
+                            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                            const newEffect = {
+                                target: targetName,
+                                source: shieldBashAttack.name,
+                                option: option.name,
+                                effect: option.effect,
+                                value: option.value || null,
+                                sizeLimit: option.sizeLimit || null,
+                                noOpportunityAttacks: option.noOpportunityAttacks || false,
+                                duration: 'until_start_of_next_turn',
+                                saveType: option.saveType || null,
+                                saveDc: option.saveDc || null,
+                                saveAbility: option.saveAbility || null,
+                                condition: option.condition || null,
+                                repeatingSave: !!option.repeatingSave,
+                            };
+                            const updatedEffects = [...storedEffects, newEffect];
+                            setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                            setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
                         }
                     }
                 }
@@ -629,7 +776,166 @@ export default function useCharActionModals({
             }
         }
 
-        // Apply Potent Spellcasting: add WIS modifier to cantrip damage
+        // Apply Crusher feat: Push (once per turn, bludgeoning hit) and Enhanced Critical (bludgeoning crit → advantage against target)
+        const crusherDamageType = (attack.damageType || '').toLowerCase();
+        const isCrusherBludgeoning = crusherDamageType === 'bludgeoning';
+        if (playerStats.automation?.passives) {
+            const crusherPush = playerStats.automation.passives.find(
+                a => a.type === 'attack_rider' && a.trigger === 'bludgeoning_damage_hit' && a.oncePerTurn
+            );
+            if (crusherPush) {
+                const crusherUsedKey = `_${crusherPush.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const crusherUsedRound = getRuntimeValue(playerStats.name, crusherUsedKey, campaignName);
+                const shouldPush = isCrusherBludgeoning && (!crusherUsedRound || crusherUsedRound !== currentRound);
+
+                if (shouldPush) {
+                    const cs = await getCombatContext(campaignName);
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    const targetName = target?.name || null;
+                    if (targetName && crusherPush.options?.length > 0) {
+                        const option = crusherPush.options[0];
+                        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                        const newEffect = {
+                            target: targetName,
+                            source: crusherPush.name,
+                            option: option.name,
+                            effect: option.effect,
+                            value: option.value || null,
+                            sizeLimit: option.sizeLimit || null,
+                            noOpportunityAttacks: option.noOpportunityAttacks || false,
+                            duration: 'until_start_of_next_turn',
+                        };
+                        const updatedEffects = [...storedEffects, newEffect];
+                        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                        setRuntimeValue(playerStats.name, crusherUsedKey, currentRound, campaignName);
+                    }
+                }
+            }
+
+            // Enhanced Critical: when you score a Critical Hit with Bludgeoning damage,
+            // attack rolls against that creature have Advantage until start of your next turn
+            if (wasCrit && isCrusherBludgeoning) {
+                const crusherCrit = playerStats.automation.passives.find(
+                    a => a.type === 'conditional_advantage' && a.trigger === 'critical_hit_bludgeoning'
+                );
+                if (crusherCrit) {
+                    const cs = await getCombatContext(campaignName);
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    const targetName = target?.name || null;
+                    if (targetName) {
+                        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                        const newEffect = {
+                            target: targetName,
+                            source: crusherCrit.name,
+                            effect: 'crusher_enhanced_critical',
+                            duration: 'until_start_of_next_turn',
+                        };
+                        const updatedEffects = [...storedEffects, newEffect];
+                        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+                    }
+                }
+            }
+        }
+
+        // Apply Piercer feat: Puncture (reroll one damage die on piercing hit, once per turn)
+        const piercerDamageType = (attack.damageType || '').toLowerCase();
+        const isPiercerPiercing = piercerDamageType === 'piercing';
+        if (playerStats.automation?.passives && isPiercerPiercing) {
+            const piercerPuncture = playerStats.automation.passives.find(
+                a => a.type === 'attack_rider' && a.trigger === 'piercing_damage_hit' && a.oncePerTurn
+            );
+            if (piercerPuncture) {
+                const piercerUsedKey = `_${piercerPuncture.name.replace(/\s+/g, '_')}_usedRound`;
+                const currentRound = getCurrentCombatRound();
+                const piercerUsedRound = getRuntimeValue(playerStats.name, piercerUsedKey, campaignName);
+                if (!piercerUsedRound || piercerUsedRound !== currentRound) {
+                    const rerollCount = piercerPuncture.rerollCount || 1;
+                    const rerolled = [];
+                    for (let i = 0; i < Math.min(rerollCount, rolls.length); i++) {
+                        const rerolledVal = Math.floor(Math.random() * 6) + 1;
+                        // Find which die to reroll (pick the largest for best result)
+                        if (rolls.length > 0) {
+                            let maxIdx = 0;
+                            for (let j = 1; j < rolls.length; j++) {
+                                if (rolls[j] > rolls[maxIdx]) maxIdx = j;
+                            }
+                            const original = rolls[maxIdx];
+                            rolls[maxIdx] = rerolledVal;
+                            const diff = rerolledVal - original;
+                            total += diff;
+                            rerolled.push({ original, rerolled: rerolledVal });
+                        }
+                    }
+                    if (rerolled.length > 0) {
+                        formula += ` [Piercer Reroll]`;
+                        setRuntimeValue(playerStats.name, piercerUsedKey, currentRound, campaignName);
+                    }
+                }
+            }
+
+            // Enhanced Critical: when you score a Critical Hit with Piercing damage,
+            // roll one additional damage die
+            if (wasCrit) {
+                const piercerCrit = playerStats.automation.passives.find(
+                    a => a.type === 'damage_bonus' && a.trigger === 'critical_hit_piercing'
+                );
+                if (piercerCrit) {
+                    const weaponDieType = piercerCrit.diceType || 'weapon_die';
+                    if (weaponDieType === 'weapon_die' && attack.damage) {
+                        const dieMatch = attack.damage.match(/(\d+)d(\d+)/);
+                        if (dieMatch) {
+                            const numDice = parseInt(dieMatch[1], 10);
+                            const dieSize = parseInt(dieMatch[2], 10);
+                            if (numDice > 0 && dieSize > 0) {
+                                const extraDieSize = dieSize;
+                                const extraDieRoll = Math.floor(Math.random() * extraDieSize) + 1;
+                                formula += ` + 1[${attack.damageType}]`;
+                                total += extraDieRoll;
+                                rolls = [...rolls, extraDieRoll];
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Apply Savage Attacker feat: roll weapon damage dice twice, use either total (once per turn)
+        const hasSavageAttacker = playerStats.automation?.passives?.some(
+            p => p.type === 'passive_rule' && p.effect === 'reroll_damage_once_per_turn'
+        );
+        if (hasSavageAttacker && attack.damage) {
+            const savageAttackerFeature = playerStats.automation.passives.find(
+                p => p.type === 'passive_rule' && p.effect === 'reroll_damage_once_per_turn'
+            );
+            const savageUsedKey = `_${savageAttackerFeature?.name?.replace(/\s+/g, '_') || 'SavageAttacker'}_usedRound`;
+            const currentRound = getCurrentCombatRound();
+            const savageUsedRound = getRuntimeValue(playerStats.name, savageUsedKey, campaignName);
+            if (!savageUsedRound || savageUsedRound !== currentRound) {
+                const diceMatch = attack.damage.match(/(\d+)d(\d+)/);
+                if (diceMatch && rolls.length > 0) {
+                    const numDice = parseInt(diceMatch[1], 10);
+                    const dieSize = parseInt(diceMatch[2], 10);
+                    if (numDice > 0 && dieSize > 0 && numDice === rolls.length) {
+                        // Roll damage dice twice and compare totals
+                        const firstTotal = rolls.reduce((sum, r) => sum + r, 0);
+                        const secondRolls = [];
+                        for (let i = 0; i < numDice; i++) {
+                            secondRolls.push(Math.floor(Math.random() * dieSize) + 1);
+                        }
+                        const secondTotal = secondRolls.reduce((sum, r) => sum + r, 0);
+                        if (secondTotal > firstTotal) {
+                            const diff = secondTotal - firstTotal;
+                            total += diff;
+                            rolls = secondRolls;
+                            formula += ` [Savage Attacker]`;
+                        }
+                        setRuntimeValue(playerStats.name, savageUsedKey, currentRound, campaignName);
+                    }
+                }
+            }
+        }
+
         if (playerStats.automation?.actions) {
             const isCantrip = playerStats.spellAbilities?.spells?.some(s => s.name === attack.name && s.level === 0);
             if (isCantrip) {
@@ -895,6 +1201,7 @@ export default function useCharActionModals({
         bastionOfLawModal, setBastionOfLawModal,
         elementalAffinityModal, setElementalAffinityModal,
         fiendishResilienceModal, setFiendishResilienceModal,
+        boonOfEnergyResistanceModal, setBoonOfEnergyResistanceModal,
         dragonCompanionModal, setDragonCompanionModal,
         wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
         wildMagicTamedModal, setWildMagicTamedModal,

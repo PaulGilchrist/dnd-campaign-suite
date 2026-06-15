@@ -117,7 +117,16 @@ const rulesFactory = {
 
     getSenses: (playerStats, playerSummary) => {
         const { raceRules: rr } = rulesFactory.getRules(playerSummary);
-        return rr.getSenses(playerStats);
+        const senses = rr.getSenses(playerStats);
+        // Apply Truesight from passive_buff automation (e.g., Boon of Truesight)
+        const passives = playerStats.automation?.passives || [];
+        const truesightPassive = passives.find(p => p.type === 'passive_buff' && p.effect === 'truesight');
+        if (truesightPassive && !senses.some(s => s.name === 'Truesight')) {
+            const rangeMatch = String(truesightPassive.range || '').match(/(\d+)\s*ft/i);
+            const range = rangeMatch ? `${rangeMatch[1]} ft.` : '60 ft.';
+            senses.push({ name: 'Truesight', value: range });
+        }
+        return senses;
       },
 
       // Master method - delegates to unified rules
@@ -185,6 +194,15 @@ const rulesFactory = {
             playerStats.resistances = [...new Set([
                 ...(playerStats.resistances || []),
                 fiendishResilienceType
+            ])];
+        }
+
+        // Resolve Boon Of Energy Resistance damage type resistances (2024 Epic Boon)
+        const boonEnergyResistances = getRuntimeValue(playerStats.name, '_Boon_Of_Energy_Resistance_chosenTypes', playerSummary.campaignName);
+        if (Array.isArray(boonEnergyResistances) && boonEnergyResistances.length > 0) {
+            playerStats.resistances = [...new Set([
+                ...(playerStats.resistances || []),
+                ...boonEnergyResistances
             ])];
         }
 

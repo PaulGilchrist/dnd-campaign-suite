@@ -10,7 +10,7 @@ import { resetMiscBonuses, applyAbilityScoreIncreases, mergeDeduplicated } from 
 const ABILITY_PATTERN = /Increase your (\w+) score by (\d+)/i;
 const ABILITY_OR_PATTERN = /Increase your (\w+) or (\w+) score by (\d+)/i;
 const ABILITY_CHOOSE_PATTERN = /Choose one ability score.*?Increase (?:it|the chosen ability score) by (\d+)/i;
-const PROFICIENCY_PATTERN = /You gain proficiency with (.+)/i;
+const PROFICIENCY_PATTERN = /You gain proficiency with ([^.]+)/i;
 const PROFICIENCY_CHOICE_PATTERN = /You gain proficiency in any combination of (.+) of your choice/i;
 const SPEED_PATTERN = /Your speed increases by (\d+) feet/i;
 const INITIATIVE_PATTERN = /You gain a \+(\d+) bonus to initiative/i;
@@ -185,24 +185,200 @@ function parse2024Benefit(benefit, feat) {
       if (desc.includes('all skills')) {
         buffs.proficiencies.push({ name: 'all_skills', type: 'skill' });
       } else if (desc.includes('Expertise')) {
+        const skillMatch = desc.match(/(?:Choose one of the following skills:\s*|Choose one skill:\s*)(.+?)\.\s*(?:If|You|This|When)/i);
+        if (skillMatch) {
+          const skillList = skillMatch[1].split(/,\s*|,\s*(?:and\s+|\bor\s+)|(?:and\s+|\bor\s+)/).map(s => s.trim()).filter(s => s.length > 0);
+          if (skillList.length > 0) {
+            buffs.proficiencies.push({
+              name: benefit.name,
+              type: 'proficiency',
+              isChoice: true,
+              choose: 1,
+              from: [skillList.join(', ')],
+              grantsExpertise: true,
+            });
+          } else {
+            buffs.features.push({
+              name: benefit.name,
+              description: desc,
+              type: 'expertise',
+            });
+          }
+        } else {
+          buffs.features.push({
+            name: benefit.name,
+            description: desc,
+            type: 'expertise',
+          });
+        }
+      } else {
+        const numWords = '(?:one|two|three|four|five|six|seven|eight|nine|ten|1|2|3|4|5|6|7|8|9|10)';
+        const chooseMatch = desc.match(new RegExp(numWords + '\\s+(?:different\\s+)?(.+?)\\s+of\\s+your\\s+choice', 'i'));
+        if (chooseMatch) {
+          const firstWord = chooseMatch[0].split(' ')[0].toLowerCase();
+          const wordToNum = { one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+          let count = wordToNum[firstWord] || 1;
+          if (!wordToNum[firstWord]) {
+            const numMatch = firstWord.match(/^(\d+)/);
+            if (numMatch) count = parseInt(numMatch[1], 10);
+          }
+          const fromList = chooseMatch[1].trim();
+          buffs.proficiencies.push({
+            name: benefit.name,
+            type: 'proficiency',
+            isChoice: true,
+            choose: count,
+            from: [fromList],
+          });
+        } else {
+          const armorTrainingMatch = desc.match(/training with (\w+(?:\s+(?:and\s+)?\w+)*)\s*armor(?:\s+and\s+shields)?/i);
+          if (armorTrainingMatch) {
+            const armorType = armorTrainingMatch[1];
+            const formattedArmor = armorType.charAt(0).toUpperCase() + armorType.slice(1) + ' Armor';
+            buffs.proficiencies.push({ name: formattedArmor, type: 'proficiency' });
+            if (/shields/i.test(armorTrainingMatch[0])) {
+              buffs.proficiencies.push({ name: 'Shields', type: 'proficiency' });
+            }
+          } else {
+            const weaponMatch = desc.match(/proficiency with (Martial|Simple|Light Martial|Finesse Martial|Heavy Martial) weapons?/i);
+            if (weaponMatch) {
+              const weaponType = weaponMatch[1].charAt(0).toUpperCase() + weaponMatch[1].slice(1);
+              buffs.proficiencies.push({ name: `${weaponType} Weapons`, type: 'proficiency' });
+            } else {
+              buffs.proficiencies.push({ name: benefit.name, type: 'proficiency' });
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case 'resistance': {
+      const auto = benefit.automation;
+      if (auto) {
+        const validTypes = auto.validTypes || [];
+        if (validTypes.length > 0) {
+          const numChoice = Array.isArray(auto.resistanceType)
+            ? auto.resistanceType[0]?.replace('player_choice_', '').replace('_from_list', '') || '2'
+            : '2';
+          const count = parseInt(numChoice, 10) || 2;
+          buffs.features.push({
+            name: benefit.name,
+            description: benefit.description,
+            type: 'resistance_choice',
+            automation: {
+              ...auto,
+              count,
+              validTypes,
+            },
+          });
+        } else {
+          buffs.features.push({
+            name: benefit.name,
+            description: benefit.description,
+            type: 'resistance',
+            automation: auto,
+          });
+        }
+      } else {
         buffs.features.push({
           name: benefit.name,
-          description: desc,
-          type: 'expertise',
+          description: benefit.description,
+          type: 'resistance',
+        });
+      }
+      break;
+    }
+
+    case 'saving_throw': {
+      const auto = benefit.automation;
+      if (auto) {
+        buffs.features.push({
+          name: benefit.name,
+          description: benefit.description,
+          type: 'saving_throw',
+          automation: auto,
+        });
+      }
+      break;
+    }
+
+    case 'damage': {
+      if (benefit.automation?.type === 'reroll_damage_once_per_turn') {
+        buffs.features.push({
+          name: 'Savage Attacker',
+          description: benefit.description,
+          type: 'reroll_damage_once_per_turn',
+          automation: { type: 'reroll_damage_once_per_turn' },
         });
       } else {
-        buffs.proficiencies.push({ name: benefit.name, type: 'proficiency' });
+        buffs.features.push({
+          name: benefit.name,
+          description: benefit.description,
+          type: benefit.type,
+          automation: benefit.automation,
+        });
+      }
+      break;
+    }
+
+    case 'spell': {
+      const isLevel1Spell = benefit.name && benefit.name.toLowerCase().includes('level 1');
+      if (isLevel1Spell && benefit.automation) {
+        buffs.features.push({
+          name: benefit.name,
+          description: benefit.description,
+          type: 'free_spell',
+          automation: benefit.automation,
+        });
+      } else {
+        buffs.features.push({
+          name: benefit.name,
+          description: benefit.description,
+          type: 'spell',
+          automation: benefit.automation,
+        });
       }
       break;
     }
 
     default: {
-      buffs.features.push({
-        name: benefit.name,
-        description: benefit.description,
-        type: benefit.type,
-        automation: benefit.automation,
-      });
+      const benefitName = benefit.name || '';
+      if (benefitName.includes('Great Weapon Fighting') || benefitName.includes('Damage Die Reroll')) {
+        buffs.features.push({
+          name: 'Great Weapon Fighting',
+          description: benefit.description,
+          type: 'great_weapon_fighting',
+          automation: { type: 'great_weapon_fighting' },
+        });
+      } else if (benefitName.includes('Savage Strike') || benefitName === 'Savage Attacker') {
+        buffs.features.push({
+          name: 'Savage Attacker',
+          description: benefit.description,
+          type: 'reroll_damage_once_per_turn',
+          automation: { type: 'reroll_damage_once_per_turn' },
+        });
+      } else if (benefit.type === 'bonus_action') {
+        const desc = benefit.description || '';
+        const profMatch = desc.match(PROFICIENCY_PATTERN);
+        if (profMatch) {
+          buffs.proficiencies.push({ name: profMatch[1].trim() });
+        }
+        buffs.features.push({
+          name: benefit.name,
+          description: benefit.description,
+          type: 'bonus_action',
+          automation: benefit.automation,
+          isBonusAction: true,
+        });
+      } else {
+        buffs.features.push({
+          name: benefit.name,
+          description: benefit.description,
+          type: benefit.type,
+          automation: benefit.automation,
+        });
+      }
       break;
     }
   }

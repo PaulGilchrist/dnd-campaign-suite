@@ -78,6 +78,9 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const bardicInspirationCur = getRuntimeValue(playerStats.name, 'bardicInspirationUses');
     const fontOfInspirationAvailable = hasFontOfInspiration && (bardicInspirationCur == null || Number(bardicInspirationCur) < bardicInspirationMax);
 
+    const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats');
+    const [bolsteringTreatsCrafted, setBolsteringTreatsCrafted] = React.useState(false);
+
     const maxHitDice = playerStats.level;
     const hitDie = getHitDieSize(playerStats);
     const conBonus = playerStats.abilities?.find(a => a.name === 'Constitution')?.bonus || 0;
@@ -137,6 +140,13 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
     const handleApplyFontOfInspiration = () => {
         if (!hasFontOfInspiration || !fontOfInspirationAvailable || fontOfInspirationRequested) return;
         setFontOfInspirationRequested(true);
+       };
+
+    const handleCraftBolsteringTreats = () => {
+        if (!hasBolsteringTreats || bolsteringTreatsCrafted) return;
+        const treatCount = playerStats.proficiency || 0;
+        setRuntimeValue(playerStats.name, 'chefBolsteringTreats', treatCount, campaignName);
+        setBolsteringTreatsCrafted(true);
        };
 
     const handleComplete = () => {
@@ -260,21 +270,37 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
                         </div>
                     )}
 
-                    {hasFontOfInspiration && (fontOfInspirationAvailable || fontOfInspirationRequested) && (
-                        <div className="short-rest-section">
-                            <h4>Font of Inspiration</h4>
-                            <p>Regain {bardicInspirationMax} expended Bardic Inspiration uses.</p>
-                            <div className="short-rest-dice-row">
-                                {fontOfInspirationRequested ? (
-                                    <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Font of Inspiration applied</span>
-                                  ) : (
-                                    <button className="char-btn" onClick={handleApplyFontOfInspiration} disabled={!fontOfInspirationAvailable}>
-                                        <i className="fas fa-wand-magic-sparkles"></i> Regain {bardicInspirationMax} Bardic Inspiration Uses
-                                    </button>
-                                  )}
-                            </div>
-                        </div>
-                    )}
+                     {hasFontOfInspiration && (fontOfInspirationAvailable || fontOfInspirationRequested) && (
+                         <div className="short-rest-section">
+                             <h4>Font of Inspiration</h4>
+                             <p>Regain {bardicInspirationMax} expended Bardic Inspiration uses.</p>
+                             <div className="short-rest-dice-row">
+                                 {fontOfInspirationRequested ? (
+                                     <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Font of Inspiration applied</span>
+                                   ) : (
+                                     <button className="char-btn" onClick={handleApplyFontOfInspiration} disabled={!fontOfInspirationAvailable}>
+                                         <i className="fas fa-wand-magic-sparkles"></i> Regain {bardicInspirationMax} Bardic Inspiration Uses
+                                     </button>
+                                   )}
+                             </div>
+                         </div>
+                     )}
+
+                     {hasBolsteringTreats && (
+                         <div className="short-rest-section">
+                             <h4>Bolstering Treats</h4>
+                             <p>Craft {playerStats.proficiency || 0} bolstering treats (last 8 hours).</p>
+                             <div className="short-rest-dice-row">
+                                 {bolsteringTreatsCrafted ? (
+                                     <span className="short-rest-applied"><i className="fa-solid fa-check"></i> Treats crafted</span>
+                                   ) : (
+                                     <button className="char-btn" onClick={handleCraftBolsteringTreats}>
+                                         <i className="fas fa-cookie-bite"></i> Craft Bolstering Treats
+                                     </button>
+                                   )}
+                             </div>
+                         </div>
+                     )}
 
                       {resourceLabels.length > 0 && (
                        <div className="short-rest-section">

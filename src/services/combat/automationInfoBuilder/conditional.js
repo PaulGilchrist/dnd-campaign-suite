@@ -79,10 +79,20 @@ export const conditionalHandlers = {
 
     'passive_rule': (feature, _playerStats) => {
         const auto = feature.automation
+        const effect = auto.effect || ''
+        if (effect === 'ignore_resistance') {
+            return {
+                type: 'passive_rule',
+                name: feature.name,
+                effect: 'ignore_resistance',
+                damageTypes: auto.damageTypes || [],
+                hasAutomation: true
+            }
+        }
         return {
             type: 'passive_rule',
             name: feature.name,
-            effect: auto.effect || '',
+            effect: effect,
             bonusExpression: auto.bonusExpression || '',
             criticalRange: auto.criticalRange || '',
             spells: auto.spells || [],

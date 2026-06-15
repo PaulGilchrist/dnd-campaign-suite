@@ -105,7 +105,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === MELEE_REACH_FEET);
         const attackRoll = meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
         if (attackRoll) {
-            rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined });
+            rollAttack(attackRoll.name, attackRoll.hitBonus, { forcedMode: undefined, isOpportunityAttack: true });
         }
     };
 
@@ -114,7 +114,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
         const auto = reaction.automation;
         if (!auto) return;
 
-        const result = await executeHandler(reaction, playerStats, campaignName, mapName);
+        const result = await executeHandler(reaction, playerStats, campaignName, mapName, playerStats.equipment);
         if (!result) {
             const html = buildFeatureDetailHtml(reaction);
             if (html) setPopupHtml(html);
@@ -123,7 +123,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
         if (result.type === 'attack_roll') {
             const { attack, targetName } = result.payload;
-            rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined });
+            rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true });
             return;
         }
 

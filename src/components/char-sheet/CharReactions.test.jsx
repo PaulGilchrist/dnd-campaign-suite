@@ -219,7 +219,7 @@ describe('CharReactions', () => {
     fireEvent.click(oaElement);
 
     await vi.waitFor(() => {
-      expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { forcedMode: undefined });
+      expect(mockRollAttack).toHaveBeenCalledWith('Longsword', 5, { forcedMode: undefined, isOpportunityAttack: true });
     });
    });
 

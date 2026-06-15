@@ -20,7 +20,50 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   if (modifier.effect === 'portent') return true;
   if (modifier.effect === 'potent_cantrip') return true;
   if (modifier.effect === 'soulstitch_spells') return true;
-  if (modifier.target !== 'saving_throw' && modifier.target !== 'save') return false;
+  if (modifier.condition === 'creature_grappled_by_you') {
+    if (!combatContext || !combatContext.creatures) return false;
+    const attackerName = combatContext.activeCreatureName || combatContext.attackerName;
+    if (!attackerName) return false;
+    const attackerCreature = combatContext.creatures.find(c => c.name === attackerName);
+    const targetName = attackerCreature?.targetName;
+    if (!targetName) return false;
+    const targetCreature = combatContext.creatures.find(c => c.name === targetName);
+    if (targetCreature && targetCreature.conditions) {
+      const targetConditions = targetCreature.conditions.map(c => {
+        if (typeof c === 'object') return String(c.key || '').toLowerCase();
+        return String(c).toLowerCase();
+      });
+      return targetConditions.includes('grappled');
+    }
+    return false;
+  }
+  if (modifier.condition === 'mounted_and_target_one_size_smaller') {
+    if (!combatContext || !combatContext.creatures) return false;
+    const attackerName = combatContext.activeCreatureName || combatContext.attackerName;
+    if (!attackerName) return false;
+    const attackerCreature = combatContext.creatures.find(c => c.name === attackerName);
+    if (!attackerCreature) return false;
+    const isMounted = attackerCreature.isMounted || false;
+    if (!isMounted) return false;
+    const isNotIncapacitated = !attackerCreature.conditions || !attackerCreature.conditions.some(c => {
+      const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
+      return ['incapacitated'].includes(cStr.toLowerCase());
+    });
+    if (!isNotIncapacitated) return false;
+    const targetName = attackerCreature.targetName;
+    if (!targetName) return false;
+    const targetCreature = combatContext.creatures.find(c => c.name === targetName);
+    if (!targetCreature) return false;
+    const mountSizeIndex = ['Fine', 'Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
+    const mountSizeIdx = mountSizeIndex.indexOf(attackerCreature.mountSize || 'Medium');
+    const targetSizeIdx = mountSizeIndex.indexOf(targetCreature.size || 'Medium');
+    if (mountSizeIdx === -1 || targetSizeIdx === -1) return false;
+    if (targetSizeIdx >= mountSizeIdx) return false;
+    const within5ft = attackerCreature.rangeToTarget == null || attackerCreature.rangeToTarget <= 5;
+    if (!within5ft) return false;
+    return true;
+  }
+  if (modifier.target !== 'saving_throw' && modifier.target !== 'save' && modifier.target !== 'attack_roll' && modifier.target !== 'attack_rolls' && modifier.target !== 'attack_rolls_vs_unmounted_near_mount') return false;
   if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'shape_shift') return shapeShiftActive;
   if (modifier.condition === 'peerless_athlete') return isPeerlessAthlete;
@@ -47,6 +90,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     if (playerCreature && playerCreature.hasActed) return false;
     return true;
   }
+  if (modifier.condition === 'concentration_breaker') return true;
   if (modifier.condition === 'pfeag_save_advantage') return true;
   if (modifier.condition === 'protection_from_poison_active') return true;
   if (modifier.condition && conditionSet.has(modifier.condition)) return true;
@@ -80,9 +124,23 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       if (mod.effect === 'dex_jump') {
         effects.dexJump = true;
       }
+    } else if (mod.target === 'all_attackers_vs_target') {
+      if (mod.effect === 'advantage') {
+        effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+      }
+      if (mod.effect === 'disadvantage') {
+        effects.targetDisadvantageCount = (effects.targetDisadvantageCount || 0) + 1;
+      }
     } else if (mod.target === 'd20') {
       if (mod.effect === 'restore_balance') {
         effects.restoreBalance = true;
+      }
+    } else if (mod.target === 'attack_roll' || mod.target === 'attack_rolls' || mod.target === 'attack_rolls_vs_unmounted_near_mount') {
+      if (mod.effect === 'advantage') {
+        effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
+      }
+      if (mod.effect === 'disadvantage') {
+        effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
       }
     } else if (mod.target !== 'saving_throw' && mod.target !== 'save') {
       continue;
@@ -131,6 +189,19 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     }
     else if (mod.effect === 'stroke_of_luck') {
       effects.strokeOfLuck = true;
+    }
+    else if (mod.effect === 'lucky_point') {
+      if (mod.effectType === 'advantage') {
+        effects.luckyAdvantage = true;
+      }
+      if (mod.effectType === 'disadvantage') {
+        effects.luckyDisadvantage = true;
+      }
+    }
+    else if (mod.effect === 'modify_d20_roll') {
+      effects.modifyD20Roll = true;
+      effects.modifyD20RollDice = mod.diceExpression || '2d4';
+      effects.modifyD20RollCanBeBonusOrPenalty = !!mod.canBeBonusOrPenalty;
     }
     else if (mod.effect === 'restore_balance') {
       effects.restoreBalance = true;
@@ -210,6 +281,11 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     tacticalMind: false,
     tacticalMindBonus: null,
     strokeOfLuck: false,
+    luckyAdvantage: false,
+    luckyDisadvantage: false,
+    modifyD20Roll: false,
+    modifyD20RollDice: null,
+    modifyD20RollCanBeBonusOrPenalty: false,
     dexJump: false,
     restoreBalance: false,
     d20Floor10: false,
@@ -225,6 +301,8 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     illusoryReality: false,
     riderSaveDisadvantage: false,
     riderAttackBonus: 0,
+    riderDamageExpression: null,
+    riderDamageType: '',
     damageDoubled: false,
     riderCannotOpportunityAttack: false,
     riderNoReactions: false,
@@ -375,6 +453,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     if (te.effect === 'next_attack_advantage') {
       effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
     }
+    if (te.effect === 'crusher_enhanced_critical') {
+      effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+    }
     if (te.effect === 'disadvantage_next_attack') {
       effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
     }
@@ -400,6 +481,13 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
       effects.pushEffect = true;
       if (!effects.pushDistance) {
         effects.pushDistance = te.value || 10;
+      }
+    }
+    if (te.effect === 'damage_bonus') {
+      effects.riderAttackBonus = (effects.riderAttackBonus || 0) + (te.value || 0);
+      if (te.damageExpression) {
+        effects.riderDamageExpression = te.damageExpression;
+        effects.riderDamageType = te.damageType || '';
       }
     }
     if (te.effect === 'prone_and_push') {

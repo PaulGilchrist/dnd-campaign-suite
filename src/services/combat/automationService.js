@@ -4,7 +4,7 @@ export { evaluateAutoExpression, resolveDiceExpression } from './automationExpre
 export { collectAutomationFromFeatures, processFeatureAutomation, collectTurnStartEffects } from './automationCollector.js'
 export { collectSaveModifiers } from './automationModifiers.js'
 export { getConditionImmunities, getConditionalImmunities, playerIsImmuneToCondition, hasSelfRestoration } from './automationImmunities.js'
-export { getPassiveBuffs, collectWeaponMastery, resolveHealingBonuses, hasHealingMaximization, hasTacticalShift } from './automationPassives.js'
+export { getPassiveBuffs, collectWeaponMastery, resolveHealingBonuses, hasHealingMaximization, hasRerollHealingOnes, hasTacticalShift, hasIgnoreResistance, hasMinDamage, hasTruesight, hasFastWrestler } from './automationPassives.js'
 
 export function hasAutomation(feature) {
     return !!(feature?.automation)

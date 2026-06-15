@@ -47,6 +47,7 @@ import BonusActionChoiceModal from './BonusActionChoiceModal.jsx'
 import RevelationInFleshModal from './RevelationInFleshModal.jsx'
 import ElementalAffinityModal from './ElementalAffinityModal.jsx'
 import FiendishResilienceModal from './FiendishResilienceModal.jsx'
+import BoonOfEnergyResistanceModal from './BoonOfEnergyResistanceModal.jsx'
 import DragonCompanionModal from './DragonCompanionModal.jsx'
 import WildMagicDoubleRollModal from './WildMagicDoubleRollModal.jsx'
 import WildMagicTamedModal from './WildMagicTamedModal.jsx'
@@ -258,6 +259,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         bastionOfLawModal, setBastionOfLawModal,
         elementalAffinityModal, setElementalAffinityModal,
         fiendishResilienceModal, setFiendishResilienceModal,
+        boonOfEnergyResistanceModal, setBoonOfEnergyResistanceModal,
         dragonCompanionModal, setDragonCompanionModal,
         wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
         wildMagicTamedModal, setWildMagicTamedModal,
@@ -444,7 +446,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }
         }
 
-        const result = await executeHandler(action, playerStats, campaignName, mapName);
+        const result = await executeHandler(action, playerStats, campaignName, mapName, playerStats.equipment);
         if (!result) return;
 
         switch (result.type) {
@@ -496,6 +498,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         const frAction = frPayload?.action;
                         const frTypes = frPayload?.damageTypes || ['Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Piercing', 'Poison', 'Psychic', 'Radiant', 'Slashing', 'Thunder'];
                         setFiendishResilienceModal({ action: frAction, playerStats, campaignName, damageTypes: frTypes, existingType: frPayload?.existingType });
+                        break;
+                    }
+                    case 'boonOfEnergyResistance': {
+                        const berPayload = result.payload;
+                        const berAction = berPayload?.action;
+                        const berTypes = berPayload?.damageTypes || ['Acid', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Poison', 'Psychic', 'Radiant', 'Thunder'];
+                        setBoonOfEnergyResistanceModal({ action: berAction, playerStats, campaignName, damageTypes: berTypes, existingTypes: berPayload?.existingTypes, maxSelections: berPayload?.maxSelections || 2 });
                         break;
                     }
                     case 'dragonCompanion':
@@ -1055,6 +1064,12 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     <FiendishResilienceModal
                         {...fiendishResilienceModal}
                         onClose={() => setFiendishResilienceModal(null)}
+                    />
+                )}
+                {boonOfEnergyResistanceModal && (
+                    <BoonOfEnergyResistanceModal
+                        {...boonOfEnergyResistanceModal}
+                        onClose={() => setBoonOfEnergyResistanceModal(null)}
                     />
                 )}
                 {dragonCompanionModal && (

@@ -23,6 +23,7 @@ vi.mock('../../common/healingRoll.js', () => ({
 vi.mock('../../../combat/automationService.js', () => ({
   resolveHealingBonuses: vi.fn(),
   hasHealingMaximization: vi.fn(),
+  hasRerollHealingOnes: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/useRuntimeState.js', () => ({
@@ -417,6 +418,76 @@ describe('healingHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
       expect(automationService.resolveHealingBonuses).toHaveBeenCalledWith(ps, 2, 3, 3);
+    });
+  });
+
+  describe('Reroll Healing Ones', () => {
+    it('should use rollExpression with rerollOnes option when hasRerollHealingOnes is true', async () => {
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Second Wind',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d10',
+        },
+      };
+
+      diceRoller.rollExpression.mockReturnValue({ total: 8, rolls: [8] });
+      automationService.resolveHealingBonuses.mockReturnValue(0);
+      automationService.hasHealingMaximization.mockReturnValue(false);
+      automationService.hasRerollHealingOnes.mockReturnValue(true);
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 22, maxHp: 30, actualHeal: 8 });
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+
+      await handle(action, ps, campaignName, null);
+
+      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d10', { rerollOnes: true });
+      expect(diceRoller.rollExpressionMaximized).not.toHaveBeenCalled();
+    });
+
+    it('should prefer maximize over rerollOnes when both are true', async () => {
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Second Wind',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d10',
+        },
+      };
+
+      diceRoller.rollExpressionMaximized.mockReturnValue({ total: 10, rolls: [10] });
+      automationService.hasHealingMaximization.mockReturnValue(true);
+      automationService.hasRerollHealingOnes.mockReturnValue(true);
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 25, maxHp: 30, actualHeal: 10 });
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+
+      await handle(action, ps, campaignName, null);
+
+      expect(diceRoller.rollExpressionMaximized).toHaveBeenCalledWith('1d10');
+      expect(diceRoller.rollExpression).not.toHaveBeenCalled();
+    });
+
+    it('should use normal rollExpression when neither maximize nor rerollOnes is true', async () => {
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Second Wind',
+        automation: {
+          type: 'self_healing',
+          healExpression: '1d10',
+        },
+      };
+
+      diceRoller.rollExpression.mockReturnValue({ total: 6, rolls: [6] });
+      automationService.resolveHealingBonuses.mockReturnValue(0);
+      automationService.hasHealingMaximization.mockReturnValue(false);
+      automationService.hasRerollHealingOnes.mockReturnValue(false);
+      healingRoll.applyHealingDirectly.mockReturnValue({ newHp: 20, maxHp: 30, actualHeal: 6 });
+      useRuntimeState.getRuntimeValue.mockReturnValue(2);
+
+      await handle(action, ps, campaignName, null);
+
+      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d10');
+      expect(diceRoller.rollExpressionMaximized).not.toHaveBeenCalled();
     });
   });
 });

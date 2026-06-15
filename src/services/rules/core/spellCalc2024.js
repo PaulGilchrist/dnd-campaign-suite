@@ -12,6 +12,10 @@ import {
     getGnomishLineageLevel3Spell,
     getGnomishLineageLevel5Spell,
 } from '../../automation/handlers/class-other/gnomishLineageHandler.js';
+import {
+    getMagicInitiateCantrips,
+    getMagicInitiateLevel1Spell,
+} from '../../automation/handlers/feats/magicInitiateHandler.js';
 
 export function getSpellAbilities(allSpells, playerStats, playerSummary) {
     let spellAbilities = null;
@@ -179,6 +183,21 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                                 }
                             }
                         }
+                    }
+                }
+                if (feature.type === 'magic_initiate') {
+                    const campaignName = playerSummary?.campaignName;
+                    const cantrips = getMagicInitiateCantrips(playerStats, campaignName);
+                    if (Array.isArray(cantrips)) {
+                        cantrips.forEach(cantripName => {
+                            if (cantripName && !spellAbilities.spells.find(s => s.name === cantripName)) {
+                                spellAbilities.spells.push({ name: cantripName, prepared: 'Always' });
+                            }
+                        });
+                    }
+                    const level1Spell = getMagicInitiateLevel1Spell(playerStats, campaignName);
+                    if (level1Spell && !spellAbilities.spells.find(s => s.name === level1Spell)) {
+                        spellAbilities.spells.push({ name: level1Spell, prepared: 'Always' });
                     }
                 }
                 if (feature.type === 'passive_rule' && feature.effect === 'always_prepared_spells' && feature.spells) {

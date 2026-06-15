@@ -447,7 +447,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
   : <CharSpells playerStats={playerStats} handleTogglePreparedSpells={(spellName) => handleTogglePreparedSpells(spellName)} campaignName={campaignName} exhaustionPenalty={exhaustionPenalty} conditionAttackMode={conditionAttackMode} cannotAct={cannotAct} mapName={activeMapName} characters={characters}></CharSpells>
 
 }<hr />
-            <CharSpecialActions playerStats={playerStats}></CharSpecialActions><hr />
+            <CharSpecialActions playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct}></CharSpecialActions><hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />
             <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
         </div>}

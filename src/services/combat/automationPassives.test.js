@@ -23,6 +23,8 @@ vi.mock('./automationExpressions.js', () => ({
         if (expr === '2d6') return 7
         if (expr === '1d8+2') return 7
         if (expr === 'invalid') return NaN
+        const num = Number(expr)
+        if (!isNaN(num)) return num
         return 0
     }),
 }))
@@ -51,6 +53,9 @@ import {
     collectWeaponMastery,
     resolveHealingBonuses,
     hasHealingMaximization,
+    hasRerollHealingOnes,
+    hasFastWrestler,
+    getDamageReduction,
 } from './automationPassives.js'
 
 // ── Helpers ──────────────────────────────────────────────────────
@@ -540,5 +545,325 @@ describe('hasHealingMaximization', () => {
         })
         const result = hasHealingMaximization(playerStats)
         expect(result).toBe(true)
+    })
+})
+
+describe('hasFastWrestler', () => {
+    function makePlayerStats(overrides = {}) {
+        return {
+            automation: { passives: [] },
+            ...overrides,
+        }
+    }
+
+    it('returns false when no passives exist', () => {
+        const playerStats = makePlayerStats()
+        const result = hasFastWrestler(playerStats)
+        expect(result).toBe(false)
+    })
+
+    it('returns false when fast_wrestler passive is absent', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'truesight' },
+                ],
+            },
+        })
+        const result = hasFastWrestler(playerStats)
+        expect(result).toBe(false)
+    })
+
+    it('returns true when fast_wrestler passive is present', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'fast_wrestler' },
+                ],
+            },
+        })
+        const result = hasFastWrestler(playerStats)
+        expect(result).toBe(true)
+    })
+
+    it('returns true when fast_wrestler is among other passives', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'truesight' },
+                    { type: 'passive_buff', effect: 'fast_wrestler' },
+                    { type: 'passive_buff', effect: 'speed_increase' },
+                ],
+            },
+        })
+        const result = hasFastWrestler(playerStats)
+        expect(result).toBe(true)
+    })
+})
+
+describe('hasRerollHealingOnes', () => {
+    function makePlayerStats(overrides = {}) {
+        return {
+            automation: { passives: [] },
+            ...overrides,
+        }
+    }
+
+    it('returns true when reroll_healing_ones passive exists', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_rule', effect: 'reroll_healing_ones' },
+                ],
+            },
+        })
+        const result = hasRerollHealingOnes(playerStats)
+        expect(result).toBe(true)
+    })
+
+    it('returns false when no passives exist', () => {
+        const playerStats = makePlayerStats({ automation: { passives: [] } })
+        const result = hasRerollHealingOnes(playerStats)
+        expect(result).toBe(false)
+    })
+
+    it('returns false when automation.passives is missing', () => {
+        const playerStats = makePlayerStats({ automation: {} })
+        const result = hasRerollHealingOnes(playerStats)
+        expect(result).toBe(false)
+    })
+
+    it('returns false when automation is missing', () => {
+        const playerStats = makePlayerStats({ automation: null })
+        const result = hasRerollHealingOnes(playerStats)
+        expect(result).toBe(false)
+    })
+
+    it('returns false when no passives have the effect', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_rule', effect: 'bonus_healing' },
+                    { type: 'passive_buff', effect: 'advantage' },
+                ],
+            },
+        })
+        const result = hasRerollHealingOnes(playerStats)
+        expect(result).toBe(false)
+    })
+
+    it('returns true when reroll_healing_ones exists among other passives', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'advantage' },
+                    { type: 'passive_rule', effect: 'reroll_healing_ones' },
+                    { type: 'passive_rule', effect: 'bonus_healing' },
+                ],
+            },
+        })
+        const result = hasRerollHealingOnes(playerStats)
+        expect(result).toBe(true)
+    })
+
+    it('returns false for passive_buff type with same effect', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_buff', effect: 'reroll_healing_ones' },
+                ],
+            },
+        })
+        const result = hasRerollHealingOnes(playerStats)
+        expect(result).toBe(false)
+    })
+
+    it('returns false for passive_immunity type with same effect', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'passive_immunity', effect: 'reroll_healing_ones' },
+                ],
+            },
+        })
+        const result = hasRerollHealingOnes(playerStats)
+        expect(result).toBe(false)
+    })
+})
+
+describe('getDamageReduction', () => {
+    beforeEach(() => {
+        vi.clearAllMocks()
+    })
+
+    it('returns null when playerStats is null', () => {
+        expect(getDamageReduction(null, 'fire', false)).toBeNull()
+    })
+
+    it('returns null when no damage_reduction automations exist', () => {
+        const playerStats = makePlayerStats({
+            automation: { passives: [], reactions: [], specialActions: [] },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBeNull()
+    })
+
+    it('applies passive damage reduction from passives', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reduction: 5 },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(5)
+    })
+
+    it('applies passive damage reduction from reactions', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                reactions: [
+                    { type: 'damage_reduction', reduction: 3 },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(3)
+    })
+
+    it('applies passive damage reduction from specialActions', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                specialActions: [
+                    { type: 'damage_reduction', reduction: 4 },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(4)
+    })
+
+    it('does NOT apply damage reduction when reaction is true', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                reactions: [
+                    { type: 'damage_reduction', reductionExpression: '1d10 + 3', reaction: true },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBeNull()
+    })
+
+    it('applies damage reduction when reaction is false', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reduction: 5, reaction: false },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(5)
+    })
+
+    it('filters by damage type', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reduction: 10, damageTypes: ['fire'] },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(10)
+        expect(getDamageReduction(playerStats, 'cold', false)).toBeNull()
+    })
+
+    it('skips when damage type does not match', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reductionExpression: '10', damageTypes: ['fire'] },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'cold', false)).toBeNull()
+    })
+
+    it('applies to all damage types when damageTypes is empty', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reduction: 5, damageTypes: [] },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(5)
+        expect(getDamageReduction(playerStats, 'cold', false)).toBe(5)
+    })
+
+    it('skips wearing_heavy_armor condition when not wearing heavy armor', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reductionExpression: '5', condition: 'wearing_heavy_armor' },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBeNull()
+    })
+
+    it('applies wearing_heavy_armor condition when wearing heavy armor', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reduction: 5, condition: 'wearing_heavy_armor' },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', true)).toBe(5)
+    })
+
+    it('sums multiple damage reductions', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reduction: 3 },
+                    { type: 'damage_reduction', reduction: 5 },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(8)
+    })
+
+    it('excludes reaction-based and includes passive damage reductions', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                reactions: [
+                    { type: 'damage_reduction', reduction: 13, reaction: true },
+                ],
+                passives: [
+                    { type: 'damage_reduction', reduction: 5 },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(5)
+    })
+
+    it('returns null when reduction evaluates to 0', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reductionExpression: '0' },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBeNull()
+    })
+
+    it('handles number reduction directly', () => {
+        const playerStats = makePlayerStats({
+            automation: {
+                passives: [
+                    { type: 'damage_reduction', reduction: 8 },
+                ],
+            },
+        })
+        expect(getDamageReduction(playerStats, 'fire', false)).toBe(8)
     })
 })

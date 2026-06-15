@@ -408,6 +408,106 @@ describe('computeFeatBuffs', () => {
       ]);
     });
 
+    it('should parse Observant Keen Observer as a proficiency choice with expertise', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            {
+              type: 'proficiency',
+              name: 'Keen Observer',
+              description: 'Choose one of the following skills: Insight, Investigation, or Perception. If you lack proficiency with the chosen skill, you gain proficiency in it, and if you already have proficiency in it, you gain Expertise in it.',
+            },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        {
+          name: 'Keen Observer',
+          type: 'proficiency',
+          isChoice: true,
+          choose: 1,
+          from: ['Insight, Investigation, Perception'],
+          grantsExpertise: true,
+        },
+      ]);
+      expect(result.features).toHaveLength(0);
+    });
+
+    it('should parse Observant Quick Search as a bonus action feature', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            {
+              type: 'bonus_action',
+              name: 'Quick Search',
+              description: 'You can take the Search action as a Bonus Action.',
+            },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.features).toEqual([
+        {
+          name: 'Quick Search',
+          description: 'You can take the Search action as a Bonus Action.',
+          type: 'bonus_action',
+          isBonusAction: true,
+        },
+      ]);
+    });
+
+    it('should parse all three Observant benefits together', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            {
+              name: 'Ability Score Increase',
+              description: 'Increase your Intelligence or Wisdom score by 1, to a maximum of 20.',
+              type: 'ability_score_increase',
+            },
+            {
+              name: 'Keen Observer',
+              description: 'Choose one of the following skills: Insight, Investigation, or Perception. If you lack proficiency with the chosen skill, you gain proficiency in it, and if you already have proficiency in it, you gain Expertise in it.',
+              type: 'proficiency',
+            },
+            {
+              name: 'Quick Search',
+              description: 'You can take the Search action as a Bonus Action.',
+              type: 'bonus_action',
+            },
+          ],
+          ability_score_increase: { scores: ['Intelligence', 'Wisdom'], amount: 1, max_value: 20 },
+        },
+        '2024'
+      );
+
+      expect(result.abilityScoreIncreases).toEqual([
+        { name: 'Intelligence', amount: 1, isChoice: true, description: 'Increase your Intelligence or Wisdom score by 1, to a maximum of 20.' },
+        { name: 'Wisdom', amount: 1, isChoice: true, description: 'Increase your Intelligence or Wisdom score by 1, to a maximum of 20.' },
+      ]);
+      expect(result.proficiencies).toEqual([
+        {
+          name: 'Keen Observer',
+          type: 'proficiency',
+          isChoice: true,
+          choose: 1,
+          from: ['Insight, Investigation, Perception'],
+          grantsExpertise: true,
+        },
+      ]);
+      expect(result.features).toEqual([
+        {
+          name: 'Quick Search',
+          description: 'You can take the Search action as a Bonus Action.',
+          type: 'bonus_action',
+          isBonusAction: true,
+        },
+      ]);
+    });
+
     it('should parse a regular proficiency benefit', () => {
       const result = computeFeatBuffs(
         {
@@ -420,6 +520,139 @@ describe('computeFeatBuffs', () => {
 
       expect(result.proficiencies).toEqual([
         { name: 'Light Armor', type: 'proficiency' },
+      ]);
+    });
+
+    it('should parse weapon proficiency from Martial Weapon Training feat', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Weapon Proficiency', description: 'You gain proficiency with Martial weapons.' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        { name: 'Martial Weapons', type: 'proficiency' },
+      ]);
+    });
+
+    it('should parse weapon proficiency from simple weapons', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Weapon Proficiency', description: 'You gain proficiency with Simple weapons.' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        { name: 'Simple Weapons', type: 'proficiency' },
+      ]);
+    });
+
+    it('should fall through to benefit name for non-weapon proficiencies', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Light Armor', description: 'Gain proficiency with light armor' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        { name: 'Light Armor', type: 'proficiency' },
+      ]);
+    });
+
+    it('should parse armor training from Heavily Armored feat', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Armor Training', description: 'You gain training with Heavy armor.' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        { name: 'Heavy Armor', type: 'proficiency' },
+      ]);
+    });
+
+    it('should parse armor training with shields from Lightly Armored feat', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Armor Training', description: 'You gain training with Light armor and Shields.' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        { name: 'Light Armor', type: 'proficiency' },
+        { name: 'Shields', type: 'proficiency' },
+      ]);
+    });
+
+    it('should parse armor training from Moderately Armored feat (medium armor only, no shields)', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Armor Training', description: 'You gain training with Medium armor.' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        { name: 'Medium Armor', type: 'proficiency' },
+      ]);
+    });
+
+    it('should parse proficiency choice from Crafter feat', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Tool Proficiency', description: 'You gain proficiency with three different Artisan\'s Tools of your choice from the Fast Crafting table.' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        {
+          name: 'Tool Proficiency',
+          type: 'proficiency',
+          isChoice: true,
+          choose: 3,
+          from: ["Artisan's Tools"],
+        },
+      ]);
+    });
+
+    it('should parse a proficiency choice with "different" keyword', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            { type: 'proficiency', name: 'Tool Proficiency', description: 'You gain proficiency with two different weapons of your choice.' },
+          ],
+        },
+        '2024'
+      );
+
+      expect(result.proficiencies).toEqual([
+        {
+          name: 'Tool Proficiency',
+          type: 'proficiency',
+          isChoice: true,
+          choose: 2,
+          from: ['weapons'],
+        },
       ]);
     });
 
@@ -517,6 +750,54 @@ describe('computeFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases[0].amount).toBe(1);
+    });
+
+    it('should parse Poisoner feat with ignore_resistance automation and proficiency', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            {
+              name: 'Ability Score Increase',
+              description: 'Increase your Dexterity or Intelligence score by 1, to a maximum of 20.',
+              type: 'ability_score_increase',
+            },
+            {
+              name: 'Potent Poison',
+              description: 'When you make a damage roll that deals Poison damage, it ignores Resistance to Poison damage.',
+              type: 'passive',
+              automation: {
+                type: 'ignore_resistance',
+                damageTypes: ['Poison'],
+              },
+            },
+            {
+              name: 'Brew Poison',
+              description: "You gain proficiency with the Poisoner's Kit. With 1 hour of work using such a kit and expending 50 GP worth of materials, you can create a number of poison doses equal to your Proficiency Bonus.",
+              type: 'bonus_action',
+            },
+          ],
+          ability_score_increase: { scores: ['Dexterity', 'Intelligence'], amount: 1, max_value: 20 },
+        },
+        '2024'
+      );
+
+      expect(result.abilityScoreIncreases).toEqual([
+        { name: 'Dexterity', amount: 1, isChoice: true, description: 'Increase your Dexterity or Intelligence score by 1, to a maximum of 20.' },
+        { name: 'Intelligence', amount: 1, isChoice: true, description: 'Increase your Dexterity or Intelligence score by 1, to a maximum of 20.' },
+      ]);
+
+      expect(result.proficiencies).toEqual([
+        { name: "the Poisoner's Kit" },
+      ]);
+
+      expect(result.features).toHaveLength(2);
+      expect(result.features[0].name).toBe('Potent Poison');
+      expect(result.features[0].automation).toEqual({
+        type: 'ignore_resistance',
+        damageTypes: ['Poison'],
+      });
+      expect(result.features[1].name).toBe('Brew Poison');
+      expect(result.features[1].isBonusAction).toBe(true);
     });
   });
 
@@ -1088,5 +1369,51 @@ describe('clearAppliedFeatBuffs', () => {
     clearAppliedFeatBuffs(formData);
 
     expect(resetMiscBonuses).toHaveBeenCalledWith(formData.abilities);
+  });
+});
+
+describe('Savage Attacker feat parsing', () => {
+  it('should parse 2024 Savage Attacker with damage benefit type and reroll automation', () => {
+    const feat = {
+      name: 'Savage Attacker',
+      type: 'Origin Feat',
+      benefits: [
+        {
+          name: 'Savage Strike',
+          description: 'Once per turn when you hit a target with a weapon, you can roll the weapon\'s damage dice twice and use either roll against the target.',
+          type: 'damage',
+          automation: {
+            type: 'reroll_damage_once_per_turn',
+          },
+        },
+      ],
+    };
+
+    const result = computeFeatBuffs(feat, '2024');
+
+    expect(result.features).toHaveLength(1);
+    expect(result.features[0].name).toBe('Savage Attacker');
+    expect(result.features[0].type).toBe('reroll_damage_once_per_turn');
+    expect(result.features[0].automation).toEqual({ type: 'reroll_damage_once_per_turn' });
+  });
+
+  it('should parse 2024 Savage Attacker with Savage Strike benefit name', () => {
+    const feat = {
+      name: 'Savage Attacker',
+      type: 'Origin Feat',
+      benefits: [
+        {
+          name: 'Savage Strike',
+          description: 'Once per turn when you hit a target with a weapon, you can roll the weapon\'s damage dice twice and use either roll against the target.',
+          type: 'other_type',
+        },
+      ],
+    };
+
+    const result = computeFeatBuffs(feat, '2024');
+
+    expect(result.features).toHaveLength(1);
+    expect(result.features[0].name).toBe('Savage Attacker');
+    expect(result.features[0].type).toBe('reroll_damage_once_per_turn');
   });
 });

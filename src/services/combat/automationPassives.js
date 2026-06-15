@@ -2,6 +2,7 @@ import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
 import { parseMagicItemName } from '../rules/core/attackCalc.js'
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { applyGreatWeaponFighting } from '../rules/core/greatWeaponFighting.js'
 
 export function getPassiveBuffs(features, playerStats) {
     const buffs = []
@@ -69,6 +70,12 @@ export function resolveHealingBonuses(playerStats, prof, level, slotLevel) {
                 totalBonus += bonus;
             }
         }
+        if (passive.type === 'passive_rule' && passive.effect === 'max_hp_increase' && passive.alsoSelfHealing?.extraHealingExpression) {
+            const bonus = evaluateAutoExpression(passive.alsoSelfHealing.extraHealingExpression, playerStats, prof, level, slotLevel);
+            if (typeof bonus === 'number' && !isNaN(bonus)) {
+                totalBonus += bonus;
+            }
+        }
     }
     return totalBonus;
 }
@@ -78,18 +85,58 @@ export function hasHealingMaximization(playerStats) {
     return passives.some(p => p.type === 'passive_rule' && p.effect === 'maximize_healing_dice');
 }
 
+export function hasRerollHealingOnes(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'reroll_healing_ones');
+}
+
 export function hasTacticalShift(playerStats) {
     const passives = playerStats.automation?.passives || [];
     return passives.some(p => p.type === 'passive_rule' && p.effect === 'tactical_shift_no_oa');
 }
 
-export function hasDamageResistance(playerStats, damageType) {
+export function isResistantToDamageType(playerStats, damageType) {
     const passives = playerStats.automation?.passives || [];
     return passives.some(p =>
         p.type === 'passive_immunity' &&
         Array.isArray(p.damageResistance) &&
         p.damageResistance.some(d => d.toLowerCase() === String(damageType).toLowerCase())
     );
+}
+
+export function hasIgnoreResistance(playerStats, damageType) {
+    const passives = playerStats.automation?.passives || [];
+    for (const passive of passives) {
+        if (passive.type === 'passive_rule' && passive.effect === 'ignore_resistance') {
+            const damageTypes = passive.damageTypes || [];
+            if (damageTypes.length === 0) return true;
+            if (damageTypes.some(dt => dt.toLowerCase() === String(damageType).toLowerCase())) {
+                return true;
+            }
+        }
+        if (passive.type === 'damage_type_choice' && passive.effect === 'elemental_adept') {
+            const typeKey = `_${passive.name.replace(/\s+/g, '_')}_chosenType`;
+            const chosenType = getRuntimeValue(playerStats.name, typeKey, playerStats.campaignName);
+            if (chosenType && chosenType.toLowerCase() === String(damageType).toLowerCase()) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+export function hasMinDamage(playerStats, damageType) {
+    const passives = playerStats.automation?.passives || [];
+    for (const passive of passives) {
+        if (passive.type === 'damage_type_choice' && passive.effect === 'elemental_adept' && passive.minDamage) {
+            const typeKey = `_${passive.name.replace(/\s+/g, '_')}_chosenType`;
+            const chosenType = getRuntimeValue(playerStats.name, typeKey, playerStats.campaignName);
+            if (chosenType && chosenType.toLowerCase() === String(damageType).toLowerCase()) {
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 export function getDamageResistances(playerStats) {
@@ -112,4 +159,59 @@ export function getResilientSphereSource(targetName, campaignName) {
     const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
     const buff = activeBuffs.find(b => b.effect === 'resilient_sphere');
     return buff?.sourceCharacter || null;
+}
+
+export function hasTruesight(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_buff' && p.effect === 'truesight');
+}
+
+export function hasFastWrestler(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_buff' && p.effect === 'fast_wrestler');
+}
+
+export function hasGreatWeaponFighting(playerStats) {
+    const passives = playerStats.automation?.passives || [];
+    return passives.some(p => p.type === 'passive_rule' && p.effect === 'great_weapon_fighting');
+}
+
+export function applyGreatWeaponFightingToDamage(rolls, playerStats) {
+    if (!hasGreatWeaponFighting(playerStats)) {
+        return rolls;
+    }
+    return applyGreatWeaponFighting(rolls);
+}
+
+export function getDamageReduction(playerStats, damageType, isWearingHeavyArmor) {
+    if (!playerStats) return null;
+    const passives = playerStats.automation?.passives || [];
+    const reactions = playerStats.automation?.reactions || [];
+    const specialActions = playerStats.automation?.specialActions || [];
+    const allAutomations = [...passives, ...reactions, ...specialActions];
+    let totalReduction = 0;
+    for (const auto of allAutomations) {
+        if (auto.type !== 'damage_reduction') continue;
+        if (auto.reaction) continue;
+        const damageTypes = auto.damageTypes || [];
+        if (damageTypes.length > 0 && !damageTypes.some(dt => dt.toLowerCase() === String(damageType).toLowerCase())) {
+            continue;
+        }
+        const condition = auto.condition || '';
+        if (condition === 'wearing_heavy_armor' && !isWearingHeavyArmor) {
+            continue;
+        }
+        let reduction = 0;
+        if (typeof auto.reduction === 'number') {
+            reduction = auto.reduction;
+        } else if (typeof auto.reductionExpression === 'number') {
+            reduction = auto.reductionExpression;
+        } else if (typeof auto.reductionExpression === 'string' && auto.reductionExpression) {
+            reduction = evaluateAutoExpression(auto.reductionExpression, playerStats);
+        }
+        if (typeof reduction === 'number' && reduction > 0) {
+            totalReduction += reduction;
+        }
+    }
+    return totalReduction > 0 ? totalReduction : null;
 }

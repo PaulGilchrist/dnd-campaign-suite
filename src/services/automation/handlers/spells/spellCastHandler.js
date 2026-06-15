@@ -1,9 +1,19 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../../services/rules/spells/postCastRiderService.js';
+import { getMagicInitiateLevel1Spell } from '../feats/magicInitiateHandler.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
+
+    // Magic Initiate: read spell name from runtime state if automation spell is explicitly empty string
+    let spellName = auto.spell || action.name;
+    if (auto.spell === '') {
+        const miSpell = getMagicInitiateLevel1Spell(playerStats, campaignName);
+        if (miSpell) {
+            spellName = miSpell;
+        }
+    }
 
     if (auto.resourceCost === 'channel_divinity') {
         const storedCharges = getRuntimeValue(playerStats.name, 'channelDivinityCharges');
@@ -27,8 +37,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         await setRuntimeValue(playerStats.name, 'channelDivinityCharges', newCharges, campaignName);
     }
 
-    const spellNames = Array.isArray(auto.spell) ? auto.spell : [auto.spell || action.name];
-    const spellName = spellNames.join(' or ');
+    // For multi-spell automation, use auto.spell array directly; otherwise use resolved spellName
+    const spellNames = Array.isArray(auto.spell) ? auto.spell : [spellName];
+    const spellLabel = spellNames.join(' or ');
 
     const noConcLabel = auto.noConcentration ? ' Does not require Concentration.' : '';
     const durLabel = auto.duration ? ` Duration: ${auto.duration.replace('_', ' ')}.` : '';
@@ -109,7 +120,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return {
             type: 'popup',
             payload: {
-                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Channel Divinity expended.</b><br/>You can now cast <b>${spellName}</b> without expending a spell slot.${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellName} normally — no spell slot will be consumed.</em>`,
+                html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Channel Divinity expended.</b><br/>You can now cast <b>${spellLabel}</b> without expending a spell slot.${noConcLabel}${durLabel}<br/><br/><em>Open your spell sheet and cast ${spellLabel} normally — no spell slot will be consumed.</em>`,
             },
         };
     }

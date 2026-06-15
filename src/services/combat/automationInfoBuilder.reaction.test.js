@@ -172,6 +172,7 @@ describe('buildAttackInfo – reaction_damage', () => {
             resourceCost: null,
             range: '5_ft',
             casting_time: '1 reaction',
+            effect: null,
             hasAutomation: true,
         })
     })

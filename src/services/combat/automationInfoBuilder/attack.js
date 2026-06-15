@@ -15,10 +15,105 @@ export const attackHandlers = {
                 }
             }
         }
+        let options = auto.options || [];
+        if (options.length === 0 && !Array.isArray(auto.effects) && auto.effect === 'push') {
+            const dist = (auto.distance || '10 ft').replace(/[^0-9]/g, '');
+            options = [{
+                name: 'Push',
+                effect: 'push',
+                value: parseInt(dist, 10) || 10,
+                sizeLimit: auto.sizeLimit || null,
+            }];
+        }
+        if (options.length === 0 && !Array.isArray(auto.effects) && auto.effect === 'push_or_prone') {
+            const dist = (auto.distance || '5 ft').replace(/[^0-9]/g, '');
+            options = [
+                {
+                    name: 'Push',
+                    effect: 'push',
+                    value: parseInt(dist, 10) || 5,
+                    sizeLimit: auto.sizeLimit || null,
+                },
+                {
+                    name: 'Prone',
+                    effect: 'prone',
+                    saveType: auto.saveType || 'STR',
+                    saveDc: auto.saveDc || 'ability',
+                    saveAbility: auto.saveAbility || 'STR',
+                },
+            ];
+            if (auto.oncePerTurn) {
+                options[1].saveDc = auto.saveDc || 'ability';
+            }
+        }
+        if (options.length === 0 && Array.isArray(auto.effects)) {
+            options = auto.effects.map(effect => {
+                if (effect.option === 'damage_bonus') {
+                    const dice = effect.dice || '1d6';
+                    return {
+                        name: effect.name || 'Damage Bonus',
+                        effect: 'damage_bonus',
+                        damageExpression: dice,
+                        damageType: effect.damageType || '',
+                    };
+                }
+                if (effect.option === 'push') {
+                    const dist = (effect.distance || '10 ft').replace(/[^0-9]/g, '');
+                    return {
+                        name: effect.name || 'Push',
+                        effect: 'push',
+                        value: parseInt(dist, 10) || 10,
+                        sizeLimit: effect.sizeLimit || null,
+                    };
+                }
+                if (effect.option === 'prone') {
+                    return {
+                        name: effect.name || 'Prone',
+                        effect: 'prone',
+                        saveType: effect.saveType || 'DEX',
+                        saveDc: effect.saveDc || 'ability',
+                        saveAbility: effect.saveAbility || 'DEX',
+                    };
+                }
+                if (effect.option === 'poisoned') {
+                    return {
+                        name: effect.name || 'Poisoned',
+                        effect: 'poisoned',
+                        saveType: effect.saveType || 'CON',
+                        saveDc: effect.saveDc || 'ability',
+                        saveAbility: effect.saveAbility || 'CON',
+                    };
+                }
+                if (effect.option === 'unconscious') {
+                    return {
+                        name: effect.name || 'Unconscious',
+                        effect: 'unconscious',
+                        saveType: effect.saveType || 'CON',
+                        saveDc: effect.saveDc || 'ability',
+                        saveAbility: effect.saveAbility || 'CON',
+                    };
+                }
+                if (effect.option === 'blinded') {
+                    return {
+                        name: effect.name || 'Blinded',
+                        effect: 'blinded',
+                        saveType: effect.saveType || 'DEX',
+                        saveDc: effect.saveDc || 'ability',
+                        saveAbility: effect.saveAbility || 'DEX',
+                    };
+                }
+                return {
+                    name: effect.name || effect.option,
+                    effect: effect.effect || effect.option,
+                    value: effect.value || null,
+                    sizeLimit: effect.sizeLimit || null,
+                };
+            });
+        }
         return {
             type: 'attack_rider',
             name: feature.name,
-            options: auto.options || [],
+            options,
             cost: auto.cost || null,
             damageExpression: resolvedExpr,
             damageType: auto.damageType || '',
@@ -78,19 +173,35 @@ export const attackHandlers = {
             usesMax,
             recharge: auto.recharge || 'long_rest',
             resourceKey: 'warPriestUses',
+            weaponRequirement: auto.weaponRequirement || null,
             hasAutomation: true
         }
     },
 
     'bonus_attacks': (feature, _playerStats) => {
         const auto = feature.automation
+        let action = null
+        const ct = auto.casting_time || ''
+        if (/bonus/i.test(ct)) {
+            action = 'bonus_action'
+        }
+        else if (/reaction/i.test(ct)) {
+            action = 'reaction'
+        }
+        else if (/action/i.test(ct)) {
+            action = 'action'
+        }
         return {
             type: 'bonus_attacks',
             name: feature.name,
-            attacks: auto.attacks || 2,
+            attacks: auto.attacks || auto.extraAttacks || 2,
             attackType: auto.attackType || 'unarmed_strike',
             cost: auto.cost || null,
             trigger: auto.trigger || 'after_attack_action',
+            action,
+            casting_time: ct || null,
+            weaponRequirements: auto.weaponRequirements || null,
+            weaponRestriction: auto.weaponRestriction || null,
             hasAutomation: true
         }
     },

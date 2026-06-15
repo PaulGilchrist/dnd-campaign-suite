@@ -52,6 +52,8 @@ export const tempHandlers = {
             healingStartOfTurn: !!auto.healingStartOfTurn,
             healingRange: auto.healingRange || '',
             casting_time: auto.casting_time || '1 bonus action',
+            includesSelf: !!auto.includesSelf,
+            multiTargetAlly: !!auto.multiTargetAlly,
             hasAutomation: true
         }
     },

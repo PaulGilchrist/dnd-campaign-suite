@@ -60,6 +60,7 @@ describe('buildAttackInfo – bonus_action_attack', () => {
             usesMax: 0,
             recharge: 'long_rest',
             resourceKey: 'warPriestUses',
+            weaponRequirement: null,
             hasAutomation: true,
         })
     })
@@ -117,6 +118,10 @@ describe('buildAttackInfo – bonus_attacks', () => {
             attackType: 'unarmed_strike',
             cost: null,
             trigger: 'after_attack_action',
+            action: null,
+            casting_time: null,
+            weaponRequirements: null,
+            weaponRestriction: null,
             hasAutomation: true,
         })
     })
@@ -137,6 +142,25 @@ describe('buildAttackInfo – bonus_attacks', () => {
         expect(result.attackType).toBe('melee')
         expect(result.cost).toBe('1 resource')
         expect(result.trigger).toBe('on_action')
+    })
+
+    it('derives action from casting_time', () => {
+        const feature = {
+            ...BASE_FEATURE,
+            automation: {
+                type: 'bonus_attacks',
+                casting_time: '1 bonus action',
+                extraAttacks: 1,
+                weaponRequirements: { mustHave: ['Light'], twoHanded: false },
+                weaponRestriction: 'must_differ_from_main_hand',
+            },
+        }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.action).toBe('bonus_action')
+        expect(result.attacks).toBe(1)
+        expect(result.casting_time).toBe('1 bonus action')
+        expect(result.weaponRequirements).toEqual({ mustHave: ['Light'], twoHanded: false })
+        expect(result.weaponRestriction).toBe('must_differ_from_main_hand')
     })
 })
 

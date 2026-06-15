@@ -76,6 +76,7 @@ export const reactions = [
     "Countercharm",
     "Deflect Energy",
     "Feather Fall",
+    "Interception",
     "Opportunity Attack",
     "Riposte",
     "Shield Block",
