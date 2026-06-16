@@ -49,6 +49,9 @@ import { executeHandler as executeLongstrider } from '../../automation/index.js'
 import { executeHandler as executeProtectionFromEnergy } from '../../automation/index.js';
 import { executeHandler as executeProtectionFromPoison } from '../../automation/index.js';
 import { executeHandler as executeStoneSkin } from '../../automation/index.js';
+import { getCombatSummary } from '../../../services/encounters/combatData.js';
+import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
+import { addEntry } from '../../../services/ui/logService.js';
 
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
@@ -603,21 +606,25 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
        rollDamage(spell.name, empEvocFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
       }
         } else {
-       const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
-        const attackCtx = {
-          autoDamageFormula: overchannelFormula,
-          autoDamageName: spell.name,
-          overchannelActive,
-          overchannelUseCount,
-          overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
-           ...rollCtx,
-           isCantrip: spell.level === 0,
-           };
-       if (hasInvisible) {
-         attackCtx.metamagicHeighten = true;
-       }
-        rollAttack(spell.name, spellToHit, attackCtx);
-        }
+        if (isMagicMissile(spell)) {
+          await executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo, campaignName, mapName });
+        } else {
+          const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
+          const attackCtx = {
+            autoDamageFormula: overchannelFormula,
+            autoDamageName: spell.name,
+            overchannelActive,
+            overchannelUseCount,
+            overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
+              ...rollCtx,
+              isCantrip: spell.level === 0,
+              };
+          if (hasInvisible) {
+            attackCtx.metamagicHeighten = true;
+          }
+           rollAttack(spell.name, spellToHit, attackCtx);
+           }
+         }
 
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
@@ -918,4 +925,113 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
         description: `${casterName} cast ${spell.name} on ${targetName}. Target regains HP and regains 1 HP at start of each turn for 1 hour.`,
         timestamp: Date.now(),
     }).catch(() => {});
+}
+
+function isMagicMissile(spell) {
+    return spell.name && spell.name.toLowerCase() === 'magic missile';
+}
+
+function getMagicMissileCount(slotLevel) {
+    return 3 + (slotLevel - 1);
+}
+
+async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, playerStats, getTargetInfo: _getTargetInfo, campaignName, mapName: _mapName }) {
+    const slotLevel = metaCtx?.slotLevel || spell.level;
+    const numMissiles = getMagicMissileCount(slotLevel);
+    const missileDamage = '1d4 + 1';
+    const damageType = spell.damage?.damage_type || 'Force';
+
+    const distribution = metaCtx?.magicMissileDistribution;
+    if (!distribution || Object.keys(distribution).length === 0) {
+        return;
+    }
+
+    const combatSummary = getCombatSummary() || { creatures: [] };
+    const casterName = playerStats.name;
+    const logEntries = [];
+
+    for (const [targetName, missileCount] of Object.entries(distribution)) {
+        if (missileCount <= 0) continue;
+
+        let totalTargetDamage = 0;
+        const missileRolls = [];
+
+        for (let i = 0; i < missileCount; i++) {
+            const missileResult = rollExpression(missileDamage);
+            if (!missileResult) continue;
+
+            missileRolls.push(missileResult.total);
+            totalTargetDamage += missileResult.total;
+        }
+
+        if (totalTargetDamage <= 0) continue;
+
+        const target = combatSummary.creatures?.find(c => c.name === targetName) || null;
+        void target;
+
+        const isShieldActive = getRuntimeValue(targetName, 'activeBuffs', campaignName)?.some(b => b.effect === 'shield');
+        let finalDamage = totalTargetDamage;
+        let damageReduced = false;
+
+        if (isShieldActive) {
+            finalDamage = 0;
+            damageReduced = true;
+        } else {
+            const ignoreResistance = (playerStats.automation?.passives || []).some(
+                p => p.type === 'auto_effect' && p.effect === 'ignore_resistance'
+            );
+            const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, null, ignoreResistance, casterName);
+            if (applyResult && applyResult.finalDamage > 0) {
+                endInvisibilityOnHostileAction(casterName, campaignName);
+            }
+            finalDamage = applyResult?.finalDamage ?? totalTargetDamage;
+            damageReduced = applyResult?.damageReduced ?? false;
+        }
+
+        const missileFormula = missileCount === 1 ? missileDamage : `${missileCount}× ${missileDamage}`;
+
+        logEntries.push({
+            type: 'roll',
+            characterName: casterName,
+            rollType: 'damage',
+            name: `Magic Missile (${targetName})`,
+            formula: missileFormula,
+            rolls: missileRolls,
+            total: totalTargetDamage,
+            modifier: 0,
+            damageType,
+            targetName,
+            finalDamage,
+            damageReduced,
+            shieldImmune: isShieldActive,
+            timestamp: Date.now(),
+        });
+    }
+
+    if (logEntries.length > 0) {
+        const allMissileDamage = logEntries.reduce((sum, e) => sum + e.total, 0);
+        const allFinalDamage = logEntries.reduce((sum, e) => sum + e.finalDamage, 0);
+        rollExpression(`${numMissiles}× ${missileDamage}`);
+
+        addEntry(campaignName, {
+            type: 'spell',
+            characterName: casterName,
+            spellName: spell.name,
+            spellLevel: slotLevel,
+            castingTime: spell.casting_time,
+            missileCount: numMissiles,
+            missileDamage,
+            damageType,
+            targets: logEntries.map(e => ({
+                name: e.targetName,
+                missiles: e.rolls.length,
+                rawDamage: e.total,
+                finalDamage: e.finalDamage,
+                shieldImmune: e.shieldImmune,
+            })),
+            totalRawDamage: allMissileDamage,
+            totalFinalDamage: allFinalDamage,
+            timestamp: Date.now(),
+        });
+    }
 }

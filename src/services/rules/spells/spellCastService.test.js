@@ -34,8 +34,24 @@ vi.mock('./postCastRiderService.js', () => ({
  }));
 
 vi.mock('./postCastHealService.js', () => ({
-  triggerPostCastSelfHeals: vi.fn().mockResolvedValue(undefined),
-  triggerPostCastAllyHeals: vi.fn().mockResolvedValue(undefined),
+   triggerPostCastSelfHeals: vi.fn().mockResolvedValue(undefined),
+   triggerPostCastAllyHeals: vi.fn().mockResolvedValue(undefined),
+ }));
+
+vi.mock('../../ui/logService.js', () => ({
+   addEntry: vi.fn().mockResolvedValue(undefined),
+ }));
+
+vi.mock('../../encounters/combatData.js', () => ({
+   getCombatSummary: vi.fn().mockReturnValue({ creatures: [] }),
+}));
+
+vi.mock('../../rules/combat/applyDamage.js', () => ({
+   applyDamageToTarget: vi.fn().mockReturnValue({ finalDamage: 7, newHp: 5, damageReduced: false }),
+}));
+
+vi.mock('../../rules/features/invisibilityService.js', () => ({
+   endInvisibilityOnHostileAction: vi.fn(),
 }));
 
 // ── Imports (Vite returns mocked versions) ─────────────────────
@@ -220,6 +236,80 @@ describe('executeSpellCast', () => {
     const options = baseOptions();
     await executeSpellCast(makeSpell(), null, options);
     expect(options.rollAttack).toHaveBeenCalled();
+   });
+
+   // ── Magic Missile (auto-hit, no attack roll) ──────────────────
+
+   it('does NOT call rollAttack for Magic Missile', async () => {
+     const options = baseOptions();
+     options.rollDamage.mockReturnValue(undefined);
+     vi.mocked(rollExpression).mockReturnValue({ total: 10, rolls: [6, 4], modifier: 0 });
+     await executeSpellCast({ name: 'Magic Missile', damage: { damage_at_slot_level: { '1d4 + 1': '1d4 + 1' }, damage_type: 'Force' }, level: 1 }, {}, options);
+     expect(options.rollAttack).not.toHaveBeenCalled();
+   });
+
+   it('calls rollExpression for each missile with distribution', async () => {
+     const options = baseOptions();
+     options.rollDamage.mockReturnValue(undefined);
+     vi.mocked(rollExpression).mockReturnValue({ total: 7, rolls: [5, 2], modifier: 0 });
+     const distribution = { 'Goblin': 3, 'Orc': 2 };
+     await executeSpellCast(
+       { name: 'Magic Missile', damage: { damage_at_slot_level: { '1d4 + 1': '1d4 + 1' }, damage_type: 'Force' }, level: 1 },
+       { magicMissileDistribution: distribution, slotLevel: 1 },
+       options,
+     );
+     expect(options.rollAttack).not.toHaveBeenCalled();
+     const missileCalls = rollExpression.mock.calls.filter(c => c[0] === '1d4 + 1');
+     expect(missileCalls.length).toBe(5);
+   });
+
+   it('calculates correct missile count: 3 at 1st level', async () => {
+     const options = baseOptions();
+     options.rollDamage.mockReturnValue(undefined);
+     vi.mocked(rollExpression).mockReturnValue({ total: 7, rolls: [5, 2], modifier: 0 });
+     await executeSpellCast(
+       { name: 'Magic Missile', damage: { damage_at_slot_level: { '1d4 + 1': '1d4 + 1' }, damage_type: 'Force' }, level: 1 },
+       { magicMissileDistribution: { 'Goblin': 3 }, slotLevel: 1 },
+       options,
+     );
+     expect(rollExpression).toHaveBeenCalledWith('1d4 + 1');
+   });
+
+   it('calculates correct missile count: 4 at 2nd level', async () => {
+     const options = baseOptions();
+     options.rollDamage.mockReturnValue(undefined);
+     vi.mocked(rollExpression).mockReturnValue({ total: 7, rolls: [5, 2], modifier: 0 });
+     await executeSpellCast(
+       { name: 'Magic Missile', damage: { damage_at_slot_level: { '1d4 + 1': '1d4 + 1' }, damage_type: 'Force' }, level: 2 },
+       { magicMissileDistribution: { 'Goblin': 4 }, slotLevel: 2 },
+       options,
+     );
+     const missileCalls = rollExpression.mock.calls.filter(c => c[0] === '1d4 + 1');
+     expect(missileCalls.length).toBe(4);
+   });
+
+   it('calculates correct missile count: 5 at 3rd level', async () => {
+     const options = baseOptions();
+     options.rollDamage.mockReturnValue(undefined);
+     vi.mocked(rollExpression).mockReturnValue({ total: 7, rolls: [5, 2], modifier: 0 });
+     await executeSpellCast(
+       { name: 'Magic Missile', damage: { damage_at_slot_level: { '1d4 + 1': '1d4 + 1' }, damage_type: 'Force' }, level: 3 },
+       { magicMissileDistribution: { 'Goblin': 5 }, slotLevel: 3 },
+       options,
+     );
+     const missileCalls = rollExpression.mock.calls.filter(c => c[0] === '1d4 + 1');
+     expect(missileCalls.length).toBe(5);
+   });
+
+   it('returns early when Magic Missile has no distribution', async () => {
+     const options = baseOptions();
+     await executeSpellCast(
+       { name: 'Magic Missile', damage: { damage_at_slot_level: { '1d4 + 1': '1d4 + 1' }, damage_type: 'Force' }, level: 1 },
+       {},
+       options,
+     );
+     expect(options.rollAttack).not.toHaveBeenCalled();
+     expect(options.rollDamage).not.toHaveBeenCalled();
    });
 
    // ── DC (save) path ───────────────────────────────────────────

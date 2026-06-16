@@ -18,6 +18,7 @@ import MageArmorTargetPopup from '../popups/MageArmorTargetPopup.jsx'
 import ShieldOfFaithTargetPopup from '../popups/ShieldOfFaithTargetPopup.jsx'
 import ProtectionFromEnergyTargetPopup from '../popups/ProtectionFromEnergyTargetPopup.jsx'
 import ResistanceTargetPopup from '../popups/ResistanceTargetPopup.jsx'
+import MagicMissileTargetPopup from '../popups/MagicMissileTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
@@ -136,6 +137,8 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const [selectedSpell, setSelectedSpell] = React.useState(null);
     const isSorcerer = playerStats.class?.name === 'Sorcerer';
     const [pendingSimpleMetamagic, setPendingSimpleMetamagic] = React.useState(null);
+    const [pendingMagicMissile, setPendingMagicMissile] = React.useState(null);
+    const [pendingMagicMissileMeta, setPendingMagicMissileMeta] = React.useState(null);
 
     const handleSimpleConfirm = React.useCallback((result) => {
       const pending = pendingSimpleMetamagic;
@@ -187,9 +190,56 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         return getTargetFromAttacker(cs, playerStats.name);
     }, [playerStats.name, campaignName]);
 
+    const handleMagicMissileConfirm = React.useCallback((result) => {
+      const pending = pendingMagicMissile;
+      const meta = pendingMagicMissileMeta;
+      setPendingMagicMissile(null);
+      setPendingMagicMissileMeta(null);
+      if (!pending || !meta) return;
+
+      const { spell } = pending;
+      const distribution = result.distribution;
+
+      const hasAnyTargets = Object.values(distribution).some(v => v > 0);
+      if (!hasAnyTargets) return;
+
+      if (meta.metaCtx) {
+        const { metaCtx, attackerPos, targetPos } = meta;
+        const finalMetaCtx = { ...metaCtx, magicMissileDistribution: distribution };
+        executeSpellCast(spell, finalMetaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, campaignName, mapName });
+      } else {
+        const slotLevel = spell.level || 1;
+        const finalMetaCtx = { magicMissileDistribution: distribution, slotLevel };
+        executeSpellCast(spell, finalMetaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName });
+      }
+    }, [pendingMagicMissile, pendingMagicMissileMeta, rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
+
+    const handleMagicMissileSkip = React.useCallback(() => {
+      setPendingMagicMissile(null);
+      setPendingMagicMissileMeta(null);
+    }, []);
+
     const cachedCastPosRef = React.useRef(null);
 
     const castAction = React.useCallback((spell, metaCtx) => {
+      const isMM = spell.name && spell.name.toLowerCase() === 'magic missile';
+      if (isMM) {
+        const slotLevel = metaCtx?.slotLevel || spell.level;
+        const numMissiles = 3 + (slotLevel - 1);
+        const cs = getCombatSummary();
+        const creatureTargets = cs?.creatures
+          ?.filter(c => c.name !== playerStats.name)
+          .map(c => c.name) || [];
+        setPendingMagicMissile({
+          spell,
+          totalMissiles: numMissiles,
+          missileDamage: '1d4 + 1',
+          creatureTargets,
+        });
+        setPendingMagicMissileMeta({ spell, metaCtx, attackerPos: cachedCastPosRef.current?.attackerPos, targetPos: cachedCastPosRef.current?.targetPos });
+        cachedCastPosRef.current = null;
+        return;
+      }
       const pos = cachedCastPosRef.current;
       executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
       cachedCastPosRef.current = null;
@@ -304,6 +354,36 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       if (spellName === "Hunter's Mark" && playerStats.class?.name === 'Ranger' && playerStats.level >= 20) {
         finalFormula = finalFormula.replace('1d6', '1d10');
       }
+
+      const isMM = spellName && spellName.toLowerCase() === 'magic missile';
+
+      if (isMM) {
+        const mmAfterUpcast = (modifiedSpell) => {
+          const slotLevel = modifiedSpell.level || spell.level;
+          const numMissiles = 3 + (slotLevel - 1);
+          const cs = getCombatSummary();
+          const creatureTargets = cs?.creatures
+            ?.filter(c => c.name !== playerStats.name)
+            .map(c => c.name) || [];
+          setPendingMagicMissile({
+            spell: modifiedSpell,
+            totalMissiles: numMissiles,
+            missileDamage: '1d4 + 1',
+            creatureTargets,
+          });
+          setPendingMagicMissileMeta({
+            spell: modifiedSpell,
+            formula,
+            getTargetInfo,
+          });
+        };
+
+        if (gateUpcast(spell, mmAfterUpcast, false)) {
+          return;
+        }
+        return;
+      }
+
       const afterUpcast = (modifiedSpell) => {
         let upcastFormula = modifiedSpell.damage?.damage_at_slot_level?.[modifiedSpell.level]
           || modifiedSpell.damage?.damage_at_character_level?.[modifiedSpell.level]
@@ -421,6 +501,23 @@ return (
                         onSkip={handleSimpleSkip}
                       />
                     )}
+                    {pendingMagicMissile && (() => {
+                      const { spell, totalMissiles, missileDamage, creatureTargets } = pendingMagicMissile;
+                      const currentTargetName = getTargetFromAttacker(getCombatSummary(), playerStats.name)?.name;
+                      return (
+                        <MagicMissileTargetPopup
+                          spell={{ name: spell.name, level: spell.level || 0 }}
+                          playerStats={playerStats}
+                          campaignName={campaignName}
+                          totalMissiles={totalMissiles}
+                          missileDamage={missileDamage}
+                          creatureTargets={creatureTargets}
+                          currentTargetName={currentTargetName}
+                          onConfirm={handleMagicMissileConfirm}
+                          onSkip={handleMagicMissileSkip}
+                        />
+                      );
+                    })()}
                     {pendingMultiTarget && (
                       <MultiTargetPopup
                         spell={{ name: pendingMultiTarget.spellName, level: pendingMultiTarget.spellLevel || 0 }}

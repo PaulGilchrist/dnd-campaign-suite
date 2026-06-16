@@ -26336,7 +26336,7 @@
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 7 (1d10 + 2) piercing damage plus 3 (1d6) poison damage.",
         "attack_bonus": 4,
         "reach": "5 ft.",
-        "damage_dice": "1d10+2",
+        "damage_dice": "1d10+2 plus 1d6",
         "damage_value": 7
       },
       {
@@ -27483,7 +27483,7 @@
         "attack_bonus": 8,
         "reach": "10 ft.",
         "damage": "17 (2d12 + 4) Piercing damage plus 22 (4d10) Poison damage",
-        "damage_dice": "2d12 plus 4 or 4d10",
+        "damage_dice": "2d12+4 plus 4d10",
         "damage_bonus": 4
       },
       {
@@ -27947,7 +27947,7 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "damage": "6 (1d4 + 4) Slashing damage plus 7 (2d6) damage of the type chosen for the Draconic Origin trait",
-        "damage_dice": "1d4 plus 4 or 2d6",
+        "damage_dice": "1d4+4 plus 2d6",
         "damage_bonus": 4
       },
       {
@@ -28444,7 +28444,7 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage": "7 (1d8 + 3) Piercing damage plus 3 (1d6) Fire damage",
-        "damage_dice": "1d8 plus 3 or 1d6",
+        "damage_dice": "1d8+3 plus 1d6",
         "damage_bonus": 3
       },
       {
@@ -28555,7 +28555,7 @@
         "attack_bonus": 6,
         "reach": "5 ft.",
         "damage": "8 (1d8 + 4) Slashing damage plus 5 (1d10) Force damage",
-        "damage_dice": "1d8 plus 4 or 1d10",
+        "damage_dice": "1d8+4 plus 1d10",
         "damage_bonus": 4
       },
       {
@@ -28667,7 +28667,7 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage": "6 (1d4 + 4) Slashing damage plus 9 (2d8) Poison damage",
-        "damage_dice": "1d4 plus 4 or 2d8",
+        "damage_dice": "1d4+4 plus 2d8",
         "damage_bonus": 4
       },
       {
@@ -29157,7 +29157,7 @@
         "reach": "5 ft.",
         "range": "150/600 ft.",
         "damage": "9 (2d6 + 2) Slashing damage plus 3 (1d6) Poison damage",
-        "damage_dice": "2d6 plus 2 or 1d6",
+        "damage_dice": "2d6+2 plus 1d6",
         "damage_bonus": 2
       },
       {
@@ -29677,7 +29677,7 @@
         "reach": "10 ft.",
         "range": "150 ft.",
         "damage": "15 (2d8 + 6) Piercing damage plus 9 (2d8) Fire damage",
-        "damage_dice": "2d8 plus 6 or 2d8",
+        "damage_dice": "2d8+6 plus 2d8",
         "damage_bonus": 6
       },
       {
@@ -30087,7 +30087,7 @@
         "reach": "5 ft.",
         "range": "30/120 ft.",
         "damage": "14 (2d8 + 5) Piercing damage plus 10 (3d6) Cold damage",
-        "damage_dice": "2d8 plus 5 or 3d6",
+        "damage_dice": "2d8+5 plus 3d6",
         "damage_bonus": 5
       },
       {
@@ -30885,7 +30885,7 @@
         "description": "Melee Attack Roll: +12, reach 10 ft. Hit: 20 (3d8 + 7) Slashing damage plus 10 (3d6) Fire damage.",
         "attack_bonus": 12,
         "damage": "20 (3d8 + 7) Slashing damage plus 10 (3d6) Fire damage",
-        "damage_dice": "3d8 + 7",
+        "damage_dice": "3d8+7 plus 3d6",
         "damage_bonus": 7,
         "save_dc": 0,
         "save_type": "",
@@ -31295,7 +31295,7 @@
         "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 7 (1d8 + 3) Slashing damage plus 3 (1d6) Necrotic damage.",
         "attack_bonus": 5,
         "damage": "7 (1d8 + 3) Slashing damage plus 3 (1d6) Necrotic damage",
-        "damage_dice": "1d8 + 3",
+        "damage_dice": "1d8+3 plus 1d6",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -31642,7 +31642,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage plus 4 (1d8) Radiant damage.",
         "attack_bonus": 5,
         "damage": "10 (2d6 + 3) Slashing damage plus 4 (1d8) Radiant damage",
-        "damage_dice": "2d6 + 3",
+        "damage_dice": "2d6+3 plus 1d8",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -31656,7 +31656,7 @@
         "description": "Ranged Attack Roll: +2, range 100/400 ft. Hit: 11 (2d10) Piercing damage plus 4 (1d8) Radiant damage.",
         "attack_bonus": 2,
         "damage": "11 (2d10) Piercing damage plus 4 (1d8) Radiant damage",
-        "damage_dice": "2d10",
+        "damage_dice": "2d10 plus 1d8",
         "damage_bonus": 0,
         "save_dc": 0,
         "save_type": "",
@@ -32445,7 +32445,7 @@
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) bludgeoning damage plus 14 (4d6) lightning damage.",
         "attack_bonus": 6,
         "reach": "5 ft.",
-        "damage_dice": "1d6+3",
+        "damage_dice": "1d6+3 plus 4d6",
         "damage_value": 6
       },
       {
@@ -32567,7 +32567,7 @@
         "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 6 (1d6 + 3) Slashing damage plus 7 (2d6) Lightning damage, and the target can't make <strong>Opportunity Attacks</strong> until the start of the kuo-toa's next turn.",
         "attack_bonus": 5,
         "damage": "6 (1d6 + 3) Slashing damage plus 7 (2d6) Lightning damage",
-        "damage_dice": "1d6 + 3",
+        "damage_dice": "1d6+3 plus 2d6",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -33070,7 +33070,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Slashing damage plus 7 (2d6) Psychic damage.",
         "attack_bonus": 5,
         "damage": "7 (1d8 + 3) Slashing damage plus 7 (2d6) Psychic damage",
-        "damage_dice": "1d8 + 3",
+        "damage_dice": "1d8+3 plus 2d6",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -34743,7 +34743,7 @@
         "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 3 (1d4 + 1) Slashing damage plus 3 (1d6) Fire damage.",
         "attack_bonus": 3,
         "damage": "3 (1d4 + 1) Slashing damage plus 3 (1d6) Fire damage",
-        "damage_dice": "1d4 + 1",
+        "damage_dice": "1d4+1 plus 1d6",
         "damage_bonus": 1,
         "save_dc": 0,
         "save_type": "",
@@ -35161,7 +35161,7 @@
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage plus 5 (2d4) Necrotic damage.",
         "attack_bonus": 4,
         "damage": "5 (1d6 + 2) Slashing damage plus 5 (2d4) Necrotic damage",
-        "damage_dice": "1d6 + 2",
+        "damage_dice": "1d6+2 plus 2d4",
         "damage_bonus": 2,
         "save_dc": 0,
         "save_type": "",
@@ -35404,7 +35404,7 @@
         "description": "Melee Attack Roll: +10, reach 15 ft. Hit: 15 (2d8 + 6) Slashing damage plus 9 (2d8) Cold damage.",
         "attack_bonus": 10,
         "damage": "15 (2d8 + 6) Slashing damage plus 9 (2d8) Cold damage",
-        "damage_dice": "2d8 + 6",
+        "damage_dice": "2d8+6 plus 2d8",
         "damage_bonus": 6,
         "save_dc": 0,
         "save_type": "",
@@ -35562,7 +35562,7 @@
         "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 10 (1d10 + 5) Slashing damage plus 7 (2d6) Necrotic damage.",
         "attack_bonus": 10,
         "damage": "10 (1d10 + 5) Slashing damage plus 7 (2d6) Necrotic damage",
-        "damage_dice": "1d10 + 5",
+        "damage_dice": "1d10+5 plus 2d6",
         "damage_bonus": 5,
         "save_dc": 0,
         "save_type": "",
@@ -35829,7 +35829,7 @@
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 5 (1d4 + 3) Piercing damage plus 14 (4d6) Poison damage.",
         "attack_bonus": 6,
         "damage": "5 (1d4 + 3) Piercing damage plus 14 (4d6) Poison damage",
-        "damage_dice": "1d4 + 3",
+        "damage_dice": "1d4+3 plus 4d6",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -36027,7 +36027,7 @@
         "description": "Melee or Ranged Attack Roll: +2, reach 5 ft. or range 20/60 ft. Hit: 3 (1d6) Piercing damage plus 2 (1d4) Cold damage. If the target is a creature, its Speed decreases by 10 feet until the end of its next turn. Hit or Miss: The spear magically returns to the merfolk's hand immediately after a ranged attack.",
         "attack_bonus": 2,
         "damage": "3 (1d6) Piercing damage plus 2 (1d4) Cold damage",
-        "damage_dice": "1d6",
+        "damage_dice": "1d6 plus 1d4",
         "damage_bonus": 0,
         "save_dc": 0,
         "save_type": "",
@@ -36425,7 +36425,7 @@
         "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 20/60 ft. Hit: 8 (1d8 + 4) Piercing damage plus 10 (3d6) Force damage. Hit or Miss: The trident magically returns to the mezzoloth's claw immediately after a ranged attack.",
         "attack_bonus": 7,
         "damage": "8 (1d8 + 4) Piercing damage plus 10 (3d6) Force damage",
-        "damage_dice": "1d8 + 4",
+        "damage_dice": "1d8+4 plus 3d6",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -36569,7 +36569,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Bludgeoning damage plus 4 (1d8) Acid damage. If the target is a Large or smaller creature, it has the <strong>Grappled</strong> condition (escape DC 13). Ability checks made to escape this grapple have Disadvantage.",
         "attack_bonus": 5,
         "damage": "7 (1d8 + 3) Bludgeoning damage plus 4 (1d8) Acid damage",
-        "damage_dice": "1d8 + 3",
+        "damage_dice": "1d8+3 plus 1d8",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -37108,7 +37108,7 @@
         "description": "Melee Attack Roll: +6, reach 10 ft. Hit: 10 (1d12 + 4) Slashing damage plus 10 (3d6) Necrotic damage.",
         "attack_bonus": 6,
         "damage": "10 (1d12 + 4) Slashing damage plus 10 (3d6) Necrotic damage",
-        "damage_dice": "1d12 + 4",
+        "damage_dice": "1d12+4 plus 3d6",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -38223,7 +38223,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Bludgeoning damage plus 10 (3d6) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target can't regain Hit Points, its Hit Point maximum doesn't return to normal when finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack.",
         "attack_bonus": 5,
         "damage": "8 (1d10 + 3) Bludgeoning damage plus 10 (3d6) Necrotic damage",
-        "damage_dice": "1d10 + 3",
+        "damage_dice": "1d10+3 plus 3d6",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -38361,7 +38361,7 @@
         "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 15 (2d10 + 4) Bludgeoning damage plus 10 (3d6) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target can't regain Hit Points, it gains no benefit from finishing a Long Rest, and its Hit Point maximum decreases by 10 (3d6) every 24 hours that elapse. A creature dies and turns to dust if reduced to 0 Hit Points by this attack.",
         "attack_bonus": 9,
         "damage": "15 (2d10 + 4) Bludgeoning damage plus 10 (3d6) Necrotic damage",
-        "damage_dice": "2d10 + 4",
+        "damage_dice": "2d10+4 plus 3d6",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -38553,7 +38553,7 @@
         "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 4 (1d8) Bludgeoning damage plus 3 (1d6) Poison damage.",
         "attack_bonus": 2,
         "damage": "4 (1d8) Bludgeoning damage plus 3 (1d6) Poison damage",
-        "damage_dice": "1d8",
+        "damage_dice": "1d8 plus 1d6",
         "damage_bonus": 0,
         "save_dc": 0,
         "save_type": "",
@@ -38687,7 +38687,7 @@
         "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 6 (2d4 + 1) Bludgeoning damage plus 5 (2d4) Poison damage.",
         "attack_bonus": 3,
         "damage": "6 (2d4 + 1) Bludgeoning damage plus 5 (2d4) Poison damage",
-        "damage_dice": "2d4 + 1",
+        "damage_dice": "2d4+1 plus 2d4",
         "damage_bonus": 1,
         "save_dc": 0,
         "save_type": "",
@@ -38820,7 +38820,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Bludgeoning damage plus 2 (1d4) Poison damage.",
         "attack_bonus": 5,
         "damage": "6 (1d6 + 3) Bludgeoning damage plus 2 (1d4) Poison damage",
-        "damage_dice": "1d6 + 3",
+        "damage_dice": "1d6+3 plus 1d4",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -38910,10 +38910,10 @@
     "actions": [
       {
         "name": "Slam",
-        "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 − 1) Bludgeoning damage plus 2 (1d4) Poison damage.",
+        "description": "Melee Attack Roll: +1, reach 5 ft. Hit: 1 (1d4 - 1) Bludgeoning damage plus 2 (1d4) Poison damage.",
         "attack_bonus": 1,
-        "damage": "1 (1d4 − 1) Bludgeoning damage plus 2 (1d4) Poison damage",
-        "damage_dice": "1d4",
+        "damage": "1 (1d4 - 1) Bludgeoning damage plus 2 (1d4) Poison damage",
+        "damage_dice": "1d4-1 plus 1d4",
         "damage_bonus": -1,
         "save_dc": 0,
         "save_type": "",
@@ -39032,7 +39032,7 @@
         "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 16 (2d10 + 5) Slashing damage plus 11 (2d10) Force damage.",
         "attack_bonus": 10,
         "damage": "16 (2d10 + 5) Slashing damage plus 11 (2d10) Force damage",
-        "damage_dice": "2d10 + 5",
+        "damage_dice": "2d10+5 plus 2d10",
         "damage_bonus": 5,
         "save_dc": 0,
         "save_type": "",
@@ -39437,7 +39437,7 @@
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage plus 10 (3d6) Fire damage.",
         "attack_bonus": 6,
         "damage": "13 (2d8 + 4) Bludgeoning damage plus 10 (3d6) Fire damage",
-        "damage_dice": "2d8 + 4",
+        "damage_dice": "2d8+4 plus 3d6",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -40100,7 +40100,7 @@
         "description": "Melee or Ranged Attack Roll: +9, reach 10 ft. or range 30/90 ft. Hit: 18 (2d12 + 5) Slashing damage plus 10 (3d6) Force damage. Hit or Miss: The axe magically returns to the nycaloth's hand immediately after a ranged attack.",
         "attack_bonus": 9,
         "damage": "18 (2d12 + 5) Slashing damage plus 10 (3d6) Force damage",
-        "damage_dice": "2d12 + 5",
+        "damage_dice": "2d12+5 plus 3d6",
         "damage_bonus": 5,
         "save_dc": 0,
         "save_type": "",
@@ -40780,7 +40780,7 @@
         "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 10 (1d12 + 4) Slashing damage plus 9 (2d8) Necrotic damage.",
         "attack_bonus": 7,
         "damage": "10 (1d12 + 4) Slashing damage plus 9 (2d8) Necrotic damage",
-        "damage_dice": "1d12 + 4",
+        "damage_dice": "1d12+4 plus 2d8",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -41065,7 +41065,8 @@
         "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 20/60 ft.. one target. Hit: 11 (1d6 + 3 plus 1d8) piercing damage, or 12 (2d8 + 3) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 5,
         "reach": "5 ft.",
-        "damage_value": 11
+        "damage_value": 11,
+        "damage_dice": "1d6+3 plus 1d8"
       }
     ],
     "traits": [
@@ -41189,14 +41190,16 @@
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 15 (1d12 + 4 plus 1d8) slashing damage.",
         "attack_bonus": 6,
         "reach": "5 ft.",
-        "damage_value": 15
+        "damage_value": 15,
+        "damage_dice": "1d12+4 plus 1d8"
       },
       {
         "name": "Spear",
         "description": "Melee or Ranged Weapon Attack: +6 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 12 (1d6 + 4 plus 1d8) piercing damage, or 13 (2d8 + 4) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 6,
         "reach": "5 ft.",
-        "damage_value": 12
+        "damage_value": 12,
+        "damage_dice": "1d6+4 plus 1d8"
       },
       {
         "name": "Battle Cry",
