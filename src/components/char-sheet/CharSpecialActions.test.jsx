@@ -13,7 +13,7 @@ vi.mock('../../services/combat/automationService.js', () => ({
 }));
 
 // Mock TeleportModal
-vi.mock('./TeleportModal.jsx', () => ({
+vi.mock('./modals/TeleportModal.jsx', () => ({
   default: ({ action, onClose }) => (
     <div data-testid="teleport-modal">
       <span>{action?.name || 'Teleport'}</span>

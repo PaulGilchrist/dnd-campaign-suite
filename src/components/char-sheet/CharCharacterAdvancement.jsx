@@ -5,8 +5,8 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { hasAutomation } from '../../services/combat/automationService.js'
 import { executeHandler } from '../../services/automation/index.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import SpellMasteryModal from './SpellMasteryModal.jsx'
-import SignatureSpellsModal from './SignatureSpellsModal.jsx'
+import SpellMasteryModal from './modals/SpellMasteryModal.jsx'
+import SignatureSpellsModal from './modals/SignatureSpellsModal.jsx'
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { useState, useCallback } from 'react';
