@@ -60020,7 +60020,7 @@
         "attack_bonus": 4,
         "range": "150/600 ft.",
         "damage": "6 (1d8 + 2) Piercing damage plus 4 (1d8) Necrotic damage",
-        "damage_dice": "1d8 + 2"
+        "damage_dice": "1d8+2 plus 1d8"
       },
       {
         "name": "Life Drain",
@@ -60819,7 +60819,7 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "damage": "11 (2d6 + 4) Piercing damage plus 24 (7d6) Poison damage",
-        "damage_dice": "2d6 + 4"
+        "damage_dice": "2d6+4 plus 7d6"
       }
     ],
     "bonus_actions": [],
@@ -61021,7 +61021,7 @@
         "attack_bonus": 6,
         "reach": "5 ft.",
         "damage": "7 (1d6 + 4) Slashing damage plus 3 (1d6) Cold damage",
-        "damage_dice": "1d6 + 4"
+        "damage_dice": "1d6+4 plus 1d6"
       },
       {
         "name": "Ice Throw",
@@ -61029,7 +61029,7 @@
         "attack_bonus": 6,
         "range": "30/120 ft.",
         "damage": "6 (1d4 + 4) Bludgeoning damage plus 2 (1d4) Cold damage",
-        "damage_dice": "1d4 + 4"
+        "damage_dice": "1d4+4 plus 1d4"
       },
       {
         "name": "Chilling Gaze",
@@ -61261,7 +61261,7 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "damage": "9 (2d4 + 4) Slashing damage plus 3 (1d6) Acid damage",
-        "damage_dice": "2d4 + 4"
+        "damage_dice": "2d4+4 plus 1d6"
       },
       {
         "name": "Acid Breath",
@@ -61377,7 +61377,7 @@
         "attack_bonus": 9,
         "reach": "10 ft.",
         "damage": "12 (2d6 + 5) Slashing damage plus 5 (1d10) Lightning damage",
-        "damage_dice": "2d6 + 5"
+        "damage_dice": "2d6+5 plus 1d10"
       },
       {
         "name": "Lightning Breath",
@@ -61993,7 +61993,7 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "damage": "11 (2d6 + 4) Slashing damage plus 7 (2d6) Poison damage",
-        "damage_dice": "2d6 + 4"
+        "damage_dice": "2d6+4 plus 2d6"
       },
       {
         "name": "Poison Breath",
@@ -62110,7 +62110,7 @@
         "attack_bonus": 10,
         "reach": "10 ft.",
         "damage": "13 (2d6 + 6) Slashing damage plus 3 (1d6) Fire damage",
-        "damage_dice": "2d6 + 6"
+        "damage_dice": "2d6+6 plus 1d6"
       },
       {
         "name": "Fire Breath",
@@ -62253,7 +62253,7 @@
         "description": "Melee Weapon Attack: +10 to hit, reach 10 ft., one target. Hit: 17 (2d10 + 6) piercing damage plus 3 (1d6) necrotic damage.",
         "attack_bonus": 10,
         "reach": "10 ft.",
-        "damage_dice": "2d10+6",
+        "damage_dice": "2d10+6 plus 1d6",
         "damage_value": 17
       },
       {
@@ -62356,7 +62356,7 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage": "15 (2d10 + 4) Piercing damage plus 13 (3d8) Fire damage",
-        "damage_dice": "2d10 + 4"
+        "damage_dice": "2d10+4 plus 3d8"
       }
     ],
     "bonus_actions": [],
@@ -62569,7 +62569,7 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "damage": "9 (2d4 + 4) Slashing damage plus 2 (1d4) Cold damage",
-        "damage_dice": "2d4 + 4"
+        "damage_dice": "2d4+4 plus 1d4"
       },
       {
         "name": "Cold Breath",
@@ -62683,7 +62683,7 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage": "11 (2d6 + 4) Piercing damage plus 10 (3d6) Poison damage",
-        "damage_dice": "2d6 + 4"
+        "damage_dice": "2d6+4 plus 3d6"
       },
       {
         "name": "Constrict",
@@ -62938,7 +62938,7 @@
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one creature. Hit: 5 (1d4 + 3) piercing damage plus 7 (2d6) poison damage.",
         "attack_bonus": 5,
         "reach": "5 ft.",
-        "damage_dice": "1d4+3",
+        "damage_dice": "1d4+3 plus 2d6",
         "damage_value": 5
       },
       {
@@ -62962,7 +62962,7 @@
         "name": "Longbow (requires human arms)",
         "description": "Ranged Weapon Attack: +4 to hit, range 150/600 ft., one target. Hit: 6 (1d8 + 2) piercing damage plus 7 (2d6) poison damage.",
         "attack_bonus": 4,
-        "damage_dice": "1d8+2",
+        "damage_dice": "1d8+2 plus 2d6",
         "damage_value": 6
       }
     ],
@@ -63052,7 +63052,7 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage": "5 (1d4 + 3) Piercing damage plus 7 (2d6) Poison damage",
-        "damage_dice": "1d4 + 3"
+        "damage_dice": "1d4+3 plus 2d6"
       },
       {
         "name": "Poison Ray",
@@ -63165,7 +63165,7 @@
         "attack_bonus": 5,
         "reach": "10 ft.",
         "damage": "7 (1d8 + 3) Piercing damage plus 7 (2d6) Poison damage",
-        "damage_dice": "1d8 + 3"
+        "damage_dice": "1d8+3 plus 2d6"
       },
       {
         "name": "Spellcasting",
@@ -63418,7 +63418,7 @@
         "name": "Shortbow",
         "description": "Ranged Weapon Attack: +3 to hit, range 80/320 ft., one target. Hit: 4 (1d6 + 1) piercing damage plus 7 (2d6) poison damage.",
         "attack_bonus": 3,
-        "damage_dice": "1d6+1",
+        "damage_dice": "1d6+1 plus 2d6",
         "damage_value": 4
       }
     ],
