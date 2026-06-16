@@ -1,6 +1,6 @@
 
 import { describe, it, expect } from 'vitest';
-import { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression } from './diceRoller.js';
+import { rollD20, rollDie, rollDice, rollAdvantage, rollDisadvantage, parseExpression, rollExpression, rollExpressionDoubled } from './diceRoller.js';
 
 describe('rollD20', () => {
   it('returns a number between 1 and 20', () => {
@@ -81,6 +81,22 @@ describe('parseExpression', () => {
     expect(parseExpression('not a formula')).toBeNull();
     expect(parseExpression('')).toBeNull();
   });
+
+  it('parses formula with " or " separator, returning first valid option', () => {
+    expect(parseExpression('1d8 + 3 or 2d6')).toEqual({ count: 1, sides: 8, modifier: 3 });
+  });
+
+  it('skips invalid first option and parses second option in " or " formula', () => {
+    expect(parseExpression('invalid or 2d6')).toEqual({ count: 2, sides: 6, modifier: 0 });
+  });
+
+  it('handles case-insensitive "or" separator', () => {
+    expect(parseExpression('1d8 + 3 OR 2d6')).toEqual({ count: 1, sides: 8, modifier: 3 });
+  });
+
+  it('returns null when all options in " or " formula are invalid', () => {
+    expect(parseExpression('invalid or nonsense')).toBeNull();
+  });
 });
 
 describe('rollExpression', () => {
@@ -111,6 +127,33 @@ describe('rollExpression', () => {
 
   it('returns null for invalid expression', () => {
     expect(rollExpression('xyz')).toBeNull();
+  });
+
+  it('rolls first valid option when formula contains " or "', () => {
+    const result = rollExpression('1d8 + 3 or 2d6');
+    expect(result).not.toBeNull();
+    expect(result.total).toBeGreaterThanOrEqual(4);
+    expect(result.total).toBeLessThanOrEqual(11);
+    expect(result.rolls).toHaveLength(1);
+    expect(result.modifier).toBe(3);
+  });
+
+  it('rolls combined damage when formula contains " plus "', () => {
+    const result = rollExpression('1d8+3 plus 2d6');
+    expect(result).not.toBeNull();
+    expect(result.total).toBeGreaterThanOrEqual(7);
+    expect(result.total).toBeLessThanOrEqual(21);
+    expect(result.rolls).toHaveLength(3);
+    expect(result.modifier).toBe(3);
+  });
+
+  it('rolls doubled combined damage when formula contains " plus "', () => {
+    const result = rollExpressionDoubled('1d8+3 plus 2d6');
+    expect(result).not.toBeNull();
+    expect(result.total).toBeGreaterThanOrEqual(7);
+    expect(result.total).toBeLessThanOrEqual(38);
+    expect(result.rolls).toHaveLength(6);
+    expect(result.modifier).toBe(3);
   });
 
   it('rerolls 1s when rerollOnes option is true', () => {

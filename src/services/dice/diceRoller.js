@@ -31,15 +31,47 @@ function parseExpression(formula) {
   if (!formula) return null;
   const cleaned = formula.replace(/\s/g, '');
   const match = cleaned.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
-  if (!match) return null;
-  return {
-    count: parseInt(match[1] || 1, 10),
-    sides: parseInt(match[2], 10),
-    modifier: match[3] ? parseInt(match[3], 10) : 0
-  };
+  if (match) {
+    return {
+      count: parseInt(match[1] || 1, 10),
+      sides: parseInt(match[2], 10),
+      modifier: match[3] ? parseInt(match[3], 10) : 0
+    };
+  }
+  if (formula.toLowerCase().includes(' or ')) {
+    const parts = formula.split(/\s+or\s+/i);
+    for (const part of parts) {
+      const result = parseExpression(part);
+      if (result) return result;
+    }
+  }
+  return null;
 }
 
 function rollExpression(formula, options = {}) {
+  if (!formula) return null;
+  if (formula.includes(' or ')) {
+    const parts = formula.split(/\s+or\s+/i);
+    for (const part of parts) {
+      const result = rollExpression(part, options);
+      if (result) return result;
+    }
+  }
+  if (formula.includes(' plus ')) {
+    const parts = formula.split(/\s+plus\s+/);
+    let total = 0;
+    let rolls = [];
+    let modifier = 0;
+    for (const part of parts) {
+      const result = rollExpression(part, options);
+      if (result) {
+        total += result.total;
+        rolls = rolls.concat(result.rolls);
+        modifier += result.modifier;
+      }
+    }
+    return { total, rolls, modifier, formula };
+  }
   const parsed = parseExpression(formula);
   if (!parsed) return null;
   const { count, sides, modifier } = parsed;
@@ -52,6 +84,29 @@ function rollExpression(formula, options = {}) {
 }
 
 function rollExpressionDoubled(formula) {
+  if (!formula) return null;
+  if (formula.includes(' or ')) {
+    const parts = formula.split(/\s+or\s+/i);
+    for (const part of parts) {
+      const result = rollExpressionDoubled(part);
+      if (result) return result;
+    }
+  }
+  if (formula.includes(' plus ')) {
+    const parts = formula.split(/\s+plus\s+/);
+    let total = 0;
+    let rolls = [];
+    let modifier = 0;
+    for (const part of parts) {
+      const result = rollExpressionDoubled(part);
+      if (result) {
+        total += result.total;
+        rolls = rolls.concat(result.rolls);
+        modifier += result.modifier;
+      }
+    }
+    return { total, rolls, modifier, formula };
+  }
   const parsed = parseExpression(formula);
   if (!parsed) return null;
   const { sides, modifier } = parsed;

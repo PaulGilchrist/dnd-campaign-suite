@@ -229,6 +229,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const renderAction = (action, i) => {
     const damageTypes = getDamageTypesForAction(action);
+    const damageOptions = action.damage_dice ? action.damage_dice.split(/\s+or\s+/) : null;
+    const hasDamageOptions = damageOptions && damageOptions.length > 1;
 
     return (
     <div key={i} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
@@ -239,10 +241,18 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           <i className="fa-solid fa-dice-d20" /> +{action.attack_bonus}
         </span>
       )}
-      {action.damage_dice && (
-        <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
-          <i className="fa-solid fa-dice" /> {action.damage_dice}
-        </span>
+      {hasDamageOptions ? (
+        damageOptions.map((option, idx) => (
+          <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, option, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
+            <i className="fa-solid fa-dice" /> {option.trim()}
+          </span>
+        ))
+      ) : (
+        action.damage_dice && (
+          <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
+            <i className="fa-solid fa-dice" /> {action.damage_dice}
+          </span>
+        )
       )}
       {parseExtraDamageDice(action.damage, action.damage_dice).map((formula, idx) => (
         <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, formula, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
