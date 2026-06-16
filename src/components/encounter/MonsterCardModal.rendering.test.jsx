@@ -526,13 +526,13 @@ describe('MonsterCardModal rendering', () => {
   });
 
   it('renders attack bonus dice link in action', () => {
-    const m = makeMonster({ actions: [{ name: 'Club', description: '', attack_bonus: 4, damage_dice: null }] });
+    const m = makeMonster({ actions: [{ name: 'Club', description: '', attack_bonus: 4, damage_dice_primary: null }] });
     render(<MonsterCardModal {...makeProps(m)} />);
     expect(screen.getByText('+4')).toBeInTheDocument();
   });
 
   it('renders damage dice link in action', () => {
-    const m = makeMonster({ actions: [{ name: 'Bite', description: '', attack_bonus: null, damage_dice: '1d4 + 2' }] });
+    const m = makeMonster({ actions: [{ name: 'Bite', description: '', attack_bonus: null, damage_dice_primary: '1d4 + 2' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
     expect(screen.getByText('1d4 + 2')).toBeInTheDocument();
   });
@@ -676,13 +676,13 @@ describe('MonsterCardModal rendering', () => {
   // ════════════════════════════════════════════
 
   it('renders action with reach property', () => {
-    const m = makeMonster({ actions: [{ name: 'Glaive', description: '', attack_bonus: 5, damage_dice: '1d10 + 3', reach: '10 ft.' }] });
+    const m = makeMonster({ actions: [{ name: 'Glaive', description: '', attack_bonus: 5, damage_dice_primary: '1d10 + 3', reach: '10 ft.' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
     expect(screen.getByText(/Glaive/)).toBeInTheDocument();
   });
 
   it('renders action with range property', () => {
-    const m = makeMonster({ actions: [{ name: 'Fireball', description: '', attack_bonus: null, damage_dice: '8d6 fire', range: '150 ft.' }] });
+    const m = makeMonster({ actions: [{ name: 'Fireball', description: '', attack_bonus: null, damage_dice_primary: '8d6', damage_type_primary: 'Fire', range: '150 ft.' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
     expect(screen.getByText(/Fireball/)).toBeInTheDocument();
   });
@@ -794,7 +794,7 @@ describe('MonsterCardModal rendering', () => {
   });
 
   it('render action in traits section with damage dice', () => {
-    const m = makeMonster({ actions: [], traits: [{ name: 'Bite', description: '', attack_bonus: null, damage_dice: '1d8' }] });
+    const m = makeMonster({ actions: [], traits: [{ name: 'Bite', description: '', attack_bonus: null, damage_dice_primary: '1d8' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
     expect(screen.getByText('1d8')).toBeInTheDocument();
   });

@@ -313,7 +313,7 @@ describe('MonsterCardModal interaction / game rules', () => {
   });
 
   it('clicking damage dice link calls rollDamage', () => {
-    const m = makeMonster({ actions: [{ name: 'Bite', description: '', attack_bonus: null, damage_dice: '1d4 + 2' }] });
+    const m = makeMonster({ actions: [{ name: 'Bite', description: '', attack_bonus: null, damage_dice_primary: '1d4 + 2' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
 
     const links = document.querySelectorAll('.mc-dice-link');
@@ -330,7 +330,7 @@ describe('MonsterCardModal interaction / game rules', () => {
   });
 
   it('clicking extra damage dice link calls rollDamage', () => {
-    const m = makeMonster({ actions: [{ name: 'Sword', description: '', attack_bonus: null, damage_dice: '1d8', damage: 'plus 2d6 slashing' }] });
+    const m = makeMonster({ actions: [{ name: 'Sword', description: '', attack_bonus: null, damage_dice_primary: '1d8', damage_dice_secondary: '2d6', damage_type_secondary: 'Slashing' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
 
     const diceLinks = document.querySelectorAll('.mc-dice-link');
@@ -465,7 +465,7 @@ describe('MonsterCardModal interaction / game rules', () => {
   });
 
   it('does not make save DC clickable when action also has attack_bonus', () => {
-    const m = makeMonster({ actions: [{ name: 'Attack', description: '', attack_bonus: 3, damage_dice: '1d6', save_dc: 13, save_type: 'Dexterity' }] });
+    const m = makeMonster({ actions: [{ name: 'Attack', description: '', attack_bonus: 3, damage_dice_primary: '1d6', save_dc: 13, save_type: 'Dexterity' }] });
     render(<MonsterCardModal {...makeProps(m)} />);
     const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
     expect(clickableSaveLinks.length).toBe(0);

@@ -371,9 +371,9 @@ describe('npcGenerator', () => {
       if (npc.actions && npc.actions.length > 0) {
         const action = npc.actions[0];
         expect(typeof action.name).toBe('string');
-         // Caster spell actions have empty attack_bonus/damage_dice but descriptive text
-        if (action.attack_bonus === '' && action.description.includes('Spell Attack Roll')) {
-          expect(action.damage_dice).toBe('');
+         // Caster spell actions have empty attack_bonus/damage_dice_primary but descriptive text
+         if (action.attack_bonus === '' && action.description.includes('Spell Attack Roll')) {
+           expect(action.damage_dice_primary).toBe('');
          }
        }
      });
@@ -444,9 +444,9 @@ describe('npcGenerator', () => {
        // For CR >= 2, damage dice should have at least 2dX
       if (npc.actions && npc.actions.length > 0) {
         npc.actions.forEach(action => {
-          if (action.damage_dice) {
-             // damage_dice like "2d8+1" — parse the num part
-            const parts = action.damage_dice.match(/^(\d+)d/);
+          if (action.damage_dice_primary) {
+             // damage_dice_primary like "2d8+1" — parse the num part
+            const parts = action.damage_dice_primary.match(/^(\d+)d/);
             if (parts) {
               expect(parseInt(parts[1])).toBeGreaterThanOrEqual(1);
              }

@@ -342,7 +342,7 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: '' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
       ],
     };
     renderForm(formData);
@@ -353,7 +353,7 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: '' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
       ],
     };
     renderForm(formData);
@@ -366,7 +366,7 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: '' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
       ],
     };
     renderForm(formData);
@@ -379,11 +379,11 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: '' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
       ],
     };
     renderForm(formData);
-    const damageInput = screen.getByPlaceholderText('Damage');
+    const damageInput = screen.getByPlaceholderText('Primary Damage Dice');
     fireEvent.change(damageInput, { target: { value: '2d6 + 3' } });
     expect(mockSetFormData).toHaveBeenCalled();
   });
@@ -392,7 +392,7 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: '' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
       ],
     };
     renderForm(formData);
@@ -405,7 +405,7 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: '' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
       ],
     };
     renderForm(formData);
@@ -425,8 +425,8 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: '' },
-        { name: 'Claw', attack_bonus: '+6', damage_dice: '2d4 + 3', description: '' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
+        { name: 'Claw', attack_bonus: '+6', damage_dice_primary: '2d4 + 3', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
       ],
     };
     renderForm(formData);
@@ -591,7 +591,7 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: 'The creature bites.' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: 'The creature bites.' },
       ],
     };
     renderForm(formData);
@@ -722,7 +722,7 @@ describe('NPCStatBlockForm', () => {
     const formData = {
       ...defaultFormData,
       actions: [
-        { name: 'Bite', attack_bonus: '+4', damage_dice: '1d6 + 2', description: '' },
+        { name: 'Bite', attack_bonus: '+4', damage_dice_primary: '1d6 + 2', damage_type_primary: 'Slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
       ],
     };
     renderForm(formData);

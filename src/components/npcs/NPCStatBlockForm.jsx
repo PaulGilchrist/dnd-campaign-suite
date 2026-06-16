@@ -52,7 +52,7 @@ function NPCStatBlockForm({ formData, setFormData }) {
   const handleAddAction = () => {
     setFormData((prev) => ({
       ...prev,
-      actions: [...(prev.actions || []), { name: '', attack_bonus: '', damage_dice: '', description: '' }],
+      actions: [...(prev.actions || []), { name: '', attack_bonus: '', damage_dice_primary: '', damage_type_primary: '', damage_dice_secondary: '', damage_type_secondary: '', description: '' }],
     }));
   };
 
@@ -237,9 +237,30 @@ function NPCStatBlockForm({ formData, setFormData }) {
               <input
                 type="text"
                 className="ct-input npcs-action-damage"
-                value={action.damage_dice ?? ''}
-                onChange={(e) => handleActionChange(i, 'damage_dice', e.target.value)}
-                placeholder="Damage"
+                value={action.damage_dice_primary ?? ''}
+                onChange={(e) => handleActionChange(i, 'damage_dice_primary', e.target.value)}
+                placeholder="Primary Damage Dice"
+              />
+              <input
+                type="text"
+                className="ct-input npcs-action-damage-type"
+                value={action.damage_type_primary ?? ''}
+                onChange={(e) => handleActionChange(i, 'damage_type_primary', e.target.value)}
+                placeholder="Primary Type"
+              />
+              <input
+                type="text"
+                className="ct-input npcs-action-damage-secondary"
+                value={action.damage_dice_secondary ?? ''}
+                onChange={(e) => handleActionChange(i, 'damage_dice_secondary', e.target.value)}
+                placeholder="Secondary Damage Dice"
+              />
+              <input
+                type="text"
+                className="ct-input npcs-action-damage-type-secondary"
+                value={action.damage_type_secondary ?? ''}
+                onChange={(e) => handleActionChange(i, 'damage_type_secondary', e.target.value)}
+                placeholder="Secondary Type"
               />
               <button
                 className="ct-btn ct-btn-sm ct-btn-danger"

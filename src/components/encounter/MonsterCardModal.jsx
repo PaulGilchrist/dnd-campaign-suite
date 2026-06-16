@@ -96,7 +96,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const getDamageTypesForAction = useCallback((action) => {
     const types = [];
-    if (action.damage_dice) {
+    if (action.damage_type_primary) {
+      types.push(action.damage_type_primary);
+    }
+    if (action.damage_type_secondary) {
+      types.push(action.damage_type_secondary);
+    }
+    if (types.length === 0) {
       types.push(...extractDamageTypes(action.description));
     }
     return types;
@@ -186,7 +192,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       isAutoCrit,
       isAutoMiss,
       rangeReason,
-      autoDamageFormula: action?.damage_dice || null,
+      autoDamageFormula: action?.damage_dice_primary || null,
       autoDamageName: name,
       targetName: target?.name,
       attackerName: monsterName,
@@ -229,8 +235,16 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const renderAction = (action, i) => {
     const damageTypes = getDamageTypesForAction(action);
-    const damageOptions = action.damage_dice ? action.damage_dice.split(/\s+or\s+/) : null;
+    const damageOptions = action.damage_dice_primary ? action.damage_dice_primary.split(/\s+or\s+/) : null;
     const hasDamageOptions = damageOptions && damageOptions.length > 1;
+
+    const renderDamageDice = (formula, type) => {
+      return (
+        <span className="mc-dice-link" onClick={() => handleDamage(action.name, formula, type, action)} role="button" tabIndex={0}>
+          <i className="fa-solid fa-dice" /> {formula}
+        </span>
+      );
+    };
 
     return (
     <div key={i} className={`mc-action ${attackerCannotAct ? 'mc-action-disabled' : ''}`}>
@@ -243,22 +257,13 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       )}
       {hasDamageOptions ? (
         damageOptions.map((option, idx) => (
-          <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, option, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
+          <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, option.trim(), formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
             <i className="fa-solid fa-dice" /> {option.trim()}
           </span>
         ))
-      ) : (
-        action.damage_dice && (
-          <span className="mc-dice-link" onClick={() => handleDamage(action.name, action.damage_dice, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
-            <i className="fa-solid fa-dice" /> {action.damage_dice}
-          </span>
-        )
-      )}
-      {parseExtraDamageDice(action.damage, action.damage_dice).map((formula, idx) => (
-        <span key={idx} className="mc-dice-link" onClick={() => handleDamage(action.name, formula, formatDamageTypes(damageTypes), action)} role="button" tabIndex={0}>
-          <i className="fa-solid fa-dice" /> {formula}
-        </span>
-      ))}
+      ) : null}
+      {action.damage_dice_primary && !hasDamageOptions ? renderDamageDice(action.damage_dice_primary, formatDamageTypes([action.damage_type_primary || ''])) : null}
+      {action.damage_dice_secondary ? renderDamageDice(action.damage_dice_secondary, formatDamageTypes([action.damage_type_secondary || ''])) : null}
       {action.save_dc != null && (
         <span className={`mc-dice-link ${!action.attack_bonus && !attackerCannotAct ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}`} onClick={!action.attack_bonus && !attackerCannotAct ? () => {
           const target = getTarget();
@@ -665,21 +670,6 @@ function parseInitiativeBonus(initStr) {
   if (!initStr) return null;
   const match = initStr.match(/^([+-]\d+)/);
   return match ? parseInt(match[1], 10) : null;
-}
-
-function parseExtraDamageDice(damageStr, excludeFormula) {
-  if (!damageStr) return [];
-  const re = /(\d+d\d+(?:\s*\+\s*\d+)?)/g;
-  const matches = [];
-  let m;
-  const exclude = (excludeFormula || '').replace(/\s+/g, '');
-  while ((m = re.exec(damageStr)) !== null) {
-    const formula = m[1].trim();
-    if (formula.replace(/\s+/g, '') !== exclude) {
-      matches.push(formula);
-    }
-  }
-  return matches;
 }
 
 function formatSenses(senses) {

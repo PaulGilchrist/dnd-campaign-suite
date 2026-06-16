@@ -176,7 +176,8 @@ function generateStatBlock(role) {
       actions.push({
         name: template.names[idx],
         attack_bonus: '',
-        damage_dice: '',
+        damage_dice_primary: '',
+        damage_type_primary: '',
         description: `Spell Attack Roll: +${atkBonus}, range ${crNum >= 2 ? '60 ft.' : '30 ft.'}. Hit: ${dmgNum} (${dice}) ${template.type} damage.`
       });
     } else if (templateRoll > 0.6) {
@@ -188,7 +189,8 @@ function generateStatBlock(role) {
       actions.push({
         name: template.names[idx],
         attack_bonus: `+${atkBonus}`,
-        damage_dice: dice,
+        damage_dice_primary: dice,
+        damage_type_primary: template.type,
         description: `Ranged Attack Roll: +${atkBonus}, range ${range}. Hit: ${dmgNum} (${dice}) ${template.type} damage.`
       });
     } else {
@@ -201,7 +203,8 @@ function generateStatBlock(role) {
       actions.push({
         name: template.names[idx],
         attack_bonus: `+${atkBonus}`,
-        damage_dice: modStr ? `${dice}${modStr}` : dice,
+        damage_dice_primary: modStr ? `${dice}${modStr}` : dice,
+        damage_type_primary: template.type,
         description: `Melee Attack Roll: +${atkBonus}, reach 5 ft. Hit: ${dmgNum} (${dice}${modStr}) ${template.type} damage.`
       });
     }
