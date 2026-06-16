@@ -22,7 +22,7 @@ import {
     getUnbreakableMajestySaveDc,
     hasAttackerTriggeredMajesty,
     markAttackerTriggeredMajesty,
-} from '../services/combat/unbreakableMajesty.js';
+} from '../services/combat/auras/unbreakableMajesty.js';
 import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
 import { getCombatContext } from '../services/rules/combat/damageUtils.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/spells/postCastRiderService.js';

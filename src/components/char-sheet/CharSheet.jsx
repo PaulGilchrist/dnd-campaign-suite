@@ -10,7 +10,7 @@ import CharSpecialActions from './CharSpecialActions.jsx'
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx'
 import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
-import { computeAuraComboEffects } from '../../services/combat/auraComboEffects.js';
+import { computeAuraComboEffects } from '../../services/combat/auras/auraComboEffects.js';
 import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';

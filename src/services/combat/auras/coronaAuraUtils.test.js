@@ -2,19 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 
-vi.mock('../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }))
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }))
 
 // ── Imports (Vite returns mocked versions) ─────────────────────
 
 import { getCoronaSaveDisadvantage } from './coronaAuraUtils.js'
-import { getDistanceFeet } from '../rules/combat/rangeValidation.js'
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getDistanceFeet } from '../../rules/combat/rangeValidation.js'
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js'
 
 // ── Helpers ─────────────────────────────────────────────────────
 

@@ -1,15 +1,15 @@
-import { getDistanceFeet } from '../rules/combat/rangeValidation.js';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
-export function getDuplicityAdvantageAgainst({ targetPos, attackerName, campaignName, mapData, skipRangeCheck }) {
+export function getWolfAdvantageAgainst({ targetPos, attackerName, campaignName, mapData, skipRangeCheck }) {
     if (!skipRangeCheck && (!targetPos || !mapData?.players?.length)) return { advantage: false };
 
     if (!skipRangeCheck) {
         for (const player of mapData.players) {
             if (player.name === attackerName) continue;
             const buffs = getRuntimeValue(player.name, 'activeBuffs', campaignName) || [];
-            const illusionBuff = Array.isArray(buffs) ? buffs.find(b => b.effect === 'create_illusion' && b.isImprovedDuplicity) : null;
-            if (!illusionBuff) continue;
+            const wolfBuff = Array.isArray(buffs) ? buffs.find(b => b.name === 'Rage of the Wilds' && b.optionName === 'Wolf') : null;
+            if (!wolfBuff) continue;
 
             const dist = getDistanceFeet(
                 { gridX: player.gridX, gridY: player.gridY },
@@ -23,8 +23,8 @@ export function getDuplicityAdvantageAgainst({ targetPos, attackerName, campaign
         for (const player of (mapData?.players || [])) {
             if (player.name === attackerName) continue;
             const buffs = getRuntimeValue(player.name, 'activeBuffs', campaignName) || [];
-            const illusionBuff = Array.isArray(buffs) ? buffs.find(b => b.effect === 'create_illusion' && b.isImprovedDuplicity) : null;
-            if (illusionBuff) {
+            const wolfBuff = Array.isArray(buffs) ? buffs.find(b => b.name === 'Rage of the Wilds' && b.optionName === 'Wolf') : null;
+            if (wolfBuff) {
                 return { advantage: true, source: player.name };
             }
         }

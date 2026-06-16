@@ -3,7 +3,7 @@ import utils from '../../services/ui/utils.js';
 import { rollD20 } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
-import { computeAuraBonus } from '../../services/combat/auraOfProtection.js';
+import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './savePromptModal.css';

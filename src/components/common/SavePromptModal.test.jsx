@@ -4,7 +4,7 @@ import React from 'react';
 import SavePromptModal from './SavePromptModal.jsx';
 import { rollD20 } from '../../services/dice/diceRoller.js';
 import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
-import { computeAuraBonus } from '../../services/combat/auraOfProtection.js';
+import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 
 // ── Mock dependencies ──
 
@@ -23,7 +23,7 @@ vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
   clearSavePrompt: vi.fn(),
 }));
 
-vi.mock('../../services/combat/auraOfProtection.js', () => ({
+vi.mock('../../services/combat/auras/auraOfProtection.js', () => ({
   computeAuraBonus: vi.fn(async () => ({ bonus: 0, sourceName: null })),
 }));
 

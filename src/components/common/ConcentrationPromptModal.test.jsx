@@ -17,7 +17,7 @@ vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
   sendConcentrationResult: vi.fn(),
 }))
 
-vi.mock('../../services/combat/auraOfProtection.js', () => ({
+vi.mock('../../services/combat/auras/auraOfProtection.js', () => ({
   computeAuraBonus: vi.fn(async () => ({ bonus: 0, sourceName: null })),
 }))
 

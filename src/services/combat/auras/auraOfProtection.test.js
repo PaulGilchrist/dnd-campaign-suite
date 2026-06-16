@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 
-vi.mock('../maps/mapsService.js', () => ({
+vi.mock('../../maps/mapsService.js', () => ({
   loadMapData: vi.fn(),
 }));
 
-vi.mock('../rules/combat/rangeValidation.js', () => ({
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -30,9 +30,9 @@ import {
   computeAuraBonus,
 } from './auraOfProtection.js';
 
-import { loadMapData } from '../maps/mapsService.js';
-import { getDistanceFeet } from '../rules/combat/rangeValidation.js';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { loadMapData } from '../../maps/mapsService.js';
+import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 

@@ -85,7 +85,7 @@ vi.mock('../../services/ui/utils.js', () => ({
 }));
 
 // Mock auraComboEffects
-vi.mock('../../services/combat/auraComboEffects.js', () => ({
+vi.mock('../../services/combat/auras/auraComboEffects.js', () => ({
   computeAuraComboEffects: vi.fn(() => Promise.resolve(null)),
 }));
 

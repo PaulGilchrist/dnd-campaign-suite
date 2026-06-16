@@ -39,19 +39,19 @@ vi.mock('../combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn(),
 }));
 
-vi.mock('../combat/wolfAuraUtils.js', () => ({
+vi.mock('../combat/auras/wolfAuraUtils.js', () => ({
   getWolfAdvantageAgainst: vi.fn(),
 }));
 
-vi.mock('../combat/duplicityAuraUtils.js', () => ({
+vi.mock('../combat/auras/duplicityAuraUtils.js', () => ({
   getDuplicityAdvantageAgainst: vi.fn(),
 }));
 
-vi.mock('../combat/lionAuraUtils.js', () => ({
+vi.mock('../combat/auras/lionAuraUtils.js', () => ({
   getLionDisadvantageAgainst: vi.fn(),
 }));
 
-vi.mock('../combat/coronaAuraUtils.js', () => ({
+vi.mock('../combat/auras/coronaAuraUtils.js', () => ({
   getCoronaSaveDisadvantage: vi.fn(),
 }));
 
@@ -69,10 +69,10 @@ import * as coverService from '../rules/combat/coverService.js';
 import * as npcsService from '../npcs/npcsService.js';
 import * as runtimeState from '../../hooks/useRuntimeState.js';
 import * as buffService from '../combat/buffs/buffService.js';
-import * as wolfAura from '../combat/wolfAuraUtils.js';
-import * as duplicityAura from '../combat/duplicityAuraUtils.js';
-import * as lionAura from '../combat/lionAuraUtils.js';
-import * as coronaAura from '../combat/coronaAuraUtils.js';
+import * as wolfAura from '../combat/auras/wolfAuraUtils.js';
+import * as duplicityAura from '../combat/auras/duplicityAuraUtils.js';
+import * as lionAura from '../combat/auras/lionAuraUtils.js';
+import * as coronaAura from '../combat/auras/coronaAuraUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

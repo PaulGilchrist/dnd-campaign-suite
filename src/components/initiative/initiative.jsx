@@ -13,7 +13,7 @@ import { npcToMonsterFormat, npcHasStatBlock } from '../../services/encounters/n
 import * as mapsService from '../../services/maps/mapsService.js'
 import { expireStaleEffects, applyTurnStartEffects } from '../../services/rules/effects/expirations.js'
 import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/encounters/combatData.js'
-import { clearPerRoundMajestyTrackers } from '../../services/combat/unbreakableMajesty.js'
+import { clearPerRoundMajestyTrackers } from '../../services/combat/auras/unbreakableMajesty.js'
 import {
     setupCreatures,
     addNpc,

@@ -6,13 +6,13 @@ import { computeCover } from '../rules/combat/coverService.js';
 import { loadNPCs } from '../npcs/npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../combat/buffs/buffService.js';
-import { getWolfAdvantageAgainst } from '../combat/wolfAuraUtils.js';
-import { getDuplicityAdvantageAgainst } from '../combat/duplicityAuraUtils.js';
-import { getLionDisadvantageAgainst } from '../combat/lionAuraUtils.js';
-import { getCoronaSaveDisadvantage } from '../combat/coronaAuraUtils.js';
-import { hasAuraOfProtection } from '../combat/auraOfProtection.js';
+import { getWolfAdvantageAgainst } from '../combat/auras/wolfAuraUtils.js';
+import { getDuplicityAdvantageAgainst } from '../combat/auras/duplicityAuraUtils.js';
+import { getLionDisadvantageAgainst } from '../combat/auras/lionAuraUtils.js';
+import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
+import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
+import { hasProtectionBuff } from '../combat/auras/protectionBuffUtils.js';
 import { isActive as isAvengingAngelActive, isAuraTarget } from '../automation/handlers/class-cleric-paladin/avengingAngelHandler.js';
-import { hasProtectionBuff } from '../combat/protectionBuffUtils.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;

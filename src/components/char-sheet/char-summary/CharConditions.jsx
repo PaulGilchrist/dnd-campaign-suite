@@ -7,8 +7,8 @@ import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '..
 import usePopup from '../../../hooks/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
-import { computeAuraBonus } from '../../../services/combat/auraOfProtection.js'
-import { clearUnbreakableMajesty } from '../../../services/combat/unbreakableMajesty.js'
+import { computeAuraBonus } from '../../../services/combat/auras/auraOfProtection.js'
+import { clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js'
 import './CharConditions.css'
 
 const STORAGE_KEY = 'activeConditions'

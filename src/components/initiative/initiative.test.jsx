@@ -43,7 +43,7 @@ vi.mock('../../services/encounters/npcStatBlockUtils.js', () => ({ npcToMonsterF
 vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn(() => Promise.resolve(null)) }));
 vi.mock('../../services/rules/effects/expirations.js', () => ({ expireStaleEffects: vi.fn(), applyTurnStartEffects: vi.fn() }));
 vi.mock('../../services/encounters/combatData.js', () => ({ loadCombatSummary: vi.fn(() => Promise.resolve(null)), getCombatSummary: vi.fn(() => null), getActiveCreatureName: vi.fn(() => null) }));
-vi.mock('../../services/combat/unbreakableMajesty.js', () => ({ clearPerRoundMajestyTrackers: vi.fn() }));
+vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({ clearPerRoundMajestyTrackers: vi.fn() }));
 vi.mock('../../services/encounters/initiativeService.js', () => ({
     setupCreatures: vi.fn((characters) => characters.map((ch) => ({ name: ch.name, type: 'player', initiative: '', targetName: null, concentration: null }))),
     addNpc: vi.fn((cs) => { cs.creatures.push({ name: 'NPC 1', type: 'npc', initiative: '', targetName: null, ac: 10, resistances: [], immunities: [], conditions: [], concentration: null, maxHp: 10, currentHp: 10, saveBonuses: {} }); return 1; }),

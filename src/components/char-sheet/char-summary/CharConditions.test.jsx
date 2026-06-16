@@ -53,18 +53,18 @@ vi.mock('../DiceRollResult.jsx', () => ({
   default: vi.fn(() => <div data-testid="dice-roll-result">DiceRollResult</div>),
 }));
 
-vi.mock('../../../services/combat/auraOfProtection.js', () => ({
+vi.mock('../../../services/combat/auras/auraOfProtection.js', () => ({
   computeAuraBonus: vi.fn(async () => ({ bonus: 0, sourceName: null })),
 }));
 
-vi.mock('../../../services/combat/unbreakableMajesty.js', () => ({
+vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
   clearUnbreakableMajesty: vi.fn(),
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { rollD20 } from '../../../services/dice/diceRoller.js';
-import { clearUnbreakableMajesty } from '../../../services/combat/unbreakableMajesty.js';
-import { computeAuraBonus } from '../../../services/combat/auraOfProtection.js';
+import { clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
+import { computeAuraBonus } from '../../../services/combat/auras/auraOfProtection.js';
 
 describe('CharConditions', () => {
   beforeEach(() => {

@@ -1,5 +1,5 @@
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { getCurrentCombatRound } from '../encounters/combatData.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getCurrentCombatRound } from '../../encounters/combatData.js';
 
 const MAJESTY_KEY = 'unbreakableMajestyActive';
 const MAJESTY_DC_KEY = 'unbreakableMajestySaveDc';
