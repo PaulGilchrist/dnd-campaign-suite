@@ -2,18 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import DeathSavePromptModal from './DeathSavePromptModal.jsx';
-import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/savePromptService.js';
-import * as deathSaveRules from '../../services/combat/deathSaveRules.js';
+import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
+import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 
 // ── Mock dependencies ──
 
-vi.mock('../../services/combat/savePromptService.js', () => ({
+vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
   sendDeathSaveResult: vi.fn(),
   clearDeathSavePrompt: vi.fn(),
 }));
 
-vi.mock('../../services/combat/deathSaveRules.js', () => ({
+vi.mock('../../services/combat/conditions/deathSaveRules.js', () => ({
   rollDeathSave: vi.fn(),
 }));
 

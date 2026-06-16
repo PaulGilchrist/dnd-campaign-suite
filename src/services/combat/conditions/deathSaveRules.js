@@ -1,4 +1,4 @@
-import { rollD20 } from '../dice/diceRoller.js'
+import { rollD20 } from '../../dice/diceRoller.js'
 
 function isStable(saves) {
   return saves.filter(Boolean).length >= 3

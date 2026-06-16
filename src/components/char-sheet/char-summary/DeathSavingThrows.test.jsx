@@ -7,20 +7,20 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../services/combat/savePromptService.js', () => ({
+vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
   clearDeathSavePrompt: vi.fn(),
   sendDeathSavePrompt: vi.fn(),
   sendDeathSaveResult: vi.fn(),
 }));
 
-vi.mock('../../../services/combat/deathSaveRules.js', () => ({
+vi.mock('../../../services/combat/conditions/deathSaveRules.js', () => ({
   isStable: vi.fn((saves) => saves.filter(Boolean).length >= 3),
   isDead: vi.fn((failures) => failures.filter(Boolean).length >= 3),
   rollDeathSave: vi.fn(),
   rollDeathSaveWithAdvantage: vi.fn(),
 }));
 
-vi.mock('../../../services/combat/conditionEffects.js', () => ({
+vi.mock('../../../services/combat/conditions/conditionEffects.js', () => ({
   hasSaveModifier: vi.fn(),
 }));
 
@@ -29,9 +29,9 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
 }));
 
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import * as deathSaveRules from '../../../services/combat/deathSaveRules.js';
-import { hasSaveModifier } from '../../../services/combat/conditionEffects.js';
-import { clearDeathSavePrompt } from '../../../services/combat/savePromptService.js';
+import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js';
+import { hasSaveModifier } from '../../../services/combat/conditions/conditionEffects.js';
+import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
 
 describe('DeathSavingThrows', () => {
   beforeEach(() => {

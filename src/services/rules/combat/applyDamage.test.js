@@ -15,7 +15,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
 
 vi.mock('../../ui/storage.js', () => ({ default: { get: vi.fn(), set: vi.fn() } }));
 
-vi.mock('../../combat/savePromptService.js', () => ({
+vi.mock('../../combat/conditions/savePromptService.js', () => ({
   sendDeathSavePrompt: vi.fn(),
   sendConcentrationPrompt: vi.fn(),
 }));
@@ -49,7 +49,7 @@ import {
 import { rollD20 } from '../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import storage from '../../ui/storage.js';
-import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/savePromptService.js';
+import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
 
 // ── Globals ────────────────────────────────────────────────────

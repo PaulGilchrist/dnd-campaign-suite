@@ -6,7 +6,7 @@ import {
 
 // ── Dependency mocks ──────────────────────────────────────────────
 
-vi.mock('../../combat/savePromptService.js', () => ({
+vi.mock('../../combat/conditions/savePromptService.js', () => ({
     sendSavePrompt: vi.fn(),
   }));
 
@@ -21,7 +21,7 @@ vi.mock('../../shared/abilityLookup.js', () => ({
 
 // Re-import after mocking
 const { sendSavePrompt } = await import(
-    '../../combat/savePromptService.js'
+    '../../combat/conditions/savePromptService.js'
 );
 const utilsModule = await import('../../ui/utils.js');
 const utils = utilsModule.default;

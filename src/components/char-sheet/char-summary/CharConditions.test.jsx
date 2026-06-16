@@ -11,7 +11,7 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(() => 15),
 }));
 
-vi.mock('../../../services/combat/conditionUtils.js', () => ({
+vi.mock('../../../services/combat/conditions/conditionUtils.js', () => ({
   CONDITIONS: [
     { key: 'blinded', label: 'Blinded' },
     { key: 'charmed', label: 'Charmed' },
@@ -29,7 +29,7 @@ vi.mock('../../../services/combat/conditionUtils.js', () => ({
   getAbilitySaveBonus: vi.fn(() => 2),
 }));
 
-vi.mock('../../../services/combat/exhaustionRules.js', () => ({
+vi.mock('../../../services/combat/conditions/exhaustionRules.js', () => ({
   EXHAUSTION_LEVELS: 6,
   isDeadFromExhaustion: vi.fn((level) => level >= 6),
   getExhaustionSaveDC: vi.fn((level) => 10 + level),

@@ -4,7 +4,7 @@ import AvatarImage from '../common/AvatarImage.jsx'
 import MonsterNameAutocomplete from '../common/MonsterNameAutocomplete.jsx'
 import NpcAvatar from './NpcAvatar.jsx'
 import CreatureHp from './CreatureHp.jsx'
-import { getAbilityLabel } from '../../services/combat/conditionUtils.js'
+import { getAbilityLabel } from '../../services/combat/conditions/conditionUtils.js'
 import { useRuntimeValue } from '../../hooks/useRuntimeState.js';
 import ConditionEffectBadges from './ConditionEffectBadges.jsx'
 

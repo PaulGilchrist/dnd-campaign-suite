@@ -5,7 +5,7 @@ import useTrackedResource from '../../../hooks/useTrackedResource.js'
 import storage from '../../../services/ui/storage.js'
 import { getTargetFromAttacker, getCombatContext } from '../../../services/rules/combat/damageUtils.js'
 import { applyHealingToTarget } from '../../../services/rules/combat/applyHealing.js'
-import { CONDITIONS } from '../../../services/combat/conditionUtils.js'
+import { CONDITIONS } from '../../../services/combat/conditions/conditionUtils.js'
 import utils from '../../../services/ui/utils.js'
 import '../CharSheet.css'
 

@@ -5,7 +5,7 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 import { rollD20 } from '../../../dice/diceRoller.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
-import { sendSaveResult } from '../../../combat/savePromptService.js';
+import { sendSaveResult } from '../../../combat/conditions/savePromptService.js';
 import utils from '../../../ui/utils.js';
 
 const AVENGING_ANGEL_KEY = 'avengingAngelActive';

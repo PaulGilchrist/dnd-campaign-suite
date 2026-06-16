@@ -9,7 +9,7 @@ vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(() => 60),
 }));
 
-vi.mock('../../../services/combat/savePromptService.js', () => ({
+vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
 }));
@@ -45,7 +45,7 @@ vi.mock('../../../services/ui/storage.js', () => ({
 }));
 
 // ── Re-import mocked modules ──
-import * as savePromptService from '../../../services/combat/savePromptService.js';
+import * as savePromptService from '../../../services/combat/conditions/savePromptService.js';
 import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
 import * as expirations from '../../../services/rules/effects/expirations.js';
 import * as logService from '../../../services/ui/logService.js';

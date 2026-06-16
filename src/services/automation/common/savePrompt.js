@@ -1,4 +1,4 @@
-import { sendSavePrompt } from '../../combat/savePromptService.js';
+import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
 

@@ -34,7 +34,7 @@ const CONDITION_SAVE_MAP = {
   unconscious: null,
 }
 
-import { getAbilitySaveModifier } from '../shared/abilityLookup.js'
+import { getAbilitySaveModifier } from '../../shared/abilityLookup.js'
 
 const ABILITY_LABELS = {
   str: 'Strength',

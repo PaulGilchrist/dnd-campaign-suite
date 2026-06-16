@@ -13,7 +13,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(() => 10),
 }))
 
-vi.mock('../../services/combat/savePromptService.js', () => ({
+vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
   sendConcentrationResult: vi.fn(),
 }))
 
@@ -21,11 +21,11 @@ vi.mock('../../services/combat/auraOfProtection.js', () => ({
   computeAuraBonus: vi.fn(async () => ({ bonus: 0, sourceName: null })),
 }))
 
-vi.mock('../../services/combat/conditionUtils.js', () => ({
+vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
   getAbilitySaveBonus: vi.fn(() => 3),
 }))
 
-vi.mock('../../services/combat/conditionEffects.js', () => ({
+vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   hasSaveModifier: vi.fn(() => false),
 }))
 

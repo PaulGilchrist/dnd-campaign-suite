@@ -45,7 +45,7 @@ vi.mock('../../hooks/useLoggedDiceRoll.js', () => {
   };
 });
 
-vi.mock('../../services/combat/conditionEffects.js', () => {
+vi.mock('../../services/combat/conditions/conditionEffects.js', () => {
   let _computeReturn = null;
   const _computeConditionEffects = vi.fn((_conditions) => {
     return _computeReturn ?? { ...defaultConditionEffects };
@@ -94,7 +94,7 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 }));
 
 // ── Re-import mocked modules for test setup helpers ----
-import * as conditionEffects from '../../services/combat/conditionEffects.js';
+import * as conditionEffects from '../../services/combat/conditions/conditionEffects.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 import * as useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
 

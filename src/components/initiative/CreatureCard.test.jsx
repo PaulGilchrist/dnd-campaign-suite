@@ -37,7 +37,7 @@ vi.mock('./ConditionEffectBadges.jsx', () => ({
     }),
 }));
 
-vi.mock('../../services/combat/conditionUtils.js', () => ({
+vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
     getAbilityLabel: (ability) => ability?.toUpperCase() || '',
 }));
 

@@ -1,6 +1,6 @@
 import * as concentrationRules from './concentrationRules.js'
 import { computeAuraBonus } from '../auraOfProtection.js'
-import { getCreatureSaveBonus } from '../conditionSaveService.js'
+import { getCreatureSaveBonus } from '../conditions/conditionSaveService.js'
 
 function hasDragonConstellation(creature, characters) {
     if (!creature || !creature.name) return false;

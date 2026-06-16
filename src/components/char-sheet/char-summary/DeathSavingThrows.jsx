@@ -1,8 +1,8 @@
 import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
-import { clearDeathSavePrompt } from '../../../services/combat/savePromptService.js'
-import * as deathSaveRules from '../../../services/combat/deathSaveRules.js'
-import { hasSaveModifier } from '../../../services/combat/conditionEffects.js'
+import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
+import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js'
+import { hasSaveModifier } from '../../../services/combat/conditions/conditionEffects.js'
 import './CharSummary.css'
 
 function DeathSavingThrows({ playerStats, campaignName }) {

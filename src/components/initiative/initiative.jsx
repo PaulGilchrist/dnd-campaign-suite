@@ -4,10 +4,10 @@ import useSSEEqualityGuard from '../../hooks/useSSEEqualityGuard.js'
 import utils from '../../services/ui/utils.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import storage from '../../services/ui/storage.js'
-import { clearDeathSavePrompt } from '../../services/combat/savePromptService.js'
+import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js'
 import { rollExpression } from '../../services/dice/diceRoller.js'
 import { getMonsterImageUrl, getMonsterData } from '../../services/npcs/monsterUtils.js'
-import { getAbilityLabel, CONDITIONS } from '../../services/combat/conditionUtils.js'
+import { getAbilityLabel, CONDITIONS } from '../../services/combat/conditions/conditionUtils.js'
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { npcToMonsterFormat, npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
 import * as mapsService from '../../services/maps/mapsService.js'
@@ -33,7 +33,7 @@ import {
     removeCondition,
     addCondition,
     buildConditionPopup,
-} from '../../services/combat/conditionSaveService.js'
+} from '../../services/combat/conditions/conditionSaveService.js'
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import {
     rollConcentrationSave,

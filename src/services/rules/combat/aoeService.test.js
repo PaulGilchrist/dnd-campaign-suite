@@ -14,7 +14,7 @@ vi.mock('./applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
 
-vi.mock('../../combat/savePromptService.js', () => ({ sendSavePrompt: vi.fn() }));
+vi.mock('../../combat/conditions/savePromptService.js', () => ({ sendSavePrompt: vi.fn() }));
 
 vi.mock('../../ui/utils.js', () => ({ default: { guid: vi.fn(() => 'aoe-guid-001') } }));
 
@@ -32,7 +32,7 @@ import {
   computeDamageAfterSave,
   applyDamageToTarget,
 } from './applyDamage.js';
-import { sendSavePrompt } from '../../combat/savePromptService.js';
+import { sendSavePrompt } from '../../combat/conditions/savePromptService.js';
 import utils from '../../ui/utils.js';
 
 // ── Globals ────────────────────────────────────────────────────

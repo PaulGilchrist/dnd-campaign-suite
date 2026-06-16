@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ────────────────────
 
-vi.mock('../dice/diceRoller.js', () => ({
+vi.mock('../../dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
 }));
 
-vi.mock('../npcs/monsterUtils.js', () => ({
+vi.mock('../../npcs/monsterUtils.js', () => ({
   getMonsterData: vi.fn(),
 }));
 
@@ -14,11 +14,11 @@ vi.mock('./conditionUtils.js', () => ({
   getAbilitySaveBonus: vi.fn(),
 }));
 
-vi.mock('./auraOfProtection.js', () => ({
+vi.mock('../auraOfProtection.js', () => ({
   computeAuraBonus: vi.fn(),
 }));
 
-vi.mock('./automationService.js', () => ({
+vi.mock('../automationService.js', () => ({
   playerIsImmuneToCondition: vi.fn(),
 }));
 
@@ -31,11 +31,11 @@ vi.mock('./automationService.js', () => ({
   buildConditionPopup,
 } from './conditionSaveService.js';
 
-import { rollD20 } from '../dice/diceRoller.js';
-import { getMonsterData } from '../npcs/monsterUtils.js';
+import { rollD20 } from '../../dice/diceRoller.js';
+import { getMonsterData } from '../../npcs/monsterUtils.js';
 import { getAbilitySaveBonus } from './conditionUtils.js';
-import { computeAuraBonus } from './auraOfProtection.js';
-import { playerIsImmuneToCondition } from './automationService.js';
+import { computeAuraBonus } from '../auraOfProtection.js';
+import { playerIsImmuneToCondition } from '../automationService.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 

@@ -24,9 +24,9 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
 vi.mock('../../services/ui/storage.js', () => ({
     default: { get: vi.fn(), set: vi.fn(), getProperty: vi.fn(), setProperty: vi.fn() },
 }));
-vi.mock('../../services/combat/savePromptService.js', () => ({ clearDeathSavePrompt: vi.fn() }));
+vi.mock('../../services/combat/conditions/savePromptService.js', () => ({ clearDeathSavePrompt: vi.fn() }));
 vi.mock('../../services/npcs/monsterUtils.js', () => ({ getMonsterImageUrl: vi.fn(() => Promise.resolve(null)), getMonsterData: vi.fn(() => Promise.resolve(null)) }));
-vi.mock('../../services/combat/conditionUtils.js', () => ({
+vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
     getAbilityLabel: (ability) => ability?.toUpperCase() || '',
     CONDITIONS: [
         { key: 'blinded', label: 'Blinded' }, { key: 'charmed', label: 'Charmed' },
@@ -62,7 +62,7 @@ vi.mock('../../services/encounters/initiativeService.js', () => ({
         return { round: initialSummary?.round ?? 1, creatures: [...(initialSummary?.creatures ?? []), ...newCreatures] };
     }),
 }));
-vi.mock('../../services/combat/conditionSaveService.js', () => ({
+vi.mock('../../services/combat/conditions/conditionSaveService.js', () => ({
     rollConditionSave: vi.fn(async () => ({ roll: 15, success: true, bonus: 2, bonusDetail: '' })),
     removeCondition: vi.fn(), addCondition: vi.fn(),
     buildConditionPopup: vi.fn(() => ({ name: 'Test Creature', condition: 'Blinded', type: 'save', rolls: [15], bonus: 2, targetName: 'Test Creature', targetAc: 10, hit: false, success: true, dc: 10 })),

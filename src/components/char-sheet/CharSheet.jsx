@@ -11,11 +11,11 @@ import CharCharacterAdvancement from './CharCharacterAdvancement.jsx'
 import CharSpells from './char-spells/CharSpells.jsx'
 import CharSummary from './char-summary/CharSummary.jsx'
 import { computeAuraComboEffects } from '../../services/combat/auraComboEffects.js';
-import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditionEffects.js';
+import { computeConditionEffects, getNetAttackMode, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { evaluateAutoExpression } from '../../services/combat/automationService.js';
-import { EXHAUSTION_LEVELS } from '../../services/combat/exhaustionRules.js';
+import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRules.js';
 import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
 import './CharSheet.css'
 

@@ -1,10 +1,10 @@
 import { useState, useCallback } from 'react';
 import utils from '../../services/ui/utils.js';
 import { rollD20 } from '../../services/dice/diceRoller.js';
-import { sendSaveResult, clearSavePrompt } from '../../services/combat/savePromptService.js';
+import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auraOfProtection.js';
-import { getAbilitySaveBonus } from '../../services/combat/conditionUtils.js';
+import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
 import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import './savePromptModal.css';
 

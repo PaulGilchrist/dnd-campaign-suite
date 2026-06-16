@@ -39,7 +39,7 @@ vi.mock('./DeathSavingThrows.jsx', () => ({
 }));
 
 // Mock savePromptService
-vi.mock('../../../services/combat/savePromptService.js', () => ({
+vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
   clearDeathSavePrompt: vi.fn(),
 }));
 

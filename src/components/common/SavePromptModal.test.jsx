@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import SavePromptModal from './SavePromptModal.jsx';
 import { rollD20 } from '../../services/dice/diceRoller.js';
-import { sendSaveResult, clearSavePrompt } from '../../services/combat/savePromptService.js';
+import { sendSaveResult, clearSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { computeAuraBonus } from '../../services/combat/auraOfProtection.js';
 
 // ── Mock dependencies ──
@@ -18,7 +18,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
 }));
 
-vi.mock('../../services/combat/savePromptService.js', () => ({
+vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
   sendSaveResult: vi.fn(),
   clearSavePrompt: vi.fn(),
 }));
@@ -27,7 +27,7 @@ vi.mock('../../services/combat/auraOfProtection.js', () => ({
   computeAuraBonus: vi.fn(async () => ({ bonus: 0, sourceName: null })),
 }));
 
-vi.mock('../../services/combat/conditionUtils.js', () => ({
+vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
   getAbilitySaveBonus: vi.fn(() => 3),
 }));
 

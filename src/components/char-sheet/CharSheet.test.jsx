@@ -90,7 +90,7 @@ vi.mock('../../services/combat/auraComboEffects.js', () => ({
 }));
 
 // Mock conditionEffects
-vi.mock('../../services/combat/conditionEffects.js', () => ({
+vi.mock('../../services/combat/conditions/conditionEffects.js', () => ({
   computeConditionEffects: vi.fn(() => ({})),
   getNetAttackMode: vi.fn(() => 'normal'),
   CONDITIONS_THAT_CANNOT_ACT: new Set(),
