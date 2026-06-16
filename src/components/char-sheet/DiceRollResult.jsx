@@ -139,7 +139,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               )}
 
             {showCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'} — damage dice doubled</div>}
-              {targetName && hit !== undefined && !isSaveDamageType && (
+              {targetName && hit !== undefined && !isSaveDamageType && rollType === 'attack' && (
                   <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>
                     {isAutoMiss ? `✗ AUTO-MISS (${coverReason || rangeReason || 'out of range'})` : (hit ? `✓ HIT (${displayTotal} vs AC ${targetAc ?? '—'}${(gloriousDefenseBonus > 0 || defensiveDuelistBonus > 0) ? ` + ${Math.max(0, gloriousDefenseBonus) + Math.max(0, defensiveDuelistBonus)} reaction` : ''})` : `✗ MISS (${displayTotal} vs AC ${targetAc ?? '—'}${(gloriousDefenseBonus > 0 || defensiveDuelistBonus > 0) ? ` + ${Math.max(0, gloriousDefenseBonus) + Math.max(0, defensiveDuelistBonus)} reaction` : ''})`)}
                   </div>

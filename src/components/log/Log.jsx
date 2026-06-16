@@ -42,7 +42,7 @@ function RollEntry({ entry }) {
         {entry.targetName && isSaveDamage && (
           <span className="log-target">{entry.targetName}</span>
         )}
-        {entry.hit !== undefined && (
+        {entry.hit !== undefined && entry.rollType === 'attack' && (
           <span className={`log-hit-miss ${entry.hit ? 'log-hit' : 'log-miss'}`}>
             {entry.isAutoMiss ? 'AUTO-MISS' : (entry.hit ? 'HIT' : 'MISS')} {entry.targetAc != null ? `(AC ${entry.targetAc})` : ''}
           </span>
