@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 
-vi.mock('../../combat/automationService.js', () => ({
+vi.mock('../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
@@ -14,7 +14,7 @@ vi.mock('../../automation/common/healingRoll.js', () => ({
 // ── Imports (Vite returns mocked versions) ─────────────────────
 
 import { hasPostCastSelfHeal, triggerPostCastSelfHeals } from './postCastHealService.js';
-import { evaluateAutoExpression } from '../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../combat/automation/automationService.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../automation/common/healingRoll.js';
 
 // ── Helpers ─────────────────────────────────────────────────────

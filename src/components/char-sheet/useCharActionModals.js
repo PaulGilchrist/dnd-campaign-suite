@@ -5,7 +5,7 @@ import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js'
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
-import { collectWeaponMastery, evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automationService.js';
+import { collectWeaponMastery, evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';

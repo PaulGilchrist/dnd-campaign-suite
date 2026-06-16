@@ -4,7 +4,7 @@ import Popup from '../common/Popup.jsx'
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
 import { getFightingStyle } from '../../services/character/fightingStyles.js'
 import { executeHandler } from '../../services/automation/index.js';
-import { hasAutomation } from '../../services/combat/automationService.js';
+import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import TeleportModal from './modals/TeleportModal.jsx';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct }) {

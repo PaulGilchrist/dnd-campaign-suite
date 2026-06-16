@@ -18,7 +18,7 @@ vi.mock('../../../encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(),
 }));
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ import * as buffToggle from '../../common/buffToggle.js';
 import * as tempTeleportHandler from '../class-warlock/tempTeleportHandler.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as combatData from '../../../encounters/combatData.js';
-import * as automationService from '../../../combat/automationService.js';
+import * as automationService from '../../../combat/automation/automationService.js';
 import * as runtimeState from '../../../../hooks/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────

@@ -6,7 +6,7 @@ import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/condi
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
-import { getDamageReduction } from '../../combat/automationPassives.js';
+import { getDamageReduction } from '../../combat/automation/automationPassives.js';
 import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js';
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
 import { getDistanceFeet } from './rangeValidation.js';

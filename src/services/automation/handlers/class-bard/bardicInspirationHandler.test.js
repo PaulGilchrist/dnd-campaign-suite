@@ -3,7 +3,7 @@ import { handle } from './bardicInspirationHandler.js';
 import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 vi.mock('../../common/targetResolver.js', () => ({
@@ -20,7 +20,7 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automation/automationService.js', () => ({
     evaluateAutoExpression: vi.fn(),
 }));
 

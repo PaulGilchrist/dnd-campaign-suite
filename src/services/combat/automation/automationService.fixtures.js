@@ -1,4 +1,4 @@
-vi.mock('../rules/attackCalc.js', () => ({
+vi.mock('../../rules/attackCalc.js', () => ({
   parseMagicItemName: vi.fn((itemName) => {
     if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
       return { baseName: itemName.substring(3), magicBonus: Number(itemName.charAt(1)) }
@@ -7,7 +7,7 @@ vi.mock('../rules/attackCalc.js', () => ({
   }),
 }))
 
-vi.mock('../shared/abilityLookup.js', () => ({
+vi.mock('../../shared/abilityLookup.js', () => ({
   getAbilityModifier: vi.fn((abilities, abilityName) => {
     if (!abilities || !abilityName) return 0
     const lower = abilityName.toLowerCase().replace(/\s+/g, '')

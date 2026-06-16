@@ -2,7 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeSt
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
-import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
 const GIANT_ANCESTRY_KEY = 'giantAncestrySelection';

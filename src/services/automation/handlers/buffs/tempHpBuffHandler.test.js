@@ -7,7 +7,7 @@ vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
@@ -32,7 +32,7 @@ vi.mock('../../../ui/logService.js', () => ({
 
 import { handle, grantTempHpOnRage, craftBolsteringTreats } from './tempHpBuffHandler.js';
 import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
-import * as automationService from '../../../combat/automationService.js';
+import * as automationService from '../../../combat/automation/automationService.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';

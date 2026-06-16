@@ -23,7 +23,7 @@ vi.mock('../../hooks/useSpellUpcastFlow.js', () => ({
   })),
 }));
 
-vi.mock('../../services/combat/automationService.js', () => ({
+vi.mock('../../services/combat/automation/automationService.js', () => ({
   hasAutomation: vi.fn(() => false),
 }));
 
@@ -104,7 +104,7 @@ vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
 }));
 
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js';
-import { hasAutomation } from '../../services/combat/automationService.js';
+import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';

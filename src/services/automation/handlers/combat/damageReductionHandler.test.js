@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
@@ -9,7 +9,7 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 import { handle } from './damageReductionHandler.js';
-import * as automationService from '../../../combat/automationService.js';
+import * as automationService from '../../../combat/automation/automationService.js';
 import * as logService from '../../../ui/logService.js';
 
 const campaignName = 'TestCampaign';

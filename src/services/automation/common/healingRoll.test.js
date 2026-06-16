@@ -14,7 +14,7 @@ vi.mock('../../dice/diceRoller.js', () => ({
     rollExpressionMaximized: vi.fn(),
 }));
 
-vi.mock('../../combat/automationService.js', () => ({
+vi.mock('../../combat/automation/automationService.js', () => ({
     hasHealingMaximization: vi.fn(),
 }));
 
@@ -41,7 +41,7 @@ const { rollExpression, rollExpressionMaximized } = await import(
      '../../dice/diceRoller.js'
 );
 const { hasHealingMaximization } = await import(
-     '../../combat/automationService.js'
+     '../../combat/automation/automationService.js'
 );
 const { getRuntimeValue, setRuntimeValue } = await import(
      '../../../hooks/useRuntimeState.js'

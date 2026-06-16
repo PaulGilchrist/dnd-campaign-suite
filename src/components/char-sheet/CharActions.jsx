@@ -15,7 +15,7 @@ import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../services/dice/diceRoller.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
-import { hasAutomation } from '../../services/combat/automationService.js'
+import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import HealingPoolModal from './modals/HealingPoolModal.jsx'

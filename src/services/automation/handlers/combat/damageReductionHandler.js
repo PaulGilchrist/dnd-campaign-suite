@@ -1,4 +1,4 @@
-import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 

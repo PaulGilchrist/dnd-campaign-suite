@@ -2,7 +2,7 @@ import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
-import { playerIsImmuneToCondition } from '../../../combat/automationImmunities.js';
+import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 
 /**
  * Web spell area save handler for 2024 ruleset.

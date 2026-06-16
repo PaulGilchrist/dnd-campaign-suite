@@ -1,6 +1,6 @@
 import { isPsychicSpellsActive, getPsychicSpellsConfig, handle } from './psychicSpellsHandler.js';
-import { collectAutomationFromFeatures } from '../../../combat/automationCollector.js';
-import { psionicHandlers } from '../../../combat/automationInfoBuilder/psionic.js';
+import { collectAutomationFromFeatures } from '../../../combat/automation/automationCollector.js';
+import { psionicHandlers } from '../../../combat/automation/automationInfoBuilder/psionic.js';
 
 describe('psychicSpellsHandler', () => {
     describe('isPsychicSpellsActive', () => {

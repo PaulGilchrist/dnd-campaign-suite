@@ -43,7 +43,7 @@ vi.mock('../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => null),
 }));
 
-vi.mock('../../services/combat/automationService.js', () => ({
+vi.mock('../../services/combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(() => 0),
 }));
 
@@ -62,7 +62,7 @@ import * as diceRoller from '../../services/dice/diceRoller.js';
 import * as restRules from '../../services/rules/effects/restRules.js';
 import * as expirations from '../../services/rules/effects/expirations.js';
 import * as classFeatures from '../../services/character/classFeatures.js';
-import * as automationService from '../../services/combat/automationService.js';
+import * as automationService from '../../services/combat/automation/automationService.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 import * as applyHealingService from '../../services/rules/combat/applyHealing.js';
 

@@ -20,7 +20,7 @@ vi.mock('../../common/healingRoll.js', () => ({
   logHealingToSSE: vi.fn(),
 }));
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automation/automationService.js', () => ({
   resolveHealingBonuses: vi.fn(),
   hasHealingMaximization: vi.fn(),
   hasRerollHealingOnes: vi.fn(),
@@ -38,7 +38,7 @@ import * as diceRoller from '../../../dice/diceRoller.js';
 import * as classFeatures from '../../../character/classFeatures.js';
 import * as targetResolver from '../../common/targetResolver.js';
 import * as healingRoll from '../../common/healingRoll.js';
-import * as automationService from '../../../combat/automationService.js';
+import * as automationService from '../../../combat/automation/automationService.js';
 import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────

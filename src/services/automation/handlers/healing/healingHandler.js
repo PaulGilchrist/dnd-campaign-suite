@@ -2,7 +2,7 @@ import { rollExpression, rollExpressionMaximized } from '../../../dice/diceRolle
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
-import { resolveHealingBonuses, hasHealingMaximization, hasRerollHealingOnes } from '../../../combat/automationService.js';
+import { resolveHealingBonuses, hasHealingMaximization, hasRerollHealingOnes } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { getHitDieSize, computeHitDieRecovery } from '../../../rules/effects/restRules.js';
 

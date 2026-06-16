@@ -35,7 +35,7 @@ vi.mock('../../../../hooks/useMetamagic.js', () => ({
   getLastAbilityCheck: vi.fn(),
 }));
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn().mockReturnValue(0),
 }));
 
@@ -50,7 +50,7 @@ import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 import * as useMetamagic from '../../../../hooks/useMetamagic.js';
-import * as automationService from '../../../combat/automationService.js';
+import * as automationService from '../../../combat/automation/automationService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 

@@ -26,7 +26,7 @@ import {
 import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
 import { getCombatContext } from '../services/rules/combat/damageUtils.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/spells/postCastRiderService.js';
-import { playerIsImmuneToCondition, hasIgnoreResistance, hasMinDamage } from '../services/combat/automationService.js';
+import { playerIsImmuneToCondition, hasIgnoreResistance, hasMinDamage } from '../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../services/rules/features/invisibilityService.js';
 
 function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {

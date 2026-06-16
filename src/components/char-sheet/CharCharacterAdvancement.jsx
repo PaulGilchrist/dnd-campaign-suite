@@ -2,7 +2,7 @@
 import useActionPopup from '../../hooks/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
-import { hasAutomation } from '../../services/combat/automationService.js'
+import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { executeHandler } from '../../services/automation/index.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
 import SpellMasteryModal from './modals/SpellMasteryModal.jsx'

@@ -7,7 +7,7 @@
        import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
        import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
        import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
-         import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automationService.js'
+         import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
         import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
         import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
        import { executeHandler } from '../../services/automation/index.js'

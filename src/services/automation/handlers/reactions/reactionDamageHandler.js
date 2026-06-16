@@ -4,7 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeSt
 import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { MELEE_REACH_FEET } from '../../../combat/baseCombatActions.js';
 
 const POLEARM_WEAPONS = ['Quarterstaff', 'Spear'];

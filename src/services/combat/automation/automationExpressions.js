@@ -1,4 +1,4 @@
-import { getAbilityModifier } from '../shared/abilityLookup.js'
+import { getAbilityModifier } from '../../shared/abilityLookup.js'
 
 function resolveUses(playerStats, usesSpec) {
     if (typeof usesSpec === 'number') return usesSpec

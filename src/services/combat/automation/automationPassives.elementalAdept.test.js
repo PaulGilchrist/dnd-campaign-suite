@@ -1,6 +1,6 @@
 import { hasIgnoreResistance, hasMinDamage } from './automationPassives.js';
 import { buildAttackInfo } from './automationInfoBuilder.js';
-import { seedTrackedResources } from '../hooks/useRuntimeState.js';
+import { seedTrackedResources } from '../../hooks/useRuntimeState.js';
 
 describe('Elemental Adept – hasIgnoreResistance', () => {
     const makePlayerStats = (extra = {}) => ({

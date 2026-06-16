@@ -5,7 +5,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState
 import { addExpiration } from '../../../services/rules/effects/expirations.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { rollD20 } from '../../../services/dice/diceRoller.js';
-import { playerIsImmuneToCondition } from '../../../services/combat/automationService.js';
+import { playerIsImmuneToCondition } from '../../../services/combat/automation/automationService.js';
 import utils from '../../../services/ui/utils.js';
 import storage from '../../../services/ui/storage.js';
 

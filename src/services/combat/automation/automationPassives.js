@@ -1,9 +1,9 @@
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
-import { parseMagicItemName } from '../rules/core/attackCalc.js'
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
-import { getChosenRuntimeValue } from '../automation/common/choiceStorage.js'
-import { applyGreatWeaponFighting } from '../rules/core/greatWeaponFighting.js'
+import { parseMagicItemName } from '../../rules/core/attackCalc.js'
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getChosenRuntimeValue } from '../../automation/common/choiceStorage.js'
+import { applyGreatWeaponFighting } from '../../rules/core/greatWeaponFighting.js'
 
 /**
  * Check if playerStats has a passive automation matching type and effect.

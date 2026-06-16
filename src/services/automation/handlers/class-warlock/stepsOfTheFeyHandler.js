@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
-import { evaluateAutoExpression } from '../../../combat/automationExpressions.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { addEntry } from '../../../ui/logService.js';

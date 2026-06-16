@@ -23,7 +23,7 @@ vi.mock('../../hooks/useSpellUpcastFlow.js', () => ({
   })),
 }));
 
-vi.mock('../../services/combat/automationService.js', () => ({
+vi.mock('../../services/combat/automation/automationService.js', () => ({
   hasAutomation: vi.fn(() => false),
   collectWeaponMastery: vi.fn(() => ({ baseMastery: null, extraMasteries: [] })),
   evaluateAutoExpression: vi.fn(() => null),
@@ -393,7 +393,7 @@ describe('CharActions rendering', () => {
     });
 
     it('should render action as clickable when it has automation', async () => {
-      const { hasAutomation } = await import('../../services/combat/automationService.js');
+      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
       hasAutomation.mockReturnValue(true);
       const stats = createStats({
         actions: [{ name: 'Rage', description: 'Enter a rage.', automation: { type: 'combat_stance' } }],
@@ -424,7 +424,7 @@ describe('CharActions rendering', () => {
 
   describe('automation badges', () => {
     it('should show save DC badge for automation with saveDc', async () => {
-      const { hasAutomation } = await import('../../services/combat/automationService.js');
+      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
       hasAutomation.mockImplementation((action) => action?.automation?.type === 'save_attack');
       const stats = createStats({
         actions: [{ name: 'Elemental Bane', description: 'Choose a creature.', automation: { type: 'save_attack', saveDc: 15, saveType: 'CON' } }],
@@ -434,7 +434,7 @@ describe('CharActions rendering', () => {
     });
 
     it('should show healing pool badge for healing_pool automation', async () => {
-      const { hasAutomation } = await import('../../services/combat/automationService.js');
+      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
       hasAutomation.mockImplementation((action) => action?.automation?.type === 'healing_pool');
       const stats = createStats({
         actions: [{ name: 'Life Stream', description: 'Heal a creature.', automation: { type: 'healing_pool', pool: 15 } }],
@@ -444,7 +444,7 @@ describe('CharActions rendering', () => {
     });
 
     it('should show damage badge for automation with damage', async () => {
-      const { hasAutomation } = await import('../../services/combat/automationService.js');
+      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
       hasAutomation.mockImplementation((action) => action?.automation?.type === 'auto_effect');
       const stats = createStats({
         actions: [{ name: 'Thunderous Smite', description: 'Strike with thunder.', automation: { type: 'auto_effect', damage: '2d6', damageType: 'Thunder' } }],
@@ -466,7 +466,7 @@ describe('CharActions rendering', () => {
 
   describe('rage expendable / restore', () => {
     it('should show Restore with Rage button when rage-expendable action is exhausted', async () => {
-      const { hasAutomation } = await import('../../services/combat/automationService.js');
+      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
       const { isExhausted } = await import('../../services/automation/handlers/combat/saveAttackHandler.js');
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
@@ -478,7 +478,7 @@ describe('CharActions rendering', () => {
     });
 
     it('should not show Restore with Rage when not rage-expendable', async () => {
-      const { hasAutomation } = await import('../../services/combat/automationService.js');
+      const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
       const { isExhausted } = await import('../../services/automation/handlers/combat/saveAttackHandler.js');
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);

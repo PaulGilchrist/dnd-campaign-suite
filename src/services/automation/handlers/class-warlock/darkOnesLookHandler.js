@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/useMetamagic.js';
-import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;

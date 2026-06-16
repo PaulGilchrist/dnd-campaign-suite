@@ -5,7 +5,7 @@ import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-import { hasAutomation } from '../../services/combat/automationService.js'
+import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'

@@ -111,7 +111,7 @@ describe('hurlThroughHellHandler', () => {
     });
 
     it('should have correct automation info builder output', () => {
-        const { miscHandlers } = require('../../../combat/automationInfoBuilder/misc.js');
+        const { miscHandlers } = require('../../../combat/automation/automationInfoBuilder/misc.js');
         expect(miscHandlers.hurl_through_hell).toBeDefined();
 
         const feature = {
@@ -144,7 +144,7 @@ describe('hurlThroughHellHandler', () => {
     });
 
     it('should include hurl_through_hell in collector passives', () => {
-        const { collectAutomationFromFeatures } = require('../../../combat/automationCollector.js');
+        const { collectAutomationFromFeatures } = require('../../../combat/automation/automationCollector.js');
 
         const features = [{
             name: 'Hurl Through Hell',

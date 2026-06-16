@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
-import { evaluateAutoExpression } from '../../../combat/automationExpressions.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationExpressions.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

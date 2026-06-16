@@ -1,5 +1,5 @@
 import { evaluateAutoExpression, resolveHealingPoolExpression } from '../automationExpressions.js'
-import { getHitDieSize } from '../../rules/effects/restRules.js'
+import { getHitDieSize } from '../../../rules/effects/restRules.js'
 
 export const healingHandlers = {
     'healing': (feature, playerStats) => {

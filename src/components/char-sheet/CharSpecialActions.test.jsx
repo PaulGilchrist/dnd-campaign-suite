@@ -8,7 +8,7 @@ vi.mock('../../services/automation/index.js', () => ({
 }));
 
 // Mock hasAutomation
-vi.mock('../../services/combat/automationService.js', () => ({
+vi.mock('../../services/combat/automation/automationService.js', () => ({
   hasAutomation: vi.fn((action) => !!(action?.automation)),
 }));
 

@@ -23,7 +23,7 @@ vi.mock('../../hooks/useSpellUpcastFlow.js', () => ({
   })),
 }));
 
-vi.mock('../../services/combat/automationService.js', () => ({
+vi.mock('../../services/combat/automation/automationService.js', () => ({
   hasAutomation: vi.fn(() => false),
   collectWeaponMastery: vi.fn(() => ({ baseMastery: null, extraMasteries: [] })),
   evaluateAutoExpression: vi.fn(() => null),

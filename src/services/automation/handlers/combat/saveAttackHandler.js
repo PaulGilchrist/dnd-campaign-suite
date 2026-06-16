@@ -5,7 +5,7 @@ import * as mapsService from '../../../maps/mapsService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { resolveUses } from '../../../combat/automationExpressions.js';
+import { resolveUses } from '../../../combat/automation/automationExpressions.js';
 
 const AREA_SHAPES = new Set(['emanation', 'cone', 'line', 'sphere', 'cube', 'cylinder', 'square', 'circle', 'wall', 'cage', 'floor', 'area']);
 

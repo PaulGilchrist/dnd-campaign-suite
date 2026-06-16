@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
-import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { buildSaveDc } from '../../common/savePrompt.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 

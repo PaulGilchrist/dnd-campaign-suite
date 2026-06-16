@@ -28,7 +28,7 @@ import {
     getAllSaveProficiencies,
     evaluateAutoExpression,
     buildAttackInfo,
-} from '../combat/automationService.js';
+} from '../combat/automation/automationService.js';
 
 /**
  * Determine which ruleset to use. Checks playerStats.rules first,

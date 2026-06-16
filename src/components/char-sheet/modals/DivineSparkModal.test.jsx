@@ -9,7 +9,7 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
   rollExpressionMaximized: vi.fn(() => ({ total: 20, rolls: [10, 10], modifier: 0, formula: '2d10', maximized: true })),
 }));
 
-vi.mock('../../../services/combat/automationService.js', () => ({
+vi.mock('../../../services/combat/automation/automationService.js', () => ({
   hasHealingMaximization: vi.fn(() => false),
 }));
 
@@ -29,7 +29,7 @@ vi.mock('../../../services/automation/common/savePrompt.js', () => ({
 // ── Re-import mocked modules ──
 
 import * as diceRoller from '../../../services/dice/diceRoller.js';
-import * as automationService from '../../../services/combat/automationService.js';
+import * as automationService from '../../../services/combat/automation/automationService.js';
 import * as logService from '../../../services/ui/logService.js';
 import * as healingRoll from '../../../services/automation/common/healingRoll.js';
 import * as savePrompt from '../../../services/automation/common/savePrompt.js';

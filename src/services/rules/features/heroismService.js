@@ -1,6 +1,6 @@
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
 import { addExpiration } from '../effects/expirations.js';
-import { evaluateAutoExpression } from '../../combat/automationExpressions.js';
+import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
 
 const HEROISM_BUFF_NAME = 'Heroism';
 

@@ -18,7 +18,7 @@ vi.mock('../auras/auraOfProtection.js', () => ({
   computeAuraBonus: vi.fn(),
 }));
 
-vi.mock('../automationService.js', () => ({
+vi.mock('../automation/automationService.js', () => ({
   playerIsImmuneToCondition: vi.fn(),
 }));
 
@@ -35,7 +35,7 @@ import { rollD20 } from '../../dice/diceRoller.js';
 import { getMonsterData } from '../../npcs/monsterUtils.js';
 import { getAbilitySaveBonus } from './conditionUtils.js';
 import { computeAuraBonus } from '../auras/auraOfProtection.js';
-import { playerIsImmuneToCondition } from '../automationService.js';
+import { playerIsImmuneToCondition } from '../automation/automationService.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 

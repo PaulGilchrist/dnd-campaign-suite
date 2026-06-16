@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mock the dependencies ────────────────────────────────────────
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),
 }))
@@ -34,7 +34,7 @@ vi.mock('./automationExpressions.js', () => ({
     }),
 }))
 
-vi.mock('../rules/core/attackCalc.js', () => ({
+vi.mock('../../rules/core/attackCalc.js', () => ({
     parseMagicItemName: vi.fn((itemName) => {
         if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
             const magicBonus = Number(itemName.charAt(1))
@@ -51,8 +51,8 @@ vi.mock('../rules/core/attackCalc.js', () => ({
 
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
-import { parseMagicItemName } from '../rules/core/attackCalc.js'
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { parseMagicItemName } from '../../rules/core/attackCalc.js'
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js'
 
 import {
     getPassiveBuffs,

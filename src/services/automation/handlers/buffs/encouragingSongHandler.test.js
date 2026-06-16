@@ -5,7 +5,7 @@ vi.mock('../../../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn((expr) => {
     if (expr === 'proficiency_bonus') return 3;
     return 0;

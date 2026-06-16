@@ -14,7 +14,7 @@ vi.mock('../../../maps/mapsService.js', () => ({
     loadMapData: vi.fn().mockResolvedValue({ players: [] }),
 }))
 
-vi.mock('../../../combat/automationService.js', () => ({
+vi.mock('../../../combat/automation/automationService.js', () => ({
     evaluateAutoExpression: vi.fn((expr, ps) => {
         if (expr.includes('warlock level + CHA')) {
             return (ps.level || 0) + (ps.abilities?.find(a => a.name === 'Charisma')?.bonus || 0)

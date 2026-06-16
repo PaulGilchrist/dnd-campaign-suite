@@ -2,7 +2,7 @@ import { rollD20 } from '../../dice/diceRoller.js'
 import { getMonsterData } from '../../npcs/monsterUtils.js'
 import { getAbilitySaveBonus } from './conditionUtils.js'
 import { computeAuraBonus } from '../auras/auraOfProtection.js'
-import { playerIsImmuneToCondition } from '../automationService.js'
+import { playerIsImmuneToCondition } from '../automation/automationService.js'
 import { getAuraOfPuritySaveAdvantageConditions, isAuraOfPurityActive } from '../../automation/handlers/buffs/auraOfPurityHandler.js'
 
 async function getCreatureSaveBonus(creature, abilityAbbr, characters, campaignNpcs, getName) {

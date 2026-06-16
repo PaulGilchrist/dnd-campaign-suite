@@ -4,7 +4,7 @@ import { handle as handleTeleport } from './class-warlock/tempTeleportHandler.js
 import { handle as handleVowOfEnmity } from './class-cleric-paladin/vowOfEnmityHandler.js';
 import { getTargetFromAttacker } from '../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
-import { evaluateAutoExpression } from '../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {

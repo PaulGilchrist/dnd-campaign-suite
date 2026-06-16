@@ -5,7 +5,7 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import * as mapsService from '../../../maps/mapsService.js';
-import { playerIsImmuneToCondition } from '../../../combat/automationImmunities.js';
+import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 
 function getAreaRadius(auto) {
     const size = auto.size || '10-foot';

@@ -1,5 +1,5 @@
-import { collectSaveModifiers } from '../automationModifiers.js'
-import { collectAutomationFromFeatures } from '../automationCollector.js'
+import { collectSaveModifiers } from '../automation/automationModifiers.js'
+import { collectAutomationFromFeatures } from '../automation/automationCollector.js'
 import { computeConditionEffects, getNetAttackMode, hasSaveAdvantage } from './conditionEffects.js'
 
 describe('restore_balance automation', () => {

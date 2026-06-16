@@ -15,7 +15,7 @@ import {
 } from '../services/campaign/randomEventService.js';
 import { generateEncounterSuggestions } from '../services/encounters/encounterGenerator.js';
 import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
-import { hasSelfRestoration } from '../services/combat/automationService.js';
+import { hasSelfRestoration } from '../services/combat/automation/automationService.js';
 
 const MODES = {
   INACTIVE: 'inactive',

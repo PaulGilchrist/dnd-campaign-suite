@@ -1,5 +1,5 @@
 import { evaluateAutoExpression } from '../automationExpressions.js'
-import { getAbilityModifier } from '../../shared/abilityLookup.js'
+import { getAbilityModifier } from '../../../shared/abilityLookup.js'
 
 export const miscHandlers = {
     'cantrip_spellcasting_ability': (feature, _playerStats) => {

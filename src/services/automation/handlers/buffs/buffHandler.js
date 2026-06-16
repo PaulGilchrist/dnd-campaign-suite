@@ -4,7 +4,7 @@ import { handle as handleTeleport } from '../class-warlock/tempTeleportHandler.j
 import { handle as handleVowOfEnmity } from '../class-cleric-paladin/vowOfEnmityHandler.js';
 import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
-import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
 
 const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';

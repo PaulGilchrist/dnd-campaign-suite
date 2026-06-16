@@ -5,7 +5,7 @@ import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidat
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { getLastAttackRoll, getLastDamageEvent, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
-import { evaluateAutoExpression } from '../../../combat/automationService.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;

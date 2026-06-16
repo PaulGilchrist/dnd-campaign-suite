@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
-import { resolveDiceExpression } from '../../../combat/automationService.js';
+import { resolveDiceExpression } from '../../../combat/automation/automationService.js';
 import { loadMapData } from '../../../maps/mapsService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { addEntry } from '../../../ui/logService.js';

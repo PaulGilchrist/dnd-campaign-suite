@@ -1,5 +1,5 @@
 import { loadSkills } from '../../ui/dataLoader.js';
-import { evaluateAutoExpression } from '../../combat/automationExpressions.js';
+import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
 
 export async function getAbilities(playerStats) {
     const skills = await loadSkills();
