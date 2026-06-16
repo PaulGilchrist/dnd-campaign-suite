@@ -7,6 +7,7 @@ import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/combat/damageUtils.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { findCreatureByName } from '../../services/rules/combat/damageUtils.js';
+import { getAbilitySaveModifier } from '../../services/shared/abilityLookup.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
@@ -249,7 +250,18 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
         </span>
       ))}
       {action.save_dc != null && (
-        <span className="mc-dice-link mc-dice-link-save">
+        <span className={`mc-dice-link ${!action.attack_bonus && !attackerCannotAct ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}`} onClick={!action.attack_bonus && !attackerCannotAct ? () => {
+          const target = getTarget();
+          const saveMod = getSaveModifierForSaveType(action.save_type, target, characters, creatures);
+          rollSavingThrow(saveAbilityAbbr(action.save_type), saveMod, {
+            attackerName: monsterName,
+            targetName: target?.name,
+            actionName: action.name,
+            saveDc: action.save_dc,
+            saveType: action.save_type,
+            dcSuccess: action.save_dc != null ? 'half' : null,
+          });
+        } : undefined} role="button" tabIndex={0}>
           DC {action.save_dc} {action.save_type}
         </span>
       )}
@@ -599,6 +611,45 @@ function saveAbilityAbbr(full) {
 }
 
 const abilityNameMap = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };
+
+function getSaveModifierForSaveType(saveType, target, characters, creatures) {
+  const abilityKey = toAbbr(saveType);
+  if (!abilityKey) return 0;
+
+  if (!target) return 0;
+
+  if (target.type === 'player') {
+    const playerChar = characters?.find(c => c.name === target.name);
+    if (playerChar?.abilities) {
+      return getAbilitySaveModifier(playerChar.abilities, abilityKey);
+    }
+    const creature = creatures?.find(c => c.name === target.name);
+    if (creature?.saving_throws?.[abilityKey]) {
+      return creature.saving_throws[abilityKey].modifier;
+    }
+    if (creature?.ability_score_modifiers?.[abilityKey] != null) {
+      return creature.ability_score_modifiers[abilityKey];
+    }
+    return 0;
+  }
+
+  if (target.saving_throws?.[abilityKey] != null) {
+    return target.saving_throws[abilityKey].modifier;
+  }
+  if (target.ability_score_modifiers?.[abilityKey] != null) {
+    return target.ability_score_modifiers[abilityKey];
+  }
+
+  const creature = creatures?.find(c => c.name === target.name);
+  if (creature?.saving_throws?.[abilityKey]) {
+    return creature.saving_throws[abilityKey].modifier;
+  }
+  if (creature?.ability_score_modifiers?.[abilityKey] != null) {
+    return creature.ability_score_modifiers[abilityKey];
+  }
+
+  return 0;
+}
 
 function parseInitiativeBonus(initStr) {
   if (!initStr) return null;

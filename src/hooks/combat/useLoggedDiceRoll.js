@@ -776,15 +776,44 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            }, campaignName);
        }
 
-       if (rollType === 'save') {
-           setRuntimeValue(characterName, 'lastSaveRoll', {
-               d20: effectiveD20,
-               bonus,
-               saveType: context?.saveType || null,
-               targetName,
-               timestamp: Date.now(),
-           }, campaignName);
-       }
+        if (rollType === 'save') {
+            setRuntimeValue(characterName, 'lastSaveRoll', {
+                d20: effectiveD20,
+                bonus,
+                saveType: context?.saveType || null,
+                targetName,
+                timestamp: Date.now(),
+            }, campaignName);
+
+            const saveDc = context?.saveDc;
+            const saveType = context?.saveType;
+            const attackerName = context?.attackerName || characterName;
+            const actionName = context?.actionName || name;
+            if (saveDc != null) {
+                const saveTotal = effectiveD20 + bonus;
+                const saveSuccess = saveTotal >= saveDc;
+                logEntry({
+                    type: 'roll',
+                    characterName: targetName || characterName,
+                    rollType: 'save',
+                    name: actionName,
+                    rolls: [effectiveD20],
+                    mode: 'normal',
+                    total: saveTotal,
+                    bonus,
+                    isNatural20: effectiveD20 === 20,
+                    isNatural1: effectiveD20 === 1,
+                    targetName: targetName,
+                    saveType: saveType,
+                    saveDc: saveDc,
+                    saveResult: saveSuccess ? 'success' : 'failure',
+                    attackerName: attackerName,
+                    dcSuccess: context?.dcSuccess,
+                    timestamp: Date.now(),
+                    id: utils.guid(),
+                });
+            }
+        }
 
     if (rollType === 'initiative') {
         const firstName = utils.getName(characterName);

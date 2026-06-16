@@ -331,3 +331,14 @@
   color: var(--color-text-secondary);
   border-color: var(--border-color);
 }
+
+.mc-dice-link-save-clickable {
+  cursor: pointer;
+  color: var(--color-text-primary);
+}
+
+.mc-dice-link-save-clickable:hover {
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  border-color: var(--color-primary);
+}

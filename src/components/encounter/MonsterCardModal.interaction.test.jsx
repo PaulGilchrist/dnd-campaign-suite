@@ -418,4 +418,80 @@ describe('MonsterCardModal interaction / game rules', () => {
     render(<MonsterCardModal {...makeProps(makeMonster())} />);
     expect(screen.getByText(/Quick Roll/)).toBeInTheDocument();
   });
+
+  // ════════════════════════════════════════════
+  // Save-based actions (save_dc without attack_bonus)
+  // ════════════════════════════════════════════
+
+  it('renders save DC as clickable for save-only actions (no attack_bonus)', () => {
+    const m = makeMonster({ actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }] });
+    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [], targetName: 'Player A' });
+    render(<MonsterCardModal {...makeProps(m)} />);
+    const saveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
+    expect(saveLinks.length).toBeGreaterThan(0);
+  });
+
+  it('clicking save-only action DC calls rollSavingThrow with correct ability and modifier', () => {
+    const m = makeMonster({
+      actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
+      ability_score_modifiers: { str: -1, dex: 3, con: 0, int: 0, wis: -1, cha: 0 },
+    });
+    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [], targetName: 'Player A' });
+    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Player A', type: 'npc', saving_throws: { dex: { modifier: 2 } } }] })} />);
+    const saveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
+    fireEvent.click(saveLinks[0]);
+    expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 2, expect.objectContaining({
+      attackerName: 'Goblin',
+      targetName: 'Player A',
+      actionName: 'Web',
+      saveDc: 13,
+      saveType: 'Dexterity',
+    }));
+  });
+
+  it('clicking save-only action DC uses monster ability modifier when target has no saving_throws', () => {
+    const m = makeMonster({
+      actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
+      ability_score_modifiers: { str: -1, dex: 3, con: 0, int: 0, wis: -1, cha: 0 },
+    });
+    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [], targetName: 'Player A' });
+    render(<MonsterCardModal {...makeProps(m, { creatures: [{ name: 'Player A', type: 'npc', ability_score_modifiers: { dex: 4 } }] })} />);
+    const saveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
+    fireEvent.click(saveLinks[0]);
+    expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 4, expect.objectContaining({
+      saveDc: 13,
+      saveType: 'Dexterity',
+    }));
+  });
+
+  it('does not make save DC clickable when action also has attack_bonus', () => {
+    const m = makeMonster({ actions: [{ name: 'Attack', description: '', attack_bonus: 3, damage_dice: '1d6', save_dc: 13, save_type: 'Dexterity' }] });
+    render(<MonsterCardModal {...makeProps(m)} />);
+    const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
+    expect(clickableSaveLinks.length).toBe(0);
+  });
+
+  it('does not make save DC clickable when attacker is incapacitated', () => {
+    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [{ key: 'incapacitated', label: 'Incapacitated' }] });
+    const m = makeMonster({ actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }] });
+    render(<MonsterCardModal {...makeProps(m)} />);
+    const clickableSaveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
+    expect(clickableSaveLinks.length).toBe(0);
+  });
+
+  it('clicking save-only action DC with no target uses ability modifier fallback', () => {
+    damageUtils.__setFindCreatureReturn({ name: 'Goblin', conditions: [] });
+    const m = makeMonster({
+      actions: [{ name: 'Web', description: 'Dexterity Saving Throw: DC 13', save_dc: 13, save_type: 'Dexterity' }],
+      ability_score_modifiers: { str: -1, dex: 3, con: 0, int: 0, wis: -1, cha: 0 },
+    });
+    render(<MonsterCardModal {...makeProps(m)} />);
+    const saveLinks = document.querySelectorAll('.mc-dice-link-save-clickable');
+    expect(saveLinks.length).toBeGreaterThan(0);
+    fireEvent.click(saveLinks[0]);
+    expect(rollSavingThrow).toHaveBeenCalledWith('DEX', 0, expect.objectContaining({
+      saveDc: 13,
+      saveType: 'Dexterity',
+    }));
+  });
 });
