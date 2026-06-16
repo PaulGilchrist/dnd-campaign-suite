@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardResistances from './useWizardResistances.js';
 
 // Mock the resistances validation service
-vi.mock('../services/character/resistancesValidation.js', () => ({
+vi.mock('../../services/character/resistancesValidation.js', () => ({
   getPreSelectedResistances: vi.fn(),
   validateResistances: vi.fn()
 }));
@@ -11,7 +11,7 @@ vi.mock('../services/character/resistancesValidation.js', () => ({
 import {
   getPreSelectedResistances,
   validateResistances
-} from '../services/character/resistancesValidation.js';
+} from '../../services/character/resistancesValidation.js';
 
 describe('useWizardResistances', () => {
   const mockFormData = {

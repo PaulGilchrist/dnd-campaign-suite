@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardNavigation from './useWizardNavigation.js';
 
 // Mock the validateStep function
-vi.mock('../config/utils.js', () => ({
+vi.mock('../../config/utils.js', () => ({
   validateStep: vi.fn()
 }));
 
-import { validateStep } from '../config/utils.js';
+import { validateStep } from '../../config/utils.js';
 
 describe('useWizardNavigation', () => {
   const mockFormData = {

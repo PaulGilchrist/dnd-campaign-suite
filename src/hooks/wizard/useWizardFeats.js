@@ -1,5 +1,5 @@
 import useWizardConfig from './useWizardConfig.js';
-import { getPreSelectedFeats } from '../services/character/featValidation.js';
+import { getPreSelectedFeats } from '../../services/character/featValidation.js';
 
 function useWizardFeats(formData, setFormData) {
   const { preSelectedFeats } = useWizardConfig({

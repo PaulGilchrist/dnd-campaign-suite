@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { validateStep } from '../config/utils.js';
+import { validateStep } from '../../config/utils.js';
 
 function useWizardNavigation(initialStep, formData, racesData, classSubtypes, ruleset) {
   const [currentStep, setCurrentStep] = useState(initialStep);

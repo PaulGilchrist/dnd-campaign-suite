@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharacterCreationWizard from './CharacterCreationWizard.jsx';
 import { validateStep, validateFinalFormData } from '../../config/utils.js';
-import useWizardNavigation from '../../hooks/useWizardNavigation.js';
+import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
 
 // Stable mock data - defined outside vi.fn() to preserve reference identity across renders
 const mockFormData = {
@@ -51,7 +51,7 @@ const mockNavigatePrevious = vi.fn();
 const mockGetStepEnabled = vi.fn(() => true);
 
 // Mock all the hooks with stable references
-vi.mock('../../hooks/useWizardForm.js', () => ({
+vi.mock('../../hooks/wizard/useWizardForm.js', () => ({
   default: vi.fn(() => ({
     formData: mockFormData,
     errors: mockErrors,
@@ -66,7 +66,7 @@ vi.mock('../../hooks/useWizardForm.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useWizardData.js', () => ({
+vi.mock('../../hooks/wizard/useWizardData.js', () => ({
   default: vi.fn(() => ({
     backgrounds: [],
     racesData: [],
@@ -77,7 +77,7 @@ vi.mock('../../hooks/useWizardData.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useWizardNavigation.js', () => ({
+vi.mock('../../hooks/wizard/useWizardNavigation.js', () => ({
   default: vi.fn(() => ({
     currentStep: 1,
     isNextDisabled: false,
@@ -89,7 +89,7 @@ vi.mock('../../hooks/useWizardNavigation.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useWizardSkills.js', () => ({
+vi.mock('../../hooks/wizard/useWizardSkills.js', () => ({
   default: vi.fn(() => ({
     skillLimits: null,
     expertiseLimits: null,
@@ -98,7 +98,7 @@ vi.mock('../../hooks/useWizardSkills.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useWizardLanguages.js', () => ({
+vi.mock('../../hooks/wizard/useWizardLanguages.js', () => ({
   default: vi.fn(() => ({
     languageLimits: null,
     fightingStyleLimits: null,
@@ -108,14 +108,14 @@ vi.mock('../../hooks/useWizardLanguages.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useWizardResistances.js', () => ({
+vi.mock('../../hooks/wizard/useWizardResistances.js', () => ({
   default: vi.fn(() => ({
     resistanceWarnings: [],
     preSelectedResistancesList: { resistances: [], immunities: [] },
   })),
 }));
 
-vi.mock('../../hooks/useWizardFeats.js', () => ({
+vi.mock('../../hooks/wizard/useWizardFeats.js', () => ({
   default: vi.fn(() => ({
     preSelectedFeats: [],
   })),
@@ -128,7 +128,7 @@ vi.mock('./use-wizard-inventory', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useWizardAbilities.js', () => ({
+vi.mock('../../hooks/wizard/useWizardAbilities.js', () => ({
   default: vi.fn(() => ({
     calculateTotalPointsSpent: vi.fn(),
     onAbilityBaseScoreChange: vi.fn(),
@@ -138,7 +138,7 @@ vi.mock('../../hooks/useWizardAbilities.js', () => ({
 }));
 
 // Mock useWizardArrayToggle - used by wizard but not previously mocked (caused OOM)
-vi.mock('../../hooks/useWizardArrayToggle.js', () => ({
+vi.mock('../../hooks/wizard/useWizardArrayToggle.js', () => ({
   default: vi.fn(() => ({
     toggleItem: vi.fn(),
     setItem: vi.fn(),

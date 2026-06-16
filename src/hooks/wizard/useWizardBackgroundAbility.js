@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { fetchBackgroundData } from '../services/ui/dataLoader.js';
+import { fetchBackgroundData } from '../../services/ui/dataLoader.js';
 
 function parseBackgroundAbilityScores(abilityScoresStr) {
   if (!abilityScoresStr) return [];

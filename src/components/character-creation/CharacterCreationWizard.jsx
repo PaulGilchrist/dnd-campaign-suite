@@ -6,19 +6,19 @@ import WizardProgressBar from './WizardProgressBar.jsx';
 import WizardFooter from './WizardFooter.jsx';
 import WizardSidebar from './WizardSidebar.jsx';
 import { WIZARD_STEPS, getTotalSteps } from '../../config/steps-config.js';
-import useWizardForm from '../../hooks/useWizardForm.js';
-import useWizardData from '../../hooks/useWizardData.js';
-import useWizardNavigation from '../../hooks/useWizardNavigation.js';
-import useWizardSkills from '../../hooks/useWizardSkills.js';
-import useWizardLanguages from '../../hooks/useWizardLanguages.js';
-import useWizardResistances from '../../hooks/useWizardResistances.js';
-import useWizardFeats from '../../hooks/useWizardFeats.js';
-import useWizardFeatBuffs from '../../hooks/useWizardFeatBuffs.js';
-import useWizardSpells from '../../hooks/useWizardSpells.js';
-import useWizardBackgroundAbility from '../../hooks/useWizardBackgroundAbility.js';
+import useWizardForm from '../../hooks/wizard/useWizardForm.js';
+import useWizardData from '../../hooks/wizard/useWizardData.js';
+import useWizardNavigation from '../../hooks/wizard/useWizardNavigation.js';
+import useWizardSkills from '../../hooks/wizard/useWizardSkills.js';
+import useWizardLanguages from '../../hooks/wizard/useWizardLanguages.js';
+import useWizardResistances from '../../hooks/wizard/useWizardResistances.js';
+import useWizardFeats from '../../hooks/wizard/useWizardFeats.js';
+import useWizardFeatBuffs from '../../hooks/wizard/useWizardFeatBuffs.js';
+import useWizardSpells from '../../hooks/wizard/useWizardSpells.js';
+import useWizardBackgroundAbility from '../../hooks/wizard/useWizardBackgroundAbility.js';
 
-import useWizardAbilities from '../../hooks/useWizardAbilities.js';
-import useWizardArrayToggle from '../../hooks/useWizardArrayToggle.js';
+import useWizardAbilities from '../../hooks/wizard/useWizardAbilities.js';
+import useWizardArrayToggle from '../../hooks/wizard/useWizardArrayToggle.js';
 
 const WizardStepRenderer = React.memo(({
   currentStep,

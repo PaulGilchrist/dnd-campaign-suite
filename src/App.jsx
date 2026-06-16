@@ -13,7 +13,7 @@ import * as mapsService from './services/maps/mapsService.js';
 import useAppData from './hooks/useAppData.js';
 import useCharacterManagement from './hooks/management/useCharacterManagement.js';
 import useCampaignManagement from './hooks/management/useCampaignManagement.js';
-import { useCharacterWizard } from './hooks/useCharacterWizard.js';
+import { useCharacterWizard } from './hooks/wizard/useCharacterWizard.js';
 import rulesFactory from './services/rules/rulesFactory.js';
 import Subscriber from './components/common/Subscriber.jsx';
 import { setRuntimeObject, seedTrackedResources } from './hooks/useRuntimeState.js';

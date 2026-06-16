@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { computeAllFeatBuffs } from '../services/character/featBuffService.js';
-import { injectSpecialActions } from '../services/shared/injectSpecialActions.js';
-import { applyAbilityScoreIncreases, mergeDeduplicated } from '../services/shared/buffApplier.js';
+import { computeAllFeatBuffs } from '../../services/character/featBuffService.js';
+import { injectSpecialActions } from '../../services/shared/injectSpecialActions.js';
+import { applyAbilityScoreIncreases, mergeDeduplicated } from '../../services/shared/buffApplier.js';
 
 function buildFormDataWithBuffs(prev, buffs) {
   const next = { ...prev };

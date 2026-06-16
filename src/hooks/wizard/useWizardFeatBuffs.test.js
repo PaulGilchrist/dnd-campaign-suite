@@ -3,11 +3,11 @@ import { renderHook } from '@testing-library/react';
 import useWizardFeatBuffs from './useWizardFeatBuffs.js';
 
 // Mock the featBuffService
-vi.mock('../services/character/featBuffService.js', () => ({
+vi.mock('../../services/character/featBuffService.js', () => ({
   computeAllFeatBuffs: vi.fn(),
 }));
 
-import { computeAllFeatBuffs } from '../services/character/featBuffService.js';
+import { computeAllFeatBuffs } from '../../services/character/featBuffService.js';
 
 describe('useWizardFeatBuffs', () => {
   const mockSetFormData = vi.fn();

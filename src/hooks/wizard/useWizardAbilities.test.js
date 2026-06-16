@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardAbilities from './useWizardAbilities.js';
 
 // Mock the utils module
-vi.mock('../config/utils.js', () => ({
+vi.mock('../../config/utils.js', () => ({
   getPointBuyCosts: vi.fn()
 }));
 
-import { getPointBuyCosts } from '../config/utils.js';
+import { getPointBuyCosts } from '../../config/utils.js';
 
 const DEFAULT_COSTS = {
   8: 0,

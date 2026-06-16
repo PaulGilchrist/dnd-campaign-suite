@@ -3,11 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardFeats from './useWizardFeats.js';
 
 // Mock the feat validation service
-vi.mock('../services/character/featValidation.js', () => ({
+vi.mock('../../services/character/featValidation.js', () => ({
   getPreSelectedFeats: vi.fn()
 }));
 
-import { getPreSelectedFeats } from '../services/character/featValidation.js';
+import { getPreSelectedFeats } from '../../services/character/featValidation.js';
 
 describe('useWizardFeats', () => {
   const mockFormData = {
