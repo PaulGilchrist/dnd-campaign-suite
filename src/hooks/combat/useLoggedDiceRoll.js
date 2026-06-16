@@ -1,6 +1,6 @@
 import { useRef, useEffect } from 'react';
 import useDiceRoll from './useDiceRoll.js';
-import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
+import { rollD20, rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
@@ -350,6 +350,29 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     }
   }, [popupHtml]);
 
+  useEffect(() => {
+    if (popupHtml?.type === 'damage' && popupHtml?.hit === true && popupHtml?.autoDamageSecondary) {
+      const timer = setTimeout(() => {
+        const { autoDamageSecondary } = popupHtml;
+        const result = popupHtml.isCritSecondary ? rollExpressionDoubled(autoDamageSecondary.formula) : rollExpression(autoDamageSecondary.formula);
+        if (result) {
+          const context = {
+            damageType: autoDamageSecondary.damageType,
+            targetName: autoDamageSecondary.targetName,
+            attackerName: autoDamageSecondary.attackerName,
+          };
+          if (autoDamageSecondary.saveDc) {
+            context.saveDc = autoDamageSecondary.saveDc;
+            context.saveType = autoDamageSecondary.saveType;
+            context.dcSuccess = autoDamageSecondary.dcSuccess;
+          }
+          logDamageAndShow(autoDamageSecondary.name, autoDamageSecondary.formula, result.total, result.rolls, result.modifier, context);
+        }
+      }, SHOW_DICE_ROLL_DELAY);
+      return () => clearTimeout(timer);
+    }
+  }, [popupHtml]); // eslint-disable-line react-hooks/exhaustive-deps
+
   function logEntry(entry) {
     fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
         method: 'POST',
@@ -530,22 +553,24 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
        }
        const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && hit;
 
-        const autoDamage = hit && context?.autoDamageFormula ? {
-          name: context.autoDamageName || name,
-          formula: context.autoDamageFormula,
-          damageType: context.damageType,
-          targetName: targetName,
-          attackerName: context.attackerName || characterName,
-          saveDc: context.saveDc,
-          saveType: context.saveType,
-          dcSuccess: context.dcSuccess,
-          metamagicTwinTarget: context.metamagicTwinTarget,
-          metamagicHeighten: context.metamagicHeighten,
-          isCantrip: context.isCantrip,
-          overchannelActive: context.overchannelActive,
-          overchannelUseCount: context.overchannelUseCount,
-          overchannelSpellLevel: context.overchannelSpellLevel,
-         } : undefined;
+         const autoDamage = hit && context?.autoDamageFormula ? {
+           name: context.autoDamageName || name,
+           formula: context.autoDamageFormula,
+           damageType: context.damageType,
+           targetName: targetName,
+           attackerName: context.attackerName || characterName,
+           saveDc: context.saveDc,
+           saveType: context.saveType,
+           dcSuccess: context.dcSuccess,
+           metamagicTwinTarget: context.metamagicTwinTarget,
+           metamagicHeighten: context.metamagicHeighten,
+           isCantrip: context.isCantrip,
+           overchannelActive: context.overchannelActive,
+           overchannelUseCount: context.overchannelUseCount,
+           overchannelSpellLevel: context.overchannelSpellLevel,
+           secondaryFormula: context.autoDamageSecondaryFormula,
+           secondaryDamageType: context.autoDamageSecondaryDamageType,
+          } : undefined;
 
      logEntry({
         type: 'roll',
@@ -1116,6 +1141,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
               mode: disadvantage ? 'disadvantage' : 'normal',
               finalDamage: applyResult?.finalDamage ?? total,
               soulstitchProtected: isSoulstitchProtected,
+              resistanceDetails: applyResult?.resistanceDetails || [],
             });
 
             setPopupHtml({
@@ -1136,6 +1162,17 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
             finalDamage: applyResult?.finalDamage,
             damageApplied: true,
             damageReduced: applyResult?.damageReduced,
+            autoDamageSecondary: context?.autoDamageSecondaryFormula ? {
+              name: context.autoDamageSecondaryName || name,
+              formula: context.autoDamageSecondaryFormula,
+              damageType: context.autoDamageSecondaryDamageType,
+              targetName: target.name,
+              attackerName: context.attackerName || characterName,
+              saveDc: context.saveDc,
+              saveType: context.saveType,
+              dcSuccess: context.dcSuccess,
+            } : undefined,
+            isCritSecondary: context?.isAutoCrit || false,
             });
 
             // Overchannel self-damage (2nd+ use before Long Rest)
@@ -1669,6 +1706,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
                  damageType,
                  targetName: target?.name,
                  finalDamage: applyResult?.finalDamage,
+                 resistanceDetails: applyResult?.resistanceDetails || [],
                });
 
        // Overchannel self-damage (2nd+ use before Long Rest)
@@ -1713,22 +1751,33 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
            }
        }
 
-         const popupData = {
-          type: 'damage',
-          name,
-          formula,
-          rolls,
-          bonus: 0,
-          modifier,
-          dc: context?.dc,
-          dcType: context?.dcType,
-          dcSuccess: context?.dcSuccess,
-          damageType,
-          targetName: target?.name,
-          total,
-          adjustedTotal: adjustedTotal,
-          elementalAdeptBonus: adjustedTotal > total ? adjustedTotal - total : 0,
-        };
+          const popupData = {
+           type: 'damage',
+           name,
+           formula,
+           rolls,
+           bonus: 0,
+           modifier,
+           dc: context?.dc,
+           dcType: context?.dcType,
+           dcSuccess: context?.dcSuccess,
+           damageType,
+           targetName: target?.name,
+           total,
+           adjustedTotal: adjustedTotal,
+           elementalAdeptBonus: adjustedTotal > total ? adjustedTotal - total : 0,
+            autoDamageSecondary: context?.autoDamageSecondaryFormula ? {
+              name: context.autoDamageSecondaryName || name,
+              formula: context.autoDamageSecondaryFormula,
+              damageType: context.autoDamageSecondaryDamageType,
+              targetName: target?.name,
+              attackerName: context.attackerName || characterName,
+              saveDc: context.saveDc,
+              saveType: context.saveType,
+              dcSuccess: context.dcSuccess,
+            } : undefined,
+           isCritSecondary: context?.isAutoCrit || false,
+         };
 
        if (applyResult) {
           popupData.targetCurrentHp = applyResult.newHp;

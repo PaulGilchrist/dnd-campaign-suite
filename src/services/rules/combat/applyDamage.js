@@ -39,6 +39,33 @@ export function computeDamageAfterResistances(rawDamage, damageTypes, resistance
   return rawDamage;
 }
 
+export function computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance = false) {
+  if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistancesWithDetails: damageTypes is required');
+  const typeDetails = [];
+  let finalDamage = rawDamage;
+  let isImmune = false;
+  let isResistant = false;
+  for (const dt of damageTypes) {
+    if (!dt) continue;
+    const lower = dt.toLowerCase();
+    if (immunities?.some(i => i.toLowerCase() === lower)) {
+      isImmune = true;
+      typeDetails.push({ damageType: dt, status: 'immune' });
+      break;
+    }
+    if (!ignoreResistance && resistances?.some(r => r.toLowerCase() === lower)) {
+      isResistant = true;
+      typeDetails.push({ damageType: dt, status: 'resistant' });
+    }
+  }
+  if (isImmune) {
+    finalDamage = 0;
+  } else if (isResistant) {
+    finalDamage = Math.floor(rawDamage / 2);
+  }
+  return { finalDamage, typeDetails };
+}
+
 export function computeDamageAfterSave(rawDamage, saveSuccess, dcSuccess) {
   if (!saveSuccess) return rawDamage;
   if (dcSuccess === 'half') return Math.floor(rawDamage / 2);
@@ -98,7 +125,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
             }
         }
     }
-    let finalDamage = computeDamageAfterResistances(rawDamage, damageTypes || [], resistances, immunities, ignoreResistance);
+    const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes || [], resistances, immunities, ignoreResistance);
+    let finalDamage = resResult.finalDamage;
+    let resistanceDetails = resResult.typeDetails;
 
     // Apply damage reduction from features (e.g., Heavy Armor Master)
     let damageReducedByFeature = 0;
@@ -490,7 +519,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
   window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
-  return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage, damageReducedByFeature: damageReducedByFeature };
+  return { finalDamage, oldHp, newHp, damageReduced: finalDamage < rawDamage, damageReducedByFeature: damageReducedByFeature, resistanceDetails };
 }
 
 function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {

@@ -70,6 +70,23 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
             context.dcSuccess = autoDamage.dcSuccess;
           }
           rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+
+          if (autoDamage.secondaryFormula) {
+            const secondaryResult = isCrit ? rollExpressionDoubled(autoDamage.secondaryFormula) : rollExpression(autoDamage.secondaryFormula);
+            if (secondaryResult) {
+              const secondaryContext = {
+                damageType: autoDamage.secondaryDamageType,
+                targetName: autoDamage.targetName,
+                attackerName: autoDamage.attackerName,
+              };
+              if (autoDamage.saveDc) {
+                secondaryContext.saveDc = autoDamage.saveDc;
+                secondaryContext.saveType = autoDamage.saveType;
+                secondaryContext.dcSuccess = autoDamage.dcSuccess;
+              }
+              rollDamage(autoDamage.secondaryName || autoDamage.name, autoDamage.secondaryFormula, secondaryResult.total, secondaryResult.rolls, secondaryResult.modifier, secondaryContext);
+            }
+          }
         }
       },
       characters,
@@ -194,6 +211,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       rangeReason,
       autoDamageFormula: action?.damage_dice_primary || null,
       autoDamageName: name,
+      autoDamageSecondaryFormula: action?.damage_dice_secondary || null,
+      autoDamageSecondaryName: name,
+      autoDamageSecondaryDamageType: action?.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
       targetName: target?.name,
       attackerName: monsterName,
       saveDc: action?.save_dc || null,

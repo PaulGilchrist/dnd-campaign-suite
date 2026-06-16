@@ -104,6 +104,15 @@ function RollEntry({ entry }) {
         {isSaveDamage && entry.finalDamage != null && entry.damageType && (
           <span className="log-final-damage">→ {entry.finalDamage} {entry.damageType} damage</span>
         )}
+        {(isDamage || isSaveDamage) && entry.resistanceDetails && entry.resistanceDetails.length > 0 && (
+          <span className="log-resistance-details">
+            {entry.resistanceDetails.map((rd, i) => (
+              <span key={i} className={rd.status === 'immune' ? 'log-immune' : 'log-resistant'}>
+                {rd.status === 'immune' ? 'Immune' : 'Resistant'} to {rd.damageType}
+              </span>
+            ))}
+          </span>
+        )}
         {isAoeDamage && entry.affectedCount != null && entry.affectedCount > 0 && (
           <span className="log-aoe-affect">{entry.affectedCount} creature{entry.affectedCount !== 1 ? 's' : ''} affected</span>
         )}

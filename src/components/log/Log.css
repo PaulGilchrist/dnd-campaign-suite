@@ -655,3 +655,24 @@
     color: var(--color-text-muted);
     font-style: italic;
 }
+
+/* Resistance/Immunity details per damage type */
+.log-resistance-details {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 1px 6px;
+    border-radius: 3px;
+}
+
+.log-resistance-details .log-immune {
+    color: #e74c3c;
+    background: rgba(231, 76, 60, 0.15);
+}
+
+.log-resistance-details .log-resistant {
+    color: #f39c12;
+    background: rgba(243, 156, 18, 0.15);
+}
