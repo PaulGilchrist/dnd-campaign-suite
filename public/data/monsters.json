@@ -7736,7 +7736,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "4 (1d4 + 2) Piercing damage, or 6 (1d8 + 2) Piercing damage if the target is Bloodied",
-        "damage_dice": "1d4 plus 2 or 1d8+2",
+        "damage_dice": "1d4+2 or 1d8+2",
         "damage_bonus": 2
       }
     ],
@@ -8017,7 +8017,7 @@
         "attack_bonus": 3,
         "reach": "5 ft.",
         "damage": "4 (1d6 + 1) Piercing damage. If the target is a Medium or smaller creature and the boar moved 20+ feet straight toward it immediately before the hit, the target takes an extra 3 (1d6) Piercing damage and has the Prone condition.",
-        "damage_dice": "1d6 plus 1 or 1d6",
+        "damage_dice": "1d6+1 or 1d6",
         "damage_bonus": 1
       }
     ],
@@ -10627,7 +10627,7 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage": "11 (2d6 + 4) Piercing damage, or 18 (4d6 + 4) Piercing damage if the chimera had Advantage on the attack roll",
-        "damage_dice": "2d6 plus 4 or 4d6+4",
+        "damage_dice": "2d6+4 or 4d6+4",
         "damage_bonus": 4
       },
       {
@@ -12262,7 +12262,7 @@
         "attack_bonus": 3,
         "reach": "5 ft.",
         "damage": "3 (1d4 + 1) Slashing damage plus 1 Necrotic damage",
-        "damage_dice": "1d4 + 1",
+        "damage_dice": "1d4+1 plus 1",
         "damage_bonus": 1
       }
     ],
@@ -15544,7 +15544,7 @@
         "description": "Melee Weapon Attack: +7 to hit, reach 5 ft., one target. Hit: 7 (1d6 + 4) piercing damage plus 10 (3d6) poison damage.",
         "attack_bonus": 7,
         "reach": "5 ft.",
-        "damage_dice": "1d6+4",
+        "damage_dice": "1d6+4 plus 3d6",
         "damage_value": 7
       },
       {
@@ -15685,8 +15685,9 @@
       },
       {
         "name": "Poisonous Pistol",
-        "description": "Ranged Weapon Attack: +6 to hit, range 30/90 ft., one target. Hit: 9 (1dlO + 4) piercing damage plus 11 (2dl0) poison damage.",
+        "description": "Ranged Weapon Attack: +6 to hit, range 30/90 ft., one target. Hit: 9 (1d10 + 4) piercing damage plus 11 (2d10) poison damage.",
         "attack_bonus": 6,
+        "damage_dice": "1dlO+4 plus 2d10",
         "damage_value": 9
       }
     ],
@@ -15804,6 +15805,7 @@
         "name": "Staff",
         "description": "Melee Weapon Attack: + 2 to hit, reach 5 ft., one target. Hit: 2 (1d6 - 1) bludgeoning damage, or 3 (1d8 - 1) bludgeoning damage if used with two hands, plus 3 (1d6) poison damage.",
         "reach": "5 ft.",
+        "damage_dice": "1d6-1 plus 1d6 or 1d8-1 plus 1d6",
         "damage_value": 2
       },
       {
@@ -15944,7 +15946,7 @@
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage plus 17 (5d6) poison damage.",
         "attack_bonus": 5,
         "reach": "5 ft.",
-        "damage_dice": "1d6+2",
+        "damage_dice": "1d6+2 plus 5d6",
         "damage_value": 5
       },
       {
@@ -16805,7 +16807,7 @@
         "description": "Melee Weapon Attack: +10 to hit, reach 5 ft., one target. Hit: 13 (2d6 + 6) slashing damage plus 7 (2d6) fire damage.",
         "attack_bonus": 10,
         "reach": "5 ft.",
-        "damage_dice": "2d6+6",
+        "damage_dice": "2d6+6 plus 2d6",
         "damage_value": 13
       },
       {
@@ -17355,7 +17357,7 @@
         "attack_bonus": 17,
         "reach": "10 ft.",
         "damage": "31 (6d6 + 10) Force damage, and the target has the Stunned condition until the start of the empyrean's next turn. The target can choose not to be Stunned, in which case it takes an extra 21 Force damage that bypasses Resistance or Immunity",
-        "damage_dice": "6d6 plus 10 or 21",
+        "damage_dice": "6d6+10 or 21",
         "damage_bonus": 10
       },
       {
@@ -18613,7 +18615,7 @@
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) piercing damage plus 3 (1d6) fire damage.",
         "attack_bonus": 3,
         "reach": "5 ft.",
-        "damage_dice": "1d4+1",
+        "damage_dice": "1d4+1 plus 1d6",
         "damage_value": 3
       },
       {
@@ -18621,14 +18623,16 @@
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) bludgeoning damage plus 3 (1d6) fire damage.",
         "attack_bonus": 3,
         "reach": "5 ft.",
-        "damage_dice": "1d4+1",
+        "damage_dice": "1d4+1 plus 1d6",
         "damage_value": 3
       }
     ],
     "traits": [
       {
         "name": "Heated Body",
-        "description": "A creature that touches the snake or hits it with a melee attack while within 5 feet of it takes 3 (1d6) fire damage."
+        "description": "A creature that touches the snake or hits it with a melee attack while within 5 feet of it takes 3 (1d6) fire damage.",
+        "damage_dice": "1d6",
+        "damage_value": 3
       }
     ],
     "reactions": [],
@@ -19140,7 +19144,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "1 Piercing damage plus 5 (2d4) Poison damage",
-        "damage_dice": "2d4",
+        "damage_dice": "2d4+1",
         "damage_bonus": 0
       }
     ],
@@ -20876,7 +20880,7 @@
         "attack_bonus": 8,
         "reach": "10 ft.",
         "damage": "18 (2d12 + 5) Slashing damage, and a creature within 5 feet of the target (axe beak's choice) takes 6 (1d12) Slashing damage",
-        "damage_dice": "2d12 plus 5 or 1d12",
+        "damage_dice": "2d12+5 or 1d12",
         "damage_bonus": 5
       },
       {
@@ -22667,7 +22671,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "9 (2d6 + 2) Bludgeoning damage, or 11 (2d8 + 2) Bludgeoning damage if the seahorse moved 20+ feet straight toward the target immediately before the hit",
-        "damage_dice": "2d6 plus 2 or 2d8+2",
+        "damage_dice": "2d6+2 or 2d8+2",
         "damage_bonus": 2
       }
     ],
