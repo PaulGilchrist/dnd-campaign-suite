@@ -20,13 +20,19 @@ export function formatDamageTypes(types) {
 
 export function getResistanceNotice(damageTypes, targetResistances, targetImmunities, targetName) {
   if (!damageTypes || damageTypes.length === 0) return null;
+  let immuneTypes = [];
+  let resistedTypes = [];
   for (const dt of damageTypes) {
     const lower = dt.toLowerCase();
     if (targetImmunities?.some(i => i.toLowerCase() === lower))
-      return `${targetName} is IMMUNE to ${dt}`;
-    if (targetResistances?.some(r => r.toLowerCase() === lower))
-      return `${targetName} resists ${dt}`;
+      immuneTypes.push(dt);
+    else if (targetResistances?.some(r => r.toLowerCase() === lower))
+      resistedTypes.push(dt);
   }
+  if (immuneTypes.length > 0)
+    return `${targetName} is IMMUNE to ${immuneTypes.join(', ')}`;
+  if (resistedTypes.length > 0)
+    return `${targetName} resists ${resistedTypes.join(', ')}`;
   return null;
 }
 
