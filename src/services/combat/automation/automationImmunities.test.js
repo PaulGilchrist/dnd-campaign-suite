@@ -1,619 +1,387 @@
 import { describe, it, expect } from 'vitest'
-import {
-   getConditionImmunities,
-   getConditionalImmunities,
-   playerIsImmuneToCondition,
-   hasSelfRestoration,
- } from './automationImmunities.js'
+import { getConditionImmunities, getConditionalImmunities, playerIsImmuneToCondition, hasSelfRestoration } from './automationImmunities.js'
+
+// Mock the protectionFromEvilAndGoodHandler
+vi.mock('../../automation/handlers/buffs/protectionFromEvilAndGoodHandler.js', () => ({
+    isProtectionFromEvilAndGoodActive: vi.fn(() => false),
+    isCreatureWarded: vi.fn(() => false),
+}))
 
 describe('getConditionImmunities', () => {
-  it('returns empty array when features is null', () => {
-    expect(getConditionImmunities(null)).toEqual([])
-  })
+    it('returns empty array when features is null', () => {
+        expect(getConditionImmunities(null)).toEqual([])
+    })
 
-  it('returns empty array when features is undefined', () => {
-    expect(getConditionImmunities(undefined)).toEqual([])
-  })
+    it('returns empty array when features is undefined', () => {
+        expect(getConditionImmunities(undefined)).toEqual([])
+    })
 
-  it('returns empty array when features is empty', () => {
-    expect(getConditionImmunities([])).toEqual([])
-  })
+    it('returns empty array when features is empty', () => {
+        expect(getConditionImmunities([])).toEqual([])
+    })
 
-  it('collects passive_immunity conditionImmunity values', () => {
-    const features = [
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ]
-    expect(getConditionImmunities(features)).toEqual(['poison'])
-  })
+    it('returns empty array when features have no automation', () => {
+        expect(getConditionImmunities([{ name: 'Test' }])).toEqual([])
+    })
 
-  it('collects multiple passive_immunity values', () => {
-    const features = [
-      {
-        name: 'Feature A',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-      {
-        name: 'Feature B',
-        automation: { type: 'passive_immunity', conditionImmunity: 'charmed' },
-      },
-    ]
-    expect(getConditionImmunities(features)).toEqual(['poison', 'charmed'])
-  })
+    it('collects passive_immunity conditionImmunity', () => {
+        const features = [{
+            name: 'Magic Resistance',
+            automation: { type: 'passive_immunity', conditionImmunity: 'charmed frightened' }
+        }]
+        const result = getConditionImmunities(features)
+        expect(result).toContain('charmed frightened')
+    })
 
-  it('collects condition_immunity_while_active immunities array', () => {
-    const features = [
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-    ]
-    expect(getConditionImmunities(features)).toEqual(['frightened'])
-  })
+    it('collects passive_immunity damageResistance as damage: prefixed strings', () => {
+        const features = [{
+            name: 'Fire Resistance',
+            automation: {
+                type: 'passive_immunity',
+                conditionImmunity: 'poisoned',
+                damageResistance: ['fire', 'cold']
+            }
+        }]
+        const result = getConditionImmunities(features)
+        expect(result).toContain('poisoned')
+        expect(result).toContain('damage:fire')
+        expect(result).toContain('damage:cold')
+    })
 
-  it('collects multiple immunities from condition_immunity_while_active', () => {
-    const features = [
-      {
-        name: 'Feature X',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened', 'charmed'],
-          requiresActive: 'Berserker Rage',
-        },
-      },
-    ]
-    expect(getConditionImmunities(features)).toEqual(['frightened', 'charmed'])
-  })
+    it('collects condition_immunity_while_active immunities', () => {
+        const features = [{
+            name: 'Etherealness',
+            automation: {
+                type: 'condition_immunity_while_active',
+                immunities: ['charmed', 'frightened', 'poisoned']
+            }
+        }]
+        const result = getConditionImmunities(features)
+        expect(result).toContain('charmed')
+        expect(result).toContain('frightened')
+        expect(result).toContain('poisoned')
+    })
 
-  it('collects both passive and conditional immunities together', () => {
-    const features = [
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-    ]
-    expect(getConditionImmunities(features)).toEqual(['poison', 'frightened'])
-  })
+    it('collects land_resistance conditionImmunity', () => {
+        const features = [{
+            name: 'Forest Walker',
+            automation: {
+                type: 'land_resistance',
+                conditionImmunity: 'charmed'
+            }
+        }]
+        const result = getConditionImmunities(features)
+        expect(result).toContain('charmed')
+    })
 
-  it('skips features without automation property', () => {
-    const features = [
-      { name: 'No Automation' },
-      { name: 'Valid', automation: { type: 'passive_immunity', conditionImmunity: 'poison' } },
-    ]
-    expect(getConditionImmunities(features)).toEqual(['poison'])
-  })
-
-  it('skips features with null automation', () => {
-    const features = [
-      { name: 'Null Automation', automation: null },
-      { name: 'Valid', automation: { type: 'passive_immunity', conditionImmunity: 'poison' } },
-    ]
-    expect(getConditionImmunities(features)).toEqual(['poison'])
-  })
-
-  it('skips features with undefined automation', () => {
-    const features = [
-      { name: 'Undefined Automation', automation: undefined },
-    ]
-    expect(getConditionImmunities(features)).toEqual([])
-  })
+    it('handles array automation', () => {
+        const features = [{
+            name: 'Mixed',
+            automation: [
+                { type: 'passive_immunity', conditionImmunity: 'charmed' },
+                { type: 'other' }
+            ]
+        }]
+        const result = getConditionImmunities(features)
+        expect(result).toContain('charmed')
+    })
 })
 
 describe('getConditionalImmunities', () => {
-  it('returns empty array when features is null', () => {
-    expect(getConditionalImmunities(null)).toEqual([])
-  })
-
-  it('returns empty array when features is undefined', () => {
-    expect(getConditionalImmunities(undefined)).toEqual([])
-  })
-
-  it('returns empty array when features is empty', () => {
-    expect(getConditionalImmunities([])).toEqual([])
-  })
-
-  it('returns empty array for passive_immunity features (not conditional)', () => {
-    const features = [
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ]
-    expect(getConditionalImmunities(features)).toEqual([])
-  })
-
-  it('collects condition_immunity_while_active entries with correct shape', () => {
-    const features = [
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-    ]
-    const result = getConditionalImmunities(features)
-    expect(result).toHaveLength(1)
-    expect(result[0]).toEqual({
-      name: 'Berserker Rage',
-      immunities: ['frightened'],
-      requiresActive: 'Rage',
+    it('returns empty array when features is null', () => {
+        expect(getConditionalImmunities(null)).toEqual([])
     })
-  })
 
-  it('defaults immunities to empty array when not provided', () => {
-    const features = [
-      {
-        name: 'Feature X',
-        automation: {
-          type: 'condition_immunity_while_active',
-          requiresActive: 'Some Buff',
-        },
-      },
-    ]
-    const result = getConditionalImmunities(features)
-    expect(result).toHaveLength(1)
-    expect(result[0].immunities).toEqual([])
-  })
+    it('returns empty array when features is empty', () => {
+        expect(getConditionalImmunities([])).toEqual([])
+    })
 
-  it('defaults requiresActive to empty string when not provided', () => {
-    const features = [
-      {
-        name: 'Feature X',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-        },
-      },
-    ]
-    const result = getConditionalImmunities(features)
-    expect(result).toHaveLength(1)
-    expect(result[0].requiresActive).toBe('')
-  })
+    it('returns empty array when features have no automation', () => {
+        expect(getConditionalImmunities([{ name: 'Test' }])).toEqual([])
+    })
 
-  it('collects multiple conditional immunity features', () => {
-    const features = [
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-      {
-        name: 'Paladin Aura',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['charmed'],
-          requiresActive: 'Aura of Protection',
-        },
-      },
-    ]
-    const result = getConditionalImmunities(features)
-    expect(result).toHaveLength(2)
-    expect(result[0].name).toBe('Berserker Rage')
-    expect(result[1].name).toBe('Paladin Aura')
-  })
+    it('collects condition_immunity_while_active entries', () => {
+        const features = [{
+            name: 'Etherealness',
+            automation: {
+                type: 'condition_immunity_while_active',
+                immunities: ['charmed', 'frightened'],
+                requiresActive: 'aura_of_protection'
+            }
+        }]
+        const result = getConditionalImmunities(features)
+        expect(result).toHaveLength(1)
+        expect(result[0]).toEqual({
+            name: 'Etherealness',
+            immunities: ['charmed', 'frightened'],
+            requiresActive: 'aura_of_protection'
+        })
+    })
 
-  it('skips features without automation property', () => {
-    const features = [
-      { name: 'No Automation' },
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-    ]
-    const result = getConditionalImmunities(features)
-    expect(result).toHaveLength(1)
-  })
+    it('uses defaults for missing fields', () => {
+        const features = [{
+            name: 'Test',
+            automation: { type: 'condition_immunity_while_active' }
+        }]
+        const result = getConditionalImmunities(features)
+        expect(result[0].immunities).toEqual([])
+        expect(result[0].requiresActive).toBe('')
+    })
 
-  it('skips features with null automation', () => {
-    const features = [
-      { name: 'Null Automation', automation: null },
-    ]
-    expect(getConditionalImmunities(features)).toEqual([])
-  })
+    it('handles array automation', () => {
+        const features = [{
+            name: 'Mixed',
+            automation: [
+                {
+                    type: 'condition_immunity_while_active',
+                    immunities: ['poisoned'],
+                    requiresActive: 'blessing'
+                },
+                { type: 'other' }
+            ]
+        }]
+        const result = getConditionalImmunities(features)
+        expect(result).toHaveLength(1)
+        expect(result[0].immunities).toEqual(['poisoned'])
+    })
 })
 
 describe('playerIsImmuneToCondition', () => {
-  const createPlayerStats = (features) => ({
-    name: 'Test Character',
-    allFeatures: features,
-  })
-
-  it('returns false when conditionKey is null', () => {
-    const stats = createPlayerStats([])
-    expect(playerIsImmuneToCondition({ conditionKey: null, playerStats: stats })).toBe(false)
-  })
-
-  it('returns false when conditionKey is undefined', () => {
-    const stats = createPlayerStats([])
-    expect(playerIsImmuneToCondition({ conditionKey: undefined, playerStats: stats })).toBe(false)
-  })
-
-  it('returns false when playerStats is null', () => {
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: null })).toBe(false)
-  })
-
-  it('returns false when playerStats has no allFeatures', () => {
-    const stats = { name: 'Test Character' }
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(false)
-  })
-
-  it('returns false when no features match', () => {
-    const stats = createPlayerStats([])
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(false)
-  })
-
-  it('returns true for exact passive_immunity match (lowercase)', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(true)
-  })
-
-  it('returns true for exact passive_immunity match (uppercase input)', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'POISON', playerStats: stats })).toBe(true)
-  })
-
-  it('returns true for exact passive_immunity match (mixed case input)', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'Poison', playerStats: stats })).toBe(true)
-  })
-
-  it('returns false for non-matching condition with passive_immunity', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: stats })).toBe(false)
-  })
-
-  it('handles passive_immunity with comma-separated conditions', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Feature',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison, frightened' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(true)
-    expect(playerIsImmuneToCondition({ conditionKey: 'frightened', playerStats: stats })).toBe(true)
-    expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: stats })).toBe(false)
-  })
-
-  it('handles passive_immunity with space-separated conditions', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Feature',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison frightened' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(true)
-    expect(playerIsImmuneToCondition({ conditionKey: 'frightened', playerStats: stats })).toBe(true)
-  })
-
-  it('returns true for condition_immunity_while_active with no requiresActive', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Feature X',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-        },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'frightened', playerStats: stats })).toBe(true)
-  })
-
-  it('returns false for condition_immunity_while_active when buff not active', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-    ])
-    const result = playerIsImmuneToCondition({
-      conditionKey: 'frightened',
-      playerStats: stats,
-      getRuntimeValue: () => [{ name: 'Some Other Buff' }],
-      campaignName: 'Test Campaign',
+    it('returns false when conditionKey is null', () => {
+        expect(playerIsImmuneToCondition({ conditionKey: null, playerStats: {} })).toBe(false)
     })
-    expect(result).toBe(false)
-  })
 
-  it('returns true for condition_immunity_while_active when buff IS active', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Berserker Rage',
-        },
-      },
-    ])
-    const result = playerIsImmuneToCondition({
-      conditionKey: 'frightened',
-      playerStats: stats,
-      getRuntimeValue: () => [{ name: 'Berserker Rage' }],
-      campaignName: 'Test Campaign',
+    it('returns false when playerStats is null', () => {
+        expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: null })).toBe(false)
     })
-    expect(result).toBe(true)
-  })
 
-  it('returns false when condition not in immunities list but buff is active', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Berserker Rage',
-        },
-      },
-    ])
-    const result = playerIsImmuneToCondition({
-      conditionKey: 'charmed',
-      playerStats: stats,
-      getRuntimeValue: () => [{ name: 'Berserker Rage' }],
-      campaignName: 'Test Campaign',
+    it('checks playerStats.immunities array', () => {
+        const playerStats = {
+            name: 'Test',
+            immunities: ['charmed', 'frightened']
+        }
+        expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats })).toBe(true)
+        expect(playerIsImmuneToCondition({ conditionKey: 'frightened', playerStats })).toBe(true)
+        expect(playerIsImmuneToCondition({ conditionKey: 'poisoned', playerStats })).toBe(false)
     })
-    expect(result).toBe(false)
-  })
 
-  it('handles case-insensitive buff name matching', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'berserker rage',
-        },
-      },
-    ])
-    const result = playerIsImmuneToCondition({
-      conditionKey: 'frightened',
-      playerStats: stats,
-      getRuntimeValue: () => [{ name: 'BERSERKER RAGE' }],
-      campaignName: 'Test Campaign',
+    it('checks case-insensitively for immunities', () => {
+        const playerStats = {
+            name: 'Test',
+            immunities: ['Charmed', 'Frightened']
+        }
+        expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats })).toBe(true)
+        expect(playerIsImmuneToCondition({ conditionKey: 'FRIGHTENED', playerStats })).toBe(true)
     })
-    expect(result).toBe(true)
-  })
 
-  it('skips features without automation', () => {
-    const stats = createPlayerStats([
-      { name: 'No Automation' },
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(true)
-  })
-
-  it('skips features with null automation', () => {
-    const stats = createPlayerStats([
-      { name: 'Null Automation', automation: null },
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(true)
-  })
-
-  it('handles passive_immunity with conditionImmunity containing only whitespace', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Feature',
-        automation: { type: 'passive_immunity', conditionImmunity: '   ' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(false)
-  })
-
-  it('handles conditionKey as non-string by converting to string', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: '123' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 123, playerStats: stats })).toBe(true)
-  })
-
-  it('returns false when getRuntimeValue/campaignName not provided for conditional immunity with requiresActive', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-    ])
-    const result = playerIsImmuneToCondition({
-      conditionKey: 'frightened',
-      playerStats: stats,
+    it('checks passive_immunity from allFeatures', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Magic Resistance',
+                automation: {
+                    type: 'passive_immunity',
+                    conditionImmunity: 'charmed frightened'
+                }
+            }]
+        }
+        expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats })).toBe(true)
+        expect(playerIsImmuneToCondition({ conditionKey: 'frightened', playerStats })).toBe(true)
     })
-    expect(result).toBe(false)
-  })
 
-  it('handles empty activeBuffs array when buff not active', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-    ])
-    const result = playerIsImmuneToCondition({
-      conditionKey: 'frightened',
-      playerStats: stats,
-      getRuntimeValue: () => [],
-      campaignName: 'Test Campaign',
+    it('checks passive_immunity damageResistance', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Fire Resistance',
+                automation: {
+                    type: 'passive_immunity',
+                    damageResistance: ['fire', 'cold']
+                }
+            }]
+        }
+        expect(playerIsImmuneToCondition({ conditionKey: 'damage:fire', playerStats })).toBe(true)
+        expect(playerIsImmuneToCondition({ conditionKey: 'damage:cold', playerStats })).toBe(true)
+        expect(playerIsImmuneToCondition({ conditionKey: 'damage:lightning', playerStats })).toBe(false)
     })
-    expect(result).toBe(false)
-  })
 
-  it('handles activeBuffs that is not an array', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Berserker Rage',
-        automation: {
-          type: 'condition_immunity_while_active',
-          immunities: ['frightened'],
-          requiresActive: 'Rage',
-        },
-      },
-    ])
-    const result = playerIsImmuneToCondition({
-      conditionKey: 'frightened',
-      playerStats: stats,
-      getRuntimeValue: () => 'not-an-array',
-      campaignName: 'Test Campaign',
+    it('checks land_resistance conditionImmunity', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Forest Walker',
+                automation: {
+                    type: 'land_resistance',
+                    conditionImmunity: 'charmed'
+                }
+            }]
+        }
+        expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats })).toBe(true)
     })
-    expect(result).toBe(false)
-  })
 
-  it('checks multiple features for immunity (first match wins)', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'No Match',
-        automation: { type: 'passive_immunity', conditionImmunity: 'charmed' },
-      },
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'poison', playerStats: stats })).toBe(true)
-    expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats: stats })).toBe(true)
-    expect(playerIsImmuneToCondition({ conditionKey: 'blinded', playerStats: stats })).toBe(false)
-  })
+    it('checks condition_immunity_while_active without requiresActive', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Etherealness',
+                automation: {
+                    type: 'condition_immunity_while_active',
+                    immunities: ['poisoned']
+                }
+            }]
+        }
+        expect(playerIsImmuneToCondition({ conditionKey: 'poisoned', playerStats })).toBe(true)
+    })
 
-  it('handles passive_immunity where immunity string contains condition as substring', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Feature',
-        automation: { type: 'passive_immunity', conditionImmunity: 'death_saves' },
-      },
-    ])
-    expect(playerIsImmuneToCondition({ conditionKey: 'death', playerStats: stats })).toBe(true)
-  })
+    it('checks condition_immunity_while_active with requiresActive', () => {
+        const getRuntimeValue = vi.fn((name, key, campaign) => [
+            { name: 'aura_of_protection' }
+        ])
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Etherealness',
+                automation: {
+                    type: 'condition_immunity_while_active',
+                    immunities: ['charmed'],
+                    requiresActive: 'aura_of_protection'
+                }
+            }]
+        }
+        expect(playerIsImmuneToCondition({
+            conditionKey: 'charmed',
+            playerStats,
+            getRuntimeValue,
+            campaignName: 'test-campaign'
+        })).toBe(true)
+    })
+
+    it('returns false when requiresActive buff is not active', () => {
+        const getRuntimeValue = vi.fn((name, key, campaign) => [
+            { name: 'other_buff' }
+        ])
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Etherealness',
+                automation: {
+                    type: 'condition_immunity_while_active',
+                    immunities: ['charmed'],
+                    requiresActive: 'aura_of_protection'
+                }
+            }]
+        }
+        expect(playerIsImmuneToCondition({
+            conditionKey: 'charmed',
+            playerStats,
+            getRuntimeValue,
+            campaignName: 'test-campaign'
+        })).toBe(false)
+    })
+
+    it('checks activeBuffs for temporary condition immunity', () => {
+        const getRuntimeValue = vi.fn((name, key, campaign) => [
+            {
+                name: 'feign_death',
+                conditionImmunity: ['dead', 'poisoned']
+            }
+        ])
+        const playerStats = {
+            name: 'Test',
+            allFeatures: []
+        }
+        expect(playerIsImmuneToCondition({
+            conditionKey: 'poisoned',
+            playerStats,
+            getRuntimeValue,
+            campaignName: 'test-campaign'
+        })).toBe(true)
+    })
+
+    it('returns false when no immunity found', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: []
+        }
+        expect(playerIsImmuneToCondition({ conditionKey: 'charmed', playerStats })).toBe(false)
+    })
 })
 
 describe('hasSelfRestoration', () => {
-  const createPlayerStats = (features) => ({
-    name: 'Test Character',
-    allFeatures: features,
-  })
+    it('returns false when playerStats is null', () => {
+        expect(hasSelfRestoration(null)).toBe(false)
+    })
 
-  it('returns false when playerStats is null', () => {
-    expect(hasSelfRestoration(null)).toBe(false)
-  })
+    it('returns false when playerStats has no allFeatures', () => {
+        expect(hasSelfRestoration({ name: 'Test' })).toBe(false)
+    })
 
-  it('returns false when playerStats is undefined', () => {
-    expect(hasSelfRestoration(undefined)).toBe(false)
-  })
+    it('returns false when allFeatures is empty', () => {
+        expect(hasSelfRestoration({ name: 'Test', allFeatures: [] })).toBe(false)
+    })
 
-  it('returns false when playerStats has no allFeatures', () => {
-    expect(hasSelfRestoration({})).toBe(false)
-  })
+    it('returns false when features have no matching automation', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Magic Resistance',
+                automation: { type: 'passive_immunity', conditionImmunity: 'charmed' }
+            }]
+        }
+        expect(hasSelfRestoration(playerStats)).toBe(false)
+    })
 
-  it('returns false when allFeatures is empty', () => {
-    expect(hasSelfRestoration({ allFeatures: [] })).toBe(false)
-  })
+    it('returns true when end_of_turn_condition_removal is found', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Self-Restoration',
+                automation: {
+                    type: 'passive_rule',
+                    effect: 'end_of_turn_condition_removal',
+                    conditions: ['charmed']
+                }
+            }]
+        }
+        expect(hasSelfRestoration(playerStats)).toBe(true)
+    })
 
-  it('returns false when features have no automation', () => {
-    expect(hasSelfRestoration({ allFeatures: [{ name: 'Some Feature' }] })).toBe(false)
-  })
+    it('handles array automation', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [{
+                name: 'Mixed',
+                automation: [
+                    { type: 'passive_immunity', conditionImmunity: 'charmed' },
+                    {
+                        type: 'passive_rule',
+                        effect: 'end_of_turn_condition_removal',
+                        conditions: ['frightened']
+                    }
+                ]
+            }]
+        }
+        expect(hasSelfRestoration(playerStats)).toBe(true)
+    })
 
-  it('returns false when automation is not end_of_turn_condition_removal', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Dwarven Resilience',
-        automation: { type: 'passive_immunity', conditionImmunity: 'poison' },
-      },
-    ])
-    expect(hasSelfRestoration(stats)).toBe(false)
-  })
-
-  it('returns true when feature has end_of_turn_condition_removal passive_rule', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Self-Restoration',
-        automation: [
-          { type: 'passive_immunity', conditionImmunity: 'charmed frightened poisoned' },
-          { type: 'passive_rule', effect: 'end_of_turn_condition_removal', conditions: ['charmed', 'frightened', 'poisoned'] },
-        ],
-      },
-    ])
-    expect(hasSelfRestoration(stats)).toBe(true)
-  })
-
-  it('returns true when end_of_turn_condition_removal is a single automation object', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Self-Restoration',
-        automation: { type: 'passive_rule', effect: 'end_of_turn_condition_removal', conditions: ['charmed', 'frightened', 'poisoned'] },
-      },
-    ])
-    expect(hasSelfRestoration(stats)).toBe(true)
-  })
-
-  it('returns false for other passive_rule effects', () => {
-    const stats = createPlayerStats([
-      {
-        name: 'Bonus Healing',
-        automation: { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '2d6' },
-      },
-    ])
-    expect(hasSelfRestoration(stats)).toBe(false)
-  })
+    it('returns true when any feature has end_of_turn_condition_removal', () => {
+        const playerStats = {
+            name: 'Test',
+            allFeatures: [
+                {
+                    name: 'Magic Resistance',
+                    automation: { type: 'passive_immunity', conditionImmunity: 'charmed' }
+                },
+                {
+                    name: 'Self-Restoration',
+                    automation: {
+                        type: 'passive_rule',
+                        effect: 'end_of_turn_condition_removal',
+                        conditions: ['charmed']
+                    }
+                }
+            ]
+        }
+        expect(hasSelfRestoration(playerStats)).toBe(true)
+    })
 })
