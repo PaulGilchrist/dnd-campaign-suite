@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useMonstersData } from '../../hooks/useMonstersData.js';
+import { useMonstersData } from '../../hooks/ui/useMonstersData.js';
 import useEncounterManagement from '../../hooks/management/useEncounterManagement.js';
 import EncounterFilterPanel from './EncounterFilterPanel.jsx';
 import EncounterSummaryPanel from './EncounterSummaryPanel.jsx';

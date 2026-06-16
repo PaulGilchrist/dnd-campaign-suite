@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useEquipmentSearch } from './useEquipmentSearch.js';
 
-vi.mock('../services/ui/dataLoader.js', () => ({
+vi.mock('../../services/ui/dataLoader.js', () => ({
   loadEquipment: vi.fn(async () => [
     { index: 'longsword', name: 'Longsword', equipment_category: 'Weapon' },
     { index: 'shield', name: 'Shield', equipment_category: 'Armor' },
@@ -66,7 +66,7 @@ describe('useEquipmentSearch', () => {
   };
 
   beforeEach(async () => {
-    vi.mocked((await import('../services/ui/dataLoader.js')).loadEquipment).mockResolvedValue(equipmentData);
+    vi.mocked((await import('../../services/ui/dataLoader.js')).loadEquipment).mockResolvedValue(equipmentData);
   });
 
   it('should start with empty search query', () => {
@@ -85,7 +85,7 @@ describe('useEquipmentSearch', () => {
   });
 
   it('should load equipment data after effect runs', async () => {
-    const { loadEquipment } = await import('../services/ui/dataLoader.js');
+    const { loadEquipment } = await import('../../services/ui/dataLoader.js');
     vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
 
     render(<Wrapper />);
@@ -132,7 +132,7 @@ describe('useEquipmentSearch', () => {
   });
 
   it('should show unique categories including All', async () => {
-    const { loadEquipment } = await import('../services/ui/dataLoader.js');
+    const { loadEquipment } = await import('../../services/ui/dataLoader.js');
     vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
 
     render(<Wrapper />);
@@ -266,7 +266,7 @@ describe('useEquipmentSearch', () => {
   });
 
   it('should handle category change', async () => {
-    const { loadEquipment } = await import('../services/ui/dataLoader.js');
+    const { loadEquipment } = await import('../../services/ui/dataLoader.js');
     vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
 
     render(<Wrapper />);
@@ -292,7 +292,7 @@ describe('useEquipmentSearch', () => {
   });
 
   it('showOnlySelectedBackpack should filter to selected items', async () => {
-    const { loadEquipment } = await import('../services/ui/dataLoader.js');
+    const { loadEquipment } = await import('../../services/ui/dataLoader.js');
     vi.mocked(loadEquipment).mockResolvedValue(equipmentData);
 
     render(<Wrapper

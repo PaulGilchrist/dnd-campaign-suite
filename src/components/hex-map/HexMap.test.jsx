@@ -65,7 +65,7 @@ vi.mock('../../hooks/management/useTravelManagement.js', () => ({
     })),
 }));
 
-vi.mock('../../hooks/useMonstersData.js', () => ({
+vi.mock('../../hooks/ui/useMonstersData.js', () => ({
     useMonstersData: () => ({ monsters: [], loading: false, error: null }),
 }));
 

@@ -4,7 +4,7 @@ import EncounterBuilder from './EncounterBuilder.jsx';
 
 let monstersDataState = { monsters: [], loading: false };
 
-vi.mock('../../hooks/useMonstersData.js', () => ({
+vi.mock('../../hooks/ui/useMonstersData.js', () => ({
   useMonstersData: () => monstersDataState,
 }));
 
