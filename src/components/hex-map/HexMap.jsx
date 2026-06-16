@@ -28,7 +28,7 @@ import NaturalWonderSVG from './svg/NaturalWonderSVG.jsx';
 import LandmarkSVG from './svg/LandmarkSVG.jsx';
 import Subscriber from '../common/Subscriber.jsx';
 import useHexMapSSESync from './hooks/useHexMapSSESync.js';
-import useTravelManagement from '../../hooks/useTravelManagement.js';
+import useTravelManagement from '../../hooks/management/useTravelManagement.js';
 import { useMonstersData } from '../../hooks/useMonstersData.js';
 import TravelPanel from './TravelPanel.jsx';
 import TravelPathLayer from './TravelPathLayer.jsx';

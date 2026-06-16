@@ -6,7 +6,7 @@ const mockSaveSettlements = vi.fn();
 const mockSaveSettlement = vi.fn();
 const mockDeleteSettlement = vi.fn();
 
-vi.mock('../services/campaign/settlementsService.js', () => ({
+vi.mock('../../services/campaign/settlementsService.js', () => ({
   loadSettlements: (...args) => mockLoadSettlements(...args),
   saveSettlements: (...args) => mockSaveSettlements(...args),
   saveSettlement: (...args) => mockSaveSettlement(...args),

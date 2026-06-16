@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import useNotesManagement from '../../hooks/useNotesManagement.js';
+import useNotesManagement from '../../hooks/management/useNotesManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Notes.css';
 

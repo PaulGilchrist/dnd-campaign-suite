@@ -11,7 +11,7 @@ let mockNPCsFactory = () => ({
   deleteNPCAction: vi.fn(),
 });
 
-vi.mock('../../hooks/useNPCsManagement.js', () => ({
+vi.mock('../../hooks/management/useNPCsManagement.js', () => ({
   __esModule: true,
   default: (...args) => mockNPCsFactory(...args),
 }));

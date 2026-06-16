@@ -5,7 +5,7 @@ const mockLoadNPCs = vi.fn();
 const mockSaveNPCs = vi.fn();
 const mockDeleteNPC = vi.fn();
 
-vi.mock('../services/npcs/npcsService.js', () => ({
+vi.mock('../../services/npcs/npcsService.js', () => ({
   loadNPCs: (...args) => mockLoadNPCs(...args),
   saveNPCs: (...args) => mockSaveNPCs(...args),
   deleteNPC: (...args) => mockDeleteNPC(...args),

@@ -2,7 +2,7 @@ import { render, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import HexMap from './HexMap.jsx';
 import * as mapsService from '../../services/maps/mapsService.js';
-import * as useTravelManagement from '../../hooks/useTravelManagement.js';
+import * as useTravelManagement from '../../hooks/management/useTravelManagement.js';
 import * as useMapLoader from './hooks/useMapLoader.js';
 import * as useEncounterGeneration from './hooks/useEncounterGeneration.js';
 import {
@@ -24,7 +24,7 @@ vi.mock('./hooks/useHexMapSSESync.js', () => ({
     default: vi.fn(() => ({ handleSSEEvent: vi.fn() })),
 }));
 
-vi.mock('../../hooks/useTravelManagement.js', () => ({
+vi.mock('../../hooks/management/useTravelManagement.js', () => ({
     default: vi.fn(() => ({
         travelMode: 'inactive',
         travelPace: 'normal',

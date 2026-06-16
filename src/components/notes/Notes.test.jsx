@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Notes from './Notes.jsx';
 
-vi.mock('../../hooks/useNotesManagement.js', () => ({
+vi.mock('../../hooks/management/useNotesManagement.js', () => ({
   default: () => ({
     notes: [],
     loading: false,
@@ -133,7 +133,7 @@ describe('Notes', () => {
   });
 
   it('should show delete button when editing existing note', async () => {
-    const notesManagement = await import('../../hooks/useNotesManagement.js');
+    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
 
     vi.mocked(notesManagement).default = () => ({
       notes: [{
@@ -192,7 +192,7 @@ describe('Notes', () => {
   });
 
   it('should show location in note list item', async () => {
-    const notesManagement = await import('../../hooks/useNotesManagement.js');
+    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
 
     vi.mocked(notesManagement).default = () => ({
       notes: [{
@@ -218,7 +218,7 @@ describe('Notes', () => {
   });
 
   it('should show "No location" when partyLocation is empty', async () => {
-    const notesManagement = await import('../../hooks/useNotesManagement.js');
+    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
 
     vi.mocked(notesManagement).default = () => ({
       notes: [{
@@ -244,7 +244,7 @@ describe('Notes', () => {
   });
 
   it('should show loading state', async () => {
-    const notesManagement = await import('../../hooks/useNotesManagement.js');
+    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
 
     vi.mocked(notesManagement).default = () => ({
       notes: [],
@@ -262,7 +262,7 @@ describe('Notes', () => {
   });
 
   it('should show search no results message', async () => {
-    const notesManagement = await import('../../hooks/useNotesManagement.js');
+    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
 
     vi.mocked(notesManagement).default = () => ({
       notes: [{

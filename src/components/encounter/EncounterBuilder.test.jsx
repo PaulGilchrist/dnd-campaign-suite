@@ -8,7 +8,7 @@ vi.mock('../../hooks/useMonstersData.js', () => ({
   useMonstersData: () => monstersDataState,
 }));
 
-vi.mock('../../hooks/useEncounterManagement.js', () => ({
+vi.mock('../../hooks/management/useEncounterManagement.js', () => ({
   default: () => ({
     modalOpen: false,
     modalMode: 'save',

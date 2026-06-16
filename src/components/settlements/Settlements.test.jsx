@@ -9,7 +9,7 @@ let mockSettlementsFactory = () => ({
   deleteSettlementAction: vi.fn(),
 });
 
-vi.mock('../../hooks/useSettlementsManagement.js', () => ({
+vi.mock('../../hooks/management/useSettlementsManagement.js', () => ({
   __esModule: true,
   default: (...args) => mockSettlementsFactory(...args),
 }));

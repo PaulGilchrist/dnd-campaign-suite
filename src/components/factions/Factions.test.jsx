@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Factions from './Factions.jsx';
 
-vi.mock('../../hooks/useFactionsManagement.js', () => ({
+vi.mock('../../hooks/management/useFactionsManagement.js', () => ({
   default: () => ({
     factions: [],
     loading: false,
@@ -131,7 +131,7 @@ describe('Factions', () => {
   });
 
   it('should render faction name in list', async () => {
-    const factionsManagement = await import('../../hooks/useFactionsManagement.js');
+    const factionsManagement = await import('../../hooks/management/useFactionsManagement.js');
 
     vi.mocked(factionsManagement).default = () => ({
       factions: [{
@@ -156,7 +156,7 @@ describe('Factions', () => {
   });
 
   it('should show influence badge', async () => {
-    const factionsManagement = await import('../../hooks/useFactionsManagement.js');
+    const factionsManagement = await import('../../hooks/management/useFactionsManagement.js');
 
     vi.mocked(factionsManagement).default = () => ({
       factions: [{
@@ -181,7 +181,7 @@ describe('Factions', () => {
   });
 
   it('should show loading state', async () => {
-    const factionsManagement = await import('../../hooks/useFactionsManagement.js');
+    const factionsManagement = await import('../../hooks/management/useFactionsManagement.js');
 
     vi.mocked(factionsManagement).default = () => ({
       factions: [],
@@ -199,7 +199,7 @@ describe('Factions', () => {
   });
 
   it('should show edit modal when faction clicked', async () => {
-    const factionsManagement = await import('../../hooks/useFactionsManagement.js');
+    const factionsManagement = await import('../../hooks/management/useFactionsManagement.js');
 
     vi.mocked(factionsManagement).default = () => ({
       factions: [{
@@ -229,7 +229,7 @@ describe('Factions', () => {
   });
 
   it('should show description preview in faction list', async () => {
-    const factionsManagement = await import('../../hooks/useFactionsManagement.js');
+    const factionsManagement = await import('../../hooks/management/useFactionsManagement.js');
 
     vi.mocked(factionsManagement).default = () => ({
       factions: [{
@@ -254,7 +254,7 @@ describe('Factions', () => {
   });
 
   it('should show search no results message', async () => {
-    const factionsManagement = await import('../../hooks/useFactionsManagement.js');
+    const factionsManagement = await import('../../hooks/management/useFactionsManagement.js');
 
     vi.mocked(factionsManagement).default = () => ({
       factions: [{

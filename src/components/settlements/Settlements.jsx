@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import useSettlementsManagement from '../../hooks/useSettlementsManagement.js';
+import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
 import './Settlements.css';

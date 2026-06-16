@@ -4,8 +4,8 @@ import useCharacterManagement from './useCharacterManagement.js';
 
 vi.mock('lodash/cloneDeep', () => ({ default: vi.fn(val => val) }));
 vi.mock('file-saver', () => ({ saveAs: vi.fn() }));
-vi.mock('../services/ui/utils.js', () => ({ default: { getName: vi.fn(n => n) } }));
-vi.mock('../services/campaign/campaignService.js', () => ({
+vi.mock('../../services/ui/utils.js', () => ({ default: { getName: vi.fn(n => n) } }));
+vi.mock('../../services/campaign/campaignService.js', () => ({
   deleteCharacter: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -53,7 +53,7 @@ describe('useCharacterManagement', () => {
   describe('handleSaveClick', () => {
     it('calls saveAs with correct filename and JSON blob', async () => {
       const { saveAs } = await import('file-saver');
-      const { default: Utils } = await import('../services/ui/utils.js');
+      const { default: Utils } = await import('../../services/ui/utils.js');
       const char = { name: 'Dark Lord' };
 
       const { result } = renderHook(() => useCharacterManagement(undefined));
@@ -182,7 +182,7 @@ describe('useCharacterManagement', () => {
     });
 
     it('deletes character and removes from state when confirmed', async () => {
-      const { deleteCharacter } = await import('../services/campaign/campaignService.js');
+      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
 
       const { result } = renderHook(() => useCharacterManagement('test-campaign'));
@@ -200,7 +200,7 @@ describe('useCharacterManagement', () => {
     });
 
     it('does not delete when user cancels confirmation', async () => {
-      const { deleteCharacter } = await import('../services/campaign/campaignService.js');
+      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
       window.confirm = vi.fn(() => false);
       const chars = [{ name: 'Frodo' }, { name: 'Sam' }];
 
@@ -255,7 +255,7 @@ describe('useCharacterManagement', () => {
     });
 
     it('throws error when no campaign is selected', async () => {
-      const { deleteCharacter } = await import('../services/campaign/campaignService.js');
+      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
 
       const { result } = renderHook(() => useCharacterManagement());
 
@@ -264,7 +264,7 @@ describe('useCharacterManagement', () => {
     });
 
     it('throws error when server delete fails', async () => {
-      const { deleteCharacter } = await import('../services/campaign/campaignService.js');
+      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
       deleteCharacter.mockRejectedValueOnce(new Error('Server error'));
 
       const { result } = renderHook(() => useCharacterManagement('test-campaign'));
@@ -277,7 +277,7 @@ describe('useCharacterManagement', () => {
     });
 
     it('builds filename with hyphens for spaces', async () => {
-      const { deleteCharacter } = await import('../services/campaign/campaignService.js');
+      const { deleteCharacter } = await import('../../services/campaign/campaignService.js');
 
       const { result } = renderHook(() => useCharacterManagement('test-campaign'));
       act(() => {

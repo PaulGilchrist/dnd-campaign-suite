@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import useQuestsManagement from '../../hooks/useQuestsManagement.js';
+import useQuestsManagement from '../../hooks/management/useQuestsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Quests.css';
 

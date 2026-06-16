@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import useNPCsManagement from '../../hooks/useNPCsManagement.js';
+import useNPCsManagement from '../../hooks/management/useNPCsManagement.js';
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
 import { getDefaultFormData, cleanNPCData } from '../../services/npcs/npcFormUtils.js';

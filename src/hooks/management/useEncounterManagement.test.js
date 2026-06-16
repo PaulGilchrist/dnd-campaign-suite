@@ -8,7 +8,7 @@ const mockUpdateEncounter = vi.fn();
 const mockDeleteEncounter = vi.fn();
 const mockRenameEncounter = vi.fn();
 
-vi.mock('../services/encounters/encountersService.js', () => ({
+vi.mock('../../services/encounters/encountersService.js', () => ({
   loadEncounters: (...args) => mockLoadEncounters(...args),
   saveEncounter: (...args) => mockSaveEncounter(...args),
   loadEncounter: (...args) => mockLoadEncounter(...args),

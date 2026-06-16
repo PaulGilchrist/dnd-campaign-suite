@@ -8,14 +8,14 @@ import {
   EXHAUSTION_LEVELS,
   applyExhaustionSpeedPenaltyToBudget,
   getExhaustionMultiplierPercent,
-} from '../services/campaign/travelService.js';
+} from '../../services/campaign/travelService.js';
 import {
   shouldTriggerEvent,
   generateRandomEvent,
-} from '../services/campaign/randomEventService.js';
-import { generateEncounterSuggestions } from '../services/encounters/encounterGenerator.js';
-import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
-import { hasSelfRestoration } from '../services/combat/automation/automationService.js';
+} from '../../services/campaign/randomEventService.js';
+import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
+import { getRuntimeValue, setRuntimeValue } from '../useRuntimeState.js';
+import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
 
 const MODES = {
   INACTIVE: 'inactive',

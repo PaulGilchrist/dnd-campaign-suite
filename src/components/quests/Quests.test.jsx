@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Quests from './Quests.jsx';
 
-vi.mock('../../hooks/useQuestsManagement.js', () => ({
+vi.mock('../../hooks/management/useQuestsManagement.js', () => ({
   default: () => ({
     quests: [],
     loading: false,
@@ -38,7 +38,7 @@ describe('Quests', () => {
     window.confirm = vi.fn(() => true);
 
     // Reset the hook mock to defaults so overrides from prior tests don't leak
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
     vi.mocked(questsManagement).default = () => ({
       quests: [],
       loading: false,
@@ -72,7 +72,7 @@ describe('Quests', () => {
   });
 
   it('should show loading state', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [],
@@ -198,7 +198,7 @@ describe('Quests', () => {
   });
 
   it('should render quest list when quests are provided', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -225,7 +225,7 @@ describe('Quests', () => {
   });
 
   it('should open edit modal with "Edit Quest" heading when quest clicked', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -256,7 +256,7 @@ describe('Quests', () => {
   });
 
   it('should show delete button in edit modal', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -293,7 +293,7 @@ describe('Quests', () => {
   });
 
   it('should filter quests based on search query', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -350,7 +350,7 @@ describe('Quests', () => {
   });
 
   it('should show search no results message', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -382,7 +382,7 @@ describe('Quests', () => {
   });
 
   it('should render status badge with correct color for active quest', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -415,7 +415,7 @@ describe('Quests', () => {
   });
 
   it('should render status badge with correct color for completed quest', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -447,7 +447,7 @@ describe('Quests', () => {
   });
 
   it('should render status badge with correct color for failed quest', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -479,7 +479,7 @@ describe('Quests', () => {
   });
 
   it('should call deleteQuestAction when delete confirmed', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     const deleteSpy = vi.fn();
 
@@ -516,7 +516,7 @@ describe('Quests', () => {
   it('should not call deleteQuestAction when confirm is cancelled', async () => {
     window.confirm = vi.fn(() => false);
 
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     const deleteSpy = vi.fn();
 
@@ -551,7 +551,7 @@ describe('Quests', () => {
   });
 
   it('should show description preview in quest list', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -580,7 +580,7 @@ describe('Quests', () => {
   });
 
   it('should truncate long description in quest list', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     const longDescription = 'A'.repeat(150);
 
@@ -629,7 +629,7 @@ describe('Quests', () => {
   });
 
   it('should show multiple quests in the list', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
@@ -674,7 +674,7 @@ describe('Quests', () => {
   });
 
   it('should populate form fields when editing a quest', async () => {
-    const questsManagement = await import('../../hooks/useQuestsManagement.js');
+    const questsManagement = await import('../../hooks/management/useQuestsManagement.js');
 
     vi.mocked(questsManagement).default = () => ({
       quests: [
