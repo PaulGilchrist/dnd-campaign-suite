@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -159,30 +159,30 @@ describe('lesserRestorationHandler.applyLesserRestoration', () => {
     expect(result).toBeNull();
   });
 
-    it('should return popup when no condition selected', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      const noCondResult = await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1' },
-      );
-      expect(noCondResult.payload.description).toContain('No condition selected');
-    });
+  it('should return popup when no condition selected', async () => {
+    getCombatContext.mockResolvedValue({ creatures: [] });
+    const noCondResult = await applyLesserRestoration(
+      makeAction(),
+      makePlayerStats(),
+      campaignName,
+      null,
+      { targetName: 'Ally1' },
+    );
+    expect(noCondResult.payload.description).toContain('No condition selected');
+  });
 
-    it('should return popup when condition not found on target', async () => {
-      getCombatContext.mockResolvedValue({ creatures: [] });
-      getRuntimeValue.mockReturnValue(['Frightened', 'Prone']);
-      const noMatchResult = await applyLesserRestoration(
-        makeAction(),
-        makePlayerStats(),
-        campaignName,
-        null,
-        { targetName: 'Ally1', condition: 'blinded' },
-      );
-      expect(noMatchResult.payload.description).toContain('No applicable condition found');
-    });
+  it('should return popup when condition not found on target', async () => {
+    getCombatContext.mockResolvedValue({ creatures: [] });
+    getRuntimeValue.mockReturnValue(['Frightened', 'Prone']);
+    const noMatchResult = await applyLesserRestoration(
+      makeAction(),
+      makePlayerStats(),
+      campaignName,
+      null,
+      { targetName: 'Ally1', condition: 'blinded' },
+    );
+    expect(noMatchResult.payload.description).toContain('No applicable condition found');
+  });
 
   it('should remove the condition from activeConditions', async () => {
     getCombatContext.mockResolvedValue({ creatures: [] });
