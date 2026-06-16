@@ -195,13 +195,6 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      // The poisoned filter call should NOT trigger a setRuntimeValue since nothing changed
-      const poisonedRemovalCalls = setRuntimeValue.mock.calls.filter(
-        call =>
-          call[1] === 'activeConditions' &&
-          Array.isArray(call[2]) &&
-          call[2].length === ['blinded', 'blinded', 'incapacitated', 'speed_zero'].length,
-      );
       // Should have exactly one setRuntimeValue for activeConditions (the conditions merge)
       const conditionsCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeConditions');
       expect(conditionsCalls.length).toBe(1);
