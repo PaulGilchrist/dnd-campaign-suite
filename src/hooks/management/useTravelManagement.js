@@ -14,7 +14,7 @@ import {
   generateRandomEvent,
 } from '../../services/campaign/randomEventService.js';
 import { generateEncounterSuggestions } from '../../services/encounters/encounterGenerator.js';
-import { getRuntimeValue, setRuntimeValue } from '../useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasSelfRestoration } from '../../services/combat/automation/automationService.js';
 
 const MODES = {

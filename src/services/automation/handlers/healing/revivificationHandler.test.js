@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -25,7 +25,7 @@ vi.mock('../../../ui/storage.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './revivificationHandler.js';
-import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logPoster from '../../../shared/logPoster.js';
 import storage from '../../../ui/storage.js';

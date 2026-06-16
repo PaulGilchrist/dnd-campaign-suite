@@ -2,7 +2,7 @@ import { cloneDeep } from 'lodash';
 import { getCategories } from '../featureCategories.js'
 import { categorizeFeatures, mergeCategorizedFeatures } from '../featureCategorizationUtils.js'
 import utils from '../../ui/utils.js';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { computePassiveSkills } from '../../shared/computePassiveSkills.js';
 import { deduplicateAndSort } from '../../shared/deduplicateAndSort.js';
 

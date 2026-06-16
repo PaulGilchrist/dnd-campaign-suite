@@ -1,6 +1,6 @@
 import { handle } from './soulOfVengeanceHandler.js';
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
@@ -14,7 +14,7 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
 }));
 
-const { getRuntimeValue } = await import('../../../../hooks/useRuntimeState.js');
+const { getRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { getCombatContext, getTargetFromAttacker } = await import('../../../rules/combat/damageUtils.js');
 
 const campaignName = 'test-campaign';

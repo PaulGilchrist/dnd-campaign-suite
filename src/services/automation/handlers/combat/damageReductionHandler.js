@@ -1,6 +1,6 @@
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { addEntry } from '../../../ui/logService.js';
-import { setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 function hasShield(playerStats) {
     const equipped = playerStats.inventory?.equipped || [];

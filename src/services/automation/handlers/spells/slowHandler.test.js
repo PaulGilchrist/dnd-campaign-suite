@@ -3,7 +3,7 @@ import { createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
 vi.mock('../../common/savePrompt.js', () => ({
@@ -26,7 +26,7 @@ vi.mock('../../../shared/logPoster.js', () => ({
     postLogEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => []),
     setRuntimeValue: vi.fn(),
 }));

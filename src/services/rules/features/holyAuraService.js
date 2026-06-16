@@ -1,5 +1,5 @@
 import { executeHandler } from '../../automation/index.js';
-import { setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 export async function triggerHolyAura(spell, metaCtx, playerStats, campaignName, mapName) {
     const spellSaveDc = playerStats.spellAbilities?.saveDc || 8 + playerStats.proficiency;

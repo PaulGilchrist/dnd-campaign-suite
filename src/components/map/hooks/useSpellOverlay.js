@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import useSSEEqualityGuard from '../../../hooks/useSSEEqualityGuard.js';
+import useSSEEqualityGuard from '../../../hooks/runtime/useSSEEqualityGuard.js';
 
 /**
  * WARNING: SSE re-render loop risk

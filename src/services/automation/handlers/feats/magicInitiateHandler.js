@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const MAGIC_INITIATE_CLASS_KEY = '_magicInitiateClass';
 const MAGIC_INITIATE_CANTRIPS_KEY = '_magicInitiateCantrips';

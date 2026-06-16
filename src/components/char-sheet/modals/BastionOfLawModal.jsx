@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../services/dice/diceRoller.js';
 import './BastionOfLawModal.css';
 

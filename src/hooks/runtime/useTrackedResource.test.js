@@ -1,20 +1,20 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 
-vi.mock('../services/ui/storage.js', () => ({
+vi.mock('../../services/ui/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
   },
 }));
 
-vi.mock('../hooks/useRuntimeState.js', () => ({
+vi.mock('./useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     addStorageChangeListener: vi.fn().mockImplementation(() => () => {}),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
 
 const useTrackedResource = (await import('./useTrackedResource.js')).default;
 

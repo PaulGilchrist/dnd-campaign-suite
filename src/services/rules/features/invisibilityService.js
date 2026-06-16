@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../automation/common/buffToggle.js';
 import { addEntry } from '../../ui/logService.js';
 

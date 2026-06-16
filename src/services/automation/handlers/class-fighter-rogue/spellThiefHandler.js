@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';

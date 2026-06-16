@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -19,7 +19,7 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle, applyRiderOption } from './attackRiderHandler.js';
-import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 

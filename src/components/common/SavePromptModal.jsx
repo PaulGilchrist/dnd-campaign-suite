@@ -5,7 +5,7 @@ import { sendSaveResult, clearSavePrompt } from '../../services/combat/condition
 import Subscriber from './Subscriber.jsx';
 import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js';
 import { getAbilitySaveBonus } from '../../services/combat/conditions/conditionUtils.js';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './savePromptModal.css';
 
 function SavePromptModal({ campaignName, characters, activeMapName }) {

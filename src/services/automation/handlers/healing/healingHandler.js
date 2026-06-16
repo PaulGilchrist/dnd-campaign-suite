@@ -3,7 +3,7 @@ import { getClassFeatures } from '../../../character/classFeatures.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { applyHealingDirectly, logHealingToSSE } from '../../common/healingRoll.js';
 import { resolveHealingBonuses, hasHealingMaximization, hasRerollHealingOnes } from '../../../combat/automation/automationService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getHitDieSize, computeHitDieRecovery } from '../../../rules/effects/restRules.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {

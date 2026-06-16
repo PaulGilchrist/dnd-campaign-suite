@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const LINEAGE_KEY = '_gnomishLineageSelection';
 const LINEAGE_CANTRIP_KEY = '_gnomishLineageCantrip';

@@ -8,7 +8,7 @@ import {
   getMaxMetamagicPerSpell,
   isPreCastOption,
 } from './metamagicRules.js';
-import { clearRuntimeState } from '../../hooks/useRuntimeState.js';
+import { clearRuntimeState } from '../../hooks/runtime/useRuntimeState.js';
 
 beforeEach(() => {
   localStorage.clear();

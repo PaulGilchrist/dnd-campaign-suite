@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const HANDLER_MODAL = 'createThrall';
 const HANDLER_CONFIRM = 'create_thrall_confirm';

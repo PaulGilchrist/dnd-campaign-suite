@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import utils from '../../services/ui/utils.js'
 import { rollExpression } from '../../services/dice/diceRoller.js';
 

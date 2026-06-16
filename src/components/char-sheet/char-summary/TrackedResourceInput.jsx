@@ -1,6 +1,6 @@
 
 import React from 'react'
-import useTrackedResource from '../../../hooks/useTrackedResource.js'
+import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 
 function TrackedResourceInput({ label, resourceKey, playerName, getMax, deps, campaignName, playerStats }) {

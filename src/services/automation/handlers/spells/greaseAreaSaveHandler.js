@@ -1,5 +1,5 @@
 import { buildSaveDc } from '../../common/savePrompt.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
@@ -126,7 +126,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
         const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
         if (targetCharacter?.type === 'player') {
             const targetStats = {
-                computedStats: (await import('../../../../hooks/useRuntimeState.js')).getRuntimeValue(targetName, 'computedStats', campaignName),
+                computedStats: (await import('../../../../hooks/runtime/useRuntimeState.js')).getRuntimeValue(targetName, 'computedStats', campaignName),
             };
             if (playerIsImmuneToCondition({
                 conditionKey: tracking.condition.toLowerCase(),

@@ -30,7 +30,7 @@ import { executeSpellCast } from '../../../services/rules/spells/spellCastServic
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rules/combat/rangeValidation.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffs/buffService.js';
-import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';

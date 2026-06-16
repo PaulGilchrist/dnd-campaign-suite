@@ -9,7 +9,7 @@ vi.mock('../../../services/ui/storage.js', () => ({
     },
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
   useRuntimeValue: vi.fn(() => null),
@@ -19,7 +19,7 @@ vi.mock('../../../hooks/useRuntimeState.js', () => ({
   clearRuntimeState: vi.fn(),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../../services/ui/storage.js';
 import CharFeats from '../char-feats/CharFeats.jsx';
 

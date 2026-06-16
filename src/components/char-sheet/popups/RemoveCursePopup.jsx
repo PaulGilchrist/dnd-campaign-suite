@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import './MetamagicPopup.css';
 import '../CharSheet.css';
 

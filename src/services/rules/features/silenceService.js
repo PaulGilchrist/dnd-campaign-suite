@@ -1,6 +1,6 @@
 import { executeHandler } from '../../automation/index.js';
 import { getDistanceFeet } from '../combat/rangeValidation.js';
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const SILENCE_NAME = 'Silence';
 const SILENCE_EFFECT = 'silence';

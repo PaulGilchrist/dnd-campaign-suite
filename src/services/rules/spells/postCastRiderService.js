@@ -1,4 +1,4 @@
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../automation/index.js';
 import { isBlockedBySpellThief } from '../../automation/handlers/class-fighter-rogue/spellThiefHandler.js';
 

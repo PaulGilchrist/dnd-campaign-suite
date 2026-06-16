@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mock the dependencies ────────────────────────────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(),
 }))
@@ -52,7 +52,7 @@ vi.mock('../../rules/core/attackCalc.js', () => ({
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { evaluateAutoExpression } from './automationExpressions.js'
 import { parseMagicItemName } from '../../rules/core/attackCalc.js'
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 
 import {
     getPassiveBuffs,

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { logHealingToSSE } from '../../../services/automation/common/healingRoll.js';
 import '../CharSheet.css';
 

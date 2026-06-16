@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharConditions, { EXHAUSTION_LEVELS, loadActiveConditions } from './CharConditions.jsx';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
@@ -61,7 +61,7 @@ vi.mock('../../../services/combat/auras/unbreakableMajesty.js', () => ({
   clearUnbreakableMajesty: vi.fn(),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { rollD20 } from '../../../services/dice/diceRoller.js';
 import { clearUnbreakableMajesty } from '../../../services/combat/auras/unbreakableMajesty.js';
 import { computeAuraBonus } from '../../../services/combat/auras/auraOfProtection.js';

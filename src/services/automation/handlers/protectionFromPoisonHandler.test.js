@@ -1,6 +1,6 @@
 import { handle, applyProtectionFromPoison, isProtectionFromPoisonActive } from './protectionFromPoisonHandler.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
@@ -17,7 +17,7 @@ vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { addExpiration } = await import('../../rules/effects/expirations.js');
 const { getCombatContext } = await import('../../rules/combat/damageUtils.js');
 

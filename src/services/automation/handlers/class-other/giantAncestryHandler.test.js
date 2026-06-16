@@ -4,7 +4,7 @@ import { handle, confirmGiantAncestry, getGiantAncestrySelection, getGiantAncest
 
 // ── Mocks ──────────────────────────────────────────────────────
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
     setRuntimeValue: vi.fn(async () => {}),
 }));
@@ -32,7 +32,7 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 
 // ── Re-import after mocking ────────────────────────────────────
 
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

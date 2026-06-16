@@ -1,5 +1,5 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { postLogEntry } from '../../../shared/logPoster.js';

@@ -3,20 +3,20 @@ import { render, screen, act } from '@testing-library/react';
 import React from 'react';
 import useTrackedResource from './useTrackedResource.js';
 
-vi.mock('../services/ui/storage.js', () => ({
+vi.mock('../../services/ui/storage.js', () => ({
   default: {
     getProperty: vi.fn(),
     setProperty: vi.fn(),
   }
 }));
 
-vi.mock('../hooks/useRuntimeState.js', () => ({
+vi.mock('./useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     addStorageChangeListener: vi.fn().mockImplementation(() => () => {}),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from './useRuntimeState.js';
 
 function TestComponent({ storageKey, playerName, maxGetter, deps, onRender }) {
   const { current, max, update } = useTrackedResource(storageKey, playerName, maxGetter, deps);

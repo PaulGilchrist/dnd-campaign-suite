@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { CELL_SIZE } from '../../../config/mapConfig';
-import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export default function usePlayerDragging({
     svgRef,

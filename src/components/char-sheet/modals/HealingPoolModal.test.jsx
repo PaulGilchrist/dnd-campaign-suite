@@ -4,13 +4,13 @@ import HealingPoolModal from './HealingPoolModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   addStorageChangeListener: vi.fn(() => () => {}),
 }));
 
-vi.mock('../../../hooks/useTrackedResource.js', () => ({
+vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
   default: vi.fn(),
 }));
 
@@ -32,8 +32,8 @@ vi.mock('../../../services/ui/utils.js', () => ({
 }));
 
 // ── Re-import mocked modules ──
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
-import useTrackedResource from '../../../hooks/useTrackedResource.js';
+import * as useRuntimeState from '../../../hooks/runtime/useRuntimeState.js';
+import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js';
 import storage from '../../../services/ui/storage.js';
 import * as damageUtils from '../../../services/rules/combat/damageUtils.js';
 import * as applyHealingService from '../../../services/rules/combat/applyHealing.js';

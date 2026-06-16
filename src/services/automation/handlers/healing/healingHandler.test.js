@@ -26,7 +26,7 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
   hasRerollHealingOnes: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -39,7 +39,7 @@ import * as classFeatures from '../../../character/classFeatures.js';
 import * as targetResolver from '../../common/targetResolver.js';
 import * as healingRoll from '../../common/healingRoll.js';
 import * as automationService from '../../../combat/automation/automationService.js';
-import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

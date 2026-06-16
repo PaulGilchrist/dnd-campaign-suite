@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, clearMovementFlag, clearSpeedZero } from './steadyAimHandler.js';
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(async () => {}),
 }));
@@ -10,7 +10,7 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(async () => ({})),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/useRuntimeState.js');
+const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { addEntry } = await import('../../../ui/logService.js');
 
 const makeAction = () => ({

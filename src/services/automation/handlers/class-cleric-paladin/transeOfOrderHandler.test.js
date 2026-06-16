@@ -1,9 +1,9 @@
 import { handle, isActive, deactivate } from './transeOfOrderHandler.js';
-import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as metamagic from '../../../../hooks/useMetamagic.js';
 import * as classFeatures from '../../../character/classFeatures.js';
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));

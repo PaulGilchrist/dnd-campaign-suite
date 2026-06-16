@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { rollDice } from '../../services/dice/diceRoller.js'
 import { getHitDieSize, computeHitDieRecovery, SHORT_REST_RESOURCES, getShortRestResourceLabels } from '../../services/rules/effects/restRules.js'
 import { clearAllExpirationEffects } from '../../services/rules/effects/expirations.js'

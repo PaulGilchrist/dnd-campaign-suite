@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { loadMapData } from '../../../maps/mapsService.js';

@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
-import { useRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../common/AvatarImage.jsx', () => ({
     default: vi.fn(({ name, imagePath, size: _size }) => {
@@ -41,7 +41,7 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
     getAbilityLabel: (ability) => ability?.toUpperCase() || '',
 }));
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     useRuntimeValue: vi.fn((campaignName, key) => {
         if (key === 'targetEffects') return [];
         return null;

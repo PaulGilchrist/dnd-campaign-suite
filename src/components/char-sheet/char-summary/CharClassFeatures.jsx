@@ -2,7 +2,7 @@
 import React from 'react'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
-import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];

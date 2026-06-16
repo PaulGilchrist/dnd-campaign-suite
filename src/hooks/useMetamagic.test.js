@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useMetamagic from './useMetamagic.js';
 
-vi.mock('./useRuntimeState.js', () => {
+vi.mock('./runtime/useRuntimeState.js', () => {
   const store = new Map();
   store.set('TestSorcerer', JSON.stringify({ sorceryPoints: 5 }));
   return {

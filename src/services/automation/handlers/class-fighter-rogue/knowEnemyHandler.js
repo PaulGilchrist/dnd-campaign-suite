@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getMonsterData } from '../../../../services/npcs/monsterUtils.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {

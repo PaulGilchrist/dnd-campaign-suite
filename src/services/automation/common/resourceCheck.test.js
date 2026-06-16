@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
     clearRuntimeState: vi.fn(),
@@ -15,7 +15,7 @@ vi.mock('../../character/classFeatures.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { getResourceAmount, spendResource, checkResourceRemaining } from './resourceCheck.js';
-import * as runtimeState from '../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
 import * as classFeatures from '../../character/classFeatures.js';
 
 // ── Helpers ────────────────────────────────────────────────────

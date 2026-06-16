@@ -1,5 +1,5 @@
 import { getLevelAfterLongRest } from '../../combat/conditions/exhaustionRules.js'
-import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearAllExpirationEffects } from './expirations.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 

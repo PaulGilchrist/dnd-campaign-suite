@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { automationInfoPopup } from '../../../shared/popupResponse.js';
 
 const POLEARM_WEAPONS = ['Quarterstaff', 'Spear'];

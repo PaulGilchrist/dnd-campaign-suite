@@ -1,4 +1,4 @@
-import { getRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { MELEE_REACH_FEET } from '../../../combat/baseCombatActions.js';

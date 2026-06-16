@@ -10,7 +10,7 @@ vi.mock('../combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => 10),
     setRuntimeValue: vi.fn(),
 }));

@@ -17,7 +17,7 @@ import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import HealingPoolModal from './modals/HealingPoolModal.jsx'
 import HandOfHealingModal from './modals/HandOfHealingModal.jsx'
 import FontOfMagicModal from './modals/FontOfMagicModal.jsx'

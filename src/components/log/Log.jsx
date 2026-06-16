@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import useLog from '../../hooks/useLog.js';
+import useLog from '../../hooks/runtime/useLog.js';
 import './Log.css';
 
 function formatTimestamp(ts) {

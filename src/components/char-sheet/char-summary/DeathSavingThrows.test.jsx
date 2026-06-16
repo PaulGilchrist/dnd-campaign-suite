@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import DeathSavingThrows from './DeathSavingThrows.jsx';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -28,7 +28,7 @@ vi.mock('../../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(() => 15),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js';
 import { hasSaveModifier } from '../../../services/combat/conditions/conditionEffects.js';
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js';

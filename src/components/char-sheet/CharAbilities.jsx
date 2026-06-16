@@ -4,7 +4,7 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import { buildAbilityDetailHtml } from '../../hooks/useActionPopup.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });

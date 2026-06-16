@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mock BEFORE imports (hoisted by vitest) ───────────────────────
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }))
@@ -17,7 +17,7 @@ import {
 import {
   getRuntimeValue,
   setRuntimeValue,
-} from '../../../hooks/useRuntimeState.js'
+} from '../../../hooks/runtime/useRuntimeState.js'
 
 const PLAYER = 'Grog the Barbarian'
 const CAMPAIGN = 'Forgotten Realms'

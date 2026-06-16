@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { applyRiderOption } from '../../../services/automation/handlers/combat/attackRiderHandler.js';
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import '../CharSheet.css';
 
 function AttackRiderModal({ action, playerStats, campaignName, targetName, onClose }) {

@@ -32,7 +32,7 @@ import useTravelManagement from '../../hooks/management/useTravelManagement.js';
 import { useMonstersData } from '../../hooks/useMonstersData.js';
 import TravelPanel from './TravelPanel.jsx';
 import TravelPathLayer from './TravelPathLayer.jsx';
-import useLog from '../../hooks/useLog.js';
+import useLog from '../../hooks/runtime/useLog.js';
 import WeatherOverlay from './WeatherOverlay.jsx';
 import EventDialog from './EventDialog.jsx';
 import useZoomPan from './hooks/useZoomPan.js';

@@ -4,7 +4,7 @@ import * as mapsService from '../../maps/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../../rules/combat/rangeValidation.js';
 import { computeCover } from '../../rules/combat/coverService.js';
 import { loadNPCs } from '../../npcs/npcsService.js';
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export function rollDamageForAction(auto, options = {}) {
     const damage = auto.damage;

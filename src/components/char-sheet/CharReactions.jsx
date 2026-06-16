@@ -9,7 +9,7 @@
        import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
          import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
         import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
-        import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
+        import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
        import { executeHandler } from '../../services/automation/index.js'
      import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
      import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'

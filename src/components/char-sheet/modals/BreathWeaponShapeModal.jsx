@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../../services/automation/index.js';
 import '../CharSheet.css';
 

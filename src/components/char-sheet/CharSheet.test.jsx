@@ -69,7 +69,7 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
 }));
 
 // Mock useRuntimeState
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
   useRuntimeValue: vi.fn(() => null),
@@ -108,7 +108,7 @@ Object.defineProperty(window, 'localStorage', {
 });
 
 import rulesFactory from '../../services/rules/rulesFactory.js';
-import { getRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import utils from '../../services/ui/utils.js';
 
 const mockPlayerSummary = {

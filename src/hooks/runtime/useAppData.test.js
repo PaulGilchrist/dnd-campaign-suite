@@ -1,7 +1,7 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../services/ui/dataLoader.js', () => ({
+vi.mock('../../services/ui/dataLoader.js', () => ({
   loadAbilityScores: vi.fn(),
   loadClassData: vi.fn(),
   loadEquipment: vi.fn(),
@@ -18,7 +18,7 @@ import {
   loadMagicItems,
   loadRaceData,
   loadSpells,
-} from '../services/ui/dataLoader.js';
+} from '../../services/ui/dataLoader.js';
 
 const mockAbilityScores = [{ name: 'Strength' }];
 const mockClasses = [{ name: 'Fighter' }];

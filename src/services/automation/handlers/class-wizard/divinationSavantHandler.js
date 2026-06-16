@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { loadSpells } from '../../../ui/dataLoader.js';
 
 const DIVINATION_SCHOOL = 'Divination';

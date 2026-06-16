@@ -1,8 +1,8 @@
 import { handle, applyTypeChoice } from './fiendishResilienceHandler.js';
-import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
     getRuntimeValue: vi.fn(),
 }));

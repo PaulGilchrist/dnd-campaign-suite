@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // --- mocks ---
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -15,7 +15,7 @@ vi.mock('./logPoster.js', () => ({
   postLogEntry: makeMockPostLogEntry(),
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from './logPoster.js';
 import { modifyHitPoints } from './hpModifier.js';
 

@@ -7,7 +7,7 @@ import { triggerSmiteOfProtection } from '../features/smiteOfProtectionService.j
 import { triggerInspiringSmite } from '../features/inspiringSmiteService.js';
 import { triggerPrimalCompanionSpellShare } from '../features/primalCompanionSpellShareService.js';
 import { triggerWildMagicSurge } from '../features/wildMagicSurgeService.js';
-import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { postLogEntry } from '../../shared/logPoster.js';

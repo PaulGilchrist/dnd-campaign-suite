@@ -20,7 +20,7 @@ vi.mock('../../../shared/logPoster.js', () => ({
     postLogEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => []),
     setRuntimeValue: vi.fn(),
 }));

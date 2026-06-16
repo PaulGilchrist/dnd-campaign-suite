@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const LEGACY_KEY = '_fiendishLegacySelection';
 const LEGACY_CANTRIP_KEY = '_fiendishLegacyCantrip';

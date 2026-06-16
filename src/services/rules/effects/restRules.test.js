@@ -14,7 +14,7 @@ import {
 } from './restRules.js'
 
 // Mock useRuntimeState before importing restRules
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
   setRuntimeBatch: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('./expirations.js', () => ({
   clearAllExpirationEffects: vi.fn(),
 }))
 
-import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js'
 
 beforeEach(() => {
   vi.clearAllMocks()

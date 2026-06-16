@@ -1,7 +1,7 @@
  
 import React from 'react'
 
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 
 function CharGold({ playerStats, campaignName }) {

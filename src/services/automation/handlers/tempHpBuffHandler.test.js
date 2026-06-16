@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -31,7 +31,7 @@ vi.mock('../../ui/logService.js', () => ({
 // ── Imports (returned as mocked versions) ─────────────────────
 
 import { handle, grantTempHpOnRage } from './tempHpBuffHandler.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as automationService from '../../combat/automation/automationService.js';
 import * as mapsService from '../../maps/mapsService.js';
 import * as expirations from '../../rules/effects/expirations.js';

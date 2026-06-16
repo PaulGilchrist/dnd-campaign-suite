@@ -1,4 +1,4 @@
-import { setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {

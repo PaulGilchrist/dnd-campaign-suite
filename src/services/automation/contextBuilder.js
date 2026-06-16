@@ -4,7 +4,7 @@ import * as mapsService from '../maps/mapsService.js';
 import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHostileNPC, getNearestPlacedItem, rangeToFeet } from '../rules/combat/rangeValidation.js';
 import { computeCover } from '../rules/combat/coverService.js';
 import { loadNPCs } from '../npcs/npcsService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../combat/buffs/buffService.js';
 import { getWolfAdvantageAgainst } from '../combat/auras/wolfAuraUtils.js';
 import { getDuplicityAdvantageAgainst } from '../combat/auras/duplicityAuraUtils.js';

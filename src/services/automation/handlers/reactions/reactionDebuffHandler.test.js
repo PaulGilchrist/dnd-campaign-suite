@@ -7,7 +7,7 @@ vi.mock('../../common/targetResolver.js', () => ({
   resolveMapPositions: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -44,7 +44,7 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
 import { handle } from './reactionDebuffHandler.js';
 
 import * as targetResolver from '../../common/targetResolver.js';
-import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';

@@ -69,7 +69,7 @@ vi.mock('../../hooks/useMonstersData.js', () => ({
     useMonstersData: () => ({ monsters: [], loading: false, error: null }),
 }));
 
-vi.mock('../../hooks/useLog.js', () => ({
+vi.mock('../../hooks/runtime/useLog.js', () => ({
     default: vi.fn(() => ({ addEntry: vi.fn() })),
 }));
 

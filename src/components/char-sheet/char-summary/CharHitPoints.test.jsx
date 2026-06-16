@@ -9,12 +9,12 @@ vi.mock('../../../services/ui/storage.js', () => ({
   },
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-import { useRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { useRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../common/HiddenInput.jsx', () => ({
   default: vi.fn(({ value, showInput, handleInputToggle, handleValueChange }) => {

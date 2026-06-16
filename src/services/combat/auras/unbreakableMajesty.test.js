@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }))
@@ -23,7 +23,7 @@ import {
   buildMajestyPromptData,
 } from './unbreakableMajesty.js'
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getCurrentCombatRound } from '../../encounters/combatData.js'
 
 // ── Tests ───────────────────────────────────────────────────────

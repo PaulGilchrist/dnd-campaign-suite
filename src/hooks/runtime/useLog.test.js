@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
-vi.mock('../services/ui/logService.js', () => ({
+vi.mock('../../services/ui/logService.js', () => ({
   getLog: vi.fn(async () => []),
   addEntry: vi.fn(async () => {}),
 }));
@@ -46,7 +46,7 @@ describe('useLog', () => {
     await waitFor(() => {
       expect(result.current.initialized).toBe(true);
         });
-    const logServiceMock = await import('../services/ui/logService.js');
+    const logServiceMock = await import('../../services/ui/logService.js');
     expect(logServiceMock.getLog).toHaveBeenCalledWith('my-campaign');
        });
 
@@ -55,7 +55,7 @@ describe('useLog', () => {
     await act(async () => {
       await result.current.addEntry({ text: 'Hello' });
          });
-    const logServiceMock = await import('../services/ui/logService.js');
+    const logServiceMock = await import('../../services/ui/logService.js');
     expect(logServiceMock.addEntry).toHaveBeenCalledWith('test-campaign', { text: 'Hello' });
        });
 
@@ -69,7 +69,7 @@ describe('useLog', () => {
         getLog: vi.fn(async () => []),
         addEntry: vi.fn(async () => {})
        };
-     vi.doMock('../services/logService.js', () => mockLogService);
+     vi.doMock('../../services/logService.js', () => mockLogService);
 
       const { result } = renderHook(() => useLog('test-campaign'));
 

@@ -1,7 +1,7 @@
 import { handle } from './resilientSphereHandler.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as targetResolver from '../../common/targetResolver.js';
-import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 import * as logPoster from '../../../shared/logPoster.js';

@@ -1,4 +1,4 @@
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import '../CharSheet.css';
 
 function ElderChampionRestoreModal({ action, playerStats, campaignName, onConfirm, onClose }) {

@@ -1,5 +1,5 @@
 
-import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../ui/storage.js';
 import { modifyHitPoints } from '../../shared/hpModifier.js';
 

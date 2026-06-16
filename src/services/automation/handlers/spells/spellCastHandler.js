@@ -1,5 +1,5 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../../services/rules/spells/postCastRiderService.js';
 import { getMagicInitiateLevel1Spell } from '../feats/magicInitiateHandler.js';
 

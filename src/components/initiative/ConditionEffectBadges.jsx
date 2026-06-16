@@ -1,5 +1,5 @@
 import { computeConditionEffects } from '../../services/combat/conditions/conditionEffects.js'
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 
 function ConditionEffectBadges({ conditions, targetEffects = [], creatureName, campaignName, hasTacticalShift, hasSpeedyOpportunityDisadvantage, hasSpeedyDifficultTerrainIgnore }) {
     const condKeys = (conditions || []).map(c => c.key)

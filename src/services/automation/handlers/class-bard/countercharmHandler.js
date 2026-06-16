@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';

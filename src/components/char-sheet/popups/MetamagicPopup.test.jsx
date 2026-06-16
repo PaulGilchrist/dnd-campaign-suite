@@ -1,7 +1,7 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MetamagicPopup from './MetamagicPopup.jsx';
-import { clearRuntimeState } from '../../../hooks/useRuntimeState.js';
+import { clearRuntimeState } from '../../../hooks/runtime/useRuntimeState.js';
 
 const mockSpell = {
   name: 'Fireball',

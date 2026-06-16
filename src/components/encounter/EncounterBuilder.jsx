@@ -14,7 +14,7 @@ import { loadEncounterToInitiative } from '../../services/encounters/encounterTo
 import { generateLootSuggestions } from '../../services/items/lootGenerator.js';
 import { calculateXPThreshold, calculateDifficultyMultiplier } from '../../services/encounters/encounterGenerator.js';
 import { ENCOUNTER_CONFIG } from '../../config/encounterConfig.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../services/ui/logService.js';
 import './EncounterBuilder.css';
 

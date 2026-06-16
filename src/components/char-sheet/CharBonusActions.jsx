@@ -7,7 +7,7 @@ import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
 import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'

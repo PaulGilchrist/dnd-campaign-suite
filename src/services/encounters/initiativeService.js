@@ -1,7 +1,7 @@
 import { rollD20 } from '../dice/diceRoller.js'
 import { getMonsterData } from '../npcs/monsterUtils.js'
 import { getMonsterSaveBonuses } from './encounterToInitiative.js'
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 
 function parseInitBonus(monster) {
     const initStr = monster.initiative_details

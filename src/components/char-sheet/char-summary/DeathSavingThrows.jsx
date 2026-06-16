@@ -1,5 +1,5 @@
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js'
 import { hasSaveModifier } from '../../../services/combat/conditions/conditionEffects.js'

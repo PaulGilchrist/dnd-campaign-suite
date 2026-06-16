@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../ui/storage.js';
 import { rollD20 } from '../../dice/diceRoller.js';
 import utils from '../../ui/utils.js';

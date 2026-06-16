@@ -30,7 +30,7 @@ vi.mock('../npcs/npcsService.js', () => ({
   loadNPCs: vi.fn(),
 }));
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -67,7 +67,7 @@ import * as mapsService from '../maps/mapsService.js';
 import * as rangeValidation from '../rules/combat/rangeValidation.js';
 import * as coverService from '../rules/combat/coverService.js';
 import * as npcsService from '../npcs/npcsService.js';
-import * as runtimeState from '../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../hooks/runtime/useRuntimeState.js';
 import * as buffService from '../combat/buffs/buffService.js';
 import * as wolfAura from '../combat/auras/wolfAuraUtils.js';
 import * as duplicityAura from '../combat/auras/duplicityAuraUtils.js';

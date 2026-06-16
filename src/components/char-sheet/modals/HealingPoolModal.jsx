@@ -1,7 +1,7 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
-import useTrackedResource from '../../../hooks/useTrackedResource.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js'
 import storage from '../../../services/ui/storage.js'
 import { getTargetFromAttacker, getCombatContext } from '../../../services/rules/combat/damageUtils.js'
 import { applyHealingToTarget } from '../../../services/rules/combat/applyHealing.js'

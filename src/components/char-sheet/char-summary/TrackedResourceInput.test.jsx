@@ -2,12 +2,12 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useTrackedResource.js', () => ({
+vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
   default: vi.fn(() => ({
     current: 0,
     max: 10,
@@ -15,7 +15,7 @@ vi.mock('../../../hooks/useTrackedResource.js', () => ({
   })),
 }));
 
-import useTrackedResource from '../../../hooks/useTrackedResource.js';
+import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js';
 
 describe('TrackedResourceInput', () => {
   beforeEach(() => {

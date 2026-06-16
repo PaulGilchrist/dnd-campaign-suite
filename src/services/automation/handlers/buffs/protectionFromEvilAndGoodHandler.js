@@ -1,6 +1,6 @@
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const PROTECTION_FROM_EVIL_AND_GOOD_KEY = 'protectionFromEvilAndGoodWardedTypes';
 const WARDED_CREATURE_TYPES = ['Aberration', 'Celestial', 'Elemental', 'Fey', 'Fiend', 'Undead'];

@@ -1,5 +1,5 @@
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export function getDuplicityAdvantageAgainst({ targetPos, attackerName, campaignName, mapData, skipRangeCheck }) {
     if (!skipRangeCheck && (!targetPos || !mapData?.players?.length)) return { advantage: false };

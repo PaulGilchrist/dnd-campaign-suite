@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, isLastStandAvailable, getLastStandUsed } from './boonOfRecoveryHandler.js';
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => undefined),
     setRuntimeValue: vi.fn(),
 }));
@@ -24,7 +24,7 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     it('should return a popup when Last Stand has not been used', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockReturnValue(undefined);
 
         const action = {
@@ -52,7 +52,7 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     it('should return a popup when Last Stand has been used this long rest', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockImplementation((_charName, runtimeKey) => {
             if (runtimeKey === 'boonOfRecoveryLastStandUsed') return true;
             if (runtimeKey === 'boonOfRecoveryLastStandRestTimestamp') return Date.now() - 3600000;
@@ -82,7 +82,7 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     it('should calculate heal amount as half max HP', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockReturnValue(undefined);
 
         const action = {
@@ -100,7 +100,7 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     it('should calculate heal amount as half max HP for odd values', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockReturnValue(undefined);
 
         const action = {
@@ -118,7 +118,7 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     it('should report Last Stand as available when never used', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockReturnValue(undefined);
 
         const playerStats = { name: playerName };
@@ -126,7 +126,7 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     it('should report Last Stand as available after long rest', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockImplementation((_charName, runtimeKey) => {
             if (runtimeKey === 'boonOfRecoveryLastStandUsed') return true;
             if (runtimeKey === 'boonOfRecoveryLastStandRestTimestamp') return Date.now() - 90000000;
@@ -138,7 +138,7 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     it('should report Last Stand as unavailable within long rest', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockImplementation((_charName, runtimeKey) => {
             if (runtimeKey === 'boonOfRecoveryLastStandUsed') return true;
             if (runtimeKey === 'boonOfRecoveryLastStandRestTimestamp') return Date.now() - 1000;
@@ -150,7 +150,7 @@ describe('boonOfRecoveryHandler', () => {
     });
 
     it('should return getLastStandUsed value', async () => {
-        const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+        const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockReturnValue(true);
 
         const playerStats = { name: playerName };

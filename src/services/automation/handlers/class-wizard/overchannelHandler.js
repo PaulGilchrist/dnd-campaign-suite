@@ -1,4 +1,4 @@
-import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const OVERCHANNEL_KEY = '_Overchannel_uses';
 const OVERCHANNEL_REST_KEY = '_Overchannel_restTimestamp';

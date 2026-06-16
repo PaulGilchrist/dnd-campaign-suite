@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { handle, handleMove } from './naturesSanctuaryHandler.js'
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }))
@@ -18,7 +18,7 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
     rangeToFeet: vi.fn((v) => parseInt(v) || 120),
 }))
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/useRuntimeState.js')
+const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js')
 const { addExpiration } = await import('../../../rules/effects/expirations.js')
 
 beforeEach(() => {

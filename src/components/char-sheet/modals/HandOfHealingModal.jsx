@@ -1,5 +1,5 @@
 import React, { useCallback } from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import utils from '../../../services/ui/utils.js'
 import storage from '../../../services/ui/storage.js'
 import { getCombatSummary } from '../../../services/encounters/combatData.js'

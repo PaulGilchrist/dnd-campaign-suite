@@ -4,7 +4,7 @@ import ShortRestModal from './ShortRestModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
@@ -57,7 +57,7 @@ vi.mock('../../services/rules/combat/applyHealing.js', () => ({
 
 // ── Re-import mocked modules ──
 
-import * as useRuntimeState from '../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../hooks/runtime/useRuntimeState.js';
 import * as diceRoller from '../../services/dice/diceRoller.js';
 import * as restRules from '../../services/rules/effects/restRules.js';
 import * as expirations from '../../services/rules/effects/expirations.js';

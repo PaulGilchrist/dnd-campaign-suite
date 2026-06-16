@@ -1,4 +1,4 @@
-import { setRuntimeValue, getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../effects/expirations.js';
 import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
 

@@ -4,13 +4,13 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }))
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }))
 
 import { getDuplicityAdvantageAgainst } from './duplicityAuraUtils.js'
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js'
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 
 function makePlayer(name, gridX = 0, gridY = 0) {
   return { name, gridX, gridY }

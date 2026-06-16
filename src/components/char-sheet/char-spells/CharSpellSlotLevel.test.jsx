@@ -11,12 +11,12 @@ vi.mock('../../../services/ui/storage.js', () => ({
 }));
 
 // Mock useRuntimeState
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
 
-import { useRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { useRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const mockPlayerStats = {
   name: 'Test Character',

@@ -1,6 +1,6 @@
 import React from 'react'
 import { cloneDeep } from 'lodash';
-import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import rulesFactory from '../../services/rules/rulesFactory.js'
 import CharAbilities from './CharAbilities.jsx'
 import CharActions from './CharActions.jsx'

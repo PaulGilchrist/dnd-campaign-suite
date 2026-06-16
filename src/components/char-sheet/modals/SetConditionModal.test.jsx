@@ -14,7 +14,7 @@ vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
   sendSaveResult: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
@@ -46,7 +46,7 @@ vi.mock('../../../services/ui/storage.js', () => ({
 
 // ── Re-import mocked modules ──
 import * as savePromptService from '../../../services/combat/conditions/savePromptService.js';
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../services/rules/effects/expirations.js';
 import * as logService from '../../../services/ui/logService.js';
 import * as diceRoller from '../../../services/dice/diceRoller.js';

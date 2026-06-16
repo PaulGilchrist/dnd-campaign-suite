@@ -1,7 +1,7 @@
 import { handle, confirmFiendishLegacy } from './fiendishLegacyHandler.js';
-import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
-vi.mock('../../../../hooks/useRuntimeState.js');
+vi.mock('../../../../hooks/runtime/useRuntimeState.js');
 
 const BASE_FEATURE = { name: 'Fiendish Legacy', automation: { type: 'fiendish_legacy', options: [] } };
 const BASE_STATS = { name: 'TestCharacter' };

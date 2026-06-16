@@ -1,5 +1,5 @@
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export function getCoronaSaveDisadvantage({ targetName, campaignName, mapData, damageType, skipRangeCheck }) {
     if (!skipRangeCheck && (!mapData?.players?.length)) return { disadvantage: false };

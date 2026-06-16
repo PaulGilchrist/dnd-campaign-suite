@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff } from '../../common/buffToggle.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {

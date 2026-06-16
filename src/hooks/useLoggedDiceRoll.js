@@ -12,7 +12,7 @@ import {
 } from '../services/rules/combat/applyDamage.js';
 import { sendSavePrompt, sendSaveResult } from '../services/combat/conditions/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/rules/combat/aoeService.js';
-import { getRuntimeValue, setRuntimeValue } from '../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from './runtime/useRuntimeState.js';
 import { clearAllExpirationEffects, addExpiration } from '../services/rules/effects/expirations.js';
 import { loadCombatSummary, getCombatSummary } from '../services/encounters/combatData.js';
 import { saveLastDamageEvent } from '../hooks/useMetamagic.js';

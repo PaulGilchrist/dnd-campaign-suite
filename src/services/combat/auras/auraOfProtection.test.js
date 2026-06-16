@@ -10,7 +10,7 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -32,7 +32,7 @@ import {
 
 import { loadMapData } from '../../maps/mapsService.js';
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
-import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 

@@ -22,7 +22,7 @@ vi.mock('../../combat/automation/automationService.js', () => ({
   evaluateAutoExpression: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ import * as tempTeleportHandler from './class-warlock/tempTeleportHandler.js';
 import * as damageUtils from '../../rules/combat/damageUtils.js';
 import * as combatData from '../../encounters/combatData.js';
 import * as automationService from '../../combat/automation/automationService.js';
-import * as runtimeState from '../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

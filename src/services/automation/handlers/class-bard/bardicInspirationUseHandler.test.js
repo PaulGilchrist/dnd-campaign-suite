@@ -6,7 +6,7 @@ vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -15,7 +15,7 @@ vi.mock('../../../../hooks/useRuntimeState.js', () => ({
 
 import { handle } from './bardicInspirationUseHandler.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
-import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

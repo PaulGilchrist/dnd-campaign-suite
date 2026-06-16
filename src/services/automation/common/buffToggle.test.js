@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { clearRuntimeState, setRuntimeValue as setRuntimeProp } from '../../../hooks/useRuntimeState.js';
+import { clearRuntimeState, setRuntimeValue as setRuntimeProp } from '../../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff, getActiveBuffs, isBuffActive } from './buffToggle.js';
 
 // ── Helpers ─────────────────────────────────────────────────────

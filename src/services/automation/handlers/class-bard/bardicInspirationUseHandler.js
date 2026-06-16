@@ -1,5 +1,5 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName) {
     const playerName = playerStats.name;

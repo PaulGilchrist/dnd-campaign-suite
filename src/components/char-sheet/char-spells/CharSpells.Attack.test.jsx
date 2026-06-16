@@ -104,7 +104,7 @@ vi.mock('../../../services/combat/buffs/buffService.js', () => ({
   getActiveBuffs: vi.fn(() => []),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   getRuntimeValue: vi.fn(() => null),

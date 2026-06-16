@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js'
 
 function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {

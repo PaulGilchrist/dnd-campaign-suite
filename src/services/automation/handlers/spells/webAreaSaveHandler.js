@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
 
 /**
@@ -60,7 +60,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
     const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type === 'player') {
         const targetStats = {
-            computedStats: (await import('../../../../hooks/useRuntimeState.js')).getRuntimeValue(targetName, 'computedStats', campaignName),
+            computedStats: (await import('../../../../hooks/runtime/useRuntimeState.js')).getRuntimeValue(targetName, 'computedStats', campaignName),
         };
         if (playerIsImmuneToCondition({
             conditionKey: 'restrained',

@@ -4,7 +4,7 @@ import React from 'react';
 import DeathSavePromptModal from './DeathSavePromptModal.jsx';
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 // ── Mock dependencies ──
 
@@ -17,7 +17,7 @@ vi.mock('../../services/combat/conditions/deathSaveRules.js', () => ({
   rollDeathSave: vi.fn(),
 }));
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));

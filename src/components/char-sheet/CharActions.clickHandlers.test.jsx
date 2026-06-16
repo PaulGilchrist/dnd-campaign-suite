@@ -51,7 +51,7 @@ vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn((_playerName, _campaignName) => ({ saveDcBonus: 0 })),
 }));
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
@@ -154,7 +154,7 @@ vi.mock('../../hooks/useActionSpellMetamagic.js', () => ({
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { executeHandler } from '../../services/automation/index.js';
 

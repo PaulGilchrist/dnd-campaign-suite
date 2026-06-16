@@ -10,7 +10,7 @@ vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -36,7 +36,7 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 import { handle, isExhausted } from './saveAttackHandler.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as savePrompt from '../../common/savePrompt.js';
-import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as mapsService from '../../../maps/mapsService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 

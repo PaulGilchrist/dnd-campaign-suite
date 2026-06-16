@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../automation/index.js';
 
 function usesSpellSlot(spell, metaCtx) {

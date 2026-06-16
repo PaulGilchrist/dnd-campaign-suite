@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './runtime/useRuntimeState.js';
 import { getClassFeatures } from '../services/character/classFeatures.js';
 import utils from '../services/ui/utils.js';
 

@@ -1,6 +1,6 @@
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const SAVE_ADVANTAGE_CONDITIONS_KEY = 'auraOfPuritySaveAdvantageConditions';
 

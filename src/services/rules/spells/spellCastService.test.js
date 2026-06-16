@@ -14,7 +14,7 @@ vi.mock('../combat/rangeValidation.js', () => ({
   rangeToFeet: vi.fn(),
 }));
 
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
   getRuntimeValue: vi.fn(),
 }));
@@ -49,7 +49,7 @@ import {
   getDistanceFeet,
   rangeToFeet,
 } from '../combat/rangeValidation.js';
-import * as useRuntimeState from '../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../hooks/runtime/useRuntimeState.js';
 import * as buffService from '../../combat/buffs/buffService.js';
 import * as postCastRiderService from './postCastRiderService.js';
 import * as postCastHealService from './postCastHealService.js';

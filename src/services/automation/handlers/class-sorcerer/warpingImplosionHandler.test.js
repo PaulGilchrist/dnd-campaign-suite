@@ -14,7 +14,7 @@ vi.mock('../../../maps/mapsService.js', () => ({
     loadMapData: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => {
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => {
     const mockFn = vi.fn((_playerName, _key, _campaignName) => {
         if (_key === 'aquaticAffinityEmanationRange') return null;
         return 1;
@@ -46,7 +46,7 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 // ── Imports (Vite returns mocked versions) ───────────────────────
 
 import { handle, applyWarpingImplosion } from './warpingImplosionHandler.js';
-import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as metamagic from '../../../../hooks/useMetamagic.js';
 
 // ── Helpers ───────────────────────────────────────────────────────

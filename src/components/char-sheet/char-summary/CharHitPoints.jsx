@@ -1,6 +1,6 @@
  
 import React from 'react'
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 import DeathSavingThrows from './DeathSavingThrows.jsx'

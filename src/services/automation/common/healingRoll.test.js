@@ -18,7 +18,7 @@ vi.mock('../../combat/automation/automationService.js', () => ({
     hasHealingMaximization: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
@@ -44,7 +44,7 @@ const { hasHealingMaximization } = await import(
      '../../combat/automation/automationService.js'
 );
 const { getRuntimeValue, setRuntimeValue } = await import(
-     '../../../hooks/useRuntimeState.js'
+     '../../../hooks/runtime/useRuntimeState.js'
 );
 const { getCombatContext, getTargetFromAttacker } = await import(
      '../../rules/combat/damageUtils.js'

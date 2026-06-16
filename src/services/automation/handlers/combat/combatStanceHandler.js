@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { grantTempHpOnRage } from '../buffs/tempHpBuffHandler.js';
 import { clearExtendedFlag } from '../class-warlock/tempTeleportHandler.js';
 

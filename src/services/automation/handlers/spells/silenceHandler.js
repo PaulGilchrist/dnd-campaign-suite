@@ -1,6 +1,6 @@
 import { toggleBuff } from '../../common/buffToggle.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 import { isSilenceActive as isSilenceActiveService } from '../../../rules/features/silenceService.js';

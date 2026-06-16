@@ -3,7 +3,7 @@ import storage from '../ui/storage.js';
 import { cloneDeep } from 'lodash';
 import { rollD20 } from '../dice/diceRoller.js';
 import { postLogEntry } from '../shared/logPoster.js';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 export function getMonsterSaveBonuses(monster) {
   const map = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' };

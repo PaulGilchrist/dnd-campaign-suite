@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../rules/effects/expirations.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { rangeToFeet } from '../../rules/combat/rangeValidation.js';

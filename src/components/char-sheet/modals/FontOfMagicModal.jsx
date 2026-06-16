@@ -1,6 +1,6 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js'
 import { getClassFeatures } from '../../../services/character/classFeatures.js'
 import './FontOfMagicModal.css'
 

@@ -12,14 +12,14 @@ import CharFeats from '../char-feats/CharFeats.jsx'
 import Popup from '../../common/Popup.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
 import AvatarModal from '../../common/AvatarModal.jsx';
-import useTrackedResource from '../../../hooks/useTrackedResource.js'
+import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js'
 import { showBackgroundPopup } from '../../../hooks/useActionPopup.js';
 import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import CharConditions from './CharConditions.jsx'
 

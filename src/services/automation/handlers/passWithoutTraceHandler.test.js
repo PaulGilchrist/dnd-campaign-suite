@@ -1,7 +1,7 @@
 import { handle, getPassWithoutTraceStealthBonus, isPassWithoutTraceActive } from './passWithoutTraceHandler.js'
 import { toggleBuff } from '../common/buffToggle.js'
 import { addExpiration } from '../../rules/effects/expirations.js'
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 
 vi.mock('../common/buffToggle.js', () => ({
     toggleBuff: vi.fn()
@@ -11,7 +11,7 @@ vi.mock('../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn()
 }))
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn()
 }))

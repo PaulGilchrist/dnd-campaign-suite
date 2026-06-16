@@ -1,6 +1,6 @@
   
 import './CharSpellSlotLevel.css'
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js'
+import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 
 function CharSpellSlotLevel({ level, totalSlots, playerStats, campaignName }) {
     const computedCurrent = playerStats?._trackedResources?.[`spell_slots_level_${level}`]?.current ?? totalSlots;

@@ -4,7 +4,7 @@ import HealingIllusionModal from './HealingIllusionModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   addStorageChangeListener: vi.fn(() => () => {}),
@@ -15,7 +15,7 @@ vi.mock('../../../services/automation/common/healingRoll.js', () => ({
 }));
 
 // ── Re-import mocked modules ──
-import * as useRuntimeState from '../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../hooks/runtime/useRuntimeState.js';
 import * as healingRoll from '../../../services/automation/common/healingRoll.js';
 
 // ── Test fixtures ──

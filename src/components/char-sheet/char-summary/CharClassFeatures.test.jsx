@@ -9,7 +9,7 @@ vi.mock('../../../services/ui/storage.js', () => ({
    },
 }));
 
-vi.mock('../../../hooks/useRuntimeState.js', () => {
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => {
   const listeners = new Map();
   return {
     getRuntimeValue: vi.fn((_characterKey, _propertyName) => {
@@ -311,7 +311,7 @@ vi.mock('../../../services/character/classRules2024.js', () => ({
    },
 }));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import storage from '../../../services/ui/storage.js';
 import classRules from '../../../services/character/classRules.js';
 import classRules2024 from '../../../services/character/classRules2024.js';

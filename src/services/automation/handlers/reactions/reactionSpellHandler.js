@@ -1,5 +1,5 @@
 import { addEntry } from '../../../ui/logService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 export async function handle(action, _playerStats, _campaignName) {
     const auto = action.automation;

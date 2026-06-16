@@ -7,9 +7,9 @@ import { loadMapData } from '../../services/maps/mapsService.js';
 import { npcToMonsterFormat } from '../../services/encounters/npcStatBlockUtils.js';
 import { isPreviousDisabled, clearCombat } from '../../services/encounters/initiativeService.js';
 
-vi.mock('../../hooks/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
+vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
-vi.mock('../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn((key, prop) => {
         if (prop === 'currentHitPoints') return 10;
         if (prop === 'hitPoints') return 10;

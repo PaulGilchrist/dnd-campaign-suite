@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react';
 import { sendDeathSaveResult, clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import * as deathSaveRules from '../../services/combat/conditions/deathSaveRules.js';
 import Subscriber from './Subscriber.jsx';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './deathSavePromptModal.css';
 
 function DeathSavePromptModal({ campaignName }) {

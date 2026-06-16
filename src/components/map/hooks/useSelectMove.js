@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef } from 'react';
 import { TOOL_SELECT } from '../../../config/mapConfig';
-import { setRuntimeValue } from '../../../hooks/useRuntimeState.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 function useSelectMove({ isLocalhost, tool, getGridFromEvent, svgRef, campaignName }) {
     const [selectionRect, setSelectionRect] = useState(null);

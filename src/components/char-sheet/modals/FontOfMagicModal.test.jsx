@@ -4,7 +4,7 @@ import FontOfMagicModal from './FontOfMagicModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeBatch: vi.fn(),
 }));
@@ -14,7 +14,7 @@ vi.mock('../../../services/character/classFeatures.js', () => ({
 }));
 
 // ── Re-import mocked modules ──
-import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
 
 // ── Test fixtures ──

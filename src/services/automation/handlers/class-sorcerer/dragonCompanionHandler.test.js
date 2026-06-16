@@ -1,6 +1,6 @@
 import { handle, confirmDragonCompanion } from './dragonCompanionHandler.js';
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
@@ -15,7 +15,7 @@ const makePlayerStats = (name = 'Test Fighter') => ({ name });
 describe('dragonCompanionHandler', () => {
     describe('handle', () => {
         it('should return popup when no uses remaining', async () => {
-            const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+            const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
             getRuntimeValue.mockReturnValue(0);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign');
@@ -26,7 +26,7 @@ describe('dragonCompanionHandler', () => {
         });
 
         it('should default to usesMax when no stored value', async () => {
-            const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+            const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
             getRuntimeValue.mockReturnValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign');
@@ -36,7 +36,7 @@ describe('dragonCompanionHandler', () => {
         });
 
         it('should show modal with noConcentrationOption', async () => {
-            const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+            const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
             getRuntimeValue.mockReturnValue(1);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign');
@@ -49,7 +49,7 @@ describe('dragonCompanionHandler', () => {
 
     describe('confirmDragonCompanion', () => {
         it('should decrement counter and return success', async () => {
-            const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+            const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
             getRuntimeValue.mockReturnValue(1);
             setRuntimeValue.mockResolvedValue(undefined);
 
@@ -63,7 +63,7 @@ describe('dragonCompanionHandler', () => {
         });
 
         it('should indicate no concentration when noConcentration=true', async () => {
-            const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+            const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
             getRuntimeValue.mockReturnValue(1);
             setRuntimeValue.mockResolvedValue(undefined);
 
@@ -75,7 +75,7 @@ describe('dragonCompanionHandler', () => {
         });
 
         it('should return error when no uses remaining', async () => {
-            const { getRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+            const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
             getRuntimeValue.mockReturnValue(0);
 
             const result = await confirmDragonCompanion(makeAction(), makePlayerStats(), 'campaign', false);
@@ -85,7 +85,7 @@ describe('dragonCompanionHandler', () => {
         });
 
         it('should reference material components in description', async () => {
-            const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/useRuntimeState.js');
+            const { getRuntimeValue, setRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
             getRuntimeValue.mockReturnValue(1);
             setRuntimeValue.mockResolvedValue(undefined);
 

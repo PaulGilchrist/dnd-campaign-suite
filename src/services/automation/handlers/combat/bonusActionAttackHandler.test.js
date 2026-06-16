@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
 }));
@@ -14,7 +14,7 @@ vi.mock('../../../shared/popupResponse.js', () => ({
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './bonusActionAttackHandler.js';
-import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as popupResponse from '../../../shared/popupResponse.js';
 
 // ── Helpers ────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from
 import { addEntry } from '../services/ui/logService.js'
 import { rollExpression, rollExpressionDoubled } from '../services/dice/diceRoller.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../services/rules/spells/metamagicRules.js'
-import { getRuntimeValue } from './useRuntimeState.js'
+import { getRuntimeValue } from './runtime/useRuntimeState.js'
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/spells/postCastRiderService.js'
 
 export function useActionSpellMetamagic({

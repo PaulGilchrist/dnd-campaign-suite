@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { grantCelestialResilience, handle } from './celestialResilienceHandler.js'
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }))
@@ -28,7 +28,7 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
     }),
 }))
 
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
 
 const campaignName = 'test-campaign'
 const mapName = 'test-map'

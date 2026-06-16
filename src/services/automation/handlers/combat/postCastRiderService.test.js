@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }));
 
@@ -17,7 +17,7 @@ import {
   hasPostCastRiderSave,
   triggerPostCastRiderSaves,
 } from '../../../rules/spells/postCastRiderService.js';
-import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as automationIndex from '../../../automation/index.js';
 
 // ── Helpers ────────────────────────────────────────────────────

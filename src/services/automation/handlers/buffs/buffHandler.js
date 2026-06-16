@@ -5,7 +5,7 @@ import { handle as handleVowOfEnmity } from '../class-cleric-paladin/vowOfEnmity
 import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';
 const ADRENALINE_RUSH_REST_KEY = 'adrenalineRushRestTimestamp';

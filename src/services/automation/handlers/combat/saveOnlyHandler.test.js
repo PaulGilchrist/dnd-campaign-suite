@@ -11,7 +11,7 @@ vi.mock('../../common/targetResolver.js', () => ({
   resolveTarget: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -29,7 +29,7 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 import { handle } from './saveOnlyHandler.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as targetResolver from '../../common/targetResolver.js';
-import * as runtimeState from '../../../../hooks/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as expirations from '../../../rules/effects/expirations.js';
 

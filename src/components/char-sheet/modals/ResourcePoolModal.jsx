@@ -1,5 +1,5 @@
 import React from 'react'
-import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js'
 import { getCurrentCombatRound } from '../../../services/encounters/combatData.js'
 import './ResourcePoolModal.css'
 
