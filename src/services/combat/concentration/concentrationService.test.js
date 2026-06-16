@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../dice/diceRoller.js', () => ({
+vi.mock('../../dice/diceRoller.js', () => ({
     rollD20: vi.fn(),
 }))
 
@@ -9,7 +9,7 @@ vi.mock('./concentrationRules.js', () => ({
     breakConcentration: vi.fn(() => null),
 }))
 
-import { rollD20 } from '../dice/diceRoller.js'
+import { rollD20 } from '../../dice/diceRoller.js'
 import { rollConcentrationSave } from './concentrationRules.js'
 import {
     rollConcentrationSave as rollConcentrationSaveSvc,

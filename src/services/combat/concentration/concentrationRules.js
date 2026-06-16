@@ -1,4 +1,4 @@
-import { rollD20 } from '../dice/diceRoller.js'
+import { rollD20 } from '../../dice/diceRoller.js'
 
 function rollConcentrationSave(saveBonus, dc, dragonConstellationActive) {
   let roll = rollD20()

@@ -3,7 +3,7 @@ import storage from '../../ui/storage.js';
 import { rollD20 } from '../../dice/diceRoller.js';
 import utils from '../../ui/utils.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/savePromptService.js';
-import { rollConcentrationSave } from '../../combat/concentrationRules.js';
+import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { isHolyAuraActive, getHolyAuraTargets } from '../../automation/handlers/buffs/holyAuraHandler.js';
 import { getDamageReduction } from '../../combat/automationPassives.js';

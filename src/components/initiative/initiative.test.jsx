@@ -67,7 +67,7 @@ vi.mock('../../services/combat/conditionSaveService.js', () => ({
     removeCondition: vi.fn(), addCondition: vi.fn(),
     buildConditionPopup: vi.fn(() => ({ name: 'Test Creature', condition: 'Blinded', type: 'save', rolls: [15], bonus: 2, targetName: 'Test Creature', targetAc: 10, hit: false, success: true, dc: 10 })),
 }));
-vi.mock('../../services/combat/concentrationService.js', () => ({
+vi.mock('../../services/combat/concentration/concentrationService.js', () => ({
     rollConcentrationSave: vi.fn(async () => ({ roll: 15, success: true, bonus: 2, bonusDetail: '' })),
     breakConcentration: vi.fn(() => 'Shield'), addConcentration: vi.fn(),
     buildConcentrationPopup: vi.fn(() => ({ name: 'Test Creature', condition: null, spell: 'Shield', type: 'save', rolls: [15], bonus: 2, targetName: 'Test Creature', targetAc: 10, hit: false, success: true, dc: 10 })),

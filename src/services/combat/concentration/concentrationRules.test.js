@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
 import { rollConcentrationSave, breakConcentration, computeConcentrationDc } from './concentrationRules.js'
-import { rollD20 } from '../dice/diceRoller.js'
+import { rollD20 } from '../../dice/diceRoller.js'
 
-vi.mock('../dice/diceRoller.js', () => ({
+vi.mock('../../dice/diceRoller.js', () => ({
   rollD20: vi.fn()
 }))
 

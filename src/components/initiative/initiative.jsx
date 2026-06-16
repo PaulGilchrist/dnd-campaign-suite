@@ -40,7 +40,7 @@ import {
     breakConcentration,
     addConcentration,
     buildConcentrationPopup,
-} from '../../services/combat/concentrationService.js'
+} from '../../services/combat/concentration/concentrationService.js'
 import {
     logInitiativeRoll,
     logConditionEvent,
