@@ -16,7 +16,7 @@ vi.mock('../../../../hooks/useMetamagic.js', () => ({
   spendSorceryPoints: vi.fn(),
 }));
 
-vi.mock('../../../combat/buffService.js', () => ({
+vi.mock('../../../combat/buffs/buffService.js', () => ({
   setInnateSorceryActive: vi.fn(),
 }));
 
@@ -27,7 +27,7 @@ import { handle } from './sorceryHandler.js';
 import * as useRuntimeState from '../../../../hooks/useRuntimeState.js';
 import * as classFeatures from '../../../character/classFeatures.js';
 import * as useMetamagic from '../../../../hooks/useMetamagic.js';
-import * as buffService from '../../../combat/buffService.js';
+import * as buffService from '../../../combat/buffs/buffService.js';
 
 // ── Helpers ────────────────────────────────────────────────────────
 

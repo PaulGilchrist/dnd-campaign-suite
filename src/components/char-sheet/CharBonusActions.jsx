@@ -15,7 +15,7 @@ import { getCurrentCombatRound } from '../../services/encounters/combatData.js'
 import * as mapsService from '../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
-import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
+import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });

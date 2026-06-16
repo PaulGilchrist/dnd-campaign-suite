@@ -44,7 +44,7 @@ vi.mock('../../hooks/useMetamagic.js', () => ({
   spendSorceryPoints: vi.fn(),
 }));
 
-vi.mock('../../services/combat/buffService.js', () => ({
+vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn((_playerName, _campaignName) => ({ saveDcBonus: 0 })),
 }));
 
@@ -152,7 +152,7 @@ import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js';
 import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
 import { hasAutomation } from '../../services/combat/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
+import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',

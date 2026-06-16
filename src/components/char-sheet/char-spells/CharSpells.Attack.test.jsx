@@ -99,7 +99,7 @@ vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(() => null),
 }));
 
-vi.mock('../../../services/combat/buffService.js', () => ({
+vi.mock('../../../services/combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
   getActiveBuffs: vi.fn(() => []),
 }));

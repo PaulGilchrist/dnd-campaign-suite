@@ -1,6 +1,6 @@
 import { rollExpression } from '../../dice/diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
-import { isInnateSorceryActive, getActiveBuffs } from '../../combat/buffService.js';
+import { isInnateSorceryActive, getActiveBuffs } from '../../combat/buffs/buffService.js';
 import { triggerPostCastRiderSaves, triggerSpellThief, triggerBewitchingMagic, triggerSoulstitchSpells, hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
 import { triggerSmiteOfProtection } from '../features/smiteOfProtectionService.js';

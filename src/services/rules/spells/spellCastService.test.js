@@ -19,7 +19,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../combat/buffService.js', () => ({
+vi.mock('../../combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(),
   getActiveBuffs: vi.fn().mockReturnValue([]),
 }));
@@ -50,7 +50,7 @@ import {
   rangeToFeet,
 } from '../combat/rangeValidation.js';
 import * as useRuntimeState from '../../hooks/useRuntimeState.js';
-import * as buffService from '../../combat/buffService.js';
+import * as buffService from '../../combat/buffs/buffService.js';
 import * as postCastRiderService from './postCastRiderService.js';
 import * as postCastHealService from './postCastHealService.js';
 

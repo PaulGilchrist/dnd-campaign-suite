@@ -75,7 +75,7 @@ import { endFriendsOnHostileAction } from '../../services/rules/features/friends
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
-import { getInnateSorceryBonus } from '../../services/combat/buffService.js';
+import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';

@@ -47,7 +47,7 @@ vi.mock('../../hooks/useMetamagic.js', () => ({
   spendSorceryPoints: vi.fn(),
 }));
 
-vi.mock('../../services/combat/buffService.js', () => ({
+vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn((_playerName, _campaignName) => ({ saveDcBonus: 0 })),
 }));
 
@@ -321,7 +321,7 @@ describe('CharActions rendering', () => {
     });
 
     it('should apply innate sorcery save DC bonus', async () => {
-      const { getInnateSorceryBonus } = await import('../../services/combat/buffService.js');
+      const { getInnateSorceryBonus } = await import('../../services/combat/buffs/buffService.js');
       getInnateSorceryBonus.mockReturnValue({ saveDcBonus: 1 });
       const stats = createStats({
         attacks: [{ name: 'Witch Bolt', range: 60, saveDc: 14, saveType: 'CON', damage: '1d12', damageType: 'Lightning', type: 'Action' }],

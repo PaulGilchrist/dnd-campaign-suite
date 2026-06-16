@@ -20,7 +20,7 @@ import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/useRuntimeState.js';
-import { getActiveBuffs } from '../../../services/combat/buffService.js';
+import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import CharConditions from './CharConditions.jsx'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });

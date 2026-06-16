@@ -29,7 +29,7 @@ import UpcastPopup from './UpcastPopup.jsx'
 import { executeSpellCast } from '../../../services/rules/spells/spellCastService.js'
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rules/combat/rangeValidation.js';
-import { isInnateSorceryActive } from '../../../services/combat/buffService.js';
+import { isInnateSorceryActive } from '../../../services/combat/buffs/buffService.js';
 import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';

@@ -47,7 +47,7 @@ vi.mock('../../hooks/useMetamagic.js', () => ({
   spendSorceryPoints: vi.fn(),
 }));
 
-vi.mock('../../services/combat/buffService.js', () => ({
+vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn((_playerName, _campaignName) => ({ saveDcBonus: 0 })),
 }));
 

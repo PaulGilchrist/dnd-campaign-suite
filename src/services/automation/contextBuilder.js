@@ -5,7 +5,7 @@ import { computeRangeEffect, computeMeleeProximityEffect, getDistanceFeet, isHos
 import { computeCover } from '../rules/combat/coverService.js';
 import { loadNPCs } from '../npcs/npcsService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/useRuntimeState.js';
-import { getInnateSorceryBonus } from '../combat/buffService.js';
+import { getInnateSorceryBonus } from '../combat/buffs/buffService.js';
 import { getWolfAdvantageAgainst } from '../combat/wolfAuraUtils.js';
 import { getDuplicityAdvantageAgainst } from '../combat/duplicityAuraUtils.js';
 import { getLionDisadvantageAgainst } from '../combat/lionAuraUtils.js';

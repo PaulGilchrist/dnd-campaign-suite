@@ -35,7 +35,7 @@ vi.mock('../../hooks/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../combat/buffService.js', () => ({
+vi.mock('../combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn(),
 }));
 
@@ -68,7 +68,7 @@ import * as rangeValidation from '../rules/combat/rangeValidation.js';
 import * as coverService from '../rules/combat/coverService.js';
 import * as npcsService from '../npcs/npcsService.js';
 import * as runtimeState from '../../hooks/useRuntimeState.js';
-import * as buffService from '../combat/buffService.js';
+import * as buffService from '../combat/buffs/buffService.js';
 import * as wolfAura from '../combat/wolfAuraUtils.js';
 import * as duplicityAura from '../combat/duplicityAuraUtils.js';
 import * as lionAura from '../combat/lionAuraUtils.js';
