@@ -84,7 +84,7 @@ vi.mock('./DiceRollResult.jsx', () => ({
   default: vi.fn((props) => <div data-testid="dice-roll-result">{props.name || 'DiceRollResult'}</div>),
 }));
 
-vi.mock('./MetamagicPopup.jsx', () => ({
+vi.mock('./popups/MetamagicPopup.jsx', () => ({
   default: vi.fn((props) => <div data-testid="metamagic-popup">{props.spell?.name || 'MetamagicPopup'}</div>),
 }));
 

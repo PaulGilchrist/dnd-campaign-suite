@@ -2,7 +2,7 @@
     import Popup from '../common/Popup.jsx'
     import DiceRollResult from './DiceRollResult.jsx'
     import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
-    import MetamagicPopup from './MetamagicPopup.jsx'
+    import MetamagicPopup from './popups/MetamagicPopup.jsx'
       import { sanitizeHtml } from '../../services/ui/sanitize.js';
        import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
        import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'

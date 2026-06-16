@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
-import MetamagicPopup from './MetamagicPopup.jsx'
-import AidTargetPopup from './AidTargetPopup.jsx'
-import GreaterRestorationPopup from './GreaterRestorationPopup.jsx'
-import RemoveCursePopup from './RemoveCursePopup.jsx'
+import MetamagicPopup from './popups/MetamagicPopup.jsx'
+import AidTargetPopup from './popups/AidTargetPopup.jsx'
+import GreaterRestorationPopup from './popups/GreaterRestorationPopup.jsx'
+import RemoveCursePopup from './popups/RemoveCursePopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
-import EmpoweredSpellPopup from './EmpoweredSpellPopup.jsx'
+import EmpoweredSpellPopup from './popups/EmpoweredSpellPopup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'

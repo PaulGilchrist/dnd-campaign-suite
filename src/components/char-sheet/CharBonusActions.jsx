@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
-import MetamagicPopup from './MetamagicPopup.jsx'
+import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'

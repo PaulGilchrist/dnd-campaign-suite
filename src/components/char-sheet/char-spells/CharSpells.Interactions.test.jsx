@@ -34,7 +34,7 @@ vi.mock('../../../hooks/useMetamagic.js', () => {
   return { default: mockFn, getCurrentSorceryPoints: mockFn.getCurrentSorceryPoints, getMaxSorceryPoints: mockFn.getMaxSorceryPoints };
 });
 
-vi.mock('../MetamagicPopup.jsx', () => ({
+vi.mock('../popups/MetamagicPopup.jsx', () => ({
   default: function MockMetamagicPopup({ onConfirm, onSkip }) {
     return (
       <div data-testid="metamagic-popup">

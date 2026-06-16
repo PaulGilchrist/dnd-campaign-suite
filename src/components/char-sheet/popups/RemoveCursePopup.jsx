@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getRuntimeValue } from '../../hooks/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/useRuntimeState.js';
 import './MetamagicPopup.css';
-import './CharSheet.css';
+import '../CharSheet.css';
 
 export default function RemoveCursePopup({ spell, _playerStats, _campaignName, creatureTargets, range, onConfirm, onSkip }) {
     const [selectedTarget, setSelectedTarget] = useState(null);
