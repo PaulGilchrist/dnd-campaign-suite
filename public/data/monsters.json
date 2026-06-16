@@ -41844,7 +41844,7 @@
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 7 (1d6 + 4) Bludgeoning damage plus 5 (2d4) Radiant damage.",
         "attack_bonus": 6,
         "damage": "7 (1d6 + 4) Bludgeoning damage plus 5 (2d4) Radiant damage",
-        "damage_dice": "1d6 + 4",
+        "damage_dice": "1d6+4 plus 2d4",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -42181,7 +42181,7 @@
         "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 10 (2d4 + 5) Bludgeoning damage plus 10 (3d6) Psychic damage.",
         "attack_bonus": 9,
         "damage": "10 (2d4 + 5) Bludgeoning damage plus 10 (3d6) Psychic damage",
-        "damage_dice": "2d4 + 5",
+        "damage_dice": "2d4+5 plus 3d6",
         "damage_bonus": 5,
         "save_dc": 0,
         "save_type": "",
@@ -42336,7 +42336,7 @@
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 8 (1d8 + 4) Piercing damage plus 7 (2d6) Psychic damage.",
         "attack_bonus": 7,
         "damage": "8 (1d8 + 4) Piercing damage plus 7 (2d6) Psychic damage",
-        "damage_dice": "1d8 + 4",
+        "damage_dice": "1d8+4 plus 2d6",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -42600,7 +42600,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Piercing damage plus 9 (2d8) Poison damage. If this damage reduces the target to 0 Hit Points, the target becomes <strong>Stable</strong>, and it has the <strong>Poisoned</strong> condition for 1 hour. While Poisoned, the target also has the <strong>Paralyzed</strong> condition.",
         "attack_bonus": 5,
         "damage": "8 (1d10 + 3) Piercing damage plus 9 (2d8) Poison damage",
-        "damage_dice": "1d10 + 3",
+        "damage_dice": "1d10+3 plus 2d8",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -43054,7 +43054,7 @@
         "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 16 (3d6 + 6) Slashing damage plus 7 (2d6) Poison damage, and the target suffers one of the following effects of the pirate's choice:<br><strong>Awestruck.</strong> The target has the <strong>Charmed</strong> condition until the start of the pirate's next turn.<br><strong>Poison.</strong> The target has the <strong>Poisoned</strong> condition until the start of the pirate's next turn.",
         "attack_bonus": 10,
         "damage": "16 (3d6 + 6) Slashing damage plus 7 (2d6) Poison damage",
-        "damage_dice": "3d6 + 6",
+        "damage_dice": "3d6+6 plus 2d6",
         "damage_bonus": 6,
         "save_dc": 0,
         "save_type": "",
@@ -43362,7 +43362,7 @@
         "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 22 (4d6 + 8) Force damage plus 21 (6d6) Fire damage.",
         "attack_bonus": 14,
         "damage": "22 (4d6 + 8) Force damage plus 21 (6d6) Fire damage",
-        "damage_dice": "4d6 + 8",
+        "damage_dice": "4d6+8 plus 6d6",
         "damage_bonus": 8,
         "save_dc": 0,
         "save_type": "",
@@ -43768,7 +43768,7 @@
         "description": "Melee Attack Roll: +12, reach 10 ft. Hit: 14 (2d6 + 7) Slashing damage plus 18 (4d8) Radiant damage.",
         "attack_bonus": 12,
         "damage": "14 (2d6 + 7) Slashing damage plus 18 (4d8) Radiant damage",
-        "damage_dice": "2d6 + 7",
+        "damage_dice": "2d6+7 plus 4d8",
         "damage_bonus": 7,
         "save_dc": 0,
         "save_type": "",
@@ -44462,7 +44462,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Bludgeoning damage plus 5 (2d4) Radiant damage.",
         "attack_bonus": 5,
         "damage": "6 (1d6 + 3) Bludgeoning damage plus 5 (2d4) Radiant damage",
-        "damage_dice": "1d6 + 3",
+        "damage_dice": "1d6+3 plus 2d4",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -44597,7 +44597,7 @@
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Bludgeoning damage plus 2 (1d4) Radiant damage.",
         "attack_bonus": 4,
         "damage": "5 (1d6 + 2) Bludgeoning damage plus 2 (1d4) Radiant damage",
-        "damage_dice": "1d6 + 2",
+        "damage_dice": "1d6+2 plus 1d4",
         "damage_bonus": 2,
         "save_dc": 0,
         "save_type": "",
@@ -45237,7 +45237,7 @@
         "description": "Melee Attack Roll: +14, reach 10 ft. Hit: 16 (2d6 + 9) Piercing damage plus 35 (10d6) Poison damage.",
         "attack_bonus": 14,
         "damage": "16 (2d6 + 9) Piercing damage plus 35 (10d6) Poison damage",
-        "damage_dice": "2d6 + 9",
+        "damage_dice": "2d6+9 plus 10d6",
         "damage_bonus": 9,
         "save_dc": 0,
         "save_type": "",
@@ -45575,7 +45575,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Slashing damage plus 5 (2d4) Psychic damage.",
         "attack_bonus": 5,
         "damage": "6 (1d6 + 3) Slashing damage plus 5 (2d4) Psychic damage",
-        "damage_dice": "1d6 + 3",
+        "damage_dice": "1d6+3 plus 2d4",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -45865,7 +45865,7 @@
         "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 12 (2d6 + 5) Slashing damage plus 22 (5d8) Radiant damage.",
         "attack_bonus": 9,
         "damage": "12 (2d6 + 5) Slashing damage plus 22 (5d8) Radiant damage",
-        "damage_dice": "2d6 + 5",
+        "damage_dice": "2d6+5 plus 5d8",
         "damage_bonus": 5,
         "save_dc": 0,
         "save_type": "",
@@ -45879,7 +45879,7 @@
         "description": "Ranged Attack Roll: +7, range 150/600 ft. Hit: 12 (2d8 + 3) Piercing damage plus 22 (5d8) Radiant damage.",
         "attack_bonus": 7,
         "damage": "12 (2d8 + 3) Piercing damage plus 22 (5d8) Radiant damage",
-        "damage_dice": "2d8 + 3",
+        "damage_dice": "2d8+3 plus 5d8",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -46101,7 +46101,7 @@
         "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 12 (2d6 + 5) Slashing damage plus 19 (3d12) Necrotic damage. If the target is a creature, it is cursed. While cursed, the target gains no benefit from finishing a Short or Long Rest.",
         "attack_bonus": 10,
         "damage": "12 (2d6 + 5) Slashing damage plus 19 (3d12) Necrotic damage",
-        "damage_dice": "2d6 + 5",
+        "damage_dice": "2d6+5 plus 3d12",
         "damage_bonus": 5,
         "save_dc": 0,
         "save_type": "",
@@ -46445,7 +46445,7 @@
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 9 (1d10 + 4) Slashing damage plus 3 (1d6) Fire damage.",
         "attack_bonus": 6,
         "damage": "9 (1d10 + 4) Slashing damage plus 3 (1d6) Fire damage",
-        "damage_dice": "1d10 + 4",
+        "damage_dice": "1d10+4 plus 1d6",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -46769,7 +46769,7 @@
         "description": "Melee Attack Roll: +11, reach 10 ft. Hit: 18 (2d10 + 7) Piercing damage plus 14 (4d6) Fire damage. If the target is a Large or smaller creature, it has the <strong>Grappled</strong> condition (escape DC 17), and it has the <strong>Restrained</strong> condition until the grapple ends.",
         "attack_bonus": 11,
         "damage": "18 (2d10 + 7) Piercing damage plus 14 (4d6) Fire damage",
-        "damage_dice": "2d10 + 7",
+        "damage_dice": "2d10+7 plus 4d6",
         "damage_bonus": 7,
         "save_dc": 0,
         "save_type": "",
@@ -48475,7 +48475,7 @@
         "description": "Melee or Ranged Attack Roll: +7, reach 5 ft. or range 20/60 ft. Hit: 13 (2d8 + 4) Piercing damage plus 7 (2d6) Fire damage. Hit or Miss: The spear magically returns to the salamander's hand immediately after a ranged attack.",
         "attack_bonus": 7,
         "damage": "13 (2d8 + 4) Piercing damage plus 7 (2d6) Fire damage",
-        "damage_dice": "2d8 + 4",
+        "damage_dice": "2d8+4 plus 2d6",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -48489,7 +48489,7 @@
         "description": "Strength Saving Throw: DC 15, one Large or smaller creature the salamander can see within 10 feet. Failure: 11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Fire damage. The target has the <strong>Grappled</strong> condition (escape DC 14), and it has the <strong>Restrained</strong> condition until the grapple ends.",
         "attack_bonus": 0,
         "damage": "11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Fire damage",
-        "damage_dice": "2d6 + 4",
+        "damage_dice": "2d6+4 plus 2d6",
         "damage_bonus": 4,
         "save_dc": 15,
         "save_type": "Strength",
@@ -48585,7 +48585,7 @@
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 6 (1d8 + 2) Piercing damage plus 3 (1d6) Fire damage.",
         "attack_bonus": 4,
         "damage": "6 (1d8 + 2) Piercing damage plus 3 (1d6) Fire damage",
-        "damage_dice": "1d8 + 2",
+        "damage_dice": "1d8+2 plus 1d6",
         "damage_bonus": 2,
         "save_dc": 0,
         "save_type": "",
@@ -48695,7 +48695,7 @@
         "description": "Melee or Ranged Attack Roll: +12, reach 5 ft. or range 30/90 ft. Hit: 16 (2d8 + 7) Piercing damage plus 14 (4d6) Fire damage. Hit or Miss: The trident magically returns to the salamander's hand immediately after a ranged attack.",
         "attack_bonus": 12,
         "damage": "16 (2d8 + 7) Piercing damage plus 14 (4d6) Fire damage",
-        "damage_dice": "2d8 + 7",
+        "damage_dice": "2d8+7 plus 4d6",
         "damage_bonus": 7,
         "save_dc": 0,
         "save_type": "",
@@ -49182,7 +49182,7 @@
         "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 1 Piercing damage plus 3 (1d6) Poison damage.",
         "attack_bonus": 2,
         "damage": "1 Piercing damage plus 3 (1d6) Poison damage",
-        "damage_dice": "1d6",
+        "damage_dice": "1 plus 1d6",
         "damage_bonus": 0,
         "save_dc": 0,
         "save_type": "",
@@ -49431,7 +49431,7 @@
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage, plus 10 (3d6) Piercing damage if the attack was made with Advantage.",
         "attack_bonus": 5,
         "damage": "6 (1d6 + 3) Piercing damage, plus 10 (3d6) Piercing damage if the attack was made with Advantage",
-        "damage_dice": "1d6 + 3",
+        "damage_dice": "1d6+3 plus 3d6",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -49445,7 +49445,7 @@
         "description": "Ranged Attack Roll: +5, range 150/600 ft. Hit: 7 (1d8 + 3) Piercing damage, plus 10 (3d6) Piercing damage if the attack was made with Advantage.",
         "attack_bonus": 5,
         "damage": "7 (1d8 + 3) Piercing damage, plus 10 (3d6) Piercing damage if the attack was made with Advantage",
-        "damage_dice": "1d8 + 3",
+        "damage_dice": "1d8+3 plus 3d6",
         "damage_bonus": 3,
         "save_dc": 0,
         "save_type": "",
@@ -50147,7 +50147,7 @@
         "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 12 (2d6 + 5) Slashing damage plus 3 (1d6) Necrotic damage.",
         "attack_bonus": 10,
         "damage": "12 (2d6 + 5) Slashing damage plus 3 (1d6) Necrotic damage",
-        "damage_dice": "2d6 + 5",
+        "damage_dice": "2d6+5 plus 1d6",
         "damage_bonus": 5,
         "save_dc": 0,
         "save_type": "",
@@ -50304,7 +50304,7 @@
         "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 7 (1d6 + 4) Bludgeoning damage plus 5 (2d4) Lightning damage. If the target is a Medium or smaller creature, the shambling mound pulls the target 5 feet straight toward itself.",
         "attack_bonus": 7,
         "damage": "7 (1d6 + 4) Bludgeoning damage plus 5 (2d4) Lightning damage",
-        "damage_dice": "1d6 + 4",
+        "damage_dice": "1d6+4 plus 2d4",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -50431,7 +50431,7 @@
         "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Force damage.",
         "attack_bonus": 7,
         "damage": "11 (2d6 + 4) Bludgeoning damage plus 7 (2d6) Force damage",
-        "damage_dice": "2d6 + 4",
+        "damage_dice": "2d6+4 plus 2d6",
         "damage_bonus": 4,
         "save_dc": 0,
         "save_type": "",
@@ -51094,7 +51094,7 @@
         "reach": "10 ft.",
         "range": "120 ft.",
         "damage": "22 (4d6 + 8) Slashing damage plus 36 (8d8) Radiant damage",
-        "damage_dice": "4d6 + 8",
+        "damage_dice": "4d6+8 plus 8d8",
         "damage_bonus": 8
       },
       {
@@ -51609,7 +51609,7 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage": "13 (2d8 + 4) Slashing damage plus 7 (2d6) Radiant damage",
-        "damage_dice": "2d8 + 4"
+        "damage_dice": "2d8+4 plus 2d6"
       },
       {
         "name": "Curse of the Riddle",
@@ -51878,7 +51878,7 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "damage": "5 (1d4 + 3) Slashing damage plus 7 (2d6) Radiant damage",
-        "damage_dice": "1d4 + 3"
+        "damage_dice": "1d4+3 plus 2d6"
       }
     ],
     "bonus_actions": [],
@@ -51970,7 +51970,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "1 Piercing damage plus 2 (1d4) Poison damage",
-        "damage_dice": "1d4"
+        "damage_dice": "1d4 plus 1d4"
       }
     ],
     "bonus_actions": [],
@@ -52055,7 +52055,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "5 (1d6 + 2) Piercing damage plus 3 (1d6) Fire damage",
-        "damage_dice": "1d6 + 2"
+        "damage_dice": "1d6+2 plus 1d6"
       },
       {
         "name": "Tail Spine",
@@ -52063,7 +52063,7 @@
         "attack_bonus": 4,
         "range": "20/80 ft.",
         "damage": "4 (1d4 + 2) Piercing damage plus 3 (1d6) Fire damage",
-        "damage_dice": "1d4 + 2"
+        "damage_dice": "1d4+2 plus 1d6"
       }
     ],
     "bonus_actions": [],
@@ -52155,7 +52155,7 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "damage": "7 (1d6 + 4) Piercing damage plus 14 (4d6) Poison damage",
-        "damage_dice": "1d6 + 4"
+        "damage_dice": "1d6+4 plus 4d6"
       },
       {
         "name": "Necrotic Ray",
@@ -52375,7 +52375,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "5 (1d6 + 2) Piercing damage plus 7 (2d6) Poison damage",
-        "damage_dice": "1d6 + 2"
+        "damage_dice": "1d6+2 plus 2d6"
       },
       {
         "name": "Hand Crossbow",
@@ -52383,7 +52383,7 @@
         "attack_bonus": 4,
         "range": "30/120 ft.",
         "damage": "5 (1d6 + 2) Piercing damage plus 7 (2d6) Poison damage",
-        "damage_dice": "1d6 + 2"
+        "damage_dice": "1d6+2 plus 2d6"
       }
     ],
     "bonus_actions": [
@@ -52493,7 +52493,7 @@
         "attack_bonus": 9,
         "reach": "5 ft.",
         "damage": "14 (2d8 + 5) Piercing damage plus 7 (2d6) Poison damage",
-        "damage_dice": "2d8 + 5"
+        "damage_dice": "2d8+5 plus 2d6"
       },
       {
         "name": "Hand Crossbow",
@@ -52501,7 +52501,7 @@
         "attack_bonus": 9,
         "range": "30/120 ft.",
         "damage": "12 (2d6 + 5) Piercing damage plus 9 (2d8) Poison damage",
-        "damage_dice": "2d6 + 5"
+        "damage_dice": "2d6+5 plus 2d8"
       },
       {
         "name": "Smoke Bomb",
@@ -52610,7 +52610,7 @@
         "attack_bonus": 2,
         "reach": "5 ft.",
         "damage": "2 (1d4) Slashing damage plus 2 (1d4) Fire damage",
-        "damage_dice": "1d4"
+        "damage_dice": "1d4 plus 1d4"
       },
       {
         "name": "Steam Breath",
@@ -52890,7 +52890,7 @@
         "attack_bonus": 10,
         "reach": "5 ft.",
         "damage": "15 (2d8 + 6) Bludgeoning damage plus 9 (2d8) Force damage",
-        "damage_dice": "2d8 + 6"
+        "damage_dice": "2d8+6 plus 2d8"
       },
       {
         "name": "Force Bolt",
@@ -53018,7 +53018,7 @@
         "attack_bonus": 14,
         "reach": "10 ft.",
         "damage": "23 (4d6 + 9) Slashing damage plus 13 (3d8) Lightning damage",
-        "damage_dice": "4d6 + 9"
+        "damage_dice": "4d6+9 plus 3d8"
       },
       {
         "name": "Thunderbolt",
@@ -55482,7 +55482,7 @@
         "attack_bonus": 3,
         "reach": "5 ft.",
         "damage": "5 (1d8 + 1) Slashing damage plus 2 (1d4) Poison damage",
-        "damage_dice": "1d8 + 1"
+        "damage_dice": "1d8+1 plus 1d4"
       },
       {
         "name": "Chatkcha",
@@ -57315,7 +57315,7 @@
         "attack_bonus": 9,
         "reach": "5 ft.",
         "damage": "8 (1d8 + 4) Bludgeoning damage plus 7 (2d6) Necrotic damage",
-        "damage_dice": "1d8 + 4",
+        "damage_dice": "1d8+4 plus 2d6",
         "damage_bonus": 4
       },
       {
@@ -57324,7 +57324,7 @@
         "save_dc": 17,
         "save_type": "Constitution",
         "damage": "6 (1d4 + 4) Piercing damage plus 13 (3d8) Necrotic damage",
-        "damage_dice": "1d4 + 4",
+        "damage_dice": "1d4+4 plus 3d8",
         "range": "5 feet"
       }
     ],
@@ -57459,7 +57459,7 @@
         "reach": "5 ft.",
         "range": "20/60 ft.",
         "damage": "5 (1d4 + 3) Piercing damage plus 7 (3d4) Necrotic damage",
-        "damage_dice": "1d4 + 3"
+        "damage_dice": "1d4+3 plus 3d4"
       }
     ],
     "bonus_actions": [
@@ -57564,7 +57564,7 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage": "7 (1d6 + 4) Piercing damage plus 10 (3d6) Necrotic damage",
-        "damage_dice": "1d6 + 4"
+        "damage_dice": "1d6+4 plus 3d6"
       },
       {
         "name": "Shadow Strike",
@@ -57572,7 +57572,7 @@
         "attack_bonus": 7,
         "reach": "5 ft.",
         "damage": "7 (1d6 + 4) Slashing damage plus 14 (4d6) Cold damage",
-        "damage_dice": "1d6 + 4"
+        "damage_dice": "1d6+4 plus 4d6"
       }
     ],
     "bonus_actions": [
@@ -57699,7 +57699,7 @@
         "save_dc": 14,
         "save_type": "Constitution",
         "damage": "5 (1d4 + 3) Piercing damage plus 10 (3d6) Necrotic damage",
-        "damage_dice": "1d4 + 3",
+        "damage_dice": "1d4+3 plus 3d6",
         "range": "5 feet"
       }
     ],
@@ -57806,7 +57806,7 @@
         "attack_bonus": 10,
         "reach": "5 ft.",
         "damage": "9 (1d8 + 5) Slashing damage plus 13 (3d8) Necrotic damage",
-        "damage_dice": "1d8 + 5"
+        "damage_dice": "1d8+5 plus 3d8"
       },
       {
         "name": "Sickening Ray",
@@ -57938,7 +57938,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "4 (1d4 + 2) Piercing damage plus 3 (1d6) Poison damage",
-        "damage_dice": "1d4 + 2"
+        "damage_dice": "1d4+2 plus 1d6"
       }
     ],
     "bonus_actions": [],
@@ -58302,7 +58302,7 @@
         "attack_bonus": 7,
         "reach": "10 ft.",
         "damage": "9 (1d10 + 4) Bludgeoning damage plus 7 (2d6) Necrotic damage",
-        "damage_dice": "1d10 + 4"
+        "damage_dice": "1d10+4 plus 2d6"
       },
       {
         "name": "Spore Bomb",
@@ -58403,7 +58403,7 @@
         "attack_bonus": 6,
         "reach": "5 ft.",
         "damage": "10 (2d6 + 3) Piercing damage plus 10 (3d6) Poison damage",
-        "damage_dice": "2d6 + 3"
+        "damage_dice": "2d6+3 plus 3d6"
       },
       {
         "name": "Spores",
@@ -59911,7 +59911,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "6 (1d8 + 2) Slashing damage plus 2 (1d4) Cold damage",
-        "damage_dice": "1d8 + 2"
+        "damage_dice": "1d8+2 plus 1d4"
       },
       {
         "name": "Cold Breath",
@@ -60012,7 +60012,7 @@
         "attack_bonus": 4,
         "reach": "5 ft.",
         "damage": "6 (1d8 + 2) Slashing damage plus 4 (1d8) Necrotic damage",
-        "damage_dice": "1d8 + 2"
+        "damage_dice": "1d8+2 plus 1d8"
       },
       {
         "name": "Necrotic Bow",
