@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MASTERY_EFFECTS, applyMasteryEffect } from '../../../services/automation/handlers/combat/weaponMasteryHandler.js';
-import { loadWeaponMasteries } from '../../../hooks/useActionPopup.js';
+import { loadWeaponMasteries } from '../../../hooks/combat/useActionPopup.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
 import '../CharSheet.css';
 

@@ -2,11 +2,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities.jsx';
 
-vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(),
 }));
 
-import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
+import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const mockPlayerStats = {
   abilities: [

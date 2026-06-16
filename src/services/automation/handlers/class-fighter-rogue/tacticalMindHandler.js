@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
+import { getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;

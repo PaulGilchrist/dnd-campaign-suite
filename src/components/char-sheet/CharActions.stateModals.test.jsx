@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 
-vi.mock('../../hooks/useSpellMetamagicFlow.js', () => ({
+vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
   useSpellMetamagicFlow: vi.fn(() => ({
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
@@ -14,7 +14,7 @@ vi.mock('../../hooks/useSpellMetamagicFlow.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useSpellUpcastFlow.js', () => ({
+vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
   useSpellUpcastFlow: vi.fn(() => ({
     buildUpcastLevels: vi.fn(() => []),
   })),
@@ -38,7 +38,7 @@ vi.mock('../../services/automation/handlers/class-cleric-paladin/divineIntervent
   onSpellSelected: vi.fn(),
 }));
 
-vi.mock('../../hooks/useMetamagic.js', () => ({
+vi.mock('../../hooks/combat/useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 10),
   getMaxSorceryPoints: vi.fn(() => 10),
   spendSorceryPoints: vi.fn(),
@@ -70,7 +70,7 @@ vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-vi.mock('../../hooks/useActionPopup.js', () => ({
+vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   showWeaponMasteryPopup: vi.fn(),
   buildFeatureDetailHtml: vi.fn((entity) => {
     if (entity.details) {
@@ -126,7 +126,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
   rollExpressionDoubled: vi.fn(() => ({ total: 10, rolls: [3, 2, 3, 2], modifier: 0 })),
 }));
 
-vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
     popupHtml: null,
     setPopupHtml: vi.fn(),
@@ -137,7 +137,7 @@ vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useActionSpellMetamagic.js', () => ({
+vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
   useActionSpellMetamagic: vi.fn(() => ({
     pendingActionMetamagic: null,
     handleActionMetamagicConfirm: vi.fn(),
@@ -148,8 +148,8 @@ vi.mock('../../hooks/useActionSpellMetamagic.js', () => ({
   })),
 }));
 
-import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js';
-import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
+import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
+import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';

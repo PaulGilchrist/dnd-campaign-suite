@@ -1,7 +1,7 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastDamageEvent } from '../../../../hooks/useMetamagic.js';
+import { getLastDamageEvent } from '../../../../hooks/combat/useMetamagic.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 

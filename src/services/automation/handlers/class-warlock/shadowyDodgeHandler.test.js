@@ -1,8 +1,8 @@
 import { handle } from './shadowyDodgeHandler.js';
-import * as metamagic from '../../../../hooks/useMetamagic.js';
+import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
 import * as logService from '../../../ui/logService.js';
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     getLastAttackRoll: vi.fn(),
 }));
 

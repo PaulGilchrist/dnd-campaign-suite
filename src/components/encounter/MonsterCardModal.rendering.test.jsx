@@ -11,7 +11,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
-vi.mock('../../hooks/useLoggedDiceRoll.js', () => {
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn();

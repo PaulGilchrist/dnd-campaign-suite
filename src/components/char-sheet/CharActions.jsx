@@ -9,9 +9,9 @@ import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import EmpoweredSpellPopup from './popups/EmpoweredSpellPopup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
-import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
-import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
+import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
+import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
+import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../services/dice/diceRoller.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import { computeFeatRangeEffects } from '../../services/character/featRangeService.js';
@@ -67,7 +67,7 @@ import { executeHandler } from '../../services/automation/index.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
+import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
@@ -79,7 +79,7 @@ import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.j
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
-import { useActionSpellMetamagic } from '../../hooks/useActionSpellMetamagic.js';
+import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
 import DivinationSavantModal from './modals/DivinationSavantModal.jsx';
 import { onDivinationSavantSelected } from '../../services/automation/handlers/class-wizard/divinationSavantHandler.js';

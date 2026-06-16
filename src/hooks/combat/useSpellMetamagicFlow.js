@@ -1,10 +1,10 @@
 import React from 'react'
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from './useMetamagic.js'
-import { addEntry } from '../services/ui/logService.js'
-import { getMultiTargetSpreadForSpell } from '../services/rules/spells/postCastRiderService.js'
-import { getCombatSummary } from '../services/encounters/combatData.js'
-import { isPsionicSpell, hasPsionicSorcery } from '../services/rules/spells/metamagicRules.js'
-import { confirmRemoveCurse } from '../services/rules/features/removeCurseService.js'
+import { addEntry } from '../../services/ui/logService.js'
+import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js'
+import { getCombatSummary } from '../../services/encounters/combatData.js'
+import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js'
+import { confirmRemoveCurse } from '../../services/rules/features/removeCurseService.js'
 
 function getCreatureTargets(excludeName) {
   const cs = getCombatSummary();
@@ -379,7 +379,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyAidEffect } = await import('../services/automation/index.js');
+      const { applyAidEffect } = await import('../../services/automation/index.js');
       await applyAidEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'aid', range: pending.range, maxTargets: pending.maxTargets } },
         playerStats,
@@ -426,7 +426,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyHeroesFeastEffect } = await import('../services/automation/index.js');
+      const { applyHeroesFeastEffect } = await import('../../services/automation/index.js');
       await applyHeroesFeastEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'heroes_feast', range: pending.range, maxTargets: pending.maxTargets } },
         playerStats,
@@ -473,7 +473,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { confirmGreaterRestoration } = await import('../services/rules/features/greaterRestorationService.js');
+      const { confirmGreaterRestoration } = await import('../../services/rules/features/greaterRestorationService.js');
       await confirmGreaterRestoration(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'greater_restoration', range: pending.range } },
         playerStats,
@@ -520,7 +520,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyLesserRestorationEffect } = await import('../services/automation/index.js');
+      const { applyLesserRestorationEffect } = await import('../../services/automation/index.js');
       await applyLesserRestorationEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'lesser_restoration', range: pending.range } },
         playerStats,
@@ -613,7 +613,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyMageArmorEffect } = await import('../services/automation/index.js');
+      const { applyMageArmorEffect } = await import('../../services/automation/index.js');
       await applyMageArmorEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'mage_armor', range: pending.range } },
         playerStats,
@@ -660,7 +660,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyProtectionFromEnergyHandler } = await import('../services/automation/index.js');
+      const { applyProtectionFromEnergyHandler } = await import('../../services/automation/index.js');
       await applyProtectionFromEnergyHandler(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'protection_from_energy', damageTypes: pending.damageTypes } },
         playerStats,
@@ -707,7 +707,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyResistanceEffect } = await import('../services/automation/index.js');
+      const { applyResistanceEffect } = await import('../../services/automation/index.js');
       await applyResistanceEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'damage_reduction', reductionExpression: '1d4', damageTypes: [], trigger: 'damage_taken_of_chosen_resistance_type' } },
         playerStats,
@@ -754,7 +754,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyShieldOfFaithEffect } = await import('../services/automation/index.js');
+      const { applyShieldOfFaithEffect } = await import('../../services/automation/index.js');
       await applyShieldOfFaithEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'shield_of_faith', range: pending.range } },
         playerStats,

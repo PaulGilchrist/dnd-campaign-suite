@@ -1,33 +1,33 @@
 import { useRef, useEffect } from 'react';
 import useDiceRoll from './useDiceRoll.js';
-import { rollD20, rollExpression } from '../services/dice/diceRoller.js';
-import utils from '../services/ui/utils.js';
-import storage from '../services/ui/storage.js';
-import { getTargetFromAttacker } from '../services/rules/combat/damageUtils.js';
+import { rollD20, rollExpression } from '../../services/dice/diceRoller.js';
+import utils from '../../services/ui/utils.js';
+import storage from '../../services/ui/storage.js';
+import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import {
   computeDamageAfterSave,
   computeDamageAfterEvasion,
   rollSaveForCreature,
   applyDamageToTarget,
-} from '../services/rules/combat/applyDamage.js';
-import { sendSavePrompt, sendSaveResult } from '../services/combat/conditions/savePromptService.js';
-import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../services/rules/combat/aoeService.js';
-import { getRuntimeValue, setRuntimeValue } from './runtime/useRuntimeState.js';
-import { clearAllExpirationEffects, addExpiration } from '../services/rules/effects/expirations.js';
-import { loadCombatSummary, getCombatSummary } from '../services/encounters/combatData.js';
-import { saveLastDamageEvent } from '../hooks/useMetamagic.js';
-import { SHOW_DICE_ROLL_DELAY } from '../config/ui-config.js';
+} from '../../services/rules/combat/applyDamage.js';
+import { sendSavePrompt, sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
+import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
+import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
+import { clearAllExpirationEffects, addExpiration } from '../../services/rules/effects/expirations.js';
+import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
+import { saveLastDamageEvent } from './useMetamagic.js';
+import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import {
     isUnbreakableMajestyActive,
     getUnbreakableMajestySaveDc,
     hasAttackerTriggeredMajesty,
     markAttackerTriggeredMajesty,
-} from '../services/combat/auras/unbreakableMajesty.js';
-import { MELEE_REACH_FEET } from '../services/combat/baseCombatActions.js';
-import { getCombatContext } from '../services/rules/combat/damageUtils.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../services/rules/spells/postCastRiderService.js';
-import { playerIsImmuneToCondition, hasIgnoreResistance, hasMinDamage } from '../services/combat/automation/automationService.js';
-import { endInvisibilityOnHostileAction } from '../services/rules/features/invisibilityService.js';
+} from '../../services/combat/auras/unbreakableMajesty.js';
+import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
+import { playerIsImmuneToCondition, hasIgnoreResistance, hasMinDamage } from '../../services/combat/automation/automationService.js';
+import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 
 function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {
     sendSavePrompt(campaignName, {

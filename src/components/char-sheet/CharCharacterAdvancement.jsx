@@ -1,5 +1,5 @@
 
-import useActionPopup from '../../hooks/useActionPopup.js'
+import useActionPopup from '../../hooks/combat/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js'

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './autoRerollHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/combat/useMetamagic.js';
 import { automationInfoPopup } from '../../../shared/popupResponse.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
@@ -17,7 +17,7 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     getLastAttackRoll: vi.fn(),
     getLastAbilityCheck: vi.fn(),
 }));
@@ -43,7 +43,7 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
     getCurrentCombatRound: vi.fn(() => 1),
 }));
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     getLastAttackRoll: vi.fn(),
     getLastAbilityCheck: vi.fn(),
     getLastSaveRoll: vi.fn(),

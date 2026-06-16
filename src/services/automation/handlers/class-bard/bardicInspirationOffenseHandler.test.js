@@ -15,7 +15,7 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockImplementation(() => Promise.resolve()),
 }));
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
   getLastDamageEvent: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ import { handle } from './bardicInspirationOffenseHandler.js';
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
-import * as useMetamagic from '../../../../hooks/useMetamagic.js';
+import * as useMetamagic from '../../../../hooks/combat/useMetamagic.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
 

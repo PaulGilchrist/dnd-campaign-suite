@@ -4,7 +4,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditions/conditionUtils.js'
 import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/combat/conditions/exhaustionRules.js'
-import usePopup from '../../../hooks/usePopup.js'
+import usePopup from '../../../hooks/combat/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import { computeAuraBonus } from '../../../services/combat/auras/auraOfProtection.js'

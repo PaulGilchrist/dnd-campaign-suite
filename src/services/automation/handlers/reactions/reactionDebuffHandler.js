@@ -4,7 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
-import { getLastAttackRoll, getLastDamageEvent, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastDamageEvent, getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 

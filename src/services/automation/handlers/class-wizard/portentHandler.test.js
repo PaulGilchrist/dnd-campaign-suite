@@ -1,6 +1,6 @@
 import { handle, getPortentDice, setPortentDice, refreshPortentDice } from './portentHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/combat/useMetamagic.js';
 import { rollD20 } from '../../../../services/dice/diceRoller.js';
 import { addEntry } from '../../../ui/logService.js';
 
@@ -9,7 +9,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     getLastAttackRoll: vi.fn(),
     getLastAbilityCheck: vi.fn(),
     getLastSaveRoll: vi.fn(),

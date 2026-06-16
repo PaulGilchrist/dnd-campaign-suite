@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
 // Mock the useActionPopup hook
-vi.mock('../../hooks/useActionPopup.js', () => ({
+vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   default: vi.fn(),
   buildFeatureDetailHtml: vi.fn((entity) => {
     if (entity.details) {
@@ -18,7 +18,7 @@ vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import useActionPopup, { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js';
+import useActionPopup, { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
 
 const mockPlayerStats = {
   characterAdvancement: [

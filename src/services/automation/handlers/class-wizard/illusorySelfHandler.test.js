@@ -1,6 +1,6 @@
 import { handle } from './illusorySelfHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getLastAttackRoll } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll } from '../../../../hooks/combat/useMetamagic.js';
 import { addEntry } from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -8,7 +8,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     getLastAttackRoll: vi.fn(),
 }));
 

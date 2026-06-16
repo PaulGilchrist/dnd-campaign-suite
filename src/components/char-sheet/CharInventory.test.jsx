@@ -9,7 +9,7 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
 }));
 
 // Mock the usePopup hook
-vi.mock('../../hooks/usePopup.js', () => ({
+vi.mock('../../hooks/combat/usePopup.js', () => ({
   default: vi.fn(),
 }));
 
@@ -18,7 +18,7 @@ vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import usePopup from '../../hooks/usePopup.js';
+import usePopup from '../../hooks/combat/usePopup.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
 
 const mockPlayerStats = {

@@ -1,6 +1,6 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getLastAttackRoll } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll } from '../../../../hooks/combat/useMetamagic.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 

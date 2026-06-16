@@ -1,4 +1,4 @@
-import { getMaxSorceryPoints, getCurrentSorceryPoints, getLastDamageEvent, spendSorceryPoints, saveLastDamageEvent } from '../../hooks/useMetamagic.js';
+import { getMaxSorceryPoints, getCurrentSorceryPoints, getLastDamageEvent, spendSorceryPoints, saveLastDamageEvent } from '../../hooks/combat/useMetamagic.js';
 import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';

@@ -11,7 +11,7 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
 
 vi.mock('../../services/ui/sanitize.js', () => ({ sanitizeHtml: vi.fn((html) => String(html || '')) }));
 
-vi.mock('../../hooks/useLoggedDiceRoll.js', () => {
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   let _popupHtml = null;
   const _rollAttack = vi.fn();
   const _rollDamage = vi.fn();
@@ -96,7 +96,7 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 // ── Re-import mocked modules for test setup helpers ----
 import * as conditionEffects from '../../services/combat/conditions/conditionEffects.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
-import * as useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
+import * as useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const rollAttack = useLoggedDiceRoll._rollAttack;
 const rollDamage = useLoggedDiceRoll._rollDamage;

@@ -4,13 +4,13 @@ import CharSpells from './CharSpells.jsx';
 
 import { mockPlayerStats2024 } from './CharSpells.test.helpers.js';
 
-import useActionPopup from '../../../hooks/useActionPopup.js';
+import useActionPopup from '../../../hooks/combat/useActionPopup.js';
 
-vi.mock('../../../hooks/useActionPopup.js', () => ({
+vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useLoggedDiceRoll.js', () => ({
+vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
     popupHtml: null,
     setPopupHtml: vi.fn(),
@@ -19,7 +19,7 @@ vi.mock('../../../hooks/useLoggedDiceRoll.js', () => ({
   })),
 }));
 
-vi.mock('../../../hooks/useMetamagic.js', () => {
+vi.mock('../../../hooks/combat/useMetamagic.js', () => {
   const mockFn = () => ({
     currentSP: 10,
     maxSP: 10,
@@ -63,7 +63,7 @@ vi.mock('lodash', () => ({
   cloneDeep: vi.fn(obj => JSON.parse(JSON.stringify(obj))),
 }));
 
-vi.mock('../../../hooks/useSpellMetamagicFlow.js', () => ({
+vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
   useSpellMetamagicFlow: vi.fn(() => ({
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
@@ -78,7 +78,7 @@ vi.mock('../../../hooks/useSpellMetamagicFlow.js', () => ({
   })),
 }));
 
-vi.mock('../../../hooks/useSpellUpcastFlow.js', () => ({
+vi.mock('../../../hooks/combat/useSpellUpcastFlow.js', () => ({
   useSpellUpcastFlow: vi.fn(() => ({
     pendingUpcast: null,
     buildUpcastLevels: vi.fn(() => []),

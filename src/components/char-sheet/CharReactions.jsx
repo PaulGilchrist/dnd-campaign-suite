@@ -4,15 +4,15 @@
     import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
     import MetamagicPopup from './popups/MetamagicPopup.jsx'
       import { sanitizeHtml } from '../../services/ui/sanitize.js';
-       import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js'
-       import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js'
+       import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
+       import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
        import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
          import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
         import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
         import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
        import { executeHandler } from '../../services/automation/index.js'
-     import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js'
-     import { useSpellUpcastFlow } from '../../hooks/useSpellUpcastFlow.js'
+     import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
+     import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
      import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
      import * as mapsService from '../../services/maps/mapsService.js';
      import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';

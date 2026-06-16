@@ -1,6 +1,6 @@
  
 
-import usePopup from '../../hooks/usePopup.js'
+import usePopup from '../../hooks/combat/usePopup.js'
 import Popup from '../common/Popup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';

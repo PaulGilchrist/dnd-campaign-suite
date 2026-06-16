@@ -1,6 +1,6 @@
 import { handle, isActive, deactivate } from './transeOfOrderHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as metamagic from '../../../../hooks/useMetamagic.js';
+import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
 import * as classFeatures from '../../../character/classFeatures.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -8,7 +8,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     spendSorceryPoints: vi.fn(),
 }));
 

@@ -35,7 +35,7 @@ vi.mock('../../../services/combat/conditions/exhaustionRules.js', () => ({
   getExhaustionSaveDC: vi.fn((level) => 10 + level),
 }));
 
-vi.mock('../../../hooks/usePopup.js', () => ({
+vi.mock('../../../hooks/combat/usePopup.js', () => ({
   default: vi.fn(() => ({
     popupHtml: null,
     setPopupHtml: vi.fn(),

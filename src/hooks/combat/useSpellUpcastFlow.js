@@ -1,5 +1,5 @@
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from './runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 
 export function useSpellUpcastFlow(playerStats, campaignName) {
   const [pendingUpcast, setPendingUpcast] = React.useState(null);

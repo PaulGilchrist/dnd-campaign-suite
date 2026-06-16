@@ -10,19 +10,19 @@ vi.mock('./useMetamagic.js', () => ({
   spendSorceryPoints: vi.fn(),
 }));
 
-vi.mock('../services/ui/logService.js', () => ({
+vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(),
 }));
 
-vi.mock('../services/rules/spells/postCastRiderService.js', () => ({
+vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
   getMultiTargetSpreadForSpell: vi.fn(() => null),
 }));
 
-vi.mock('../services/encounters/combatData.js', () => ({
+vi.mock('../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
 
-vi.mock('../services/rules/spells/metamagicRules.js', () => ({
+vi.mock('../../services/rules/spells/metamagicRules.js', () => ({
   isPsionicSpell: vi.fn(() => false),
   hasPsionicSorcery: vi.fn(() => false),
 }));
@@ -121,7 +121,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.gateMetamagic(spell);
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).toHaveBeenCalledWith('TestCampaign', {
         type: 'spell',
         characterName: playerStats.name,
@@ -149,7 +149,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.gateMetamagic(spell);
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).toHaveBeenCalledWith('TestCampaign', {
         type: 'spell',
         characterName: playerStats.name,
@@ -174,7 +174,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.gateMetamagic(spell);
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).toHaveBeenCalled();
       expect(onExecute).toHaveBeenCalledWith(spell, {});
     });
@@ -246,7 +246,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.handleConfirm({ totalCost: 0, options: [] });
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).not.toHaveBeenCalled();
       expect(onExecute).not.toHaveBeenCalled();
     });
@@ -262,7 +262,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.handleConfirm(null);
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
@@ -277,7 +277,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.handleConfirm(undefined);
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
@@ -359,7 +359,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.handleConfirm({ totalCost: 3, options: ['Empowered Spell'] });
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).toHaveBeenCalledWith('TestCampaign', {
         type: 'spell',
         characterName: playerStats.name,
@@ -633,7 +633,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.handleSkip();
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).not.toHaveBeenCalled();
       expect(onExecute).not.toHaveBeenCalled();
     });
@@ -654,7 +654,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.handleSkip();
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).toHaveBeenCalledWith('TestCampaign', {
         type: 'spell',
         characterName: playerStats.name,
@@ -706,7 +706,7 @@ describe('useSpellMetamagicFlow', () => {
         result.current.handleSkip();
       });
 
-      const logService = await import('../services/ui/logService.js');
+      const logService = await import('../../services/ui/logService.js');
       expect(logService.addEntry).toHaveBeenCalledWith('TestCampaign', {
         type: 'spell',
         characterName: playerStats.name,

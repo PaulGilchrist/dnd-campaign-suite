@@ -1,8 +1,8 @@
 
 import React from 'react'
 import { cloneDeep } from 'lodash';
-import useActionPopup from '../../../hooks/useActionPopup.js'
-import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js'
+import useActionPopup from '../../../hooks/combat/useActionPopup.js'
+import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import MetamagicPopup from '../popups/MetamagicPopup.jsx'
@@ -22,9 +22,9 @@ import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
-import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/useMetamagic.js'
-import { useSpellMetamagicFlow } from '../../../hooks/useSpellMetamagicFlow.js'
-import { useSpellUpcastFlow } from '../../../hooks/useSpellUpcastFlow.js'
+import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/combat/useMetamagic.js'
+import { useSpellMetamagicFlow } from '../../../hooks/combat/useSpellMetamagicFlow.js'
+import { useSpellUpcastFlow } from '../../../hooks/combat/useSpellUpcastFlow.js'
 import UpcastPopup from './UpcastPopup.jsx'
 import { executeSpellCast } from '../../../services/rules/spells/spellCastService.js'
 import * as mapsService from '../../../services/maps/mapsService.js';

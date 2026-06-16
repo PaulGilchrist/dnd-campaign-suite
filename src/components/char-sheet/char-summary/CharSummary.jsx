@@ -13,8 +13,8 @@ import Popup from '../../common/Popup.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
 import AvatarModal from '../../common/AvatarModal.jsx';
 import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js'
-import { showBackgroundPopup } from '../../../hooks/useActionPopup.js';
-import useLoggedDiceRoll from '../../../hooks/useLoggedDiceRoll.js';
+import { showBackgroundPopup } from '../../../hooks/combat/useActionPopup.js';
+import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'

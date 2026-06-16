@@ -18,7 +18,7 @@ vi.mock('../../../services/automation/handlers/combat/weaponMasteryHandler.js', 
     applyMasteryEffect: vi.fn(),
 }));
 
-vi.mock('../../../hooks/useActionPopup.js', () => ({
+vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
     loadWeaponMasteries: vi.fn(),
 }));
 
@@ -30,7 +30,7 @@ vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
 // ── Re-import mocked modules ──
 
 import * as weaponMasteryHandler from '../../../services/automation/handlers/combat/weaponMasteryHandler.js';
-import * as useActionPopup from '../../../hooks/useActionPopup.js';
+import * as useActionPopup from '../../../hooks/combat/useActionPopup.js';
 import * as damageUtils from '../../../services/rules/combat/damageUtils.js';
 
 // ── Test fixtures ──

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
 
-vi.mock('../../hooks/useMetamagic.js', () => ({
+vi.mock('../../hooks/combat/useMetamagic.js', () => ({
   getMaxSorceryPoints: vi.fn(),
   getCurrentSorceryPoints: vi.fn(),
   getLastDamageEvent: vi.fn(),
@@ -40,7 +40,7 @@ import {
   getLastDamageEvent,
   spendSorceryPoints,
   saveLastDamageEvent,
-} from '../../hooks/useMetamagic.js';
+} from '../../hooks/combat/useMetamagic.js';
 import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';

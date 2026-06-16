@@ -22,7 +22,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => {
     return { getRuntimeValue: mockFn, setRuntimeValue: vi.fn().mockResolvedValue(undefined) };
 });
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     getCurrentSorceryPoints: vi.fn(() => 10),
     spendSorceryPoints: vi.fn(),
 }));
@@ -47,7 +47,7 @@ vi.mock('../../../rules/combat/rangeValidation.js', () => ({
 
 import { handle, applyWarpingImplosion } from './warpingImplosionHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as metamagic from '../../../../hooks/useMetamagic.js';
+import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
 
 // ── Helpers ───────────────────────────────────────────────────────
 

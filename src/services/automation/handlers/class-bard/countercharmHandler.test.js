@@ -11,7 +11,7 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
   getLastAttackRoll: vi.fn(),
   getLastAbilityCheck: vi.fn(),
 }));
@@ -34,7 +34,7 @@ vi.mock('../../common/targetResolver.js', () => ({
 import { handle } from './countercharmHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';

@@ -4,7 +4,7 @@ import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidat
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { createSaveListener } from '../../common/savePrompt.js';
-import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 

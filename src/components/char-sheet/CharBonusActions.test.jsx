@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
-vi.mock('../../hooks/useSpellMetamagicFlow.js', () => ({
+vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
   useSpellMetamagicFlow: vi.fn(() => ({
     pendingMetamagic: null,
     gateMetamagic: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('../../hooks/useSpellMetamagicFlow.js', () => ({
   })),
 }));
 
-vi.mock('../../hooks/useSpellUpcastFlow.js', () => ({
+vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
   useSpellUpcastFlow: vi.fn(() => ({
     buildUpcastLevels: vi.fn(() => []),
   })),
@@ -49,7 +49,7 @@ vi.mock('../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../hooks/useMetamagic.js', () => ({
+vi.mock('../../hooks/combat/useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 10),
   getMaxSorceryPoints: vi.fn(() => 10),
   spendSorceryPoints: vi.fn(),
@@ -81,7 +81,7 @@ vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-vi.mock('../../hooks/useActionPopup.js', () => ({
+vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   showWeaponMasteryPopup: vi.fn(),
   buildFeatureDetailHtml: vi.fn((entity) => {
     if (entity.details) {
@@ -103,12 +103,12 @@ vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
   default: vi.fn((props) => <div data-testid="spell-detail-popup">{props.spell?.name || 'SpellDetailPopup'}</div>),
 }));
 
-import { useSpellMetamagicFlow } from '../../hooks/useSpellMetamagicFlow.js';
+import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
-import { showWeaponMasteryPopup } from '../../hooks/useActionPopup.js';
+import { showWeaponMasteryPopup } from '../../hooks/combat/useActionPopup.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 
 const basePlayerStats = {

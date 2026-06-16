@@ -7,7 +7,7 @@ import { useSpellUpcastFlow } from './useSpellUpcastFlow.js';
 const mockGetRuntimeValue = vi.fn(() => null);
 const mockSetRuntimeValue = vi.fn();
 
-vi.mock('./runtime/useRuntimeState.js', () => ({
+vi.mock('../runtime/useRuntimeState.js', () => ({
   getRuntimeValue: (...args) => mockGetRuntimeValue(...args),
   setRuntimeValue: (...args) => mockSetRuntimeValue(...args),
 }));

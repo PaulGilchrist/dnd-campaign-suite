@@ -1,5 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { spendSorceryPoints } from '../../../../hooks/useMetamagic.js';
+import { spendSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
 import { getClassFeatures } from '../../../character/classFeatures.js';
 import { addEntry } from '../../../ui/logService.js';
 

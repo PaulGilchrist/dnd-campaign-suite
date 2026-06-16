@@ -1,10 +1,10 @@
 import { handle } from './boonOfFateHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as metamagic from '../../../../hooks/useMetamagic.js';
+import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
 import * as logService from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../../../hooks/useMetamagic.js');
+vi.mock('../../../../hooks/combat/useMetamagic.js');
 vi.mock('../../../ui/logService.js');
 
 describe('boonOfFateHandler.handle', () => {

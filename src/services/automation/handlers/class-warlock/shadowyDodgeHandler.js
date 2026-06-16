@@ -1,5 +1,5 @@
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll } from '../../../../hooks/useMetamagic.js';
+import { getLastAttackRoll } from '../../../../hooks/combat/useMetamagic.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;

@@ -29,7 +29,7 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/useMetamagic.js', () => ({
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
   getLastDamageEvent: vi.fn(),
   getLastAttackRoll: vi.fn(),
   getLastAbilityCheck: vi.fn(),
@@ -49,7 +49,7 @@ import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
-import * as useMetamagic from '../../../../hooks/useMetamagic.js';
+import * as useMetamagic from '../../../../hooks/combat/useMetamagic.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────

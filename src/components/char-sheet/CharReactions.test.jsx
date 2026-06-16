@@ -2,7 +2,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharReactions from './CharReactions.jsx';
 
-vi.mock('../../hooks/useLoggedDiceRoll.js', () => ({
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(),
 }));
 
@@ -10,8 +10,8 @@ vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-import useLoggedDiceRoll from '../../hooks/useLoggedDiceRoll.js';
-import { buildFeatureDetailHtml } from '../../hooks/useActionPopup.js';
+import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
 
 const mockPlayerStats = {
   reactions: [

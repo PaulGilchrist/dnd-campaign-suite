@@ -30,7 +30,7 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 }));
 
 // Mock useActionPopup (no longer used but still imported)
-vi.mock('../../hooks/useActionPopup.js', () => ({
+vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   default: vi.fn(),
   buildFeatureDetailHtml: (entity) => {
     if (entity.details) {

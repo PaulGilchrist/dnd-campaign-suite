@@ -1,7 +1,7 @@
  
 
 import { loadFeatData } from '../../../services/ui/dataLoader.js'
-import usePopup from '../../../hooks/usePopup.js'
+import usePopup from '../../../hooks/combat/usePopup.js'
 import Popup from '../../common/Popup.jsx'
 import './CharFeats.css'
 
