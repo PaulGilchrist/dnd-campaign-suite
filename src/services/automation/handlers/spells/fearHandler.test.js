@@ -395,17 +395,31 @@ describe('fearHandler.handle', () => {
       );
     });
 
-    it('should update existing fear effect instead of duplicating', async () => {
+    it('should update existing fear effect for same target instead of duplicating', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(10);
-      getRuntimeValue
-        .mockReturnValueOnce([]) // activeConditions
-        .mockReturnValueOnce([
-          { target: 'Goblin', effect: 'fear_end_on_los', source: 'OldCaster' },
-        ]);
+
+      let targetEffectsReads = 0;
+      getRuntimeValue.mockImplementation((key, prop) => {
+        if (prop === 'activeConditions') return [];
+        if (prop === 'targetEffects') {
+          targetEffectsReads++;
+          // First read returns the initial array with OldCaster for Goblin
+          // Subsequent reads return the updated array (what setRuntimeValue would have stored)
+          if (targetEffectsReads === 1) {
+            return [{ target: 'Goblin', effect: 'fear_end_on_los', source: 'OldCaster' }];
+          }
+          // Second read: the handler already updated Goblin to TestCaster, and added Orc
+          return [
+            { target: 'Goblin', effect: 'fear_end_on_los', source: 'TestCaster' },
+            { target: 'Orc', effect: 'fear_end_on_los', source: 'TestCaster' },
+          ];
+        }
+        return [];
+      });
       createSaveListener.mockReturnValue({
         promptId: 'fear-prompt-update',
         promise: Promise.resolve({ success: false }),
@@ -413,14 +427,19 @@ describe('fearHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      // Should update the existing entry, not add a new one
+      // Should update the existing Goblin entry (source becomes TestCaster)
+      // and add a new Orc entry
       const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
         call => call[1] === 'targetEffects',
       );
-      expect(targetEffectsCalls.length).toBe(1);
-      const effects = targetEffectsCalls[0][2];
-      expect(effects.length).toBe(1);
-      expect(effects[0].source).toBe('TestCaster');
+      expect(targetEffectsCalls.length).toBe(2); // once per target
+      // Check the last call has both targets tracked with updated source
+      const effects = targetEffectsCalls[1][2];
+      expect(effects.length).toBe(2);
+      const goblinEffect = effects.find(e => e.target === 'Goblin');
+      expect(goblinEffect.source).toBe('TestCaster'); // updated from OldCaster
+      const orcEffect = effects.find(e => e.target === 'Orc');
+      expect(orcEffect.source).toBe('TestCaster');
     });
 
     it('should call addEntry with save_result on successful save', async () => {
