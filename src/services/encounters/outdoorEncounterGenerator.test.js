@@ -143,20 +143,7 @@ describe('generateOutdoorEncounter', () => {
  // ════════════════════════════════════════════════════════════════════
  // Water biome — no features to place
  // ════════════════════════════════════════════════════════════════════
- describe('water biome', () => {
-    // NOTE: water biome has features=[] which causes pickWeighted to return undefined.
-    // Testing the bgFill without triggering the placement loop by checking properties
-    // that are set before the placement loop runs (which would crash).
-    it.skip('placedItems is an empty array for water terrain', () => {
-      const result = gen('water', 10, [], 0, 0);
-      expect(result.placedItems).toEqual([]);
-     });
 
-    it.skip('uses water bgFill color', () => {
-      const result = gen('water', 10, defaultPlayers, 0, 0);
-      expect(result.bgFill).toBe('#356090');
-      });
-   });
 
  // ════════════════════════════════════════════════════════════════════
  // Player positioning from marchingOrder
@@ -295,10 +282,12 @@ describe('generateOutdoorEncounter', () => {
      }
    });
 
-    // NOTE: water biome has features=[] and density=0, which causes itemCount to clamp
-    // to min 4, then pickWeighted([]) returns undefined causing a runtime error.
-    // This is known source behavior - skipping this edge case.
- });
+    it('water biome returns empty placedItems (no features to place)', () => {
+      const result = gen('water', 10, [], 0, 0);
+      expect(result.placedItems).toEqual([]);
+      expect(result.bgFill).toBe('#356090');
+    });
+  });
 
  // ════════════════════════════════════════════════════════════════════
  // GridSize edge cases

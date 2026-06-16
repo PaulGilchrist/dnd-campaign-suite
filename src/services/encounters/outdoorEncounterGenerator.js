@@ -146,24 +146,26 @@ export function generateOutdoorEncounter(terrainType, gridSize, marchingOrder, q
   const placedItems = [];
   const features = biome.features;
 
-  const totalCells = gridSize * gridSize;
-  let itemCount = Math.round(totalCells * biome.density);
-  itemCount = Math.max(Math.min(itemCount, 60), 4);
+  if (features.length > 0) {
+    const totalCells = gridSize * gridSize;
+    let itemCount = Math.round(totalCells * biome.density);
+    itemCount = Math.max(Math.min(itemCount, 60), 4);
 
-  let itemIdCounter = 0;
-  for (let i = 0; i < itemCount; i++) {
-    const feature = pickWeighted(features, rng);
-    const result = findPlacement(gridSize, taken, feature.minDist, rng, 20);
-    if (!result) continue;
+    let itemIdCounter = 0;
+    for (let i = 0; i < itemCount; i++) {
+      const feature = pickWeighted(features, rng);
+      const result = findPlacement(gridSize, taken, feature.minDist, rng, 20);
+      if (!result) continue;
 
-    taken.add(result.key);
-    placedItems.push({
-      id: `${feature.type}-${itemIdCounter++}`,
-      type: feature.type,
-      gridX: result.gx,
-      gridY: result.gy,
-      visible: true,
-    });
+      taken.add(result.key);
+      placedItems.push({
+        id: `${feature.type}-${itemIdCounter++}`,
+        type: feature.type,
+        gridX: result.gx,
+        gridY: result.gy,
+        visible: true,
+      });
+    }
   }
 
   const center = Math.floor(gridSize / 2);

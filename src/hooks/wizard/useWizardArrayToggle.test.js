@@ -68,7 +68,6 @@ describe('useWizardArrayToggle', () => {
   });
 
   it('toggleItem should clear error on toggle', () => {
-    let errors = { testField: 'Error exists' };
     let currentData = { testField: [] };
     const setFormData = vi.fn((fn) => {
       currentData = fn(currentData);

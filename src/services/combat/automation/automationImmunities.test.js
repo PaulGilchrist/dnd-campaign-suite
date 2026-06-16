@@ -234,7 +234,7 @@ describe('playerIsImmuneToCondition', () => {
     })
 
     it('checks condition_immunity_while_active with requiresActive', () => {
-        const getRuntimeValue = vi.fn((name, key, campaign) => [
+        const getRuntimeValue = vi.fn((_name, _key, _campaign) => [
             { name: 'aura_of_protection' }
         ])
         const playerStats = {
@@ -257,7 +257,7 @@ describe('playerIsImmuneToCondition', () => {
     })
 
     it('returns false when requiresActive buff is not active', () => {
-        const getRuntimeValue = vi.fn((name, key, campaign) => [
+        const getRuntimeValue = vi.fn((_name, _key, _campaign) => [
             { name: 'other_buff' }
         ])
         const playerStats = {
@@ -280,7 +280,7 @@ describe('playerIsImmuneToCondition', () => {
     })
 
     it('checks activeBuffs for temporary condition immunity', () => {
-        const getRuntimeValue = vi.fn((name, key, campaign) => [
+        const getRuntimeValue = vi.fn((_name, _key, _campaign) => [
             {
                 name: 'feign_death',
                 conditionImmunity: ['dead', 'poisoned']
