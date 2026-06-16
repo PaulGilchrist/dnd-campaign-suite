@@ -17,11 +17,6 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-    getLastAttackRoll: vi.fn(),
-    getLastAbilityCheck: vi.fn(),
-}));
-
 vi.mock('../../../shared/popupResponse.js', () => ({
     automationInfoPopup: vi.fn(),
 }));

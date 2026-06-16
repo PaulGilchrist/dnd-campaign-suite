@@ -60,6 +60,8 @@ export function getHolyAuraTargets(playerName, campaignName) {
 }
 
 export function isHolyAuraActive(playerName, campaignName) {
-    const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+    const activeBuffs = Array.isArray(getRuntimeValue(playerName, 'activeBuffs', campaignName))
+        ? getRuntimeValue(playerName, 'activeBuffs', campaignName)
+        : [];
     return activeBuffs.some(b => b.name === 'Holy Aura' && b.effect === 'holy_aura');
 }
