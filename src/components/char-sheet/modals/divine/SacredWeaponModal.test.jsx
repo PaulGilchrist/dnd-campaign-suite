@@ -4,13 +4,13 @@ import SacredWeaponModal from './SacredWeaponModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/class-cleric-paladin/sacredWeaponHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/class-cleric-paladin/sacredWeaponHandler.js', () => ({
     applyDamageTypeChoice: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as sacredWeaponHandler from '../../../services/automation/handlers/class-cleric-paladin/sacredWeaponHandler.js';
+import * as sacredWeaponHandler from '../../../../services/automation/handlers/class-cleric-paladin/sacredWeaponHandler.js';
 
 // ── Test fixtures ──
 

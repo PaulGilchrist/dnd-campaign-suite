@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { applyDamageTypeChoice } from '../../../services/automation/handlers/class-cleric-paladin/sacredWeaponHandler.js';
-import '../CharSheet.css';
+import { applyDamageTypeChoice } from '../../../../services/automation/handlers/class-cleric-paladin/sacredWeaponHandler.js';
+import '../../CharSheet.css';
 
 function SacredWeaponModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(null);

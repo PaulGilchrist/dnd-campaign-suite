@@ -4,39 +4,39 @@ import HealingPoolModal from './HealingPoolModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   addStorageChangeListener: vi.fn(() => () => {}),
 }));
 
-vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
+vi.mock('../../../../hooks/runtime/useTrackedResource.js', () => ({
   default: vi.fn(),
 }));
 
-vi.mock('../../../services/ui/storage.js', () => ({
+vi.mock('../../../../services/ui/storage.js', () => ({
   default: { set: vi.fn() },
 }));
 
-vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
+vi.mock('../../../../services/rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(() => null),
   getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
-vi.mock('../../../services/rules/combat/applyHealing.js', () => ({
+vi.mock('../../../../services/rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../../services/ui/utils.js', () => ({
+vi.mock('../../../../services/ui/utils.js', () => ({
   default: { getName: vi.fn((n) => n?.toLowerCase().trim()) },
 }));
 
 // ── Re-import mocked modules ──
-import * as useRuntimeState from '../../../hooks/runtime/useRuntimeState.js';
-import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js';
-import storage from '../../../services/ui/storage.js';
-import * as damageUtils from '../../../services/rules/combat/damageUtils.js';
-import * as applyHealingService from '../../../services/rules/combat/applyHealing.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import useTrackedResource from '../../../../hooks/runtime/useTrackedResource.js';
+import storage from '../../../../services/ui/storage.js';
+import * as damageUtils from '../../../../services/rules/combat/damageUtils.js';
+import * as applyHealingService from '../../../../services/rules/combat/applyHealing.js';
 
 // ── Test fixtures ──
 

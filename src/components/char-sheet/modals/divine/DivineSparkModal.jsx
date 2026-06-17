@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { rollExpression, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
-import { hasHealingMaximization } from '../../../services/combat/automation/automationService.js';
-import { addEntry } from '../../../services/ui/logService.js';
-import { applyHealingDirectly, logHealingToSSE } from '../../../services/automation/common/healingRoll.js';
-import { createSaveListener } from '../../../services/automation/common/savePrompt.js';
+import { rollExpression, rollExpressionMaximized } from '../../../../services/dice/diceRoller.js';
+import { hasHealingMaximization } from '../../../../services/combat/automation/automationService.js';
+import { addEntry } from '../../../../services/ui/logService.js';
+import { applyHealingDirectly, logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
+import { createSaveListener } from '../../../../services/automation/common/savePrompt.js';
 
 function DivineSparkModal({ featureName, attackerName, targetName, campaignName, healExpression, damageExpression, damageTypes, saveType, wisModifier, playerStats, onClose }) {
     const [mode, setMode] = useState(null);

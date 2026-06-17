@@ -1,13 +1,13 @@
 
 import React from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
-import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js'
-import storage from '../../../services/ui/storage.js'
-import { getTargetFromAttacker, getCombatContext } from '../../../services/rules/combat/damageUtils.js'
-import { applyHealingToTarget } from '../../../services/rules/combat/applyHealing.js'
-import { CONDITIONS } from '../../../services/combat/conditions/conditionUtils.js'
-import utils from '../../../services/ui/utils.js'
-import '../CharSheet.css'
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
+import useTrackedResource from '../../../../hooks/runtime/useTrackedResource.js'
+import storage from '../../../../services/ui/storage.js'
+import { getTargetFromAttacker, getCombatContext } from '../../../../services/rules/combat/damageUtils.js'
+import { applyHealingToTarget } from '../../../../services/rules/combat/applyHealing.js'
+import { CONDITIONS } from '../../../../services/combat/conditions/conditionUtils.js'
+import utils from '../../../../services/ui/utils.js'
+import '../../CharSheet.css'
 
 function conditionMatches(c, targetCondition) {
     return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();

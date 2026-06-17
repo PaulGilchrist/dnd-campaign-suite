@@ -4,35 +4,35 @@ import DivineSparkModal from './DivineSparkModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/dice/diceRoller.js', () => ({
+vi.mock('../../../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d10' })),
   rollExpressionMaximized: vi.fn(() => ({ total: 20, rolls: [10, 10], modifier: 0, formula: '2d10', maximized: true })),
 }));
 
-vi.mock('../../../services/combat/automation/automationService.js', () => ({
+vi.mock('../../../../services/combat/automation/automationService.js', () => ({
   hasHealingMaximization: vi.fn(() => false),
 }));
 
-vi.mock('../../../services/ui/logService.js', () => ({
+vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../services/automation/common/healingRoll.js', () => ({
+vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
   applyHealingDirectly: vi.fn(() => ({ newHp: 30, maxHp: 40, actualHeal: 10 })),
   logHealingToSSE: vi.fn(),
 }));
 
-vi.mock('../../../services/automation/common/savePrompt.js', () => ({
+vi.mock('../../../../services/automation/common/savePrompt.js', () => ({
   createSaveListener: vi.fn(() => ({ promptId: 'test-prompt-id' })),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as diceRoller from '../../../services/dice/diceRoller.js';
-import * as automationService from '../../../services/combat/automation/automationService.js';
-import * as logService from '../../../services/ui/logService.js';
-import * as healingRoll from '../../../services/automation/common/healingRoll.js';
-import * as savePrompt from '../../../services/automation/common/savePrompt.js';
+import * as diceRoller from '../../../../services/dice/diceRoller.js';
+import * as automationService from '../../../../services/combat/automation/automationService.js';
+import * as logService from '../../../../services/ui/logService.js';
+import * as healingRoll from '../../../../services/automation/common/healingRoll.js';
+import * as savePrompt from '../../../../services/automation/common/savePrompt.js';
 
 // ── Test fixtures ──
 

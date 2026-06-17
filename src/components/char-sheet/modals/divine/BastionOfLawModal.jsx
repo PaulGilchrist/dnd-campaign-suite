@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { rollExpression } from '../../../services/dice/diceRoller.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { rollExpression } from '../../../../services/dice/diceRoller.js';
 import './BastionOfLawModal.css';
 
 function BastionOfLawModal({ featureName, targetName, playerName, campaignName, auto, onClose, onConfirm }) {

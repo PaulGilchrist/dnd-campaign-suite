@@ -4,21 +4,21 @@ import BastionOfLawModal from './BastionOfLawModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((player, key) => {
     if (key === 'bastionOfLawWardDice') return [];
     return 10;
   }),
 }));
 
-vi.mock('../../../services/dice/diceRoller.js', () => ({
+vi.mock('../../../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(() => ({ total: 15, rolls: [8, 7], modifier: 0, formula: '2d8' })),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
-import * as diceRoller from '../../../services/dice/diceRoller.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as diceRoller from '../../../../services/dice/diceRoller.js';
 
 // ── Test fixtures ──
 
