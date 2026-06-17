@@ -103,8 +103,8 @@ describe('constants', () => {
     it('should have abilities with default baseScore of 8', () => {
       constants.DEFAULT_FORM_DATA.abilities.forEach(ability => {
         expect(ability.baseScore).toBe(8);
-        expect(ability.abilityImprovements).toBe(0);
-        expect(ability.miscBonus).toBe(0);
+        expect(ability.featIncrease).toBe(0);
+        expect(ability.miscIncrease).toBe(0);
       });
     });
 

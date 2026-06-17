@@ -4,7 +4,7 @@ import { applyAbilityScoreIncreases, mergeDeduplicated } from '../../services/sh
 
 function buildFormDataWithBuffs(prev, buffs) {
   const next = { ...prev };
-  next.abilities = (prev.abilities || []).map(a => ({ ...a, miscBonus: 0 }));
+  next.abilities = (prev.abilities || []).map(a => ({ ...a, featIncrease: 0 }));
 
   applyAbilityScoreIncreases(next.abilities, buffs.abilityScoreIncreases);
 
@@ -55,7 +55,7 @@ function useWizardFeatBuffs(formData, allFeats, setFormData) {
       if (!prev.abilities) return prev;
       return {
         ...prev,
-        abilities: prev.abilities.map(a => ({ ...a, miscBonus: 0 })),
+        abilities: prev.abilities.map(a => ({ ...a, featIncrease: 0 })),
       };
     });
   }, [setFormData]);

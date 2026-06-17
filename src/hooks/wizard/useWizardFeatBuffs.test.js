@@ -19,9 +19,9 @@ describe('useWizardFeatBuffs', () => {
   const baseFormData = {
     feats: [],
     abilities: [
-      { name: 'Strength', miscBonus: 0 },
-      { name: 'Dexterity', miscBonus: 0 },
-      { name: 'Constitution', miscBonus: 0 },
+      { name: 'Strength', featIncrease: 0 },
+      { name: 'Dexterity', featIncrease: 0 },
+      { name: 'Constitution', featIncrease: 0 },
     ],
     resistances: [],
     specialActions: [],
@@ -243,7 +243,7 @@ describe('useWizardFeatBuffs', () => {
       if (typeof updater === 'function') {
         const result = updater(formData);
         const strAbility = result.abilities.find(a => a.name === 'Strength');
-        expect(strAbility.miscBonus).toBe(2);
+        expect(strAbility.featIncrease).toBe(2);
       }
     });
 
@@ -266,9 +266,9 @@ describe('useWizardFeatBuffs', () => {
       const updater = actualApplyCall[0];
       if (typeof updater === 'function') {
         const result = updater(formData);
-        // No ability should have a miscBonus since "any" is skipped
+        // No ability should have a featIncrease since "any" is skipped
         result.abilities.forEach(a => {
-          expect(a.miscBonus).toBe(0);
+          expect(a.featIncrease).toBe(0);
         });
       }
     });
@@ -468,7 +468,7 @@ describe('useWizardFeatBuffs', () => {
   });
 
   describe('clearBuffs behavior', () => {
-    it('should reset miscBonus to 0 for all abilities when clearing', () => {
+    it('should reset featIncrease to 0 for all abilities when clearing', () => {
       const formData = { ...baseFormData, feats: ['Tough'] };
       computeAllFeatBuffs.mockReturnValue({
         abilityScoreIncreases: [],
@@ -488,13 +488,13 @@ describe('useWizardFeatBuffs', () => {
         const formDataWithBonuses = {
           ...baseFormData,
           abilities: [
-            { name: 'Strength', miscBonus: 5 },
-            { name: 'Dexterity', miscBonus: 3 },
+            { name: 'Strength', featIncrease: 5 },
+            { name: 'Dexterity', featIncrease: 3 },
           ],
         };
         const result = updater(formDataWithBonuses);
-        expect(result.abilities[0].miscBonus).toBe(0);
-        expect(result.abilities[1].miscBonus).toBe(0);
+        expect(result.abilities[0].featIncrease).toBe(0);
+        expect(result.abilities[1].featIncrease).toBe(0);
       }
     });
 
@@ -562,7 +562,7 @@ describe('useWizardFeatBuffs', () => {
       if (typeof updater === 'function') {
         const result = updater(formData);
         const strAbility = result.abilities.find(a => a.name === 'Strength');
-        expect(strAbility.miscBonus).toBe(2);
+        expect(strAbility.featIncrease).toBe(2);
       }
     });
 
@@ -589,7 +589,7 @@ describe('useWizardFeatBuffs', () => {
       }
     });
 
-    it('should accumulate miscBonus from multiple increases', () => {
+    it('should accumulate featIncrease from multiple increases', () => {
       const formData = { ...baseFormData, feats: ['Tough'] };
       const mockBuffs = {
         abilityScoreIncreases: [
@@ -611,7 +611,7 @@ describe('useWizardFeatBuffs', () => {
       if (typeof updater === 'function') {
         const result = updater(formData);
         const strAbility = result.abilities.find(a => a.name === 'Strength');
-        expect(strAbility.miscBonus).toBe(3);
+        expect(strAbility.featIncrease).toBe(3);
       }
     });
 
@@ -667,7 +667,7 @@ describe('useWizardFeatBuffs', () => {
       }
     });
 
-    it('should handle ability with no miscBonus property', () => {
+    it('should handle ability with no featIncrease property', () => {
       const formData = { ...baseFormData, feats: ['Tough'] };
       const mockBuffs = {
         abilityScoreIncreases: [{ name: 'Dexterity', amount: 2 }],
@@ -693,7 +693,7 @@ describe('useWizardFeatBuffs', () => {
         };
         const result = updater(formDataNoMisc);
         const dexAbility = result.abilities.find(a => a.name === 'Dexterity');
-        expect(dexAbility.miscBonus).toBe(2);
+        expect(dexAbility.featIncrease).toBe(2);
       }
     });
 

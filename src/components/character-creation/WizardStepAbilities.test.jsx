@@ -59,18 +59,17 @@ describe('WizardStepAbilities - Background Ability Scores', () => {
     formData: {
       rules: '5e',
       abilities: [
-        { baseScore: '8', abilityImprovements: '0', miscBonus: '0' },
-        { baseScore: '8', abilityImprovements: '0', miscBonus: '0' },
-        { baseScore: '8', abilityImprovements: '0', miscBonus: '0' },
-        { baseScore: '8', abilityImprovements: '0', miscBonus: '0' },
-        { baseScore: '8', abilityImprovements: '0', miscBonus: '0' },
-        { baseScore: '8', abilityImprovements: '0', miscBonus: '0' },
+        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
+        { baseScore: '8', featIncrease: '0', miscIncrease: '0', backgroundIncrease: '0' },
       ],
     },
     errors: {},
     onAbilityBaseScoreChange: vi.fn(),
-    onAbilityImprovementChange: vi.fn(),
-    onAbilityMiscBonusChange: vi.fn(),
+    onAbilityMiscIncreaseChange: vi.fn(),
     onBgAbilityBonusChange: vi.fn(),
   };
 

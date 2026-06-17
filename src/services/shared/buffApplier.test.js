@@ -24,131 +24,131 @@ describe('applyAbilityScoreIncreases', () => {
   });
 
   it('should do nothing with empty arrays', () => {
-    const abilities = [{ name: 'Strength', miscBonus: 0 }];
+    const abilities = [{ name: 'Strength', featIncrease: 0 }];
     applyAbilityScoreIncreases(abilities, []);
-    expect(abilities[0].miscBonus).toBe(0);
+    expect(abilities[0].featIncrease).toBe(0);
   });
 
   it('should apply bonus to matching ability name (case-insensitive)', () => {
     const abilities = [
-      { name: 'Strength', miscBonus: 0 },
-      { name: 'Dexterity', miscBonus: 0 },
+      { name: 'Strength', featIncrease: 0 },
+      { name: 'Dexterity', featIncrease: 0 },
     ];
     applyAbilityScoreIncreases(abilities, [{ name: 'strength', amount: 2 }]);
-    expect(abilities[0].miscBonus).toBe(2);
-    expect(abilities[1].miscBonus).toBe(0);
+    expect(abilities[0].featIncrease).toBe(2);
+    expect(abilities[1].featIncrease).toBe(0);
   });
 
   it('should apply bonus when ability name matches exactly', () => {
     const abilities = [
-      { name: 'Constitution', miscBonus: 0 },
+      { name: 'Constitution', featIncrease: 0 },
     ];
     applyAbilityScoreIncreases(abilities, [{ name: 'Constitution', amount: -1 }]);
-    expect(abilities[0].miscBonus).toBe(-1);
+    expect(abilities[0].featIncrease).toBe(-1);
   });
 
   it('should skip increases with name "any"', () => {
     const abilities = [
-      { name: 'Strength', miscBonus: 0 },
-      { name: 'Dexterity', miscBonus: 0 },
+      { name: 'Strength', featIncrease: 0 },
+      { name: 'Dexterity', featIncrease: 0 },
     ];
     applyAbilityScoreIncreases(abilities, [{ name: 'any', amount: 5 }]);
-    expect(abilities[0].miscBonus).toBe(0);
-    expect(abilities[1].miscBonus).toBe(0);
+    expect(abilities[0].featIncrease).toBe(0);
+    expect(abilities[1].featIncrease).toBe(0);
   });
 
   it('should accumulate bonuses on same ability from multiple increases', () => {
     const abilities = [
-      { name: 'Strength', miscBonus: 0 },
+      { name: 'Strength', featIncrease: 0 },
     ];
     applyAbilityScoreIncreases(abilities, [
       { name: 'strength', amount: 2 },
       { name: 'Strength', amount: 3 },
     ]);
-    expect(abilities[0].miscBonus).toBe(5);
+    expect(abilities[0].featIncrease).toBe(5);
   });
 
-  it('should accumulate bonuses when ability already has a miscBonus', () => {
+  it('should accumulate bonuses when ability already has a featIncrease', () => {
     const abilities = [
-      { name: 'Intelligence', miscBonus: 4 },
+      { name: 'Intelligence', featIncrease: 4 },
     ];
     applyAbilityScoreIncreases(abilities, [{ name: 'intelligence', amount: 1 }]);
-    expect(abilities[0].miscBonus).toBe(5);
+    expect(abilities[0].featIncrease).toBe(5);
   });
 
-  it('should handle ability.miscBonus being undefined (treats as 0)', () => {
+  it('should handle ability.featIncrease being undefined (treats as 0)', () => {
     const abilities = [
-      { name: 'Wisdom' }, // no miscBonus property
+      { name: 'Wisdom' }, // no featIncrease property
     ];
     applyAbilityScoreIncreases(abilities, [{ name: 'wisdom', amount: 2 }]);
-    expect(abilities[0].miscBonus).toBe(2);
+    expect(abilities[0].featIncrease).toBe(2);
   });
 
   it('should not affect non-matching abilities', () => {
     const abilities = [
-      { name: 'Strength', miscBonus: 0 },
-      { name: 'Dexterity', miscBonus: 3 },
-      { name: 'Constitution', miscBonus: 1 },
+      { name: 'Strength', featIncrease: 0 },
+      { name: 'Dexterity', featIncrease: 3 },
+      { name: 'Constitution', featIncrease: 1 },
     ];
     applyAbilityScoreIncreases(abilities, [{ name: 'charisma', amount: 5 }]);
-    expect(abilities[0].miscBonus).toBe(0);
-    expect(abilities[1].miscBonus).toBe(3);
-    expect(abilities[2].miscBonus).toBe(1);
+    expect(abilities[0].featIncrease).toBe(0);
+    expect(abilities[1].featIncrease).toBe(3);
+    expect(abilities[2].featIncrease).toBe(1);
   });
 
   it('should handle mixed case increases and abilities', () => {
     const abilities = [
-      { name: 'CHARISMA', miscBonus: 0 },
+      { name: 'CHARISMA', featIncrease: 0 },
     ];
     applyAbilityScoreIncreases(abilities, [{ name: 'cHaRiSmA', amount: 2 }]);
-    expect(abilities[0].miscBonus).toBe(2);
+    expect(abilities[0].featIncrease).toBe(2);
   });
 
   it('should handle multiple increases affecting different abilities', () => {
     const abilities = [
-      { name: 'Strength', miscBonus: 0 },
-      { name: 'Dexterity', miscBonus: 0 },
-      { name: 'Constitution', miscBonus: 0 },
+      { name: 'Strength', featIncrease: 0 },
+      { name: 'Dexterity', featIncrease: 0 },
+      { name: 'Constitution', featIncrease: 0 },
     ];
     applyAbilityScoreIncreases(abilities, [
       { name: 'strength', amount: 2 },
       { name: 'dexterity', amount: 1 },
       { name: 'constitution', amount: -1 },
     ]);
-    expect(abilities[0].miscBonus).toBe(2);
-    expect(abilities[1].miscBonus).toBe(1);
-    expect(abilities[2].miscBonus).toBe(-1);
+    expect(abilities[0].featIncrease).toBe(2);
+    expect(abilities[1].featIncrease).toBe(1);
+    expect(abilities[2].featIncrease).toBe(-1);
   });
 
   it('should not mutate abilities array length', () => {
-    const abilities = [{ name: 'Strength', miscBonus: 0 }];
+    const abilities = [{ name: 'Strength', featIncrease: 0 }];
     applyAbilityScoreIncreases(abilities, [{ name: 'strength', amount: 2 }]);
     expect(abilities.length).toBe(1);
   });
 
   it('should handle "any" mixed with specific increases', () => {
     const abilities = [
-      { name: 'Strength', miscBonus: 0 },
-      { name: 'Dexterity', miscBonus: 0 },
+      { name: 'Strength', featIncrease: 0 },
+      { name: 'Dexterity', featIncrease: 0 },
     ];
     applyAbilityScoreIncreases(abilities, [
       { name: 'any', amount: 10 }, // should be skipped
       { name: 'strength', amount: 2 },
     ]);
-    expect(abilities[0].miscBonus).toBe(2);
-    expect(abilities[1].miscBonus).toBe(0);
+    expect(abilities[0].featIncrease).toBe(2);
+    expect(abilities[1].featIncrease).toBe(0);
   });
 
   it('should handle increase with missing name property gracefully', () => {
-    const abilities = [{ name: 'Strength', miscBonus: 0 }];
+    const abilities = [{ name: 'Strength', featIncrease: 0 }];
     applyAbilityScoreIncreases(abilities, [{ amount: 5 }]); // no name
-    expect(abilities[0].miscBonus).toBe(0);
+    expect(abilities[0].featIncrease).toBe(0);
   });
 
   it('should handle increase with undefined name gracefully', () => {
-    const abilities = [{ name: 'Strength', miscBonus: 0 }];
+    const abilities = [{ name: 'Strength', featIncrease: 0 }];
     applyAbilityScoreIncreases(abilities, [{ name: undefined, amount: 5 }]);
-    expect(abilities[0].miscBonus).toBe(0);
+    expect(abilities[0].featIncrease).toBe(0);
   });
 });
 
@@ -393,24 +393,24 @@ describe('resetMiscBonuses', () => {
     expect(resetMiscBonuses(undefined)).toBeUndefined();
   });
 
-  it('should reset all miscBonuses to 0', () => {
+  it('should reset all miscIncreases to 0', () => {
     const abilities = [
-      { name: 'Strength', miscBonus: 5 },
-      { name: 'Dexterity', miscBonus: -2 },
-      { name: 'Constitution', miscBonus: 3 },
+      { name: 'Strength', miscIncrease: 5 },
+      { name: 'Dexterity', miscIncrease: -2 },
+      { name: 'Constitution', miscIncrease: 3 },
     ];
     resetMiscBonuses(abilities);
-    expect(abilities[0].miscBonus).toBe(0);
-    expect(abilities[1].miscBonus).toBe(0);
-    expect(abilities[2].miscBonus).toBe(0);
+    expect(abilities[0].miscIncrease).toBe(0);
+    expect(abilities[1].miscIncrease).toBe(0);
+    expect(abilities[2].miscIncrease).toBe(0);
   });
 
-  it('should leave abilities without miscBonus set to 0', () => {
+  it('should leave abilities without miscIncrease set to 0', () => {
     const abilities = [
       { name: 'Intelligence' },
     ];
     resetMiscBonuses(abilities);
-    expect(abilities[0].miscBonus).toBe(0);
+    expect(abilities[0].miscIncrease).toBe(0);
   });
 
   it('should handle empty abilities array', () => {
@@ -419,28 +419,28 @@ describe('resetMiscBonuses', () => {
     expect(abilities.length).toBe(0);
   });
 
-  it('should only reset miscBonus and not touch other properties', () => {
+  it('should only reset miscIncrease and not touch other properties', () => {
     const abilities = [
-      { name: 'Charisma', baseScore: 15, miscBonus: 3, profBonus: 2 },
+      { name: 'Charisma', baseScore: 15, miscIncrease: 3, profBonus: 2 },
     ];
     resetMiscBonuses(abilities);
     expect(abilities[0].name).toBe('Charisma');
     expect(abilities[0].baseScore).toBe(15);
-    expect(abilities[0].miscBonus).toBe(0);
+    expect(abilities[0].miscIncrease).toBe(0);
     expect(abilities[0].profBonus).toBe(2);
   });
 
-  it('should handle abilities that already have miscBonus of 0', () => {
+  it('should handle abilities that already have miscIncrease of 0', () => {
     const abilities = [
-      { name: 'Strength', miscBonus: 0 },
+      { name: 'Strength', miscIncrease: 0 },
     ];
     resetMiscBonuses(abilities);
-    expect(abilities[0].miscBonus).toBe(0);
+    expect(abilities[0].miscIncrease).toBe(0);
   });
 
   it('should not mutate array length or order', () => {
     const abilities = [];
-    for (let i = 1; i <= 6; i++) abilities.push({ name: `ability${i}`, miscBonus: i });
+    for (let i = 1; i <= 6; i++) abilities.push({ name: `ability${i}`, miscIncrease: i });
     resetMiscBonuses(abilities);
     expect(abilities.length).toBe(6);
     // Names should be unchanged

@@ -758,7 +758,7 @@ const rules = {
           [playerStats.proficienciesAllowed, playerStats.proficiencies] = rules.getProficiencies(playerStats, false, playerSummary);
           [playerStats.skillProficienciesAllowed, playerStats.skillProficiencies] = rules.getProficiencies(playerStats, true, playerSummary);
 
-        // Apply feat buffs to ability miscBonus before computing abilities
+        // Apply feat buffs to ability featIncrease before computing abilities
         const featData = await loadFeatData(is2024(playerStats, playerSummary) ? '2024' : '5e');
         const featBuffs = computeAllFeatBuffs(playerStats, featData);
         featBuffs.abilityScoreIncreases.forEach(inc => {
@@ -767,7 +767,7 @@ const rules = {
                     a => a.name.toLowerCase() === inc.name.toLowerCase()
                 );
                 if (ability) {
-                    ability.miscBonus = (ability.miscBonus || 0) + inc.amount;
+                    ability.featIncrease = (ability.featIncrease || 0) + inc.amount;
                 }
             }
         });

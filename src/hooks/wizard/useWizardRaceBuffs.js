@@ -1,5 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { computeRaceBuffs, applyRaceBuffsToPlayerData } from '../../services/character/raceBuffService.js';
+import { resetFeatIncreases } from '../../services/shared/buffApplier.js';
 
 function useWizardRaceBuffs(formData, allRaces, setFormData) {
   const prevRaceRef = useRef(null);
@@ -29,7 +30,7 @@ function useWizardRaceBuffs(formData, allRaces, setFormData) {
     setFormData(prev => {
       const next = { ...prev };
       if (next.abilities) {
-        next.abilities = next.abilities.map(a => ({ ...a, miscBonus: 0 }));
+        resetFeatIncreases(next.abilities);
       }
       return next;
     });

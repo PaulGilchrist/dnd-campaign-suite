@@ -10,12 +10,12 @@ vi.mock('../../config/constants.js', () => ({
     background: '',
     level: 1,
     abilities: [
-      { name: 'Strength', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Dexterity', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Constitution', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Intelligence', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
+      { name: 'Strength', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Dexterity', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Constitution', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Intelligence', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
     ],
     inventory: { gold: 0, backpack: [], equipped: [] },
     rules: '5e',
@@ -32,12 +32,12 @@ describe('useWizardForm', () => {
     background: '',
     level: 1,
     abilities: [
-      { name: 'Strength', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Dexterity', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Constitution', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Intelligence', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
+      { name: 'Strength', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Dexterity', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Constitution', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Intelligence', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
     ],
     inventory: { gold: 0, backpack: [], equipped: [] },
     rules: '5e',
@@ -165,10 +165,10 @@ describe('useWizardForm', () => {
     it('should update the correct ability by index', () => {
       const { result } = renderHook(() => useWizardFormWithMocks(null, false));
       act(() => {
-        result.current.updateAbility(2, 'miscBonus', 2);
+        result.current.updateAbility(2, 'miscIncrease', 2);
       });
-      expect(result.current.formData.abilities[2].miscBonus).toBe(2);
-      expect(result.current.formData.abilities[0].miscBonus).toBe(0);
+      expect(result.current.formData.abilities[2].miscIncrease).toBe(2);
+      expect(result.current.formData.abilities[0].miscIncrease).toBe(0);
     });
 
     it('should not clear errors for ability updates (only updateField does that)', () => {

@@ -139,8 +139,7 @@ describe('steps-config', () => {
         formData: { abilities: [] },
         errors: {},
         onAbilityBaseScoreChange: vi.fn(),
-        onAbilityImprovementChange: vi.fn(),
-        onAbilityMiscBonusChange: vi.fn(),
+        onAbilityMiscIncreaseChange: vi.fn(),
       };
       const props = config.getProps(mockProps);
       expect(props.formData).toBeDefined();

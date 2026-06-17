@@ -33,12 +33,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: ['Strength', 'Constitution'],
@@ -98,12 +98,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: [],
@@ -125,12 +125,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: [],
@@ -150,12 +150,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 5,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: ['Strength'],
@@ -176,12 +176,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 20,
         abilities: [
-          { name: 'Strength', baseScore: 20, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 20, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: ['Strength'],
@@ -203,12 +203,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 8, abilityImprovements: 2, miscBonus: 1 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 8, featIncrease: 2, miscIncrease: 1, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: [],
@@ -230,12 +230,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: [],
@@ -257,12 +257,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {},
         skillProficiencies: [],
@@ -279,12 +279,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 0, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 30, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 0, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 30, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: [],
@@ -307,12 +307,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 20,
         abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           name: 'Barbarian',
@@ -339,12 +339,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 20,
         abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           name: 'Fighter',
@@ -368,12 +368,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 19,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           name: 'Barbarian',
@@ -397,12 +397,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 20,
         abilities: [
-          { name: 'Strength', baseScore: 22, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 22, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           name: 'Barbarian',
@@ -426,12 +426,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, bonus: 2 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
+          { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
         class: {
           hit_point_die: 'd10',
@@ -448,12 +448,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 5,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
-          { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, bonus: 2 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
+          { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
         class: {
           hit_point_die: 'd10',
@@ -470,7 +470,7 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0, bonus: 1 },
+          { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, bonus: 1 },
         ],
         class: {
           hit_die: 'd8',
@@ -488,7 +488,7 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
         class: {
           hit_point_die: 'invalid',
@@ -505,7 +505,7 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 5,
         abilities: [
-          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
+          { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
         ],
         class: {
           hit_point_die: 'd8',
@@ -526,7 +526,7 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 3,
         abilities: [
-          { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0, bonus: 1 },
+          { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, bonus: 1 },
         ],
         class: {
           hit_point_die: 'd6',
@@ -546,7 +546,7 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 0,
         abilities: [
-          { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
         class: {
           hit_point_die: 'd10',
@@ -563,7 +563,7 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
         class: {
           hit_point_die: 'd8',
@@ -581,12 +581,12 @@ describe('abilityCalc2024', () => {
       const playerStats = {
         level: 7,
         abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
         class: {
           saving_throw_proficiencies: ['Dexterity', 'Intelligence'],

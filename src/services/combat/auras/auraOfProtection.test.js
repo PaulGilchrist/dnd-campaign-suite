@@ -202,9 +202,9 @@ describe('getChaModifier', () => {
       abilities: [
          {
           name: 'Charisma',
-          baseScore: 16,
-          abilityImprovements: 0,
-          miscBonus: 0,
+           baseScore: 16,
+           featIncrease: 0,
+           miscIncrease: 0,
          },
        ],
      };
@@ -212,14 +212,14 @@ describe('getChaModifier', () => {
     expect(getChaModifier(stats)).toBe(3);
    });
 
-  it('includes abilityImprovements in computation', () => {
+  it('includes featIncrease in computation', () => {
     const stats = {
       abilities: [
          {
           name: 'Charisma',
-          baseScore: 14,
-          abilityImprovements: 2,
-          miscBonus: 0,
+           baseScore: 14,
+           featIncrease: 2,
+           miscIncrease: 0,
          },
        ],
      };
@@ -227,14 +227,14 @@ describe('getChaModifier', () => {
     expect(getChaModifier(stats)).toBe(3);
    });
 
-  it('includes miscBonus in computation', () => {
+  it('includes miscIncrease in computation', () => {
     const stats = {
       abilities: [
          {
           name: 'Charisma',
-          baseScore: 10,
-          abilityImprovements: 0,
-          miscBonus: 2,
+           baseScore: 10,
+           featIncrease: 0,
+           miscIncrease: 2,
          },
        ],
      };
@@ -247,9 +247,9 @@ describe('getChaModifier', () => {
       abilities: [
          {
           name: 'Charisma',
-          baseScore: 15,
-          abilityImprovements: 0,
-          miscBonus: 0,
+           baseScore: 15,
+           featIncrease: 0,
+           miscIncrease: 0,
          },
        ],
      };
@@ -262,9 +262,9 @@ describe('getChaModifier', () => {
       abilities: [
          {
           name: 'Charisma',
-          baseScore: 7,
-          abilityImprovements: 0,
-          miscBonus: 0,
+           baseScore: 7,
+           featIncrease: 0,
+           miscIncrease: 0,
          },
        ],
      };
@@ -292,10 +292,10 @@ describe('getChaModifier', () => {
       abilities: [
          {
           name: 'Charisma',
-          baseScore: 10,
-          abilityImprovements: 0,
-          miscBonus: 0,
-          bonus: 7,
+           baseScore: 10,
+           featIncrease: 0,
+           miscIncrease: 0,
+           bonus: 7,
          },
        ],
      };
@@ -961,9 +961,9 @@ describe('computeAuraBonus', () => {
       abilities: [
          {
           name: 'Charisma',
-          baseScore: 18,
-          abilityImprovements: 0,
-          miscBonus: 0,
+           baseScore: 18,
+           featIncrease: 0,
+           miscIncrease: 0,
          },
        ],
      });

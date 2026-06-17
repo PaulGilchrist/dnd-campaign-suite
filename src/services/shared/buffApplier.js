@@ -6,7 +6,7 @@ export function applyAbilityScoreIncreases(abilities, increases) {
         a => a.name.toLowerCase() === inc.name.toLowerCase()
       );
       if (ability) {
-        ability.miscBonus = (ability.miscBonus || 0) + inc.amount;
+        ability.featIncrease = (ability.featIncrease || 0) + inc.amount;
       }
     }
   });
@@ -39,6 +39,20 @@ export function mergeAbilitiesByKey(target, key, newItems, keyFn) {
 export function resetMiscBonuses(abilities) {
   if (!abilities) return;
   abilities.forEach(ability => {
-    ability.miscBonus = 0;
+    ability.miscIncrease = 0;
+  });
+}
+
+export function resetFeatIncreases(abilities) {
+  if (!abilities) return;
+  abilities.forEach(ability => {
+    ability.featIncrease = 0;
+  });
+}
+
+export function resetBackgroundIncreases(abilities) {
+  if (!abilities) return;
+  abilities.forEach(ability => {
+    ability.backgroundIncrease = 0;
   });
 }

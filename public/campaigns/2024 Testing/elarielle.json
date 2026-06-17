@@ -6,38 +6,44 @@
     {
       "name": "Strength",
       "baseScore": 8,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 10,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 14,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 15,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 2,
+      "backgroundIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 14,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 10,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     }
   ],
   "background": "Sage",
@@ -46,7 +52,9 @@
     "subclass": {
       "name": "Evoker",
       "type": ""
-    }
+    },
+    "divineOrder": "",
+    "primalOrder": ""
   },
   "expertSkills": [],
   "feats": [
@@ -84,7 +92,10 @@
     "gold": 10,
     "magicItems": []
   },
-  "languages": [],
+  "languages": [
+    "Common",
+    "Elvish"
+  ],
   "resistances": [
     "Poison",
     "Necrotic",

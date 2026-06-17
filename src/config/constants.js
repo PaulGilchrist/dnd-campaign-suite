@@ -20,8 +20,9 @@ export const DEFAULT_FORM_DATA = {
     abilities: ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'].map((name) => ({
         name,
         baseScore: 8,
-        abilityImprovements: 0,
-        miscBonus: 0,
+        featIncrease: 0,
+        backgroundIncrease: 0,
+        miscIncrease: 0,
       })),
     background: '',
     class: {

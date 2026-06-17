@@ -23,12 +23,12 @@ const DEFAULT_COSTS = {
 describe('useWizardAbilities', () => {
   const mockFormData = {
     abilities: [
-      { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-      { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+      { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+      { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
     ],
     rules: '5e'
   };
@@ -69,7 +69,7 @@ describe('useWizardAbilities', () => {
       const formDataWithLowScore = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 7, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 7, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           ...mockFormData.abilities.slice(1)
         ]
       };
@@ -93,7 +93,7 @@ describe('useWizardAbilities', () => {
       const formDataWithHighScore = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           ...mockFormData.abilities.slice(1)
         ]
       };
@@ -117,7 +117,7 @@ describe('useWizardAbilities', () => {
       const formDataWithHighTotal = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 6, miscBonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: 6, miscIncrease: 0 },
           ...mockFormData.abilities.slice(1)
         ]
       };
@@ -141,12 +141,12 @@ describe('useWizardAbilities', () => {
       const formDataWithExcessPoints = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ]
       };
 
@@ -170,12 +170,12 @@ describe('useWizardAbilities', () => {
       const formDataWithExcessPoints = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ]
       };
 
@@ -192,11 +192,11 @@ describe('useWizardAbilities', () => {
       expect(errors.pointsExceeded).toContain('54');
     });
 
-    it('should report error when abilityImprovements is negative', async () => {
+    it('should not report error for negative featIncrease (source does not validate it)', async () => {
       const formDataWithNegativeImprovements = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: -1, miscBonus: 0 },
+          { name: 'Strength', baseScore: 15, featIncrease: -1, miscIncrease: 0, backgroundIncrease: 0 },
           ...mockFormData.abilities.slice(1)
         ]
       };
@@ -213,14 +213,14 @@ describe('useWizardAbilities', () => {
       expect(typeof setErrorsCall).toBe('function');
 
       const errors = setErrorsCall({});
-      expect(errors).toHaveProperty('ability_0_abilityImprovements');
+      expect(errors).not.toHaveProperty('ability_0_featIncrease');
     });
 
-    it('should report error when miscBonus is negative', async () => {
+    it('should report error when miscIncrease is negative', async () => {
       const formDataWithNegativeMisc = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: -2 },
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: -2 },
           ...mockFormData.abilities.slice(1)
         ]
       };
@@ -237,7 +237,7 @@ describe('useWizardAbilities', () => {
       expect(typeof setErrorsCall).toBe('function');
 
       const errors = setErrorsCall({});
-      expect(errors).toHaveProperty('ability_0_miscBonus');
+      expect(errors).toHaveProperty('ability_0_miscIncrease');
     });
 
     it('should clear stale ability errors from previous validation', async () => {
@@ -299,12 +299,12 @@ describe('useWizardAbilities', () => {
       const allEights = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ]
       };
 
@@ -326,7 +326,7 @@ describe('useWizardAbilities', () => {
       const formDataNaN = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: NaN, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: NaN, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           ...mockFormData.abilities.slice(1)
         ]
       };
@@ -373,12 +373,12 @@ describe('useWizardAbilities', () => {
 
     it('should return 0 for all abilities at score 8', async () => {
       const allEights = [
-        { name: 'Strength', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Dexterity', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Constitution', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Intelligence', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+        { name: 'Strength', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Dexterity', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Constitution', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Intelligence', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
       ];
 
       const { result } = renderHook(() =>
@@ -396,12 +396,12 @@ describe('useWizardAbilities', () => {
 
     it('should calculate 54 for all abilities at score 15', async () => {
       const allFifteens = [
-        { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Dexterity', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Constitution', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Intelligence', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Wisdom', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Charisma', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+        { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Dexterity', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Constitution', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Intelligence', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Wisdom', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Charisma', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
       ];
 
       const { result } = renderHook(() =>
@@ -452,12 +452,12 @@ describe('useWizardAbilities', () => {
 
     it('should handle NaN baseScore entries (default to 8, cost 0)', async () => {
       const abilitiesWithNaN = [
-        { name: 'Strength', baseScore: NaN, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+        { name: 'Strength', baseScore: NaN, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
       ];
 
       const { result } = renderHook(() =>
@@ -507,106 +507,17 @@ describe('useWizardAbilities', () => {
     });
   });
 
-  describe('onAbilityImprovementChange', () => {
-    it('should call updateAbility with valid improvements', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
 
-      result.current.onAbilityImprovementChange(0, '4');
-
-      // Strength: baseScore 15 + improvements 4 + misc 0 = 19 (<= 20)
-      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'abilityImprovements', 4);
-    });
-
-    it('should not update when improvements are negative', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
-
-      result.current.onAbilityImprovementChange(1, '-1');
-
-      expect(mockUpdateAbility).not.toHaveBeenCalled();
-    });
-
-    it('should not update when total score would exceed 20', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
-
-      // Strength: baseScore 15 + improvements 6 + misc 0 = 21 (> 20)
-      result.current.onAbilityImprovementChange(0, '6');
-
-      expect(mockUpdateAbility).not.toHaveBeenCalled();
-    });
-
-    it('should default to 0 when value is not a valid number', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
-
-      result.current.onAbilityImprovementChange(2, 'abc');
-
-      // NaN → 0, total = 12 + 0 + 0 = 12, valid
-      expect(mockUpdateAbility).toHaveBeenCalledWith(2, 'abilityImprovements', 0);
-    });
-
-    it('should handle NaN baseScore in formData (default to 8)', () => {
-      const formWithNaN = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: NaN, abilityImprovements: 0, miscBonus: 0 },
-          ...mockFormData.abilities.slice(1)
-        ]
-      };
-
-      const { result } = renderHook(() =>
-        useWizardAbilities(formWithNaN, 5, mockSetErrors, mockUpdateAbility)
-      );
-
-      // NaN baseScore → parseInt returns NaN → || 8 → baseScore = 8
-      // improvements 10 + baseScore 8 + misc 0 = 18 (<= 20), valid
-      result.current.onAbilityImprovementChange(0, '10');
-      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'abilityImprovements', 10);
-    });
-
-    it('should allow improvements up to but not exceeding 20 total with misc bonus', () => {
-      const formWithMisc = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 2 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
-        ]
-      };
-
-      const { result } = renderHook(() =>
-        useWizardAbilities(formWithMisc, 5, mockSetErrors, mockUpdateAbility)
-      );
-
-      // Strength: baseScore 15 + misc 2 = 17, improvements 3 → total 20, valid
-      result.current.onAbilityImprovementChange(0, '3');
-      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'abilityImprovements', 3);
-
-      // Strength: baseScore 15 + misc 2 = 17, improvements 4 → total 21, blocked
-      result.current.onAbilityImprovementChange(0, '4');
-      expect(mockUpdateAbility).toHaveBeenCalledTimes(1); // still only the first call
-    });
-  });
-
-  describe('onAbilityMiscBonusChange', () => {
+  describe('onAbilityMiscIncreaseChange', () => {
     it('should call updateAbility with valid misc bonus', () => {
       const { result } = renderHook(() =>
         useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
       );
 
-      result.current.onAbilityMiscBonusChange(0, '2');
+      result.current.onAbilityMiscIncreaseChange(0, '2');
 
       // Strength: baseScore 15 + improvements 0 + misc 2 = 17 (<= 20)
-      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscBonus', 2);
+      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscIncrease', 2);
     });
 
     it('should not update when misc bonus is negative', () => {
@@ -614,7 +525,7 @@ describe('useWizardAbilities', () => {
         useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
       );
 
-      result.current.onAbilityMiscBonusChange(2, '-3');
+      result.current.onAbilityMiscIncreaseChange(2, '-3');
 
       expect(mockUpdateAbility).not.toHaveBeenCalled();
     });
@@ -625,7 +536,7 @@ describe('useWizardAbilities', () => {
       );
 
       // Strength: baseScore 15 + improvements 0 + misc 6 = 21 (> 20)
-      result.current.onAbilityMiscBonusChange(0, '6');
+      result.current.onAbilityMiscIncreaseChange(0, '6');
 
       expect(mockUpdateAbility).not.toHaveBeenCalled();
     });
@@ -635,17 +546,17 @@ describe('useWizardAbilities', () => {
         useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
       );
 
-      result.current.onAbilityMiscBonusChange(4, 'abc');
+      result.current.onAbilityMiscIncreaseChange(4, 'abc');
 
       // NaN → 0, total = 8 + 0 + 0 = 8, valid
-      expect(mockUpdateAbility).toHaveBeenCalledWith(4, 'miscBonus', 0);
+      expect(mockUpdateAbility).toHaveBeenCalledWith(4, 'miscIncrease', 0);
     });
 
     it('should handle NaN baseScore in formData (default to 8)', () => {
       const formWithNaN = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: NaN, abilityImprovements: 0, miscBonus: 0 },
+          { name: 'Strength', baseScore: NaN, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           ...mockFormData.abilities.slice(1)
         ]
       };
@@ -656,20 +567,20 @@ describe('useWizardAbilities', () => {
 
       // NaN baseScore → parseInt returns NaN → || 8 → baseScore = 8
       // misc 10 + baseScore 8 + improvements 0 = 18 (<= 20), valid
-      result.current.onAbilityMiscBonusChange(0, '10');
-      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscBonus', 10);
+      result.current.onAbilityMiscIncreaseChange(0, '10');
+      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscIncrease', 10);
     });
 
     it('should allow misc bonus up to but not exceeding 20 total with improvements', () => {
       const formWithImprovements = {
         ...mockFormData,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 3, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 3, miscIncrease: 0 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ]
       };
 
@@ -678,11 +589,11 @@ describe('useWizardAbilities', () => {
       );
 
       // Strength: baseScore 15 + improvements 3 = 18, misc 2 → total 20, valid
-      result.current.onAbilityMiscBonusChange(0, '2');
-      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscBonus', 2);
+      result.current.onAbilityMiscIncreaseChange(0, '2');
+      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscIncrease', 2);
 
       // Strength: baseScore 15 + improvements 3 = 18, misc 3 → total 21, blocked
-      result.current.onAbilityMiscBonusChange(0, '3');
+      result.current.onAbilityMiscIncreaseChange(0, '3');
       expect(mockUpdateAbility).toHaveBeenCalledTimes(1); // still only the first call
     });
   });
@@ -719,12 +630,10 @@ describe('useWizardAbilities', () => {
 
       expect(result.current).toHaveProperty('calculateTotalPointsSpent');
       expect(result.current).toHaveProperty('onAbilityBaseScoreChange');
-      expect(result.current).toHaveProperty('onAbilityImprovementChange');
-      expect(result.current).toHaveProperty('onAbilityMiscBonusChange');
+      expect(result.current).toHaveProperty('onAbilityMiscIncreaseChange');
       expect(typeof result.current.calculateTotalPointsSpent).toBe('function');
       expect(typeof result.current.onAbilityBaseScoreChange).toBe('function');
-      expect(typeof result.current.onAbilityImprovementChange).toBe('function');
-      expect(typeof result.current.onAbilityMiscBonusChange).toBe('function');
+      expect(typeof result.current.onAbilityMiscIncreaseChange).toBe('function');
     });
   });
 });

@@ -192,3 +192,33 @@
 .wizard-step-abilities .bg-ability-badge i {
   font-size: 0.75rem;
 }
+
+.wizard-step-abilities .feat-increase-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: var(--color-success);
+  color: var(--color-text-inverse);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.wizard-step-abilities .feat-increase-badge i {
+  font-size: 0.75rem;
+}
+
+.wizard-step-abilities .feat-increase-input {
+  max-width: 60px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-color-input);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: center;
+  flex-grow: 1;
+  background-color: var(--background-color-point-cost);
+  color: var(--color-text);
+  font-weight: 600;
+}

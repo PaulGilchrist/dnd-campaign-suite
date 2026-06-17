@@ -19,6 +19,7 @@ import useWizardBackgroundAbility from '../../hooks/wizard/useWizardBackgroundAb
 
 import useWizardAbilities from '../../hooks/wizard/useWizardAbilities.js';
 import useWizardArrayToggle from '../../hooks/wizard/useWizardArrayToggle.js';
+import useWizardFeatAbilityChoices from '../../hooks/wizard/useWizardFeatAbilityChoices.js';
 
 const WizardStepRenderer = React.memo(({
   currentStep,
@@ -58,8 +59,7 @@ const WizardStepRenderer = React.memo(({
   onInventoryChange,
   onTempInventoryChange,
   onAbilityBaseScoreChange,
-  onAbilityImprovementChange,
-  onAbilityMiscBonusChange,
+  onAbilityMiscIncreaseChange,
   onSkillToggle,
   onSkillExpertiseToggle,
   onLanguageToggle,
@@ -70,6 +70,9 @@ const WizardStepRenderer = React.memo(({
   allFeats,
   allMagicItems,
   updateBgAbilityBonus,
+  featAbilityChoices,
+  featAbilityAssignments,
+  handleFeatAbilityChoice,
 }) => {
   const stepConfig = WIZARD_STEPS.find((step) => step.step === currentStep);
   if (!stepConfig) {
@@ -114,8 +117,7 @@ const WizardStepRenderer = React.memo(({
     onInventoryChange,
     onTempInventoryChange,
     onAbilityBaseScoreChange,
-    onAbilityImprovementChange,
-    onAbilityMiscBonusChange,
+    onAbilityMiscIncreaseChange,
     onSkillToggle,
     onSkillExpertiseToggle,
     onLanguageToggle,
@@ -126,6 +128,9 @@ const WizardStepRenderer = React.memo(({
     allFeats,
     allMagicItems,
     updateBgAbilityBonus,
+    featAbilityChoices,
+    featAbilityAssignments,
+    handleFeatAbilityChoice,
   });
 
   return <StepComponent {...props} />;
@@ -222,12 +227,18 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
 		setTempInventory(prev => ({ ...prev, [field]: value }));
 	}, []);
 
-   // Abilities validation
-  const {
-    onAbilityBaseScoreChange,
-    onAbilityImprovementChange,
-    onAbilityMiscBonusChange,
-  } = useWizardAbilities(formData, currentStep, setErrors, updateAbility);
+  // Abilities validation
+   const {
+     onAbilityBaseScoreChange,
+     onAbilityMiscIncreaseChange,
+   } = useWizardAbilities(formData, currentStep, setErrors, updateAbility);
+
+   // Feat ability score choices (ASI from feats)
+   const {
+     featAbilityChoices,
+     featAbilityAssignments,
+     handleFeatAbilityChoice,
+   } = useWizardFeatAbilityChoices(formData, feats, setFormData);
 
    // Handlers
   const handleRulesetChange = useCallback(async (newRuleset) => {
@@ -348,8 +359,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
         onInventoryChange={updateInventory}
         onTempInventoryChange={updateTempInventory}
         onAbilityBaseScoreChange={onAbilityBaseScoreChange}
-        onAbilityImprovementChange={onAbilityImprovementChange}
-        onAbilityMiscBonusChange={onAbilityMiscBonusChange}
+        onAbilityMiscIncreaseChange={onAbilityMiscIncreaseChange}
         onSkillToggle={handleSkillToggle}
         onSkillExpertiseToggle={handleSkillExpertiseToggle}
         onLanguageToggle={handleLanguageToggle}
@@ -360,6 +370,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
         allFeats={feats}
         allMagicItems={magicItems}
         updateBgAbilityBonus={updateBgAbilityBonus}
+        featAbilityChoices={featAbilityChoices}
+        featAbilityAssignments={featAbilityAssignments}
+        handleFeatAbilityChoice={handleFeatAbilityChoice}
       />
     );
   }, [
@@ -398,8 +411,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
     updateInventory,
     updateTempInventory,
     onAbilityBaseScoreChange,
-    onAbilityImprovementChange,
-    onAbilityMiscBonusChange,
+    onAbilityMiscIncreaseChange,
     handleSkillToggle,
     handleSkillExpertiseToggle,
     handleLanguageToggle,
@@ -407,6 +419,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
     handleResistanceToggle,
     handleImmunityToggle,
     updateBgAbilityBonus,
+    featAbilityChoices,
+    featAbilityAssignments,
+    handleFeatAbilityChoice,
   ]);
 
   const totalSteps = getTotalSteps();

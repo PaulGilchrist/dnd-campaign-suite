@@ -72,16 +72,19 @@ export const WIZARD_STEPS = [
     step: 5,
     title: 'Ability Scores',
     component: WizardStepAbilities,
-    getProps: ({ formData, errors, onAbilityBaseScoreChange, onAbilityImprovementChange, onAbilityMiscBonusChange, updateBgAbilityBonus, bgAbilityNames, bgAbilityAssignments, bgValidationWarnings }) => ({
+    getProps: ({ formData, errors, onAbilityBaseScoreChange, onAbilityMiscIncreaseChange, updateBgAbilityBonus, bgAbilityNames, bgAbilityAssignments, bgValidationWarnings, allFeats, featAbilityChoices, featAbilityAssignments, handleFeatAbilityChoice }) => ({
       formData,
       errors,
       onAbilityBaseScoreChange,
-      onAbilityImprovementChange,
-      onAbilityMiscBonusChange,
+      onAbilityMiscIncreaseChange,
       onBgAbilityBonusChange: updateBgAbilityBonus,
       bgAbilityChoices: bgAbilityNames,
       bgAbilityAssignments,
       bgValidationWarnings,
+      allFeats,
+      featAbilityChoices,
+      featAbilityAssignments,
+      onFeatAbilityChoiceChange: handleFeatAbilityChoice,
     }),
   },
   {

@@ -51,7 +51,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
         },
         abilities: [
-          { name: 'Intelligence', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
         ],
         spells: ['Fire Bolt'],
         proficiency: 2,
@@ -85,7 +85,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
         },
         abilities: [
-          { name: 'Intelligence', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
         ],
         spells: [],
         proficiency: 2,
@@ -113,7 +113,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
         },
         abilities: [
-          { name: 'Intelligence', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
         ],
         spells: [],
         proficiency: 2,
@@ -137,7 +137,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
         },
         abilities: [
-          { name: 'Intelligence', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
+          { name: 'Intelligence', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 },
         ],
         spells: [],
         proficiency: 2,
@@ -164,7 +164,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
         },
         abilities: [
-          { name: 'Intelligence', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
         ],
         proficiency: 2,
       };
@@ -190,7 +190,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
         },
         abilities: [
-          { name: 'Strength', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
         ],
         spells: [],
         proficiency: 2,
@@ -223,7 +223,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
         },
         abilities: [
-          { name: 'Intelligence', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
         ],
         spells: ['Fire Bolt', 'Magic Missile'],
         proficiency: 2,
@@ -263,7 +263,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
         },
         abilities: [
-          { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
         ],
         spells: ['Shield', 'Fire Bolt', 'Magic Missile', 'Acid Splash'],
         proficiency: 2,
@@ -296,7 +296,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Wisdom',
         },
         abilities: [
-          { name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+          { name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
         ],
         spells: [],
         proficiency: 2,
@@ -325,7 +325,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: ['Unknown Spell'],
         proficiency: 2,
@@ -359,7 +359,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: ['Fire Bolt'],
         proficiency: 2,
@@ -395,7 +395,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Wisdom',
           },
         abilities: [
-            { name: 'Wisdom', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
+            { name: 'Wisdom', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 },
           ],
         spells: [],
         proficiency: 2,
@@ -431,7 +431,7 @@ describe('spellCalc2024', () => {
         spell_casting_ability: 'Wisdom',
           },
         abilities: [
-             { name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+             { name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
            ],
         spells: [],
         proficiency: 2,
@@ -463,7 +463,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: ['Fire Bolt'], // already known
         proficiency: 2,
@@ -495,7 +495,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: [],
         proficiency: 2,
@@ -523,7 +523,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: [],
         proficiency: 2,
@@ -556,7 +556,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Charisma',
          },
         abilities: [
-           { name: 'Charisma', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
+           { name: 'Charisma', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 },
          ],
         spells: [],
         proficiency: 2,
@@ -588,7 +588,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: ['Fire Bolt'], // already known
         proficiency: 2,
@@ -616,7 +616,7 @@ describe('spellCalc2024', () => {
           class_levels: [{ level: 1, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4 } } }],
           spell_casting_ability: 'Wisdom',
          },
-        abilities: [{ name: 'Wisdom', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 }],
+        abilities: [{ name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
         spells: [],
         proficiency: 3,
         automation: {
@@ -645,7 +645,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: [],
         proficiency: 2,
@@ -678,7 +678,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: [],
         proficiency: 2,
@@ -708,7 +708,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: [],
         proficiency: 2,
@@ -742,7 +742,7 @@ describe('spellCalc2024', () => {
         spell_casting_ability: 'Intelligence',
           },
       abilities: [
-           { name: 'Intelligence', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
+           { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
             ],
         spells: [],
         proficiency: 2,
@@ -776,7 +776,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: [],
         proficiency: 2,
@@ -804,7 +804,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: [],
         proficiency: 2,
@@ -828,7 +828,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
+           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
          ],
         spells: [],
         proficiency: 2,
@@ -858,7 +858,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0, bonus: 1 },
+           { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 1 },
          ],
         spells: ['Fire Bolt'],
         proficiency: 2,
@@ -897,7 +897,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0, bonus: 1 },
+           { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 1 },
          ],
         spells: ['Alarm'],
         proficiency: 2,
@@ -930,7 +930,7 @@ describe('spellCalc2024', () => {
           spell_casting_ability: 'Intelligence',
          },
         abilities: [
-           { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0, bonus: 1 },
+           { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 1 },
          ],
         spells: ['Fire Bolt'],
         proficiency: 2,

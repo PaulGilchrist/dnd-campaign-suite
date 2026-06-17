@@ -22,7 +22,7 @@ export function getAuraRangeFromStats(playerStats) {
 export function getChaModifier(playerStats) {
   const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
   if (cha?.bonus != null) return cha.bonus;
-  if (cha) return Math.floor((cha.baseScore + cha.abilityImprovements + cha.miscBonus - 10) / 2);
+  if (cha) return Math.floor((cha.baseScore + cha.featIncrease + cha.miscIncrease - 10) / 2);
   return 0;
 }
 

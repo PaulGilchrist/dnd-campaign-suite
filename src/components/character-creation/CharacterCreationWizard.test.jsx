@@ -10,12 +10,12 @@ const mockFormData = {
   race: {},
   class: {},
   abilities: [
-    { baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-    { baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-    { baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-    { baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-    { baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-    { baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+    { baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
   ],
   skillProficiencies: [],
   expertSkills: [],
@@ -121,6 +121,14 @@ vi.mock('../../hooks/wizard/useWizardFeats.js', () => ({
   })),
 }));
 
+vi.mock('../../hooks/wizard/useWizardFeatAbilityChoices.js', () => ({
+  default: vi.fn(() => ({
+    featAbilityChoices: [],
+    featAbilityAssignments: {},
+    handleFeatAbilityChoice: vi.fn(),
+  })),
+}));
+
 vi.mock('./use-wizard-inventory', () => ({
   default: vi.fn(() => ({
     tempInventory: { backpack: [], equipped: [] },
@@ -132,8 +140,7 @@ vi.mock('../../hooks/wizard/useWizardAbilities.js', () => ({
   default: vi.fn(() => ({
     calculateTotalPointsSpent: vi.fn(),
     onAbilityBaseScoreChange: vi.fn(),
-    onAbilityImprovementChange: vi.fn(),
-    onAbilityMiscBonusChange: vi.fn(),
+    onAbilityMiscIncreaseChange: vi.fn(),
   })),
 }));
 
@@ -181,7 +188,7 @@ vi.mock('./WizardSidebar.jsx', () => ({
 
 // Mock steps-config with components that call handlers
 vi.mock('../../config/steps-config.js', () => {
-  const StepComponent = ({ onRulesetChange, onSkillToggle, onSkillExpertiseToggle, onLanguageToggle, onFightingStyleToggle, onResistanceToggle, onImmunityToggle, onAbilityBaseScoreChange, onAbilityImprovementChange, onAbilityMiscBonusChange, onTempInventoryChange, tempInventory }) => (
+  const StepComponent = ({ onRulesetChange, onSkillToggle, onSkillExpertiseToggle, onLanguageToggle, onFightingStyleToggle, onResistanceToggle, onImmunityToggle, onAbilityBaseScoreChange, onAbilityMiscIncreaseChange, onTempInventoryChange, tempInventory }) => (
     <div data-testid="step-ruleset">
       <button onClick={() => onRulesetChange('2024')}>Change Ruleset</button>
       <button onClick={() => onRulesetChange('5e')}>Ruleset 5e</button>
@@ -194,8 +201,7 @@ vi.mock('../../config/steps-config.js', () => {
       <button onClick={() => onResistanceToggle('Fire', false)}>Toggle Resistance</button>
       <button onClick={() => onImmunityToggle('Poison', false)}>Toggle Immunity</button>
       <button onClick={() => onAbilityBaseScoreChange(0, '14')}>Change Ability</button>
-      <button onClick={() => onAbilityImprovementChange(0, 1)}>Improve Ability</button>
-      <button onClick={() => onAbilityMiscBonusChange(0, 2)}>Misc Bonus</button>
+      <button onClick={() => onAbilityMiscIncreaseChange(0, 2)}>Misc Increase</button>
     </div>
   );
   StepComponent.displayName = 'StepComponent';
@@ -465,15 +471,9 @@ describe('CharacterCreationWizard', () => {
     expect(screen.getByTestId('step-ruleset')).toBeInTheDocument();
   });
 
-  it('should call onAbilityImprovementChange when improvement changed', () => {
+  it('should call onAbilityMiscIncreaseChange when misc increase changed', () => {
     render(<CharacterCreationWizard {...defaultProps} />);
-    fireEvent.click(screen.getByText('Improve Ability'));
-    expect(screen.getByTestId('step-ruleset')).toBeInTheDocument();
-  });
-
-  it('should call onAbilityMiscBonusChange when misc bonus changed', () => {
-    render(<CharacterCreationWizard {...defaultProps} />);
-    fireEvent.click(screen.getByText('Misc Bonus'));
+    fireEvent.click(screen.getByText('Misc Increase'));
     expect(screen.getByText('Create New Character')).toBeInTheDocument();
   });
 

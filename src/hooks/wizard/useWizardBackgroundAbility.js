@@ -89,9 +89,9 @@ function useWizardBackgroundAbility(formData, setFormData) {
     setFormData(prev => {
       const abilities = (prev.abilities || []).map(ability => {
         if (ability.name === abilityName) {
-          const currentBonus = ability.miscBonus || 0;
+          const currentBonus = ability.backgroundIncrease || 0;
           const oldBonus = bgAbilityAssignments[abilityName] || 0;
-          return { ...ability, miscBonus: currentBonus - oldBonus + validBonus };
+          return { ...ability, backgroundIncrease: currentBonus - oldBonus + validBonus };
         }
         return ability;
       });

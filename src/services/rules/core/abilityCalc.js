@@ -8,7 +8,7 @@ export async function getAbilities(playerStats) {
         const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
         const newAbility = { ...ability };
         newAbility.totalScore = Math.min(
-            ability.baseScore + ability.abilityImprovements + ability.miscBonus + raceRules.getRacialBonus(playerStats, ability.name),
+            ability.baseScore + ability.featIncrease + ability.backgroundIncrease + ability.miscIncrease + raceRules.getRacialBonus(playerStats, ability.name),
             20
         );
         if((newAbility.name === 'Strength' || newAbility.name === 'Constitution') && playerStats.class.name === 'Barbarian' && playerStats.level > 19) {

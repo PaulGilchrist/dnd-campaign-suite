@@ -5,12 +5,12 @@ const makePlayerStats = (overrides = {}) => ({
   level: 5,
   proficiency: 3,
   abilities: [
-    { name: 'Strength', baseScore: 16, abilityImprovements: 0, miscBonus: 0 },
-    { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-    { name: 'Constitution', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-    { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-    { name: 'Wisdom', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
-    { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 },
+    { name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Wisdom', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
   ],
   class: {
     name: 'Fighter',
@@ -113,12 +113,12 @@ describe('abilityCalc', () => {
 
     it('should handle extreme ability scores', async () => {
       const abilities = [
-        { name: 'Strength', baseScore: 3, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Dexterity', baseScore: 30, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Constitution', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Intelligence', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-        { name: 'Charisma', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
+        { name: 'Strength', baseScore: 3, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Dexterity', baseScore: 30, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
       ];
       const result = await getAbilities(makePlayerStats({ abilities }));
       const str = result.find(a => a.name === 'Strength');

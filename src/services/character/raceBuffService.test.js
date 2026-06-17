@@ -407,8 +407,8 @@ describe('raceBuffService', () => {
     it('applies ability score increases to playerData', () => {
       const playerData = {
         abilities: [
-          { name: 'Strength', miscBonus: 0 },
-          { name: 'Dexterity', miscBonus: 0 },
+          { name: 'Strength', featIncrease: 0 },
+          { name: 'Dexterity', featIncrease: 0 },
         ],
         languages: [],
       };
@@ -420,8 +420,8 @@ describe('raceBuffService', () => {
         languages: ['Common', 'Elvish'],
       };
       applyRaceBuffsToPlayerData(playerData, buffs);
-      expect(playerData.abilities[0].miscBonus).toBe(2);
-      expect(playerData.abilities[1].miscBonus).toBe(1);
+      expect(playerData.abilities[0].featIncrease).toBe(2);
+      expect(playerData.abilities[1].featIncrease).toBe(1);
     });
 
     it('merges languages with deduplication', () => {
@@ -452,7 +452,7 @@ describe('raceBuffService', () => {
 
     it('handles empty abilityScoreIncreases', () => {
       const playerData = {
-        abilities: [{ name: 'Strength', miscBonus: 0 }],
+        abilities: [{ name: 'Strength', featIncrease: 0 }],
         languages: [],
       };
       const buffs = {
@@ -460,7 +460,7 @@ describe('raceBuffService', () => {
         languages: [],
       };
       applyRaceBuffsToPlayerData(playerData, buffs);
-      expect(playerData.abilities[0].miscBonus).toBe(0);
+      expect(playerData.abilities[0].featIncrease).toBe(0);
     });
 
     it('handles undefined playerData abilities gracefully', () => {

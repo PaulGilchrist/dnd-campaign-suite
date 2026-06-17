@@ -1,5 +1,5 @@
 import { findFeat } from '../shared/featFinder.js';
-import { resetMiscBonuses, applyAbilityScoreIncreases, mergeDeduplicated } from '../shared/buffApplier.js';
+import { resetFeatIncreases, applyAbilityScoreIncreases, mergeDeduplicated } from '../shared/buffApplier.js';
 
 /**
  * Feat Buff Service
@@ -505,7 +505,7 @@ export function computeAllFeatBuffs(formData, allFeats) {
 export function applyFeatBuffsToFormData(formData, allFeats) {
   const buffs = computeAllFeatBuffs(formData, allFeats);
 
-  resetMiscBonuses(formData.abilities);
+  resetFeatIncreases(formData.abilities);
   applyAbilityScoreIncreases(formData.abilities, buffs.abilityScoreIncreases);
   mergeDeduplicated(formData, 'resistances', buffs.resistances);
 
@@ -513,5 +513,5 @@ export function applyFeatBuffsToFormData(formData, allFeats) {
 }
 
 export function clearAppliedFeatBuffs(formData) {
-  resetMiscBonuses(formData.abilities);
+  resetFeatIncreases(formData.abilities);
 }

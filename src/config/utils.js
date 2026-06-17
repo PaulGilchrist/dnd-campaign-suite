@@ -34,14 +34,15 @@ export async function calculatePointBuyCost(baseScore, ruleset = '5e') {
 
 /**
  * Calculate total score for an ability
- * @param {object} ability - Ability object with baseScore, abilityImprovements, miscBonus
+ * @param {object} ability - Ability object with baseScore, featIncrease, backgroundIncrease, miscIncrease
  * @returns {number} - Total score
  */
 export const calculateTotalScore = (ability) => {
   const base = parseInt(ability.baseScore) || 8;
-  const improvements = parseInt(ability.abilityImprovements) || 0;
-  const misc = parseInt(ability.miscBonus) || 0;
-  return base + improvements + misc;
+  const feat = parseInt(ability.featIncrease) || 0;
+  const bg = parseInt(ability.backgroundIncrease) || 0;
+  const misc = parseInt(ability.miscIncrease) || 0;
+  return base + feat + bg + misc;
 };
 
 /**
@@ -73,11 +74,8 @@ export async function validateAbility(ability, index, ruleset = '5e', level = 1)
   if (totalScore > maxTotal) {
     errors.totalScore = `Total score (base + improvements + misc) cannot exceed ${maxTotal}`;
   }
-  if (parseInt(ability.abilityImprovements) < 0) {
-    errors.abilityImprovements = 'Improvements must be 0 or above';
-  }
-  if (parseInt(ability.miscBonus) < 0) {
-    errors.miscBonus = 'Misc bonus must be 0 or above';
+  if (parseInt(ability.miscIncrease) < 0) {
+    errors.miscIncrease = 'Misc bonus must be 0 or above';
   }
 
   return errors;

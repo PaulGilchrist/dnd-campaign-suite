@@ -5,14 +5,14 @@ vi.mock('../shared/featFinder.js', () => ({
 }));
 
 vi.mock('../shared/buffApplier.js', () => ({
-  resetMiscBonuses: vi.fn(),
+  resetFeatIncreases: vi.fn(),
   applyAbilityScoreIncreases: vi.fn(),
   mergeDeduplicated: vi.fn(),
 }));
 
 import { findFeat } from '../shared/featFinder.js';
 import {
-  resetMiscBonuses,
+  resetFeatIncreases,
   applyAbilityScoreIncreases,
   mergeDeduplicated,
 } from '../shared/buffApplier.js';
@@ -20,11 +20,11 @@ import {
 import { applyFeatBuffsToFormData } from './featBuffService.js';
 
 describe('applyFeatBuffsToFormData', () => {
-  it('should reset misc bonuses on abilities', () => {
+  it('should reset feat increases on abilities', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 5 }],
+      abilities: [{ name: 'Strength', featIncrease: 5 }],
     };
 
     findFeat.mockReturnValue({
@@ -33,14 +33,14 @@ describe('applyFeatBuffsToFormData', () => {
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(resetMiscBonuses).toHaveBeenCalledWith(formData.abilities);
+    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
   });
 
   it('should apply ability score increases to abilities', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     findFeat.mockReturnValue({
@@ -59,7 +59,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
       resistances: [],
     };
 
@@ -80,7 +80,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     findFeat.mockReturnValue({
@@ -98,7 +98,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     findFeat.mockReturnValue({
@@ -119,7 +119,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     findFeat.mockReturnValue({
@@ -135,7 +135,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough', 'Alert'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
       specialActions: [
         { name: 'Custom Action', description: 'Already there', type: 'custom' },
       ],
@@ -159,7 +159,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     findFeat.mockReturnValue({
@@ -175,7 +175,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
       specialActions: ['Existing Action'],
     };
 
@@ -192,7 +192,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     findFeat.mockReturnValue({
@@ -209,7 +209,7 @@ describe('applyFeatBuffsToFormData', () => {
   it('should default to "5e" ruleset when not specified', () => {
     const formData = {
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     findFeat.mockReturnValue({
@@ -225,12 +225,12 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '5e',
       feats: [],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(resetMiscBonuses).toHaveBeenCalledWith(formData.abilities);
+    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
     expect(applyAbilityScoreIncreases).toHaveBeenCalledWith(
       formData.abilities,
       []
@@ -240,19 +240,19 @@ describe('applyFeatBuffsToFormData', () => {
   it('should handle undefined feats in formData', () => {
     const formData = {
       rules: '5e',
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(resetMiscBonuses).toHaveBeenCalledWith(formData.abilities);
+    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
   });
 
   it('should not modify specialActions when feature already exists', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
       specialActions: [
         { name: 'Cantrip', description: 'Old cantrip', type: 'spell' },
       ],
@@ -271,7 +271,7 @@ describe('applyFeatBuffsToFormData', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
-      abilities: [{ name: 'Strength', miscBonus: 0 }],
+      abilities: [{ name: 'Strength', featIncrease: 0 }],
     };
 
     findFeat.mockReturnValue({

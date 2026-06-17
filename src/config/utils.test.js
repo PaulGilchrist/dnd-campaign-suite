@@ -46,8 +46,9 @@ describe('character-creation/utils', () => {
         it('should calculate total score correctly', () => {
             const ability = {
                 baseScore: '10',
-                abilityImprovements: '2',
-                miscBonus: '1'
+                featIncrease: '2',
+                miscIncrease: '1',
+                backgroundIncrease: '0'
                 };
 
             const result = utils.calculateTotalScore(ability);
@@ -58,8 +59,9 @@ describe('character-creation/utils', () => {
         it('should handle string values', () => {
             const ability = {
                 baseScore: '15',
-                abilityImprovements: '5',
-                miscBonus: '0'
+                featIncrease: '5',
+                miscIncrease: '0',
+                backgroundIncrease: '0'
                 };
 
             const result = utils.calculateTotalScore(ability);
@@ -69,8 +71,9 @@ describe('character-creation/utils', () => {
 
         it('should default to 8 for missing baseScore', () => {
             const ability = {
-                abilityImprovements: '2',
-                miscBonus: '1'
+                featIncrease: '2',
+                miscIncrease: '1',
+                backgroundIncrease: '0'
                 };
 
             const result = utils.calculateTotalScore(ability);
@@ -78,10 +81,11 @@ describe('character-creation/utils', () => {
             expect(result).toBe(11);
            });
 
-        it('should default to 0 for missing abilityImprovements', () => {
+        it('should default to 0 for missing featIncrease', () => {
             const ability = {
                 baseScore: '10',
-                miscBonus: '1'
+                miscIncrease: '1',
+                backgroundIncrease: '0'
                 };
 
             const result = utils.calculateTotalScore(ability);
@@ -89,10 +93,11 @@ describe('character-creation/utils', () => {
             expect(result).toBe(11);
            });
 
-        it('should default to 0 for missing miscBonus', () => {
+        it('should default to 0 for missing miscIncrease', () => {
             const ability = {
                 baseScore: '10',
-                abilityImprovements: '2'
+                featIncrease: '2',
+                backgroundIncrease: '0'
                 };
 
             const result = utils.calculateTotalScore(ability);
@@ -109,8 +114,9 @@ describe('character-creation/utils', () => {
         it('should handle negative values', () => {
             const ability = {
                 baseScore: '10',
-                abilityImprovements: '-1',
-                miscBonus: '-1'
+                featIncrease: '-1',
+                miscIncrease: '-1',
+                backgroundIncrease: '0'
                 };
 
             const result = utils.calculateTotalScore(ability);
@@ -121,8 +127,9 @@ describe('character-creation/utils', () => {
         it('should handle invalid values', () => {
             const ability = {
                 baseScore: 'invalid',
-                abilityImprovements: 'invalid',
-                miscBonus: 'invalid'
+                featIncrease: 'invalid',
+                miscIncrease: 'invalid',
+                backgroundIncrease: 'invalid'
                 };
 
             const result = utils.calculateTotalScore(ability);
@@ -254,8 +261,9 @@ describe('character-creation/utils', () => {
         it('should return no errors for a valid ability', async () => {
             const ability = {
                 baseScore: 10,
-                abilityImprovements: 0,
-                miscBonus: 0
+                featIncrease: 0,
+                miscIncrease: 0,
+                backgroundIncrease: 0
               };
             const result = await utils.validateAbility(ability, 0, '5e', 1);
             expect(result).toEqual({});
@@ -264,8 +272,9 @@ describe('character-creation/utils', () => {
         it('should return error when baseScore is below minimum', async () => {
             const ability = {
                 baseScore: 7,
-                abilityImprovements: 0,
-                miscBonus: 0
+                featIncrease: 0,
+                miscIncrease: 0,
+                backgroundIncrease: 0
               };
             const result = await utils.validateAbility(ability, 0, '5e', 1);
             expect(result.baseScore).toBe('Base score must be at least 8');
@@ -274,8 +283,9 @@ describe('character-creation/utils', () => {
         it('should return error when baseScore exceeds maximum', async () => {
             const ability = {
                 baseScore: 16,
-                abilityImprovements: 0,
-                miscBonus: 0
+                featIncrease: 0,
+                miscIncrease: 0,
+                backgroundIncrease: 0
               };
             const result = await utils.validateAbility(ability, 0, '5e', 1);
             expect(result.baseScore).toBe('Base score cannot exceed 15 (point buy max)');
@@ -284,8 +294,9 @@ describe('character-creation/utils', () => {
         it('should return error when totalScore exceeds maximum', async () => {
             const ability = {
                 baseScore: 15,
-                abilityImprovements: 6,
-                miscBonus: 0
+                featIncrease: 6,
+                miscIncrease: 0,
+                backgroundIncrease: 0
               };
             const result = await utils.validateAbility(ability, 0, '5e', 1);
             expect(result.totalScore).toBe('Total score (base + improvements + misc) cannot exceed 20');
@@ -294,31 +305,34 @@ describe('character-creation/utils', () => {
         it('should allow higher totalScore max at level 20', async () => {
             const ability = {
                 baseScore: 15,
-                abilityImprovements: 5,
-                miscBonus: 0
+                featIncrease: 5,
+                miscIncrease: 0,
+                backgroundIncrease: 0
               };
             const result = await utils.validateAbility(ability, 0, '5e', 20);
             expect(result.totalScore).toBeUndefined();
         });
 
-        it('should return error for negative abilityImprovements', async () => {
+        it('should not validate featIncrease (source does not check it)', async () => {
             const ability = {
                 baseScore: 10,
-                abilityImprovements: -1,
-                miscBonus: 0
+                featIncrease: -1,
+                miscIncrease: 0,
+                backgroundIncrease: 0
               };
             const result = await utils.validateAbility(ability, 0, '5e', 1);
-            expect(result.abilityImprovements).toBe('Improvements must be 0 or above');
+            expect(result.featIncrease).toBeUndefined();
         });
 
-        it('should return error for negative miscBonus', async () => {
+        it('should return error for negative miscIncrease', async () => {
             const ability = {
                 baseScore: 10,
-                abilityImprovements: 0,
-                miscBonus: -1
+                featIncrease: 0,
+                miscIncrease: -1,
+                backgroundIncrease: 0
               };
             const result = await utils.validateAbility(ability, 0, '5e', 1);
-            expect(result.miscBonus).toBe('Misc bonus must be 0 or above');
+            expect(result.miscIncrease).toBe('Misc bonus must be 0 or above');
      });
       });
 

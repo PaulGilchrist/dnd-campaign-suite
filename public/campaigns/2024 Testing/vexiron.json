@@ -6,38 +6,44 @@
     {
       "name": "Strength",
       "baseScore": 10,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 15,
-      "abilityImprovements": 0,
-      "miscBonus": 1
+      "featIncrease": 0,
+      "miscIncrease": 1,
+      "backgroundIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 14,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 12,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 13,
-      "abilityImprovements": 0,
-      "miscBonus": 1
+      "featIncrease": 0,
+      "miscIncrease": 1,
+      "backgroundIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 8,
-      "abilityImprovements": 0,
-      "miscBonus": 0
+      "featIncrease": 0,
+      "miscIncrease": 0,
+      "backgroundIncrease": 0
     }
   ],
   "background": "Hermit",

@@ -134,13 +134,17 @@
                         "maximum": 30,
                         "description": "The base score for this ability before modifiers"
                     },
-                    "abilityImprovements": {
+                    "featIncrease": {
                         "type": "integer",
-                        "description": "Number of ability score improvements applied"
+                        "description": "Ability score increase from feats (ASI, race, etc.)"
                     },
-                    "miscBonus": {
+                    "backgroundIncrease": {
                         "type": "integer",
-                        "description": "Miscellaneous bonus to this ability score from various sources"
+                        "description": "Ability score increase from background selection"
+                    },
+                    "miscIncrease": {
+                        "type": "integer",
+                        "description": "Miscellaneous bonus/penalty to this ability score from magic items or DM"
                     }
                 }
             }

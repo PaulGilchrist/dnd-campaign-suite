@@ -176,12 +176,12 @@ describe('rules', () => {
       const playerStats = {
         level: 5,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 2, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 2, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Fighter',
@@ -208,7 +208,7 @@ describe('rules', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Fighter',
@@ -229,8 +229,8 @@ describe('rules', () => {
       const playerStats = {
         level: 20,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 14, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Barbarian',
@@ -252,7 +252,7 @@ describe('rules', () => {
       const playerStats = {
         level: 19,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Barbarian',
@@ -272,7 +272,7 @@ describe('rules', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Fighter',
@@ -291,7 +291,7 @@ describe('rules', () => {
       const playerStats = {
         level: 5,
         abilities: [
-          { name: 'Dexterity', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Dexterity', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Rogue',
@@ -312,7 +312,7 @@ describe('rules', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Fighter',
@@ -389,12 +389,12 @@ describe('rules', () => {
       const playerSummary = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         inventory: { equipped: [], magicItems: [] },
         skillProficiencies: [],
@@ -431,12 +431,12 @@ describe('rules', () => {
       const playerSummary = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         inventory: { equipped: [], magicItems: [] },
         skillProficiencies: [],
@@ -513,7 +513,7 @@ describe('rules', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Fighter',
@@ -539,8 +539,8 @@ describe('rules', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-          { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0 }
+          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
         ],
         class: {
           name: 'Fighter',
@@ -605,7 +605,7 @@ describe('rules', () => {
         const playerStats = {
           rules: '5e',
           level: 1,
-          abilities: [{ name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 }],
+          abilities: [{ name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }],
           class: { name: 'Fighter', saving_throws: [] },
           skillProficiencies: [],
           expertise: []
@@ -734,12 +734,12 @@ describe('rules', () => {
           class: { name: 'Fighter' },
           race: { name: 'Human' },
           abilities: [
-            { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+            { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
           ],
           inventory: { equipped: [], magicItems: [] },
           skillProficiencies: [],
@@ -769,12 +769,12 @@ describe('rules', () => {
           class: { name: 'Fighter' },
           race: { name: 'Human' },
           abilities: [
-            { name: 'Strength', baseScore: 15, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Constitution', baseScore: 13, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Intelligence', baseScore: 12, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Wisdom', baseScore: 10, abilityImprovements: 0, miscBonus: 0 },
-            { name: 'Charisma', baseScore: 8, abilityImprovements: 0, miscBonus: 0 }
+            { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+            { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
           ],
           inventory: { equipped: [], magicItems: [] },
           skillProficiencies: [],
