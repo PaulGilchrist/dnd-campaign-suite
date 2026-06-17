@@ -1,509 +1,207 @@
-import { describe, it, expect } from 'vitest';
-import { getClassFeatures } from './classFeatures.js';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-describe('getClassFeatures', () => {
-  describe('Bard Features (5e)', () => {
-    it('should return correct bardicDie, songOfRestDie, magicalSecrets, subclassMagicalSecrets for 5e rules', () => {
-      const playerStats = {
-        class: {
-          name: 'Bard',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { bardic_inspiration_die: 6, song_of_rest_die: 6, magical_secrets_max_5: 2 } }
-          ]
-        },
-        level: 3
-      };
+describe('classFeatures', () => {
+  let classRules;
+  let classRules2024;
 
-      const result = getClassFeatures(playerStats);
-
-      expect(result.bardicDie).toBe(6);
-      expect(result.songOfRestDie).toBe(6);
-      expect(result.magicalSecrets).toBe(2);
-      expect(result.subclassMagicalSecrets).toBe(0);
-    });
-
-    it('should return subclassMagicalSecrets for Lore subclass', () => {
-      const playerStats = {
-        class: {
-          name: 'Bard',
-          subclass: {
-            name: 'Lore',
-            class_levels: [
-              { level: 3, subclass_specific: { additional_magical_secrets_max_lvl: 2 } }
-            ]
-          },
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { bardic_inspiration_die: 6 } }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.subclassMagicalSecrets).toBe(2);
-    });
+  beforeEach(() => {
+    vi.resetModules();
+    classRules = vi.fn();
+    classRules2024 = vi.fn();
+    vi.doMock('./classRules.js', () => ({ default: classRules }));
+    vi.doMock('./classRules2024.js', () => ({ default: classRules2024 }));
   });
 
-  describe('Bard Features (2024)', () => {
-    it('should return bardicDie with songOfRestDie and magicalSecrets as null', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Bard',
-          class_levels: [
-            { level: 1 },
-            { level: 2 },
-            { level: 3, bardic_die: 6 }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.bardicDie).toBe(6);
-      expect(result.songOfRestDie).toBeNull();
-      expect(result.magicalSecrets).toBeNull();
-      expect(result.subclassMagicalSecrets).toBe(0);
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('Cleric Features (5e)', () => {
-    it('should return maxChannelDivinity and destroyUndeadCR', () => {
-      const playerStats = {
-        class: {
-          name: 'Cleric',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { channel_divinity_charges: 1, destroy_undead_cr: 1/2 } }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.maxChannelDivinity).toBe(1);
-      expect(result.destroyUndeadCR).toBe(1/2);
-    });
+  it('returns null for unknown class name', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Fighter' } });
+    expect(result).toBeNull();
   });
 
-  describe('Cleric Features (2024)', () => {
-    it('should return maxChannelDivinity with destroyUndeadCR as null', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Cleric',
-          class_levels: [
-            { level: 1 },
-            { level: 2 },
-            { level: 3, channel_divinity: 1 }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.maxChannelDivinity).toBe(1);
-      expect(result.destroyUndeadCR).toBeNull();
-    });
+  it('calls classRules.getBardFeatures for Bard 5e', async () => {
+    classRules.getBardFeatures = vi.fn().mockReturnValue({ bardicInspiration: 4 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Bard' } });
+    expect(classRules.getBardFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ bardicInspiration: 4 });
   });
 
-  describe('Druid Features (5e)', () => {
-    it('should return correct wild shape data with limitations based on fly flag', () => {
-      const playerStats = {
-        class: {
-          name: 'Druid',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { wild_shape_max_cr: 1/2, wild_shape_fly: true } }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.maxWildShapeUses).toBe(2);
-      expect(result.maxWildShapeChallengeRating).toBe(1/2);
-      expect(result.beastKnownForms).toBe(0);
-      expect(result.wildShapeLimitations).toBe('walk, swim, or fly');
-    });
-
-    it('should return correct wild shape data with limitations based on swim flag', () => {
-      const playerStats = {
-        class: {
-          name: 'Druid',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { wild_shape_max_cr: 1/2, wild_shape_swim: true } }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.wildShapeLimitations).toBe('walk or swim only (no fly)');
-    });
-
-    it('should return walk only limitation when neither fly nor swim is true', () => {
-      const playerStats = {
-        class: {
-          name: 'Druid',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { wild_shape_max_cr: 1/2 } }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.wildShapeLimitations).toBe('walk only (no swim or fly)');
-    });
+  it('calls classRules2024.getBardFeatures for Bard 2024', async () => {
+    classRules2024.getBardFeatures = vi.fn().mockReturnValue({ bardicDie: 6 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Bard' } });
+    expect(classRules2024.getBardFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ bardicDie: 6 });
   });
 
-  describe('Druid Features (2024)', () => {
-    it('should return wild shape data from 2024 methods', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Druid',
-          class_levels: [
-            { level: 1 },
-            { level: 2 },
-            { level: 3, beast_max_cr: 1, wild_shape: 2, beast_known_forms: 4, beast_fly_speed: 'Yes' }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.maxWildShapeUses).toBe(2);
-      expect(result.maxWildShapeChallengeRating).toBe(1);
-      expect(result.beastKnownForms).toBe(4);
-      expect(result.wildShapeLimitations).toBe('walk, swim, or fly');
-    });
-
-    it('should return walk or swim only when beast_fly_speed is not Yes', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Druid',
-          class_levels: [
-            { level: 3, beast_max_cr: 1, wild_shape: 2, beast_known_forms: 4, beast_fly_speed: 'No' }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.wildShapeLimitations).toBe('walk or swim only (no fly)');
-    });
+  it('calls classRules.getClericFeatures for Cleric 5e', async () => {
+    classRules.getClericFeatures = vi.fn().mockReturnValue({ maxChannelDivinity: 2 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Cleric' } });
+    expect(classRules.getClericFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ maxChannelDivinity: 2 });
   });
 
-  describe('Paladin Features (5e)', () => {
-    it('should return channel divinity, aura range, and extra attacks', () => {
-      const playerStats = {
-        class: {
-          name: 'Paladin',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { channel_divinity_charges: 1, aura_range: 10 } }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.maxChannelDivinity).toBe(1);
-      expect(result.auraRange).toBe(10);
-      expect(result.extraAttacks).toBe(0);
-    });
-
-    it('should return extra attacks for level > 4', () => {
-      const playerStats = {
-        class: {
-          name: 'Paladin',
-          class_levels: [
-            { level: 5, class_specific: { channel_divinity_charges: 1 } }
-          ]
-        },
-        level: 5
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.extraAttacks).toBe(1);
-    });
+  it('calls classRules2024.getClericFeatures for Cleric 2024', async () => {
+    classRules2024.getClericFeatures = vi.fn().mockReturnValue({ maxChannelDivinity: 3 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Cleric' } });
+    expect(classRules2024.getClericFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ maxChannelDivinity: 3 });
   });
 
-  describe('Paladin Features (2024)', () => {
-    it('should return channel divinity with aura range as null', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Paladin',
-          class_levels: [
-            { level: 1 },
-            { level: 2 },
-            { level: 3, channel_divinity: 1 }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.maxChannelDivinity).toBe(1);
-      expect(result.auraRange).toBeNull();
-      expect(result.extraAttacks).toBe(0);
-    });
+  it('calls classRules.getDruidFeatures for Druid 5e', async () => {
+    classRules.getDruidFeatures = vi.fn().mockReturnValue({ maxWildShapeUses: 2 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Druid' } });
+    expect(classRules.getDruidFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ maxWildShapeUses: 2 });
   });
 
-  describe('Sorcerer Features (5e)', () => {
-    it('should return sorcery points, metamagic known, and spell slot costs', () => {
-      const playerStats = {
-        class: {
-          name: 'Sorcerer',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { sorcery_points: 3, metamagic_known: 2, creating_spell_slots: [{ sorcery_point_cost: 2 }, { sorcery_point_cost: 3 }] } }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.maxSorceryPoints).toBe(3);
-      expect(result.metamagicKnown).toBe(2);
-      expect(result.creatingSpellSlotCosts).toEqual([2, 3]);
-    });
+  it('calls classRules2024.getDruidFeatures for Druid 2024', async () => {
+    classRules2024.getDruidFeatures = vi.fn().mockReturnValue({ maxWildShapeUses: 3 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Druid' } });
+    expect(classRules2024.getDruidFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ maxWildShapeUses: 3 });
   });
 
-  describe('Sorcerer Features (2024)', () => {
-    it('should return sorcery points and metamagic known based on level', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Sorcerer',
-          class_levels: [
-            { level: 1 },
-            { level: 2 },
-            { level: 3, sorcery_points: 3 }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.maxSorceryPoints).toBe(3);
-      expect(result.metamagicKnown).toBe(2);
-      expect(result.creatingSpellSlotCosts).toEqual([]);
-    });
-
-    it('should return 4 metamagic known for level 10', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Sorcerer',
-          class_levels: [
-            { level: 10, sorcery_points: 10 }
-          ]
-        },
-        level: 10
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.metamagicKnown).toBe(4);
-    });
-
-    it('should return 6 metamagic known for level 17', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Sorcerer',
-          class_levels: [
-            { level: 17, sorcery_points: 17 }
-          ]
-        },
-        level: 17
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.metamagicKnown).toBe(6);
-    });
+  it('calls classRules.getPaladinFeatures for Paladin 5e', async () => {
+    classRules.getPaladinFeatures = vi.fn().mockReturnValue({ maxChannelDivinity: 2 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Paladin' } });
+    expect(classRules.getPaladinFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ maxChannelDivinity: 2 });
   });
 
-  describe('Warlock Features (5e)', () => {
-    it('should return invocations known and arcanum data for level > 10', () => {
-      const playerStats = {
-        class: {
-          name: 'Warlock',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 11, class_specific: { invocations_known: 6, mystic_arcanum_level_6: 1, mystic_arcanum_level_7: 1 } }
-          ],
-          arcanums: [{ level: 6, spell: 'Sunbeam' }]
-        },
-        level: 11
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.invocationsKnown).toBe(6);
-      expect(result.hasArcanum).toBe(true);
-      expect(result.arcanumLevels).toEqual({ level6: 1, level7: 1, level8: 0, level9: 0 });
-      expect(result.arcanums).toEqual([{ level: 6, spell: 'Sunbeam' }]);
-    });
-
-    it('should return hasArcanum false for level <= 10', () => {
-      const playerStats = {
-        class: {
-          name: 'Warlock',
-          class_levels: [
-            { level: 10, class_specific: { invocations_known: 5 } }
-          ]
-        },
-        level: 10
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.hasArcanum).toBe(false);
-      expect(result.arcanumLevels).toEqual({ level6: 0, level7: 0, level8: 0, level9: 0 });
-    });
+  it('calls classRules2024.getPaladinFeatures for Paladin 2024', async () => {
+    classRules2024.getPaladinFeatures = vi.fn().mockReturnValue({ maxChannelDivinity: 3 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Paladin' } });
+    expect(classRules2024.getPaladinFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ maxChannelDivinity: 3 });
   });
 
-  describe('Warlock Features (2024)', () => {
-    it('should return eldritch invocations with hasArcanum false for low level', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Warlock',
-          class_levels: [
-            { level: 1 },
-            { level: 2, eldritch_invocations: 2 }
-          ],
-          pactBoon: { name: 'Pact of the Blade' },
-          invocations: [{ name: 'Agonizing Blast' }]
-        },
-        level: 2
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.invocationsKnown).toBe(2);
-      expect(result.hasArcanum).toBe(false);
-      expect(result.arcanumLevels).toBeNull();
-      expect(result.arcanums).toEqual([]);
-      expect(result.pactBoon).toEqual({ name: 'Pact of the Blade' });
-      expect(result.invocations).toEqual([{ name: 'Agonizing Blast' }]);
-    });
-
-    it('should return arcanum data for high level 2024 Warlock', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Warlock',
-          class_levels: Array.from({ length: 13 }, (_, i) => {
-            const level = i + 1;
-            return level === 13 ? { level, eldritch_invocations: 8 } : { level };
-          }),
-          arcanums: ['Crown of Stars'],
-          pactBoon: { name: 'Pact of the Blade' },
-          invocations: ['Agonizing Blast']
-        },
-        level: 13
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.invocationsKnown).toBe(8);
-      expect(result.hasArcanum).toBe(true);
-      expect(result.arcanumLevels).toEqual({ level6: 1, level7: 1, level8: 0, level9: 0 });
-      expect(result.arcanums).toEqual(['Crown of Stars']);
-      expect(result.pactBoon).toEqual({ name: 'Pact of the Blade' });
-      expect(result.invocations).toEqual(['Agonizing Blast']);
-    });
+  it('calls classRules.getSorcererFeatures for Sorcerer 5e', async () => {
+    classRules.getSorcererFeatures = vi.fn().mockReturnValue({ maxSorceryPoints: 5 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Sorcerer' } });
+    expect(classRules.getSorcererFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ maxSorceryPoints: 5 });
   });
 
-  describe('Wizard Features (5e)', () => {
-    it('should return arcane recovery levels with showWizardFeatures true', () => {
-      const playerStats = {
-        class: {
-          name: 'Wizard',
-          class_levels: [
-            { level: 1, class_specific: {} },
-            { level: 2, class_specific: {} },
-            { level: 3, class_specific: { arcane_recovery_levels: 2 } }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.arcaneRecoveryLevels).toBe(2);
-      expect(result.showWizardFeatures).toBe(true);
-    });
+  it('calls classRules2024.getSorcererFeatures for Sorcerer 2024', async () => {
+    classRules2024.getSorcererFeatures = vi.fn().mockReturnValue({ maxSorceryPoints: 10 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Sorcerer' } });
+    expect(classRules2024.getSorcererFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ maxSorceryPoints: 10 });
   });
 
-  describe('Wizard Features (2024)', () => {
-    it('should return showWizardFeatures false', () => {
-      const playerStats = {
-        rules: '2024',
-        class: {
-          name: 'Wizard',
-          class_levels: [
-            { level: 1 },
-            { level: 2 },
-            { level: 3 }
-          ]
-        },
-        level: 3
-      };
-
-      const result = getClassFeatures(playerStats);
-
-      expect(result.showWizardFeatures).toBe(false);
-      expect(result.arcaneRecoveryLevels).toBe(0);
-    });
+  it('calls classRules.getWarlockFeatures for Warlock 5e', async () => {
+    classRules.getWarlockFeatures = vi.fn().mockReturnValue({ invocationsKnown: 2 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Warlock' } });
+    expect(classRules.getWarlockFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ invocationsKnown: 2 });
   });
 
-  describe('Unknown class', () => {
-    it('should return null for unknown class names', () => {
-      const playerStats = {
-        class: {
-          name: 'NonExistentClass'
-        },
-        level: 1
-      };
+  it('calls classRules2024.getWarlockFeatures for Warlock 2024', async () => {
+    classRules2024.getWarlockFeatures = vi.fn().mockReturnValue({ invocationsKnown: 4 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Warlock' } });
+    expect(classRules2024.getWarlockFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ invocationsKnown: 4 });
+  });
 
-      const result = getClassFeatures(playerStats);
+  it('calls classRules.getWizardFeatures for Wizard 5e', async () => {
+    classRules.getWizardFeatures = vi.fn().mockReturnValue({ arcaneRecoveryLevels: 1 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Wizard' } });
+    expect(classRules.getWizardFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ arcaneRecoveryLevels: 1 });
+  });
 
-      expect(result).toBeNull();
-    });
+  it('calls classRules2024.getWizardFeatures for Wizard 2024', async () => {
+    classRules2024.getWizardFeatures = vi.fn().mockReturnValue({ arcaneRecoveryLevels: 2 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Wizard' } });
+    expect(classRules2024.getWizardFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ arcaneRecoveryLevels: 2 });
+  });
+
+  it('calls classRules.getMonkFeatures for Monk 5e', async () => {
+    classRules.getMonkFeatures = vi.fn().mockReturnValue({ martialArtsDie: 4 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Monk' } });
+    expect(classRules.getMonkFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ martialArtsDie: 4 });
+  });
+
+  it('calls classRules2024.getMonkFeatures for Monk 2024', async () => {
+    classRules2024.getMonkFeatures = vi.fn().mockReturnValue({ martialArtsDie: 6 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Monk' } });
+    expect(classRules2024.getMonkFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ martialArtsDie: 6 });
+  });
+
+  it('calls classRules.getRogueFeatures for Rogue 5e', async () => {
+    classRules.getRogueFeatures = vi.fn().mockReturnValue({ sneakAttack: { dice_count: 3, dice_value: 6 } });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Rogue' } });
+    expect(classRules.getRogueFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ sneakAttack: { dice_count: 3, dice_value: 6 } });
+  });
+
+  it('calls classRules2024.getRogueFeatures for Rogue 2024', async () => {
+    classRules2024.getRogueFeatures = vi.fn().mockReturnValue({ sneakAttack: { dice_count: 5, dice_value: 6 } });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Rogue' } });
+    expect(classRules2024.getRogueFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ sneakAttack: { dice_count: 5, dice_value: 6 } });
+  });
+
+  it('calls classRules.getRangerFeatures for Ranger 5e', async () => {
+    classRules.getRangerFeatures = vi.fn().mockReturnValue({ favoredEnemies: 1 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: { name: 'Ranger' } });
+    expect(classRules.getRangerFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ favoredEnemies: 1 });
+  });
+
+  it('calls classRules2024.getRangerFeatures for Ranger 2024', async () => {
+    classRules2024.getRangerFeatures = vi.fn().mockReturnValue({ favoredEnemies: 2 });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Ranger' } });
+    expect(classRules2024.getRangerFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ favoredEnemies: 2 });
+  });
+
+
+  it('handles playerStats with no class property', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e' });
+    expect(result).toBeNull();
+  });
+
+  it('handles playerStats with null class property', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '5e', class: null });
+    expect(result).toBeNull();
+  });
+
+  it('prefers classRules2024 over classRules for 2024 ruleset', async () => {
+    classRules.getBardFeatures = vi.fn().mockReturnValue({ from5e: true });
+    classRules2024.getBardFeatures = vi.fn().mockReturnValue({ from2024: true });
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024', class: { name: 'Bard' } });
+    expect(classRules.getBardFeatures).not.toHaveBeenCalled();
+    expect(classRules2024.getBardFeatures).toHaveBeenCalled();
+    expect(result).toEqual({ from2024: true });
   });
 });

@@ -1,63 +1,138 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-    isDivineSmite,
-    getInspiringSmitePassives,
-    hasInspiringSmite,
-} from './inspiringSmiteService.js';
+  isDivineSmite,
+  getInspiringSmitePassives,
+  hasInspiringSmite,
+  triggerInspiringSmite,
+} from './inspiringSmiteService.js'
+
+vi.mock('../../automation/index.js', () => ({
+  executeHandler: vi.fn(async () => null),
+}))
 
 describe('inspiringSmiteService', () => {
-    describe('isDivineSmite', () => {
-        it('returns true for Divine Smite (case insensitive)', () => {
-            expect(isDivineSmite({ name: 'Divine Smite' })).toBe(true);
-            expect(isDivineSmite({ name: 'divine smite' })).toBe(true);
-            expect(isDivineSmite({ name: 'DIVINE SMITE' })).toBe(true);
-        });
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
-        it('returns false for other spells', () => {
-            expect(isDivineSmite({ name: 'Burning Hands' })).toBe(false);
-            expect(isDivineSmite({ name: 'Thunderwave' })).toBe(false);
-        });
-    });
+  describe('isDivineSmite', () => {
+    it('returns true for "Divine Smite"', () => {
+      expect(isDivineSmite({ name: 'Divine Smite' })).toBe(true)
+    })
 
-    describe('getInspiringSmitePassives', () => {
-        it('filters for post_cast_inspiring_smite type passives', () => {
-            const playerStats = {
-                automation: {
-                    passives: [
-                        { type: 'post_cast_inspiring_smite', name: 'Inspiring Smite' },
-                        { type: 'post_cast_smite_cover', name: 'Smite of Protection' },
-                        { type: 'passive_buff', name: 'Aura' },
-                    ],
-                },
-            };
-            const result = getInspiringSmitePassives(playerStats);
-            expect(result).toHaveLength(1);
-            expect(result[0].name).toBe('Inspiring Smite');
-        });
+    it('returns true for lowercase', () => {
+      expect(isDivineSmite({ name: 'divine smite' })).toBe(true)
+    })
 
-        it('returns empty array when no passives', () => {
-            const playerStats = { automation: { passives: [] } };
-            expect(getInspiringSmitePassives(playerStats)).toHaveLength(0);
-        });
+    it('returns false for other spells', () => {
+      expect(isDivineSmite({ name: 'Fireball' })).toBe(false)
+    })
 
-        it('returns empty array when no passives key', () => {
-            const playerStats = {};
-            expect(getInspiringSmitePassives(playerStats)).toHaveLength(0);
-        });
-    });
+    it('returns false for empty name', () => {
+      expect(isDivineSmite({ name: '' })).toBe(false)
+    })
 
-    describe('hasInspiringSmite', () => {
-        it('returns true when inspiring smite passive exists', () => {
-            const playerStats = {
-                automation: {
-                    passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspiring Smite' }],
-                },
-            };
-            expect(hasInspiringSmite(playerStats)).toBe(true);
-        });
+    it('returns false for undefined name', () => {
+      expect(isDivineSmite({})).toBe(false)
+    })
+  })
 
-        it('returns false when no inspiring smite passive', () => {
-            const playerStats = { automation: { passives: [] } };
-            expect(hasInspiringSmite(playerStats)).toBe(false);
-        });
-    });
-});
+  describe('getInspiringSmitePassives', () => {
+    it('returns passives with type post_cast_inspiring_smite', () => {
+      const stats = {
+        automation: {
+          passives: [
+            { type: 'post_cast_inspiring_smite', name: 'Inspiring Smite 1' },
+            { type: 'other_type', name: 'Other' },
+            { type: 'post_cast_inspiring_smite', name: 'Inspiring Smite 2' },
+          ],
+        },
+      }
+      const result = getInspiringSmitePassives(stats)
+      expect(result).toHaveLength(2)
+      expect(result[0].name).toBe('Inspiring Smite 1')
+    })
+
+    it('returns empty array when no passives exist', () => {
+      expect(getInspiringSmitePassives({})).toEqual([])
+    })
+
+    it('returns empty array when passives is undefined', () => {
+      expect(getInspiringSmitePassives({ automation: {} })).toEqual([])
+    })
+  })
+
+  describe('hasInspiringSmite', () => {
+    it('returns true when inspiring smite passives exist', () => {
+      const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite' }] } }
+      expect(hasInspiringSmite(stats)).toBe(true)
+    })
+
+    it('returns false when no inspiring smite passives exist', () => {
+      const stats = { automation: { passives: [{ type: 'other' }] } }
+      expect(hasInspiringSmite(stats)).toBe(false)
+    })
+
+    it('returns false when no passives', () => {
+      expect(hasInspiringSmite({})).toBe(false)
+    })
+  })
+
+  describe('triggerInspiringSmite', () => {
+    it('returns null for non-divine smite spell', async () => {
+      const result = await triggerInspiringSmite({ name: 'Fireball' }, {}, {}, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when no slot level used', async () => {
+      const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } }
+      const result = await triggerInspiringSmite({ name: 'Divine Smite', level: 0 }, { slotLevel: 0 }, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when no inspiring smite passives', async () => {
+      const stats = { automation: { passives: [] } }
+      const result = await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 2 }, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('calls executeHandler for each inspiring smite passive', async () => {
+      const { executeHandler } = await import('../../automation/index.js')
+      vi.mocked(executeHandler).mockResolvedValue({ success: true })
+
+      const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } }
+      const result = await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 2 }, stats, 'camp', 'map')
+      expect(executeHandler).toHaveBeenCalled()
+      expect(result).toEqual([{ success: true }])
+    })
+
+    it('returns null when executeHandler returns falsy results', async () => {
+      const { executeHandler } = await import('../../automation/index.js')
+      vi.mocked(executeHandler).mockResolvedValue(null)
+      const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } }
+      const result = await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 2 }, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('handles executeHandler errors gracefully', async () => {
+      const { executeHandler } = await import('../../automation/index.js')
+      vi.mocked(executeHandler).mockRejectedValue(new Error('fail'))
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } }
+      const result = await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 2 }, stats, 'camp', 'map')
+      expect(consoleSpy).toHaveBeenCalled()
+      expect(result).toBeNull()
+      consoleSpy.mockRestore()
+    })
+
+    it('passes spell level when metaCtx has no slotLevel', async () => {
+      const { executeHandler } = await import('../../automation/index.js')
+      vi.mocked(executeHandler).mockResolvedValue({ success: true })
+
+      const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } }
+      await triggerInspiringSmite({ name: 'Divine Smite', level: 1 }, {}, stats, 'camp', 'map')
+      expect(executeHandler).toHaveBeenCalled()
+    })
+  })
+})

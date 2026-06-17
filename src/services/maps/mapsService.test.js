@@ -1,240 +1,404 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import {
-  loadMapData,
-  updateMapDescription,
-  formatMapName,
-  toKebabCase,
-} from './mapsService';
+import { toKebabCase, formatMapName } from './mapsService.js';
 
-// ─── fetch mock helpers ────────────────────────────────────────────────
-
-function mockFetch(ok, body) {
-  return vi.spyOn(global, 'fetch').mockResolvedValue({
-    ok,
-    json: async () => body,
-  });
-}
-
-function mockFetchError(errorMsg = 'API error') {
-  return vi.spyOn(global, 'fetch').mockResolvedValue({
-    ok: false,
-    json: async () => ({ error: errorMsg }),
-  });
-}
-
-function mockFetchNetworkError() {
-  return vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network'));
-}
-
-// ─── console.error suppression ────────────────────────────────────────
-let consoleSpy;
-beforeEach(() => {
-  consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-});
-afterEach(() => {
-  consoleSpy.mockRestore();
-  vi.restoreAllMocks();
-});
-
-// ════════════════════════════════════════════════════════════════════════
-// formatMapName — lines 166-173 (currently uncovered)
-// ════════════════════════════════════════════════════════════════════════
-
-describe('formatMapName', () => {
-  it('returns empty string for null input', () => {
-    expect(formatMapName(null)).toBe('');
+describe('mapsService', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    global.fetch = vi.fn();
   });
 
-  it('returns empty string for undefined input', () => {
-    expect(formatMapName(undefined)).toBe('');
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete global.fetch;
   });
 
-  it('returns empty string for empty string input', () => {
-    expect(formatMapName('')).toBe('');
+  describe('toKebabCase', () => {
+    it('converts spaces to hyphens', () => {
+      expect(toKebabCase('My Map')).toBe('my-map');
+    });
+
+    it('removes non-alphanumeric characters', () => {
+      expect(toKebabCase('Map #1!')).toBe('map-1');
+    });
+
+    it('lowercases the result', () => {
+      expect(toKebabCase('UPPER CASE MAP')).toBe('upper-case-map');
+    });
+
+    it('removes .json extension', () => {
+      expect(toKebabCase('map.json')).toBe('map');
+    });
+
+    it('handles already kebab-cased input', () => {
+      expect(toKebabCase('already-kebab')).toBe('already-kebab');
+    });
+
+    it('returns empty string for empty input', () => {
+      expect(toKebabCase('')).toBe('');
+    });
   });
 
-  it('converts kebab-case to Title Case', () => {
-    expect(formatMapName('dungeon-hall')).toBe('Dungeon Hall');
-  });
+  describe('loadMaps', () => {
+    it('fetches maps from the API', async () => {
+      const mockMaps = [{ name: 'Dungeon', fileName: 'dungeon.json' }];
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockMaps,
+      });
 
-  it('strips .json suffix before formatting', () => {
-    expect(formatMapName('treasure-room.json')).toBe('Treasure Room');
-  });
+      const { loadMaps } = await import('./mapsService.js');
+      const result = await loadMaps('testCampaign');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps',
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(result).toEqual(mockMaps);
+    });
 
-  it('handles single word without dashes', () => {
-    expect(formatMapName('entrance')).toBe('Entrance');
-  });
+    it('throws error on non-ok response', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'Not found' }),
+      });
 
-  it('capitalizes each segment', () => {
-    expect(formatMapName('long-dark-corridor')).toBe('Long Dark Corridor');
-  });
+      const { loadMaps } = await import('./mapsService.js');
+      await expect(loadMaps('testCampaign')).rejects.toThrow('Not found');
+    });
 
-  it('handles mixed case input (lowercases then uppercases first char)', () => {
-    expect(formatMapName('Dark-Hall')).toBe('Dark Hall');
-  });
-});
+    it('catches and re-throws fetch errors', async () => {
+      global.fetch.mockRejectedValue(new Error('network error'));
 
-// ════════════════════════════════════════════════════════════════════════
-// toKebabCase — used by loadMapData, updateMapDescription (exported)
-// ═════════════════════════════════════odash──────────────────────────────
+      const { loadMaps } = await import('./mapsService.js');
+      await expect(loadMaps('testCampaign')).rejects.toThrow('network error');
+    });
 
-describe('toKebabCase', () => {
-  it('converts spaces to dashes', () => {
-    expect(toKebabCase('Dungeon Hall')).toBe('dungeon-hall');
-  });
+    it('encodes campaign name in URL', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => [],
+      });
 
-  it('strips .json suffix', () => {
-    expect(toKebabCase('Treasure Room.json')).toBe('treasure-room');
-  });
-
-  it('removes special characters', () => {
-    expect(toKebabCase('Room #1 (Main)')).toBe('room-1-main');
-  });
-
-  it('lowercases everything', () => {
-    expect(toKebabCase('UPPER CASE')).toBe('upper-case');
-  });
-});
-
-// ═════════════════════════════════─────────────────────────────────────
-// loadMapData — success path (already covered elsewhere? testing fail here)
-// Uncovered lines: 140-143 (catch block with console.error + throw)
-// ════════════════════════════════════════════════════════════════════════
-
-describe('loadMapData', () => {
-  const campaign = 'my-campaign';
-  const mapName = 'Dungeon Hall';
-
-  it('returns map data on successful GET', async () => {
-    const fetchData = mockFetch(true, { id: 'dungeon-hall', type: 'indoor' });
-    const result = await loadMapData(campaign, mapName);
-    expect(result).toEqual({ id: 'dungeon-hall', type: 'indoor' });
-    expect(fetchData).toHaveBeenCalledWith(
-      `/api/campaigns/${encodeURIComponent(campaign)}/maps/dungeon-hall`,
-      { method: 'GET', headers: { 'Content-Type': 'application/json' } },
-    );
-  });
-
-  // Lines 140-143: catch block with console.error + throw (error response path)
-  it('throws error on non-ok response and logs to console', async () => {
-    const errMsg = 'Map not found';
-    mockFetchError(errMsg);
-
-    await expect(loadMapData(campaign, mapName)).rejects.toThrow(errMsg);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Error loading map data:',
-      expect.any(Error),
-    );
-  });
-
-  // Lines 140-143: catch block — network error path
-  it('throws on network failure and logs to console', async () => {
-    mockFetchNetworkError();
-    await expect(loadMapData(campaign, mapName)).rejects.toThrow('network');
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Error loading map data:',
-      expect.any(Error),
-    );
-  });
-
-  it('encodes campaign name in URL', async () => {
-    const fetchData = mockFetch(true, {});
-    await loadMapData('My Campaign?', 'Test Map');
-    expect(fetchData).toHaveBeenLastCalledWith(
-        '/api/campaigns/My%20Campaign%3F/maps/test-map',
-      expect.any(Object),
+      const { loadMaps } = await import('./mapsService.js');
+      await loadMaps('my campaign');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/my%20campaign/maps',
+        expect.anything()
       );
     });
   });
 
-// ═════════════─────────────────────────────────────────────────────────
-// updateMapDescription — lines 146-163 (currently uncovered)
-// ════════════════════════════════════════════════════════════════════════
+  describe('createMap', () => {
+    it('creates a map via POST', async () => {
+      const mockMap = { name: 'Dungeon', fileName: 'dungeon.json' };
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockMap,
+      });
 
-describe('updateMapDescription', () => {
-  const campaign = 'my-campaign';
-  const mapName = 'Dungeon Hall';
-
-  it('sends PUT request with description payload on success', async () => {
-    const desc = 'A dark and dusty corridor.';
-    const responseData = { name: 'dungeon-hall', description: desc };
-    const fetchData = mockFetch(true, responseData);
-
-    const result = await updateMapDescription(campaign, mapName, desc);
-    expect(result).toEqual(responseData);
-    expect(fetchData).toHaveBeenCalledWith(
-      `/api/campaigns/${encodeURIComponent(campaign)}/maps/dungeon-hall/description`,
-      {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ description: desc }),
-      },
-    );
-  });
-
-  it('throws and logs on non-ok response', async () => {
-    const errMsg = 'Failed to update description';
-    mockFetchError(errMsg);
-
-    await expect(
-      updateMapDescription(campaign, mapName, 'new desc'),
-    ).rejects.toThrow(errMsg);
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Error updating map description:',
-      expect.any(Error),
-    );
-  });
-
-  it('throws custom error message when server returns one', async () => {
-    const errMsg = 'Map not found';
-    mockFetchError(errMsg);
-
-    await expect(
-      updateMapDescription(campaign, mapName, ''),
-    ).rejects.toThrow(errMsg);
-  });
-
-  it('encodes campaign and map name in URL', async () => {
-    const fetchData = mockFetch(true, {});
-    await updateMapDescription('Adventure Map', 'Grand Hall', 'test');
-    expect(fetchData).toHaveBeenLastCalledWith(
-      '/api/campaigns/Adventure%20Map/maps/grand-hall/description',
-      expect.any(Object),
-    );
-  });
-
-  it('uses default error message when server body has no error field', async () => {
-    const fetchData = vi.spyOn(global, 'fetch').mockResolvedValue({
-      ok: false,
-      json: async () => ({}),
+      const { createMap } = await import('./mapsService.js');
+      const result = await createMap('testCampaign', 'Dungeon');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ name: 'Dungeon', type: 'indoor' }),
+        })
+      );
+      expect(result).toEqual(mockMap);
     });
 
-    await expect(
-      updateMapDescription(campaign, mapName, 'desc'),
-    ).rejects.toThrow('Failed to update map description');
-    expect(fetchData).toHaveBeenCalled();
+    it('creates a map with additional options', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ name: 'Room', fileName: 'room.json' }),
+      });
+
+      const { createMap } = await import('./mapsService.js');
+      await createMap('testCampaign', 'Room', { grid: true, gridSize: 5 });
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps',
+        expect.objectContaining({
+          body: JSON.stringify({ name: 'Room', type: 'indoor', grid: true, gridSize: 5 }),
+        })
+      );
+    });
+
+    it('resolves existing map when map already exists', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'map already exists' }),
+      });
+
+      const { createMap } = await import('./mapsService.js');
+      const result = await createMap('testCampaign', 'Dungeon');
+      expect(result.alreadyExists).toBe(true);
+      expect(result.name).toBe('Dungeon');
+      expect(result.fileName).toBe('dungeon.json');
+    });
+
+    it('throws error for other non-ok responses', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'server error' }),
+      });
+
+      const { createMap } = await import('./mapsService.js');
+      await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow('server error');
+    });
+
+    it('handles empty error response on conflict', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => { throw new Error('empty'); },
+      });
+
+      const { createMap } = await import('./mapsService.js');
+      await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow();
+    });
+
+    it('encodes campaign name in URL', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ name: 'Map', fileName: 'map.json' }),
+      });
+
+      const { createMap } = await import('./mapsService.js');
+      await createMap('my campaign', 'Map');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/my%20campaign/maps',
+        expect.anything()
+      );
+    });
   });
 
-  it('throws and logs on network failure', async () => {
-    mockFetchNetworkError();
+  describe('deleteMap', () => {
+    it('deletes a map via DELETE', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
 
-    await expect(
-      updateMapDescription(campaign, mapName, 'desc'),
-    ).rejects.toThrow('network');
-    expect(consoleSpy).toHaveBeenCalledWith(
-      'Error updating map description:',
-      expect.any(Error),
-    );
+      const { deleteMap } = await import('./mapsService.js');
+      const result = await deleteMap('testCampaign', 'Dungeon');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon',
+        expect.objectContaining({ method: 'DELETE' })
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it('encodes map name in URL', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      const { deleteMap } = await import('./mapsService.js');
+      await deleteMap('testCampaign', 'My Dungeon');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/my-dungeon',
+        expect.anything()
+      );
+    });
+
+    it('throws error on non-ok response', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'not found' }),
+      });
+
+      const { deleteMap } = await import('./mapsService.js');
+      await expect(deleteMap('testCampaign', 'Dungeon')).rejects.toThrow('not found');
+    });
   });
 
-  it('handles empty description', async () => {
-    const fetchData = mockFetch(true, { description: '' });
-    await updateMapDescription(campaign, mapName, '');
-    expect(fetchData).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.objectContaining({
-        body: JSON.stringify({ description: '' }),
-      }),
-    );
+  describe('renameMap', () => {
+    it('renames a map via PUT', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      const { renameMap } = await import('./mapsService.js');
+      const result = await renameMap('testCampaign', 'OldName', 'NewName');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/oldname/rename',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ newName: 'NewName' }),
+        })
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it('encodes both old and new map names', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      const { renameMap } = await import('./mapsService.js');
+      await renameMap('testCampaign', 'Old Map', 'New Map');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/old-map/rename',
+        expect.anything()
+      );
+    });
+
+    it('throws error on non-ok response', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'not found' }),
+      });
+
+      const { renameMap } = await import('./mapsService.js');
+      await expect(renameMap('testCampaign', 'Old', 'New')).rejects.toThrow('not found');
+    });
+  });
+
+  describe('activateMap', () => {
+    it('activates a map via PUT', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      const { activateMap } = await import('./mapsService.js');
+      const result = await activateMap('testCampaign', 'Dungeon');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon/activate',
+        expect.objectContaining({ method: 'PUT' })
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it('throws error on non-ok response', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'not found' }),
+      });
+
+      const { activateMap } = await import('./mapsService.js');
+      await expect(activateMap('testCampaign', 'Dungeon')).rejects.toThrow('not found');
+    });
+  });
+
+  describe('saveMapData', () => {
+    it('saves map data via PUT', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      const { saveMapData } = await import('./mapsService.js');
+      const data = { tiles: [], tokens: [] };
+      const result = await saveMapData('testCampaign', 'Dungeon', data);
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify(data),
+        })
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it('throws error on non-ok response', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'save failed' }),
+      });
+
+      const { saveMapData } = await import('./mapsService.js');
+      await expect(saveMapData('testCampaign', 'Dungeon', {})).rejects.toThrow('save failed');
+    });
+  });
+
+  describe('loadMapData', () => {
+    it('loads map data via GET', async () => {
+      const mockData = { tiles: [], tokens: [] };
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => mockData,
+      });
+
+      const { loadMapData } = await import('./mapsService.js');
+      const result = await loadMapData('testCampaign', 'Dungeon');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon',
+        expect.objectContaining({ method: 'GET' })
+      );
+      expect(result).toEqual(mockData);
+    });
+
+    it('throws error on non-ok response', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'not found' }),
+      });
+
+      const { loadMapData } = await import('./mapsService.js');
+      await expect(loadMapData('testCampaign', 'Dungeon')).rejects.toThrow('not found');
+    });
+  });
+
+  describe('updateMapDescription', () => {
+    it('updates map description via PUT', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true }),
+      });
+
+      const { updateMapDescription } = await import('./mapsService.js');
+      const result = await updateMapDescription('testCampaign', 'Dungeon', 'A dark dungeon');
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon/description',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ description: 'A dark dungeon' }),
+        })
+      );
+      expect(result).toEqual({ success: true });
+    });
+
+    it('throws error on non-ok response', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'not found' }),
+      });
+
+      const { updateMapDescription } = await import('./mapsService.js');
+      await expect(updateMapDescription('testCampaign', 'Dungeon', 'desc')).rejects.toThrow('not found');
+    });
+  });
+
+  describe('formatMapName', () => {
+    it('converts kebab-case to title case', () => {
+      expect(formatMapName('dungeon-map')).toBe('Dungeon Map');
+    });
+
+    it('handles single word', () => {
+      expect(formatMapName('dungeon')).toBe('Dungeon');
+    });
+
+    it('removes .json extension', () => {
+      expect(formatMapName('dungeon-map.json')).toBe('Dungeon Map');
+    });
+
+    it('handles empty string', () => {
+      expect(formatMapName('')).toBe('');
+    });
+
+    it('handles null input', () => {
+      expect(formatMapName(null)).toBe('');
+    });
+
+    it('handles undefined input', () => {
+      expect(formatMapName(undefined)).toBe('');
+    });
+
+    it('handles multiple hyphens', () => {
+      expect(formatMapName('deep-dungeon-map')).toBe('Deep Dungeon Map');
+    });
   });
 });

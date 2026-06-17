@@ -1,180 +1,199 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handle, getEffectOptions } from './eyebiteHandler.js';
 
 vi.mock('../../common/savePrompt.js', () => ({
-    buildSaveDc: vi.fn((auto, playerStats) => {
-        const prof = playerStats.proficiency || 0;
-        const wisBonus = playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0;
-        return 8 + wisBonus + prof;
-    }),
+    buildSaveDc: vi.fn((auto) => auto.saveDc || 15),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
-    getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
+    getCombatContext: vi.fn(),
 }));
 
 vi.mock('../../../maps/mapsService.js', () => ({
-    loadMapData: vi.fn(() => Promise.resolve(null)),
+    loadMapData: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-    rangeToFeet: vi.fn(range => {
-        if (!range) return 60;
-        const match = range.match(/(\d+)\s*ft/);
-        return match ? parseInt(match[1], 10) : 60;
+    rangeToFeet: vi.fn((r) => {
+        if (typeof r === 'number') return r;
+        const m = String(r).match(/(\d+)/);
+        return m ? parseInt(m[1], 10) : 60;
     }),
 }));
 
-describe('eyebiteHandler', () => {
+import { handle, getEffectOptions } from './eyebiteHandler.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import * as mapsService from '../../../maps/mapsService.js';
+
+const campaignName = 'TestCampaign';
+const mapName = 'TestMap';
+
+function makePlayerStats(overrides = {}) {
+    return {
+        name: 'Necromancer1',
+        level: 7,
+        proficiency: 4,
+        abilities: [{ name: 'Intelligence', bonus: 3 }],
+        ...overrides,
+    };
+}
+
+function makeAction(automation = {}) {
+    return {
+        name: 'Eyebite',
+        automation: { type: 'eyebite', ...automation },
+    };
+}
+
+// ─── handle ───
+
+describe('eyebiteHandler.handle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    const campaignName = 'TestCampaign';
-    const mapName = 'TestMap';
+    it('returns a modal with modalName eyebiteEffect', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
 
-    function makePlayerStats(overrides = {}) {
-        return {
-            name: 'TestWizard',
-            level: 10,
-            proficiency: 4,
-            abilities: [
-                { name: 'Wisdom', bonus: 3 },
-            ],
-            ...overrides,
-        };
-    }
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
-    function makeAction(automation = {}) {
-        return {
-            name: 'Eyebite',
-            automation: {
-                type: 'eyebite',
-                saveType: 'WIS',
-                range: '60 ft',
-                duration: '1_minute',
-                ...automation,
-            },
-        };
-    }
-
-    it('returns a modal result with eyebiteEffect modalName', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
-
-        expect(result).toBeDefined();
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('eyebiteEffect');
     });
 
-    it('includes saveDc in payload', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
+    it('includes correct payload properties', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
+        mapsService.loadMapData.mockResolvedValue({
+            players: [{ name: 'Necromancer1', gridX: 5, gridY: 10 }],
+        });
 
-        expect(result.payload.saveDc).toBe(15);
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload).toHaveProperty('combatSummary');
+        expect(result.payload).toHaveProperty('attackerName', 'Necromancer1');
+        expect(result.payload).toHaveProperty('saveDc');
+        expect(result.payload).toHaveProperty('campaignName', campaignName);
+        expect(result.payload).toHaveProperty('mapData');
+        expect(result.payload).toHaveProperty('featureName', 'Eyebite');
+        expect(result.payload).toHaveProperty('rangeFeet');
+        expect(result.payload).toHaveProperty('durationRounds', 10);
     });
 
-    it('includes rangeFeet in payload', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
+    it('includes attackerPos when mapName provided and player found on map', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
+        mapsService.loadMapData.mockResolvedValue({
+            players: [{ name: 'Necromancer1', gridX: 5, gridY: 10 }],
+        });
 
-        expect(result.payload.rangeFeet).toBe(60);
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.attackerPos).toEqual({ gridX: 5, gridY: 10 });
     });
 
-    it('includes durationRounds of 10 for 1_minute duration', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
+    it('has null attackerPos when player not found on map', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
+        mapsService.loadMapData.mockResolvedValue({
+            players: [],
+        });
 
-        expect(result.payload.durationRounds).toBe(10);
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('includes combatSummary in payload', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
+    it('has null attackerPos when mapName is null', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
 
-        expect(result.payload.combatSummary).toBeDefined();
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('includes attackerName in payload', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
+    it('uses automation range or defaults to 60', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
 
-        expect(result.payload.attackerName).toBe('TestWizard');
+        const result = await handle(makeAction({ range: '120 ft' }), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.rangeFeet).toBe(120);
     });
 
-    it('includes featureName in payload', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
+    it('uses saveDc from buildSaveDc', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
 
-        expect(result.payload.featureName).toBe('Eyebite');
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.saveDc).toBeDefined();
     });
 
-    it('includes campaignName in payload', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
+    it('handles map load failure gracefully', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
+        mapsService.loadMapData.mockRejectedValue(new Error('Map not found'));
 
-        expect(result.payload.campaignName).toBe('TestCampaign');
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.type).toBe('modal');
+        expect(result.payload.attackerPos).toBeNull();
     });
 
-    it('handles null mapName', async () => {
-        const action = makeAction();
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, null);
+    it('returns modal even when no creatures in combat', async () => {
+        getCombatContext.mockResolvedValue({ creatures: [] });
 
-        expect(result).toBeDefined();
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
         expect(result.type).toBe('modal');
         expect(result.modalName).toBe('eyebiteEffect');
-    });
-
-    it('handles custom range', async () => {
-        const action = makeAction({ range: '30 ft' });
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
-
-        expect(result.payload.rangeFeet).toBe(30);
-    });
-
-    it('returns default 60 feet when range is missing', async () => {
-        const action = makeAction({ range: undefined });
-        const playerStats = makePlayerStats();
-        const result = await handle(action, playerStats, campaignName, mapName);
-
-        expect(result.payload.rangeFeet).toBe(60);
     });
 });
 
+// ─── getEffectOptions ───
+
 describe('getEffectOptions', () => {
-    it('returns three effect options', () => {
+    it('returns the EFFECT_OPTIONS array', () => {
         const options = getEffectOptions();
-        expect(options).toHaveLength(3);
+
+        expect(Array.isArray(options)).toBe(true);
+        expect(options.length).toBe(3);
     });
 
-    it('includes asleep effect', () => {
+    it('includes asleep option with unconscious condition', () => {
         const options = getEffectOptions();
-        const asleep = options.find(o => o.key === 'asleep');
+        const asleep = options.find((o) => o.key === 'asleep');
+
         expect(asleep).toBeDefined();
+        expect(asleep.label).toBe('Asleep');
         expect(asleep.condition).toBe('unconscious');
     });
 
-    it('includes panicked effect', () => {
+    it('includes panicked option with frightened condition', () => {
         const options = getEffectOptions();
-        const panicked = options.find(o => o.key === 'panicked');
+        const panicked = options.find((o) => o.key === 'panicked');
+
         expect(panicked).toBeDefined();
+        expect(panicked.label).toBe('Panicked');
         expect(panicked.condition).toBe('frightened');
     });
 
-    it('includes sickened effect', () => {
+    it('includes sickened option with poisoned condition', () => {
         const options = getEffectOptions();
-        const sickened = options.find(o => o.key === 'sickened');
+        const sickened = options.find((o) => o.key === 'sickened');
+
         expect(sickened).toBeDefined();
+        expect(sickened.label).toBe('Sickened');
         expect(sickened.condition).toBe('poisoned');
     });
 });

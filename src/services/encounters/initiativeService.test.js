@@ -1,392 +1,599 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../dice/diceRoller.js', () => ({
-    rollD20: vi.fn(),
-}));
-
-vi.mock('./encounterToInitiative.js', () => ({
-    getMonsterSaveBonuses: vi.fn(() => ({ str: 1, dex: 2, con: 3, int: 0, wis: 1, cha: -1 })),
-}));
-
-import { rollD20 } from '../dice/diceRoller.js'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-    parseInitBonus,
-    setupCreatures,
-    addNpc,
-    removeNpc,
-    getNextCreatureName,
-    getPreviousCreatureName,
-    isPreviousDisabled,
-    setInitiative,
-    rollNpcInitiative,
-    setTarget,
-    clearCombat,
-    mergeCombatSummaryWithCharacters,
-} from './initiativeService.js'
+  parseInitBonus,
+  setupCreatures,
+  addNpc,
+  removeNpc,
+  getNextCreatureName,
+  getPreviousCreatureName,
+  isPreviousDisabled,
+  setInitiative,
+  rollNpcInitiative,
+  applyNpcMonsterData,
+  setTarget,
+  clearCombat,
+  mergeCombatSummaryWithCharacters,
+} from './initiativeService.js';
 
-function createCharacter(name) {
-    return { name, computedStats: { hitPoints: 30, armorClass: 15 } }
-}
+describe('initiativeService', () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
 
-function createCombatSummary(creatures = [], round = 1) {
-    return { round, creatures }
-}
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-describe('parseInitBonus', () => {
-    it('parses positive bonus from initiative_details', () => {
-        expect(parseInitBonus({ initiative_details: '+5' })).toBe(5)
-    })
+  describe('parseInitBonus', () => {
+    it('returns 0 when initiative_details has no match', () => {
+      expect(parseInitBonus({ initiative_details: 'flat +2' })).toBe(0);
+    });
 
-    it('parses negative bonus from initiative_details', () => {
-        expect(parseInitBonus({ initiative_details: '-2' })).toBe(-2)
-    })
+    it('parses bonus from longer string', () => {
+      expect(parseInitBonus({ initiative_details: '+3 initiative' })).toBe(3);
+    });
 
-    it('returns 0 when initiative_details is missing', () => {
-        expect(parseInitBonus({})).toBe(0)
-    })
+    it('returns positive bonus from match', () => {
+      expect(parseInitBonus({ initiative_details: '+4' })).toBe(4);
+    });
 
-    it('returns 0 when initiative_details is empty string', () => {
-        expect(parseInitBonus({ initiative_details: '' })).toBe(0)
-    })
+    it('returns negative bonus from match', () => {
+      expect(parseInitBonus({ initiative_details: '-2' })).toBe(-2);
+    });
+  });
 
-    it('returns 0 when initiative_details has no leading number', () => {
-        expect(parseInitBonus({ initiative_details: 'advantage' })).toBe(0)
-    })
-})
+  describe('setupCreatures', () => {
+    it('creates player creatures with correct structure', () => {
+      const characters = [{ name: 'Aldric' }, { name: 'Brenna' }];
+      const getName = (name) => name;
+      const result = setupCreatures(characters, 0, getName);
 
-describe('setupCreatures', () => {
-    const getName = (n) => n || 'Unknown'
+      expect(result).toHaveLength(2);
+      expect(result[0].type).toBe('player');
+      expect(result[0].name).toBe('Aldric');
+      expect(result[0].initiative).toBe('');
+      expect(result[0].targetName).toBeNull();
+      expect(result[0].concentration).toBeNull();
+    });
 
-    it('creates player creatures sorted alphabetically', () => {
-        const chars = [createCharacter('Zara'), createCharacter('Alice')]
-        const creatures = setupCreatures(chars, 0, getName)
+    it('sorts creatures alphabetically by name', () => {
+      const characters = [{ name: 'Zara' }, { name: 'Aldric' }, { name: 'Mira' }];
+      const getName = (name) => name;
+      const result = setupCreatures(characters, 0, getName);
 
-        expect(creatures).toHaveLength(2)
-        expect(creatures[0].name).toBe('Alice')
-        expect(creatures[1].name).toBe('Zara')
-    })
+      expect(result[0].name).toBe('Aldric');
+      expect(result[1].name).toBe('Mira');
+      expect(result[2].name).toBe('Zara');
+    });
 
-    it('creates player creatures with empty initiative', () => {
-        const chars = [createCharacter('Alice')]
-        const creatures = setupCreatures(chars, 0, getName)
+    it('creates NPC creatures with default values', () => {
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = setupCreatures(characters, 2, getName);
 
-        expect(creatures[0].initiative).toBe('')
-        expect(creatures[0].type).toBe('player')
-        expect(creatures[0].targetName).toBeNull()
-        expect(creatures[0].concentration).toBeNull()
-    })
+      expect(result).toHaveLength(3);
+      expect(result[1].type).toBe('npc');
+      expect(result[1].name).toBe('NPC 1');
+      expect(result[1].ac).toBe(10);
+      expect(result[1].maxHp).toBe(10);
+      expect(result[1].currentHp).toBe(10);
+      expect(result[1].resistances).toEqual([]);
+      expect(result[1].immunities).toEqual([]);
+      expect(result[1].conditions).toEqual([]);
+      expect(result[1].saveBonuses).toEqual({});
+    });
 
-    it('creates the specified number of NPCs', () => {
-        const chars = [createCharacter('Alice')]
-        const creatures = setupCreatures(chars, 3, getName)
+    it('names NPCs sequentially', () => {
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = setupCreatures(characters, 3, getName);
 
-        expect(creatures).toHaveLength(4)
-        const npcs = creatures.filter(c => c.type === 'npc')
-        expect(npcs).toHaveLength(3)
-        expect(npcs[0].name).toBe('NPC 1')
-        expect(npcs[1].name).toBe('NPC 2')
-        expect(npcs[2].name).toBe('NPC 3')
-    })
+      expect(result[1].name).toBe('NPC 1');
+      expect(result[2].name).toBe('NPC 2');
+      expect(result[3].name).toBe('NPC 3');
+    });
 
-    it('NPCs have default stats', () => {
-        const creatures = setupCreatures([], 1, getName)
-        const npc = creatures[0]
+    it('handles zero characters', () => {
+      const result = setupCreatures([], 1, (name) => name);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('NPC 1');
+    });
 
-        expect(npc.ac).toBe(10)
-        expect(npc.maxHp).toBe(10)
-        expect(npc.currentHp).toBe(10)
-        expect(npc.resistances).toEqual([])
-        expect(npc.immunities).toEqual([])
-        expect(npc.conditions).toEqual([])
-        expect(npc.saveBonuses).toEqual({})
-    })
-})
+    it('handles zero NPCs', () => {
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = setupCreatures(characters, 0, getName);
+      expect(result).toHaveLength(1);
+    });
+  });
 
-describe('addNpc', () => {
-    it('adds NPC with next sequential number', () => {
-        const cs = createCombatSummary([
-            { name: 'NPC 1', type: 'npc' },
-            { name: 'NPC 2', type: 'npc' },
-        ])
-        const nextNum = addNpc(cs)
+  describe('addNpc', () => {
+    it('adds an NPC with sequential numbering', () => {
+      const combatSummary = {
+        round: 1,
+        creatures: [
+          { name: 'NPC 1', type: 'npc' },
+          { name: 'NPC 2', type: 'npc' },
+        ],
+      };
+      const result = addNpc(combatSummary);
+      expect(result).toBe(3);
+      expect(combatSummary.creatures[2].name).toBe('NPC 3');
+      expect(combatSummary.creatures[2].type).toBe('npc');
+      expect(combatSummary.creatures[2].ac).toBe(10);
+      expect(combatSummary.creatures[2].maxHp).toBe(10);
+      expect(combatSummary.creatures[2].currentHp).toBe(10);
+    });
 
-        expect(nextNum).toBe(3)
-        expect(cs.creatures).toHaveLength(3)
-        expect(cs.creatures[2].name).toBe('NPC 3')
-    })
+    it('handles combatSummary with no NPCs', () => {
+      const combatSummary = {
+        round: 1,
+        creatures: [{ name: 'Aldric', type: 'player' }],
+      };
+      const result = addNpc(combatSummary);
+      expect(result).toBe(1);
+      expect(combatSummary.creatures[1].name).toBe('NPC 1');
+    });
+  });
 
-    it('finds next number when NPCs are non-contiguous', () => {
-        const cs = createCombatSummary([
-            { name: 'NPC 1', type: 'npc' },
-            { name: 'NPC 5', type: 'npc' },
-        ])
-        const nextNum = addNpc(cs)
+  describe('removeNpc', () => {
+    it('removes the specified NPC', () => {
+      const combatSummary = {
+        round: 1,
+        creatures: [
+          { name: 'Aldric', type: 'player' },
+          { name: 'NPC 1', type: 'npc' },
+          { name: 'NPC 2', type: 'npc' },
+        ],
+      };
+      removeNpc(combatSummary, 'NPC 1');
+      expect(combatSummary.creatures).toHaveLength(2);
+      expect(combatSummary.creatures[1].name).toBe('NPC 2');
+    });
 
-        expect(nextNum).toBe(6)
-    })
+    it('does nothing for non-existent NPC', () => {
+      const combatSummary = {
+        round: 1,
+        creatures: [{ name: 'NPC 1', type: 'npc' }],
+      };
+      removeNpc(combatSummary, 'NPC 99');
+      expect(combatSummary.creatures).toHaveLength(1);
+    });
+  });
 
-    it('starts at 1 when no NPCs exist', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-        ])
-        const nextNum = addNpc(cs)
+  describe('getNextCreatureName', () => {
+    it('returns next creature in list', () => {
+      const combatSummary = {
+        creatures: [
+          { name: 'Aldric' },
+          { name: 'Brenna' },
+          { name: 'NPC 1' },
+        ],
+      };
+      const result = getNextCreatureName(combatSummary, 'Aldric');
+      expect(result.newActiveName).toBe('Brenna');
+      expect(result.roundIncrement).toBe(false);
+    });
 
-        expect(nextNum).toBe(1)
-    })
-})
+    it('wraps to first creature and increments round at last', () => {
+      const combatSummary = {
+        creatures: [
+          { name: 'Aldric' },
+          { name: 'Brenna' },
+        ],
+      };
+      const result = getNextCreatureName(combatSummary, 'Brenna');
+      expect(result.newActiveName).toBe('Aldric');
+      expect(result.roundIncrement).toBe(true);
+    });
 
-describe('removeNpc', () => {
-    it('removes the named creature', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-            { name: 'NPC 1', type: 'npc' },
-        ])
-        removeNpc(cs, 'NPC 1')
+    it('handles single creature', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric' }],
+      };
+      const result = getNextCreatureName(combatSummary, 'Aldric');
+      expect(result.newActiveName).toBe('Aldric');
+      expect(result.roundIncrement).toBe(true);
+    });
+  });
 
-        expect(cs.creatures).toHaveLength(1)
-        expect(cs.creatures[0].name).toBe('Alice')
-    })
+  describe('getPreviousCreatureName', () => {
+    it('returns previous creature in list', () => {
+      const combatSummary = {
+        creatures: [
+          { name: 'Aldric' },
+          { name: 'Brenna' },
+          { name: 'NPC 1' },
+        ],
+      };
+      const result = getPreviousCreatureName(combatSummary, 'NPC 1');
+      expect(result.newActiveName).toBe('Brenna');
+      expect(result.roundDecrement).toBe(false);
+    });
 
-    it('does nothing if creature not found', () => {
-        const cs = createCombatSummary([{ name: 'Alice', type: 'player' }])
-        removeNpc(cs, 'NonExistent')
+    it('wraps to last creature at first', () => {
+      const combatSummary = {
+        creatures: [
+          { name: 'Aldric' },
+          { name: 'Brenna' },
+        ],
+      };
+      const result = getPreviousCreatureName(combatSummary, 'Aldric');
+      expect(result.newActiveName).toBe('Brenna');
+      expect(result.roundDecrement).toBe(true);
+    });
 
-        expect(cs.creatures).toHaveLength(1)
-    })
-})
+    it('handles single creature', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric' }],
+      };
+      const result = getPreviousCreatureName(combatSummary, 'Aldric');
+      expect(result.newActiveName).toBe('Aldric');
+      expect(result.roundDecrement).toBe(true);
+    });
+  });
 
-describe('getNextCreatureName', () => {
-    it('returns next creature when not at end', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-            { name: 'Bob', type: 'player' },
-            { name: 'NPC 1', type: 'npc' },
-        ])
-        const result = getNextCreatureName(cs, 'Alice')
-
-        expect(result.newActiveName).toBe('Bob')
-        expect(result.roundIncrement).toBe(false)
-    })
-
-    it('wraps to first creature and increments round at end', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-            { name: 'Bob', type: 'player' },
-        ])
-        const result = getNextCreatureName(cs, 'Bob')
-
-        expect(result.newActiveName).toBe('Alice')
-        expect(result.roundIncrement).toBe(true)
-    })
-})
-
-describe('getPreviousCreatureName', () => {
-    it('returns previous creature when not at start', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-            { name: 'Bob', type: 'player' },
-        ])
-        const result = getPreviousCreatureName(cs, 'Bob')
-
-        expect(result.newActiveName).toBe('Alice')
-        expect(result.roundDecrement).toBe(false)
-    })
-
-    it('wraps to last creature and decrements round at start', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-            { name: 'Bob', type: 'player' },
-        ])
-        const result = getPreviousCreatureName(cs, 'Alice')
-
-        expect(result.newActiveName).toBe('Bob')
-        expect(result.roundDecrement).toBe(true)
-    })
-})
-
-describe('isPreviousDisabled', () => {
-    it('returns true when active is first creature in round 1', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-            { name: 'Bob', type: 'player' },
-        ], 1)
-        expect(isPreviousDisabled(cs, 'Alice')).toBe(true)
-    })
-
-    it('returns false when not in round 1', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-        ], 2)
-        expect(isPreviousDisabled(cs, 'Alice')).toBe(false)
-    })
-
-    it('returns false when active is not first creature', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player' },
-            { name: 'Bob', type: 'player' },
-        ], 1)
-        expect(isPreviousDisabled(cs, 'Bob')).toBe(false)
-    })
-
+  describe('isPreviousDisabled', () => {
     it('returns false when combatSummary is null', () => {
-        expect(isPreviousDisabled(null, 'Alice')).toBe(false)
-    })
-})
+      expect(isPreviousDisabled(null, 'Aldric')).toBe(false);
+    });
 
-describe('setInitiative', () => {
-    it('sets initiative and sorts descending', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player', initiative: '10' },
-            { name: 'Bob', type: 'player', initiative: '5' },
-        ])
-        setInitiative(cs, 'Bob', '15')
+    it('returns false when not on first creature', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric' }, { name: 'Brenna' }],
+        round: 1,
+      };
+      expect(isPreviousDisabled(combatSummary, 'Brenna')).toBe(false);
+    });
 
-        expect(cs.creatures[0].name).toBe('Bob')
-        expect(cs.creatures[1].name).toBe('Alice')
-    })
+    it('returns false when round > 1', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric' }],
+        round: 2,
+      };
+      expect(isPreviousDisabled(combatSummary, 'Aldric')).toBe(false);
+    });
 
-    it('does nothing if creature not found', () => {
-        const cs = createCombatSummary([{ name: 'Alice', type: 'player', initiative: '10' }])
-        setInitiative(cs, 'NonExistent', '15')
+    it('returns true when on first creature and round 1', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric' }],
+        round: 1,
+      };
+      expect(isPreviousDisabled(combatSummary, 'Aldric')).toBe(true);
+    });
+  });
 
-        expect(cs.creatures[0].initiative).toBe('10')
-    })
-})
+  describe('setInitiative', () => {
+    it('sets initiative for a creature', () => {
+      const combatSummary = {
+        creatures: [
+          { name: 'Aldric', initiative: '' },
+          { name: 'Brenna', initiative: '' },
+        ],
+      };
+      setInitiative(combatSummary, 'Aldric', '5');
+      expect(combatSummary.creatures[0].initiative).toBe('5');
+    });
 
-describe('rollNpcInitiative', () => {
-    beforeEach(() => {
-        vi.clearAllMocks()
-        rollD20.mockReset()
-    })
+    it('sorts creatures by initiative descending', () => {
+      const combatSummary = {
+        creatures: [
+          { name: 'Aldric', initiative: '3' },
+          { name: 'Brenna', initiative: '7' },
+        ],
+      };
+      setInitiative(combatSummary, 'Aldric', '9');
+      expect(combatSummary.creatures[0].name).toBe('Aldric');
+      expect(combatSummary.creatures[1].name).toBe('Brenna');
+    });
 
-    it('rolls d20 + bonus and sets initiative', () => {
-        rollD20.mockReturnValue(15)
-        const cs = createCombatSummary([
-            { name: 'Goblin', type: 'npc', initiative: '', initiativeBonus: 2 },
-        ])
-        const result = rollNpcInitiative(cs, 'Goblin')
+    it('does nothing for non-existent creature', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric', initiative: '3' }],
+      };
+      setInitiative(combatSummary, 'Nonexistent', '5');
+      expect(combatSummary.creatures[0].initiative).toBe('3');
+    });
+  });
 
-        expect(result.roll).toBe(15)
-        expect(result.bonus).toBe(2)
-        expect(result.total).toBe(17)
-        expect(cs.creatures[0].initiative).toBe('17')
-    })
+  describe('rollNpcInitiative', () => {
+    it('rolls initiative for an NPC', () => {
+      const combatSummary = {
+        creatures: [
+          { name: 'Aldric', type: 'player' },
+          { name: 'NPC 1', type: 'npc', initiativeBonus: 2 },
+        ],
+      };
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      const result = rollNpcInitiative(combatSummary, 'NPC 1');
+      expect(result.roll).toBe(11);
+      expect(result.bonus).toBe(2);
+      expect(result.total).toBe(13);
+      expect(combatSummary.creatures[1].initiative).toBe('13');
+    });
 
-    it('returns null for non-npc creature', () => {
-        const cs = createCombatSummary([{ name: 'Alice', type: 'player' }])
-        const result = rollNpcInitiative(cs, 'Alice')
+    it('returns null for non-NPC', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric', type: 'player' }],
+      };
+      const result = rollNpcInitiative(combatSummary, 'Aldric');
+      expect(result).toBeNull();
+    });
 
-        expect(result).toBeNull()
-    })
+    it('returns null for non-existent creature', () => {
+      const combatSummary = {
+        creatures: [{ name: 'NPC 1', type: 'npc' }],
+      };
+      const result = rollNpcInitiative(combatSummary, 'NPC 99');
+      expect(result).toBeNull();
+    });
 
-    it('returns null for nonexistent creature', () => {
-        const cs = createCombatSummary([])
-        const result = rollNpcInitiative(cs, 'Nobody')
+    it('uses default initiativeBonus of 0', () => {
+      const combatSummary = {
+        creatures: [{ name: 'NPC 1', type: 'npc' }],
+      };
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      const result = rollNpcInitiative(combatSummary, 'NPC 1');
+      expect(result.bonus).toBe(0);
+    });
+  });
 
-        expect(result).toBeNull()
-    })
+  describe('applyNpcMonsterData', () => {
+    it('sets monster data on creature', async () => {
+      const combatSummary = {
+        creatures: [
+          { name: 'NPC 1', type: 'npc' },
+        ],
+      };
+      const monster = {
+        armor_class: 15,
+        damage_resistances: ['fire'],
+        damage_immunities: ['poison'],
+        hit_points: 50,
+        initiative_details: '+4',
+        saving_throws: { str: { modifier: 5 } },
+      };
+      await applyNpcMonsterData(combatSummary, 0, monster, []);
+      expect(combatSummary.creatures[0].ac).toBe(15);
+      expect(combatSummary.creatures[0].resistances).toEqual(['fire']);
+      expect(combatSummary.creatures[0].immunities).toEqual(['poison']);
+      expect(combatSummary.creatures[0].maxHp).toBe(50);
+      expect(combatSummary.creatures[0].currentHp).toBe(50);
+      expect(combatSummary.creatures[0].initiativeBonus).toBe(4);
+      expect(combatSummary.creatures[0].saveBonuses.str).toBe(5);
+    });
 
-    it('sorts creatures by initiative after rolling', () => {
-        rollD20.mockReturnValue(20)
-        const cs = createCombatSummary([
-            { name: 'Goblin', type: 'npc', initiative: '5', initiativeBonus: 0 },
-            { name: 'Orc', type: 'npc', initiative: '10', initiativeBonus: 0 },
-        ])
-        rollNpcInitiative(cs, 'Goblin')
+    it('defaults AC to 10 when not a number', async () => {
+      const combatSummary = {
+        creatures: [{ name: 'NPC 1', type: 'npc' }],
+      };
+      const monster = { armor_class: '15' };
+      await applyNpcMonsterData(combatSummary, 0, monster, []);
+      expect(combatSummary.creatures[0].ac).toBe(10);
+    });
 
-        expect(cs.creatures[0].name).toBe('Goblin')
-        expect(cs.creatures[1].name).toBe('Orc')
-    })
-})
+    it('defaults HP to 10 when not defined', async () => {
+      const combatSummary = {
+        creatures: [{ name: 'NPC 1', type: 'npc' }],
+      };
+      const monster = {};
+      await applyNpcMonsterData(combatSummary, 0, monster, []);
+      expect(combatSummary.creatures[0].maxHp).toBe(10);
+      expect(combatSummary.creatures[0].currentHp).toBe(10);
+    });
 
-describe('setTarget', () => {
-    it('sets target on creature', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player', targetName: null },
-            { name: 'Bob', type: 'player', targetName: null },
-        ])
-        setTarget(cs, 'Alice', 'Bob')
+    it('defaults initiativeBonus to 0 when no match', async () => {
+      const combatSummary = {
+        creatures: [{ name: 'NPC 1', type: 'npc' }],
+      };
+      const monster = { initiative_details: 'flat +2' };
+      await applyNpcMonsterData(combatSummary, 0, monster, []);
+      expect(combatSummary.creatures[0].initiativeBonus).toBe(0);
+    });
 
-        expect(cs.creatures[0].targetName).toBe('Bob')
-    })
+    it('handles missing saveBonuses gracefully', async () => {
+      const combatSummary = {
+        creatures: [{ name: 'NPC 1', type: 'npc' }],
+      };
+      const monster = {};
+      await applyNpcMonsterData(combatSummary, 0, monster, []);
+      expect(combatSummary.creatures[0].saveBonuses).toBeDefined();
+    });
 
-    it('clears target when set to null', () => {
-        const cs = createCombatSummary([
-            { name: 'Alice', type: 'player', targetName: 'Bob' },
-        ])
-        setTarget(cs, 'Alice', null)
+    it('handles non-existent creature index', async () => {
+      const combatSummary = { creatures: [] };
+      const monster = { armor_class: 15 };
+      await applyNpcMonsterData(combatSummary, 5, monster, []);
+      expect(combatSummary.creatures).toEqual([]);
+    });
 
-        expect(cs.creatures[0].targetName).toBeNull()
-    })
+    it('sets imagePath from campaignNpc', async () => {
+      const combatSummary = {
+        creatures: [{ name: 'goblin', type: 'npc' }],
+      };
+      const monster = {};
+      const campaignNpcs = [{ name: 'Goblin', imagePath: '/images/goblin.png' }];
+      await applyNpcMonsterData(combatSummary, 0, monster, campaignNpcs);
+      expect(combatSummary.creatures[0].imagePath).toBe('/images/goblin.png');
+    });
 
-    it('does nothing if creature not found', () => {
-        const cs = createCombatSummary([])
-        setTarget(cs, 'NonExistent', 'Bob')
-    })
-})
+    it('does not set imagePath when no match', async () => {
+      const combatSummary = {
+        creatures: [{ name: 'goblin', type: 'npc' }],
+      };
+      const monster = {};
+      const campaignNpcs = [{ name: 'Orc', imagePath: '/images/orc.png' }];
+      await applyNpcMonsterData(combatSummary, 0, monster, campaignNpcs);
+      expect(combatSummary.creatures[0].imagePath).toBeUndefined();
+    });
+  });
 
-describe('clearCombat', () => {
-    const getName = (n) => n || 'Unknown'
+  describe('setTarget', () => {
+    it('sets target for a creature', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric', targetName: null }],
+      };
+      setTarget(combatSummary, 'Aldric', 'Goblin');
+      expect(combatSummary.creatures[0].targetName).toBe('Goblin');
+    });
 
-    it('creates fresh combat with round 1', () => {
-        const chars = [createCharacter('Alice')]
-        const result = clearCombat(chars, 2, getName)
+    it('clears target when value is null', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric', targetName: 'Goblin' }],
+      };
+      setTarget(combatSummary, 'Aldric', null);
+      expect(combatSummary.creatures[0].targetName).toBeNull();
+    });
 
-        expect(result.round).toBe(1)
-        expect(result.creatures).toHaveLength(3)
-    })
-})
+    it('does nothing for non-existent creature', () => {
+      const combatSummary = {
+        creatures: [{ name: 'Aldric', targetName: 'Goblin' }],
+      };
+      setTarget(combatSummary, 'Nonexistent', null);
+      expect(combatSummary.creatures[0].targetName).toBe('Goblin');
+    });
+  });
 
-describe('mergeCombatSummaryWithCharacters', () => {
-    const getName = (n) => n || 'Unknown'
+  describe('clearCombat', () => {
+    it('creates fresh combat summary with setupCreatures', () => {
+      const characters = [{ name: 'Aldric' }, { name: 'Brenna' }];
+      const getName = (name) => name;
+      const result = clearCombat(characters, 2, getName);
 
-    it('merges player creatures with defaults', () => {
-        const initial = {
-            round: 2,
-            creatures: [
-                { name: 'Alice', type: 'player' },
-                { name: 'Goblin', type: 'npc' },
-            ],
-        }
-        const chars = [createCharacter('Alice')]
-        const result = mergeCombatSummaryWithCharacters(initial, chars, getName)
+      expect(result.round).toBe(1);
+      expect(result.creatures).toHaveLength(4);
+      expect(result.creatures[0].type).toBe('player');
+      expect(result.creatures[2].type).toBe('npc');
+    });
+  });
 
-        expect(result.round).toBe(2)
-        const player = result.creatures.find(c => c.name === 'Alice')
-        expect(player.initiative).toBe('')
-        expect(player.targetName).toBeNull()
-        expect(player.concentration).toBeNull()
-    })
+  describe('mergeCombatSummaryWithCharacters', () => {
+    it('merges initial summary with characters', () => {
+      const initialSummary = {
+        round: 2,
+        creatures: [
+          { name: 'Aldric', type: 'player', initiative: '5', targetName: 'Goblin', concentration: 'spell1' },
+          { name: 'NPC 1', type: 'npc', initiative: '3', conditions: ['poisoned'], currentHp: 5, maxHp: 10 },
+        ],
+      };
+      const characters = [{ name: 'Aldric' }, { name: 'Brenna' }];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
 
-    it('merges NPC creatures with defaults', () => {
-        const initial = {
-            round: 1,
-            creatures: [
-                { name: 'Goblin', type: 'npc' },
-            ],
-        }
-        const result = mergeCombatSummaryWithCharacters(initial, [], getName)
+      expect(result.round).toBe(2);
+      expect(result.creatures).toHaveLength(3);
+      expect(result.creatures.find(c => c.name === 'Aldric').initiative).toBe('5');
+      expect(result.creatures.find(c => c.name === 'NPC 1').currentHp).toBe(5);
+      expect(result.creatures.find(c => c.name === 'Brenna').type).toBe('player');
+    });
 
-        const npc = result.creatures[0]
-        expect(npc.conditions).toEqual([])
-        expect(npc.concentration).toBeNull()
-        expect(npc.currentHp).toBe(10)
-        expect(npc.maxHp).toBe(10)
-        expect(npc.saveBonuses).toEqual({})
-    })
+    it('preserves initiative from initial summary or defaults to empty', () => {
+      const initialSummary = {
+        round: 1,
+        creatures: [
+          { name: 'Aldric', type: 'player', initiative: '7', targetName: null, concentration: null },
+        ],
+      };
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures[0].initiative).toBe('7');
+    });
 
-    it('preserves existing NPC values when present', () => {
-        const initial = {
-            round: 1,
-            creatures: [
-                { name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10, conditions: [{ id: '1', key: 'poisoned' }] },
-            ],
-        }
-        const result = mergeCombatSummaryWithCharacters(initial, [], getName)
+    it('defaults initiative to empty string when not in summary', () => {
+      const initialSummary = {
+        round: 1,
+        creatures: [],
+      };
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures[0].initiative).toBe('');
+    });
 
-        const npc = result.creatures[0]
-        expect(npc.currentHp).toBe(5)
-        expect(npc.maxHp).toBe(10)
-        expect(npc.conditions).toHaveLength(1)
-    })
-})
+    it('defaults targetName to null when not in summary', () => {
+      const initialSummary = {
+        round: 1,
+        creatures: [],
+      };
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures[0].targetName).toBeNull();
+    });
+
+    it('defaults concentration to null when not in summary', () => {
+      const initialSummary = {
+        round: 1,
+        creatures: [],
+      };
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures[0].concentration).toBeNull();
+    });
+
+    it('defaults NPC currentHp to maxHp when not set', () => {
+      const initialSummary = {
+        round: 1,
+        creatures: [
+          { name: 'NPC 1', type: 'npc', maxHp: 20 },
+        ],
+      };
+      const characters = [];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures[0].currentHp).toBe(20);
+    });
+
+    it('defaults NPC maxHp to 10 when not set', () => {
+      const initialSummary = {
+        round: 1,
+        creatures: [
+          { name: 'NPC 1', type: 'npc' },
+        ],
+      };
+      const characters = [];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures[0].maxHp).toBe(10);
+      expect(result.creatures[0].currentHp).toBe(10);
+    });
+
+    it('sorts merged creatures alphabetically', () => {
+      const initialSummary = {
+        round: 1,
+        creatures: [
+          { name: 'Zara', type: 'player', initiative: '', targetName: null, concentration: null },
+        ],
+      };
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures[0].name).toBe('Aldric');
+      expect(result.creatures[1].name).toBe('Zara');
+    });
+
+    it('handles empty initial summary', () => {
+      const initialSummary = { round: 1, creatures: [] };
+      const characters = [{ name: 'Aldric' }];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures).toHaveLength(1);
+      expect(result.round).toBe(1);
+    });
+
+    it('handles empty characters array', () => {
+      const initialSummary = {
+        round: 1,
+        creatures: [
+          { name: 'NPC 1', type: 'npc', initiative: '3' },
+        ],
+      };
+      const characters = [];
+      const getName = (name) => name;
+      const result = mergeCombatSummaryWithCharacters(initialSummary, characters, getName);
+      expect(result.creatures).toHaveLength(1);
+    });
+  });
+});

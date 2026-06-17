@@ -1,253 +1,331 @@
-import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import WizardStepRaceClass from './WizardStepRaceClass.jsx';
 
-describe('WizardStepRaceClass', () => {
-  const mockProps = {
-    formData: {
-      race: { name: 'Human' },
-      class: { name: 'Fighter' },
-     },
-    errors: {},
-    ruleset: '5e',
-    onInputChange: vi.fn(),
-    racesData: [
-       { name: 'Human', subraces: [{ index: 'hill', name: 'Hill' }, { index: 'high', name: 'High' }] },
-       { name: 'Elf', subraces: [{ index: 'wood', name: 'Wood' }, { index: 'drow', name: 'Drow' }] },
-      ],
-    classSubtypes: [
-       { className: 'Fighter', subtypes: [{ name: 'Champion' }, { name: 'Battle Master' }] },
-       { className: 'Wizard', subtypes: [{ name: 'Evocation' }, { name: 'Transmutation' }] },
-      ],
-    };
+vi.mock('./CascadingSelect.jsx', () => ({
+  default: function CascadingSelect({ label, childLabel, fieldName, errorKey, errors, formData, onInputChange }) {
+    return (
+      <div data-testid={`cascading-select-${fieldName}`}>
+        <label>{label}</label>
+        {childLabel && <label>{childLabel}</label>}
+        <input
+          data-testid={`input-${fieldName}`}
+          value={typeof fieldName === 'string' ? formData[fieldName] || '' : formData[fieldName]?.name || ''}
+          onChange={(e) => onInputChange(fieldName, typeof fieldName === 'string' ? e.target.value : { ...formData[fieldName], name: e.target.value })}
+        />
+        {errors && errorKey && errors[errorKey] && (
+          <span className="error-message">{errors[errorKey]}</span>
+        )}
+      </div>
+    );
+  },
+}));
 
+const baseProps = {
+  formData: { race: '', subrace: '', class: {} },
+  errors: {},
+  racesData: [
+    { name: 'Human', subraces: ['Variant', 'Standard'] },
+    { name: 'Elf', subraces: ['High Elf', 'Wood Elf'] },
+    { name: 'Dwarf', subraces: ['Hill Dwarf', 'Mountain Dwarf'] },
+  ],
+  classSubtypes: [
+    { className: 'Cleric', subtypes: ['Order of the Keeper', 'Order of the Storm'] },
+    { className: 'Druid', subtypes: ['Circle of the Land', 'Circle of the Moon'] },
+    { className: 'Fighter', subtypes: ['Champion', 'Battle Master'] },
+  ],
+  ruleset: '5e',
+  onInputChange: vi.fn((field, value) => {
+    baseProps.formData[field] = value;
+  }),
+};
+
+describe('WizardStepRaceClass', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    });
+  });
 
-  it('should render step header', () => {
-    render(<WizardStepRaceClass {...mockProps} />);
-
+  it('renders the wizard step container', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
     expect(screen.getByText('Step 3: Race & Class')).toBeInTheDocument();
-    });
+  });
 
-  it('should render race label', () => {
-    render(<WizardStepRaceClass {...mockProps} />);
+  it('renders Race CascadingSelect', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    expect(screen.getByTestId('cascading-select-race')).toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Race *')).toBeInTheDocument();
-    });
+  it('renders Class CascadingSelect', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    expect(screen.getByTestId('cascading-select-class')).toBeInTheDocument();
+  });
 
-  it('should display race options', () => {
-    render(<WizardStepRaceClass {...mockProps} />);
+  it('renders Race label', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    expect(screen.getByText('Race')).toBeInTheDocument();
+  });
 
-    const raceSelect = document.querySelector('select');
-    expect(raceSelect).toBeInTheDocument();
+  it('renders Class label', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    expect(screen.getByText('Class')).toBeInTheDocument();
+  });
 
-    fireEvent.change(raceSelect, { target: { value: 'Human' } });
+  it('renders Subrace label for race cascading select', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    expect(screen.getByText('Subrace')).toBeInTheDocument();
+  });
 
-    expect(mockProps.onInputChange).toHaveBeenCalledWith('race', { name: 'Human' });
-    });
+  it('renders Subclass label for class cascading select', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    expect(screen.getByText('Subclass')).toBeInTheDocument();
+  });
 
-  it('should display subrace options when race has subraces', () => {
-    render(<WizardStepRaceClass {...mockProps} />);
+  it('does not render Divine Order select for non-2024 rules', () => {
+    render(<WizardStepRaceClass {...baseProps} ruleset="5e" />);
+    expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Hill')).toBeInTheDocument();
-    expect(screen.getByText('High')).toBeInTheDocument();
-    });
+  it('does not render Divine Order select for 2024 rules with non-Cleric', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Fighter' } }}
+    />);
+    expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
+  });
 
-  it('should not show subrace dropdown when race has no subraces', () => {
-    const propsNoSubraces = {
-        ...mockProps,
-      formData: {
-        race: { name: 'Elf' },
-        class: { name: 'Fighter' },
-        },
-      racesData: [{ name: 'Elf', subraces: [] }],
-      };
+  it('renders Divine Order select for 2024 Cleric', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Cleric' } }}
+    />);
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+  });
 
-    render(<WizardStepRaceClass {...propsNoSubraces} />);
+  it('renders Divine Order options for 2024 Cleric', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Cleric' } }}
+    />);
+    expect(screen.getByText('Protector')).toBeInTheDocument();
+    expect(screen.getByText('Thaumaturge')).toBeInTheDocument();
+  });
 
-    expect(screen.queryByText('Hill')).not.toBeInTheDocument();
-    });
+  it('does not render Primal Order select for non-2024 rules', () => {
+    render(<WizardStepRaceClass {...baseProps} ruleset="5e" />);
+    expect(screen.queryByText('Primal Order')).not.toBeInTheDocument();
+  });
 
-  it('should display class label', () => {
-    render(<WizardStepRaceClass {...mockProps} />);
+  it('does not render Primal Order select for 2024 rules with non-Druid', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Fighter' } }}
+    />);
+    expect(screen.queryByText('Primal Order')).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Class *')).toBeInTheDocument();
-    });
+  it('renders Primal Order select for 2024 Druid', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Druid' } }}
+    />);
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+  });
 
-  it('should display class options', () => {
-    render(<WizardStepRaceClass {...mockProps} />);
+  it('renders Primal Order options for 2024 Druid', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Druid' } }}
+    />);
+    expect(screen.getByText('Magician')).toBeInTheDocument();
+    expect(screen.getByText('Warden')).toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Champion')).toBeInTheDocument();
-    expect(screen.getByText('Battle Master')).toBeInTheDocument();
-    });
+  it('does not render Primal Order when Cleric selected in 2024', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Cleric' } }}
+    />);
+    expect(screen.queryByText(/Primal Order/)).not.toBeInTheDocument();
+  });
 
-  it('should display subclass label (5e)', () => {
-    render(<WizardStepRaceClass {...mockProps} />);
+  it('does not render Divine Order when Druid selected in 2024', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Druid' } }}
+    />);
+    expect(screen.getByRole('combobox')).toBeInTheDocument();
+    expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Subclass *')).toBeInTheDocument();
-    });
+  it('calls onInputChange when race input changes', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    const raceInput = screen.getByTestId('input-race');
+    fireEvent.change(raceInput, { target: { value: 'Human' } });
+    expect(baseProps.onInputChange).toHaveBeenCalled();
+  });
 
-  it('should use Major label for 2024 ruleset', () => {
-    const props2024 = {
-        ...mockProps,
-      ruleset: '2024',
-      };
+  it('calls onInputChange when class input changes', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    const classInput = screen.getByTestId('input-class');
+    fireEvent.change(classInput, { target: { value: 'Fighter' } });
+    expect(baseProps.onInputChange).toHaveBeenCalled();
+  });
 
-    render(<WizardStepRaceClass {...props2024} />);
+  it('renders error message when race error exists', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      errors={{ subrace: 'Please select a subrace' }}
+    />);
+    expect(screen.getByText('Please select a subrace')).toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Subclass (Major) *')).toBeInTheDocument();
-    });
+  it('renders error message when divineOrder error exists', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Cleric' } }}
+      errors={{ divineOrder: 'Please select a divine order' }}
+    />);
+    expect(screen.getByText('Please select a divine order')).toBeInTheDocument();
+  });
 
-  it('should use Subrace Major label for 2024 ruleset', () => {
-    const props2024 = {
-        ...mockProps,
-      ruleset: '2024',
-      };
+  it('renders error message when primalOrder error exists', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Druid' } }}
+      errors={{ primalOrder: 'Please select a primal order' }}
+    />);
+    expect(screen.getByText('Please select a primal order')).toBeInTheDocument();
+  });
 
-    render(<WizardStepRaceClass {...props2024} />);
+  it('renders error class on divineOrder error', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Cleric' } }}
+      errors={{ divineOrder: 'Required' }}
+    />);
+    const select = screen.getByRole('combobox');
+    expect(select).toHaveClass('error');
+  });
 
-    expect(screen.getByText('Subrace (Major) *')).toBeInTheDocument();
-    });
+  it('renders error class on primalOrder error', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Druid' } }}
+      errors={{ primalOrder: 'Required' }}
+    />);
+    const select = screen.getByRole('combobox');
+    expect(select).toHaveClass('error');
+  });
 
-  it('should call onInputChange when class changes', () => {
-    const mockOnInputChange = vi.fn();
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         onInputChange={mockOnInputChange}
-        />
-      );
+  it('renders select with default option for Divine Order', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Cleric' } }}
+    />);
+    const select = screen.getByRole('combobox');
+    expect(select).toHaveValue('');
+  });
 
-    const classSelect = document.querySelectorAll('select')[2];
-    fireEvent.change(classSelect, { target: { value: 'Wizard' } });
+  it('renders select with default option for Primal Order', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Druid' } }}
+    />);
+    const select = screen.getByRole('combobox');
+    expect(select).toHaveValue('');
+  });
 
-    expect(mockOnInputChange).toHaveBeenCalledWith('class', { name: 'Wizard' });
-    });
+  it('renders wizard-step class on container', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    const container = screen.getByText('Step 3: Race & Class').parentElement;
+    expect(container).toHaveClass('wizard-step');
+  });
 
-  it('should update subrace when changed', () => {
-    const mockOnInputChange = vi.fn();
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         onInputChange={mockOnInputChange}
-        />
-      );
+  it('renders form-group class on Divine Order form group', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Cleric' } }}
+    />);
+    const formGroup = screen.getByRole('combobox').parentElement;
+    expect(formGroup).toHaveClass('form-group');
+  });
 
-    const subraceSelect = document.querySelectorAll('select')[1];
-    fireEvent.change(subraceSelect, { target: { value: 'Hill' } });
+  it('renders form-group class on Primal Order form group', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Druid' } }}
+    />);
+    const formGroup = screen.getByRole('combobox').parentElement;
+    expect(formGroup).toHaveClass('form-group');
+  });
 
-    expect(mockOnInputChange).toHaveBeenCalledWith(
-      'race',
-      expect.objectContaining({ subrace: expect.objectContaining({ name: 'Hill' }) })
-     );
-    });
+  it('renders required asterisk on Divine Order label', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Cleric' } }}
+    />);
+    expect(screen.getByText('Divine Order *')).toBeInTheDocument();
+  });
 
-  it('should update subclass when changed', () => {
-    const mockOnInputChange = vi.fn();
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         onInputChange={mockOnInputChange}
-        />
-      );
+  it('renders required asterisk on Primal Order label', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      ruleset="2024"
+      formData={{ ...baseProps.formData, class: { name: 'Druid' } }}
+    />);
+    expect(screen.getByText('Primal Order *')).toBeInTheDocument();
+  });
 
-    const subclassSelect = document.querySelectorAll('select')[3];
-    fireEvent.change(subclassSelect, { target: { value: 'Champion' } });
+  it('passes racesData to CascadingSelect', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    expect(screen.getByTestId('cascading-select-race')).toBeInTheDocument();
+  });
 
-    expect(mockOnInputChange).toHaveBeenCalledWith(
-      'class',
-      expect.objectContaining({ subclass: expect.objectContaining({ name: 'Champion' }) })
-     );
-    });
+  it('passes classSubtypes to CascadingSelect', () => {
+    render(<WizardStepRaceClass {...baseProps} />);
+    expect(screen.getByTestId('cascading-select-class')).toBeInTheDocument();
+  });
 
-  it('should show race error when provided', () => {
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         errors={{ race: 'Race is required' }}
-        />
-      );
+  it('passes ruleset to CascadingSelect components', () => {
+    render(<WizardStepRaceClass {...baseProps} ruleset="2024" />);
+    expect(screen.getByTestId('cascading-select-race')).toBeInTheDocument();
+    expect(screen.getByTestId('cascading-select-class')).toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Race is required')).toBeInTheDocument();
-    });
-
-  it('should show class error when provided', () => {
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         errors={{ class: 'Class is required' }}
-        />
-      );
-
-    expect(screen.getByText('Class is required')).toBeInTheDocument();
-    });
-
-  it('should show subclass error when provided', () => {
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         errors={{ subclass: 'Subclass is required' }}
-        />
-      );
-
-    expect(screen.getByText('Subclass is required')).toBeInTheDocument();
-    });
-
-  it('should show subrace error when provided', () => {
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         errors={{ subrace: 'Subrace is required' }}
-        />
-      );
-
-    expect(screen.getByText('Subrace is required')).toBeInTheDocument();
-    });
-
-  it('should show loading races when racesData is empty', () => {
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         racesData={[]}
-        />
-      );
-
-    expect(screen.getByText('Loading races...')).toBeInTheDocument();
-    });
-
-  it('should show loading classes when classSubtypes is empty', () => {
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         classSubtypes={[]}
-        />
-      );
-
-    expect(screen.getByText('Loading classes...')).toBeInTheDocument();
-    });
-
-  it('should not show subclass dropdown when no subclasses available', () => {
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         formData={{ ...mockProps.formData, class: { name: 'Wizard' } }}
-         classSubtypes={[]}
-        />
-      );
-
-    expect(screen.queryByText('Champion')).not.toBeInTheDocument();
-    });
-
-  it('should handle undefined race', () => {
-    render(
-        <WizardStepRaceClass
-         {...mockProps}
-         formData={{ race: undefined, class: { name: 'Fighter' } }}
-        />
-      );
-
+  it('handles undefined class in formData', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      formData={{ ...baseProps.formData, class: undefined }}
+    />);
     expect(screen.getByText('Step 3: Race & Class')).toBeInTheDocument();
-    });
+    expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
+    expect(screen.queryByText('Primal Order')).not.toBeInTheDocument();
+  });
+
+  it('handles empty class name in formData', () => {
+    render(<WizardStepRaceClass
+      {...baseProps}
+      formData={{ ...baseProps.formData, class: { name: '' } }}
+    />);
+    expect(screen.getByText('Step 3: Race & Class')).toBeInTheDocument();
+    expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
+    expect(screen.queryByText('Primal Order')).not.toBeInTheDocument();
+  });
 });

@@ -1,98 +1,97 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
-import AvatarImage from './AvatarImage.jsx';
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import AvatarImage from './AvatarImage';
 
 describe('AvatarImage', () => {
-    describe('with imagePath', () => {
-        it('should render an img element with correct src', () => {
-            render(<AvatarImage name="Gandalf" imagePath="/images/gandalf.png" />);
-            const img = screen.getByRole('img');
-            expect(img).toBeInTheDocument();
-            expect(img).toHaveAttribute('src', '/images/gandalf.png');
-        });
+  it('renders image when imagePath is provided', () => {
+    render(<AvatarImage name="Test User" imagePath="/avatar.png" />);
+    const img = screen.getByRole('img');
+    expect(img).toHaveAttribute('src', '/avatar.png');
+    expect(img).toHaveAttribute('alt', 'Test User');
+  });
 
-        it('should render an img element with correct alt text', () => {
-            render(<AvatarImage name="Gandalf" imagePath="/images/gandalf.png" />);
-            const img = screen.getByRole('img');
-            expect(img).toHaveAttribute('alt', 'Gandalf');
-        });
+  it('renders initial when no imagePath', () => {
+    render(<AvatarImage name="Test User" />);
+    expect(screen.getByText('T')).toBeInTheDocument();
+  });
 
-        it('should render a div with class "avatar-wrapper" around the image', () => {
-            const { container } = render(<AvatarImage name="Gandalf" imagePath="/images/gandalf.png" />);
-            const wrapper = container.querySelector('.avatar-wrapper');
-            expect(wrapper).toBeInTheDocument();
-            expect(wrapper.querySelector('img')).toBeInTheDocument();
-        });
-    });
+  it('renders "?" when no name and no imagePath', () => {
+    render(<AvatarImage />);
+    expect(screen.getByText('?')).toBeInTheDocument();
+  });
 
-    describe('without imagePath (initial fallback)', () => {
-        it('should render a div with class "avatar-initial" when no imagePath', () => {
-            const { container } = render(<AvatarImage name="Gandalf" />);
-            const wrapper = container.querySelector('.avatar-wrapper');
-            expect(wrapper).toHaveClass('avatar-initial');
-        });
+  it('renders uppercase initial', () => {
+    render(<AvatarImage name="lowercase" />);
+    expect(screen.getByText('L')).toBeInTheDocument();
+  });
 
-        it('should render the first letter of the name as initial', () => {
-            render(<AvatarImage name="Gandalf" />);
-            expect(screen.getByText('G')).toBeInTheDocument();
-        });
+  it('applies size prop to container dimensions', () => {
+    const { container } = render(<AvatarImage name="Test" size={100} />);
+    const wrapper = container.querySelector('.avatar-wrapper');
+    expect(wrapper).toHaveStyle({ width: '100px', height: '100px' });
+  });
 
-        it('should render "G" for name "Gandalf"', () => {
-            render(<AvatarImage name="Gandalf" />);
-            const initialSpan = screen.getByText('G');
-            expect(initialSpan).toBeInTheDocument();
-        });
+  it('uses default size of 60', () => {
+    const { container } = render(<AvatarImage name="Test" />);
+    const wrapper = container.querySelector('.avatar-wrapper');
+    expect(wrapper).toHaveStyle({ width: '60px', height: '60px' });
+  });
 
-        it('should render "?" for empty name', () => {
-            render(<AvatarImage name="" />);
-            expect(screen.getByText('?')).toBeInTheDocument();
-        });
+  it('calls onClick when clicked with imagePath', () => {
+    const onClick = vi.fn();
+    render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
+    fireEvent.click(screen.getByRole('button'));
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 
-        it('should render "?" for null name', () => {
-            render(<AvatarImage name={null} />);
-            expect(screen.getByText('?')).toBeInTheDocument();
-        });
+  it('calls onClick when Enter key pressed', () => {
+    const onClick = vi.fn();
+    render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
+    fireEvent.keyDown(screen.getByRole('button'), { key: 'Enter' });
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 
-        it('should render "?" for undefined name', () => {
-            render(<AvatarImage name={undefined} />);
-            expect(screen.getByText('?')).toBeInTheDocument();
-        });
+  it('calls onClick when Space key pressed', () => {
+    const onClick = vi.fn();
+    render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
+    fireEvent.keyDown(screen.getByRole('button'), { key: ' ' });
+    expect(onClick).toHaveBeenCalledTimes(1);
+  });
 
-        it('should uppercase the initial', () => {
-            render(<AvatarImage name="gandalf" />);
-            expect(screen.getByText('G')).toBeInTheDocument();
-        });
-    });
+  it('does not call onClick when other key pressed', () => {
+    const onClick = vi.fn();
+    render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
+    fireEvent.keyDown(screen.getByRole('button'), { key: 'a' });
+    expect(onClick).not.toHaveBeenCalled();
+  });
 
-    describe('size prop', () => {
-        it('should apply default size of 60 when not specified', () => {
-            const { container } = render(<AvatarImage name="Gandalf" />);
-            const wrapper = container.querySelector('.avatar-wrapper');
-            expect(wrapper).toHaveStyle({ width: '60px', height: '60px' });
-        });
+  it('has pointer cursor when onClick is provided', () => {
+    const onClick = vi.fn();
+    const { container } = render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
+    const wrapper = container.querySelector('.avatar-wrapper');
+    expect(wrapper).toHaveStyle({ cursor: 'pointer' });
+  });
 
-        it('should apply custom size for width and height', () => {
-            const { container } = render(<AvatarImage name="Gandalf" size={100} />);
-            const wrapper = container.querySelector('.avatar-wrapper');
-            expect(wrapper).toHaveStyle({ width: '100px', height: '100px' });
-        });
+  it('has no cursor when onClick is not provided', () => {
+    const { container } = render(<AvatarImage name="Test" imagePath="/avatar.png" />);
+    const wrapper = container.querySelector('.avatar-wrapper');
+    expect(wrapper).not.toHaveStyle({ cursor: 'pointer' });
+  });
 
-        it('should set fontSize to size * 0.4 for initial avatar', () => {
-            const { container } = render(<AvatarImage name="Gandalf" size={100} />);
-            const wrapper = container.querySelector('.avatar-wrapper');
-            expect(wrapper).toHaveStyle({ fontSize: '40px' });
-        });
+  it('has role button when onClick is provided', () => {
+    const onClick = vi.fn();
+    render(<AvatarImage name="Test" imagePath="/avatar.png" onClick={onClick} />);
+    expect(screen.getByRole('button')).toBeInTheDocument();
+  });
 
-        it('should set fontSize to 24px when default size is used', () => {
-            const { container } = render(<AvatarImage name="Gandalf" />);
-            const wrapper = container.querySelector('.avatar-wrapper');
-            expect(wrapper).toHaveStyle({ fontSize: '24px' });
-        });
+  it('has no role when onClick is not provided', () => {
+    render(<AvatarImage name="Test" imagePath="/avatar.png" />);
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
 
-        it('should apply size to image wrapper as well', () => {
-            const { container } = render(<AvatarImage name="Gandalf" imagePath="/img.png" size={80} />);
-            const wrapper = container.querySelector('.avatar-wrapper');
-            expect(wrapper).toHaveStyle({ width: '80px', height: '80px' });
-        });
-    });
+  it('applies custom size to initial avatar', () => {
+    const { container } = render(<AvatarImage name="Test" size={80} />);
+    const wrapper = container.querySelector('.avatar-wrapper');
+    expect(wrapper).toHaveStyle({ width: '80px', height: '80px' });
+  });
 });

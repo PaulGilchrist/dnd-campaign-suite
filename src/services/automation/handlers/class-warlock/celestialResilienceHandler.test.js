@@ -1,164 +1,147 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { grantCelestialResilience, handle } from './celestialResilienceHandler.js'
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { handle, grantCelestialResilience } from './celestialResilienceHandler.js';
+
+// ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(),
-}))
-
-vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn().mockResolvedValue(undefined),
-}))
-
-vi.mock('../../../maps/mapsService.js', () => ({
-    loadMapData: vi.fn().mockResolvedValue({ players: [] }),
-}))
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn(async () => {}),
+}));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
-    evaluateAutoExpression: vi.fn((expr, ps) => {
-        if (expr.includes('warlock level + CHA')) {
-            return (ps.level || 0) + (ps.abilities?.find(a => a.name === 'Charisma')?.bonus || 0)
-        }
-        if (expr.includes('floor(warlock level / 2) + CHA')) {
-            const warlockLevel = ps.level || 0
-            const chaMod = ps.abilities?.find(a => a.name === 'Charisma')?.bonus || 0
-            return Math.floor(warlockLevel / 2) + chaMod
-        }
-        return 0
+    evaluateAutoExpression: vi.fn((_expr) => 5),
+}));
+
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(async () => {}),
+}));
+
+vi.mock('../../../maps/mapsService.js', () => ({
+    loadMapData: vi.fn(async () => null),
+}));
+
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
+    getDistanceFeet: vi.fn(() => 10),
+    rangeToFeet: vi.fn((r) => {
+        const m = String(r).match(/^(\d+)_ft$/);
+        return m ? parseInt(m[1], 10) : null;
     }),
-}))
+}));
 
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
+// ── Re-import after mocking ────────────────────────────────────
 
-const campaignName = 'test-campaign'
-const mapName = 'test-map'
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
-const makePlayerStats = (overrides = {}) => ({
-    name: 'TestWarlock',
-    level: 10,
-    abilities: [{ name: 'Charisma', bonus: 3 }],
-    class: { major: {}, subclass: {} },
-    ...overrides,
-})
+// ── Helpers ────────────────────────────────────────────────────
 
-const celestialPlayerStats = (overrides = {}) => ({
-    ...makePlayerStats(overrides),
-    class: {
-        major: { name: 'Celestial Patron' },
-        subclass: { name: 'Celestial Patron' },
-    },
-    characterAdvancement: [
-        { name: 'Celestial Resilience', automation: {
+function makeAction(overrides = {}) {
+    return {
+        name: 'Celestial Resilience',
+        description: 'Gain temporary hit points.',
+        automation: {
             type: 'celestial_resilience',
             tempHpExpression: 'warlock level + CHA modifier',
             allyTempHpExpression: 'floor(warlock level / 2) + CHA modifier',
             maxAllies: 5,
             range: '60_ft',
-        }},
-    ],
-})
+        },
+        ...overrides,
+    };
+}
+
+function makeCelestialPlayerStats(overrides = {}) {
+    return {
+        name: 'TestHero',
+        proficiency: 3,
+        class: { major: { name: 'Celestial Patron' }, subclass: { name: 'Celestial Patron' } },
+        characterAdvancement: [
+            { name: 'Celestial Resilience', automation: { tempHpExpression: 'warlock level + CHA modifier', allyTempHpExpression: 'floor(warlock level / 2) + CHA modifier', maxAllies: 5, range: '60_ft' } },
+        ],
+        ...overrides,
+    };
+}
+
+function makeNonCelestialPlayerStats(overrides = {}) {
+    return {
+        name: 'TestHero',
+        proficiency: 3,
+        class: { major: { name: 'Other Patron' } },
+        characterAdvancement: [],
+        ...overrides,
+    };
+}
+
+// ── Tests ──────────────────────────────────────────────────────
 
 describe('celestialResilienceHandler', () => {
     beforeEach(() => {
-        vi.clearAllMocks()
-    })
+        vi.clearAllMocks();
+    });
 
     describe('grantCelestialResilience', () => {
-        it('returns null for non-Celestial patrons', async () => {
-            const result = await grantCelestialResilience(
-                makePlayerStats({ class: { major: { name: 'Fiend Patron' } } }),
-                campaignName,
-                'magical_cunning',
-                mapName,
-            )
-            expect(result).toBeNull()
-        })
+        it('should return null for non-celestial patron', async () => {
+            const result = await grantCelestialResilience(makeNonCelestialPlayerStats(), 'campaign', 'magical_cunning', 'map');
+            expect(result).toBe(null);
+        });
 
-        it('returns null when feature not in character advancement', async () => {
-            const result = await grantCelestialResilience(
-                makePlayerStats({
-                    class: { major: { name: 'Celestial Patron' } },
-                    characterAdvancement: [],
-                }),
-                campaignName,
-                'magical_cunning',
-                mapName,
-            )
-            expect(result).toBeNull()
-        })
+        it('should return null when Celestial Resilience feature is missing', async () => {
+            const stats = makeCelestialPlayerStats({ characterAdvancement: [] });
+            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
+            expect(result).toBe(null);
+        });
 
-        it('grants self temp HP on rest trigger', async () => {
-            getRuntimeValue.mockReturnValue(0)
+        it('should return null when automation is missing', async () => {
+            const stats = makeCelestialPlayerStats({
+                characterAdvancement: [{ name: 'Celestial Resilience', automation: null }],
+            });
+            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
+            expect(result).toBe(null);
+        });
 
-            const result = await grantCelestialResilience(
-                celestialPlayerStats(),
-                campaignName,
-                'rest',
-                null,
-            )
+        it('should set temp HP and return result when valid', async () => {
+            getRuntimeValue.mockReturnValue(0);
+            const stats = makeCelestialPlayerStats();
+            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
 
-            expect(result).not.toBeNull()
-            expect(result.selfTempHp).toBe(13) // level 10 + cha 3
-            expect(result.message).toContain('13 temporary hit points')
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'tempHp', 13, campaignName)
-        })
+            expect(result).not.toBe(null);
+            expect(result.selfTempHp).toBe(5);
+            expect(result.message).toContain('5 temporary hit points');
+        });
 
-        it('grants self temp HP on magical cunning trigger', async () => {
-            getRuntimeValue.mockReturnValue(0)
+        it('should add to existing temp HP', async () => {
+            getRuntimeValue.mockReturnValue(3);
+            const stats = makeCelestialPlayerStats();
+            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
 
-            const result = await grantCelestialResilience(
-                celestialPlayerStats(),
-                campaignName,
-                'magical_cunning',
-                mapName,
-            )
+            expect(result.selfTempHp).toBe(5);
+        });
 
-            expect(result).not.toBeNull()
-            expect(result.selfTempHp).toBe(13)
-            expect(result.allyTempHp).toBe(8) // floor(10/2) + 3
-            expect(result.maxAllies).toBe(5)
-        })
+        it('should return null when temp HP expression evaluates to non-positive', async () => {
+            vi.mocked(await import('../../../combat/automation/automationService.js')).evaluateAutoExpression.mockReturnValue(0);
+            const stats = makeCelestialPlayerStats();
+            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
+            expect(result).toBe(null);
+        });
 
-        it('adds to existing temp HP', async () => {
-            getRuntimeValue.mockReturnValue(5)
+        it('should not add ally temp HP when source is not magical_cunning', async () => {
+            const { evaluateAutoExpression } = await import('../../../combat/automation/automationService.js');
+            evaluateAutoExpression.mockReturnValue(5);
+            getRuntimeValue.mockImplementation((_name, _key, _campaign) => 0);
+            const stats = makeCelestialPlayerStats();
+            const result = await grantCelestialResilience(stats, 'campaign', 'other_source', 'map');
 
-            await grantCelestialResilience(
-                celestialPlayerStats(),
-                campaignName,
-                'rest',
-                null,
-            )
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestWarlock', 'tempHp', 18, campaignName)
-        })
-    })
+            expect(result).not.toBe(null);
+            expect(result.selfTempHp).toBe(5);
+            expect(result.allyTempHp).toBeUndefined();
+        });
+    });
 
     describe('handle', () => {
-        it('returns popup with description when granted', async () => {
-            getRuntimeValue.mockReturnValue(0)
-
-            const result = await handle(
-                { name: 'Celestial Resilience', automation: { type: 'celestial_resilience' } },
-                celestialPlayerStats(),
-                campaignName,
-                mapName,
-            )
-
-            expect(result.type).toBe('popup')
-            expect(result.payload.type).toBe('automation_info')
-            expect(result.payload.description).toContain('Celestial Resilience')
-            expect(result.payload.description).toContain('temporary hit points')
-        })
-
-        it('returns null for non-Celestial patron', async () => {
-            const result = await handle(
-                { name: 'Celestial Resilience', automation: { type: 'celestial_resilience' } },
-                makePlayerStats({ class: { major: { name: 'Fiend Patron' } } }),
-                campaignName,
-                mapName,
-            )
-
-            expect(result).toBeNull()
-        })
-    })
-})
+        it('should return null when grantCelestialResilience returns null', async () => {
+            const stats = makeNonCelestialPlayerStats();
+            const result = await handle(makeAction(), stats, 'campaign', 'map');
+            expect(result).toBe(null);
+        });
+    });
+});

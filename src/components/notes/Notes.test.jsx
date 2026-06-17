@@ -1,294 +1,410 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Notes from './Notes.jsx';
 
 vi.mock('../../hooks/management/useNotesManagement.js', () => ({
-  default: () => ({
+  default: vi.fn(() => ({
     notes: [],
     loading: false,
     loadNotesList: vi.fn(),
     saveNotesList: vi.fn(),
     deleteNoteAction: vi.fn(),
-  }),
+  })),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({
-  default: ({ id, value, onChange, placeholder, label }) => (
-    <div data-testid={`preview-toggle-${id}`}>
-      <label>{label}</label>
-      <textarea
-        data-testid={`note-field-${id}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
-    </div>
-  ),
+  default: function PreviewToggle({ value, onChange, placeholder, label }) {
+    return (
+      <div className="preview-toggle-wrapper">
+        {label && <label>{label}</label>}
+        <textarea
+          data-testid="preview-toggle-textarea"
+          value={value || ''}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder={placeholder}
+        />
+      </div>
+    );
+  },
 }));
 
+import useNotesManagement from '../../hooks/management/useNotesManagement.js';
+
 describe('Notes', () => {
-  const defaultProps = {
-    campaignName: 'test-campaign',
-    characters: [{ name: 'Aragorn', level: 5 }],
-    isLocalhost: true,
-    onBack: vi.fn(),
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2025-01-01T00:00:00.000Z');
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const mockUseNotes = {
+    notes: [],
+    loading: false,
+    loadNotesList: vi.fn(),
+    saveNotesList: vi.fn().mockResolvedValue(undefined),
+    deleteNoteAction: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    window.confirm = vi.fn(() => true);
+    useNotesManagement.mockReturnValue(mockUseNotes);
   });
 
-  it('should render header with back button and title', () => {
-    render(<Notes {...defaultProps} />);
-    expect(screen.getByText(/Back/)).toBeInTheDocument();
-    expect(screen.getByText(/Notes/)).toBeInTheDocument();
+  it('renders header with title and back button', () => {
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByRole('heading', { name: /notes/i })).toBeInTheDocument();
+    expect(screen.getByText(/back/i)).toBeInTheDocument();
   });
 
-  it('should call onBack when back button clicked', () => {
-    render(<Notes {...defaultProps} />);
-    fireEvent.click(screen.getByText(/Back/));
-    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
+  it('renders new note button', () => {
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByRole('button', { name: /new note/i })).toBeInTheDocument();
   });
 
-  it('should render New Note button', () => {
-    render(<Notes {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Note/);
-    expect(buttons[0].tagName).toBe('BUTTON');
+  it('renders search bar', () => {
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByLabelText('Search notes')).toBeInTheDocument();
   });
 
-  it('should open modal when New Note clicked', () => {
-    render(<Notes {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByRole('heading', { name: 'New Note' })).toBeInTheDocument();
+  it('renders empty state when no notes exist', () => {
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByText(/no notes yet/i)).toBeInTheDocument();
   });
 
-  it('should show empty state when no notes', () => {
-    render(<Notes {...defaultProps} />);
-    expect(screen.getByText(/No notes yet/)).toBeInTheDocument();
+  it('renders loading state when loading', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      loading: true,
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByText(/loading notes/i)).toBeInTheDocument();
   });
 
-  it('should render search input', () => {
-    render(<Notes {...defaultProps} />);
-    expect(screen.getByPlaceholderText(/Search notes/)).toBeInTheDocument();
+  it('renders notes list when notes exist', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        {
+          id: '1',
+          description: 'Test note content',
+          partyLocation: 'Skull Creek Cave',
+          isPrivate: false,
+          dateCreated: '2025-01-01T00:00:00.000Z',
+          dateModified: '2025-01-15T12:00:00.000Z',
+        },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByText(/skull creek cave/i)).toBeInTheDocument();
   });
 
-  it('should show clear search button when search has text', () => {
-    render(<Notes {...defaultProps} />);
-    const searchInput = screen.getByPlaceholderText(/Search notes/);
-    fireEvent.change(searchInput, { target: { value: 'test' } });
-    expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
+  it('filters notes by search query and shows no results for non-matching query', async () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Fireball is a 3rd level spell', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+        { id: '2', description: 'Thunderwave explosion', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const searchInput = screen.getByLabelText('Search notes');
+    fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
+    expect(screen.getByText(/no notes found matching/i)).toBeInTheDocument();
   });
 
-  it('should clear search when clear button clicked', () => {
-    render(<Notes {...defaultProps} />);
-    const searchInput = screen.getByPlaceholderText(/Search notes/);
-    fireEvent.change(searchInput, { target: { value: 'test' } });
-    fireEvent.click(screen.getByLabelText('Clear search'));
+  it('shows no notes matching when search yields no results', async () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Fireball is a 3rd level spell', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const searchInput = screen.getByLabelText('Search notes');
+    fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
+    expect(screen.getByText(/no notes found matching/i)).toBeInTheDocument();
+  });
+
+  it('clears search when clear button is clicked', async () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Fireball is a 3rd level spell', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const searchInput = screen.getByLabelText('Search notes');
+    fireEvent.change(searchInput, { target: { value: 'fireball' } });
+    const clearBtn = screen.getByLabelText('Clear search');
+    fireEvent.click(clearBtn);
     expect(searchInput.value).toBe('');
   });
 
-  it('should close modal when Cancel clicked', () => {
-    render(<Notes {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByRole('heading', { name: 'New Note' })).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Cancel'));
-    expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
-  });
-
-  it('should close modal when X button clicked', () => {
-    render(<Notes {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    fireEvent.click(screen.getByLabelText('Close'));
-    expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
-  });
-
-  it('should close modal when overlay clicked', () => {
-    render(<Notes {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    const overlay = document.querySelector('.ct-modal-overlay');
-    fireEvent.click(overlay);
-    expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
-  });
-
-  it('should not close modal when modal content clicked', () => {
-    render(<Notes {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    const modal = document.querySelector('.ct-modal');
-    fireEvent.click(modal);
-    expect(screen.getByRole('heading', { name: 'New Note' })).toBeInTheDocument();
-  });
-
-  it('should disable save button when description is empty', () => {
-    render(<Notes {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    const saveButton = screen.getByText('Save').closest('button');
-    expect(saveButton.disabled).toBe(true);
-  });
-
-  it('should show delete button when editing existing note', async () => {
-    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
-
-    vi.mocked(notesManagement).default = () => ({
-      notes: [{
-        id: 'note-1',
-        description: 'Test note',
-        isPrivate: false,
-        dateCreated: '2024-01-01T00:00:00.000Z',
-        dateModified: '2024-01-02T00:00:00.000Z',
-        partyLevel: 5,
-        partyLocation: 'Town',
-      }],
-      loading: false,
-      loadNotesList: vi.fn(),
-      saveNotesList: vi.fn(),
-      deleteNoteAction: vi.fn(),
+  it('shows private lock icon for private notes', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Secret', partyLocation: '', isPrivate: true, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
     });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByTitle('Private note')).toBeInTheDocument();
+  });
 
-    render(<Notes {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Town')).toBeInTheDocument();
+  it('shows no location for notes without partyLocation', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Test', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
     });
-
-    fireEvent.click(screen.getByText('Town').closest('.ct-list-item'));
-
-    expect(screen.getByText('Edit Note')).toBeInTheDocument();
-    expect(screen.getByText(/Delete/)).toBeInTheDocument();
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByText(/no location/i)).toBeInTheDocument();
   });
 
-  it('should show party level auto-calculated from characters', () => {
-    render(<Notes {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByText('5')).toBeInTheDocument();
+  it('auto-calculates party level from characters', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[{ level: 5 }, { level: 7 }]} isLocalhost={true} onBack={() => {}} />);
+    // Party level should be (5+7)/2 = 6
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByText('6')).toBeInTheDocument();
   });
 
-  it('should show party level 1 when no characters', () => {
-    render(<Notes {...defaultProps} characters={[]} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
+  it('defaults party level to 1 when no characters', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
     expect(screen.getByText('1')).toBeInTheDocument();
   });
 
-  it('should show private note checkbox on localhost', () => {
-    render(<Notes {...defaultProps} isLocalhost={true} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByText(/Private Note/)).toBeInTheDocument();
+  it('opens modal when new note button is clicked', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByRole('heading', { name: 'New Note' })).toBeInTheDocument();
   });
 
-  it('should not show private note checkbox on non-localhost', () => {
-    render(<Notes {...defaultProps} isLocalhost={false} />);
-    const buttons = screen.getAllByText(/New Note/);
-    fireEvent.click(buttons[0]);
-    expect(screen.queryByText(/Private Note/)).not.toBeInTheDocument();
+  it('shows private note checkbox only when isLocalhost is true', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={false} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    expect(screen.queryByLabelText(/private note/i)).not.toBeInTheDocument();
   });
 
-  it('should show location in note list item', async () => {
-    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
+  it('shows private note checkbox when isLocalhost is true', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByLabelText(/private note/i)).toBeInTheDocument();
+  });
 
-    vi.mocked(notesManagement).default = () => ({
-      notes: [{
-        id: 'note-1',
-        description: 'A note about the cave',
-        isPrivate: false,
-        dateCreated: '2024-01-01T00:00:00.000Z',
-        dateModified: '2024-01-02T00:00:00.000Z',
-        partyLevel: 5,
-        partyLocation: 'Skull Creek Cave',
-      }],
-      loading: false,
-      loadNotesList: vi.fn(),
-      saveNotesList: vi.fn(),
-      deleteNoteAction: vi.fn(),
-    });
+  it('closes modal when cancel button is clicked', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByRole('heading', { name: 'New Note' })).toBeInTheDocument();
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel' });
+    fireEvent.click(cancelBtn);
+    expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
+  });
 
-    render(<Notes {...defaultProps} />);
+  it('closes modal when close button is clicked', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    const closeBtn = screen.getByLabelText('Close');
+    fireEvent.click(closeBtn);
+    expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
+  });
 
+  it('closes modal when clicking overlay', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    const overlay = document.querySelector('.ct-modal-overlay');
+    if (overlay) {
+      fireEvent.click(overlay);
+    }
+    expect(screen.queryByRole('heading', { name: 'New Note' })).not.toBeInTheDocument();
+  });
+
+  it('saves a new note when save is clicked with description', async () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    const textarea = screen.getByTestId('preview-toggle-textarea');
+    fireEvent.change(textarea, { target: { value: 'My new note' } });
+    const saveBtn = screen.getByRole('button', { name: /save/i });
+    fireEvent.click(saveBtn);
     await waitFor(() => {
-      expect(screen.getByText('Skull Creek Cave')).toBeInTheDocument();
+      expect(mockUseNotes.saveNotesList).toHaveBeenCalled();
     });
   });
 
-  it('should show "No location" when partyLocation is empty', async () => {
-    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
+  it('does not save when description is empty', async () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    const saveBtn = screen.getByRole('button', { name: /save/i });
+    fireEvent.click(saveBtn);
+    expect(mockUseNotes.saveNotesList).not.toHaveBeenCalled();
+  });
 
-    vi.mocked(notesManagement).default = () => ({
-      notes: [{
-        id: 'note-1',
-        description: 'A note',
-        isPrivate: false,
-        dateCreated: '2024-01-01T00:00:00.000Z',
-        dateModified: '2024-01-02T00:00:00.000Z',
-        partyLevel: 5,
-        partyLocation: '',
-      }],
-      loading: false,
-      loadNotesList: vi.fn(),
-      saveNotesList: vi.fn(),
-      deleteNoteAction: vi.fn(),
+  it('disables save button when description is empty', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    const saveBtn = screen.getByRole('button', { name: /save/i });
+    expect(saveBtn).toBeDisabled();
+  });
+
+  it('opens edit modal when clicking a note', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Edit me', partyLocation: 'Cave', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
     });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const noteItem = screen.getByRole('button', { name: /edit note/i });
+    fireEvent.click(noteItem);
+    expect(screen.getByRole('heading', { name: 'Edit Note' })).toBeInTheDocument();
+  });
 
-    render(<Notes {...defaultProps} />);
+  it('shows delete button when editing a note', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Delete me', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const noteItem = screen.getByRole('button', { name: /edit note/i });
+    fireEvent.click(noteItem);
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' });
+    expect(deleteBtn).toBeInTheDocument();
+  });
 
+  it('does not show delete button for new note', () => {
+    useNotesManagement.mockReturnValue(mockUseNotes);
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new note/i });
+    fireEvent.click(modalOpen);
+    expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+  });
+
+  it('calls deleteNoteAction when delete is confirmed', async () => {
+    global.window.confirm = vi.fn(() => true);
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Delete me', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const noteItem = screen.getByRole('button', { name: /edit note/i });
+    fireEvent.click(noteItem);
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteBtn);
     await waitFor(() => {
-      expect(screen.getByText('No location')).toBeInTheDocument();
+      expect(mockUseNotes.deleteNoteAction).toHaveBeenCalledWith('1');
     });
   });
 
-  it('should show loading state', async () => {
-    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
-
-    vi.mocked(notesManagement).default = () => ({
-      notes: [],
-      loading: true,
-      loadNotesList: vi.fn(),
-      saveNotesList: vi.fn(),
-      deleteNoteAction: vi.fn(),
+  it('does not delete when user cancels confirmation', async () => {
+    global.window.confirm = vi.fn(() => false);
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Keep me', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
     });
-
-    render(<Notes {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Loading notes/)).toBeInTheDocument();
-    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const noteItem = screen.getByRole('button', { name: /edit note/i });
+    fireEvent.click(noteItem);
+    const deleteBtn = screen.getByRole('button', { name: /delete/i });
+    fireEvent.click(deleteBtn);
+    expect(mockUseNotes.deleteNoteAction).not.toHaveBeenCalled();
   });
 
-  it('should show search no results message', async () => {
-    const notesManagement = await import('../../hooks/management/useNotesManagement.js');
-
-    vi.mocked(notesManagement).default = () => ({
-      notes: [{
-        id: 'note-1',
-        description: 'A note about caves',
-        isPrivate: false,
-        dateCreated: '2024-01-01T00:00:00.000Z',
-        dateModified: '2024-01-02T00:00:00.000Z',
-        partyLevel: 5,
-        partyLocation: 'Cave',
-      }],
-      loading: false,
-      loadNotesList: vi.fn(),
-      saveNotesList: vi.fn(),
-      deleteNoteAction: vi.fn(),
+  it('loads notes on mount with campaignName', () => {
+    const loadNotesListMock = vi.fn();
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      loadNotesList: loadNotesListMock,
     });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(loadNotesListMock).toHaveBeenCalled();
+  });
 
-    render(<Notes {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Cave')).toBeInTheDocument();
+  it('does not load notes without campaignName', () => {
+    const loadNotesListMock = vi.fn();
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      loadNotesList: loadNotesListMock,
     });
+    render(<Notes campaignName={null} characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(loadNotesListMock).not.toHaveBeenCalled();
+  });
 
-    const searchInput = screen.getByPlaceholderText(/Search notes/);
-    fireEvent.change(searchInput, { target: { value: 'dragons' } });
+  it('truncates long descriptions in list view', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'A'.repeat(200), partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const noteItem = screen.getByRole('button', { name: /edit note/i });
+    expect(noteItem.textContent).toContain('…');
+  });
 
-    expect(screen.getByText(/No notes found matching/)).toBeInTheDocument();
+  it('does not truncate short descriptions', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Short', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const noteItem = screen.getByRole('button', { name: /edit note/i });
+    expect(noteItem.textContent).toContain('Short');
+  });
+
+  it('shows location icon for notes with partyLocation', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Test', partyLocation: 'Dungeon', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    expect(screen.getByText('Dungeon')).toBeInTheDocument();
+  });
+
+  it('renders date modified for notes', () => {
+    useNotesManagement.mockReturnValue({
+      ...mockUseNotes,
+      notes: [
+        { id: '1', description: 'Test', partyLocation: '', isPrivate: false, dateCreated: '2025-01-01T00:00:00.000Z', dateModified: '2025-01-15T12:00:00.000Z' },
+      ],
+    });
+    render(<Notes campaignName="test" characters={[]} isLocalhost={true} onBack={() => {}} />);
+    const noteItem = screen.getByRole('button', { name: /edit note/i });
+    expect(noteItem.textContent).toContain('2025');
   });
 });

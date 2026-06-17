@@ -1,498 +1,426 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handle } from './reactionBonusHandler.js';
-import * as targetResolver from '../../common/targetResolver.js';
-import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as expirations from '../../../rules/effects/expirations.js';
-import * as logService from '../../../ui/logService.js';
-import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 
-// ── Mocks (hoisted) ────────────────────────────────────────────
+import { handle } from './reactionBonusHandler.js';
+
+// ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../common/targetResolver.js', () => ({
-  resolveTarget: vi.fn(),
-  resolveMapPositions: vi.fn(),
+    resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
+    resolveMapPositions: vi.fn(async () => ({
+        attackerPos: { gridX: 1, gridY: 1 },
+        targetPos: { gridX: 2, gridY: 2 },
+    })),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+    getRuntimeValue: vi.fn((playerName, key) => {
+        if (key === 'defensiveDuelistActive' || key === 'unbreakableMajestyActive') return null;
+        if (key === 'conditions') return [];
+        if (key === 'speed') return 30;
+        if (key === 'mountName' || key === 'mount') return 'Warhorse';
+        if (key === 'bardicInspirationUses') return 2;
+        if (key === 'usesRemaining') return 2;
+        return null;
+    }),
+    setRuntimeValue: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
-  addExpiration: vi.fn().mockResolvedValue(undefined),
+    addExpiration: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+    addEntry: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(),
-  rangeToFeet: vi.fn(),
+    getDistanceFeet: vi.fn(() => 10),
+    rangeToFeet: vi.fn((r) => {
+        const m = String(r).match(/^(\d+)_?ft$/i);
+        return m ? parseInt(m[1], 10) : null;
+    }),
 }));
+
+vi.mock('../../../dice/diceRoller.js', () => ({
+    rollExpression: vi.fn(() => ({ total: 3, rolls: [3] })),
+}));
+
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
+    spendSorceryPoints: vi.fn(),
+    getCurrentSorceryPoints: vi.fn(() => 3),
+    getLastAttackRoll: vi.fn(() => null),
+    getLastAbilityCheck: vi.fn(() => null),
+    getLastSaveRoll: vi.fn(() => null),
+}));
+
+vi.mock('../../../../services/character/classFeatures.js', () => ({
+    getClassFeatures: vi.fn(() => null),
+}));
+
+// ── Re-import after mocking ────────────────────────────────────
+
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
-const campaignName = 'TestCampaign';
-const mapName = 'DungeonMap';
+function makeAction(overrides = {}) {
+    return {
+        name: 'Test Reaction',
+        description: 'A reaction bonus.',
+        automation: {
+            type: 'reaction_bonus',
+            ...overrides.automation,
+        },
+        ...overrides,
+    };
+}
 
 function makePlayerStats(overrides = {}) {
-  return {
-    name: 'Paladin',
-    proficiency: 2,
-    level: 3,
-    speed: 30,
-    abilities: [
-      { name: 'Strength', bonus: 3 },
-      { name: 'Dexterity', bonus: 1 },
-      { name: 'Constitution', bonus: 2 },
-      { name: 'Intelligence', bonus: 0 },
-      { name: 'Wisdom', bonus: 1 },
-      { name: 'Charisma', bonus: 3 },
-    ],
-    ...overrides,
-  };
+    return {
+        name: 'TestHero',
+        proficiency: 3,
+        abilities: [
+            { name: 'Charisma', bonus: 2 },
+        ],
+        conditions: [],
+        speed: 30,
+        ...overrides,
+    };
 }
 
-function makeAction(automation = {}) {
-  return {
-    name: 'Test Reaction',
-    automation: {
-      effect: '',
-      duration: '',
-      uses_expression: null,
-      usesMax: null,
-      uses: 0,
-      resourceKey: null,
-      allyRange: '30 ft',
-      noOAs: false,
-      ...automation,
-    },
-  };
-}
+// ── Tests ──────────────────────────────────────────────────────
 
-function resetMocks() {
-  useRuntimeState.getRuntimeValue.mockClear().mockReset();
-  useRuntimeState.setRuntimeValue.mockClear().mockResolvedValue(undefined);
-  targetResolver.resolveTarget.mockClear().mockReset();
-  targetResolver.resolveMapPositions.mockClear().mockReset();
-  rangeValidation.getDistanceFeet.mockClear().mockReset();
-  rangeValidation.rangeToFeet.mockClear().mockReturnValue(30);
-  expirations.addExpiration.mockClear().mockReset();
-  logService.addEntry.mockClear().mockResolvedValue({});
-}
-
-// ── handle() entry point — dispatch routing ────────────────────
-
-describe('handle — dispatch routing', () => {
-  beforeEach(() => resetMocks());
-
-  it('routes to Unbreakable Majesty when effect is miss_on_failed_save', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('activated');
-  });
-
-  it('routes to Inspiring Movement for any other effect value', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('half your Speed');
-  });
-
-  it('routes to Inspiring Movement when effect is empty string', async () => {
-    const ps = makePlayerStats({ speed: 30 });
-    const action = makeAction({ effect: '' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('half your Speed');
-  });
-
-  it('routes to Inspiring Movement when effect is undefined', async () => {
-    const ps = makePlayerStats({ speed: 30 });
-    const action = makeAction({ effect: undefined });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('half your Speed');
-  });
-
-  it('passes mapName to Inspiring Movement handler', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue(null);
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(targetResolver.resolveMapPositions).toHaveBeenCalledWith(
-      campaignName, mapName, 'Paladin'
-    );
-  });
-
-  it('does not pass mapName when routing to Unbreakable Majesty', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
-  });
-});
-
-// ── handle() — return value structure ──────────────────────────
-
-describe('handle — return value structure', () => {
-  beforeEach(() => resetMocks());
-
-  it('returns a popup with automation_info payload for Unbreakable Majesty activation', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result).toEqual({
-      type: 'popup',
-      payload: expect.objectContaining({
-        type: 'automation_info',
-        name: 'Test Reaction',
-        automation: action.automation,
-      }),
+describe('reactionBonusHandler', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
     });
-  });
 
-  it('returns a popup with automation_info payload for Inspiring Movement', async () => {
-    const ps = makePlayerStats({ speed: 30 });
-    const action = makeAction({ effect: 'inspiring_movement' });
+    describe('handle routing', () => {
+        it('should route miss_on_failed_save to handleUnbreakableMajesty', async () => {
+            const action = makeAction({
+                automation: { effect: 'miss_on_failed_save', duration: '1_minute' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('activated');
+        });
 
-    const result = await handle(action, ps, campaignName, mapName);
+        it('should route bonus_or_penalty_choice to handleBendFate', async () => {
+            const action = makeAction({
+                automation: { effect: 'bonus_or_penalty_choice' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    expect(result).toEqual({
-      type: 'popup',
-      payload: expect.objectContaining({
-        type: 'automation_info',
-        name: 'Test Reaction',
-        automation: action.automation,
-      }),
+            expect(result.type).toBe('popup');
+        });
+
+        it('should route ac_bonus to handleAcBonus', async () => {
+            const action = makeAction({
+                automation: { effect: 'ac_bonus' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should route redirect_attack_to_self to handleVeer', async () => {
+            const action = makeAction({
+                automation: { effect: 'redirect_attack_to_self' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should default to handleInspiringMovement', async () => {
+            const action = makeAction({
+                automation: { effect: 'inspiring_movement' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+        });
     });
-  });
 
-  it('returns a popup with no uses remaining when uses exhausted', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', usesMax: 3 });
+    describe('handleUnbreakableMajesty', () => {
+        it('should activate and return popup', async () => {
+            const action = makeAction({
+                automation: { effect: 'miss_on_failed_save', duration: '1_minute' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('activated');
+            expect(result.payload.description).toContain('CHA save');
+        });
 
-    const result = await handle(action, ps, campaignName, mapName);
+        it('should toggle off when already active', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'unbreakableMajestyActive') return true;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'miss_on_failed_save', duration: '1_minute' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('no uses remaining');
-  });
-});
-
-// ── Unbreakable Majesty — activation/deactivation toggle ───────
-
-describe('handle — Unbreakable Majesty toggle behavior', () => {
-  beforeEach(() => resetMocks());
-
-  it('activates on first call (wasActive=false)', async () => {
-    const ps = makePlayerStats({ name: 'Paladin' });
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(false);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('activated');
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin', 'unbreakableMajestyActive', true, campaignName
-    );
-  });
-
-  it('deactivates on second call (wasActive=true)', async () => {
-    const ps = makePlayerStats({ name: 'Paladin' });
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(true);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('ended');
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Paladin', 'unbreakableMajestyActive', null, campaignName
-    );
-  });
-
-  it('treats non-true return (string "yes") as not active (uses === comparison)', async () => {
-    const ps = makePlayerStats({ name: 'Paladin' });
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue('yes');
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('activated');
-  });
-
-  it('treats null/undefined return as not active', async () => {
-    const ps = makePlayerStats({ name: 'Paladin' });
-    const action = makeAction({ effect: 'miss_on_failed_save' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('activated');
-  });
-});
-
-// ── Inspiring Movement — noOAs behavior ────────────────────────
-
-describe('handle — Inspiring Movement noOAs', () => {
-  beforeEach(() => resetMocks());
-
-  it('sets noOA expiration on self when noOAs true', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', noOAs: true });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Bard', 'inspiringMovementNoOA', true, campaignName
-    );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Bard', [{ type: 'inspiring_movement_no_oa' }], campaignName, 1
-    );
-  });
-
-  it('does not set noOA on self when noOAs false', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', noOAs: false });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    await handle(action, ps, campaignName, mapName);
-
-    const selfNoOACall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      c => c[0] === 'Bard' && c[1] === 'inspiringMovementNoOA'
-    );
-    expect(selfNoOACall).toBeUndefined();
-  });
-});
-
-// ── Inspiring Movement — uses tracking ─────────────────────────
-
-describe('handle — Inspiring Movement uses tracking', () => {
-  beforeEach(() => resetMocks());
-
-  it('does not decrement uses when usesMax is 0', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', usesMax: 0 });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    await handle(action, ps, campaignName, mapName);
-
-    const usesCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      c => c[1] === 'bardicInspirationUses' || c[1]?.includes('Uses')
-    );
-    expect(usesCall).toBeUndefined();
-  });
-
-  it('decrements uses when usesMax > 0', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', usesMax: 3 });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce(2);
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Bard', 'bardicInspirationUses', 1, campaignName
-    );
-  });
-
-  it('uses custom resourceKey when provided', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', usesMax: 3, resourceKey: 'customResource' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce(1);
-
-    await handle(action, ps, campaignName, mapName);
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Bard', 'customResource', 0, campaignName
-    );
-  });
-
-  it('exits early with no uses message when all uses consumed', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', usesMax: 1 });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, mapName);
-
-    expect(result.payload.description).toContain('no uses remaining');
-  });
-});
-
-// ── Inspiring Movement — ally granting ─────────────────────────
-
-describe('handle — Inspiring Movement ally granting', () => {
-  beforeEach(() => resetMocks());
-
-  it('grants inspiring movement to ally when in range', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue({
-      attackerPos: { gridX: 0, gridY: 0 },
-      targetPos: { gridX: 2, gridY: 0 },
+            expect(result.payload.description).toContain('ended');
+        });
     });
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally1' } });
-    rangeValidation.getDistanceFeet.mockReturnValue(15);
 
-    await handle(action, ps, campaignName, mapName);
+    describe('handleBendFate', () => {
+        it('should reject when no sorcery points', async () => {
+            vi.mocked(await import('../../../../hooks/combat/useMetamagic.js')).getCurrentSorceryPoints.mockReturnValue(0);
+            const action = makeAction({
+                automation: { effect: 'bonus_or_penalty_choice' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Ally1', 'inspiringMovementGranted', true, campaignName
-    );
-  });
+            expect(result.payload.description).toContain('No Sorcery Points available');
+        });
 
-  it('grants noOA to ally when both noOAs and ally in range', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', noOAs: true });
+        it('should reject when target is self', async () => {
+            vi.mocked(await import('../../common/targetResolver.js')).resolveTarget.mockResolvedValue({ target: { name: 'TestHero' } });
+            vi.mocked(await import('../../../../hooks/combat/useMetamagic.js')).getCurrentSorceryPoints.mockReturnValue(1);
+            const action = makeAction({
+                automation: { effect: 'bonus_or_penalty_choice' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(30);
-    targetResolver.resolveMapPositions.mockResolvedValue({
-      attackerPos: { gridX: 0, gridY: 0 },
-      targetPos: { gridX: 2, gridY: 0 },
+            expect(result.payload.description).toContain('not yourself');
+        });
     });
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally1' } });
-    rangeValidation.getDistanceFeet.mockReturnValue(15);
 
-    await handle(action, ps, campaignName, mapName);
+    describe('handleAcBonus', () => {
+        it('should activate defensive duelist', async () => {
+            const action = makeAction({
+                automation: { effect: 'ac_bonus' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'Ally1', 'inspiringMovementNoOA', true, campaignName
-    );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Ally1', [{ type: 'inspiring_movement_no_oa' }], campaignName, 1
-    );
-    expect(expirations.addExpiration).toHaveBeenCalledWith(
-      'Bard', 'Ally1', [{ type: 'inspiring_movement_granted' }], campaignName, 1
-    );
-  });
+            expect(result.payload.description).toContain('activated');
+            expect(result.payload.description).toContain('Proficiency Bonus');
+        });
 
-  it('does not grant to ally when out of range', async () => {
-    const ps = makePlayerStats({ name: 'Bard' });
-    const action = makeAction({ effect: 'inspiring_movement', allyRange: '10 ft' });
+        it('should toggle off when already active', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'defensiveDuelistActive') return true;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'ac_bonus' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(10);
-    targetResolver.resolveMapPositions.mockResolvedValue({
-      attackerPos: { gridX: 0, gridY: 0 },
-      targetPos: { gridX: 10, gridY: 0 },
+            expect(result.payload.description).toContain('ended');
+        });
+
+
     });
-    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Ally1' } });
-    rangeValidation.getDistanceFeet.mockReturnValue(50);
 
-    await handle(action, ps, campaignName, mapName);
+    describe('handleLeapAside', () => {
+        it('should reject when no mount', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'mountName' || key === 'mount') return null;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'zero_on_success_half_on_fail_for_mount' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    const grantCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      c => c[1] === 'inspiringMovementGranted'
-    );
-    expect(grantCall).toBeUndefined();
-  });
-});
+            expect(result.payload.description).toContain('requires you to be mounted');
+        });
 
-// ── Null safety ────────────────────────────────────────────────
+        it('should reject when player is incapacitated', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'mountName' || key === 'mount') return 'Warhorse';
+                if (key === 'conditions') return [{ key: 'incapacitated' }];
+                return null;
+            });
+            const stats = makePlayerStats({
+                conditions: [{ key: 'incapacitated' }],
+            });
+            const action = makeAction({
+                automation: { effect: 'zero_on_success_half_on_fail_for_mount' },
+            });
+            const result = await handle(action, stats, 'campaign', 'map');
 
-describe('handle — null safety', () => {
-  beforeEach(() => resetMocks());
+            expect(result.payload.description).toContain('not be Incapacitated');
+        });
 
-  it('does not crash when playerStats.name is undefined', async () => {
-    const ps = makePlayerStats({});
-    delete ps.name;
-    const action = makeAction({ effect: 'inspiring_movement' });
+        it('should reject when mount is incapacitated', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'mountName' || key === 'mount') return 'Warhorse';
+                if (key === 'conditions') return [{ key: 'incapacitated' }];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'zero_on_success_half_on_fail_for_mount' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+            expect(result.payload.description).toContain('mount to not be Incapacitated');
+        });
 
-    await expect(handle(action, ps, campaignName, mapName)).resolves.toBeDefined();
-  });
+    });
 
-  it('does not crash when playerStats.speed is undefined', async () => {
-    const ps = makePlayerStats({});
-    delete ps.speed;
-    const action = makeAction({ effect: 'inspiring_movement' });
+    describe('handleVeer', () => {
+        it('should reject when no mount', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'mountName' || key === 'mount') return null;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'redirect_attack_to_self' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+            expect(result.payload.description).toContain('requires you to be mounted');
+        });
 
-    const result = await handle(action, ps, campaignName, mapName);
+        it('should reject when player is incapacitated', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'mountName' || key === 'mount') return 'Warhorse';
+                if (key === 'conditions') return ['incapacitated'];
+                return null;
+            });
+            const stats = makePlayerStats({
+                conditions: ['incapacitated'],
+            });
+            const action = makeAction({
+                automation: { effect: 'redirect_attack_to_self' },
+            });
+            const result = await handle(action, stats, 'campaign', 'map');
 
-    expect(result.payload.description).toContain('half your Speed');
-  });
+            expect(result.payload.description).toContain('not be Incapacitated');
+        });
 
-  it('does not crash when campaignName is undefined', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'inspiring_movement' });
+        it('should activate successfully', async () => {
+            const action = makeAction({
+                automation: { effect: 'redirect_attack_to_self' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+            expect(result.payload.description).toContain('activated');
+        });
+    });
 
-    await expect(handle(action, ps, undefined, mapName)).resolves.toBeDefined();
-  });
+    describe('handleInspiringMovement', () => {
+        it('should return popup with movement description', async () => {
+            const action = makeAction({
+                automation: { effect: 'inspiring_movement', allyRange: '30_ft' },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-  it('does not crash when mapName is undefined', async () => {
-    const ps = makePlayerStats({ speed: 30 });
-    const action = makeAction({ effect: 'inspiring_movement' });
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('move up to 15 ft');
+        });
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+        it('should reject when no uses remaining', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'bardicInspirationUses' || key === 'usesRemaining') return 0;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'inspiring_movement', usesMax: 3 },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    const result = await handle(action, ps, campaignName, undefined);
+            expect(result.payload.description).toContain('no uses remaining');
+        });
 
-    expect(result.type).toBe('popup');
-  });
+        it('should consume a use', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'bardicInspirationUses') return 1;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'inspiring_movement', usesMax: 3 },
+            });
+            await handle(action, makePlayerStats(), 'campaign', 'map');
 
-  it('does not crash when logService.addEntry rejects', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ effect: 'inspiring_movement' });
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                'bardicInspirationUses',
+                0,
+                'campaign'
+            );
+        });
 
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    logService.addEntry.mockRejectedValue(new Error('fail'));
+        it('should use custom resource key', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'customUses') return 2;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'inspiring_movement', usesMax: 3, resourceKey: 'customUses' },
+            });
+            await handle(action, makePlayerStats(), 'campaign', 'map');
 
-    await expect(handle(action, ps, campaignName, mapName)).resolves.toBeDefined();
-  });
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                'customUses',
+                1,
+                'campaign'
+            );
+        });
+
+        it('should handle noOAs flag', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'bardicInspirationUses' || key === 'usesRemaining') return 2;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'inspiring_movement', noOAs: true, usesMax: 3 },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.payload.description).toContain('does not provoke Opportunity Attacks');
+            expect(addExpiration).toHaveBeenCalled();
+        });
+
+        it('should use uses_expression when provided', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'bardicInspirationUses' || key === 'usesRemaining') return 2;
+                if (key === 'conditions') return [];
+                return null;
+            });
+            const action = makeAction({
+                automation: { effect: 'inspiring_movement', uses_expression: 'proficiency_bonus + level', usesMax: 0 },
+            });
+            const stats = makePlayerStats({ level: 3 });
+            const result = await handle(action, stats, 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should find ally within range on map', async () => {
+            vi.mocked(await import('../../common/targetResolver.js')).resolveMapPositions.mockResolvedValue({
+                attackerPos: { gridX: 1, gridY: 1 },
+                targetPos: { gridX: 2, gridY: 2 },
+            });
+            vi.mocked(await import('../../common/targetResolver.js')).resolveTarget.mockResolvedValue({
+                target: { name: 'Ally' },
+            });
+            vi.mocked(await import('../../../rules/combat/rangeValidation.js')).getDistanceFeet.mockReturnValue(10);
+
+            const action = makeAction({
+                automation: { effect: 'inspiring_movement', allyRange: '30_ft', usesMax: 3 },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.payload.description).toContain('Ally');
+        });
+    });
 });

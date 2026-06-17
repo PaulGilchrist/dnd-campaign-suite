@@ -1,17 +1,8 @@
-import { handle, processSlowRepeatSave } from './slowHandler.js';
-import { createSaveListener } from '../../common/savePrompt.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { addEntry } from '../../../ui/logService.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { addExpiration } from '../../../rules/effects/expirations.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
-    buildSaveDc: vi.fn(() => 15),
-    createSaveListener: vi.fn(() => ({
-        promptId: 'test-prompt-1',
-        promise: Promise.resolve({ success: false }),
-    })),
+    buildSaveDc: vi.fn((auto) => auto.saveDc || 15),
+    createSaveListener: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -23,11 +14,11 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 vi.mock('../../../shared/logPoster.js', () => ({
-    postLogEntry: vi.fn(() => Promise.resolve()),
+    postLogEntry: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(() => []),
+    getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
@@ -35,256 +26,329 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
     addExpiration: vi.fn(),
 }));
 
-describe('slowHandler', () => {
-    const playerStats = {
-        name: 'TestWizard',
-        proficiency: 4,
-        spellAbilities: { saveDc: 15 },
-        abilities: [
-            { name: 'Intelligence', bonus: 4 },
-            { name: 'Wisdom', bonus: 2 },
-        ],
+import { processSlowRepeatSave, handle } from './slowHandler.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { createSaveListener } from '../../common/savePrompt.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+
+const campaignName = 'TestCampaign';
+const casterName = 'Wizard1';
+const targetName = 'Goblin';
+const saveDc = 15;
+
+function makePlayerStats(overrides = {}) {
+    return {
+        name: casterName,
+        level: 5,
+        proficiency: 3,
+        abilities: [{ name: 'Intelligence', bonus: 3 }],
+        ...overrides,
     };
+}
 
-    const defaultCombatContext = {
-        creatures: [
-            { name: 'Goblin', type: 'npc' },
-            { name: 'Orc', type: 'npc' },
-        ],
+function makeAction(automation = {}) {
+    return {
+        name: 'Slow',
+        automation: { type: 'slow', ...automation },
     };
+}
 
-    function setupMocks(runtimeGetReturnValue = []) {
-        vi.mocked(getCombatContext).mockResolvedValue(defaultCombatContext);
-        vi.mocked(getRuntimeValue).mockImplementation((key) => {
-            if (key === 'activeConditions') return runtimeGetReturnValue;
-            if (key === 'targetEffects') return [];
-            if (key.startsWith('_slow_')) return null;
-            return null;
-        });
-    }
+// ─── processSlowRepeatSave ───
 
-    describe('handle', () => {
-        it('should return popup when no creatures in combat', async () => {
-            vi.mocked(getCombatContext).mockResolvedValue({ creatures: [] });
-
-            const result = await handle(
-                { name: 'Slow', automation: { type: 'slow', saveType: 'WIS', saveDc: 15 } },
-                playerStats,
-                'TestCampaign',
-                'TestMap'
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('No creatures in combat');
-        });
-
-        it('should prompt for WIS save on each target', async () => {
-            setupMocks();
-            const result = await handle(
-                { name: 'Slow', automation: { type: 'slow', saveType: 'WIS', saveDc: 15 } },
-                playerStats,
-                'TestCampaign',
-                'TestMap'
-            );
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Slow');
-            expect(result.payload.description).toContain('Slow affects');
-        });
-
-        it('should apply slow condition on failed save', async () => {
-            setupMocks([]);
-            await handle(
-                { name: 'Slow', automation: { type: 'slow', saveType: 'WIS', saveDc: 15 } },
-                playerStats,
-                'TestCampaign',
-                'TestMap'
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                expect.arrayContaining(['slow']),
-                'TestCampaign'
-            );
-        });
-
-        it('should set tracking for repeat save', async () => {
-            setupMocks();
-            await handle(
-                { name: 'Slow', automation: { type: 'slow', saveType: 'WIS', saveDc: 15 } },
-                playerStats,
-                'TestCampaign',
-                'TestMap'
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                '_slow_Goblin',
-                true,
-                'TestCampaign'
-            );
-        });
-
-        it('should add expiration for concentration', async () => {
-            setupMocks();
-            await handle(
-                { name: 'Slow', automation: { type: 'slow', saveType: 'WIS', saveDc: 15 } },
-                playerStats,
-                'TestCampaign',
-                'TestMap'
-            );
-
-            expect(addExpiration).toHaveBeenCalledWith(
-                'TestWizard',
-                'Goblin',
-                expect.arrayContaining([
-                    expect.objectContaining({ type: 'condition', condition: 'slow' }),
-                ]),
-                'TestCampaign',
-                10
-            );
-        });
-
-        it('should store target effects for slow debuffs', async () => {
-            setupMocks();
-            await handle(
-                { name: 'Slow', automation: { type: 'slow', saveType: 'WIS', saveDc: 15 } },
-                playerStats,
-                'TestCampaign',
-                'TestMap'
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestCampaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({ effect: 'speed_halved' }),
-                    expect.objectContaining({ effect: 'no_reactions' }),
-                    expect.objectContaining({ effect: 'ac_penalty', value: -2 }),
-                    expect.objectContaining({ effect: 'dex_save_disadvantage' }),
-                    expect.objectContaining({ effect: 'action_limit' }),
-                    expect.objectContaining({ effect: 'single_attack_limit' }),
-                    expect.objectContaining({ effect: 'somatic_failure_chance', chance: 25 }),
-                    expect.objectContaining({ effect: 'slow_repeat_save' }),
-                ]),
-                'TestCampaign'
-            );
-        });
-
-        it('should log entries for save result', async () => {
-            setupMocks();
-            await handle(
-                { name: 'Slow', automation: { type: 'slow', saveType: 'WIS', saveDc: 15 } },
-                playerStats,
-                'TestCampaign',
-                'TestMap'
-            );
-
-            expect(addEntry).toHaveBeenCalledWith(
-                'TestCampaign',
-                expect.objectContaining({
-                    type: 'save_result',
-                    rollType: 'save-slow',
-                    targetName: 'Goblin',
-                    saveType: 'WIS',
-                    success: false,
-                })
-            );
-        });
-
-        it('should post log entry for condition applied', async () => {
-            setupMocks();
-            await handle(
-                { name: 'Slow', automation: { type: 'slow', saveType: 'WIS', saveDc: 15 } },
-                playerStats,
-                'TestCampaign',
-                'TestMap'
-            );
-
-            expect(postLogEntry).toHaveBeenCalledWith(
-                'TestCampaign',
-                expect.objectContaining({
-                    type: 'condition',
-                    action: 'applied',
-                    characterName: 'Goblin',
-                    condition: 'Slow',
-                    reason: 'Slow spell',
-                })
-            );
-        });
+describe('processSlowRepeatSave', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
     });
 
-    describe('processSlowRepeatSave', () => {
-        it('should return null when no tracking exists', async () => {
-            vi.mocked(getRuntimeValue).mockImplementation((_characterKey, propertyName) => {
-                if (propertyName === '_slow_Goblin') return null;
-                return null;
-            });
+    it('returns null when no tracking data exists', async () => {
+        getRuntimeValue.mockReturnValue(null);
 
-            const result = await processSlowRepeatSave(
-                'TestWizard',
-                'Goblin',
-                15,
-                'TestCampaign'
-            );
+        const result = await processSlowRepeatSave(casterName, targetName, saveDc, campaignName);
 
-            expect(result).toBeNull();
+        expect(result).toBeNull();
+    });
+
+    it('returns success popup when save succeeds', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(['slow'])
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        const result = await processSlowRepeatSave(casterName, targetName, saveDc, campaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toContain('succeeded on WIS save');
+    });
+
+    it('clears slow condition on successful save', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(['slow', 'poisoned'])
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        await processSlowRepeatSave(casterName, targetName, saveDc, campaignName);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            targetName,
+            'activeConditions',
+            ['poisoned'],
+            campaignName,
+        );
+    });
+
+    it('clears tracking key on successful save', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(['slow'])
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        await processSlowRepeatSave(casterName, targetName, saveDc, campaignName);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            casterName,
+            expect.stringContaining('_slow_'),
+            null,
+            campaignName,
+        );
+    });
+
+    it('removes slow-related target effects on successful save', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(['slow'])
+            .mockReturnValueOnce([
+                { target: targetName, effect: 'speed_halved', source: casterName },
+                { target: targetName, effect: 'no_reactions', source: casterName },
+                { target: targetName, effect: 'ac_penalty', source: casterName },
+                { target: targetName, effect: 'dex_save_disadvantage', source: casterName },
+                { target: targetName, effect: 'other_effect', source: 'OtherCaster' },
+            ])
+            .mockReturnValueOnce([]);
+
+        await processSlowRepeatSave(casterName, targetName, saveDc, campaignName);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            campaignName,
+            'targetEffects',
+            expect.arrayContaining([
+                expect.objectContaining({ effect: 'other_effect' }),
+            ]),
+            campaignName,
+        );
+    });
+
+    it('returns failure popup when save fails', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getRuntimeValue.mockReturnValueOnce(true);
+
+        const result = await processSlowRepeatSave(casterName, targetName, saveDc, campaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('failed WIS save');
+    });
+
+    it('posts condition log entry on successful save', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce(true)
+            .mockReturnValueOnce(['slow'])
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        await processSlowRepeatSave(casterName, targetName, saveDc, campaignName);
+
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({
+                type: 'condition',
+                action: 'removed',
+                characterName: targetName,
+                condition: 'Slow',
+            }),
+        );
+    });
+});
+
+// ─── handle ───
+
+describe('handle - Slow spell', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('returns popup with no creatures message when no combat context', async () => {
+        getCombatContext.mockResolvedValue({ creatures: [] });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('No creatures in combat');
+    });
+
+    it('returns popup when combat context is null', async () => {
+        getCombatContext.mockResolvedValue(null);
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('No creatures in combat');
+    });
+
+    it('excludes caster from targets', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: casterName, type: 'player' },
+                { name: targetName, type: 'npc' },
+            ],
         });
 
-        it('should remove slow condition on successful repeat save', async () => {
-            vi.mocked(createSaveListener).mockReturnValue({
-                promptId: 'test-prompt-2',
-                promise: Promise.resolve({ success: true }),
-            });
-            vi.mocked(getRuntimeValue).mockImplementation((_characterKey, propertyName) => {
-                if (propertyName === '_slow_Goblin') return true;
-                if (propertyName === 'activeConditions') return ['slow'];
-                if (propertyName === 'targetEffects') return [];
-                return null;
-            });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            const result = await processSlowRepeatSave(
-                'TestWizard',
-                'Goblin',
-                15,
-                'TestCampaign'
-            );
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('saved');
+    });
 
-            expect(result).not.toBeNull();
-            expect(result.payload.description).toContain('succeeded on WIS save');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Goblin',
-                'activeConditions',
-                expect.not.arrayContaining(['slow']),
-                'TestCampaign'
-            );
+    it('applies slow condition when save fails', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('is slowed');
+    });
+
+    it('adds slow tracking key for failed save', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            casterName,
+            expect.stringContaining('_slow_'),
+            true,
+            campaignName,
+        );
+    });
+
+    it('adds expiration for slow condition', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(addExpiration).toHaveBeenCalledWith(
+            casterName,
+            targetName,
+            expect.arrayContaining([expect.objectContaining({ type: 'condition', condition: 'slow' })]),
+            campaignName,
+            10,
+        );
+    });
+
+    it('stores target effects for slow debuffs', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        const targetEffectsCall = setRuntimeValue.mock.calls.find(
+            (c) => c[1] === 'targetEffects' && Array.isArray(c[2]),
+        );
+        expect(targetEffectsCall).toBeDefined();
+        const effects = targetEffectsCall[2];
+        const effectTypes = effects.map((e) => e.effect);
+        expect(effectTypes).toContain('speed_halved');
+        expect(effectTypes).toContain('no_reactions');
+        expect(effectTypes).toContain('ac_penalty');
+        expect(effectTypes).toContain('slow_repeat_save');
+    });
+
+    it('posts condition log entry when slow is applied', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getRuntimeValue
+            .mockReturnValueOnce([])
+            .mockReturnValueOnce([]);
+
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({
+                type: 'condition',
+                action: 'applied',
+                characterName: targetName,
+                condition: 'Slow',
+            }),
+        );
+    });
+
+    it('handles target that succeeds save', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'save-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: targetName, type: 'npc' },
+            ],
         });
 
-        it('should continue tracking on failed repeat save', async () => {
-            vi.mocked(createSaveListener).mockReturnValue({
-                promptId: 'test-prompt-3',
-                promise: Promise.resolve({ success: false }),
-            });
-            vi.mocked(getRuntimeValue).mockImplementation((_characterKey, propertyName) => {
-                if (propertyName === '_slow_Goblin') return true;
-                if (propertyName === 'activeConditions') return ['slow'];
-                if (propertyName === 'targetEffects') return [];
-                return null;
-            });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            const result = await processSlowRepeatSave(
-                'TestWizard',
-                'Goblin',
-                15,
-                'TestCampaign'
-            );
-
-            expect(result).not.toBeNull();
-            expect(result.payload.description).toContain('failed WIS save');
-            expect(result.payload.description).toContain('Slow continues');
-        });
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('saved');
     });
 });

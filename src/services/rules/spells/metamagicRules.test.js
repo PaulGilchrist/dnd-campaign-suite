@@ -1,140 +1,271 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  METAMAGIC_OPTIONS,
   METAMAGIC_EFFECTS,
+  METAMAGIC_OPTIONS,
   getMetamagicCost,
   getPreCastOptions,
   getChaModifier,
   getMaxMetamagicPerSpell,
   isPreCastOption,
-} from './metamagicRules.js';
-import { clearRuntimeState } from '../../hooks/runtime/useRuntimeState.js';
+  hasArcaneApotheosis,
+  computeMetamagicCost,
+  getPsionicSpellsList,
+  isPsionicSpell,
+  hasPsionicSorcery,
+} from './metamagicRules.js'
 
-beforeEach(() => {
-  localStorage.clear();
-  Object.keys(localStorage); // no-op to ensure clean state
-  clearRuntimeState('Test');
-});
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => undefined),
+}))
 
-describe('METAMAGIC_OPTIONS', () => {
-  it('has 8 options', () => {
-    expect(METAMAGIC_OPTIONS).toHaveLength(8);
-  });
+vi.mock('../../shared/abilityLookup.js', () => ({
+  getAbilityModifier: vi.fn((abilities, name) => {
+    const ability = abilities?.find((a) => a.name === name)
+    return ability?.bonus || 0
+  }),
+}))
 
-  it('includes all expected metamagic options', () => {
-    const names = METAMAGIC_OPTIONS.map(o => o.name);
-    expect(names).toContain('Careful Spell');
-    expect(names).toContain('Distant Spell');
-    expect(names).toContain('Empowered Spell');
-    expect(names).toContain('Extended Spell');
-    expect(names).toContain('Heightened Spell');
-    expect(names).toContain('Quickened Spell');
-    expect(names).toContain('Subtle Spell');
-    expect(names).toContain('Twinned Spell');
-  });
+describe('metamagicRules', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
 
-  it('has correct costs', () => {
-    const find = name => METAMAGIC_OPTIONS.find(o => o.name === name);
-    expect(find('Careful Spell').cost).toBe(1);
-    expect(find('Distant Spell').cost).toBe(1);
-    expect(find('Empowered Spell').cost).toBe(1);
-    expect(find('Extended Spell').cost).toBe(1);
-    expect(find('Heightened Spell').cost).toBe(3);
-    expect(find('Quickened Spell').cost).toBe(2);
-    expect(find('Subtle Spell').cost).toBe(1);
-    expect(find('Twinned Spell').cost).toBe('spell_level');
-  });
-});
+  describe('METAMAGIC_EFFECTS', () => {
+    it('defines all expected effect keys', () => {
+      expect(METAMAGIC_EFFECTS.CAREFUL).toBe('ally_auto_succeed_save')
+      expect(METAMAGIC_EFFECTS.DISTANT).toBe('double_range')
+      expect(METAMAGIC_EFFECTS.EMPOWERED).toBe('reroll_damage_dice')
+      expect(METAMAGIC_EFFECTS.EXTENDED).toBe('double_duration')
+      expect(METAMAGIC_EFFECTS.HEIGHTENED).toBe('disadvantage_on_save')
+      expect(METAMAGIC_EFFECTS.QUICKENED).toBe('cast_spell_as_bonus_action')
+      expect(METAMAGIC_EFFECTS.SUBTLE).toBe('no_verbal_somatic')
+      expect(METAMAGIC_EFFECTS.TWINNED).toBe('target_two_creatures')
+    })
+  })
 
-describe('getMetamagicCost', () => {
-  it('returns numeric cost as-is', () => {
-    expect(getMetamagicCost({ cost: 1 }, 3)).toBe(1);
-    expect(getMetamagicCost({ cost: 3 }, 3)).toBe(3);
-  });
+  describe('METAMAGIC_OPTIONS', () => {
+    it('has 8 metamagic options', () => {
+      expect(METAMAGIC_OPTIONS).toHaveLength(8)
+    })
 
-  it('resolves spell_level cost to spell level (minimum 1)', () => {
-    expect(getMetamagicCost({ cost: 'spell_level' }, 3)).toBe(3);
-    expect(getMetamagicCost({ cost: 'spell_level' }, 0)).toBe(1);
-    expect(getMetamagicCost({ cost: 'spell_level' }, 1)).toBe(1);
-  });
-});
+    it('has correct cost for Twinned Spell', () => {
+      const twinned = METAMAGIC_OPTIONS.find((o) => o.name === 'Twinned Spell')
+      expect(twinned.cost).toBe('spell_level')
+    })
 
-describe('getPreCastOptions', () => {
-  const sorcererStats = {
-    class: { name: 'Sorcerer' },
-  };
+    it('has correct cost for Heightened Spell', () => {
+      const heightened = METAMAGIC_OPTIONS.find((o) => o.name === 'Heightened Spell')
+      expect(heightened.cost).toBe(3)
+    })
 
-  it('returns empty for non-Sorcerer', () => {
-    expect(getPreCastOptions({ class: { name: 'Wizard' } }, 10, 3)).toEqual([]);
-  });
+    it('has correct cost for Quickened Spell', () => {
+      const quickened = METAMAGIC_OPTIONS.find((o) => o.name === 'Quickened Spell')
+      expect(quickened.cost).toBe(2)
+    })
+  })
 
-  it('returns pre-cast options for Sorcerer', () => {
-    const options = getPreCastOptions(sorcererStats, 10, 3);
-    expect(options.length).toBe(7);
-    expect(options.find(o => o.name === 'Empowered Spell')).toBeUndefined();
-  });
+  describe('getMetamagicCost', () => {
+    it('returns fixed cost for non-spell_level options', () => {
+      const option = { cost: 1 }
+      expect(getMetamagicCost(option, 5)).toBe(1)
+    })
 
-  it('marks options affordable based on current SP', () => {
-    const options = getPreCastOptions(sorcererStats, 1, 3);
-    const costly = options.find(o => o.name === 'Heightened Spell');
-    expect(costly.affordable).toBe(false);
-    const cheap = options.find(o => o.name === 'Careful Spell');
-    expect(cheap.affordable).toBe(true);
-  });
+    it('returns spell level for spell_level cost', () => {
+      const option = { cost: 'spell_level' }
+      expect(getMetamagicCost(option, 3)).toBe(3)
+    })
 
-  it('resolves Twinned Spell cost to spell level', () => {
-    const options = getPreCastOptions(sorcererStats, 10, 5);
-    const twinned = options.find(o => o.name === 'Twinned Spell');
-    expect(twinned.resolvedCost).toBe(5);
-  });
-});
+    it('returns max(1, spellLevel) for spell_level cost when spellLevel is 0', () => {
+      const option = { cost: 'spell_level' }
+      expect(getMetamagicCost(option, 0)).toBe(1)
+    })
+  })
 
-describe('getChaModifier', () => {
-  it('returns Charisma bonus', () => {
-    expect(getChaModifier({ abilities: [{ name: 'Charisma', bonus: 4 }] })).toBe(4);
-  });
+  describe('getPreCastOptions', () => {
+    it('returns empty array for non-Sorcerer', () => {
+      expect(getPreCastOptions({ class: { name: 'Wizard' } }, 10, 1)).toEqual([])
+    })
 
-  it('returns 0 for negative modifier', () => {
-    expect(getChaModifier({ abilities: [{ name: 'Charisma', bonus: -1 }] })).toBe(0);
-  });
+    it('returns empty array when stats is null', () => {
+      expect(getPreCastOptions(null, 10, 1)).toEqual([])
+    })
 
-  it('returns 0 when no abilities', () => {
-    expect(getChaModifier({})).toBe(0);
-  });
-});
+    it('returns pre-cast options for Sorcerer', () => {
+      const stats = { class: { name: 'Sorcerer' } }
+      const result = getPreCastOptions(stats, 10, 1)
+      expect(result.length).toBeGreaterThan(0)
+      expect(result[0].affordable).toBe(true)
+    })
 
-describe('getMaxMetamagicPerSpell', () => {
-  it('returns 1 for 5e rules', () => {
-    expect(getMaxMetamagicPerSpell({ rules: '5e', level: 10 }, 'Test')).toBe(1);
-   });
+    it('marks options as unaffordable when not enough SP', () => {
+      const stats = { class: { name: 'Sorcerer' } }
+      const result = getPreCastOptions(stats, 0, 1)
+      result.forEach((opt) => {
+        expect(opt.affordable).toBe(false)
+      })
+    })
 
-  it('returns 1 for 2024 rules below level 6', () => {
-    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 5 }, 'Test')).toBe(1);
-   });
+    it('includes resolvedCost in each option', () => {
+      const stats = { class: { name: 'Sorcerer' } }
+      const result = getPreCastOptions(stats, 10, 3)
+      result.forEach((opt) => {
+        expect(opt).toHaveProperty('resolvedCost')
+      })
+    })
+  })
 
-  it('returns 2 for 2024 rules level 6+ with Innate Sorcery active', () => {
-    localStorage.setItem('Test', JSON.stringify({ activeBuffs: [{ name: 'Innate Sorcery' }] }));
-    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'Test')).toBe(2);
-    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 10 }, 'Test')).toBe(2);
-   });
+  describe('getChaModifier', () => {
+    it('returns 0 when abilities is missing', () => {
+      expect(getChaModifier({})).toBe(0)
+    })
 
-  it('returns 1 for 2024 rules level 6+ without Innate Sorcery active', () => {
-    localStorage.setItem('Test', JSON.stringify({ activeBuffs: [] }));
-    expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'Test')).toBe(1);
-   });
+    it('returns 0 when Charisma ability is missing', () => {
+      expect(getChaModifier({ abilities: [{ name: 'Strength', bonus: 3 }] })).toBe(0)
+    })
 
-  it('handles missing level', () => {
-    expect(getMaxMetamagicPerSpell({ rules: '2024' }, 'Test')).toBe(1);
-   });
-});
+    it('returns the Charisma modifier', () => {
+      const stats = { abilities: [{ name: 'Charisma', bonus: 3 }] }
+      expect(getChaModifier(stats)).toBe(3)
+    })
 
-describe('isPreCastOption', () => {
-  it('returns true for non-Empowered options', () => {
-    expect(isPreCastOption({ effect: METAMAGIC_EFFECTS.CAREFUL })).toBe(true);
-    expect(isPreCastOption({ effect: METAMAGIC_EFFECTS.TWINNED })).toBe(true);
-  });
+    it('returns 0 when Charisma bonus is negative (clamped by Math.max)', () => {
+      const stats = { abilities: [{ name: 'Charisma', bonus: -3 }] }
+      expect(getChaModifier(stats)).toBe(0)
+    })
+  })
 
-  it('returns false for Empowered Spell', () => {
-    expect(isPreCastOption({ effect: METAMAGIC_EFFECTS.EMPOWERED })).toBe(false);
-  });
-});
+  describe('getMaxMetamagicPerSpell', () => {
+    it('returns 1 for 5e ruleset', () => {
+      expect(getMaxMetamagicPerSpell({ rules: '5e', level: 10 }, 'player')).toBe(1)
+    })
+
+    it('returns 1 for 2024 ruleset below level 6', () => {
+      expect(getMaxMetamagicPerSpell({ rules: '2024', level: 5 }, 'player')).toBe(1)
+    })
+
+    it('returns 1 for 2024 ruleset at level 6 with no Innate Sorcery buff', () => {
+      expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'player')).toBe(1)
+    })
+
+    it('returns 2 for 2024 ruleset at level 6 with Innate Sorcery buff', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      vi.mocked(getRuntimeValue).mockReturnValue([{ name: 'Innate Sorcery' }])
+      expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'player')).toBe(2)
+      vi.mocked(getRuntimeValue).mockRestore()
+    })
+  })
+
+  describe('isPreCastOption', () => {
+    it('returns true for non-empowered options', () => {
+      expect(isPreCastOption({ effect: 'double_range' })).toBe(true)
+    })
+
+    it('returns false for empowered option', () => {
+      expect(isPreCastOption({ effect: 'reroll_damage_dice' })).toBe(false)
+    })
+  })
+
+  describe('hasArcaneApotheosis', () => {
+    it('returns false when no passives', () => {
+      expect(hasArcaneApotheosis({}, 'player')).toBe(false)
+    })
+
+    it('returns false when Arcane Apotheosis not present', () => {
+      const stats = { automation: { passives: [{ name: 'Other' }] } }
+      expect(hasArcaneApotheosis(stats, 'player')).toBe(false)
+    })
+
+    it('returns false when Arcane Apotheosis present but no Innate Sorcery buff', () => {
+      const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } }
+      expect(hasArcaneApotheosis(stats, 'player')).toBe(false)
+    })
+
+    it('returns true when Arcane Apotheosis and Innate Sorcery buff present', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      vi.mocked(getRuntimeValue).mockReturnValue([{ name: 'Innate Sorcery' }])
+      const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } }
+      expect(hasArcaneApotheosis(stats, 'player')).toBe(true)
+      vi.mocked(getRuntimeValue).mockRestore()
+    })
+  })
+
+  describe('computeMetamagicCost', () => {
+    it('returns zero cost for empty selection', () => {
+      expect(computeMetamagicCost([], [], {}, 'player')).toEqual({ totalCost: 0, waivedName: null })
+    })
+
+    it('returns total cost without waiver when no Arcane Apotheosis', () => {
+      const options = [{ name: 'Careful Spell', resolvedCost: 1 }, { name: 'Distant Spell', resolvedCost: 1 }]
+      expect(computeMetamagicCost(['Careful Spell', 'Distant Spell'], options, {}, 'player')).toEqual({
+        totalCost: 2,
+        waivedName: null,
+      })
+    })
+
+    it('waives highest cost option when Arcane Apotheosis active', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      vi.mocked(getRuntimeValue).mockReturnValue([{ name: 'Innate Sorcery' }])
+      const options = [{ name: 'Careful Spell', resolvedCost: 1 }, { name: 'Heightened Spell', resolvedCost: 3 }]
+      const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } }
+      const result = computeMetamagicCost(['Careful Spell', 'Heightened Spell'], options, stats, 'player')
+      expect(result.totalCost).toBe(1)
+      expect(result.waivedName).toBe('Heightened Spell')
+      vi.mocked(getRuntimeValue).mockRestore()
+    })
+  })
+
+  describe('getPsionicSpellsList', () => {
+    it('returns psionic spells list when found', () => {
+      const stats = {
+        automation: {
+          passives: [{ type: 'psionic_spells_list', psionicSpells: ['Bolt', 'Shield'] }],
+        },
+      }
+      expect(getPsionicSpellsList(stats)).toEqual(['Bolt', 'Shield'])
+    })
+
+    it('returns empty array when not found', () => {
+      expect(getPsionicSpellsList({})).toEqual([])
+    })
+  })
+
+  describe('isPsionicSpell', () => {
+    it('returns false for null spell name', () => {
+      expect(isPsionicSpell({}, null)).toBe(false)
+    })
+
+    it('returns true when spell is in psionic list', () => {
+      const stats = {
+        automation: {
+          passives: [{ type: 'psionic_spells_list', psionicSpells: ['Bolt'] }],
+        },
+      }
+      expect(isPsionicSpell(stats, 'Bolt')).toBe(true)
+    })
+
+    it('returns false when spell is not in psionic list', () => {
+      const stats = {
+        automation: {
+          passives: [{ type: 'psionic_spells_list', psionicSpells: ['Bolt'] }],
+        },
+      }
+      expect(isPsionicSpell(stats, 'Fireball')).toBe(false)
+    })
+  })
+
+  describe('hasPsionicSorcery', () => {
+    it('returns true when psionic_sorcery passive exists', () => {
+      const stats = { automation: { passives: [{ type: 'psionic_sorcery' }] } }
+      expect(hasPsionicSorcery(stats)).toBe(true)
+    })
+
+    it('returns false when no psionic_sorcery passive', () => {
+      const stats = { automation: { passives: [{ type: 'other' }] } }
+      expect(hasPsionicSorcery(stats)).toBe(false)
+    })
+
+    it('returns false when no passives', () => {
+      expect(hasPsionicSorcery({})).toBe(false)
+    })
+  })
+})

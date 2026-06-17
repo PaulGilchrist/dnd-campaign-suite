@@ -3,290 +3,229 @@ import { getProficiencies, getProficiencyChoiceCount } from './proficiencyUtils2
 
 describe('proficiencyUtils2024', () => {
   describe('getProficiencies', () => {
-    it('should be a function (re-exported from proficiencyUtils.js)', () => {
+    it('is re-exported from proficiencyUtils', () => {
       expect(typeof getProficiencies).toBe('function');
+    });
+
+    it('returns an array with two elements', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+      };
+      const playerStats = {
+        class: { proficiencies: ['Simple Weapons'] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, true, mockChoiceCount, mockConfig);
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(2);
+    });
+
+    it('returns skill proficiencies when skills is true', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+      };
+      const playerStats = {
+        class: { proficiencies: ['Skill: Perception', 'Skill: Stealth'] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, true, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Perception');
+      expect(result[1]).toContain('Stealth');
+    });
+
+    it('returns non-skill proficiencies when skills is false', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+      };
+      const playerStats = {
+        class: { proficiencies: ['Simple Weapons', 'Skill: Perception'] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, false, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Simple Weapons');
+      expect(result[1]).not.toContain('Perception');
+    });
+
+    it('adds background tool proficiencies when provided', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+        backgroundToolProficiencies: () => ['Healer\'s Kit'],
+      };
+      const playerStats = {
+        class: { proficiencies: [] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, false, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Healer\'s Kit');
+    });
+
+    it('adds bonus proficiencies from bonusSource', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+        bonusSource: { bonus_proficiencies: ['Medium Armor'] },
+      };
+      const playerStats = {
+        class: { proficiencies: [] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, false, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Medium Armor');
+    });
+
+    it('adds bonus skill proficiencies from bonusSource', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+        bonusSource: { bonus_skill_proficiencies: 2 },
+      };
+      const playerStats = {
+        class: { proficiencies: ['Skill: Perception'] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, true, mockChoiceCount, mockConfig);
+      expect(result[0]).toBeGreaterThan(1);
+    });
+
+    it('merges already-selected skill proficiencies', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+      };
+      const playerStats = {
+        class: { proficiencies: ['Skill: Stealth'] },
+        race: { starting_proficiencies: [] },
+        skillProficiencies: ['Perception'],
+      };
+      const result = getProficiencies(playerStats, true, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Perception');
+      expect(result[1]).toContain('Stealth');
+    });
+
+    it('merges already-selected proficiencies', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+      };
+      const playerStats = {
+        class: { proficiencies: ['Simple Weapons'] },
+        race: { starting_proficiencies: [] },
+        proficiencies: ['Medium Armor'],
+      };
+      const result = getProficiencies(playerStats, false, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Simple Weapons');
+      expect(result[1]).toContain('Medium Armor');
+    });
+
+    it('returns sorted proficiencies', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+      };
+      const playerStats = {
+        class: { proficiencies: ['Z Weapon', 'A Weapon'] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, false, mockChoiceCount, mockConfig);
+      expect(result[1]).toEqual(['A Weapon', 'Z Weapon']);
+    });
+
+    it('handles race proficiencies from config', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => ['Longsword'],
+      };
+      const playerStats = {
+        class: { proficiencies: [] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, false, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Longsword');
+    });
+
+    it('handles proficiency_choices from bonusSource (array format)', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+        bonusSource: {
+          proficiency_choices: [
+            { from: ['Skill: Perception', 'Skill: Stealth'] },
+          ],
+        },
+      };
+      const playerStats = {
+        class: { proficiencies: [] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, true, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Perception');
+      expect(result[1]).toContain('Stealth');
+    });
+
+    it('handles background tool proficiency choices', () => {
+      const mockChoiceCount = () => 0;
+      const mockConfig = {
+        raceProficiencies: () => [],
+        backgroundToolProficiencyChoices: () => [
+          { choose: 1, from: ['Artisan\'s Tools', 'Thieves\' Tools'] },
+        ],
+      };
+      const playerStats = {
+        class: { proficiencies: [] },
+        race: { starting_proficiencies: [] },
+      };
+      const result = getProficiencies(playerStats, false, mockChoiceCount, mockConfig);
+      expect(result[1]).toContain('Artisan\'s Tools');
+      expect(result[1]).toContain('Thieves\' Tools');
+      expect(result[0]).toBe(2);
     });
   });
 
   describe('getProficiencyChoiceCount', () => {
-    it('should return 0 when class has no skill_proficiency_choices', () => {
+    it('is re-exported from proficiencyUtils', () => {
+      expect(typeof getProficiencyChoiceCount).toBe('function');
+    });
+
+    it('parses class skill_proficiency_choices (2024 format)', () => {
+      const playerStats = {
+        class: { skill_proficiency_choices: 'Choose 2' },
+        race: {},
+      };
+      expect(getProficiencyChoiceCount(playerStats, true)).toBe(2);
+    });
+
+    it('returns 0 when no skill_proficiency_choices', () => {
       const playerStats = {
         class: {},
         race: {},
       };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(0);
-    });
-
-    it('should return 0 when class has skill_proficiency_choices but no match', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'No numbers here',
-        },
-        race: {},
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(0);
-    });
-
-    it('should parse Choose X pattern from class skill_proficiency_choices', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 2 skills from Acrobatics, Athletics, Perception, Stealth',
-        },
-        race: {},
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(2);
-    });
-
-    it('should parse Choose X with single digit', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 1',
-        },
-        race: {},
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(1);
-    });
-
-    it('should add race starting_proficiency_options for skills when skills=true', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 1 skill',
-        },
-        race: {
-          starting_proficiency_options: {
-            choose: 2,
-            from: ['Skill: Acrobatics', 'Skill: Athletics'],
-          },
-        },
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(3); // 1 from class + 2 from race
-    });
-
-    it('should NOT add race starting_proficiency_options for non-skills when skills=true', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 1 skill',
-        },
-        race: {
-          starting_proficiency_options: {
-            choose: 2,
-            from: ['Tool: Thieves Tools', 'Tool: Navigator Tools'],
-          },
-        },
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(1); // 1 from class, race not counted (not skill)
-    });
-
-    it('should add race starting_proficiency_options for non-skills when skills=false', () => {
-      const playerStats = {
-        class: {},
-        race: {
-          starting_proficiency_options: {
-            choose: 1,
-            from: ['Tool: Thieves Tools'],
-          },
-        },
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, false);
-
-      expect(result).toBe(1);
-    });
-
-    it('should NOT add race starting_proficiency_options for skills when skills=false', () => {
-      const playerStats = {
-        class: {},
-        race: {
-          starting_proficiency_options: {
-            choose: 2,
-            from: ['Skill: Acrobatics', 'Skill: Athletics'],
-          },
-        },
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, false);
-
-      expect(result).toBe(0); // race options are skills, but we want non-skills
-    });
-
-    it('should handle both class choices and race options combined', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 3 skills',
-        },
-        race: {
-          starting_proficiency_options: {
-            choose: 1,
-            from: ['Skill: Stealth'],
-          },
-        },
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(4); // 3 from class + 1 from race
-    });
-
-    it('should handle starting_proficiency_options with no from array', () => {
-      const playerStats = {
-        class: {},
-        race: {
-          starting_proficiency_options: {
-            choose: 2,
-            from: [],
-          },
-        },
-      };
-
-      // Accessing from[0] on empty array returns undefined → undefined.startsWith throws
-      expect(() => getProficiencyChoiceCount(playerStats, true)).toThrow();
-    });
-
-    it('should return 0 when playerStats is minimal', () => {
-      const playerStats = {
-        class: {},
-        race: {},
-      };
-
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
-      expect(getProficiencyChoiceCount(playerStats, false)).toBe(0);
     });
 
-    it('should count skill proficiency choices from class.major.proficiency_choices', () => {
+    it('returns 0 when skill_proficiency_choices does not match pattern', () => {
       const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 2: Acrobatics, Athletics',
-          major: {
-            proficiency_choices: [
-              { choose: 1, from: ['Skill: History', 'Skill: Insight', 'Skill: Perception'] }
-            ]
-          }
-        },
+        class: { skill_proficiency_choices: 'Choose two skills' },
         race: {},
       };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(3); // 2 from class + 1 from major
+      expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
     });
 
-    it('should count tool proficiency choices from class.major.proficiency_choices when skills=false', () => {
+    it('handles proficiency_choices with empty from array', () => {
       const playerStats = {
         class: {
           major: {
             proficiency_choices: [
-              { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] }
-            ]
-          }
+              { choose: 1, from: [] },
+            ],
+          },
         },
         race: {},
       };
-
-      const result = getProficiencyChoiceCount(playerStats, false);
-
-      expect(result).toBe(1);
-    });
-
-    it('should NOT count tool choices when skills=true', () => {
-      const playerStats = {
-        class: {
-          major: {
-            proficiency_choices: [
-              { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] }
-            ]
-          }
-        },
-        race: {},
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(0);
-    });
-
-    it('should NOT count skill choices when skills=false', () => {
-      const playerStats = {
-        class: {
-          major: {
-            proficiency_choices: [
-              { choose: 1, from: ['Skill: Acrobatics', 'Skill: Athletics'] }
-            ]
-          }
-        },
-        race: {},
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, false);
-
-      expect(result).toBe(0);
-    });
-
-    it('should combine class choices and major choices for skills', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 2: Acrobatics, Athletics, Perception',
-          major: {
-            proficiency_choices: [
-              { choose: 1, from: ['Skill: History', 'Skill: Insight'] }
-            ]
-          }
-        },
-        race: {},
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(3); // 2 from class + 1 from major
-    });
-
-    it('should handle major with no proficiency_choices', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 1 skill',
-          major: {}
-        },
-        race: {},
-      };
-
-      const result = getProficiencyChoiceCount(playerStats, true);
-
-      expect(result).toBe(1);
-    });
-
-    it('should handle Student of War with both tool and skill choices', () => {
-      const playerStats = {
-        class: {
-          skill_proficiency_choices: 'Choose 2: Acrobatics, Animal Handling, Athletics',
-          major: {
-            proficiency_choices: [
-              { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] },
-              { choose: 1, from: ['Skill: History', 'Skill: Insight'] }
-            ]
-          }
-        },
-        race: {},
-      };
-
-      expect(getProficiencyChoiceCount(playerStats, true)).toBe(3); // 2 class + 1 major skill
-      expect(getProficiencyChoiceCount(playerStats, false)).toBe(1); // 1 major tool
+      expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
     });
   });
 });

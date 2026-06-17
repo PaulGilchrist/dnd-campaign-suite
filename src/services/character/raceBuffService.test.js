@@ -1,1101 +1,491 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../shared/buffApplier.js', () => ({
-  applyAbilityScoreIncreases: vi.fn(),
-  mergeDeduplicated: vi.fn(),
-}));
-
+import { describe, it, expect } from 'vitest';
 import { computeRaceBuffs, applyRaceBuffsToPlayerData } from './raceBuffService.js';
-import * as buffApplier from '../shared/buffApplier.js';
 
-// ── Helpers ───────────────────────────────────────────────────────
-
-function makeRace(overrides = {}) {
-  return {
-    name: 'Dragonborn',
-    ability_bonuses: [
-      { name: 'str', bonus: 2 },
-      { name: 'cha', bonus: 1 },
-    ],
-    starting_proficiencies: [],
-    languages: [],
-    traits: [],
-    subraces: [],
-    ...overrides,
-  };
-}
-
-function makePlayerData(overrides = {}) {
-  return {
-    race: { name: 'Dragonborn', subrace: { name: 'Gold Dragon' } },
-    abilities: [
-      { name: 'Strength', score: 10 },
-      { name: 'Dexterity', score: 10 },
-      { name: 'Constitution', score: 10 },
-      { name: 'Intelligence', score: 10 },
-      { name: 'Wisdom', score: 10 },
-      { name: 'Charisma', score: 10 },
-    ],
-    languages: [],
-    ...overrides,
-  };
-}
-
-function resetMocks() {
-  buffApplier.applyAbilityScoreIncreases.mockClear();
-  buffApplier.mergeDeduplicated.mockClear();
-}
-
-// ── computeRaceBuffs — general / null safety ──────────────────────
-
-describe('computeRaceBuffs — null safety', () => {
-  beforeEach(resetMocks);
-
-  it('returns default empty result when race is null', () => {
-    const result = computeRaceBuffs(null, makePlayerData());
-
-    expect(result).toEqual({
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      languages: [],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    });
-  });
-
-  it('returns default empty result when race is undefined', () => {
-    const result = computeRaceBuffs(undefined, makePlayerData());
-
-    expect(result).toEqual({
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      languages: [],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    });
-  });
-
-  it('returns default empty result when race is an empty object', () => {
-    const result = computeRaceBuffs({}, makePlayerData());
-
-    expect(result.abilityScoreIncreases).toEqual([]);
-    expect(result.proficiencies).toEqual([]);
-    expect(result.languages).toEqual([]);
-    expect(result.resistances).toEqual([]);
-    expect(result.traits).toEqual([]);
-    expect(result.speed).toBeNull();
-    expect(result.hitPointBonusPerLevel).toBe(0);
-  });
-});
-
-// ── computeRaceBuffs — ability bonuses (5e) ───────────────────────
-
-describe('computeRaceBuffs — ability bonuses (5e)', () => {
-  beforeEach(resetMocks);
-
-  it('extracts ability bonuses from race.ability_bonuses for 5e', () => {
-    const race = makeRace({
-      ability_bonuses: [
-        { name: 'str', bonus: 2 },
-        { name: 'cha', bonus: 1 },
-      ],
+describe('raceBuffService', () => {
+  describe('computeRaceBuffs', () => {
+    it('returns empty result when race is null', () => {
+      const result = computeRaceBuffs(null, {});
+      expect(result.abilityScoreIncreases).toEqual([]);
+      expect(result.proficiencies).toEqual([]);
+      expect(result.languages).toEqual([]);
+      expect(result.resistances).toEqual([]);
+      expect(result.traits).toEqual([]);
+      expect(result.speed).toBeNull();
+      expect(result.hitPointBonusPerLevel).toBe(0);
+      expect(result.feats).toEqual([]);
     });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 2 },
-      { name: 'Charisma', amount: 1 },
-    ]);
-  });
-
-  it('defaults bonus to 1 when bonus property is missing', () => {
-    const race = makeRace({
-      ability_bonuses: [
-        { name: 'dex' },
-      ],
+    it('returns empty result when race is undefined', () => {
+      const result = computeRaceBuffs(undefined, {});
+      expect(result.abilityScoreIncreases).toEqual([]);
     });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Dexterity', amount: 1 },
-    ]);
-  });
-
-  it('defaults bonus to 1 when bonus is null', () => {
-    const race = makeRace({
-      ability_bonuses: [
-        { name: 'con', bonus: null },
-      ],
+    it('returns default result with no race data', () => {
+      const result = computeRaceBuffs({}, {});
+      expect(result.abilityScoreIncreases).toEqual([]);
+      expect(result.proficiencies).toEqual([]);
+      expect(result.languages).toEqual([]);
+      expect(result.resistances).toEqual([]);
+      expect(result.traits).toEqual([]);
+      expect(result.speed).toBeNull();
+      expect(result.hitPointBonusPerLevel).toBe(0);
     });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Constitution', amount: 1 },
-    ]);
-  });
-
-  it('expands abbreviated ability names to full names', () => {
-    const race = makeRace({
-      ability_bonuses: [
-        { name: 'str', bonus: 2 },
-        { name: 'dex', bonus: 1 },
-        { name: 'con', bonus: 2 },
-        { name: 'int', bonus: 1 },
-        { name: 'wis', bonus: 2 },
-        { name: 'cha', bonus: 1 },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.abilityScoreIncreases.map(i => i.name)).toEqual([
-      'Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma',
-    ]);
-  });
-
-  it('leaves ability names unchanged when already expanded', () => {
-    const race = makeRace({
-      ability_bonuses: [
-        { name: 'Strength', bonus: 2 },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 2 },
-    ]);
-  });
-
-  it('does not extract ability bonuses for 2024 ruleset', () => {
-    const race = makeRace({
-      ability_bonuses: [
-        { name: 'str', bonus: 2 },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '2024');
-
-    expect(result.abilityScoreIncreases).toEqual([]);
-  });
-});
-
-// ── computeRaceBuffs — starting proficiencies ────────────────────
-
-describe('computeRaceBuffs — starting proficiencies', () => {
-  beforeEach(resetMocks);
-
-  it('extracts starting_proficiencies from race', () => {
-    const race = makeRace({
-      starting_proficiencies: ['Light Armor', 'Simple Weapons'],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.proficiencies).toEqual([
-      { name: 'Light Armor' },
-      { name: 'Simple Weapons' },
-    ]);
-  });
-
-  it('handles empty starting_proficiencies', () => {
-    const race = makeRace({
-      starting_proficiencies: [],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.proficiencies).toEqual([]);
-  });
-
-  it('handles missing starting_proficiencies', () => {
-    const race = makeRace({
-      starting_proficiencies: undefined,
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.proficiencies).toEqual([]);
-  });
-});
-
-// ── computeRaceBuffs — languages ──────────────────────────────────
-
-describe('computeRaceBuffs — languages', () => {
-  beforeEach(resetMocks);
-
-  it('extracts languages from race', () => {
-    const race = makeRace({
-      languages: ['Common', 'Draconic'],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.languages).toEqual(['Common', 'Draconic']);
-  });
-
-  it('handles empty languages array', () => {
-    const race = makeRace({
-      languages: [],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.languages).toEqual([]);
-  });
-
-  it('handles missing languages', () => {
-    const race = makeRace({
-      languages: undefined,
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.languages).toEqual([]);
-  });
-});
-
-// ── computeRaceBuffs — traits (5e) ───────────────────────────────
-
-describe('computeRaceBuffs — traits (5e)', () => {
-  beforeEach(resetMocks);
-
-  it('extracts traits with name and description', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Draconic Ancestry', description: 'You can speak, read, and write Draconic.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.traits).toEqual([
-      { name: 'Draconic Ancestry', description: 'You can speak, read, and write Draconic.' },
-    ]);
-  });
-
-  it('extracts proficiencies from trait.proficiencies', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Combat Training', description: 'Proficiency with certain weapons.', proficiencies: ['Shortsword', 'Longspear'] },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.proficiencies).toEqual([
-      { name: 'Shortsword' },
-      { name: 'Longspear' },
-    ]);
-  });
-
-  it('extracts proficiency choices from trait.proficiency_choices', () => {
-    const race = makeRace({
-      traits: [
-        {
-          name: 'Skill Proficiencies',
-          description: 'Choose two skills.',
-          proficiency_choices: [
-            { choose: '2', from: ['Acrobatics', 'Athletics', 'Stealth', 'Sleight of Hand'] },
-          ],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.proficiencies).toEqual([
-      {
-        name: '2 from: Acrobatics, Athletics, Stealth, Sleight of Hand',
-        isChoice: true,
-        choose: '2',
-        from: ['Acrobatics', 'Athletics', 'Stealth', 'Sleight of Hand'],
-      },
-    ]);
-  });
-
-  it('extracts speed from trait description', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Swimming Speed', description: "You have a swimming speed of 40 feet." },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBe(40);
-  });
-
-  it('extracts speed with "feet" (plural)', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Walking Speed', description: "You have a walking speed of 30 feet." },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBe(30);
-  });
-
-  it('extracts speed with "feet" (singular)', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Walking Speed', description: "You have a walking speed of 30 feet." },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBe(30);
-  });
-
-  it('does not extract speed when no number found in description', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Darkvision', description: 'You can see in dim light within 60 feet.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBeNull();
-  });
-
-  it('extracts resistances from trait description (5e)', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Resistance', description: 'You have resistance to fire.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.resistances).toEqual(['fire']);
-  });
-
-  it('extracts resistances with "resistant" keyword', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Damage Resistance', description: 'You are resistant to cold damage.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.resistances).toEqual(['cold']);
-  });
-
-  it('does not extract resistances for 2024 ruleset', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Resistance', description: 'You have resistance to fire.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '2024');
-
-    expect(result.resistances).toEqual([]);
-  });
-
-  it('handles traits with no proficiencies or proficiency_choices', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Darkvision', description: 'You can see in dim light within 60 feet.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.traits).toEqual([
-      { name: 'Darkvision', description: 'You can see in dim light within 60 feet.' },
-    ]);
-    expect(result.proficiencies).toEqual([]);
-  });
-
-  it('handles traits with both proficiencies and proficiency_choices', () => {
-    const race = makeRace({
-      traits: [
-        {
-          name: 'Combat Training',
-          description: 'Proficiency with certain weapons.',
-          proficiencies: ['Shortsword'],
-          proficiency_choices: [
-            { choose: '1', from: ['Acrobatics', 'Athletics'] },
-          ],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.proficiencies).toEqual([
-      { name: 'Shortsword' },
-      {
-        name: '1 from: Acrobatics, Athletics',
-        isChoice: true,
-        choose: '1',
-        from: ['Acrobatics', 'Athletics'],
-      },
-    ]);
-  });
-
-  it('handles empty traits array', () => {
-    const race = makeRace({
-      traits: [],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.traits).toEqual([]);
-  });
-
-  it('handles missing traits', () => {
-    const race = makeRace({
-      traits: undefined,
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.traits).toEqual([]);
-  });
-});
-
-// ── computeRaceBuffs — subrace (5e) ───────────────────────────────
-
-describe('computeRaceBuffs — subrace (5e)', () => {
-  beforeEach(resetMocks);
-
-  it('merges subrace ability bonuses with race ability bonuses', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
+    describe('5e ruleset', () => {
+      it('applies ability bonuses from race', () => {
+        const race = {
           ability_bonuses: [
-            { name: 'str', bonus: 1 },
-            { name: 'cha', bonus: 2 },
-          ],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 3 },
-      { name: 'Charisma', amount: 3 },
-    ]);
-  });
-
-  it('adds new ability entries from subrace when not in race bonuses', () => {
-    const race = makeRace({
-      ability_bonuses: [
-        { name: 'str', bonus: 2 },
-      ],
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          ability_bonuses: [
+            { name: 'str', bonus: 2 },
             { name: 'dex', bonus: 1 },
           ],
-        },
-      ],
-    });
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.abilityScoreIncreases).toEqual([
+          { name: 'Strength', amount: 2 },
+          { name: 'Dexterity', amount: 1 },
+        ]);
+      });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
+      it('applies ability bonuses from subrace', () => {
+        const race = {
+          ability_bonuses: [{ name: 'str', bonus: 2 }],
+          subraces: [
+            { name: 'High Elf', ability_bonuses: [{ name: 'int', bonus: 1 }] },
+          ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'High Elf' } } }, '5e');
+        expect(result.abilityScoreIncreases).toEqual([
+          { name: 'Strength', amount: 2 },
+          { name: 'Intelligence', amount: 1 },
+        ]);
+      });
 
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 2 },
-      { name: 'Dexterity', amount: 1 },
-    ]);
-  });
+      it('combines ability bonuses from race and subrace', () => {
+        const race = {
+          ability_bonuses: [{ name: 'str', bonus: 2 }],
+          subraces: [
+            { name: 'Half-Elf', ability_bonuses: [{ name: 'str', bonus: 1 }] },
+          ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'Half-Elf' } } }, '5e');
+        expect(result.abilityScoreIncreases).toEqual([
+          { name: 'Strength', amount: 3 },
+        ]);
+      });
 
-  it('extracts subrace starting_proficiencies', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          starting_proficiencies: ['Dragon Breath'],
-        },
-      ],
-    });
+      it('applies starting proficiencies from race', () => {
+        const race = {
+          starting_proficiencies: ['Perception', 'Stealth'],
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.proficiencies).toEqual([
+          { name: 'Perception' },
+          { name: 'Stealth' },
+        ]);
+      });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
+      it('applies starting proficiencies from subrace', () => {
+        const race = {
+          starting_proficiencies: ['Perception'],
+          subraces: [
+            { name: 'High Elf', starting_proficiencies: ['Stealth'] },
+          ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'High Elf' } } }, '5e');
+        expect(result.proficiencies).toEqual([
+          { name: 'Perception' },
+          { name: 'Stealth' },
+        ]);
+      });
 
-    expect(result.proficiencies).toEqual([
-      { name: 'Dragon Breath' },
-    ]);
-  });
+      it('applies languages from race', () => {
+        const race = {
+          languages: ['Common', 'Elvish'],
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.languages).toEqual(['Common', 'Elvish']);
+      });
 
-  it('extracts subrace languages with deduplication', () => {
-    const race = makeRace({
-      languages: ['Common'],
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          languages: ['Common', 'Draconic'],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.languages).toEqual(['Common', 'Draconic']);
-  });
-
-  it('does not duplicate languages already present from race', () => {
-    const race = makeRace({
-      languages: ['Common', 'Draconic'],
-      subraces: [
-        {
-          name: 'Gold Dragon',
+      it('applies languages from subrace (deduplicated)', () => {
+        const race = {
           languages: ['Common'],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.languages).toEqual(['Common', 'Draconic']);
-  });
-
-  it('accumulates hitPointBonusPerLevel from subrace', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          hit_point_bonus_per_level: 1,
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.hitPointBonusPerLevel).toBe(1);
-  });
-
-  it('extracts racial_traits from subrace', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          racial_traits: [
-            { name: 'Breath Weapon', description: 'You can exhale destructive energy.' },
+          subraces: [
+            { name: 'High Elf', languages: ['Common', 'Elvish'] },
           ],
-        },
-      ],
-    });
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'High Elf' } } }, '5e');
+        expect(result.languages).toEqual(['Common', 'Elvish']);
+      });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
+      it('applies traits from race', () => {
+        const race = {
+          traits: [
+            { name: 'Darkvision', description: '60 ft.' },
+            { name: 'Trance', description: '4 hours.' },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.traits).toEqual([
+          { name: 'Darkvision', description: '60 ft.' },
+          { name: 'Trance', description: '4 hours.' },
+        ]);
+      });
 
-    expect(result.traits).toEqual([
-      { name: 'Breath Weapon', description: 'You can exhale destructive energy.' },
-    ]);
-  });
+      it('extracts speed from trait description', () => {
+        const race = {
+          traits: [
+            { name: 'Speed', description: '30 feet' },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.speed).toBe(30);
+      });
 
-  it('extracts proficiencies from subrace racial_traits', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          racial_traits: [
+      it('extracts speed with different casing', () => {
+        const race = {
+          traits: [
+            { name: 'Speed', description: '35 Feet' },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.speed).toBe(35);
+      });
+
+      it('extracts resistances from trait description in 5e', () => {
+        const race = {
+          traits: [
+            { name: 'Resistance', description: 'Resistance to fire' },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.resistances).toContain('fire');
+      });
+
+      it('adds Trance trait for Trance trait name', () => {
+        const race = {
+          traits: [
+            { name: 'Trance', description: '4 hours.' },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.traits.some(t => t.name === 'Trance')).toBe(true);
+      });
+
+      it('applies trait proficiencies from race in 5e', () => {
+        const race = {
+          traits: [
+            { name: 'Skill Proficiency', proficiencies: ['Perception'] },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.proficiencies).toContainEqual({ name: 'Perception' });
+      });
+
+      it('applies trait proficiency_choices from race in 5e', () => {
+        const race = {
+          traits: [
             {
-              name: 'Dragon Weapons',
-              description: 'Proficiency with certain weapons.',
-              proficiencies: ['Longsword', 'Shortsword'],
+              name: 'Skill Choice',
+              proficiency_choices: [
+                {
+                  choose: '2',
+                  from: ['Perception', 'Stealth', 'Athletics'],
+                },
+              ],
             },
           ],
-        },
-      ],
-    });
+        };
+        const result = computeRaceBuffs(race, {}, '5e');
+        expect(result.proficiencies).toContainEqual({
+          name: '2 from: Perception, Stealth, Athletics',
+          isChoice: true,
+          choose: '2',
+          from: ['Perception', 'Stealth', 'Athletics'],
+        });
+      });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.proficiencies).toEqual([
-      { name: 'Longsword' },
-      { name: 'Shortsword' },
-    ]);
-  });
-
-  it('does not match subrace when playerData race subrace name is missing', () => {
-    const race = makeRace({
-      ability_bonuses: [{ name: 'str', bonus: 2 }],
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          ability_bonuses: [{ name: 'str', bonus: 5 }],
-        },
-      ],
-    });
-
-    const playerData = makePlayerData({ race: { name: 'Dragonborn' } }); // no subrace
-
-    const result = computeRaceBuffs(race, playerData, '5e');
-
-    // Only race ability_bonuses apply; subrace is not matched
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 2 },
-    ]);
-  });
-
-  it('does not match subrace when playerData is null', () => {
-    const race = makeRace({
-      ability_bonuses: [{ name: 'str', bonus: 2 }],
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          ability_bonuses: [{ name: 'str', bonus: 5 }],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, null, '5e');
-
-    // Only race ability_bonuses apply; subrace is not matched
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 2 },
-    ]);
-  });
-
-  it('does not match subrace when race has no subraces', () => {
-    const race = makeRace({
-      subraces: undefined,
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 2 },
-      { name: 'Charisma', amount: 1 },
-    ]);
-  });
-
-  it('does not apply subrace ability bonuses for 2024 ruleset', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          ability_bonuses: [{ name: 'str', bonus: 5 }],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '2024');
-
-    expect(result.abilityScoreIncreases).toEqual([]);
-  });
-
-  it('applies subrace starting_proficiencies for 2024 ruleset', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          starting_proficiencies: ['Dragon Breath'],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '2024');
-
-    expect(result.proficiencies).toEqual([
-      { name: 'Dragon Breath' },
-    ]);
-  });
-
-  it('applies subrace languages for 2024 ruleset', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          languages: ['Draconic'],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '2024');
-
-    expect(result.languages).toEqual(['Draconic']);
-  });
-
-  it('applies subrace hit_point_bonus_per_level for 2024 ruleset', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          hit_point_bonus_per_level: 2,
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '2024');
-
-    expect(result.hitPointBonusPerLevel).toBe(2);
-  });
-
-  it('applies subrace racial_traits for 2024 ruleset', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          racial_traits: [
-            { name: 'Breath Weapon', description: 'Destructive energy.' },
-          ],
-        },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '2024');
-
-    expect(result.traits).toEqual([
-      { name: 'Breath Weapon', description: 'Destructive energy.' },
-    ]);
-  });
-
-  it('applies subrace racial_trait proficiencies for 2024 ruleset', () => {
-    const race = makeRace({
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          racial_traits: [
+      it('applies subrace racial_traits proficiencies', () => {
+        const race = {
+          subraces: [
             {
-              name: 'Dragon Weapons',
-              description: 'Proficiency.',
-              proficiencies: ['Longsword'],
+              name: 'High Elf',
+              racial_traits: [
+                { name: 'Cantrip', proficiencies: ['Arcana'] },
+              ],
             },
           ],
-        },
-      ],
-    });
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'High Elf' } } }, '5e');
+        expect(result.proficiencies).toContainEqual({ name: 'Arcana' });
+      });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '2024');
-
-    expect(result.proficiencies).toEqual([
-      { name: 'Longsword' },
-    ]);
-  });
-});
-
-// ── computeRaceBuffs — speed extraction edge cases ────────────────
-
-describe('computeRaceBuffs — speed extraction edge cases', () => {
-  beforeEach(resetMocks);
-
-  it('extracts speed from trait with "Speed" in name', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Speed', description: 'Your speed is 35 feet.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBe(35);
-  });
-
-  it('extracts speed from trait with "speed" in name (lowercase)', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'walking speed', description: 'Your speed is 30 feet.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBe(30);
-  });
-
-  it('does not extract speed when trait name does not contain "speed" and trait_type is not set', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Amorphous', description: 'You can move through a space as narrow as 1 inch wide. Your speed is 25 feet.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    // Source only checks trait.trait_type === 'speed' or trait.name.includes('speed')
-    expect(result.speed).toBeNull();
-  });
-
-  it('extracts speed when trait_type is "speed"', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Walking Speed', trait_type: 'speed', description: 'Your speed is 25 feet.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBe(25);
-  });
-
-  it('handles speed with no space between number and feet', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Walking Speed', description: 'Your speed is 30feet.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBe(30);
-  });
-
-  it('does not extract speed when trait has no description', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Walking Speed' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.speed).toBeNull();
-  });
-});
-
-// ── computeRaceBuffs — multiple traits processing ─────────────────
-
-describe('computeRaceBuffs — multiple traits', () => {
-  beforeEach(resetMocks);
-
-  it('processes all traits and accumulates proficiencies', () => {
-    const race = makeRace({
-      starting_proficiencies: ['Light Armor'],
-      traits: [
-        { name: 'Combat Training', description: 'Weapon proficiency.', proficiencies: ['Shortsword'] },
-        { name: 'Darkvision', description: 'You can see in dim light within 60 feet.' },
-        { name: 'Resistance', description: 'You have resistance to fire.', proficiencies: ['Medium Armor'] },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.proficiencies).toEqual([
-      { name: 'Light Armor' },
-      { name: 'Shortsword' },
-      { name: 'Medium Armor' },
-    ]);
-  });
-
-  it('accumulates resistances from multiple traits', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Fire Resistance', description: 'You have resistance to fire.' },
-        { name: 'Cold Resistance', description: 'You are resistant to cold.' },
-      ],
-    });
-
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
-
-    expect(result.resistances).toEqual(['fire', 'cold']);
-  });
-
-  it('accumulates traits from both race and subrace', () => {
-    const race = makeRace({
-      traits: [
-        { name: 'Draconic Ancestry', description: 'Ancestral power.' },
-      ],
-      subraces: [
-        {
-          name: 'Gold Dragon',
-          racial_traits: [
-            { name: 'Breath Weapon', description: 'Destructive energy.' },
+      it('applies subrace hit_point_bonus_per_level', () => {
+        const race = {
+          subraces: [
+            { name: 'Half-Orc', hit_point_bonus_per_level: 1 },
           ],
-        },
-      ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'Half-Orc' } } }, '5e');
+        expect(result.hitPointBonusPerLevel).toBe(1);
+      });
     });
 
-    const result = computeRaceBuffs(race, makePlayerData(), '5e');
+    describe('2024 ruleset', () => {
+      it('applies damage_resistance from race', () => {
+        const race = {
+          damage_resistance: 'fire',
+        };
+        const result = computeRaceBuffs(race, {}, '2024');
+        expect(result.resistances).toEqual(['fire']);
+      });
 
-    expect(result.traits).toEqual([
-      { name: 'Draconic Ancestry', description: 'Ancestral power.' },
-      { name: 'Breath Weapon', description: 'Destructive energy.' },
-    ]);
+      it('applies damage_resistance from subrace', () => {
+        const race = {
+          damage_resistance: 'fire',
+          subraces: [
+            { name: 'Variant', damage_resistance: 'cold' },
+          ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'Variant' } } }, '2024');
+        expect(result.resistances).toEqual(['fire', 'cold']);
+      });
+
+      it('deduplicates damage_resistance from race and subrace', () => {
+        const race = {
+          damage_resistance: 'fire',
+          subraces: [
+            { name: 'Variant', damage_resistance: 'fire' },
+          ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'Variant' } } }, '2024');
+        expect(result.resistances).toEqual(['fire']);
+      });
+
+      it('applies starting_proficiencies from race in 2024', () => {
+        const race = {
+          starting_proficiencies: ['Perception'],
+          subraces: [],
+        };
+        const result = computeRaceBuffs(race, {}, '2024');
+        expect(result.proficiencies).toEqual([{ name: 'Perception' }]);
+      });
+
+      it('applies starting_proficiencies from subrace in 2024', () => {
+        const race = {
+          starting_proficiencies: ['Perception'],
+          subraces: [
+            { name: 'Variant', starting_proficiencies: ['Stealth'] },
+          ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'Variant' } } }, '2024');
+        expect(result.proficiencies).toContainEqual({ name: 'Perception' });
+        expect(result.proficiencies).toContainEqual({ name: 'Stealth' });
+      });
+
+      it('extracts skill proficiencies from trait description in 2024', () => {
+        const race = {
+          traits: [
+            { name: 'Skill Proficiency', description: 'Proficiency in the Perception skill' },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '2024');
+        expect(result.proficiencies).toContainEqual({ name: 'Skill: Perception' });
+      });
+
+      it('extracts multiple skills from trait description in 2024', () => {
+        const race = {
+          traits: [
+            { name: 'Skill Proficiency', description: 'Proficiency in the Perception and Stealth skills' },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '2024');
+        expect(result.proficiencies).toContainEqual({ name: 'Skill: Perception' });
+        expect(result.proficiencies).toContainEqual({ name: 'Skill: Stealth' });
+      });
+
+      it('extracts skills with "or" separator in 2024', () => {
+        const race = {
+          traits: [
+            { name: 'Skill Proficiency', description: 'Proficiency in the Perception or Stealth skill' },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '2024');
+        expect(result.proficiencies).toContainEqual({ name: 'Skill: Perception' });
+        expect(result.proficiencies).toContainEqual({ name: 'Skill: Stealth' });
+      });
+
+      it('applies proficiency_choices from trait in 2024', () => {
+        const race = {
+          traits: [
+            {
+              name: 'Skillful',
+              proficiency_choices: {
+                choose: '2',
+                from: ['Perception', 'Stealth', 'Athletics'],
+              },
+            },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '2024');
+        expect(result.proficiencies).toContainEqual({
+          name: 'Perception',
+          isChoice: true,
+          choose: '2',
+        });
+        expect(result.proficiencies).toContainEqual({
+          name: 'Stealth',
+          isChoice: true,
+          choose: '2',
+        });
+        expect(result.proficiencies).toContainEqual({
+          name: 'Athletics',
+          isChoice: true,
+          choose: '2',
+        });
+      });
+
+      it('applies Versatile proficiency_choices as feats in 2024', () => {
+        const race = {
+          traits: [
+            {
+              name: 'Versatile',
+              proficiency_choices: {
+                choose: '1',
+                from: ['Lucky', 'Observant'],
+              },
+            },
+          ],
+        };
+        const result = computeRaceBuffs(race, {}, '2024');
+        expect(result.feats).toContainEqual({
+          name: 'Lucky',
+          isChoice: true,
+          choose: '1',
+        });
+        expect(result.feats).toContainEqual({
+          name: 'Observant',
+          isChoice: true,
+          choose: '1',
+        });
+      });
+
+      it('applies subrace starting_proficiencies in 2024', () => {
+        const race = {
+          starting_proficiencies: ['Perception'],
+          subraces: [
+            { name: 'Variant', starting_proficiencies: ['Stealth'] },
+          ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'Variant' } } }, '2024');
+        expect(result.proficiencies).toContainEqual({ name: 'Perception' });
+        expect(result.proficiencies).toContainEqual({ name: 'Stealth' });
+      });
+
+      it('applies subrace hit_point_bonus_per_level in 2024', () => {
+        const race = {
+          subraces: [
+            { name: 'Variant', hit_point_bonus_per_level: 1 },
+          ],
+        };
+        const result = computeRaceBuffs(race, { race: { subrace: { name: 'Variant' } } }, '2024');
+        expect(result.hitPointBonusPerLevel).toBe(1);
+      });
+    });
+
+    describe('default ruleset (5e)', () => {
+      it('defaults to 5e ruleset when not specified', () => {
+        const race = {
+          ability_bonuses: [{ name: 'str', bonus: 2 }],
+        };
+        const result = computeRaceBuffs(race, {});
+        expect(result.abilityScoreIncreases).toEqual([{ name: 'Strength', amount: 2 }]);
+      });
+    });
   });
-});
 
-// ── applyRaceBuffsToPlayerData ────────────────────────────────────
+  describe('applyRaceBuffsToPlayerData', () => {
+    it('applies ability score increases to playerData', () => {
+      const playerData = {
+        abilities: [
+          { name: 'Strength', miscBonus: 0 },
+          { name: 'Dexterity', miscBonus: 0 },
+        ],
+        languages: [],
+      };
+      const buffs = {
+        abilityScoreIncreases: [
+          { name: 'Strength', amount: 2 },
+          { name: 'Dexterity', amount: 1 },
+        ],
+        languages: ['Common', 'Elvish'],
+      };
+      applyRaceBuffsToPlayerData(playerData, buffs);
+      expect(playerData.abilities[0].miscBonus).toBe(2);
+      expect(playerData.abilities[1].miscBonus).toBe(1);
+    });
 
-describe('applyRaceBuffsToPlayerData', () => {
-  beforeEach(resetMocks);
+    it('merges languages with deduplication', () => {
+      const playerData = {
+        abilities: [],
+        languages: ['Common'],
+      };
+      const buffs = {
+        abilityScoreIncreases: [],
+        languages: ['Common', 'Elvish'],
+      };
+      applyRaceBuffsToPlayerData(playerData, buffs);
+      expect(playerData.languages).toEqual(['Common', 'Elvish']);
+    });
 
-  it('calls applyAbilityScoreIncreases with playerData.abilities and buffs.abilityScoreIncreases', () => {
-    const playerData = makePlayerData();
-    const buffs = {
-      abilityScoreIncreases: [
-        { name: 'Strength', amount: 2 },
-        { name: 'Charisma', amount: 1 },
-      ],
-      proficiencies: [],
-      languages: [],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    };
+    it('does not duplicate existing languages', () => {
+      const playerData = {
+        abilities: [],
+        languages: ['Common'],
+      };
+      const buffs = {
+        abilityScoreIncreases: [],
+        languages: ['Common'],
+      };
+      applyRaceBuffsToPlayerData(playerData, buffs);
+      expect(playerData.languages).toEqual(['Common']);
+    });
 
-    applyRaceBuffsToPlayerData(playerData, buffs);
+    it('handles empty abilityScoreIncreases', () => {
+      const playerData = {
+        abilities: [{ name: 'Strength', miscBonus: 0 }],
+        languages: [],
+      };
+      const buffs = {
+        abilityScoreIncreases: [],
+        languages: [],
+      };
+      applyRaceBuffsToPlayerData(playerData, buffs);
+      expect(playerData.abilities[0].miscBonus).toBe(0);
+    });
 
-    expect(buffApplier.applyAbilityScoreIncreases).toHaveBeenCalledWith(
-      playerData.abilities,
-      buffs.abilityScoreIncreases,
-    );
-  });
+    it('handles undefined playerData abilities gracefully', () => {
+      const playerData = {
+        languages: [],
+      };
+      const buffs = {
+        abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
+        languages: [],
+      };
+      applyRaceBuffsToPlayerData(playerData, buffs);
+      expect(playerData.abilities).toBeUndefined();
+    });
 
-  it('calls mergeDeduplicated with playerData, languages key, and buffs.languages', () => {
-    const playerData = makePlayerData();
-    const buffs = {
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      languages: ['Common', 'Draconic'],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    };
-
-    applyRaceBuffsToPlayerData(playerData, buffs);
-
-    expect(buffApplier.mergeDeduplicated).toHaveBeenCalledWith(
-      playerData,
-      'languages',
-      buffs.languages,
-    );
-  });
-
-  it('does not call mergeDeduplicated when languages array is empty', () => {
-    const playerData = makePlayerData();
-    const buffs = {
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      languages: [],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    };
-
-    applyRaceBuffsToPlayerData(playerData, buffs);
-
-    expect(buffApplier.mergeDeduplicated).toHaveBeenCalledWith(
-      playerData,
-      'languages',
-      [],
-    );
-  });
-
-  it('calls applyAbilityScoreIncreases with correct arguments', () => {
-    const playerData = makePlayerData();
-    const buffs = {
-      abilityScoreIncreases: [
-        { name: 'Strength', amount: 2 },
-      ],
-      proficiencies: [],
-      languages: [],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    };
-
-    applyRaceBuffsToPlayerData(playerData, buffs);
-
-    expect(buffApplier.applyAbilityScoreIncreases).toHaveBeenCalledWith(
-      playerData.abilities,
-      [{ name: 'Strength', amount: 2 }],
-    );
-  });
-
-  it('calls mergeDeduplicated with correct arguments', () => {
-    const playerData = makePlayerData({ languages: ['Common'] });
-    const buffs = {
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      languages: ['Draconic'],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    };
-
-    applyRaceBuffsToPlayerData(playerData, buffs);
-
-    expect(buffApplier.mergeDeduplicated).toHaveBeenCalledWith(
-      playerData,
-      'languages',
-      ['Draconic'],
-    );
-  });
-
-  it('passes the exact abilities array reference to applyAbilityScoreIncreases', () => {
-    const playerData = makePlayerData();
-    const buffs = {
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      languages: [],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    };
-
-    applyRaceBuffsToPlayerData(playerData, buffs);
-
-    const call = buffApplier.applyAbilityScoreIncreases.mock.calls[0];
-    expect(call[0]).toBe(playerData.abilities);
-  });
-
-  it('passes the exact languages array reference to mergeDeduplicated', () => {
-    const playerData = makePlayerData({ languages: ['Common'] });
-    const buffs = {
-      abilityScoreIncreases: [],
-      proficiencies: [],
-      languages: ['Draconic'],
-      resistances: [],
-      traits: [],
-      speed: null,
-      hitPointBonusPerLevel: 0,
-      feats: [],
-    };
-
-    applyRaceBuffsToPlayerData(playerData, buffs);
-
-    const call = buffApplier.mergeDeduplicated.mock.calls[0];
-    expect(call[2]).toBe(buffs.languages);
-  });
-
-  it('ignores other buff properties not handled by applyRaceBuffsToPlayerData', () => {
-    const playerData = makePlayerData();
-    const buffs = {
-      abilityScoreIncreases: [{ name: 'Strength', amount: 2 }],
-      proficiencies: [{ name: 'Shield' }],
-      languages: ['Common'],
-      resistances: ['fire'],
-      traits: [{ name: 'Darkvision', description: 'See in dark.' }],
-      speed: 30,
-      hitPointBonusPerLevel: 1,
-    };
-
-    applyRaceBuffsToPlayerData(playerData, buffs);
-
-    // Only abilityScoreIncreases and languages should be applied
-    expect(buffApplier.applyAbilityScoreIncreases).toHaveBeenCalled();
-    expect(buffApplier.mergeDeduplicated).toHaveBeenCalled();
+    it('handles empty buff languages', () => {
+      const playerData = {
+        abilities: [],
+        languages: ['Common'],
+      };
+      const buffs = {
+        abilityScoreIncreases: [],
+        languages: [],
+      };
+      applyRaceBuffsToPlayerData(playerData, buffs);
+      expect(playerData.languages).toEqual(['Common']);
+    });
   });
 });

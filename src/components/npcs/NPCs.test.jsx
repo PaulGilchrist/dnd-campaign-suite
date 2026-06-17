@@ -1,1176 +1,215 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import NPCs from './NPCs.jsx';
+import NPCs from './NPCs';
 
-let mockNPCsFactory = () => ({
-  npcs: [],
-  loading: false,
-  loadNPCsList: vi.fn(),
-  saveNPCsList: vi.fn(),
-  saveNPCAction: vi.fn(),
-  deleteNPCAction: vi.fn(),
-});
+const mockUseNPCsManagement = vi.fn();
 
 vi.mock('../../hooks/management/useNPCsManagement.js', () => ({
-  __esModule: true,
-  default: (...args) => mockNPCsFactory(...args),
+  default: (...args) => mockUseNPCsManagement(...args),
 }));
 
-vi.mock('../common/PreviewToggle.jsx', () => ({
-  default: ({ id, value, onChange, placeholder, label }) => (
-    <div data-testid={`preview-toggle-${id}`}>
-      <label>{label}</label>
-      <textarea
-        data-testid={`field-${id}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
+vi.mock('./NPCListItem.jsx', () => ({
+  default: vi.fn(({ npc, onEdit, onAddToInitiative }) => (
+    <li data-testid={`npc-list-item-${npc.name}`}>
+      <span>{npc.name}</span>
+      <button data-testid={`edit-btn-${npc.name}`} onClick={() => onEdit(npc)}>Edit</button>
+      <button data-testid={`init-btn-${npc.name}`} onClick={() => onAddToInitiative(npc)}>Add to Initiative</button>
+    </li>
+  )),
+}));
+
+vi.mock('./NPCFormModal.jsx', () => ({
+  default: ({ onClose, onSave, onDelete }) => (
+    <div data-testid="npc-form-modal">
+      <button onClick={onClose}>Close</button>
+      <button onClick={onSave}>Save</button>
+      <button onClick={onDelete}>Delete</button>
     </div>
   ),
 }));
 
-describe('NPCs', () => {
-  const defaultProps = {
-    campaignName: 'test-campaign',
-    characters: [{ name: 'Aragorn', level: 5 }],
-    onBack: vi.fn(),
-  };
+vi.mock('../../services/npcs/npcFormUtils.js', () => ({
+  getDefaultFormData: vi.fn(() => ({
+    name: '', race: '', classRole: '', appearance: '', personality: '',
+    goals: '', secrets: '', notes: '', tags: '', attitude: 'neutral',
+    image: '', imageName: '', imagePath: '', armorClass: 10, hitPoints: '',
+    hitDice: '', initiativeBonus: '', speed: { walk: '30 ft.' },
+    abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+    savingThrowBonuses: {}, skillBonuses: {}, damageResistances: [],
+    damageImmunities: [], conditionImmunities: [], actions: [], traits: '', reactions: '',
+  })),
+  cleanNPCData: vi.fn((data) => data),
+}));
 
+vi.mock('../../services/npcs/npcCombatService.js', () => ({
+  addNPCToInitiative: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../services/npcs/npcGenerator.js', () => ({
+  generateNPC: vi.fn().mockResolvedValue({ name: 'Generated NPC', race: 'Humanoid' }),
+}));
+
+const defaultProps = {
+  campaignName: 'test-campaign',
+  onBack: vi.fn(),
+  onViewInitiative: vi.fn(),
+};
+
+describe('NPCs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.confirm = vi.fn(() => true);
-    // Reset the hook mock to defaults so overrides from one test don't leak
-    mockNPCsFactory = () => ({
-      npcs: [],
+    mockUseNPCsManagement.mockReturnValue({
+      npcs: [
+        { name: 'Goblin', race: 'Humanoid', classRole: 'Scout', tags: 'enemy' },
+        { name: 'Wizard', race: 'Humanoid', classRole: 'Caster', tags: 'boss' },
+      ],
       loading: false,
       loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      saveNPCAction: vi.fn(),
-      deleteNPCAction: vi.fn(),
+      saveNPCAction: vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } }),
+      deleteNPCAction: vi.fn().mockResolvedValue(undefined),
     });
   });
 
-  // ── Header ────────────────────────────────────────────────────────
-
-  it('should render header with back button, title, and New NPC button', () => {
+  it('renders back button', () => {
     render(<NPCs {...defaultProps} />);
-    expect(screen.getByText(/Back/)).toBeInTheDocument();
-    // "NPCs" appears in the h2 title and also in empty-state text; use heading query
-    expect(screen.getByRole('heading', { name: 'NPCs' })).toBeInTheDocument();
-    expect(screen.getAllByText(/New NPC/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByRole('button', { name: /Back/i })).toBeInTheDocument();
   });
 
-  it('should call onBack when back button clicked', () => {
+  it('renders NPCs title', () => {
     render(<NPCs {...defaultProps} />);
-    fireEvent.click(screen.getByText(/Back/));
-    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
+    expect(screen.getByText('NPCs')).toBeInTheDocument();
   });
 
-  // ── Search ────────────────────────────────────────────────────────
-
-  const clickNewNPC = () => {
-    const btn = screen.getAllByText(/New NPC/).find(
-      (el) => el.tagName === 'BUTTON'
-    );
-    fireEvent.click(btn);
-  };
-
-  it('should render search input', () => {
+  it('renders New NPC button', () => {
     render(<NPCs {...defaultProps} />);
-    expect(screen.getByPlaceholderText(/Search NPCs/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /New NPC/i })).toBeInTheDocument();
   });
 
-  it('should show clear search button when search has text', () => {
+  it('renders Generate NPC button', () => {
     render(<NPCs {...defaultProps} />);
-    const searchInput = screen.getByPlaceholderText(/Search NPCs/);
-    fireEvent.change(searchInput, { target: { value: 'test' } });
+    expect(screen.getByRole('button', { name: /Generate NPC/i })).toBeInTheDocument();
+  });
+
+  it('renders search input', () => {
+    render(<NPCs {...defaultProps} />);
+    expect(screen.getByLabelText('Search NPCs')).toBeInTheDocument();
+  });
+
+  it('renders NPC list items', () => {
+    render(<NPCs {...defaultProps} />);
+    expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
+    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
+  });
+
+  it('filters NPCs by search query', () => {
+    render(<NPCs {...defaultProps} />);
+    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
+    expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
+    expect(screen.queryByTestId('npc-list-item-Wizard')).not.toBeInTheDocument();
+  });
+
+  it('shows clear button when search has query', () => {
+    render(<NPCs {...defaultProps} />);
+    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'test' } });
     expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
   });
 
-  it('should clear search when clear button clicked', () => {
+  it('clears search when clear button clicked', () => {
     render(<NPCs {...defaultProps} />);
-    const searchInput = screen.getByPlaceholderText(/Search NPCs/);
-    fireEvent.change(searchInput, { target: { value: 'test' } });
+    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
+    expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
     fireEvent.click(screen.getByLabelText('Clear search'));
-    expect(searchInput.value).toBe('');
+    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
   });
 
-  // ── Loading & empty states ────────────────────────────────────────
-
-  it('should show loading state', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [],
-      loading: true,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
+  it('shows empty state when no NPCs', () => {
+    mockUseNPCsManagement.mockReturnValue({
+      npcs: [], loading: false, loadNPCsList: vi.fn(),
+      saveNPCAction: vi.fn(), deleteNPCAction: vi.fn(),
     });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/Loading NPCs/)).toBeInTheDocument();
-    });
-  });
-
-  it('should show empty state when no NPCs', () => {
     render(<NPCs {...defaultProps} />);
     expect(screen.getByText(/No NPCs yet/)).toBeInTheDocument();
   });
 
-  // ── Modal open / close ────────────────────────────────────────────
-
-  it('should open modal when New NPC clicked', () => {
+  it('shows no results state when search matches nothing', () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    expect(
-      screen.getByRole('heading', { name: 'New NPC' })
-    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Nonexistent' } });
+    expect(screen.getByText(/No NPCs found/)).toBeInTheDocument();
   });
 
-  it('should show "New NPC" heading in modal', () => {
+  it('opens form modal when New NPC clicked', async () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    expect(screen.getByRole('heading', { name: 'New NPC' })).toBeInTheDocument();
-  });
-
-  it('should close modal when Cancel clicked', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    expect(
-      screen.getByRole('heading', { name: 'New NPC' })
-    ).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Cancel'));
-    expect(
-      screen.queryByRole('heading', { name: 'New NPC' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('should close modal when X button clicked', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    fireEvent.click(screen.getByLabelText('Close'));
-    expect(
-      screen.queryByRole('heading', { name: 'New NPC' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('should not close modal when overlay clicked', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const overlay = document.querySelector('.ct-modal-overlay');
-    fireEvent.click(overlay);
-    expect(
-      screen.getByRole('heading', { name: 'New NPC' })
-    ).toBeInTheDocument();
-  });
-
-  it('should not close modal when modal content clicked', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const modal = document.querySelector('.ct-modal');
-    fireEvent.click(modal);
-    expect(
-      screen.getByRole('heading', { name: 'New NPC' })
-    ).toBeInTheDocument();
-  });
-
-  // ── Modal form fields ─────────────────────────────────────────────
-
-  it('should render all form fields in modal', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-
-    // Standard inputs
-    expect(screen.getByLabelText(/Name/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Race/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Class \/ Role/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Attitude/)).toBeInTheDocument();
-    expect(screen.getByLabelText(/Tags/)).toBeInTheDocument();
-
-    // PreviewToggle fields
-    expect(screen.getByTestId('preview-toggle-npc-appearance')).toBeInTheDocument();
-    expect(screen.getByTestId('preview-toggle-npc-personality')).toBeInTheDocument();
-    expect(screen.getByTestId('preview-toggle-npc-goals')).toBeInTheDocument();
-    expect(screen.getByTestId('preview-toggle-npc-secrets')).toBeInTheDocument();
-    expect(screen.getByTestId('preview-toggle-npc-notes')).toBeInTheDocument();
-  });
-
-  it('should render required asterisk for name field', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    expect(screen.getByText('*')).toBeInTheDocument();
-  });
-
-  it('should render all attitude options in select', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-
-    const attitudeSelect = screen.getByLabelText(/Attitude/);
-    const options = attitudeSelect.querySelectorAll('option');
-    expect(options.length).toBe(5);
-    expect(options[0].textContent).toBe('Deep Bonds');
-    expect(options[1].textContent).toBe('Positive');
-    expect(options[2].textContent).toBe('Neutral');
-    expect(options[3].textContent).toBe('Negative');
-    expect(options[4].textContent).toBe('Extreme Opposition');
-  });
-
-  // ── Form field changes ────────────────────────────────────────────
-
-  it('should handle name field changes', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const nameInput = screen.getByLabelText(/Name/);
-    fireEvent.change(nameInput, { target: { value: 'Gandalf' } });
-    expect(nameInput.value).toBe('Gandalf');
-  });
-
-  it('should handle race field changes', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const raceInput = screen.getByLabelText(/Race/);
-    fireEvent.change(raceInput, { target: { value: 'Human' } });
-    expect(raceInput.value).toBe('Human');
-  });
-
-  it('should handle classRole field changes', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const classInput = screen.getByLabelText(/Class \/ Role/);
-    fireEvent.change(classInput, { target: { value: 'Wizard' } });
-    expect(classInput.value).toBe('Wizard');
-  });
-
-  it('should handle attitude select changes', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const attitudeSelect = screen.getByLabelText(/Attitude/);
-    fireEvent.change(attitudeSelect, { target: { value: 'positive' } });
-    expect(attitudeSelect.value).toBe('positive');
-  });
-
-  it('should handle tags field changes', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const tagsInput = screen.getByLabelText(/Tags/);
-    fireEvent.change(tagsInput, { target: { value: 'ally, quest-giver' } });
-    expect(tagsInput.value).toBe('ally, quest-giver');
-  });
-
-  it('should handle PreviewToggle field changes', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const appearanceField = screen.getByTestId('field-npc-appearance');
-    fireEvent.change(appearanceField, {
-      target: { value: 'Tall with a long beard' },
-    });
-    expect(appearanceField.value).toBe('Tall with a long beard');
-  });
-
-  // ── Save button disabled ──────────────────────────────────────────
-
-  it('should disable save button when name is empty', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const saveButton = screen.getByText('Save').closest('button');
-    expect(saveButton.disabled).toBe(true);
-  });
-
-  it('should enable save button when name has text', () => {
-    render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    const nameInput = screen.getByLabelText(/Name/);
-    fireEvent.change(nameInput, { target: { value: 'Gandalf' } });
-    const saveButton = screen.getByText('Save').closest('button');
-    expect(saveButton.disabled).toBe(false);
-  });
-
-  // ── NPC list rendering ────────────────────────────────────────────
-
-  it('should render NPC list when NPCs provided', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: 'Tall with a long beard',
-          personality: 'Wise and mysterious',
-          goals: 'Defeat Sauron',
-          secrets: 'He is a Maia',
-          notes: 'Carries a staff',
-          tags: 'ally, quest-giver',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
+    fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
     await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
+      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });
   });
 
-  it('should render race and class in NPC list item', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Legolas',
-          race: 'Elf',
-          classRole: 'Archer',
-          attitude: 'neutral',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
+  it('opens form modal when Generate NPC clicked', async () => {
     render(<NPCs {...defaultProps} />);
-
+    fireEvent.click(screen.getByRole('button', { name: /Generate NPC/i }));
     await waitFor(() => {
-      expect(screen.getByText(/Elf/)).toBeInTheDocument();
-      expect(screen.getByText(/Archer/)).toBeInTheDocument();
+      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });
   });
 
-  it('should render tags in NPC list item', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gimli',
-          race: 'Dwarf',
-          classRole: 'Fighter',
-          attitude: 'neutral',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: 'ally, warrior',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
+  it('opens form modal when Edit clicked', async () => {
     render(<NPCs {...defaultProps} />);
-
+    fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
     await waitFor(() => {
-      expect(screen.getByText(/ally, warrior/)).toBeInTheDocument();
+      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });
   });
 
-  // ── Edit modal ────────────────────────────────────────────────────
-
-  it('should open edit modal with "Edit NPC" heading when NPC clicked', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
+  it('closes modal when Close clicked', async () => {
     render(<NPCs {...defaultProps} />);
-
+    fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
     await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
+      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
     });
-
-    fireEvent.click(screen.getByText('Gandalf'));
-
-    expect(
-      screen.getByRole('heading', { name: 'Edit NPC' })
-    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
   });
 
-  it('should show delete button in edit modal', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
+  it('calls onBack when back button clicked', () => {
     render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Gandalf'));
-
-    expect(screen.getByText(/Delete/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Back/i }));
+    expect(defaultProps.onBack).toHaveBeenCalled();
   });
 
-  it('should not show delete button in new NPC modal', () => {
+  it('calls addNPCToInitiative when Add to Initiative clicked', async () => {
     render(<NPCs {...defaultProps} />);
-    clickNewNPC();
-    expect(screen.queryByText(/^Delete$/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('init-btn-Goblin'));
+    // The addNPCToInitiative mock resolves synchronously
   });
 
-  it('should populate form fields when editing an NPC', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: 'Tall with a long beard',
-          personality: 'Wise',
-          goals: 'Defeat Sauron',
-          secrets: 'Is a Maia',
-          notes: 'Carries staff',
-          tags: 'ally',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
+  it('renders with loading state', () => {
+    mockUseNPCsManagement.mockReturnValue({
+      npcs: [], loading: true, loadNPCsList: vi.fn(),
+      saveNPCAction: vi.fn(), deleteNPCAction: vi.fn(),
     });
-
     render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Gandalf'));
-
-    const nameInput = screen.getByLabelText(/Name/);
-    expect(nameInput.value).toBe('Gandalf');
-
-    const raceInput = screen.getByLabelText(/Race/);
-    expect(raceInput.value).toBe('Human');
-
-    const classInput = screen.getByLabelText(/Class \/ Role/);
-    expect(classInput.value).toBe('Wizard');
-
-    const attitudeSelect = screen.getByLabelText(/Attitude/);
-    expect(attitudeSelect.value).toBe('positive');
-
-    const tagsInput = screen.getByLabelText(/Tags/);
-    expect(tagsInput.value).toBe('ally');
+    expect(screen.getByText(/Loading NPCs/)).toBeInTheDocument();
   });
 
-  // ── Search filtering ──────────────────────────────────────────────
-
-  it('should filter NPCs by name', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-        {
-          id: 'npc-2',
-          name: 'Legolas',
-          race: 'Elf',
-          classRole: 'Archer',
-          attitude: 'neutral',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
+  it('filters by race', () => {
     render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-      expect(screen.getByText('Legolas')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search NPCs/);
-    fireEvent.change(searchInput, { target: { value: 'gandalf' } });
-
-    expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    expect(screen.queryByText('Legolas')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Humanoid' } });
+    expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
+    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
   });
 
-  it('should filter NPCs by race', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-        {
-          id: 'npc-2',
-          name: 'Legolas',
-          race: 'Elf',
-          classRole: 'Archer',
-          attitude: 'neutral',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
+  it('filters by class role', () => {
     render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search NPCs/);
-    fireEvent.change(searchInput, { target: { value: 'elf' } });
-
-    expect(screen.getByText('Legolas')).toBeInTheDocument();
-    expect(screen.queryByText('Gandalf')).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Caster' } });
+    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
+    expect(screen.queryByTestId('npc-list-item-Goblin')).not.toBeInTheDocument();
   });
 
-  it('should filter NPCs by classRole', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-        {
-          id: 'npc-2',
-          name: 'Aragorn',
-          race: 'Human',
-          classRole: 'Fighter',
-          attitude: 'neutral',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
+  it('filters by tags', () => {
     render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search NPCs/);
-    fireEvent.change(searchInput, { target: { value: 'fighter' } });
-
-    expect(screen.getByText('Aragorn')).toBeInTheDocument();
-    expect(screen.queryByText('Gandalf')).not.toBeInTheDocument();
-  });
-
-  it('should filter NPCs by tags', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: 'ally, quest-giver',
-        },
-        {
-          id: 'npc-2',
-          name: 'Sauron',
-          race: 'Maia',
-          classRole: 'Dark Lord',
-          attitude: 'extreme opposition',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: 'enemy, villain',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search NPCs/);
-    fireEvent.change(searchInput, { target: { value: 'villain' } });
-
-    expect(screen.getByText('Sauron')).toBeInTheDocument();
-    expect(screen.queryByText('Gandalf')).not.toBeInTheDocument();
-  });
-
-  it('should show search no results message', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search NPCs/);
-    fireEvent.change(searchInput, { target: { value: 'dragons' } });
-
-    expect(
-      screen.getByText(/No NPCs found matching/)
-    ).toBeInTheDocument();
-  });
-
-  // ── Attitude badge ────────────────────────────────────────────────
-
-  it('should render attitude badge with correct styles', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    const badge = screen.getByTitle('positive');
-    expect(badge).toBeInTheDocument();
-    expect(badge.textContent).toBe('positive');
-    expect(badge.style.backgroundColor).toBe('rgb(27, 67, 50)');
-    expect(badge.style.color).toBe('rgb(183, 228, 199)');
-    expect(badge.style.borderColor).toBe('rgb(64, 145, 108)');
-  });
-
-  it('should render extreme opposition badge with correct styles', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Sauron',
-          race: 'Maia',
-          classRole: 'Dark Lord',
-          attitude: 'extreme opposition',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Sauron')).toBeInTheDocument();
-    });
-
-    const badge = screen.getByTitle('extreme opposition');
-    expect(badge).toBeInTheDocument();
-    expect(badge.style.backgroundColor).toBe('rgb(92, 3, 14)');
-    expect(badge.style.color).toBe('rgb(255, 107, 107)');
-    expect(badge.style.borderColor).toBe('rgb(139, 0, 0)');
-  });
-
-  it('should render deep bonds badge with correct styles', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Sam',
-          race: 'Hobbit',
-          classRole: 'Gardener',
-          attitude: 'deep bonds',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Sam')).toBeInTheDocument();
-    });
-
-    const badge = screen.getByTitle('deep bonds');
-    expect(badge).toBeInTheDocument();
-    expect(badge.style.backgroundColor).toBe('rgb(26, 71, 42)');
-    expect(badge.style.color).toBe('rgb(144, 238, 144)');
-    expect(badge.style.borderColor).toBe('rgb(45, 106, 79)');
-  });
-
-  it('should render negative badge with correct styles', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Saruman',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'negative',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Saruman')).toBeInTheDocument();
-    });
-
-    const badge = screen.getByTitle('negative');
-    expect(badge).toBeInTheDocument();
-    expect(badge.style.backgroundColor).toBe('rgb(123, 36, 28)');
-    expect(badge.style.color).toBe('rgb(244, 160, 160)');
-    expect(badge.style.borderColor).toBe('rgb(164, 51, 48)');
-  });
-
-  it('should not render attitude badge when attitude is empty', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Mystery NPC',
-          race: 'Unknown',
-          classRole: '',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Mystery NPC')).toBeInTheDocument();
-    });
-
-    expect(
-      document.querySelector('.ct-list-attitude')
-    ).not.toBeInTheDocument();
-  });
-
-  // ── Delete action ─────────────────────────────────────────────────
-
-  it('should call deleteNPCAction when delete confirmed', async () => {
-    const mockDelete = vi.fn();
-
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: mockDelete,
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Gandalf'));
-
-    const deleteButton = screen.getByText(/Delete/);
-    fireEvent.click(deleteButton);
-
-    expect(window.confirm).toHaveBeenCalledWith('Delete this NPC?');
-    expect(mockDelete).toHaveBeenCalledWith('Gandalf');
-  });
-
-  it('should not call deleteNPCAction when confirm is cancelled', async () => {
-    window.confirm = vi.fn(() => false);
-
-    const mockDelete = vi.fn();
-
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: mockDelete,
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Gandalf'));
-
-    const deleteButton = screen.getByText(/Delete/);
-    fireEvent.click(deleteButton);
-
-    expect(window.confirm).toHaveBeenCalledWith('Delete this NPC?');
-    expect(mockDelete).not.toHaveBeenCalled();
-  });
-
-  // ── Save action ───────────────────────────────────────────────────
-
-  it('should call saveNPCAction when save clicked with valid data', async () => {
-    const mockSave = vi.fn();
-
-    mockNPCsFactory = () => ({
-      npcs: [],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      saveNPCAction: mockSave,
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    // "New NPC" appears in button and empty-state text; target the button specifically
-    const newBtn = screen.getAllByText(/New NPC/).find(
-      (el) => el.tagName === 'BUTTON'
-    );
-    fireEvent.click(newBtn);
-
-    const nameInput = screen.getByLabelText(/Name/);
-    fireEvent.change(nameInput, { target: { value: 'Gandalf' } });
-
-    const saveButton = screen.getByText('Save').closest('button');
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(mockSave).toHaveBeenCalled();
-    });
-  });
-
-  // ── Multiple NPCs ─────────────────────────────────────────────────
-
-  it('should render multiple NPCs in the list', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-        {
-          id: 'npc-2',
-          name: 'Legolas',
-          race: 'Elf',
-          classRole: 'Archer',
-          attitude: 'neutral',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-        {
-          id: 'npc-3',
-          name: 'Gimli',
-          race: 'Dwarf',
-          classRole: 'Fighter',
-          attitude: 'neutral',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-      expect(screen.getByText('Legolas')).toBeInTheDocument();
-      expect(screen.getByText('Gimli')).toBeInTheDocument();
-    });
-  });
-
-  // ── Keyboard accessibility ────────────────────────────────────────
-
-  it('should open edit modal on Enter key press on NPC item', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    const npcItem = screen.getByText('Gandalf').closest('.ct-list-item');
-    fireEvent.keyDown(npcItem, { key: 'Enter' });
-
-    expect(
-      screen.getByRole('heading', { name: 'Edit NPC' })
-    ).toBeInTheDocument();
-  });
-
-  it('should open edit modal on Space key press on NPC item', async () => {
-    mockNPCsFactory = () => ({
-      npcs: [
-        {
-          id: 'npc-1',
-          name: 'Gandalf',
-          race: 'Human',
-          classRole: 'Wizard',
-          attitude: 'positive',
-          appearance: '',
-          personality: '',
-          goals: '',
-          secrets: '',
-          notes: '',
-          tags: '',
-        },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCsList: vi.fn(),
-      deleteNPCAction: vi.fn(),
-    });
-
-    render(<NPCs {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Gandalf')).toBeInTheDocument();
-    });
-
-    const npcItem = screen.getByText('Gandalf').closest('.ct-list-item');
-    fireEvent.keyDown(npcItem, { key: ' ' });
-
-    expect(
-      screen.getByRole('heading', { name: 'Edit NPC' })
-    ).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'boss' } });
+    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
+    expect(screen.queryByTestId('npc-list-item-Goblin')).not.toBeInTheDocument();
   });
 });

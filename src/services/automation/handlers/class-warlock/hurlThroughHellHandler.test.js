@@ -1,171 +1,280 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import { handle } from './hurlThroughHellHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { rollExpression } from '../../../dice/diceRoller.js';
-import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+
+// ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
+    addEntry: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
+    rollExpression: vi.fn(() => ({ total: 44, rolls: [10, 10, 10, 10, 4] })),
 }));
 
 vi.mock('../../common/savePrompt.js', () => ({
-    buildSaveDc: vi.fn(),
-    createSaveListener: vi.fn(),
+    buildSaveDc: vi.fn((_auto) => 15),
+    createSaveListener: vi.fn(() => ({ promptId: 'test-prompt-id' })),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
-    getCombatContext: vi.fn(),
-    getTargetFromAttacker: vi.fn(),
+    getCombatContext: vi.fn(async () => ({
+        creatures: [{ name: 'Goblin', type: 'fiend' }],
+    })),
+    getTargetFromAttacker: vi.fn(() => ({ name: 'Goblin' })),
 }));
 
-const makeAction = (overrides = {}) => ({
-    name: 'Hurl Through Hell',
-    automation: {
-        type: 'hurl_through_hell',
-        damageExpression: '8d10',
-        damageType: 'Psychic',
-        saveType: 'CHA',
-        saveDc: 'ability',
-        saveAbility: 'CHA',
-        oncePerTurn: true,
-        uses: 1,
-        pactMagicRecharge: true,
-        casting_time: 'passive',
-        ...overrides,
-    },
-});
+// ── Re-import after mocking ────────────────────────────────────
 
-const makePlayerStats = () => ({
-    name: 'Test Warlock',
-    proficiency: 3,
-    abilities: [
-        { name: 'Charisma', bonus: 4 },
-    ],
-    resources: {},
-});
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
+
+// ── Helpers ────────────────────────────────────────────────────
+
+function makeAction(overrides = {}) {
+    return {
+        name: 'Hurl Through Hell',
+        automation: {
+            type: 'hurl_through_hell',
+            uses: 1,
+            damageExpression: '8d10',
+            damageType: 'Psychic',
+            saveType: 'CHA',
+            saveAbility: 'CHA',
+            ...overrides.automation,
+        },
+        ...overrides,
+    };
+}
+
+function makePlayerStats(overrides = {}) {
+    return { name: 'TestHero', proficiency: 3, ...overrides };
+}
+
+// ── Tests ──────────────────────────────────────────────────────
 
 describe('hurlThroughHellHandler', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.restoreAllMocks();
     });
 
-    it('should return automation_info when already used this turn', async () => {
-        vi.mocked(getRuntimeValue).mockImplementation((key, _subKey, _campaign) => {
-            if (key === 'Test Warlock' && _subKey === 'hurlThroughHellTurnUsed') return 'turn1';
-            return null;
+    describe('handle', () => {
+        it('should return popup when already used this turn', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'hurlThroughHellTurnUsed') return 'turn1';
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Already used this turn');
         });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+        it('should return popup when no uses remaining and no pact magic', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'hurlThroughHellUses') return 1;
+                return null;
+            });
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Already used this turn');
-    });
-
-    it('should return automation_info when no uses remaining and no pact slots', async () => {
-        vi.mocked(getRuntimeValue).mockImplementation((key, _subKey, _campaign) => {
-            if (key === 'Test Warlock' && _subKey === 'hurlThroughHellUses') return 1;
-            if (key === 'Test Warlock' && _subKey === 'warlockPactMagic') return 0;
-            return null;
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No uses remaining');
         });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+        it('should spend pact magic slot to restore a use when available', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'hurlThroughHellUses') return 1;
+                if (key === 'warlockPactMagic') return 2;
+                return null;
+            });
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('No uses remaining');
-    });
+            const result = await handle(makeAction({
+                automation: { pactMagicRecharge: true },
+            }), makePlayerStats(), 'campaign', 'map');
 
-    it('should spend pact slot when no uses remaining but pact slots available', async () => {
-        vi.mocked(getRuntimeValue).mockImplementation((key, _subKey, _campaign) => {
-            if (key === 'Test Warlock' && _subKey === 'hurlThroughHellUses') return 1;
-            if (key === 'Test Warlock' && _subKey === 'warlockPactMagic') return 2;
-            return null;
+            expect(result.type).toBe('popup');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'warlockPactMagic', 1, 'campaign');
         });
 
-        vi.mocked(getCombatContext).mockResolvedValue({
-            creatures: [{ name: 'Goblin', position: { gridX: 5, gridY: 5 } }],
+        it('should return popup for no pact magic slots when recharge needed', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'hurlThroughHellUses') return 1;
+                if (key === 'warlockPactMagic') return 0;
+                return null;
+            });
+
+            const result = await handle(makeAction({
+                automation: { pactMagicRecharge: true },
+            }), makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No Pact Magic slots available');
         });
-        vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Goblin' });
-        vi.mocked(buildSaveDc).mockReturnValue(14);
-        vi.mocked(rollExpression).mockReturnValue({ total: 44 });
-        vi.mocked(createSaveListener).mockReturnValue({ promptId: 'test-prompt' });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+        it('should return popup when no target found', async () => {
+            vi.mocked(await import('../../../rules/combat/damageUtils.js')).getCombatContext.mockResolvedValue(null);
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                return null;
+            });
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('Hurl Through Hell');
-        expect(setRuntimeValue).toHaveBeenCalledWith('Test Warlock', 'warlockPactMagic', 1, 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('Test Warlock', 'hurlThroughHellUses', 0, 'test-campaign');
-    });
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No target selected');
+        });
 
-    it('should have correct automation info builder output', () => {
-        const { miscHandlers } = require('../../../combat/automation/automationInfoBuilder/misc.js');
-        expect(miscHandlers.hurl_through_hell).toBeDefined();
+        it('should increment use counter', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                return null;
+            });
 
-        const feature = {
-            name: 'Hurl Through Hell',
-            automation: {
-                type: 'hurl_through_hell',
-                damageExpression: '8d10',
-                damageType: 'Psychic',
-                saveType: 'CHA',
-                saveDc: 'ability',
-                saveAbility: 'CHA',
-                oncePerTurn: true,
-                uses: 1,
-                pactMagicRecharge: true,
-                casting_time: 'passive',
-            },
-        };
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hurlThroughHellUses', 1, 'campaign');
+        });
 
-        const result = miscHandlers.hurl_through_hell(feature, { proficiency: 3, abilities: [{ name: 'Charisma', bonus: 4 }] });
+        it('should mark the turn as used', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                return null;
+            });
 
-        expect(result.type).toBe('hurl_through_hell');
-        expect(result.name).toBe('Hurl Through Hell');
-        expect(result.damageExpression).toBe('8d10');
-        expect(result.damageType).toBe('Psychic');
-        expect(result.saveType).toBe('CHA');
-        expect(result.oncePerTurn).toBe(true);
-        expect(result.uses).toBe(1);
-        expect(result.pactMagicRecharge).toBe(true);
-        expect(result.hasAutomation).toBe(true);
-    });
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'hurlThroughHellTurnUsed', 'turn1', 'campaign');
+        });
 
-    it('should include hurl_through_hell in collector passives', () => {
-        const { collectAutomationFromFeatures } = require('../../../combat/automation/automationCollector.js');
+        it('should apply incapacitated condition on save failure', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                if (key === 'targetEffects') return [];
+                if (key === 'activeConditions') return [];
+                return null;
+            });
 
-        const features = [{
-            name: 'Hurl Through Hell',
-            automation: {
-                type: 'hurl_through_hell',
-                damageExpression: '8d10',
-                damageType: 'Psychic',
-                saveType: 'CHA',
-                saveDc: 'ability',
-                saveAbility: 'CHA',
-                oncePerTurn: true,
-                uses: 1,
-                pactMagicRecharge: true,
-                casting_time: 'passive',
-            },
-        }];
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
 
-        const result = collectAutomationFromFeatures(features, { proficiency: 3, abilities: [{ name: 'Charisma', bonus: 4 }] });
+            window.dispatchEvent(new CustomEvent('save-result', {
+                detail: { promptId: 'test-prompt-id', success: false },
+            }));
 
-        expect(result.passives).toHaveLength(1);
-        expect(result.passives[0].type).toBe('hurl_through_hell');
-        expect(result.passives[0].name).toBe('Hurl Through Hell');
+            await new Promise(r => setTimeout(r, 10));
+
+            expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['incapacitated'], 'campaign');
+        });
+
+        it('should log damage entry for non-fiend on save failure', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                if (key === 'targetEffects') return [];
+                if (key === 'activeConditions') return [];
+                return null;
+            });
+
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Human', type: 'humanoid' }],
+            });
+            const { getTargetFromAttacker } = await import('../../../rules/combat/damageUtils.js');
+            getTargetFromAttacker.mockReturnValue({ name: 'Human' });
+
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            window.dispatchEvent(new CustomEvent('save-result', {
+                detail: { promptId: 'test-prompt-id', success: false },
+            }));
+
+            await new Promise(r => setTimeout(r, 10));
+
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'damage_roll',
+                targetName: 'Human',
+            }));
+        });
+
+        it('should skip damage entry for fiend on save failure', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                if (key === 'targetEffects') return [];
+                if (key === 'activeConditions') return [];
+                return null;
+            });
+
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Goblin', type: 'fiend' }],
+            });
+            const { getTargetFromAttacker } = await import('../../../rules/combat/damageUtils.js');
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            window.dispatchEvent(new CustomEvent('save-result', {
+                detail: { promptId: 'test-prompt-id', success: false },
+            }));
+
+            await new Promise(r => setTimeout(r, 10));
+
+            const damageEntries = addEntry.mock.calls.filter(
+                call => call[1]?.type === 'damage_roll'
+            );
+            expect(damageEntries).toHaveLength(0);
+        });
+
+        it('should log save success entry on save success', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                return null;
+            });
+
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            window.dispatchEvent(new CustomEvent('save-result', {
+                detail: { promptId: 'test-prompt-id', success: true },
+            }));
+
+            await new Promise(r => setTimeout(r, 10));
+
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'save_result',
+                success: true,
+            }));
+        });
+
+        it('should include damage info in popup payload', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.saveType).toBe('CHA');
+            expect(result.payload.saveDc).toBe(15);
+            expect(result.payload.damageType).toBe('Psychic');
+            expect(result.payload.targetName).toBe('Goblin');
+        });
+
+        it('should ignore save result events with wrong promptId', async () => {
+            getRuntimeValue.mockImplementation((playerName, key) => {
+                if (key === 'currentTurn') return 'turn1';
+                return null;
+            });
+
+            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+
+            window.dispatchEvent(new CustomEvent('save-result', {
+                detail: { promptId: 'wrong-prompt-id', success: false },
+            }));
+
+            await new Promise(r => setTimeout(r, 10));
+
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeConditions', expect.arrayContaining(['incapacitated']));
+        });
     });
 });

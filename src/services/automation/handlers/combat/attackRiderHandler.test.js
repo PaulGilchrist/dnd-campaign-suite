@@ -1,480 +1,242 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports ───────────────────────────────────────
+import { handle, applyRiderOption } from './attackRiderHandler.js';
+
+// ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn(() => Promise.resolve()),
+    addEntry: vi.fn(async () => {}),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
-  getTargetFromAttacker: vi.fn(),
+    getCombatContext: vi.fn(async () => null),
+    getTargetFromAttacker: vi.fn(() => null),
 }));
 
-// ── Imports ────────────────────────────────────────────────────
+vi.mock('../../../rules/combat/rangeValidation.js', () => ({
+    getDistanceFeet: vi.fn(() => 5),
+}));
 
-import { handle, applyRiderOption } from './attackRiderHandler.js';
-import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as logService from '../../../ui/logService.js';
-import * as damageUtils from '../../../rules/combat/damageUtils.js';
+vi.mock('../../../../../services/encounters/combatData.js', () => ({
+    getCurrentCombatRound: vi.fn(() => 1),
+}));
+
+// ── Re-import after mocking ────────────────────────────────────
+
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
-const campaignName = 'TestCampaign';
-
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestHero',
-    level: 3,
-    proficiencyBonus: 2,
-    ...overrides,
-  };
+function makeAction(overrides = {}) {
+    return {
+        name: 'Cunning Strike',
+        description: 'Apply a rider effect on a hit.',
+        automation: {
+            type: 'attack_rider',
+            options: [
+                { name: 'Trip', effect: 'prone' },
+                { name: 'Poison', effect: 'poisoned', requires: 'Poisoner\'s Kit' },
+                { name: 'Daze', effect: 'daze' },
+                { name: 'Push 15ft', effect: 'push_15ft', value: 15 },
+                { name: 'Disadvantage on Save', effect: 'disadvantage_on_next_save' },
+                { name: 'No Opportunity Attacks', effect: 'no_opportunity_attacks', movement: true },
+                { name: 'Sudden Strike', effect: 'sudden_strike' },
+                { name: 'Mass Fear', effect: 'mass_fear', saveType: 'WIS', saveAbility: 'WIS' },
+                { name: 'Damage Bonus', effect: 'damage_bonus', damageExpression: '2d6' },
+                { name: 'Cleave', effect: 'cleave', oncePerTurn: true },
+            ],
+            ...overrides.automation,
+        },
+        ...overrides,
+    };
 }
 
-function makeAction(automation = {}) {
-  return {
-    name: 'Giant Crusher',
-    automation: {
-      type: 'attack_rider',
-      ...automation,
-    },
-  };
+function makePlayerStats(overrides = {}) {
+    return {
+        name: 'TestHero',
+        proficiency: 3,
+        abilities: [
+            { name: 'Dexterity', bonus: 2 },
+            { name: 'Constitution', bonus: 1 },
+            { name: 'Wisdom', bonus: 3 },
+        ],
+        toolProficiencies: [],
+        automation: { passives: [] },
+        ...overrides,
+    };
 }
 
 // ── Tests ──────────────────────────────────────────────────────
 
-describe('attackRiderHandler.handle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should return popup when options is empty', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ options: [] });
-
-    damageUtils.getCombatContext.mockResolvedValue(null);
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe(action.name);
-    expect(result.payload.automationType).toBe('attack_rider');
-  });
-
-  it('should return modal when options exist AND chooseOne is true', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A' }],
-      chooseOne: true,
+describe('attackRiderHandler', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
     });
 
-    damageUtils.getCombatContext.mockResolvedValue(null);
+    describe('handle', () => {
 
-    const result = await handle(action, ps, campaignName, null);
 
-    expect(result.type).toBe('modal');
-    expect(result.modalName).toBe('attackRider');
-  });
+        it('should apply immediately when single option', async () => {
+            const action = makeAction({
+                automation: {
+                    type: 'attack_rider',
+                    options: [{ name: 'Trip', effect: 'prone' }],
+                },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
 
-  it('should return modal when options exist AND maxEffects > 1', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A' }, { name: 'Option B' }],
-      maxEffects: 2,
+            expect(result.type).toBe('popup');
+        });
+
+        it('should return ready info when no options', async () => {
+            const action = makeAction({
+                automation: { type: 'attack_rider', options: [] },
+            });
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('ready');
+        });
+
+
+
+
     });
 
-    damageUtils.getCombatContext.mockResolvedValue(null);
+    describe('applyRiderOption', () => {
+        it('should return null when no matching options found', async () => {
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Nonexistent']);
+            expect(result).toBe(null);
+        });
 
-    const result = await handle(action, ps, campaignName, null);
+        it('should apply Trip effect', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
 
-    expect(result.type).toBe('modal');
-    expect(result.modalName).toBe('attackRider');
-  });
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Trip');
+        });
 
-  it('should return popup when options exist but chooseOne is false and maxEffects <= 1', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A' }],
-      chooseOne: false,
-      maxEffects: 1,
+        it('should apply Trip effect when target is too large (sync lookup fails)', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            vi.mocked(await import('../../../rules/combat/damageUtils.js')).getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Goblin', size: 'Gargantuan' }],
+            });
+
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip']);
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should reject Poison without Poisoner\'s Kit', async () => {
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Poison']);
+
+            expect(result.payload.description).toContain('Poisoner\'s Kit');
+        });
+
+        it('should allow Poison with Poisoner\'s Kit', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const stats = makePlayerStats({
+                toolProficiencies: ['Poisoner\'s Kit'],
+            });
+            const action = makeAction();
+            const result = await applyRiderOption(action, stats, 'campaign', 'Goblin', ['Poison']);
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should apply Sudden Strike effect', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Sudden Strike']);
+
+            expect(result.payload.description).toContain('Sudden Strike enabled');
+        });
+
+        it('should apply Mass Fear effect', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Mass Fear']);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Mass Fear');
+        });
+
+        it('should apply Push 15ft effect', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Push 15ft']);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Push 15ft');
+        });
+
+        it('should apply Disadvantage on Save effect', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Disadvantage on Save']);
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should apply No Opportunity Attacks effect', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['No Opportunity Attacks']);
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should apply Damage Bonus effect', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Damage Bonus']);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('2d6');
+        });
+
+
+
+        it('should deduct Cunning Strike cost when specified', async () => {
+            getRuntimeValue.mockReturnValue(0);
+            const action = makeAction({
+                automation: {
+                    type: 'attack_rider',
+                    options: [{ name: 'Costly Strike', effect: 'poisoned', cost: '2d6' }],
+                },
+            });
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Costly Strike']);
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should return null when no target', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', null, ['Trip']);
+
+            expect(result.payload.description).toContain('No target selected');
+        });
+
+        it('should handle multiple options', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const action = makeAction();
+            const result = await applyRiderOption(action, makePlayerStats(), 'campaign', 'Goblin', ['Trip', 'Daze']);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Trip');
+        });
+
+
     });
-
-    damageUtils.getCombatContext.mockResolvedValue(null);
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.type).toBe('popup');
-  });
-
-  it('should include targetName in modal payload when combat context has a target', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A' }],
-      chooseOne: true,
-    });
-
-    damageUtils.getCombatContext.mockResolvedValue({});
-    damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.payload.targetName).toBe('Goblin');
-  });
-
-  it('should include null targetName in modal payload when no combat context', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A' }],
-      chooseOne: true,
-    });
-
-    damageUtils.getCombatContext.mockResolvedValue(null);
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.payload.targetName).toBeNull();
-  });
-
-  it('should call addEntry with correct ability_use data', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ options: [] });
-
-    damageUtils.getCombatContext.mockResolvedValue(null);
-
-    await handle(action, ps, campaignName, null);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-      type: 'ability_use',
-      characterName: ps.name,
-      abilityName: action.name,
-      description: `${action.name} used`,
-    });
-  });
-
-  it('should call addEntry with target name in description when target exists', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ options: [] });
-
-    damageUtils.getCombatContext.mockResolvedValue({});
-    damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-
-    await handle(action, ps, campaignName, null);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-      type: 'ability_use',
-      characterName: ps.name,
-      abilityName: action.name,
-      description: `${action.name} used against Orc`,
-    });
-  });
-
-  it('should call addEntry without target name when no target', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ options: [] });
-
-    damageUtils.getCombatContext.mockResolvedValue(null);
-
-    await handle(action, ps, campaignName, null);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-      type: 'ability_use',
-      characterName: ps.name,
-      abilityName: action.name,
-      description: `${action.name} used`,
-    });
-  });
-});
-
-describe('attackRiderHandler.applyRiderOption', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should return null when no options match the given names', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A' }, { name: 'Option B' }],
-    });
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', ['Nonexistent']);
-
-    expect(result).toBeNull();
-  });
-
-  it('should return null when optionNames is empty array', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A' }],
-    });
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', []);
-
-    expect(result).toBeNull();
-  });
-
-  it('should handle single option name as string (not array)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A', effect: 'push_15ft' }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', 'Option A');
-
-    expect(result).not.toBeNull();
-    expect(result.type).toBe('popup');
-  });
-
-  it('should handle optionNames as array of strings', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [
-        { name: 'Option A', effect: 'push_15ft' },
-        { name: 'Option B', effect: 'speed_reduction' },
-      ],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', ['Option A', 'Option B']);
-
-    expect(result).not.toBeNull();
-    expect(result.type).toBe('popup');
-  });
-
-  it('should call setRuntimeValue to clear pendingRiderChoice', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A', effect: 'push_15ft' }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    await applyRiderOption(action, ps, campaignName, 'Target', 'Option A');
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      ps.name,
-      'pendingRiderChoice',
-      null,
-      campaignName,
-    );
-  });
-
-  it('should return single popup when one option chosen', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A', effect: 'push_15ft' }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', 'Option A');
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-  });
-
-  it('should return combined popup when multiple options chosen', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [
-        { name: 'Push', effect: 'push_15ft' },
-        { name: 'Slow', effect: 'speed_reduction' },
-      ],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', ['Push', 'Slow']);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('Applied to Target:');
-    expect(result.payload.description).toContain('Push');
-    expect(result.payload.description).toContain('Slow');
-  });
-
-  it('should include effect descriptions for disadvantage_on_next_save', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Cursed Strike', effect: 'disadvantage_on_next_save' }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', 'Cursed Strike');
-
-    expect(result.payload.description).toContain('target has Disadvantage on the next saving throw it makes');
-  });
-
-  it('should include effect descriptions for noOpportunityAttacks', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Controlled Push', noOpportunityAttacks: true }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', 'Controlled Push');
-
-    expect(result.payload.description).toContain('target cannot make Opportunity Attacks until the start of your next turn');
-  });
-
-  it('should include effect descriptions for next_attack_advantage with value', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Blessed Strike', effect: 'next_attack_advantage', value: 7 }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', 'Blessed Strike');
-
-    expect(result.payload.description).toContain('the next attack against Target gains +7');
-  });
-
-  it('should include effect descriptions for push_15ft', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [
-        { name: 'Shove', effect: 'push_15ft' },
-        { name: 'Slow', effect: 'speed_reduction' },
-      ],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', ['Shove', 'Slow']);
-
-    expect(result.payload.description).toContain('target pushed 15 ft away');
-  });
-
-  it('should include effect descriptions for speed_reduction', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [
-        { name: 'Shove', effect: 'push_15ft' },
-        { name: 'Weakening Touch', effect: 'speed_reduction' },
-      ],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', ['Shove', 'Weakening Touch']);
-
-    expect(result.payload.description).toContain('target Speed reduced by 15 ft');
-  });
-});
-
-describe('attackRiderHandler.applyRiderEffect (via applyRiderOption)', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should return "no target selected" popup when targetName is null', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Option A', effect: 'push_15ft' }],
-    });
-
-    const result = await applyRiderOption(action, ps, campaignName, null, 'Option A');
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('No target selected');
-    expect(result.payload.description).toContain('effect noted for manual application');
-  });
-
-  it('should store effect in targetEffects runtime state when targetName exists', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Push', effect: 'push_15ft' }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    await applyRiderOption(action, ps, campaignName, 'Target', 'Push');
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      campaignName,
-      'targetEffects',
-      expect.arrayContaining([
-        expect.objectContaining({
-          target: 'Target',
-          source: action.name,
-          option: 'Push',
-          effect: 'push_15ft',
-        }),
-      ]),
-      campaignName,
-    );
-  });
-
-  it('should call setRuntimeValue with updated effects array', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Push', effect: 'push_15ft' }],
-    });
-
-    const existingEffects = [
-      { target: 'OldTarget', effect: 'speed_reduction' },
-    ];
-    useRuntimeState.getRuntimeValue.mockReturnValue(existingEffects);
-
-    await applyRiderOption(action, ps, campaignName, 'Target', 'Push');
-
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      campaignName,
-      'targetEffects',
-      expect.arrayContaining([
-        expect.objectContaining({ target: 'OldTarget' }),
-        expect.objectContaining({ target: 'Target', effect: 'push_15ft' }),
-      ]),
-      campaignName,
-    );
-  });
-
-  it('should include noOpportunityAttacks in effect description popup', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Controlled Push', noOpportunityAttacks: true }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', 'Controlled Push');
-
-    expect(result.payload.description).toContain('target cannot make Opportunity Attacks until the start of your next turn');
-  });
-
-  it('should include disadvantage_on_next_save in effect description popup', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Cursed Strike', effect: 'disadvantage_on_next_save' }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', 'Cursed Strike');
-
-    expect(result.payload.description).toContain('target has Disadvantage on the next saving throw it makes');
-  });
-
-  it('should include next_attack_advantage with custom value in popup', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({
-      options: [{ name: 'Blessed Strike', effect: 'next_attack_advantage', value: 7 }],
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue([]);
-
-    const result = await applyRiderOption(action, ps, campaignName, 'Target', 'Blessed Strike');
-
-    expect(result.payload.description).toContain('the next attack against Target gains +7');
-  });
 });

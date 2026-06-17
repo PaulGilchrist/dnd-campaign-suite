@@ -1,154 +1,322 @@
-import { handle } from './resilientSphereHandler.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ── Mocks BEFORE imports ───────────────────────────────────────
+
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(),
+}));
+
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../../shared/logPoster.js', () => ({
+  postLogEntry: vi.fn(),
+}));
+
+vi.mock('../../../rules/effects/expirations.js', () => ({
+  addExpiration: vi.fn(),
+}));
+
+vi.mock('../../common/savePrompt.js', () => ({
+  buildSaveDc: vi.fn(),
+  createSaveListener: vi.fn(({ targetName, saveType, saveDc }) => ({
+    promptId: `prompt-${targetName}-${saveType}-${saveDc}`,
+    promise: Promise.resolve({ success: false }),
+  })),
+}));
+
+vi.mock('../../common/targetResolver.js', () => ({
+  resolveTarget: vi.fn(),
+}));
+
+// ── Imports ────────────────────────────────────────────────────
+
+import { handle, isResilientSphereActive, getResilientSphereSource } from './resilientSphereHandler.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as savePrompt from '../../common/savePrompt.js';
 import * as targetResolver from '../../common/targetResolver.js';
-import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as logService from '../../../ui/logService.js';
-import * as expirations from '../../../rules/effects/expirations.js';
-import * as logPoster from '../../../shared/logPoster.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as logService from '../../../ui/logService.js';
+import * as logPoster from '../../../shared/logPoster.js';
+import * as expirations from '../../../rules/effects/expirations.js';
 
-const campaignName = 'test-campaign';
+// ── Helpers ────────────────────────────────────────────────────
 
-function makePlayerStats(name = 'TestWizard') {
-    return {
-        name,
-        proficiency: 4,
-        spellAbilities: { saveDc: 15 },
-        abilities: [{ name: 'Intelligence', bonus: 4 }],
-    };
+const campaignName = 'TestCampaign';
+
+function makePlayerStats(overrides = {}) {
+  return {
+    name: 'TestWizard',
+    level: 10,
+    ...overrides,
+  };
 }
 
+function makeAction(automation = {}) {
+  return {
+    name: 'Resilient Sphere',
+    automation: {
+      type: 'spell',
+      ...automation,
+    },
+  };
+}
+
+// ── Tests ──────────────────────────────────────────────────────
+
 describe('resilientSphereHandler', () => {
-    let mockPromptId;
-    let mockSavePromise;
-    let mockResolve;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    savePrompt.buildSaveDc.mockReturnValue(13);
+    targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'EnemyGoblin' } });
+  });
 
-    beforeEach(() => {
-        mockPromptId = 'prompt-1';
-        mockSavePromise = new Promise(resolve => { mockResolve = resolve; });
+  describe('Combat context checks', () => {
+    it('should return popup when no creatures in combat', async () => {
+      damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
 
-        vi.spyOn(savePrompt, 'buildSaveDc').mockReturnValue(15);
-        vi.spyOn(savePrompt, 'createSaveListener').mockReturnValue({
-            promptId: mockPromptId,
-            promise: mockSavePromise,
-        });
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        vi.spyOn(targetResolver, 'resolveTarget').mockResolvedValue({
-            target: { name: 'Goblin' },
-        });
-
-        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
-            creatures: [{ name: 'Goblin' }],
-        });
-
-        vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue([]);
-        vi.spyOn(runtimeState, 'setRuntimeValue').mockReturnValue(undefined);
-        vi.spyOn(logService, 'addEntry').mockResolvedValue({ id: 1 });
-        vi.spyOn(logPoster, 'postLogEntry').mockResolvedValue(undefined);
-        vi.spyOn(expirations, 'addExpiration').mockReturnValue(undefined);
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No creatures in combat');
     });
 
-    afterEach(() => {
-        vi.restoreAllMocks();
+    it('should return popup when combat context is null', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(null);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No creatures in combat');
+    });
+  });
+
+  describe('Target resolution', () => {
+    it('should return popup when no target selected', async () => {
+      damageUtils.getCombatContext.mockResolvedValue({ creatures: [{ name: 'EnemyGoblin' }] });
+      targetResolver.resolveTarget.mockResolvedValue({});
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No target selected');
+    });
+  });
+
+  describe('Save - success', () => {
+    it('should return popup when target succeeds on save', async () => {
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-EnemyGoblin-DEX-13',
+        promise: Promise.resolve({ success: true }),
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('succeeded on DEX save');
     });
 
-    it('should prompt for DEX save on failed save', async () => {
-        const action = {
-            name: "Otiluke's Resilient Sphere",
-            automation: {
-                type: 'resilient_sphere',
-                saveDc: 15,
-                saveType: 'DEX',
-            },
-        };
+    it('should add save_result log entry on success', async () => {
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-EnemyGoblin-DEX-13',
+        promise: Promise.resolve({ success: true }),
+      });
 
-        const resultPromise = handle(action, makePlayerStats(), campaignName, null);
-        // Trigger the save as failed
-        mockResolve({ success: false });
-        const result = await resultPromise;
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('failed DEX save');
-        expect(result.payload.description).toContain('Resilient Sphere');
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'save_result',
+        characterName: 'TestWizard',
+        rollType: 'save-resilient-sphere',
+        targetName: 'EnemyGoblin',
+        saveDc: 13,
+        saveType: 'DEX',
+        success: true,
+        description: expect.stringContaining('succeeded on DEX save'),
+      });
+    });
+  });
+
+  describe('Save - failure', () => {
+    it('should toggle resilient sphere buff on failed save', async () => {
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-EnemyGoblin-DEX-13',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('enclosed in a Resilient Sphere');
     });
 
-    it('should report success on successful save', async () => {
-        const action = {
-            name: "Otiluke's Resilient Sphere",
-            automation: {
-                type: 'resilient_sphere',
-                saveDc: 15,
-                saveType: 'DEX',
-            },
-        };
+    it('should add expiration for concentration', async () => {
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-EnemyGoblin-DEX-13',
+        promise: Promise.resolve({ success: false }),
+      });
 
-        const resultPromise = handle(action, makePlayerStats(), campaignName, null);
-        mockResolve({ success: true });
-        const result = await resultPromise;
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toContain('succeeded on DEX save');
+      expect(expirations.addExpiration).toHaveBeenCalledWith(
+        'TestWizard',
+        'EnemyGoblin',
+        [{ type: 'remove_active_buff', buffName: 'Resilient Sphere', effect: 'resilient_sphere' }],
+        campaignName,
+        10,
+      );
     });
 
-    it('should apply resilient_sphere buff on failed save', async () => {
-        const action = {
-            name: "Otiluke's Resilient Sphere",
-            automation: {
-                type: 'resilient_sphere',
-                saveDc: 15,
-                saveType: 'DEX',
-            },
-        };
+    it('should post log entry for condition applied', async () => {
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-EnemyGoblin-DEX-13',
+        promise: Promise.resolve({ success: false }),
+      });
 
-        const resultPromise = handle(action, makePlayerStats(), campaignName, null);
-        mockResolve({ success: false });
-        await resultPromise;
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Goblin',
-            'activeBuffs',
-            expect.arrayContaining([
-                expect.objectContaining({ effect: 'resilient_sphere' })
-            ]),
-            campaignName
-        );
+      expect(logPoster.postLogEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'condition',
+        action: 'applied',
+        characterName: 'EnemyGoblin',
+        condition: 'Resilient Sphere',
+        reason: 'Resilient Sphere',
+        note: expect.stringContaining('enclosed in Otiluke\'s Resilient Sphere'),
+        timestamp: expect.any(Number),
+      });
     });
 
-    it('should return early when no creatures in combat', async () => {
-        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({ creatures: [] });
+    it('should add save_result log entry on failure', async () => {
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-EnemyGoblin-DEX-13',
+        promise: Promise.resolve({ success: false }),
+      });
 
-        const action = {
-            name: "Otiluke's Resilient Sphere",
-            automation: {
-                type: 'resilient_sphere',
-                saveDc: 15,
-                saveType: 'DEX',
-            },
-        };
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-        const result = await handle(action, makePlayerStats(), campaignName, null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No creatures in combat');
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'save_result',
+        characterName: 'TestWizard',
+        rollType: 'save-resilient-sphere',
+        targetName: 'EnemyGoblin',
+        saveDc: 13,
+        saveType: 'DEX',
+        success: false,
+        description: expect.stringContaining('failed DEX save'),
+      });
     });
 
-    it('should return early when no target selected', async () => {
-        vi.spyOn(targetResolver, 'resolveTarget').mockResolvedValue(null);
+    it('should use custom duration from automation when provided', async () => {
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-EnemyGoblin-DEX-13',
+        promise: Promise.resolve({ success: false }),
+      });
 
-        const action = {
-            name: "Otiluke's Resilient Sphere",
-            automation: {
-                type: 'resilient_sphere',
-                saveDc: 15,
-                saveType: 'DEX',
-            },
-        };
+      const action = makeAction({ duration: 'Concentration, up to 2 minutes' });
 
-        const result = await handle(action, makePlayerStats(), campaignName, null);
+      await handle(action, makePlayerStats(), campaignName, null);
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No target selected');
+      expect(expirations.addExpiration).toHaveBeenCalledWith(
+        'TestWizard',
+        'EnemyGoblin',
+        [{ type: 'remove_active_buff', buffName: 'Resilient Sphere', effect: 'resilient_sphere' }],
+        campaignName,
+        10,
+      );
     });
+  });
+
+  describe('isResilientSphereActive', () => {
+    it('should return true when resilient sphere buff is active', () => {
+      runtimeState.getRuntimeValue.mockReturnValue([
+        { name: 'Resilient Sphere', effect: 'resilient_sphere' },
+      ]);
+
+      const result = isResilientSphereActive('EnemyGoblin', campaignName);
+
+      expect(result).toBe(true);
+    });
+
+    it('should return false when resilient sphere buff is not active', () => {
+      runtimeState.getRuntimeValue.mockReturnValue([
+        { name: 'Fire Shield', effect: 'fire_shield' },
+      ]);
+
+      const result = isResilientSphereActive('EnemyGoblin', campaignName);
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when activeBuffs is empty', () => {
+      runtimeState.getRuntimeValue.mockReturnValue([]);
+
+      const result = isResilientSphereActive('EnemyGoblin', campaignName);
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when activeBuffs is null', () => {
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+
+      const result = isResilientSphereActive('EnemyGoblin', campaignName);
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe('getResilientSphereSource', () => {
+    it('should return caster name when sphere is active', () => {
+      runtimeState.getRuntimeValue.mockReturnValue([
+        { name: 'Resilient Sphere', effect: 'resilient_sphere', sourceCharacter: 'TestWizard' },
+      ]);
+
+      const result = getResilientSphereSource('EnemyGoblin', campaignName);
+
+      expect(result).toBe('TestWizard');
+    });
+
+    it('should return null when sphere is not active', () => {
+      runtimeState.getRuntimeValue.mockReturnValue([
+        { name: 'Fire Shield', effect: 'fire_shield' },
+      ]);
+
+      const result = getResilientSphereSource('EnemyGoblin', campaignName);
+
+      expect(result).toBe(null);
+    });
+
+    it('should return null when no sourceCharacter on buff', () => {
+      runtimeState.getRuntimeValue.mockReturnValue([
+        { name: 'Resilient Sphere', effect: 'resilient_sphere' },
+      ]);
+
+      const result = getResilientSphereSource('EnemyGoblin', campaignName);
+
+      expect(result).toBe(null);
+    });
+  });
+
+  describe('Toggle behavior', () => {
+    it('should deactivate when sphere is already active on re-cast', async () => {
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-EnemyGoblin-DEX-13',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      runtimeState.getRuntimeValue
+        .mockReturnValueOnce([{ name: 'Resilient Sphere', effect: 'resilient_sphere' }]) // first call in toggle
+        .mockReturnValueOnce([{ name: 'Resilient Sphere', effect: 'resilient_sphere' }]); // second call in toggle
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('enclosed in a Resilient Sphere');
+    });
+  });
 });

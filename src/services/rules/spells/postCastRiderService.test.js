@@ -1,805 +1,393 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-// ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
-
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-}));
-
-vi.mock('../../automation/index.js', () => ({
-  executeHandler: vi.fn().mockResolvedValue({ type: 'popup', payload: {} }),
-}));
-
-// ── Imports ────────────────────────────────────────────────────
-
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { executeHandler } from '../../automation/index.js'
 import {
   getPostCastRiderSaves,
-  hasPostCastRiderSave,
+  getSpellThiefFeatures,
+  hasSpellThief,
   getMultiTargetSpreads,
   getMultiTargetSpreadForSpell,
+  hasPostCastRiderSave,
   triggerPostCastRiderSaves,
-} from './postCastRiderService.js';
-import * as useRuntimeState from '../../hooks/runtime/useRuntimeState.js';
-import * as automationIndex from '../../automation/index.js';
+  getSoulstitchFeatures,
+  hasSoulstitchSpells,
+  triggerSoulstitchSpells,
+  getEmpoweredEvocationFeatures,
+  hasEmpoweredEvocation,
+  getEmpoweredEvocationIntModifier,
+  triggerSpellThief,
+  getBewitchingMagicFeatures,
+  triggerBewitchingMagic,
+} from './postCastRiderService.js'
 
-// ── Helpers ────────────────────────────────────────────────────
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => 1),
+}))
 
-const campaignName = 'TestCampaign';
-const mapName = 'TestMap';
+vi.mock('../../automation/index.js', () => ({
+  executeHandler: vi.fn(),
+}))
 
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestHero',
-    level: 5,
-    proficiencyBonus: 3,
-    abilities: [
-      { name: 'Strength', bonus: 2 },
-      { name: 'Dexterity', bonus: 1 },
-      { name: 'Constitution', bonus: 0 },
-      { name: 'Intelligence', bonus: 3 },
-      { name: 'Wisdom', bonus: -1 },
-      { name: 'Charisma', bonus: 4 },
-    ],
-    characterAdvancement: [],
-    automation: { passives: [] },
-    ...overrides,
-  };
-}
+vi.mock('../../automation/handlers/class-fighter-rogue/spellThiefHandler.js', () => ({
+  isBlockedBySpellThief: vi.fn(() => false),
+}))
 
-function makeSpell(overrides = {}) {
-  return {
-    name: 'Charm Person',
-    school: 'enchantment',
-    level: 1,
-    ...overrides,
-  };
-}
-
-function makeMetaCtx(overrides = {}) {
-  return { slotLevel: 1, ...overrides };
-}
-
-// ── Tests for getPostCastRiderSaves ────────────────────────────
-
-describe('getPostCastRiderSaves', () => {
-  it('should return empty array when no passives exist', () => {
-    const ps = makePlayerStats({ automation: { passives: [] } });
-    expect(getPostCastRiderSaves(ps)).toEqual([]);
-  });
-
-  it('should return empty array when passives is undefined', () => {
-    const ps = makePlayerStats({ automation: {} });
-    expect(getPostCastRiderSaves(ps)).toEqual([]);
-  });
-
-  it('should filter for post_cast_rider type passives', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'post_cast_rider', name: 'Charm Save' },
-          { type: 'post_cast_rider', name: 'Fear Save' },
-        ],
-      },
-    });
-    const result = getPostCastRiderSaves(ps);
-    expect(result).toHaveLength(2);
-    expect(result[0].name).toBe('Charm Save');
-    expect(result[1].name).toBe('Fear Save');
-  });
-
-  it('should filter for passive_rule type with riderSave property', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'passive_rule', riderSave: { type: 'WIS' }, name: 'Rider Rule' },
-          { type: 'passive_rule', name: 'No Rider' },
-        ],
-      },
-    });
-    const result = getPostCastRiderSaves(ps);
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('Rider Rule');
-  });
-
-  it('should exclude passives that are neither post_cast_rider nor passive_rule with riderSave', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'post_cast_rider', name: 'Valid' },
-          { type: 'passive_rule', riderSave: { type: 'CHA' }, name: 'ValidRule' },
-          { type: 'passive_rule', name: 'InvalidNoRiderSave' },
-          { type: 'some_other_type', name: 'InvalidType' },
-        ],
-      },
-    });
-    const result = getPostCastRiderSaves(ps);
-    expect(result).toHaveLength(2);
-    expect(result.map((p) => p.name)).toEqual(['Valid', 'ValidRule']);
-  });
-
-  it('should handle null playerStats gracefully', () => {
-    expect(() => getPostCastRiderSaves(null)).toThrow();
-  });
-});
-
-// ── Tests for hasPostCastRiderSave ─────────────────────────────
-
-describe('hasPostCastRiderSave', () => {
-  it('should return false when no rider saves exist', () => {
-    const ps = makePlayerStats();
-    expect(hasPostCastRiderSave(ps)).toBe(false);
-  });
-
-  it('should return true when at least one rider save exists', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [{ type: 'post_cast_rider', name: 'Charm Save' }],
-      },
-    });
-    expect(hasPostCastRiderSave(ps)).toBe(true);
-  });
-
-  it('should return true when passive_rule with riderSave exists', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [{ type: 'passive_rule', riderSave: { type: 'CHA' }, name: 'RiderRule' }],
-      },
-    });
-    expect(hasPostCastRiderSave(ps)).toBe(true);
-  });
-
-  it('should return false when only non-matching passives exist', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'passive_rule', name: 'NoRider' },
-          { type: 'some_other_type', name: 'Other' },
-        ],
-      },
-    });
-    expect(hasPostCastRiderSave(ps)).toBe(false);
-  });
-});
-
-// ── Tests for getMultiTargetSpreads ────────────────────────────
-
-describe('getMultiTargetSpreads', () => {
-  it('should return empty array when no passives exist', () => {
-    const ps = makePlayerStats({ automation: { passives: [] } });
-    expect(getMultiTargetSpreads(ps)).toEqual([]);
-  });
-
-  it('should return empty array when passives is undefined', () => {
-    const ps = makePlayerStats({ automation: {} });
-    expect(getMultiTargetSpreads(ps)).toEqual([]);
-  });
-
-  it('should filter for multi_target_spread type passives', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'multi_target_spread', name: 'Spread A', spellFilter: ['Fireball'] },
-          { type: 'multi_target_spread', name: 'Spread B', spellFilter: ['Thunderwave'] },
-        ],
-      },
-    });
-    const result = getMultiTargetSpreads(ps);
-    expect(result).toHaveLength(2);
-    expect(result[0].name).toBe('Spread A');
-    expect(result[1].name).toBe('Spread B');
-  });
-
-  it('should exclude non-matching passives', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'post_cast_rider', name: 'Rider' },
-          { type: 'multi_target_spread', name: 'ValidSpread' },
-          { type: 'passive_rule', name: 'Rule' },
-        ],
-      },
-    });
-    const result = getMultiTargetSpreads(ps);
-    expect(result).toHaveLength(1);
-    expect(result[0].name).toBe('ValidSpread');
-  });
-});
-
-// ── Tests for getMultiTargetSpreadForSpell ─────────────────────
-
-describe('getMultiTargetSpreadForSpell', () => {
-  it('should return null when no spreads match', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'multi_target_spread', name: 'Spread A', spellFilter: ['Fireball'] },
-        ],
-      },
-    });
-    const result = getMultiTargetSpreadForSpell(ps, 'Thunderwave');
-    expect(result).toBeNull();
-  });
-
-  it('should return spread when spell name matches filter', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'multi_target_spread', name: 'Fire Spread', spellFilter: ['Fireball'] },
-        ],
-      },
-    });
-    const result = getMultiTargetSpreadForSpell(ps, 'Fireball');
-    expect(result).not.toBeNull();
-    expect(result.name).toBe('Fire Spread');
-  });
-
-  it('should return first matching spread', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'multi_target_spread', name: 'First Spread', spellFilter: ['Lightning Bolt'] },
-          { type: 'multi_target_spread', name: 'Second Spread', spellFilter: ['Lightning Bolt'] },
-        ],
-      },
-    });
-    const result = getMultiTargetSpreadForSpell(ps, 'Lightning Bolt');
-    expect(result.name).toBe('First Spread');
-  });
-
-  it('should return null when spellFilter is empty', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'multi_target_spread', name: 'No Filter', spellFilter: [] },
-        ],
-      },
-    });
-    const result = getMultiTargetSpreadForSpell(ps, 'Any Spell');
-    expect(result).toBeNull();
-  });
-
-  it('should return null when no passives exist', () => {
-    const ps = makePlayerStats({ automation: { passives: [] } });
-    const result = getMultiTargetSpreadForSpell(ps, 'Any Spell');
-    expect(result).toBeNull();
-  });
-
-  it('should return null when passives is undefined', () => {
-    const ps = makePlayerStats({ automation: {} });
-    const result = getMultiTargetSpreadForSpell(ps, 'Any Spell');
-    expect(result).toBeNull();
-  });
-});
-
-// ── Tests for triggerPostCastRiderSaves ────────────────────────
-
-describe('triggerPostCastRiderSaves', () => {
+describe('postCastRiderService', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    // Default: getRuntimeValue returns 1 for any key (rider has uses)
-    useRuntimeState.getRuntimeValue.mockReturnValue(1);
-  });
-
-  it('should return null for non-enchantment/illusion spells', async () => {
-    const spell = makeSpell({ school: 'evocation' });
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      makePlayerStats(),
-      campaignName,
-      mapName,
-    );
-    expect(result).toBeNull();
-  });
-
-  it('should return null for spells with no school', async () => {
-    const spell = makeSpell({ school: '' });
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      makePlayerStats(),
-      campaignName,
-      mapName,
-    );
-    expect(result).toBeNull();
-  });
-
-  it('should match enchantment school case-insensitively', async () => {
-    const spell = makeSpell({ school: 'Enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Charm Save' }] },
-    });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-    expect(result).not.toBeNull();
-  });
-
-  it('should match illusion school case-insensitively', async () => {
-    const spell = makeSpell({ school: 'ILLUSION' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Phantom Save' }] },
-    });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-    expect(result).not.toBeNull();
-  });
-
-  it('should return null when spell uses no slot and level is 0', async () => {
-    const spell = makeSpell({ school: 'enchantment', level: 0 });
-    const metaCtx = { slotLevel: 0 };
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Charm Save' }] },
-    });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      metaCtx,
-      ps,
-      campaignName,
-      mapName,
-    );
-    expect(result).toBeNull();
-  });
-
-  it('should proceed when spell has slotLevel > 0', async () => {
-    const spell = makeSpell({ school: 'enchantment', level: 0 });
-    const metaCtx = { slotLevel: 1 };
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Charm Save' }] },
-    });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      metaCtx,
-      ps,
-      campaignName,
-      mapName,
-    );
-    expect(result).not.toBeNull();
-  });
-
-  it('should proceed when spell has level > 0 even with slotLevel 0', async () => {
-    const spell = makeSpell({ school: 'illusion', level: 2 });
-    const metaCtx = { slotLevel: 0 };
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Phantom Save' }] },
-    });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      metaCtx,
-      ps,
-      campaignName,
-      mapName,
-    );
-    expect(result).not.toBeNull();
-  });
-
-  it('should return null when no rider saves are configured', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats();
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-    expect(result).toBeNull();
-  });
-
-  it('should skip riders with uses <= 0', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'post_cast_rider', name: 'Charm Save' },
-          { type: 'post_cast_rider', name: 'Fear Save' },
-        ],
-      },
-    });
-    useRuntimeState.getRuntimeValue.mockImplementation((_char, key) => {
-      if (key.includes('Charm')) return 0;
-      return 1;
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(1);
-    expect(automationIndex.executeHandler).toHaveBeenCalledTimes(1);
-    expect(automationIndex.executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Fear Save' }),
-      ps,
-      campaignName,
-      mapName,
-    );
-  });
-
-  it('should build correct action for riderSave type riders', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          {
-            type: 'passive_rule',
-            riderSave: {
-              type: 'CHA',
-              condition: 'Charmed',
-              duration: '1 minute',
-              range: '30 ft.',
-              recharge: '6',
-            },
-            name: 'Charm Rider',
-          },
-        ],
-      },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(automationIndex.executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'Charm Rider',
-        automation: expect.objectContaining({
-          type: 'post_cast_rider',
-          saveType: 'CHA',
-          saveDc: 'ability',
-          saveAbility: 'CHA',
-          condition: 'Charmed',
-          duration: '1 minute',
-          range: '30 ft.',
-          recharge: '6',
-        }),
-      }),
-      ps,
-      campaignName,
-      mapName,
-    );
-  });
-
-  it('should build correct action for non-riderSave type riders', async () => {
-    const spell = makeSpell({ school: 'illusion' });
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          {
-            type: 'post_cast_rider',
-            name: 'Phantom Rider',
-            saveType: 'WIS',
-            saveDc: 15,
-            saveAbility: 'INT',
-            condition: 'Frightened',
-            duration: '1 round',
-            range: '60 ft.',
-            spellSchools: ['illusion'],
-            recharge: '5-6',
-          },
-        ],
-      },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(automationIndex.executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        name: 'Phantom Rider',
-        automation: expect.objectContaining({
-          type: 'post_cast_rider',
-          saveType: 'WIS',
-          saveDc: 15,
-          saveAbility: 'INT',
-          condition: 'Frightened',
-          duration: '1 round',
-          range: '60 ft.',
-          spellSchools: ['illusion'],
-          recharge: '5-6',
-        }),
-      }),
-      ps,
-      campaignName,
-      mapName,
-    );
-  });
-
-  it('should collect results from multiple riders', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'post_cast_rider', name: 'Rider A' },
-          { type: 'post_cast_rider', name: 'Rider B' },
-        ],
-      },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: { name: 'result' } });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(result).toHaveLength(2);
-    expect(result[0].payload.name).toBe('result');
-    expect(result[1].payload.name).toBe('result');
-  });
-
-  it('should return null when all riders produce no results', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: {
-        passives: [{ type: 'post_cast_rider', name: 'Silent Rider' }],
-      },
-    });
-    automationIndex.executeHandler.mockResolvedValue(null);
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(result).toBeNull();
-  });
-
-  it('should catch and log errors from handler execution', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: {
-        passives: [{ type: 'post_cast_rider', name: 'Failing Rider' }],
-      },
-    });
-    automationIndex.executeHandler.mockRejectedValue(new Error('handler broke'));
-
-    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(consoleSpy).toHaveBeenCalledWith(
-      '[postCastRider] Failed to execute rider save for Failing Rider:',
-      expect.any(Error),
-    );
-    expect(result).toBeNull();
-
-    consoleSpy.mockRestore();
-  });
-
-  it('should use runtime value default of 1 when getRuntimeValue returns undefined', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Default Uses' }] },
-    });
-    useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(result).not.toBeNull();
-  });
-
-  it('should use metaCtx slotLevel when available', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Slot Rider' }] },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    await triggerPostCastRiderSaves(
-      spell,
-      { slotLevel: 3 },
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(automationIndex.executeHandler).toHaveBeenCalled();
-  });
-
-  it('should use spell level when metaCtx is null', async () => {
-    const spell = makeSpell({ school: 'illusion', level: 3 });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Null Meta Rider' }] },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      null,
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(result).not.toBeNull();
-  });
-
-  it('should use spell level when metaCtx is undefined', async () => {
-    const spell = makeSpell({ school: 'enchantment', level: 2 });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Undefined Meta Rider' }] },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      undefined,
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(result).not.toBeNull();
-  });
-
-  it('should return null when metaCtx is null and spell level is 0', async () => {
-    const spell = makeSpell({ school: 'enchantment', level: 0 });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'No Uses Rider' }] },
-    });
-
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      null,
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(result).toBeNull();
-  });
-
-  it('should use campaignName for runtime value lookup', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Campaign Rider' }] },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      'MyCampaign',
-      mapName,
-    );
-
-    expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(
-      ps.name,
-      'postCastRider_Campaign_Rider',
-      'MyCampaign',
-    );
-  });
-
-  it('should handle rider names with spaces in runtime key', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'My Special Rider' }] },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith(
-      ps.name,
-      'postCastRider_My_Special_Rider',
-      campaignName,
-    );
-  });
-
-  it('should pass mapName to executeHandler', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Map Rider' }] },
-    });
-    automationIndex.executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-    await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      'DungeonMap1',
-    );
-
-    expect(automationIndex.executeHandler).toHaveBeenCalledWith(
-      expect.any(Object),
-      ps,
-      campaignName,
-      'DungeonMap1',
-    );
-  });
-
-  it('should not call executeHandler when rider has no uses', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Exhausted Rider' }] },
-    });
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(automationIndex.executeHandler).not.toHaveBeenCalled();
-  });
-
-  it('should not call executeHandler when rider has negative uses', async () => {
-    const spell = makeSpell({ school: 'enchantment' });
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Negative Rider' }] },
-    });
-    useRuntimeState.getRuntimeValue.mockReturnValue(-1);
-
-    await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
-
-    expect(automationIndex.executeHandler).not.toHaveBeenCalled();
-  });
-});
+    vi.clearAllMocks()
+  })
+
+  describe('getPostCastRiderSaves', () => {
+    it('returns rider save passives', () => {
+      const stats = {
+        automation: {
+          passives: [
+            { type: 'post_cast_rider', name: 'Rider 1' },
+            { type: 'passive_rule', riderSave: true, name: 'Rider 2' },
+            { type: 'other', name: 'Other' },
+          ],
+        },
+      }
+      const result = getPostCastRiderSaves(stats)
+      expect(result).toHaveLength(2)
+    })
+
+    it('returns empty when no passives', () => {
+      expect(getPostCastRiderSaves({})).toEqual([])
+    })
+  })
+
+  describe('getSpellThiefFeatures', () => {
+    it('returns spell_thief passives', () => {
+      const stats = {
+        automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] },
+      }
+      expect(getSpellThiefFeatures(stats)).toHaveLength(1)
+    })
+
+    it('returns empty when no spell_thief passives', () => {
+      expect(getSpellThiefFeatures({})).toEqual([])
+    })
+  })
+
+  describe('hasSpellThief', () => {
+    it('returns true when spell_thief features exist', () => {
+      const stats = { automation: { passives: [{ type: 'spell_thief' }] } }
+      expect(hasSpellThief(stats)).toBe(true)
+    })
+
+    it('returns false when no spell_thief features', () => {
+      expect(hasSpellThief({})).toBe(false)
+    })
+  })
+
+  describe('getMultiTargetSpreads', () => {
+    it('returns multi_target_spread passives', () => {
+      const stats = {
+        automation: { passives: [{ type: 'multi_target_spread', spellFilter: ['Fireball'] }] },
+      }
+      expect(getMultiTargetSpreads(stats)).toHaveLength(1)
+    })
+
+    it('returns empty when no multi_target_spread passives', () => {
+      expect(getMultiTargetSpreads({})).toEqual([])
+    })
+  })
+
+  describe('getMultiTargetSpreadForSpell', () => {
+    it('returns spread when spell matches filter', () => {
+      const stats = {
+        automation: {
+          passives: [{ type: 'multi_target_spread', spellFilter: ['Fireball'], name: 'Spread 1' }],
+        },
+      }
+      expect(getMultiTargetSpreadForSpell(stats, 'Fireball')).toBeDefined()
+    })
+
+    it('returns null when no matching spread', () => {
+      const stats = {
+        automation: {
+          passives: [{ type: 'multi_target_spread', spellFilter: ['Fireball'] }],
+        },
+      }
+      expect(getMultiTargetSpreadForSpell(stats, 'Iceball')).toBeNull()
+    })
+
+    it('returns null when no spreads', () => {
+      expect(getMultiTargetSpreadForSpell({}, 'Fireball')).toBeNull()
+    })
+  })
+
+  describe('hasPostCastRiderSave', () => {
+    it('returns true when rider saves exist', () => {
+      const stats = { automation: { passives: [{ type: 'post_cast_rider' }] } }
+      expect(hasPostCastRiderSave(stats)).toBe(true)
+    })
+
+    it('returns false when no rider saves', () => {
+      expect(hasPostCastRiderSave({})).toBe(false)
+    })
+  })
+
+  describe('triggerPostCastRiderSaves', () => {
+    const enchantmentSpell = { name: 'Charm Person', school: 'enchantment' }
+    const evocationSpell = { name: 'Fireball', school: 'evocation' }
+
+    it('returns null for non-enchantment/illusion spell', async () => {
+      const stats = {
+        name: 'Player',
+        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
+      }
+      const result = await triggerPostCastRiderSaves(evocationSpell, {}, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when no spell slot used', async () => {
+      const stats = {
+        name: 'Player',
+        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
+      }
+      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 0 }, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when no rider saves', async () => {
+      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, { automation: { passives: [] } }, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when uses are exhausted', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      vi.mocked(getRuntimeValue).mockReturnValue(0)
+      const stats = {
+        name: 'Player',
+        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
+      }
+      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      expect(result).toBeNull()
+      vi.mocked(getRuntimeValue).mockRestore()
+    })
+
+    it('calls executeHandler for each rider save', async () => {
+      executeHandler.mockResolvedValue({ success: true })
+      const stats = {
+        name: 'Player',
+        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider', saveType: 'CON', saveDc: 15 }] },
+      }
+      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      expect(executeHandler).toHaveBeenCalled()
+      expect(result).toEqual([{ success: true }])
+    })
+
+    it('handles riderSave format passives', async () => {
+      executeHandler.mockResolvedValue({ success: true })
+      const stats = {
+        name: 'Player',
+        automation: {
+          passives: [{ type: 'passive_rule', name: 'RiderSave', riderSave: { type: 'WIS', condition: 'charmed' } }],
+        },
+      }
+      await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      expect(executeHandler).toHaveBeenCalled()
+    })
+
+    it('catches and logs executeHandler errors', async () => {
+      executeHandler.mockRejectedValue(new Error('fail'))
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const stats = {
+        name: 'Player',
+        automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
+      }
+      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      expect(consoleSpy).toHaveBeenCalled()
+      expect(result).toBeNull()
+      consoleSpy.mockRestore()
+    })
+  })
+
+  describe('getSoulstitchFeatures', () => {
+    it('returns soulstitch_spells passives', () => {
+      const stats = { automation: { passives: [{ type: 'soulstitch_spells' }] } }
+      expect(getSoulstitchFeatures(stats)).toHaveLength(1)
+    })
+
+    it('returns empty when no soulstitch features', () => {
+      expect(getSoulstitchFeatures({})).toEqual([])
+    })
+  })
+
+  describe('hasSoulstitchSpells', () => {
+    it('returns true when soulstitch features exist', () => {
+      const stats = { automation: { passives: [{ type: 'soulstitch_spells' }] } }
+      expect(hasSoulstitchSpells(stats)).toBe(true)
+    })
+
+    it('returns false when no soulstitch features', () => {
+      expect(hasSoulstitchSpells({})).toBe(false)
+    })
+  })
+
+  describe('triggerSoulstitchSpells', () => {
+    const evocationSpell = { name: 'Fireball', school: 'Evocation', dc: { dc_type: 'CON' } }
+    const nonEvocationSpell = { name: 'Charm Person', school: 'Enchantment', dc: { dc_type: 'WIS' } }
+
+    it('returns null when no soulstitch features', async () => {
+      const result = await triggerSoulstitchSpells(evocationSpell, {}, {}, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null for non-evocation spell', async () => {
+      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
+      const result = await triggerSoulstitchSpells(nonEvocationSpell, {}, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when spell has no dc', async () => {
+      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
+      const noDcSpell = { name: 'Fireball', school: 'Evocation' }
+      const result = await triggerSoulstitchSpells(noDcSpell, {}, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null for lowercase evocation school (case-sensitive check)', async () => {
+      executeHandler.mockResolvedValue({ success: true })
+      const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
+      const lowercaseSpell = { name: 'Fireball', school: 'evocation', dc: { dc_type: 'CON' } }
+      const result = await triggerSoulstitchSpells(lowercaseSpell, {}, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+  })
+
+  describe('getEmpoweredEvocationFeatures', () => {
+    it('returns empowered_evocation passives', () => {
+      const stats = { automation: { passives: [{ type: 'empowered_evocation' }] } }
+      expect(getEmpoweredEvocationFeatures(stats)).toHaveLength(1)
+    })
+
+    it('returns empty when no empowered_evocation passives', () => {
+      expect(getEmpoweredEvocationFeatures({})).toEqual([])
+    })
+  })
+
+  describe('hasEmpoweredEvocation', () => {
+    it('returns true when powered evocation features exist', () => {
+      const stats = { automation: { passives: [{ type: 'empowered_evocation' }] } }
+      expect(hasEmpoweredEvocation(stats)).toBe(true)
+    })
+
+    it('returns false when no empowered evocation features', () => {
+      expect(hasEmpoweredEvocation({})).toBe(false)
+    })
+  })
+
+  describe('getEmpoweredEvocationIntModifier', () => {
+    it('returns Intelligence bonus', () => {
+      const stats = { abilities: [{ name: 'Intelligence', bonus: 3 }] }
+      expect(getEmpoweredEvocationIntModifier(stats)).toBe(3)
+    })
+
+    it('returns 0 when Intelligence ability missing', () => {
+      const stats = { abilities: [{ name: 'Strength', bonus: 3 }] }
+      expect(getEmpoweredEvocationIntModifier(stats)).toBe(0)
+    })
+
+    it('returns 0 when abilities missing', () => {
+      expect(getEmpoweredEvocationIntModifier({ abilities: [] })).toBe(0)
+    })
+  })
+
+  describe('triggerSpellThief', () => {
+    const spell = { name: 'Fireball' }
+
+    it('returns null when no spell slot used', async () => {
+      const stats = { name: 'Player', automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] } }
+      const result = await triggerSpellThief(spell, { slotLevel: 0 }, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when blocked by spell thief', async () => {
+      const { isBlockedBySpellThief } = await import('../../automation/handlers/class-fighter-rogue/spellThiefHandler.js')
+      vi.mocked(isBlockedBySpellThief).mockReturnValue(true)
+      const stats = { name: 'Player', automation: { passives: [{ type: 'spell_thief', name: 'Thief' }] } }
+      const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
+      expect(result).toBeNull()
+      vi.mocked(isBlockedBySpellThief).mockReturnValue(false)
+    })
+
+    it('returns null when no spell thief features', async () => {
+      const result = await triggerSpellThief(spell, { slotLevel: 1 }, { automation: { passives: [] } }, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when uses exhausted', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      vi.mocked(getRuntimeValue).mockReturnValue(false)
+      const result = await triggerSpellThief(spell, { slotLevel: 1 }, { automation: { passives: [] } }, 'camp', 'map')
+      expect(result).toBeNull()
+      vi.mocked(getRuntimeValue).mockRestore()
+    })
+
+    it('calls executeHandler for each thief feature', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      executeHandler.mockResolvedValue({ success: true })
+      // Return false for restTimestamp (triggers else-if branch), then 1 for uses
+      vi.mocked(getRuntimeValue)
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(1)
+      const stats = {
+        name: 'Player',
+        automation: { passives: [{ type: 'spell_thief', name: 'Thief', saveType: 'INT' }] },
+      }
+      const result = await triggerSpellThief(spell, { slotLevel: 1 }, stats, 'camp', 'map')
+      expect(executeHandler).toHaveBeenCalled()
+      expect(result).toEqual([{ success: true }])
+      vi.mocked(getRuntimeValue).mockRestore()
+    })
+  })
+
+  describe('getBewitchingMagicFeatures', () => {
+    it('returns bewitching_magic passives', () => {
+      const stats = { automation: { passives: [{ type: 'bewitching_magic' }] } }
+      expect(getBewitchingMagicFeatures(stats)).toHaveLength(1)
+    })
+
+    it('returns empty when no bewitching_magic passives', () => {
+      expect(getBewitchingMagicFeatures({})).toEqual([])
+    })
+  })
+
+  describe('triggerBewitchingMagic', () => {
+    const enchantmentSpell = { name: 'Charm Person', school: 'enchantment', casting_time: '1 action' }
+    const actionSpell = { name: 'Fireball', school: 'evocation', casting_time: '1 action' }
+
+    it('returns null for non-enchantment/illusion spell', async () => {
+      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+      const result = await triggerBewitchingMagic(actionSpell, {}, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when no spell slot used', async () => {
+      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+      const result = await triggerBewitchingMagic({ ...enchantmentSpell, level: 0 }, {}, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when casting time is not 1 action', async () => {
+      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+      const result = await triggerBewitchingMagic({ ...enchantmentSpell, casting_time: '1 bonus action' }, {}, stats, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('returns null when no bewitching features', async () => {
+      const result = await triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, { automation: { passives: [] } }, 'camp', 'map')
+      expect(result).toBeNull()
+    })
+
+    it('calls executeHandler for each bewitching feature', async () => {
+      executeHandler.mockResolvedValue({ success: true })
+      const stats = { automation: { passives: [{ type: 'bewitching_magic', name: 'Bewitch' }] } }
+      const result = await triggerBewitchingMagic(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      expect(executeHandler).toHaveBeenCalled()
+      expect(result).toEqual([{ success: true }])
+    })
+  })
+})

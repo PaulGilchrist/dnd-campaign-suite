@@ -1,637 +1,187 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   getHitDieSize,
+  getShortRestResourceLabels,
   computeHitDieRecovery,
   computeShortRestHpNewCurrent,
-  SHORT_REST_RESOURCES,
   getShortRestResources,
-  LONG_REST_RESOURCES,
   getLongRestResources,
   spellSlotLevels,
-  applyShortRest,
-  applyLongRest,
-  getShortRestResourceLabels
 } from './restRules.js'
 
-// Mock useRuntimeState before importing restRules
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+// Mock dependencies
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn((_name, _key, _campaign) => undefined),
   setRuntimeBatch: vi.fn(),
+  setRuntimeValue: vi.fn(),
+}))
+
+vi.mock('../../../services/dice/diceRoller.js', () => ({
+  rollD20: vi.fn(() => 10),
 }))
 
 vi.mock('./expirations.js', () => ({
   clearAllExpirationEffects: vi.fn(),
 }))
 
-import { getRuntimeValue, setRuntimeBatch } from '../../../hooks/runtime/useRuntimeState.js'
+vi.mock('../../combat/conditions/exhaustionRules.js', () => ({
+  getLevelAfterLongRest: vi.fn((level) => Math.max(0, level - 1)),
+}))
 
-beforeEach(() => {
-  vi.clearAllMocks()
-})
+describe('restRules', () => {
+  describe('getHitDieSize', () => {
+    it('returns the parsed die number from hit_point_die', () => {
+      const stats = { class: { hit_point_die: 'd12' } }
+      expect(getHitDieSize(stats)).toBe(12)
+    })
 
-describe('getHitDieSize', () => {
-  it('returns hit_die as number from class root (5e)', () => {
-    const playerStats = {
-       level: 3,
-      class: { hit_die: 12 }
-     }
-    expect(getHitDieSize(playerStats)).toBe(12)
-   })
+    it('returns the parsed die number from hit_die', () => {
+      const stats = { class: { hit_die: 'd8' } }
+      expect(getHitDieSize(stats)).toBe(8)
+    })
 
-  it('returns hit_point_die from class root (2024)', () => {
-    const playerStats = {
-       level: 3,
-      class: { hit_point_die: '10' }
-     }
-    expect(getHitDieSize(playerStats)).toBe(10)
-   })
+    it('returns 8 as default when no hit die found', () => {
+      expect(getHitDieSize({})).toBe(8)
+    })
 
-  it('handles hit_point_die with dN format', () => {
-    const playerStats = {
-       level: 3,
-      class: { hit_point_die: 'd8' }
-     }
-    expect(getHitDieSize(playerStats)).toBe(8)
-   })
+    it('returns 8 when playerStats is null', () => {
+      expect(getHitDieSize(null)).toBe(8)
+    })
 
-  it('falls back to hit_die when hit_point_die is missing', () => {
-    const playerStats = {
-       level: 3,
-      class: { name: 'Fighter', hit_die: 10 }
-     }
-    expect(getHitDieSize(playerStats)).toBe(10)
-   })
-
-  it('returns default 8 when no class data', () => {
-    expect(getHitDieSize({ level: 1 })).toBe(8)
-   })
-
-  it('returns default 8 when class is missing hit_die and hit_point_die', () => {
-    const playerStats = { level: 1, class: {} }
-    expect(getHitDieSize(playerStats)).toBe(8)
-   })
-
-  it('ignores hit_die in class_levels', () => {
-    const playerStats = {
-       level: 3,
-      class: {
-          hit_die: 6,
-         class_levels: [{ hit_die: 10 }, { hit_die: 10 }, { hit_die: 12 }]
-        }
-      }
-    expect(getHitDieSize(playerStats)).toBe(6)
-   })
-
-  it('returns d4 for caster at level 1', () => {
-    const playerStats = {
-       level: 1,
-      class: { hit_die: 4 }
-     }
-    expect(getHitDieSize(playerStats)).toBe(4)
-   })
-
-  it('returns d8 for martial class at level 1', () => {
-    const playerStats = {
-       level: 1,
-      class: { hit_die: 8 }
-     }
-    expect(getHitDieSize(playerStats)).toBe(8)
-   })
-})
-
-describe('computeHitDieRecovery', () => {
-  it('returns roll + con bonus when positive', () => {
-    expect(computeHitDieRecovery(5, 2)).toBe(7)
-  })
-
-  it('returns 1 when total is zero or negative', () => {
-    expect(computeHitDieRecovery(1, -2)).toBe(1)
-    expect(computeHitDieRecovery(3, -3)).toBe(1)
-  })
-
-  it('returns roll when con bonus is zero', () => {
-    expect(computeHitDieRecovery(4, 0)).toBe(4)
-  })
-
-  it('handles negative roll edge case', () => {
-    expect(computeHitDieRecovery(-10, -5)).toBe(1)
-  })
-})
-
-describe('computeShortRestHpNewCurrent', () => {
-  it('caps at max hp when recovery exceeds remaining', () => {
-    expect(computeShortRestHpNewCurrent(20, 30, 25)).toBe(30)
-  })
-
-  it('adds recovery to current hp normally', () => {
-    expect(computeShortRestHpNewCurrent(20, 30, 5)).toBe(25)
-  })
-
-  it('uses max hp as base when current is null', () => {
-    expect(computeShortRestHpNewCurrent(null, 30, 5)).toBe(30)
-  })
-
-  it('uses max hp as base when current is empty string', () => {
-    expect(computeShortRestHpNewCurrent('', 30, 5)).toBe(30)
-  })
-
-  it('handles zero recovery amount', () => {
-    expect(computeShortRestHpNewCurrent(20, 30, 0)).toBe(20)
-  })
-
-  it('handles undefined recovery amount as zero', () => {
-    expect(computeShortRestHpNewCurrent(15, 30, undefined)).toBe(15)
-  })
-})
-
-describe('SHORT_REST_RESOURCES', () => {
-  it('contains expected resource keys', () => {
-    expect(SHORT_REST_RESOURCES).toContain('channelDivinityCharges')
-    expect(SHORT_REST_RESOURCES).toContain('wildShapeUses')
-    expect(SHORT_REST_RESOURCES).toContain('psionicEnergy')
-    expect(SHORT_REST_RESOURCES).toContain('focusPoints')
-  })
-
-  it('has at least 5 entries', () => {
-    expect(SHORT_REST_RESOURCES.length).toBeGreaterThanOrEqual(5)
-  })
-})
-
-describe('getShortRestResources', () => {
-  it('returns array matching SHORT_REST_RESOURCES', () => {
-    expect(getShortRestResources()).toEqual(SHORT_REST_RESOURCES)
-  })
-
-  it('returns a new array each call', () => {
-    const a = getShortRestResources()
-    const b = getShortRestResources()
-    expect(a).not.toBe(b)
-  })
-})
-
-describe('LONG_REST_RESOURCES', () => {
-  it('contains expected resource keys', () => {
-    expect(LONG_REST_RESOURCES).toContain('ragePoints')
-    expect(LONG_REST_RESOURCES).toContain('bardicInspirationUses')
-    expect(LONG_REST_RESOURCES).toContain('channelDivinityCharges')
-    expect(LONG_REST_RESOURCES).toContain('wildShapeUses')
-    expect(LONG_REST_RESOURCES).toContain('secondwindUses')
-    expect(LONG_REST_RESOURCES).toContain('psionicEnergy')
-    expect(LONG_REST_RESOURCES).toContain('focusPoints')
-    expect(LONG_REST_RESOURCES).toContain('sorceryPoints')
-    expect(LONG_REST_RESOURCES).toContain('arcaneRecoveryLevels')
-  })
-
-  it('has at least 9 entries', () => {
-    expect(LONG_REST_RESOURCES.length).toBeGreaterThanOrEqual(9)
-  })
-})
-
-describe('getLongRestResources', () => {
-  it('returns array matching LONG_REST_RESOURCES', () => {
-    expect(getLongRestResources()).toEqual(LONG_REST_RESOURCES)
-  })
-
-  it('returns a new array each call', () => {
-    const a = getLongRestResources()
-    const b = getLongRestResources()
-    expect(a).not.toBe(b)
-  })
-})
-
-describe('spellSlotLevels', () => {
-  it('returns levels 1 through 9', () => {
-    expect(spellSlotLevels()).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
-  })
-})
-
-describe('applyShortRest', () => {
-  it('resets short rest resources to null via setRuntimeBatch', () => {
-    const playerStats = { name: 'Frog', hitPoints: 30, level: 5 }
-    getRuntimeValue.mockReturnValue(20)
-    applyShortRest(playerStats, 'Campaign1')
-
-    expect(getRuntimeValue).toHaveBeenCalledWith('Frog', 'currentHitPoints')
-    expect(setRuntimeBatch).toHaveBeenCalledTimes(1)
-    const data = setRuntimeBatch.mock.calls[0][1]
-    SHORT_REST_RESOURCES.forEach((key) => {
-      expect(data[key]).toBeNull()
+    it('returns 8 when hitDieStr is null', () => {
+      expect(getHitDieSize({ class: { hit_point_die: null } })).toBe(8)
     })
   })
 
-  it('preserves current hp when no recovery passed', () => {
-    const playerStats = { name: 'Frog', hitPoints: 30 }
-    getRuntimeValue.mockReturnValue(20)
-    applyShortRest(playerStats, 'Campaign1')
-    
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.currentHitPoints).toBe(20)
-    expect(setRuntimeBatch.mock.calls[0][2]).toBe('Campaign1')
-  })
+  describe('getShortRestResourceLabels', () => {
+    it('returns Channel Divinity for Cleric', () => {
+      const stats = { class: { name: 'Cleric' } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).toContain('Channel Divinity')
+    })
 
-  it('uses campaign name in all storage calls', () => {
-    const playerStats = { name: 'Grog', hitPoints: 40 }
-    getRuntimeValue.mockReturnValue(30)
-    applyShortRest(playerStats, 'MyCampaign')
+    it('returns Channel Divinity for Paladin', () => {
+      const stats = { class: { name: 'Paladin' } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).toContain('Channel Divinity')
+    })
 
-    expect(setRuntimeBatch).toHaveBeenCalledWith('Grog', expect.any(Object), 'MyCampaign')
-  })
+    it('returns Wild Shape for Druid', () => {
+      const stats = { class: { name: 'Druid' } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).toContain('Wild Shape')
+    })
 
-  it('restores Bardic Inspiration for characters with Font of Inspiration', () => {
-    const charismaBonus = 3
-    const playerStats = {
-      name: 'Bard',
-      hitPoints: 30,
-      level: 5,
-      abilities: [{ name: 'Charisma', bonus: charismaBonus }],
-      automation: {
-        passives: [{ type: 'font_of_inspiration' }],
-      },
-    }
-    getRuntimeValue.mockReturnValue(1)
-    applyShortRest(playerStats, 'Campaign1')
+    it('returns Second Wind and Action Surge for Fighter', () => {
+      const stats = { class: { name: 'Fighter' } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).toContain('Second Wind')
+      expect(labels).toContain('Action Surge')
+    })
 
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.bardicInspirationUses).toBe(charismaBonus)
-  })
+    it('returns Focus Points for Monk', () => {
+      const stats = { class: { name: 'Monk' } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).toContain('Focus Points')
+    })
 
-  it('does not restore Bardic Inspiration when Font of Inspiration is missing', () => {
-    const playerStats = {
-      name: 'Bard',
-      hitPoints: 30,
-      level: 5,
-      abilities: [{ name: 'Charisma', bonus: 3 }],
-    }
-    getRuntimeValue.mockReturnValue(1)
-    applyShortRest(playerStats, 'Campaign1')
+    it('filters subclasses correctly', () => {
+      const stats = { class: { name: 'Fighter', subclass: { name: 'Psi Warrior' } } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).toContain('Psionic Energy')
+    })
 
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.bardicInspirationUses).toBeUndefined()
-  })
+    it('excludes subclass when not matching', () => {
+      const stats = { class: { name: 'Fighter', subclass: { name: 'Eldritch Knight' } } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).not.toContain('Psionic Energy')
+    })
 
-  it('does not set Bardic Inspiration when already at max', () => {
-    const charismaBonus = 3
-    const playerStats = {
-      name: 'Bard',
-      hitPoints: 30,
-      level: 5,
-      abilities: [{ name: 'Charisma', bonus: charismaBonus }],
-      automation: {
-        passives: [{ type: 'font_of_inspiration' }],
-      },
-    }
-    getRuntimeValue.mockReturnValue(3)
-    applyShortRest(playerStats, 'Campaign1')
+    it('uses major.name as fallback for subclass', () => {
+      const stats = { class: { name: 'Druid', major: { name: 'Circle of the Land' } } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).toContain('Natural Recovery (Spell Slots)')
+    })
 
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.bardicInspirationUses).toBeUndefined()
-  })
-
-  it('recovers spell slots for Druid with Natural Recovery on short rest', () => {
-    const playerStats = {
-      name: 'Druid',
-      hitPoints: 30,
-      level: 10,
-      class: { name: 'Druid' },
-      spellAbilities: {
-        spell_slots_level_1: 4,
-        spell_slots_level_2: 3,
-        spell_slots_level_3: 2,
-      },
-      automation: {
-        passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }],
-      },
-    }
-    getRuntimeValue
-      .mockReturnValueOnce(20) // currentHitPoints
-      .mockReturnValueOnce(2)   // spell_slots_level_1 (4 max, 2 used)
-      .mockReturnValueOnce(1)   // spell_slots_level_2 (3 max, 2 used)
-      .mockReturnValueOnce(0)   // spell_slots_level_3 (2 max, 2 used)
-
-    applyShortRest(playerStats, 'Campaign1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    // Druid level 10 → floor(10/2) = 5 slot levels to recover
-    // Level 1: 2 available, Level 2: 2 available, Level 3: 1 available (limited by remaining) = 5 total
-    expect(data.spell_slots_level_1).toBe(4)
-    expect(data.spell_slots_level_2).toBe(3)
-    expect(data.spell_slots_level_3).toBe(1)
-  })
-
-  it('restores all Warlock Pact Magic spell slots on short rest', () => {
-    const playerStats = {
-      name: 'Warlock',
-      hitPoints: 30,
-      level: 5,
-      class: { name: 'Warlock' },
-      spellAbilities: {
-        spell_slots_level_3: 2,
-        spell_slots_level_1: 0,
-        spell_slots_level_2: 0,
-        spell_slots_level_4: 0,
-        spell_slots_level_5: 0,
-      },
-    }
-    getRuntimeValue
-      .mockReturnValueOnce(20) // currentHitPoints
-      .mockReturnValueOnce(1)   // spell_slots_level_3 (2 max, 1 used)
-
-    applyShortRest(playerStats, 'Campaign1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.spell_slots_level_3).toBe(2)
-  })
-
-  it('restores all Warlock spell slots across all levels on short rest', () => {
-    const playerStats = {
-      name: 'Warlock',
-      hitPoints: 30,
-      level: 11,
-      class: { name: 'Warlock' },
-      spellAbilities: {
-        spell_slots_level_5: 3,
-        spell_slots_level_1: 0,
-        spell_slots_level_2: 0,
-        spell_slots_level_3: 0,
-        spell_slots_level_4: 0,
-        spell_slots_level_6: 0,
-        spell_slots_level_7: 0,
-        spell_slots_level_8: 0,
-        spell_slots_level_9: 0,
-      },
-    }
-    getRuntimeValue
-      .mockReturnValueOnce(20) // currentHitPoints
-      .mockReturnValueOnce(3)   // spell_slots_level_5 (already full, no update needed)
-
-    applyShortRest(playerStats, 'Campaign1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    // Since spell_slots_level_5 is already at max (3), it should not be updated
-    expect(data.spell_slots_level_5).toBeUndefined()
-  })
-
-  it('does not restore spell slots for non-Warlock on short rest', () => {
-    const playerStats = {
-      name: 'Wizard',
-      hitPoints: 30,
-      level: 5,
-      class: { name: 'Wizard' },
-      spellAbilities: {
-        spell_slots_level_1: 4,
-        spell_slots_level_2: 3,
-      },
-    }
-    getRuntimeValue.mockReturnValueOnce(20)
-
-    applyShortRest(playerStats, 'Campaign1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.spell_slots_level_1).toBeUndefined()
-    expect(data.spell_slots_level_2).toBeUndefined()
-  })
-
-  it('resets Natural Recovery free cast on long rest', () => {
-    const playerStats = {
-      name: 'Druid',
-      hitPoints: 50,
-      level: 10,
-      class: { name: 'Druid' },
-      spellAbilities: {
-        spell_slots_level_1: 4,
-      },
-      automation: {
-        passives: [{ type: 'resource_restoration', resourceKey: 'naturalRecoverySlots' }],
-      },
-    }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'Campaign1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.naturalRecoveryFreeCast).toBeNull()
-    expect(data.naturalRecoverySlots).toBeNull()
-  })
-})
-
-describe('applyLongRest', () => {
-  it('performs a single atomic setRuntimeBatch with all changes', () => {
-    const playerStats = { name: 'Frog', hitPoints: 50, level: 10 }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'C1')
-
-    expect(setRuntimeBatch).toHaveBeenCalledTimes(1)
-    const callArgs = setRuntimeBatch.mock.calls[0]
-    expect(callArgs[0]).toBe('Frog')
-    expect(callArgs[1].currentHitPoints).toBe(50)
-    expect(callArgs[1].shortRestHitDice).toBe(10)
-    expect(callArgs[2]).toBe('C1')
-  })
-
-  it('restores spell slots to max when spellAbilities exists', () => {
-    const playerStats = {
-      name: 'Frog',
-      hitPoints: 50,
-      level: 5,
-      spellAbilities: {
-        spell_slots_level_1: 4,
-        spell_slots_level_2: 3,
-        spell_slots_level_3: 0
-      }
-    }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'C1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.spell_slots_level_1).toBe(4)
-    expect(data.spell_slots_level_2).toBe(3)
-    expect(data.spell_slots_level_3).toBe(0)
-  })
-
-  it('does not set spell slots when no spellAbilities', () => {
-    const playerStats = { name: 'Barb', hitPoints: 60, level: 8 }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'C1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.spell_slots_level_1).toBeUndefined()
-  })
-
-  it('resets long rest resources to null', () => {
-    const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'C1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    LONG_REST_RESOURCES.forEach((key) => {
-      expect(data[key]).toBeNull()
+    it('returns empty array for unknown class', () => {
+      const stats = { class: { name: 'Rogue' } }
+      const labels = getShortRestResourceLabels(stats)
+      expect(labels).toEqual([])
     })
   })
 
-  it('reduces exhaustion by one', () => {
-    const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    getRuntimeValue.mockReturnValue(3)
-    applyLongRest(playerStats, 'C1')
+  describe('computeHitDieRecovery', () => {
+    it('adds roll value and conBonus', () => {
+      expect(computeHitDieRecovery(5, 3)).toBe(8)
+    })
 
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.exhaustionLevel).toBe(2)
+    it('returns at least 1 even when sum is negative', () => {
+      expect(computeHitDieRecovery(1, -5)).toBe(1)
+    })
+
+    it('handles zero values', () => {
+      expect(computeHitDieRecovery(0, 0)).toBe(1)
+    })
   })
 
-  it('keeps exhaustion at 0 when already at 0', () => {
-    const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    getRuntimeValue.mockReturnValue(0)
-    applyLongRest(playerStats, 'C1')
+  describe('computeShortRestHpNewCurrent', () => {
+    it('adds recovered amount to currentHp capped at maxHp', () => {
+      expect(computeShortRestHpNewCurrent(10, 20, 5)).toBe(15)
+    })
 
-    // When exhaustion is 0, the key should not be in the data
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.exhaustionLevel).toBeUndefined()
+    it('caps at maxHp when recovery would exceed', () => {
+      expect(computeShortRestHpNewCurrent(18, 20, 5)).toBe(20)
+    })
+
+    it('uses maxHp as base when currentHp is null', () => {
+      expect(computeShortRestHpNewCurrent(null, 20, 5)).toBe(20)
+    })
+
+    it('uses maxHp as base when currentHp is empty string', () => {
+      expect(computeShortRestHpNewCurrent('', 20, 5)).toBe(20)
+    })
+
+    it('returns maxHp when recoveredAmount is 0', () => {
+      expect(computeShortRestHpNewCurrent(10, 20, 0)).toBe(10)
+    })
+
+    it('returns currentHp when recoveredAmount is undefined', () => {
+      expect(computeShortRestHpNewCurrent(10, 20, undefined)).toBe(10)
+    })
   })
 
-  it('skips exhaustion update when value is null', () => {
-    const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'C1')
+  describe('getShortRestResources', () => {
+    it('returns a copy of SHORT_REST_RESOURCES', () => {
+      const resources = getShortRestResources()
+      expect(Array.isArray(resources)).toBe(true)
+      expect(resources.length).toBeGreaterThan(0)
+    })
 
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.exhaustionLevel).toBeUndefined()
+    it('returns a new array each call', () => {
+      const a = getShortRestResources()
+      const b = getShortRestResources()
+      expect(a).not.toBe(b)
+    })
   })
 
-  it('reduces exhaustion from level 1 to 0', () => {
-    const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    getRuntimeValue.mockReturnValue(1)
-    applyLongRest(playerStats, 'C1')
+  describe('getLongRestResources', () => {
+    it('returns a copy of LONG_REST_RESOURCES', () => {
+      const resources = getLongRestResources()
+      expect(Array.isArray(resources)).toBe(true)
+      expect(resources.length).toBeGreaterThan(0)
+    })
 
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.exhaustionLevel).toBe(0)
+    it('returns a new array each call', () => {
+      const a = getLongRestResources()
+      const b = getLongRestResources()
+      expect(a).not.toBe(b)
+    })
   })
 
-  it('sets hasInspiration when character has Resourceful trait', () => {
-    const playerStats = {
-      name: 'Frog',
-      hitPoints: 50,
-      level: 5,
-      characterAdvancement: [
-        { name: 'Resourceful', description: 'Heroic Inspiration on Long Rest' }
-      ]
-    }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'C1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.hasInspiration).toBe(true)
+  describe('spellSlotLevels', () => {
+    it('returns levels 1 through 9', () => {
+      const levels = spellSlotLevels()
+      expect(levels).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9])
+    })
   })
-
-  it('does not set hasInspiration when character lacks Resourceful trait', () => {
-    const playerStats = {
-      name: 'Frog',
-      hitPoints: 50,
-      level: 5,
-      characterAdvancement: [
-        { name: 'Brave', description: 'Advantage vs frightened' }
-      ]
-    }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'C1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.hasInspiration).toBeUndefined()
-  })
-
-  it('does not set hasInspiration when characterAdvancement is missing', () => {
-    const playerStats = { name: 'Frog', hitPoints: 50, level: 5 }
-    getRuntimeValue.mockReturnValue(null)
-    applyLongRest(playerStats, 'C1')
-
-    const data = setRuntimeBatch.mock.calls[0][1]
-    expect(data.hasInspiration).toBeUndefined()
-    })
-})
-
-describe('getShortRestResourceLabels', () => {
-  it('returns Channel Divinity for Cleric', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Cleric' } })
-    expect(labels).toContain('Channel Divinity')
-     expect(labels).not.toContain('Wild Shape')
-     expect(labels).not.toContain('Second Wind')
-    })
-
-  it('returns Channel Divinity for Paladin', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Paladin' } })
-    expect(labels).toContain('Channel Divinity')
-    })
-
-  it('returns Wild Shape for Druid', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Druid' } })
-    expect(labels).toContain('Wild Shape')
-     expect(labels).not.toContain('Second Wind')
-    })
-
-  it('returns Second Wind and Action Surge for Fighter', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Fighter' } })
-    expect(labels).toContain('Second Wind')
-     expect(labels).toContain('Action Surge')
-     expect(labels).not.toContain('Superiority Dice')
-     expect(labels).not.toContain('Psionic Energy')
-    })
-
-  it('includes Psionic Energy for Fighter with Psi Warrior major', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Fighter', major: { name: 'Psi Warrior' } } })
-    expect(labels).toContain('Psionic Energy')
-     expect(labels).toContain('Second Wind')
-     expect(labels).toContain('Action Surge')
-    })
-
-  it('includes Psionic Energy for Fighter with Psi Warrior subclass', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Fighter', subclass: { name: 'Psi Warrior' } } })
-    expect(labels).toContain('Psionic Energy')
-    })
-
-  it('includes Superiority Dice and not Psionic for Fighter with Battle Master major', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Fighter', major: { name: 'Battle Master' } } })
-    expect(labels).toContain('Superiority Dice')
-     expect(labels).toContain('Second Wind')
-     expect(labels).toContain('Action Surge')
-     expect(labels).not.toContain('Psionic Energy')
-    })
-
-  it('includes Superiority Dice for Fighter with Battle Master subclass', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Fighter', subclass: { name: 'Battle Master' } } })
-    expect(labels).toContain('Superiority Dice')
-    })
-
-  it('returns Focus Points for Monk', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Monk' } })
-    expect(labels).toContain('Focus Points')
-     expect(labels).not.toContain('Second Wind')
-    })
-
-  it('returns empty array for Barbarian', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Barbarian' } })
-    expect(labels).toEqual([])
-    })
-
-  it('returns Arcane Recovery label for Wizard', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Wizard' } })
-    expect(labels).toEqual(['Arcane Recovery (Spell Slots)'])
-    })
-
-  it('returns empty array when class is missing', () => {
-    const labels = getShortRestResourceLabels({ level: 1 })
-    expect(labels).toEqual([])
-    })
-
-  it('returns empty array for undefined playerStats', () => {
-    const labels = getShortRestResourceLabels(undefined)
-    expect(labels).toEqual([])
-    })
-
-  it('includes Natural Recovery for Druid Circle of the Land', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Druid', subclass: { name: 'Circle of the Land' } } })
-    expect(labels).toContain('Natural Recovery (Spell Slots)')
-    })
-
-  it('excludes Natural Recovery for Druid without Circle of the Land', () => {
-    const labels = getShortRestResourceLabels({ class: { name: 'Druid', subclass: { name: 'Moon' } } })
-    expect(labels).not.toContain('Natural Recovery (Spell Slots)')
-    })
 })

@@ -1,142 +1,302 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import CharHitPoints from './CharHitPoints.jsx';
 
-vi.mock('../../../services/ui/storage.js', () => ({
-  default: {
-    getProperty: vi.fn(),
-    setProperty: vi.fn(),
-  },
-}));
-
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  useRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  useRuntimeValue: vi.fn(),
 }));
 
-import { useRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-
-vi.mock('../../common/HiddenInput.jsx', () => ({
-  default: vi.fn(({ value, showInput, handleInputToggle, handleValueChange }) => {
-    if (showInput) {
-      return (
-        <input
-          data-testid="hidden-input"
-          type="number"
-          value={value}
-          onChange={(e) => handleValueChange(e.target.value)}
-          onBlur={handleInputToggle}
-        />
-      );
-    }
-    return <span data-testid="hidden-value">{value}</span>;
-  }),
-}));
-
-// Mock DeathSavingThrows
-vi.mock('./DeathSavingThrows.jsx', () => ({
-  default: vi.fn(() => <div>DeathSavingThrows</div>),
-}));
-
-// Mock savePromptService
 vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
   clearDeathSavePrompt: vi.fn(),
 }));
 
+vi.mock('./DeathSavingThrows.jsx', () => ({
+  default: vi.fn(({ playerStats, campaignName }) => (
+    <div data-testid="death-saving-throws">
+      Death Saving Throws for {playerStats.name} in {campaignName}
+    </div>
+  )),
+}));
+
+vi.mock('../../../services/combat/conditions/deathSaveRules.js', () => ({}));
+
+vi.mock('../../../services/combat/conditions/conditionEffects.js', () => ({
+  hasSaveModifier: vi.fn(() => false),
+}));
+
+import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js';
+
+const mockPlayerStats = {
+  name: 'TestCharacter',
+  hitPoints: 10,
+};
+
 describe('CharHitPoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useRuntimeValue.mockReturnValue(null);
+    localStorage.clear();
+    useRuntimeValue.mockImplementation((key, prop) => {
+      if (prop === 'currentHitPoints') return null;
+      if (prop === 'aidHpMaxIncrease') return 0;
+      return null;
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders hit points label with current and max', () => {
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    expect(screen.getByText(/Hit Points:/)).toBeInTheDocument();
+  });
+
+  it('displays current hit points as max when no stored value', () => {
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    const clickable = screen.getByText(/Hit Points:/).parentElement;
+    expect(clickable.textContent).toContain('10');
+  });
+
+  it('shows stored current HP when available', () => {
+    useRuntimeValue.mockImplementation((_key, prop) => {
+      if (prop === 'currentHitPoints') return 5;
+      if (prop === 'aidHpMaxIncrease') return 0;
+      return null;
+    });
+
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    expect(screen.getByText(/5/)).toBeInTheDocument();
+  });
+
+  it('uses aidHpMaxIncrease to calculate effective max HP', () => {
+    useRuntimeValue.mockImplementation((_key, prop) => {
+      if (prop === 'currentHitPoints') return null;
+      if (prop === 'aidHpMaxIncrease') return 3;
+      return null;
+    });
+
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    const clickable = screen.getByText(/Hit Points:/).parentElement;
+    expect(clickable.textContent).toContain('13');
+  });
+
+  it('toggles input visibility on click', () => {
+    const { container } = render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    const clickable = container.querySelector('.clickable');
+    fireEvent.click(clickable);
+
+    const input = container.querySelector('input[type="number"]');
+    expect(input).toBeInTheDocument();
+  });
+
+  it('calls setRuntimeValue when current HP is changed', async () => {
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    const clickable = screen.getByText(/Hit Points:/).parentElement;
+    fireEvent.click(clickable);
+
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '7' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'currentHitPoints',
+        7,
+        'test-campaign'
+      );
+    });
+  });
+
+
+
+  it('logs hp_change when HP delta is non-zero', async () => {
+    const originalFetch = global.fetch;
     global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
-  });
 
-  const mockPlayerStats = {
-    name: 'Test Character',
-    hitPoints: 45,
-  };
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
 
-  it('should render hit points label', () => {
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    expect(screen.getByText(/Hit Points/)).toBeInTheDocument();
-  });
-
-  it('should display max hit points', () => {
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    const clickable = document.querySelector('.clickable');
-    expect(clickable.textContent).toContain('45');
-  });
-
-  it('should render HiddenInput with initial value 0', () => {
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    const hiddenVal = screen.getByTestId('hidden-value');
-    expect(hiddenVal).toBeInTheDocument();
-  });
-
-  it('should use stored current HP when available', () => {
-    useRuntimeValue.mockReturnValue(30);
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    expect(screen.getByTestId('hidden-value')).toHaveTextContent('30');
-  });
-
-  it('should toggle input visibility when clicked', () => {
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    const clickable = document.querySelector('.clickable');
-    expect(screen.queryByTestId('hidden-input')).not.toBeInTheDocument();
+    const clickable = screen.getByText(/Hit Points:/).parentElement;
     fireEvent.click(clickable);
-    expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
+
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '7' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining('/log'),
+        expect.objectContaining({
+          method: 'POST',
+          body: expect.any(String),
+        })
+      );
+    });
+
+    global.fetch = originalFetch;
   });
 
-  it('should toggle input visibility when keydown', () => {
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    const clickable = document.querySelector('.clickable');
-    fireEvent.keyDown(clickable);
-    expect(screen.getByTestId('hidden-input')).toBeInTheDocument();
-  });
+  it('resets death saves when HP is set above 0', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
 
-  it('should call setRuntimeValue when HP value changes', () => {
-    useRuntimeValue.mockReturnValue(30);
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    const clickable = document.querySelector('.clickable');
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    const clickable = screen.getByText(/Hit Points:/).parentElement;
     fireEvent.click(clickable);
-    const input = screen.getByTestId('hidden-input');
-    fireEvent.change(input, { target: { value: '20' } });
-    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', 20, undefined);
+
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '5' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'deathSaves',
+        [false, false, false],
+        'test-campaign'
+      );
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'deathFailures',
+        [false, false, false],
+        'test-campaign'
+      );
+      expect(clearDeathSavePrompt).toHaveBeenCalledWith('test-campaign', 'TestCharacter');
+    });
+
+    global.fetch = originalFetch;
   });
 
-  it('should show cur/max label', () => {
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    expect(screen.getByText(/\(cur\/max\)/)).toBeInTheDocument();
- });
+  it('renders DeathSavingThrows when current HP is 0 or less', () => {
+    useRuntimeValue.mockImplementation((_key, prop) => {
+      if (prop === 'currentHitPoints') return 0;
+      if (prop === 'aidHpMaxIncrease') return 0;
+      return null;
+    });
 
-  it('should have tabIndex for accessibility', () => {
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    const clickable = document.querySelector('.clickable');
-    expect(clickable).toHaveAttribute('tabIndex', '0');
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    expect(screen.getByTestId('death-saving-throws')).toBeInTheDocument();
   });
 
-  it('should show DeathSavingThrows when HP is 0', () => {
-    useRuntimeValue.mockReturnValue(0);
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    expect(screen.getByText(/DeathSavingThrows/)).toBeInTheDocument();
+  it('does not render DeathSavingThrows when HP is positive', () => {
+    useRuntimeValue.mockImplementation((_key, prop) => {
+      if (prop === 'currentHitPoints') return 5;
+      if (prop === 'aidHpMaxIncrease') return 0;
+      return null;
+    });
+
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    expect(screen.queryByTestId('death-saving-throws')).not.toBeInTheDocument();
   });
 
-  it('should hide DeathSavingThrows when HP is > 0', () => {
-    useRuntimeValue.mockReturnValue(10);
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
-    expect(screen.queryByText(/DeathSavingThrows/)).not.toBeInTheDocument();
+  it('initializes stored HP to max HP if null on mount', () => {
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'currentHitPoints',
+      10,
+      'test-campaign'
+    );
   });
 
-  it('should reset death saves when HP is raised above 0', () => {
-    useRuntimeValue.mockReturnValue(0);
-    render(<CharHitPoints playerStats={mockPlayerStats} />);
+  it('shows text-muted span with cur/max label', () => {
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
 
-    const clickable = document.querySelector('.clickable');
-    fireEvent.click(clickable);
-    const input = screen.getByTestId('hidden-input');
-    fireEvent.change(input, { target: { value: '10' } });
+    expect(screen.getByText('(cur/max)')).toBeInTheDocument();
+  });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'currentHitPoints', 10, undefined);
-    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'deathSaves', [false, false, false], undefined);
-    expect(setRuntimeValue).toHaveBeenCalledWith('Test Character', 'deathFailures', [false, false, false], undefined);
+  it('handles death-save-result event to update current HP', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    const event = new CustomEvent('death-save-result', {
+      detail: { targetName: 'TestCharacter', restoredToHp: 8 },
+    });
+    window.dispatchEvent(event);
+
+    await waitFor(() => {
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'currentHitPoints',
+        8,
+        'test-campaign'
+      );
+    });
+
+    global.fetch = originalFetch;
+  });
+
+  it('ignores death-save-result event for different character', async () => {
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    const event = new CustomEvent('death-save-result', {
+      detail: { targetName: 'OtherCharacter', restoredToHp: 8 },
+    });
+    window.dispatchEvent(event);
+
+    await waitFor(() => {
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestCharacter',
+        'currentHitPoints',
+        8,
+        'test-campaign'
+      );
+    });
+
+    global.fetch = originalFetch;
+  });
+
+  it('renders clickable div with proper attributes', () => {
+    render(
+      <CharHitPoints playerStats={mockPlayerStats} campaignName="test-campaign" />
+    );
+
+    const clickable = screen.getByText(/Hit Points:/).parentElement;
+    expect(clickable).toHaveAttribute('tabindex', '0');
   });
 });

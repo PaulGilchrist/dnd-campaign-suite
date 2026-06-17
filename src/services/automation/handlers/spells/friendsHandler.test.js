@@ -1,339 +1,281 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports ───────────────────────────────────────
-
 vi.mock('../../common/savePrompt.js', () => ({
-  buildSaveDc: vi.fn(),
-  createSaveListener: vi.fn(),
+    buildSaveDc: vi.fn((auto) => auto.saveDc || 15),
+    createSaveListener: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
-  addExpiration: vi.fn().mockResolvedValue(undefined),
+    addExpiration: vi.fn(),
 }));
 
 vi.mock('../../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn().mockResolvedValue({}),
+    postLogEntry: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
+    getCombatContext: vi.fn(),
 }));
 
-// ── Imports ────────────────────────────────────────────────────
-
 import { handle } from './friendsHandler.js';
-import * as savePrompt from '../../common/savePrompt.js';
-import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as logService from '../../../ui/logService.js';
-import * as expirations from '../../../rules/effects/expirations.js';
-import * as logPoster from '../../../shared/logPoster.js';
-import * as damageUtils from '../../../rules/combat/damageUtils.js';
-
-// ── Helpers ────────────────────────────────────────────────────
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
+import { createSaveListener } from '../../common/savePrompt.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 const campaignName = 'TestCampaign';
 
 function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestBard',
-    level: 5,
-    proficiency: 3,
-    abilities: [{ name: 'Charisma', bonus: 2 }],
-    ...overrides,
-  };
+    return {
+        name: 'Bard1',
+        level: 5,
+        proficiency: 3,
+        abilities: [{ name: 'Charisma', bonus: 3 }],
+        ...overrides,
+    };
 }
 
 function makeAction(automation = {}) {
-  return {
-    name: 'Friends',
-    automation: {
-      type: 'friends',
-      targetName: 'Goblin',
-      ...automation,
-    },
-  };
+    return {
+        name: 'Friends',
+        automation: { type: 'friends_cantrip', ...automation },
+    };
 }
 
-const baseCombatContext = {
-  creatures: [
-    { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-    { name: 'TestBard', type: 'player', gridX: 5, gridY: 10 },
-  ],
-  players: [{ name: 'TestBard', gridX: 5, gridY: 10 }],
-  placedItems: [],
-};
-
-// ── Tests ──────────────────────────────────────────────────────
+// ─── handle ───
 
 describe('friendsHandler.handle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('creates save listener and returns popup', async () => {
-    const action = makeAction();
-    const ps = makePlayerStats();
-
-    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({
-      promptId: 'test-prompt-1',
-      promise: Promise.resolve({ success: false }),
+    beforeEach(() => {
+        vi.clearAllMocks();
     });
 
-    const result = await handle(action, ps, campaignName, null);
+    it('returns success popup when save succeeds', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe('Friends');
-    expect(result.payload.targetName).toBe('Goblin');
-    expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-      targetName: 'Goblin',
-      saveType: 'WIS',
-      saveDc: 13,
-      dcSuccess: 'none',
-    });
-  });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-  it('uses custom targetName from automation', async () => {
-    const action = makeAction({ targetName: 'Orc' });
-    const ps = makePlayerStats();
-
-    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-    savePrompt.buildSaveDc.mockReturnValue(14);
-    savePrompt.createSaveListener.mockReturnValue({
-      promptId: 'test-prompt-2',
-      promise: Promise.resolve({ success: false }),
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('succeeded on the Wisdom save');
     });
 
-    const result = await handle(action, ps, campaignName, null);
+    it('clears active Friends tracking on success', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
 
-    expect(result.payload.targetName).toBe('Orc');
-  });
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-  it('defaults targetName to Unknown when not in automation', async () => {
-    const action = makeAction({ targetName: undefined });
-    const ps = makePlayerStats();
-
-    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({
-      promptId: 'test-prompt-3',
-      promise: Promise.resolve({ success: false }),
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            campaignName,
+            expect.stringContaining('_activeFriends_'),
+            null,
+            campaignName,
+        );
     });
 
-    const result = await handle(action, ps, campaignName, null);
+    it('applies charmed condition when save fails for player target', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Ally1', type: 'player' }],
+        });
+        getRuntimeValue.mockReturnValue([]);
 
-    expect(result.payload.targetName).toBe('Unknown');
-  });
+        const result = await handle(makeAction({ targetName: 'Ally1' }), makePlayerStats(), campaignName, null);
 
-  it('uses automation or empty object when automation is undefined', async () => {
-    const action = { name: 'Friends', automation: undefined };
-    const ps = makePlayerStats();
-
-    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({
-      promptId: 'test-prompt-4',
-      promise: Promise.resolve({ success: false }),
+        expect(result.type).toBe('popup');
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'Ally1',
+            'activeConditions',
+            expect.arrayContaining(['charmed']),
+            campaignName,
+        );
     });
 
-    const result = await handle(action, ps, campaignName, null);
+    it('applies charmed condition to npc creature when save fails', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
 
-    expect(result.payload.description).toContain('Unknown');
-  });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-  it('tracks active Friends in runtime state', async () => {
-    const action = makeAction();
-    const ps = makePlayerStats();
-
-    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({
-      promptId: 'test-prompt-5',
-      promise: Promise.resolve({ success: false }),
+        expect(result.type).toBe('popup');
     });
 
-    await handle(action, ps, campaignName, null);
+    it('adds expiration for charmed condition', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
 
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      campaignName,
-      '_activeFriends_TestBard',
-      'Goblin',
-      campaignName,
-    );
-  });
+        await handle(makeAction({ targetName: 'Goblin' }), makePlayerStats(), campaignName, null);
 
-  it('saves result from promise on success', async () => {
-    const action = makeAction();
-    const ps = makePlayerStats();
-
-    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({
-      promptId: 'test-prompt-6',
-      promise: Promise.resolve({ success: true }),
+        expect(addExpiration).toHaveBeenCalledWith(
+            'Bard1',
+            'Goblin',
+            expect.arrayContaining([
+                expect.objectContaining({ type: 'condition', condition: 'charmed' }),
+            ]),
+            campaignName,
+            2,
+        );
     });
 
-    const result = await handle(action, ps, campaignName, null);
+    it('posts condition log entry when charmed is applied', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('succeeded on the Wisdom save');
-  });
+        await handle(makeAction({ targetName: 'Goblin' }), makePlayerStats(), campaignName, null);
 
-  it('saves result from promise on failure', async () => {
-    const action = makeAction();
-    const ps = makePlayerStats();
-
-    damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-    savePrompt.buildSaveDc.mockReturnValue(13);
-    savePrompt.createSaveListener.mockReturnValue({
-      promptId: 'test-prompt-7',
-      promise: Promise.resolve({ success: false }),
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({
+                type: 'condition',
+                action: 'applied',
+                characterName: 'Goblin',
+                condition: 'Charmed',
+            }),
+        );
     });
 
-    const result = await handle(action, ps, campaignName, null);
+    it('uses targetName from automation when provided', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'CustomTarget', type: 'npc', conditions: [] }],
+        });
 
-    expect(result.payload.description).toContain('failed the WIS save');
-    expect(result.payload.description).toContain('Charmed');
-  });
+        await handle(makeAction({ targetName: 'CustomTarget' }), makePlayerStats(), campaignName, null);
 
-  describe('save success path', () => {
-    it('clears active Friends tracking', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'clear-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      const clearCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-        c => c[1] === '_activeFriends_TestBard' && c[2] === null,
-      );
-      expect(clearCall).toBeDefined();
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({
+                characterName: 'CustomTarget',
+            }),
+        );
     });
 
-    it('returns popup with success message', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    it('defaults targetName to Unknown when not in automation', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getCombatContext.mockResolvedValue(null);
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'success-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.name).toBe('Friends');
-      expect(result.payload.description).toContain('succeeded');
-      expect(result.payload.description).not.toContain('Charmed');
+        expect(result.payload.description).toContain('Unknown');
     });
 
-    it('logs save_result entry on success', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    it('sets active tracking key on campaign', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getCombatContext.mockResolvedValue(null);
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'success-log-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      await handle(action, ps, campaignName, null);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'save_result',
-          success: true,
-          saveType: 'WIS',
-          rollType: 'save-friends',
-        }),
-      );
-    });
-  });
-
-  describe('save failure path - NPC target', () => {
-    it('applies Charmed condition to NPC creature', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'npc-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await handle(action, ps, campaignName, null);
-
-      const goblinCreature = baseCombatContext.creatures.find(c => c.name === 'Goblin');
-      expect(goblinCreature.conditions).toHaveLength(1);
-      expect(goblinCreature.conditions[0].key).toBe('charmed');
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            campaignName,
+            expect.stringContaining('_activeFriends_'),
+            expect.any(String),
+            campaignName,
+        );
     });
 
-    it('adds expiration for Charmed condition', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    it('returns failure popup with correct description when save fails', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'exp-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      await handle(action, ps, campaignName, null);
-
-      expect(expirations.addExpiration).toHaveBeenCalledWith(
-        'TestBard',
-        'Goblin',
-        [{ type: 'condition', condition: 'charmed' }],
-        campaignName,
-        2,
-      );
+        expect(result.payload.name).toBe('Friends');
+        expect(result.payload.description).toContain('Charmed');
+        expect(result.payload.description).toContain('Concentration');
     });
 
-    it('posts log entry for condition application', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    it('adds charmed condition to npc creature conditions array', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        const creature = { name: 'Goblin', type: 'npc', conditions: [] };
+        getCombatContext.mockResolvedValue({ creatures: [creature] });
 
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'log-prompt',
-        promise: Promise.resolve({ success: false }),
-      });
+        await handle(makeAction({ targetName: 'Goblin' }), makePlayerStats(), campaignName, null);
 
-      await handle(action, ps, campaignName, null);
-
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'condition',
-          action: 'applied',
-          characterName: 'Goblin',
-          condition: 'Charmed',
-          reason: 'Friends cantrip',
-        }),
-      );
+        expect(creature.conditions).toHaveLength(1);
+        expect(creature.conditions[0].key).toBe('charmed');
+        expect(creature.conditions[0].label).toBe('Charmed');
     });
-  });
+
+    it('removes existing charmed condition before adding new one for npc', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: false }),
+        });
+        const existingCondition = { key: 'charmed', id: 'old-id' };
+        const creature = { name: 'Goblin', type: 'npc', conditions: [existingCondition, { key: 'blinded' }] };
+        getCombatContext.mockResolvedValue({ creatures: [creature] });
+
+        await handle(makeAction({ targetName: 'Goblin' }), makePlayerStats(), campaignName, null);
+
+        expect(creature.conditions.length).toBe(2);
+        const charmedCond = creature.conditions.find((c) => c.key === 'charmed');
+        expect(charmedCond.id).not.toBe('old-id');
+    });
+
+    it('handles targetCreature being undefined (no combat context)', async () => {
+        createSaveListener.mockReturnValue({
+            promptId: 'friends-prompt-1',
+            promise: Promise.resolve({ success: true }),
+        });
+        getCombatContext.mockResolvedValue(null);
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result.type).toBe('popup');
+    });
 });

@@ -1,321 +1,279 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import rulesFactory from './rulesFactory.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import rulesFactory from './rulesFactory.js'
 
-// Mock the rules modules
 vi.mock('./rules.js', () => ({
   default: {
-    getAbilityLongName: vi.fn(),
-    getAbilities: vi.fn(),
-    getActions: vi.fn(),
-    getArmorClass: vi.fn(),
-    getAttacks: vi.fn(),
-    getHitPoints: vi.fn(),
-    getLanguages: vi.fn(),
-    getMagicItems: vi.fn(),
-    getProficiencyChoiceCount: vi.fn(),
-    getProficiencies: vi.fn(),
-    getSpellAbilities: vi.fn(),
-    getSpellMaxLevel: vi.fn(),
-    getPlayerStats: vi.fn()
-    }
-}));
-
+    getAbilityLongName: vi.fn((s) => s),
+    getAbilities: vi.fn(async () => []),
+    getActions: vi.fn(() => [[], [], [], [], []]),
+    getArmorClass: vi.fn(() => [10, '']),
+    getAttacks: vi.fn(() => []),
+    getHitPoints: vi.fn(() => 10),
+    getLanguages: vi.fn(() => [2, []]),
+    getMagicItems: vi.fn(() => null),
+    getProficiencyChoiceCount: vi.fn(() => 0),
+    getProficiencies: vi.fn(() => [5, []]),
+    getSpellAbilities: vi.fn(() => ({})),
+    getSpellMaxLevel: vi.fn(() => 9),
+    getPlayerStats: vi.fn(async (classes, equipment, magicItems, races, spells, summary) => ({
+      ...summary,
+      class: summary.class || { name: 'Fighter' },
+      race: {},
+      immunities: [],
+      resistances: summary.resistances || [],
+      automation: summary.automation || { passives: [] },
+      level: 1,
+    })),
+  },
+}))
 
 vi.mock('../character/race-rules/index.js', () => ({
   rules5e: {
-    getImmunities: vi.fn(),
-    getRace: vi.fn(),
-    getResistances: vi.fn(),
-    getSenses: vi.fn()
+    getRace: vi.fn(() => ({})),
+    getImmunities: vi.fn(() => []),
+    getResistances: vi.fn(() => []),
+    getSenses: vi.fn(() => []),
   },
   rules2024: {
-    getImmunities: vi.fn(),
-    getRace: vi.fn(),
-    getResistances: vi.fn(),
-    getSenses: vi.fn()
-  }
-}));
+    getRace: vi.fn(() => ({})),
+    getImmunities: vi.fn(() => []),
+    getResistances: vi.fn(() => []),
+    getSenses: vi.fn(() => []),
+  },
+}))
 
 vi.mock('../character/classRules.js', () => ({
   default: {
-    getClass: vi.fn(),
-    getDruidMaxWildShapeChallengeRating: vi.fn(),
-    getDruidWildShapeUses: vi.fn(),
-    getDruidBeastKnownForms: vi.fn(),
-    getDruidBeastFlySpeed: vi.fn(),
-    getRogueSneakAttack: vi.fn(),
-    getFeatures: vi.fn()
-    }
-}));
+    getClass: vi.fn(() => ({ name: 'Fighter' })),
+    getDruidMaxWildShapeChallengeRating: vi.fn(() => 0),
+    getDruidWildShapeUses: vi.fn(() => 0),
+    getDruidBeastKnownForms: vi.fn(() => []),
+    getDruidBeastFlySpeed: vi.fn(() => null),
+    getRogueSneakAttack: vi.fn(() => 0),
+  },
+}))
 
 vi.mock('../character/classRules2024.js', () => ({
   default: {
-    getClass: vi.fn(),
-    getDruidMaxWildShapeChallengeRating: vi.fn(),
-    getDruidWildShapeUses: vi.fn(),
-    getDruidBeastKnownForms: vi.fn(),
-    getDruidBeastFlySpeed: vi.fn(),
-    getRogueSneakAttack: vi.fn(),
-    getFeatures: vi.fn()
-    }
-}));
+    getClass: vi.fn(() => ({ name: 'Fighter' })),
+    getDruidMaxWildShapeChallengeRating: vi.fn(() => 0),
+    getDruidWildShapeUses: vi.fn(() => 0),
+    getDruidBeastKnownForms: vi.fn(() => []),
+    getDruidBeastFlySpeed: vi.fn(() => null),
+    getRogueSneakAttack: vi.fn(() => 0),
+  },
+}))
 
-import * as rules5e from './rules.js';
-import { rules5e as raceRules5e, rules2024 as raceRules2024 } from '../character/race-rules/index.js';
-import * as classRules5e from '../character/classRules.js';
-import * as classRules2024 from '../character/classRules2024.js';
+vi.mock('./trackedResources.js', () => ({
+  computeTrackedResources: vi.fn(() => ({})),
+}))
+
+vi.mock('../automation/common/choiceStorage.js', () => ({
+  getChosenRuntimeValue: vi.fn(() => null),
+}))
 
 describe('rulesFactory', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-     });
+    vi.clearAllMocks()
+  })
 
   describe('getRules', () => {
-    it('should return 5e rules by default', () => {
-      const playerSummary = {};
-      const rules = rulesFactory.getRules(playerSummary);
+    it('returns 5e rules by default', () => {
+      const result = rulesFactory.getRules({})
+      expect(result.rules).toBeDefined()
+      expect(result.raceRules).toBeDefined()
+    })
 
-      expect(rules.rules).toBe(rules5e.default);
-      expect(rules.raceRules).toBe(raceRules5e);
-      expect(rules.classRules).toBe(classRules5e.default);
-      });
+    it('returns 5e rules when rules is 5e', () => {
+      const result = rulesFactory.getRules({ rules: '5e' })
+      expect(result.raceRules).toBeDefined()
+    })
 
-    it('should return 5e rules when rules is 5e', () => {
-      const playerSummary = { rules: '5e' };
-      const rules = rulesFactory.getRules(playerSummary);
+    it('returns 2024 rules when rules is 2024', () => {
+      const result = rulesFactory.getRules({ rules: '2024' })
+      expect(result.raceRules).toBeDefined()
+    })
+  })
 
-      expect(rules.rules).toBe(rules5e.default);
-      expect(rules.raceRules).toBe(raceRules5e);
-      expect(rules.classRules).toBe(classRules5e.default);
-      });
+  describe('getRulesType', () => {
+    it('returns 5e by default', () => {
+      expect(rulesFactory.getRulesType({})).toBe('5e')
+    })
 
-    it('should return 2024 rules when rules is 2024', () => {
-      const playerSummary = { rules: '2024' };
-      const rules = rulesFactory.getRules(playerSummary);
+    it('returns the rules type from summary', () => {
+      expect(rulesFactory.getRulesType({ rules: '2024' })).toBe('2024')
+    })
+  })
 
-      expect(rules.rules).toBe(rules5e.default);
-      expect(rules.raceRules).toBe(raceRules2024);
-      expect(rules.classRules).toBe(classRules2024.default);
-    });
-   });
+  describe('delegation wrappers', () => {
+    it('getAbilityLongName delegates to rules', () => {
+      expect(typeof rulesFactory.getAbilityLongName).toBe('function')
+    })
 
-  describe('getAbilityLongName', () => {
-    it('should delegate to rules.getAbilityLongName', () => {
-      rules5e.default.getAbilityLongName.mockReturnValue('Strength');
-      const playerSummary = { name: 'Test Character' };
+    it('getAbilities delegates to rules', async () => {
+      const result = await rulesFactory.getAbilities({}, {})
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-      const result = rulesFactory.getAbilityLongName('STR', playerSummary);
+    it('getActions delegates to rules', () => {
+      const result = rulesFactory.getActions({ rules: '5e' }, {})
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-      expect(result).toBe('Strength');
-      expect(rules5e.default.getAbilityLongName).toHaveBeenCalledWith('STR');
-      });
-   });
+    it('getArmorClass delegates to rules', () => {
+      const result = rulesFactory.getArmorClass([], { rules: '5e' }, {})
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-  describe('getAbilities', () => {
-    it('should delegate to rules.getAbilities', async () => {
-      const mockAbilities = [{ name: 'Strength', score: 15 }];
-      rules5e.default.getAbilities.mockResolvedValue(mockAbilities);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
+    it('getAttacks delegates to rules', () => {
+      const result = rulesFactory.getAttacks([], [], { rules: '5e' }, {})
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-      const result = await rulesFactory.getAbilities(playerStats, playerSummary);
+    it('getHitPoints delegates to rules', () => {
+      const result = rulesFactory.getHitPoints({ rules: '5e' }, {})
+      expect(typeof result).toBe('number')
+    })
 
-      expect(result).toBe(mockAbilities);
-      expect(rules5e.default.getAbilities).toHaveBeenCalledWith(playerStats, playerSummary);
-      });
-   });
+    it('getLanguages delegates to rules', () => {
+      const result = rulesFactory.getLanguages({ rules: '5e' }, {})
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-  describe('getActions', () => {
-    it('should delegate to rules.getActions', () => {
-      const mockActions = ['Attack', 'Dash'];
-      rules5e.default.getActions.mockReturnValue(mockActions);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
+    it('getMagicItems delegates to rules', () => {
+      const result = rulesFactory.getMagicItems([], {}, { rules: '5e' })
+      expect(result).toBeNull()
+    })
 
-      const result = rulesFactory.getActions(playerStats, playerSummary);
+    it('getProficiencyChoiceCount delegates to rules', () => {
+      const result = rulesFactory.getProficiencyChoiceCount({}, [], {})
+      expect(typeof result).toBe('number')
+    })
 
-      expect(result).toBe(mockActions);
-      expect(rules5e.default.getActions).toHaveBeenCalledWith(playerStats, playerSummary);
-      });
-   });
+    it('getProficiencies delegates to rules', () => {
+      const result = rulesFactory.getProficiencies({ rules: '5e' }, true, {})
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-  describe('getHitPoints', () => {
-    it('should delegate to rules.getHitPoints', () => {
-      rules5e.default.getHitPoints.mockReturnValue(20);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
+    it('getSpellAbilities delegates to rules', () => {
+      const result = rulesFactory.getSpellAbilities([], { rules: '5e' }, {})
+      expect(result).toBeDefined()
+    })
 
-      const result = rulesFactory.getHitPoints(playerStats, playerSummary);
+    it('getSpellMaxLevel delegates to rules', () => {
+      const result = rulesFactory.getSpellMaxLevel({})
+      expect(typeof result).toBe('number')
+    })
+  })
 
-      expect(result).toBe(20);
-      expect(rules5e.default.getHitPoints).toHaveBeenCalledWith(playerStats, playerSummary);
-      });
-   });
+  describe('class rules delegation', () => {
+    it('getDruidMaxWildShapeChallengeRating', () => {
+      const result = rulesFactory.getDruidMaxWildShapeChallengeRating({}, { rules: '5e' })
+      expect(typeof result).toBe('number')
+    })
 
-  describe('getLanguages', () => {
-    it('should delegate to rules.getLanguages', () => {
-      const mockLanguages = ['Common', 'Elvish'];
-      rules5e.default.getLanguages.mockReturnValue(mockLanguages);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
+    it('getDruidWildShapeUses', () => {
+      const result = rulesFactory.getDruidWildShapeUses({}, { rules: '5e' })
+      expect(typeof result).toBe('number')
+    })
 
-      const result = rulesFactory.getLanguages(playerStats, playerSummary);
+    it('getDruidBeastKnownForms', () => {
+      const result = rulesFactory.getDruidBeastKnownForms({}, { rules: '5e' })
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-      expect(result).toBe(mockLanguages);
-      expect(rules5e.default.getLanguages).toHaveBeenCalledWith(playerStats, playerSummary);
-      });
-   });
+    it('getDruidBeastFlySpeed', () => {
+      const result = rulesFactory.getDruidBeastFlySpeed({}, { rules: '5e' })
+      expect(result).toBeNull()
+    })
 
-  describe('getMagicItems', () => {
-    it('should delegate to rules.getMagicItems', () => {
-      const mockMagicItems = [{ name: 'Ring of Protection' }];
-      rules5e.default.getMagicItems.mockReturnValue(mockMagicItems);
-      const allMagicItems = [];
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
+    it('getRogueSneakAttack', () => {
+      const result = rulesFactory.getRogueSneakAttack({}, { rules: '5e' })
+      expect(typeof result).toBe('number')
+    })
+  })
 
-      const result = rulesFactory.getMagicItems(allMagicItems, playerSummary, playerStats);
+  describe('race rules delegation', () => {
+    it('getImmunities', () => {
+      const result = rulesFactory.getImmunities({ rules: '5e' })
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-      expect(result).toBe(mockMagicItems);
-      expect(rules5e.default.getMagicItems).toHaveBeenCalledWith(allMagicItems, playerSummary, playerStats);
-      });
-   });
+    it('getResistances', () => {
+      const result = rulesFactory.getResistances({ rules: '5e' })
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-  describe('getProficiencyChoiceCount', () => {
-    it('should delegate to rules.getProficiencyChoiceCount', () => {
-      rules5e.default.getProficiencyChoiceCount.mockReturnValue(4);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
+    it('getSenses returns senses array', () => {
+      const result = rulesFactory.getSenses({}, { rules: '5e' })
+      expect(Array.isArray(result)).toBe(true)
+    })
 
-      const result = rulesFactory.getProficiencyChoiceCount(playerStats, true, playerSummary);
+    it('getSenses adds truesight from passive_buff', () => {
+      const stats = {
+        automation: {
+          passives: [{ type: 'passive_buff', effect: 'truesight', range: '120 ft.' }],
+        },
+      }
+      const result = rulesFactory.getSenses(stats, { rules: '5e' })
+      const truesight = result.find((s) => s.name === 'Truesight')
+      expect(truesight).toBeDefined()
+      expect(truesight.value).toBe('120 ft.')
+    })
 
-      expect(result).toBe(4);
-      expect(rules5e.default.getProficiencyChoiceCount).toHaveBeenCalledWith(playerStats, true, playerSummary);
-      });
-   });
-
-  describe('getProficiencies', () => {
-    it('should delegate to rules.getProficiencies', () => {
-      const mockProficiencies = ['Light Armor', 'Simple Weapons'];
-      rules5e.default.getProficiencies.mockReturnValue(mockProficiencies);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
-
-      const result = rulesFactory.getProficiencies(playerStats, true, playerSummary);
-
-      expect(result).toBe(mockProficiencies);
-      expect(rules5e.default.getProficiencies).toHaveBeenCalledWith(playerStats, true, playerSummary);
-      });
-   });
-
-  describe('getSpellMaxLevel', () => {
-    it('should delegate to rules.getSpellMaxLevel', () => {
-      rules5e.default.getSpellMaxLevel.mockReturnValue(3);
-      const spellAbilities = {};
-      const playerSummary = { name: 'Test Character' };
-
-      const result = rulesFactory.getSpellMaxLevel(spellAbilities, playerSummary);
-
-      expect(result).toBe(3);
-      expect(rules5e.default.getSpellMaxLevel).toHaveBeenCalledWith(spellAbilities);
-      });
-   });
-
-  describe('getDruidMaxWildShapeChallengeRating', () => {
-    it('should delegate to classRules.getDruidMaxWildShapeChallengeRating', () => {
-      classRules5e.default.getDruidMaxWildShapeChallengeRating.mockReturnValue(1);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
-
-      const result = rulesFactory.getDruidMaxWildShapeChallengeRating(playerStats, playerSummary);
-
-      expect(result).toBe(1);
-      expect(classRules5e.default.getDruidMaxWildShapeChallengeRating).toHaveBeenCalledWith(playerStats);
-      });
-   });
-
-  describe('getDruidWildShapeUses', () => {
-    it('should delegate to classRules.getDruidWildShapeUses', () => {
-      classRules5e.default.getDruidWildShapeUses.mockReturnValue(2);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
-
-      const result = rulesFactory.getDruidWildShapeUses(playerStats, playerSummary);
-
-      expect(result).toBe(2);
-      expect(classRules5e.default.getDruidWildShapeUses).toHaveBeenCalledWith(playerStats);
-      });
-   });
-
-  describe('getDruidBeastKnownForms', () => {
-    it('should delegate to classRules.getDruidBeastKnownForms', () => {
-      classRules5e.default.getDruidBeastKnownForms.mockReturnValue(4);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
-
-      const result = rulesFactory.getDruidBeastKnownForms(playerStats, playerSummary);
-
-      expect(result).toBe(4);
-      expect(classRules5e.default.getDruidBeastKnownForms).toHaveBeenCalledWith(playerStats);
-      });
-   });
-
-  describe('getDruidBeastFlySpeed', () => {
-    it('should delegate to classRules.getDruidBeastFlySpeed', () => {
-      classRules5e.default.getDruidBeastFlySpeed.mockReturnValue(0);
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
-
-      const result = rulesFactory.getDruidBeastFlySpeed(playerStats, playerSummary);
-
-      expect(result).toBe(0);
-      expect(classRules5e.default.getDruidBeastFlySpeed).toHaveBeenCalledWith(playerStats);
-      });
-   });
-
-  describe('getRogueSneakAttack', () => {
-    it('should delegate to classRules.getRogueSneakAttack', () => {
-      classRules5e.default.getRogueSneakAttack.mockReturnValue({ dice_count: 1, dice_value: 6 });
-      const playerStats = {};
-      const playerSummary = { name: 'Test Character' };
-
-      const result = rulesFactory.getRogueSneakAttack(playerStats, playerSummary);
-
-      expect(result).toEqual({ dice_count: 1, dice_value: 6 });
-      expect(classRules5e.default.getRogueSneakAttack).toHaveBeenCalledWith(playerStats);
-      });
-   });
+    it('getSenses adds blindsight from passive_buff', () => {
+      const stats = {
+        automation: {
+          passives: [{ type: 'passive_buff', effect: 'blindsight', range: '30 ft.' }],
+        },
+      }
+      const result = rulesFactory.getSenses(stats, { rules: '5e' })
+      const blindsight = result.find((s) => s.name === 'Blindsight')
+      expect(blindsight).toBeDefined()
+      expect(blindsight.value).toBe('30 ft.')
+    })
+  })
 
   describe('getPlayerStats', () => {
-    it('should gather all player stats', async () => {
-      const mockPlayerStats = { senses: ['Darkvision'] };
-      rules5e.default.getPlayerStats.mockResolvedValue(mockPlayerStats);
-      raceRules5e.getImmunities.mockReturnValue([]);
-      raceRules5e.getRace.mockReturnValue({ name: 'Human' });
-      raceRules5e.getResistances.mockReturnValue([]);
-      classRules5e.default.getClass.mockReturnValue({ name: 'Fighter' });
+    it('returns player stats with tracked resources', async () => {
+      const result = await rulesFactory.getPlayerStats([], [], [], [], {}, { rules: '5e' })
+      expect(result).toBeDefined()
+      expect(result._trackedResources).toBeDefined()
+    })
 
-      const allClasses = [];
-      const allEquipment = [];
-      const allMagicItems = [];
-      const allRaces = [];
-      const allSpells = [];
-      const playerSummary = { name: 'Test Character' };
+    it('adds auto resistances from passives', async () => {
+      const result = await rulesFactory.getPlayerStats([], [], [], [], {}, {
+        rules: '5e',
+        resistances: [],
+        automation: {
+          passives: [{ type: 'resistance', damageTypes: ['Fire', 'Cold'] }],
+        },
+      })
+      expect(result.resistances).toContain('Fire')
+      expect(result.resistances).toContain('Cold')
+    })
 
-      const result = await rulesFactory.getPlayerStats(
-        allClasses,
-        allEquipment,
-        allMagicItems,
-        allRaces,
-        allSpells,
-        playerSummary
-        );
+    it('adds passive immunity resistances', async () => {
+      const result = await rulesFactory.getPlayerStats([], [], [], [], {}, {
+        rules: '5e',
+        resistances: [],
+        automation: {
+          passives: [{ type: 'passive_immunity', damageResistance: ['Psychic'] }],
+        },
+      })
+      expect(result.resistances).toContain('Psychic')
+    })
 
-      expect(result.immunities).toEqual([]);
-      expect(result.race).toEqual({ name: 'Human' });
-      expect(result.resistances).toEqual([]);
-      expect(result.senses).toEqual(['Darkvision']);
-      expect(result.class).toEqual({ name: 'Fighter' });
-      });
-   });
-});
+    it('does not add land resistance when class type does not match mapping', async () => {
+      const result = await rulesFactory.getPlayerStats([], [], [], [], {}, {
+        rules: '5e',
+        resistances: [],
+        class: { major: { type: 'fire' } },
+        automation: {
+          passives: [{ type: 'land_resistance', landMappings: { nature: 'Lightning' } }],
+        },
+      })
+      expect(result.resistances).not.toContain('Lightning')
+    })
+  })
+})

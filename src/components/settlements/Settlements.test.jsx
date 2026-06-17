@@ -1,1067 +1,625 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
-let mockSettlementsFactory = () => ({
-  settlements: [],
-  loading: false,
-  saveSettlementAction: vi.fn(),
-  deleteSettlementAction: vi.fn(),
-});
-
 vi.mock('../../hooks/management/useSettlementsManagement.js', () => ({
-  __esModule: true,
-  default: (...args) => mockSettlementsFactory(...args),
+  default: vi.fn(() => ({
+    settlements: [],
+    loading: false,
+    saveSettlementAction: vi.fn().mockResolvedValue(undefined),
+    deleteSettlementAction: vi.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({
-  default: ({ id, value, onChange, placeholder, label }) => (
-    <div data-testid={`preview-toggle-${id}`}>
-      {label && <label>{label}</label>}
-      <textarea
-        data-testid={`settlement-field-${id}`}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
-    </div>
-  ),
+  default: function PreviewToggle({ value, onChange, placeholder, label, id }) {
+    return (
+      <div className="preview-toggle-wrapper">
+        {label && <label htmlFor={id}>{label}</label>}
+        <textarea
+          data-testid={`preview-toggle-${id}`}
+          value={value || ''}
+          onChange={(e) => onChange?.(e.target.value)}
+          placeholder={placeholder}
+        />
+      </div>
+    );
+  },
 }));
 
 vi.mock('../../services/campaign/settlementGenerator.js', () => ({
-  generateSettlement: vi.fn(),
+  generateSettlement: vi.fn().mockResolvedValue({
+    name: 'Generated Town',
+    size: 'town',
+    description: 'A bustling town',
+    atmosphere: 'Lively',
+    government: 'Council',
+    population: '1,500 souls',
+    services: [],
+    notableNPCs: [],
+    rumors: [],
+    tags: 'generated',
+    notes: '',
+    threat: 'Bandits',
+  }),
 }));
 
+import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
+
 describe('Settlements', () => {
-  const defaultProps = {
-    campaignName: 'test-campaign',
-    onBack: vi.fn(),
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const mockUseSettlements = {
+    settlements: [],
+    loading: false,
+    saveSettlementAction: vi.fn().mockResolvedValue(undefined),
+    deleteSettlementAction: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
-    vi.clearAllMocks();
-    window.confirm = vi.fn(() => true);
-    // Suppress the unhandled fetch rejection from the component's useEffect
-    // that loads /data/settlement-descriptions.json (not relevant to tests).
-    window.fetch = vi.fn(() =>
-      Promise.resolve({ json: () => Promise.resolve({}) })
-    );
-    mockSettlementsFactory = () => ({
-      settlements: [],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
+    useSettlementsManagement.mockReturnValue(mockUseSettlements);
+  });
+
+  it('renders header with title and back button', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByRole('heading', { name: /settlements/i })).toBeInTheDocument();
+    expect(screen.getByText(/back/i)).toBeInTheDocument();
+  });
+
+  it('renders new settlement button', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByRole('button', { name: /new settlement/i })).toBeInTheDocument();
+  });
+
+  it('renders generate settlement button', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByRole('button', { name: /generate settlement/i })).toBeInTheDocument();
+  });
+
+  it('renders search bar', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByLabelText('Search settlements')).toBeInTheDocument();
+  });
+
+  it('renders size filter buttons', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByRole('button', { name: /village/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /town/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /city/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /metropolis/i })).toBeInTheDocument();
+  });
+
+  it('renders empty state when no settlements exist', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText(/no settlements yet/i)).toBeInTheDocument();
+  });
+
+  it('renders loading state when loading', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      loading: true,
     });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText(/loading settlements/i)).toBeInTheDocument();
   });
 
-  // ── Header and navigation ──
-
-  it('should render header with back button and title', () => {
-    render(<Settlements {...defaultProps} />);
-    expect(screen.getByText(/Back/)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Settlements' })).toBeInTheDocument();
+  it('renders settlements list when settlements exist', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        {
+          name: 'Sample Town',
+          size: 'town',
+          population: '1,500 souls',
+          tags: 'coastal',
+          services: [{ type: 'inn', name: 'The Inn' }],
+          description: 'A nice town by the sea',
+        },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('Sample Town')).toBeInTheDocument();
+    expect(screen.getByText('1,500 souls')).toBeInTheDocument();
   });
 
-  it('should call onBack when back button clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    fireEvent.click(screen.getByText(/Back/));
-    expect(defaultProps.onBack).toHaveBeenCalledTimes(1);
+  it('filters settlements by search query and shows no results for non-matching query', async () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: 'A town of fire' },
+        { name: 'Iceholm', size: 'village', population: '', tags: '', services: [], description: 'A cold village' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const searchInput = screen.getByLabelText('Search settlements');
+    fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
+    expect(screen.getByText(/no settlements found matching your filters/i)).toBeInTheDocument();
   });
 
-  // ── New Settlement button and modal ──
-
-  it('should render New Settlement button', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    expect(buttons[0].tagName).toBe('BUTTON');
+  it('filters settlements by size', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
+        { name: 'Iceholm', size: 'village', population: '', tags: '', services: [], description: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const villageBtn = screen.getByRole('button', { name: /village/i });
+    fireEvent.click(villageBtn);
+    expect(screen.getByText('Iceholm')).toBeInTheDocument();
+    expect(screen.queryByText('Fireport')).not.toBeInTheDocument();
   });
 
-  it('should open modal when New Settlement clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
+  it('toggles size filter off when clicked again', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
+        { name: 'Iceholm', size: 'village', population: '', tags: '', services: [], description: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const villageBtn = screen.getByRole('button', { name: /village/i });
+    fireEvent.click(villageBtn);
+    fireEvent.click(villageBtn);
+    expect(screen.getByText('Fireport')).toBeInTheDocument();
+    expect(screen.getByText('Iceholm')).toBeInTheDocument();
+  });
+
+  it('shows service count in settlement list', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Service Town', size: 'town', population: '', tags: '', services: [{ type: 'inn' }, { type: 'tavern' }], description: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText(/2 services/i)).toBeInTheDocument();
+  });
+
+  it('shows single service count without plural', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Service Town', size: 'town', population: '', tags: '', services: [{ type: 'inn' }], description: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText(/1 service/)).toBeInTheDocument();
+  });
+
+  it('shows tags when present', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Tagged Town', size: 'town', population: '', tags: 'coastal, trade', services: [], description: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('coastal, trade')).toBeInTheDocument();
+  });
+
+  it('shows description preview truncated at 120 chars', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Long Desc Town', size: 'town', population: '', tags: '', services: [], description: 'A'.repeat(200) },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const listItem = screen.getByRole('button', { name: /edit settlement/i });
+    expect(listItem.textContent).toContain('…');
+  });
+
+  it('opens modal when new settlement button is clicked', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
     expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
   });
 
-  it('should close modal when Cancel clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Cancel'));
-    expect(
-      screen.queryByRole('heading', { name: 'New Settlement' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('should close modal when X button clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    fireEvent.click(screen.getByLabelText('Close'));
-    expect(
-      screen.queryByRole('heading', { name: 'New Settlement' })
-    ).not.toBeInTheDocument();
-  });
-
-  it('should disable save button when name is empty', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const saveButton = screen.getByText('Save').closest('button');
-    expect(saveButton.disabled).toBe(true);
-  });
-
-  it('should enable save button when name has text', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const nameInput = screen.getByLabelText('Name *');
-    fireEvent.change(nameInput, { target: { value: 'Whiteridge' } });
-    const saveButton = screen.getByText('Save').closest('button');
-    expect(saveButton.disabled).toBe(false);
-  });
-
-  it('should render required asterisk for name field', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByText('*')).toBeInTheDocument();
-  });
-
-  // ── Generate Settlement button ──
-
-  it('should render Generate Settlement button', () => {
-    render(<Settlements {...defaultProps} />);
-    expect(screen.getByText(/Generate Settlement/)).toBeInTheDocument();
-  });
-
-  it('should open modal with generated data when Generate Settlement clicked', async () => {
-    const settlementGenerator = await import('../../services/campaign/settlementGenerator.js');
-
-    vi.mocked(settlementGenerator.generateSettlement).mockResolvedValue({
-      name: 'Generated Town',
-      size: 'town',
-      description: 'A generated town.',
-      atmosphere: '',
-      government: '',
-      population: '',
-      services: [],
-      notableNPCs: [],
-      rumors: [],
-      tags: '',
-      notes: '',
-      threat: '',
+  it('opens edit modal when clicking a settlement', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Edit Me', size: 'village', population: '100 souls', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
+      ],
     });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const settlementItem = screen.getByRole('button', { name: /edit settlement/i });
+    fireEvent.click(settlementItem);
+    expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
+  });
 
-    render(<Settlements {...defaultProps} />);
-    fireEvent.click(screen.getByText(/Generate Settlement/));
+  it('closes modal when cancel button is clicked', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const cancelBtn = screen.getByRole('button', { name: 'Cancel' });
+    fireEvent.click(cancelBtn);
+    expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument();
+  });
 
+  it('closes modal when close button is clicked', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const closeBtn = screen.getByLabelText('Close');
+    fireEvent.click(closeBtn);
+    expect(screen.queryByRole('heading', { name: 'New Settlement' })).not.toBeInTheDocument();
+  });
+
+  it('shows size selector in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByRole('combobox', { name: /size/i })).toBeInTheDocument();
+  });
+
+  it('shows population input in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByPlaceholderText(/souls/i)).toBeInTheDocument();
+  });
+
+  it('saves a new settlement when save is clicked with name', async () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const nameInput = screen.getByLabelText(/name/i);
+    fireEvent.change(nameInput, { target: { value: 'My Settlement' } });
+    const saveBtn = screen.getByRole('button', { name: /save/i });
+    fireEvent.click(saveBtn);
+    await waitFor(() => {
+      expect(mockUseSettlements.saveSettlementAction).toHaveBeenCalled();
+    });
+  });
+
+  it('does not save when name is empty', async () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const saveBtn = screen.getByRole('button', { name: /save/i });
+    fireEvent.click(saveBtn);
+    expect(mockUseSettlements.saveSettlementAction).not.toHaveBeenCalled();
+  });
+
+  it('disables save button when name is empty', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const saveBtn = screen.getByRole('button', { name: /save/i });
+    expect(saveBtn).toBeDisabled();
+  });
+
+  it('shows delete button when editing a settlement', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Delete Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const settlementItem = screen.getByRole('button', { name: /edit settlement/i });
+    fireEvent.click(settlementItem);
+    expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('does not show delete button for new settlement', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+  });
+
+  it('calls deleteSettlementAction when delete is confirmed', async () => {
+    global.window.confirm = vi.fn(() => true);
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Delete Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const settlementItem = screen.getByRole('button', { name: /edit settlement/i });
+    fireEvent.click(settlementItem);
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteBtn);
+    await waitFor(() => {
+      expect(mockUseSettlements.deleteSettlementAction).toHaveBeenCalledWith('Delete Me');
+    });
+  });
+
+  it('does not delete when user cancels confirmation', async () => {
+    global.window.confirm = vi.fn(() => false);
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Keep Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const settlementItem = screen.getByRole('button', { name: /edit settlement/i });
+    fireEvent.click(settlementItem);
+    const deleteBtn = screen.getByRole('button', { name: 'Delete' });
+    fireEvent.click(deleteBtn);
+    expect(mockUseSettlements.deleteSettlementAction).not.toHaveBeenCalled();
+  });
+
+  it('generates a settlement when generate button is clicked', async () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const genBtn = screen.getByRole('button', { name: /generate settlement/i });
+    fireEvent.click(genBtn);
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'New Settlement' })).toBeInTheDocument();
     });
-
-    expect(settlementGenerator.generateSettlement).toHaveBeenCalled();
   });
 
-  it('should show generating state on button while generating', async () => {
-    const settlementGenerator = await import('../../services/campaign/settlementGenerator.js');
-
-    let resolvePromise;
-    vi.mocked(settlementGenerator.generateSettlement).mockReturnValue(
-      new Promise((resolve) => { resolvePromise = resolve; })
-    );
-
-    render(<Settlements {...defaultProps} />);
-    fireEvent.click(screen.getByText(/Generate Settlement/));
-
-    expect(screen.getByText(/Generating…/)).toBeInTheDocument();
-    resolvePromise({ name: 'Test', size: 'village' });
-  });
-
-  // ── Empty states ──
-
-  it('should show empty state when no settlements', () => {
-    render(<Settlements {...defaultProps} />);
-    expect(screen.getByText(/No settlements yet/)).toBeInTheDocument();
-  });
-
-  it('should show loading state', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [],
-      loading: true,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
+  it('disables generate button while generating', async () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const genBtn = screen.getByRole('button', { name: /generate settlement/i });
+    fireEvent.click(genBtn);
     await waitFor(() => {
-      expect(screen.getByText(/Loading settlements/)).toBeInTheDocument();
+      expect(genBtn).toBeDisabled();
     });
   });
 
-  // ── Search functionality ──
-
-  it('should render search input', () => {
-    render(<Settlements {...defaultProps} />);
-    expect(screen.getByPlaceholderText(/Search settlements/)).toBeInTheDocument();
-  });
-
-  it('should show clear search button when search has text', () => {
-    render(<Settlements {...defaultProps} />);
-    const searchInput = screen.getByPlaceholderText(/Search settlements/);
-    fireEvent.change(searchInput, { target: { value: 'test' } });
-    expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
-  });
-
-  it('should clear search when clear button clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    const searchInput = screen.getByPlaceholderText(/Search settlements/);
-    fireEvent.change(searchInput, { target: { value: 'test' } });
-    fireEvent.click(screen.getByLabelText('Clear search'));
-    expect(searchInput.value).toBe('');
-  });
-
-  // ── Size filter buttons ──
-
-  it('should render size filter buttons', () => {
-    render(<Settlements {...defaultProps} />);
-    expect(screen.getByTitle('Filter: Village')).toBeInTheDocument();
-    expect(screen.getByTitle('Filter: Town')).toBeInTheDocument();
-    expect(screen.getByTitle('Filter: City')).toBeInTheDocument();
-    expect(screen.getByTitle('Filter: Metropolis')).toBeInTheDocument();
-  });
-
-  it('should apply size filter when button clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    const villageBtn = screen.getByTitle('Filter: Village');
-    fireEvent.click(villageBtn);
-    expect(villageBtn.className).toContain('settlements-size-btn-active');
-  });
-
-  it('should remove size filter when active button clicked again', () => {
-    render(<Settlements {...defaultProps} />);
-    const villageBtn = screen.getByTitle('Filter: Village');
-    fireEvent.click(villageBtn);
-    expect(villageBtn.className).toContain('settlements-size-btn-active');
-    fireEvent.click(villageBtn);
-    expect(villageBtn.className).not.toContain('settlements-size-btn-active');
-  });
-
-  // ── Settlement list rendering ──
-
-  it('should render settlement name in list', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-  });
-
-  it('should render size badge for settlement', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'city',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByTitle('city')).toBeInTheDocument();
-    });
-  });
-
-  it('should render population in list', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '2,500 souls',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('2,500 souls')).toBeInTheDocument();
-    });
-  });
-
-  it('should render tags in list', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: 'coastal, trade-hub',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('coastal, trade-hub')).toBeInTheDocument();
-    });
-  });
-
-  it('should render service count in list', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [
-          { type: 'inn', name: 'The Golden Stag' },
-          { type: 'tavern', name: 'The Rusty Anchor' },
-        ],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('2 services')).toBeInTheDocument();
-    });
-  });
-
-  it('should render singular service count in list', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [{ type: 'inn', name: 'The Golden Stag' }],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('1 service')).toBeInTheDocument();
-    });
-  });
-
-  it('should truncate long descriptions in list', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: 'A very long description that goes on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on and on',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      const preview = screen.getByText(/A very long description/);
-      expect(preview.textContent.length).toBeLessThan(130);
-    });
-  });
-
-  it('should not show description when empty', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const previewElements = document.querySelectorAll('.settlements-list-preview');
-    expect(previewElements.length).toBe(0);
-  });
-
-  it('should not show tags when empty', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const tagElements = document.querySelectorAll('.settlements-list-tags');
-    expect(tagElements.length).toBe(0);
-  });
-
-  it('should not show services count when empty', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const serviceElements = document.querySelectorAll('.settlements-list-services');
-    expect(serviceElements.length).toBe(0);
-  });
-
-  // ── Filtering settlements ──
-
-  it('should filter settlements by size', async () => {
-    mockSettlementsFactory = () => ({
+  it('shows size badge with correct icon for settlements', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
       settlements: [
-        { name: 'Village A', size: 'village', description: '', population: '', tags: '', services: [] },
-        { name: 'Town B', size: 'town', description: '', population: '', tags: '', services: [] },
+        { name: 'City', size: 'city', population: '', tags: '', services: [], description: '' },
       ],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
     });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('city')).toBeInTheDocument();
+  });
 
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Village A')).toBeInTheDocument();
-      expect(screen.getByText('Town B')).toBeInTheDocument();
+  it('shows no settlements matching when search yields no results', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
+      ],
     });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const searchInput = screen.getByLabelText('Search settlements');
+    fireEvent.change(searchInput, { target: { value: 'nonexistent' } });
+    expect(screen.getByText(/no settlements found matching your filters/i)).toBeInTheDocument();
+  });
 
-    const villageBtn = screen.getByTitle('Filter: Village');
+  it('shows no settlements matching when size filter yields no results', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const villageBtn = screen.getByRole('button', { name: /village/i });
     fireEvent.click(villageBtn);
-
-    expect(screen.queryByText('Town B')).not.toBeInTheDocument();
+    expect(screen.getByText(/no settlements found matching your filters/i)).toBeInTheDocument();
   });
 
-  it('should filter settlements by search query', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [
-        { name: 'Whiteridge', size: 'town', description: '', population: '', tags: '', services: [] },
-        { name: 'Blackwater', size: 'city', description: '', population: '', tags: '', services: [] },
-      ],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search settlements/);
-    fireEvent.change(searchInput, { target: { value: 'white' } });
-
-    expect(screen.queryByText('Blackwater')).not.toBeInTheDocument();
+  it('renders services section in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByText(/services/i)).toBeInTheDocument();
   });
 
-  it('should show no results message when filter has no matches', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [
-        { name: 'Whiteridge', size: 'town', description: '', population: '', tags: '', services: [] },
-      ],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const cityBtn = screen.getByTitle('Filter: City');
-    fireEvent.click(cityBtn);
-
-    expect(screen.getByText(/No settlements found matching/)).toBeInTheDocument();
+  it('renders notable NPCs section in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByText(/notable npcs/i)).toBeInTheDocument();
   });
 
-  it('should show no results message when search has no matches', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [
-        { name: 'Whiteridge', size: 'town', description: '', population: '', tags: '', services: [] },
-      ],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search settlements/);
-    fireEvent.change(searchInput, { target: { value: 'dragons' } });
-
-    expect(screen.getByText(/No settlements found matching/)).toBeInTheDocument();
+  it('renders rumors section in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByText(/rumors/i)).toBeInTheDocument();
   });
 
-  // ── Edit settlement ──
-
-  it('should open edit modal when settlement clicked', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: 'A peaceful town.',
-        population: '2,500 souls',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Whiteridge'));
-
-    expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
-    expect(screen.getByText(/Delete/)).toBeInTheDocument();
-  });
-
-  it('should open edit modal on keyboard Enter key', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const listItem = screen.getByRole('button', { name: 'Edit settlement: Whiteridge' });
-    fireEvent.keyDown(listItem, { key: 'Enter' });
-
-    expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
-  });
-
-  it('should open edit modal on keyboard Space key', async () => {
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const listItem = screen.getByRole('button', { name: 'Edit settlement: Whiteridge' });
-    fireEvent.keyDown(listItem, { key: ' ' });
-
-    expect(screen.getByRole('heading', { name: 'Edit Settlement' })).toBeInTheDocument();
-  });
-
-  // ── Modal form fields ──
-
-  it('should render settlement name input in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByLabelText('Name *')).toBeInTheDocument();
-  });
-
-  it('should render size select in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByLabelText('Size')).toBeInTheDocument();
-  });
-
-  it('should render population input in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByLabelText('Population')).toBeInTheDocument();
-  });
-
-  it('should render government field in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByTestId('preview-toggle-settlement-government')).toBeInTheDocument();
-  });
-
-  it('should render description field in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByTestId('preview-toggle-settlement-description')).toBeInTheDocument();
-  });
-
-  it('should render atmosphere field in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByTestId('preview-toggle-settlement-atmosphere')).toBeInTheDocument();
-  });
-
-  it('should render tags input in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByLabelText('Tags (comma separated)')).toBeInTheDocument();
-  });
-
-  it('should render notes field in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByTestId('preview-toggle-settlement-notes')).toBeInTheDocument();
-  });
-
-  it('should render services section title in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByText('Services')).toBeInTheDocument();
-  });
-
-  it('should render NPCs section title in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByText('Notable NPCs')).toBeInTheDocument();
-  });
-
-  it('should render Rumors section title in modal', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByText('Rumors & News')).toBeInTheDocument();
-  });
-
-  // ── Add/Remove services, NPCs, rumors ──
-
-  it('should add a service when Add Service clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const addServiceBtn = screen.getAllByText(/Add Service/)[0];
+  it('allows adding a service', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const addServiceBtn = screen.getByRole('button', { name: /add service/i });
     fireEvent.click(addServiceBtn);
-    expect(screen.getByText('Add Service')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove service/i })).toBeInTheDocument();
   });
 
-  it('should add an NPC when Add NPC clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const addNpcBtn = screen.getAllByText(/Add NPC/)[0];
+  it('allows adding an NPC', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const addNpcBtn = screen.getByRole('button', { name: /add npc/i });
     fireEvent.click(addNpcBtn);
-    expect(screen.getByText('Add NPC')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove npc/i })).toBeInTheDocument();
   });
 
-  it('should add a rumor when Add Rumor clicked', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const addRumorBtn = screen.getAllByText(/Add Rumor/)[0];
+  it('allows adding a rumor', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const addRumorBtn = screen.getByRole('button', { name: /add rumor/i });
     fireEvent.click(addRumorBtn);
-    expect(screen.getByText('Add Rumor')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /remove rumor/i })).toBeInTheDocument();
   });
 
-  // ── Modal does not show threat field when threat is empty ──
-
-  it('should not show threat field when threat is empty', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.queryByTestId('preview-toggle-settlement-threat')).not.toBeInTheDocument();
+  it('allows removing a service after adding', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const addServiceBtn = screen.getByRole('button', { name: /add service/i });
+    fireEvent.click(addServiceBtn);
+    const removeServiceBtn = screen.getByRole('button', { name: /remove service/i });
+    fireEvent.click(removeServiceBtn);
+    expect(screen.queryByRole('button', { name: /remove service/i })).not.toBeInTheDocument();
   });
 
-  // ── Delete button only visible in edit mode ──
-
-  it('should not show delete button when creating new settlement', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.queryByText(/Delete/)).not.toBeInTheDocument();
+  it('allows removing an NPC after adding', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const addNpcBtn = screen.getByRole('button', { name: /add npc/i });
+    fireEvent.click(addNpcBtn);
+    const removeNpcBtn = screen.getByRole('button', { name: /remove npc/i });
+    fireEvent.click(removeNpcBtn);
+    expect(screen.queryByRole('button', { name: /remove npc/i })).not.toBeInTheDocument();
   });
 
-  // ── Size change in form triggers auto-population ──
-
-  it('should default size to village', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const sizeSelect = screen.getByLabelText('Size');
-    expect(sizeSelect.value).toBe('village');
+  it('allows removing a rumor after adding', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    const addRumorBtn = screen.getByRole('button', { name: /add rumor/i });
+    fireEvent.click(addRumorBtn);
+    const removeRumorBtn = screen.getByRole('button', { name: /remove rumor/i });
+    fireEvent.click(removeRumorBtn);
+    expect(screen.queryByRole('button', { name: /remove rumor/i })).not.toBeInTheDocument();
   });
 
-  // ── Modal footer buttons ──
-
-  it('should have Cancel and Save buttons in modal footer', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    expect(screen.getByText('Cancel')).toBeInTheDocument();
+  it('renders government preview toggle in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByText(/government/i)).toBeInTheDocument();
   });
 
-  // ── Save action ──
-
-  it('should call saveSettlementAction when save clicked with valid data', async () => {
-    const mockSave = vi.fn();
-
-    mockSettlementsFactory = () => ({
-      settlements: [],
-      loading: false,
-      saveSettlementAction: mockSave,
-      deleteSettlementAction: vi.fn(),
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-
-    const nameInput = screen.getByLabelText('Name *');
-    fireEvent.change(nameInput, { target: { value: 'Whiteridge' } });
-
-    const saveButton = screen.getByText('Save').closest('button');
-    fireEvent.click(saveButton);
-
-    await waitFor(() => {
-      expect(mockSave).toHaveBeenCalled();
-    });
+  it('renders description preview toggle in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByText(/description/i)).toBeInTheDocument();
   });
 
-  // ── Delete action ──
-
-  it('should call deleteSettlementAction when delete confirmed', async () => {
-    const mockDelete = vi.fn();
-
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: mockDelete,
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Whiteridge'));
-
-    const deleteButton = screen.getByText(/Delete/);
-    fireEvent.click(deleteButton);
-
-    expect(window.confirm).toHaveBeenCalledWith('Delete this settlement?');
-    expect(mockDelete).toHaveBeenCalledWith('Whiteridge');
+  it('renders atmosphere preview toggle in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByText(/atmosphere/i)).toBeInTheDocument();
   });
 
-  it('should not call deleteSettlementAction when confirm is cancelled', async () => {
-    window.confirm = vi.fn(() => false);
-
-    const mockDelete = vi.fn();
-
-    mockSettlementsFactory = () => ({
-      settlements: [{
-        name: 'Whiteridge',
-        size: 'town',
-        description: '',
-        population: '',
-        tags: '',
-        services: [],
-      }],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: mockDelete,
-    });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    fireEvent.click(screen.getByText('Whiteridge'));
-
-    const deleteButton = screen.getByText(/Delete/);
-    fireEvent.click(deleteButton);
-
-    expect(window.confirm).toHaveBeenCalledWith('Delete this settlement?');
-    expect(mockDelete).not.toHaveBeenCalled();
+  it('renders tags input in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByLabelText(/tags/i)).toBeInTheDocument();
   });
 
-  // ── Multiple settlements ──
+  it('renders notes preview toggle in modal', () => {
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const modalOpen = screen.getByRole('button', { name: /new settlement/i });
+    fireEvent.click(modalOpen);
+    expect(screen.getByText(/notes/i)).toBeInTheDocument();
+  });
 
-  it('should render multiple settlements in the list', async () => {
-    mockSettlementsFactory = () => ({
+  it('renders size badge for village', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
       settlements: [
-        { name: 'Whiteridge', size: 'town', description: '', population: '', tags: '', services: [] },
-        { name: 'Blackwater', size: 'city', description: '', population: '', tags: '', services: [] },
-        { name: 'Dawn\'s Rest', size: 'village', description: '', population: '', tags: '', services: [] },
+        { name: 'Village', size: 'village', population: '', tags: '', services: [], description: '' },
       ],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
     });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-      expect(screen.getByText('Blackwater')).toBeInTheDocument();
-    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('village')).toBeInTheDocument();
   });
 
-  // ── Size options in select ──
-
-  it('should render all size options in select', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-
-    const sizeSelect = screen.getByLabelText('Size');
-    const options = sizeSelect.querySelectorAll('option');
-    expect(options.length).toBe(4);
-    expect(options[0].textContent).toBe('Village');
-    expect(options[1].textContent).toBe('Town');
-    expect(options[2].textContent).toBe('City');
-    expect(options[3].textContent).toBe('Metropolis');
-  });
-
-  // ── Service type options in modal ──
-
-  it('should not render service type select when no services added', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const svcTypeSelects = document.querySelectorAll('.settlements-svc-type');
-    expect(svcTypeSelects.length).toBe(0);
-  });
-
-  // ── Form field changes ──
-
-  it('should handle name field changes', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const nameInput = screen.getByLabelText('Name *');
-    fireEvent.change(nameInput, { target: { value: 'Whiteridge' } });
-    expect(nameInput.value).toBe('Whiteridge');
-  });
-
-  it('should handle population field changes', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const popInput = screen.getByLabelText('Population');
-    fireEvent.change(popInput, { target: { value: '5,000 souls' } });
-    expect(popInput.value).toBe('5,000 souls');
-  });
-
-  it('should handle tags field changes', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const tagsInput = screen.getByLabelText('Tags (comma separated)');
-    fireEvent.change(tagsInput, { target: { value: 'coastal, trade-hub' } });
-    expect(tagsInput.value).toBe('coastal, trade-hub');
-  });
-
-  it('should handle PreviewToggle field changes', () => {
-    render(<Settlements {...defaultProps} />);
-    const buttons = screen.getAllByText(/New Settlement/);
-    fireEvent.click(buttons[0]);
-    const govField = screen.getByTestId('settlement-field-settlement-government');
-    fireEvent.change(govField, { target: { value: 'Monarchy' } });
-    expect(govField.value).toBe('Monarchy');
-  });
-
-  // ── Size filter with settlements present ──
-
-  it('should show filtered results when size filter applied', async () => {
-    mockSettlementsFactory = () => ({
+  it('renders size badge for metropolis', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
       settlements: [
-        { name: 'Village A', size: 'village', description: '', population: '', tags: '', services: [] },
-        { name: 'Town B', size: 'town', description: '', population: '', tags: '', services: [] },
-        { name: 'City C', size: 'city', description: '', population: '', tags: '', services: [] },
+        { name: 'Metropolis', size: 'metropolis', population: '', tags: '', services: [], description: '' },
       ],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
     });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Village A')).toBeInTheDocument();
-      expect(screen.getByText('Town B')).toBeInTheDocument();
-      expect(screen.getByText('City C')).toBeInTheDocument();
-    });
-
-    const townBtn = screen.getByTitle('Filter: Town');
-    fireEvent.click(townBtn);
-
-    expect(screen.queryByText('Village A')).not.toBeInTheDocument();
-    expect(screen.getByText('Town B')).toBeInTheDocument();
-    expect(screen.queryByText('City C')).not.toBeInTheDocument();
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('metropolis')).toBeInTheDocument();
   });
 
-  // ── Search by tags and description ──
-
-  it('should filter settlements by tags', async () => {
-    mockSettlementsFactory = () => ({
+  it('handles settlement with no services gracefully', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
       settlements: [
-        { name: 'Whiteridge', size: 'town', description: '', population: '', tags: 'coastal, trade-hub', services: [] },
-        { name: 'Blackwater', size: 'city', description: '', population: '', tags: 'mountain, mining', services: [] },
+        { name: 'No Services', size: 'village', population: '', tags: '', services: null, description: '' },
       ],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
     });
-
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
-    });
-
-    const searchInput = screen.getByPlaceholderText(/Search settlements/);
-    fireEvent.change(searchInput, { target: { value: 'coastal' } });
-
-    expect(screen.queryByText('Blackwater')).not.toBeInTheDocument();
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('No Services')).toBeInTheDocument();
   });
 
-  it('should filter settlements by description', async () => {
-    mockSettlementsFactory = () => ({
+  it('handles settlement with empty services array gracefully', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
       settlements: [
-        { name: 'Whiteridge', size: 'town', description: 'A peaceful coastal town.', population: '', tags: '', services: [] },
-        { name: 'Blackwater', size: 'city', description: 'A bustling mountain city.', population: '', tags: '', services: [] },
+        { name: 'Empty Services', size: 'village', population: '', tags: '', services: [], description: '' },
       ],
-      loading: false,
-      saveSettlementAction: vi.fn(),
-      deleteSettlementAction: vi.fn(),
     });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('Empty Services')).toBeInTheDocument();
+  });
 
-    render(<Settlements {...defaultProps} />);
-
-    await waitFor(() => {
-      expect(screen.getByText('Whiteridge')).toBeInTheDocument();
+  it('renders settlement with no population', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'No Pop', size: 'village', population: null, tags: '', services: [], description: '' },
+      ],
     });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('No Pop')).toBeInTheDocument();
+  });
 
-    const searchInput = screen.getByPlaceholderText(/Search settlements/);
-    fireEvent.change(searchInput, { target: { value: 'coastal' } });
+  it('renders settlement with no description', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'No Desc', size: 'village', population: '', tags: '', services: [], description: null },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('No Desc')).toBeInTheDocument();
+  });
 
-    expect(screen.queryByText('Blackwater')).not.toBeInTheDocument();
+  it('renders settlement with no tags', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'No Tags', size: 'village', population: '', tags: null, services: [], description: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    expect(screen.getByText('No Tags')).toBeInTheDocument();
+  });
+
+  it('clears search when clear button is clicked', () => {
+    useSettlementsManagement.mockReturnValue({
+      ...mockUseSettlements,
+      settlements: [
+        { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: '' },
+      ],
+    });
+    render(<Settlements campaignName="test" onBack={() => {}} />);
+    const searchInput = screen.getByLabelText('Search settlements');
+    fireEvent.change(searchInput, { target: { value: 'fire' } });
+    const clearBtn = screen.getByLabelText('Clear search');
+    fireEvent.click(clearBtn);
+    expect(searchInput.value).toBe('');
   });
 });

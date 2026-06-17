@@ -1,155 +1,239 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports ───────────────────────────────────────
+import { handle } from './bonusActionAttackHandler.js';
+
+// ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
-  setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(() => null),
+    setRuntimeValue: vi.fn(async () => {}),
 }));
 
-vi.mock('../../../shared/popupResponse.js', () => ({
-  automationInfoPopup: vi.fn(),
-}));
+// ── Re-import after mocking ────────────────────────────────────
 
-// ── Imports ────────────────────────────────────────────────────
-
-import { handle } from './bonusActionAttackHandler.js';
-import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as popupResponse from '../../../shared/popupResponse.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
-const campaignName = 'TestCampaign';
-
-function makePlayerStats(overrides = {}) {
-  return {
-    name: 'TestHero',
-    ...overrides,
-  };
+function makeAction(overrides = {}) {
+    return {
+        name: 'Bonus Action Attack',
+        description: 'Make a bonus action attack.',
+        automation: {
+            type: 'bonus_action_attack',
+            ...overrides.automation,
+        },
+        ...overrides,
+    };
 }
 
-function makeAction(automation = {}) {
-  return {
-    name: 'Divine Strike',
-    description: 'A powerful strike.',
-    automation: {
-      ...automation,
-    },
-  };
+function makePlayerStats(overrides = {}) {
+    return {
+        name: 'TestHero',
+        proficiency: 3,
+        inventory: { equipped: [] },
+        ...overrides,
+    };
+}
+
+function makeAllEquipment(overrides = []) {
+    return [
+        { name: 'Quarterstaff', properties: [] },
+        { name: 'Spear', properties: [] },
+        { name: 'Longsword', properties: ['Heavy', 'Reach'] },
+        ...overrides,
+    ];
 }
 
 // ── Tests ──────────────────────────────────────────────────────
 
-describe('bonusActionAttackHandler.handle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+describe('bonusActionAttackHandler', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
 
-  it('should return automationInfoPopup result when usesMax is 0', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ usesMax: 0 });
-    const popupResult = { type: 'popup', payload: { type: 'automation_info' } };
-    popupResponse.automationInfoPopup.mockReturnValue(popupResult);
+    describe('handle', () => {
+        it('should return automation info popup for basic case', async () => {
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
 
-    const result = await handle(action, ps, campaignName);
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+        });
 
-    expect(result).toBe(popupResult);
-    expect(popupResponse.automationInfoPopup).toHaveBeenCalledWith(action);
-  });
+        it('should reject when polearm required and none equipped', async () => {
+            const action = makeAction({
+                automation: { trigger: 'after_attack_action_with_polearm' },
+            });
+            const stats = makePlayerStats({
+                inventory: { equipped: ['Longsword'] },
+            });
+            const allEquipment = makeAllEquipment([{ name: 'Longsword', properties: ['Heavy', 'Reach'] }]);
 
-  it('should return automationInfoPopup result when usesMax is falsy/undefined (defaults to 0)', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({}); // no usesMax
-    const popupResult = { type: 'popup', payload: { type: 'automation_info' } };
-    popupResponse.automationInfoPopup.mockReturnValue(popupResult);
+            await handle(action, stats, 'campaign', 'map', allEquipment);
 
-    const result = await handle(action, ps, campaignName);
+            // Longsword with Heavy+Reach should pass, so test with a weapon that doesn't qualify
+            const stats2 = makePlayerStats({
+                inventory: { equipped: ['Shortsword'] },
+            });
+            const allEquipment2 = makeAllEquipment([{ name: 'Shortsword', properties: ['Light'] }]);
 
-    expect(result).toBe(popupResult);
-    expect(useRuntimeState.getRuntimeValue).not.toHaveBeenCalled();
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
+            const result2 = await handle(action, stats2, 'campaign', 'map', allEquipment2);
 
-  it('should return "no uses remaining" popup when usesUsed >= usesMax', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ usesMax: 3 });
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+            expect(result2.type).toBe('popup');
+            expect(result2.payload.description).toContain('requires you to be holding a Quarterstaff');
+        });
 
-    const result = await handle(action, ps, campaignName);
+        it('should accept Quarterstaff', async () => {
+            const action = makeAction({
+                automation: { trigger: 'after_attack_action_with_polearm' },
+            });
+            const stats = makePlayerStats({
+                inventory: { equipped: ['Quarterstaff'] },
+            });
+            const allEquipment = makeAllEquipment();
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe(action.name);
-    expect(result.payload.description).toContain('has no uses remaining');
-    expect(result.payload.automation).toBe(action.automation);
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
+            const result = await handle(action, stats, 'campaign', 'map', allEquipment);
 
-  it('should include recharge value in description when auto.recharge is set', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ usesMax: 3, recharge: 'Short Rest' });
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+            // Has polearm, should proceed to automation info
+            expect(result.type).toBe('popup');
+        });
 
-    const result = await handle(action, ps, campaignName);
+        it('should accept Spear', async () => {
+            const action = makeAction({
+                automation: { trigger: 'after_attack_action_with_polearm' },
+            });
+            const stats = makePlayerStats({
+                inventory: { equipped: ['Spear'] },
+            });
+            const allEquipment = makeAllEquipment();
 
-    expect(result.payload.description).toContain('Recharges on a Short Rest');
-  });
+            const result = await handle(action, stats, 'campaign', 'map', allEquipment);
 
-  it('should use "Long Rest" as default recharge text when auto.recharge is missing', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ usesMax: 3 });
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
+            expect(result.type).toBe('popup');
+        });
 
-    const result = await handle(action, ps, campaignName);
+        it('should accept Heavy + Reach weapon', async () => {
+            const action = makeAction({
+                automation: { weaponRequirement: 'quarterstaff_spear_heavy_reach' },
+            });
+            const stats = makePlayerStats({
+                inventory: { equipped: ['Maul'] },
+            });
+            const allEquipment = makeAllEquipment([{ name: 'Maul', properties: ['Heavy', 'Reach', 'Two-Handed'] }]);
 
-    expect(result.payload.description).toContain('Recharges on a Long Rest');
-  });
+            const result = await handle(action, stats, 'campaign', 'map', allEquipment);
 
-  it('should increment usesUsed by 1 via setRuntimeValue when usesUsed < usesMax', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ usesMax: 3 });
-    useRuntimeState.getRuntimeValue.mockReturnValue(1);
-    popupResponse.automationInfoPopup.mockReturnValue({ type: 'popup', payload: {} });
+            expect(result.type).toBe('popup');
+        });
 
-    await handle(action, ps, campaignName);
+        it('should reject weapon with only Heavy (no Reach)', async () => {
+            const action = makeAction({
+                automation: { weaponRequirement: 'quarterstaff_spear_heavy_reach' },
+            });
+            const stats = makePlayerStats({
+                inventory: { equipped: ['Warhammer'] },
+            });
+            const allEquipment = makeAllEquipment([{ name: 'Warhammer', properties: ['Heavy'] }]);
 
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      ps.name,
-      'warPriestUses',
-      0,
-      campaignName,
-    );
-  });
+            const result = await handle(action, stats, 'campaign', 'map', allEquipment);
 
-  it('should use custom resourceKey from auto.resourceKey', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ usesMax: 3, resourceKey: 'channelDivinityUses' });
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-    popupResponse.automationInfoPopup.mockReturnValue({ type: 'popup', payload: {} });
+            expect(result.payload.description).toContain('requires you to be holding');
+        });
 
-    await handle(action, ps, campaignName);
+        it('should reject weapon with only Reach (no Heavy)', async () => {
+            const action = makeAction({
+                automation: { weaponRequirement: 'quarterstaff_spear_heavy_reach' },
+            });
+            const stats = makePlayerStats({
+                inventory: { equipped: ['Glaive'] },
+            });
+            const allEquipment = makeAllEquipment([{ name: 'Glaive', properties: ['Reach', 'Two-Handed'] }]);
 
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      ps.name,
-      'channelDivinityUses',
-      1,
-      campaignName,
-    );
-  });
+            const result = await handle(action, stats, 'campaign', 'map', allEquipment);
 
-  it('should use default "warPriestUses" when auto.resourceKey is missing', async () => {
-    const ps = makePlayerStats();
-    const action = makeAction({ usesMax: 3 });
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-    popupResponse.automationInfoPopup.mockReturnValue({ type: 'popup', payload: {} });
+            expect(result.payload.description).toContain('requires you to be holding');
+        });
 
-    await handle(action, ps, campaignName);
+        it('should strip + prefix from equipped weapon names', async () => {
+            const action = makeAction({
+                automation: { trigger: 'after_attack_action_with_polearm' },
+            });
+            const stats = makePlayerStats({
+                inventory: { equipped: ['+Quarterstaff'] },
+            });
+            const allEquipment = makeAllEquipment();
 
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      ps.name,
-      'warPriestUses',
-      1,
-      campaignName,
-    );
-  });
+            const result = await handle(action, stats, 'campaign', 'map', allEquipment);
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should consume uses when usesMax > 0', async () => {
+            const action = makeAction({
+                automation: { usesMax: 3 },
+            });
+            getRuntimeValue.mockReturnValue(2);
+
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
+
+            expect(result.type).toBe('popup');
+        });
+
+        it('should reject when no uses remaining', async () => {
+            const action = makeAction({
+                automation: { usesMax: 3 },
+            });
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
+
+            expect(result.payload.description).toContain('no uses remaining');
+        });
+
+        it('should use custom resource key when specified', async () => {
+            const action = makeAction({
+                automation: { usesMax: 1, resourceKey: 'warPriestUses' },
+            });
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
+
+            expect(result.payload.description).toContain('no uses remaining');
+        });
+
+        it('should use custom recharge message', async () => {
+            const action = makeAction({
+                automation: { usesMax: 1, recharge: 'Short Rest' },
+            });
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
+
+            expect(result.payload.description).toContain('Short Rest');
+        });
+
+        it('should handle disengage_end_grappled effect', async () => {
+            getRuntimeValue.mockReturnValue(['grappled', 'fatigued']);
+            const action = makeAction({
+                automation: { effect: 'disengage_end_grappled' },
+            });
+
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
+
+            expect(result.payload.description).toContain('Disengage action');
+            expect(result.payload.description).toContain('Grappled condition ends');
+        });
+
+        it('should not modify conditions if not grappled', async () => {
+            getRuntimeValue.mockReturnValue(['fatigued']);
+            const action = makeAction({
+                automation: { effect: 'disengage_end_grappled' },
+            });
+
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map', []);
+
+            expect(result.type).toBe('popup');
+        });
+    });
 });

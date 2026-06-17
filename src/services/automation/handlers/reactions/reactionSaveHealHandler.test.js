@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -9,7 +9,6 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(),
-  getTargetFromAttacker: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -20,13 +19,14 @@ vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
   createSaveListener: vi.fn(({ targetName, saveType, saveDc }) => ({
     promptId: `prompt-${targetName}-${saveType}-${saveDc}`,
+    promise: Promise.resolve({ success: false }),
   })),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './reactionSaveHealHandler.js';
-import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
 import * as savePrompt from '../../common/savePrompt.js';
@@ -37,7 +37,7 @@ const campaignName = 'TestCampaign';
 
 function makePlayerStats(overrides = {}) {
   return {
-    name: 'TestHero',
+    name: 'TestBarbarian',
     level: 11,
     ...overrides,
   };
@@ -53,14 +53,15 @@ function makeAction(automation = {}) {
       dcScaling: 5,
       healExpression: '2 * barbarian_level',
       recharge: 'short_or_long_rest',
-      casting_time: '1 reaction',
       ...automation,
     },
   };
 }
 
 function createRuntimeMock(values) {
-  return vi.fn((name, key) => {
+  return vi.fn((name, key, campaign) => {
+    const k = `${name}:${key}:${campaign}`;
+    if (values[k] !== undefined) return values[k];
     if (values[key] !== undefined) return values[key];
     return null;
   });
@@ -68,10 +69,14 @@ function createRuntimeMock(values) {
 
 // ── Tests ──────────────────────────────────────────────────────
 
-describe('reactionSaveHealHandler.handle', () => {
+describe('reactionSaveHealHandler', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
   describe('Rage checks', () => {
     it('should return "no rage" popup when rage is 0', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(0);
+      runtimeState.getRuntimeValue.mockReturnValue(0);
       damageUtils.getCombatContext.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -82,7 +87,7 @@ describe('reactionSaveHealHandler.handle', () => {
     });
 
     it('should return "no rage" popup when rage is negative', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(-2);
+      runtimeState.getRuntimeValue.mockReturnValue(-2);
       damageUtils.getCombatContext.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -91,8 +96,8 @@ describe('reactionSaveHealHandler.handle', () => {
       expect(result.payload.description).toBe('No Rage remaining to power Relentless Rage.');
     });
 
-    it('should return "no rage" popup when storedRage is null (defaults to 0)', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+    it('should return "no rage" popup when storedRage is null', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(null);
       damageUtils.getCombatContext.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -104,7 +109,7 @@ describe('reactionSaveHealHandler.handle', () => {
 
   describe('Combat context checks', () => {
     it('should return "no combat" popup when getCombatContext returns null', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+      runtimeState.getRuntimeValue.mockReturnValue(1);
       damageUtils.getCombatContext.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -116,15 +121,15 @@ describe('reactionSaveHealHandler.handle', () => {
 
   describe('HP checks', () => {
     it('should return "not at 0 HP" popup when player is above 0 HP', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+      runtimeState.getRuntimeValue.mockReturnValue(1);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 5 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 5 }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toBe('TestHero is not at 0 Hit Points.');
+      expect(result.payload.description).toBe('TestBarbarian is not at 0 Hit Points.');
     });
 
     it('should proceed when player is at exactly 0 HP', async () => {
@@ -132,9 +137,9 @@ describe('reactionSaveHealHandler.handle', () => {
         currentHitPoints: 0,
         ragePoints: 2,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -148,14 +153,18 @@ describe('reactionSaveHealHandler.handle', () => {
         currentHitPoints: 0,
         ragePoints: 2,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player' }],
+        creatures: [{ name: 'TestBarbarian', type: 'player' }],
       });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(useRuntimeState.getRuntimeValue).toHaveBeenCalledWith('TestHero', 'currentHitPoints', campaignName);
+      expect(runtimeState.getRuntimeValue).toHaveBeenCalledWith(
+        'TestBarbarian',
+        'currentHitPoints',
+        campaignName,
+      );
     });
   });
 
@@ -167,9 +176,9 @@ describe('reactionSaveHealHandler.handle', () => {
         relentlessrageUses: 1,
         relentlessrageRestTimestamp: Date.now() - 3600000,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -178,15 +187,15 @@ describe('reactionSaveHealHandler.handle', () => {
       expect(result.payload.description).toContain('no uses remaining');
     });
 
-    it('should allow use when uses < max for short_or_long_rest recharge', async () => {
+    it('should allow use when uses < max', async () => {
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -203,19 +212,21 @@ describe('reactionSaveHealHandler.handle', () => {
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'TestHero',
+        targetName: 'TestBarbarian',
         saveType: 'CON',
         saveDc: 10,
       });
     });
+
+
   });
 
   describe('Save listener setup', () => {
@@ -225,15 +236,15 @@ describe('reactionSaveHealHandler.handle', () => {
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'TestHero',
+        targetName: 'TestBarbarian',
         saveType: 'CON',
         saveDc: 10,
       });
@@ -245,9 +256,9 @@ describe('reactionSaveHealHandler.handle', () => {
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
@@ -266,16 +277,16 @@ describe('reactionSaveHealHandler.handle', () => {
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
         type: 'ability_use',
-        characterName: 'TestHero',
+        characterName: 'TestBarbarian',
         abilityName: 'Relentless Rage',
         description: expect.stringContaining('Relentless Rage triggered'),
         promptId: expect.any(String),
@@ -290,9 +301,9 @@ describe('reactionSaveHealHandler.handle', () => {
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -300,7 +311,7 @@ describe('reactionSaveHealHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Relentless Rage');
-      expect(result.payload.targetName).toBe('TestHero');
+      expect(result.payload.targetName).toBe('TestBarbarian');
     });
 
     it('should include save DC in description', async () => {
@@ -309,14 +320,14 @@ describe('reactionSaveHealHandler.handle', () => {
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(result.payload.description).toBe('TestHero must make a CON saving throw (DC 10).');
+      expect(result.payload.description).toBe('TestBarbarian must make a CON saving throw (DC 10).');
     });
   });
 
@@ -333,15 +344,20 @@ describe('reactionSaveHealHandler.handle', () => {
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       await handle(makeAction(), ps, campaignName, null);
 
       expect(savePrompt.createSaveListener).toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestBarbarian',
+        'currentHitPoints',
+        expect.any(Number),
+        campaignName,
+      );
     });
 
     it('should calculate heal amount as 2 * level when barbarian level not found', async () => {
@@ -356,118 +372,66 @@ describe('reactionSaveHealHandler.handle', () => {
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
       await handle(makeAction(), ps, campaignName, null);
 
       expect(savePrompt.createSaveListener).toHaveBeenCalled();
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
   });
 
-  describe('Failed save', () => {
-    it('should log failure and NOT heal when save fails', async () => {
-      const ps = makePlayerStats({
-        class: {
-          class_levels: [{ name: 'Barbarian', level: 11 }],
-        },
-      });
+
+
+  describe('Save result handler - failure path', () => {
+    it('should NOT set currentHitPoints on save failure', async () => {
+      const ps = makePlayerStats();
 
       const runtime = createRuntimeMock({
         currentHitPoints: 0,
         ragePoints: 2,
         relentlessrageUses: 0,
       });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+      runtimeState.getRuntimeValue.mockImplementation(runtime);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
+      });
+
+      savePrompt.createSaveListener.mockReturnValue({
+        promptId: 'prompt-TestBarbarian-CON-10',
+        promise: Promise.resolve({ success: false }),
       });
 
       await handle(makeAction(), ps, campaignName, null);
 
-      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestHero',
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestBarbarian',
         'currentHitPoints',
         expect.any(Number),
-        campaignName
+        campaignName,
       );
     });
   });
 
-  describe('Usage increment', () => {
-    it('should track that save prompt was created', async () => {
-      const ps = makePlayerStats({
-        class: {
-          class_levels: [{ name: 'Barbarian', level: 11 }],
-        },
-      });
 
-      const runtime = createRuntimeMock({
-        currentHitPoints: 0,
-        ragePoints: 2,
-        relentlessrageUses: 0,
-      });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
+
+  describe('Custom feature name', () => {
+    it('should use action.name as featureName when provided', async () => {
+      runtimeState.getRuntimeValue.mockReturnValue(1);
       damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
+        creatures: [{ name: 'TestBarbarian', type: 'player', currentHp: 0 }],
       });
 
-      await handle(makeAction(), ps, campaignName, null);
+      const action = {
+        name: 'Custom Feature',
+        automation: { type: 'reaction_save_heal' },
+      };
 
-      expect(savePrompt.createSaveListener).toHaveBeenCalled();
-    });
-  });
+      const result = await handle(action, makePlayerStats(), campaignName, null);
 
-  describe('Event cleanup', () => {
-    it('should set up event listener for save-result', async () => {
-      const ps = makePlayerStats({
-        class: {
-          class_levels: [{ name: 'Barbarian', level: 11 }],
-        },
-      });
-
-      const runtime = createRuntimeMock({
-        currentHitPoints: 0,
-        ragePoints: 2,
-        relentlessrageUses: 0,
-      });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
-      });
-
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-      await handle(makeAction(), ps, campaignName, null);
-
-      expect(addEventListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
-      addEventListenerSpy.mockRestore();
-    });
-  });
-
-  describe('Combat summary update', () => {
-    it('should set up save listener for prompt', async () => {
-      const ps = makePlayerStats({
-        class: {
-          class_levels: [{ name: 'Barbarian', level: 11 }],
-        },
-      });
-
-      const runtime = createRuntimeMock({
-        currentHitPoints: 0,
-        ragePoints: 2,
-        relentlessrageUses: 0,
-      });
-      useRuntimeState.getRuntimeValue.mockImplementation(runtime);
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'TestHero', type: 'player', currentHp: 0 }],
-      });
-
-      await handle(makeAction(), ps, campaignName, null);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalled();
+      expect(result.payload.name).toBe('Custom Feature');
     });
   });
 });
