@@ -894,6 +894,13 @@ const rules = {
             }
         }
 
+        // Re-sort all action arrays after feat features are merged
+        playerStats.actions = uniqBy(playerStats.actions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        playerStats.bonusActions = uniqBy(playerStats.bonusActions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        playerStats.reactions = uniqBy(playerStats.reactions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        playerStats.specialActions = uniqBy(playerStats.specialActions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
         playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
         playerStats.carryingCapacity = rules.getCarryingCapacity(playerStats);

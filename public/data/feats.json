@@ -694,7 +694,7 @@
             "type": "passive_buff",
             "target": "self",
             "effect": "improvised_weapon_proficiency",
-            "casting_time": "1 action"
+            "casting_time": "1 bonus action"
         }
     },
     {
@@ -708,7 +708,7 @@
             "target": "self",
             "effect": "max_hp_increase",
             "bonusExpression": "2 * level",
-            "casting_time": "1 action"
+            "casting_time": "passive"
         }
     },
     {
