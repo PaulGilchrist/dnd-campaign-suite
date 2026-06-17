@@ -63,7 +63,7 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
 
     const stored = {};
     choicesWithAbilities.forEach((choice, idx) => {
-      const key = `feat_choice_${idx}`;
+      const key = `${idx}`;
       const saved = localStorage.getItem(key);
       if (saved) {
         try {

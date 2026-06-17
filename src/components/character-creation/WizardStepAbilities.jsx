@@ -266,14 +266,13 @@ function WizardStepAbilities({
         {abilityNames.map((ability, index) => {
           const abilityData = formData.abilities?.[index] || { baseScore: '8', featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 };
           const baseScore = parseInt(abilityData.baseScore) || 8;
-          const featInc = parseInt(abilityData.featIncrease) || 0;
           const bgInc = parseInt(abilityData.backgroundIncrease) || 0;
           const misc = parseInt(abilityData.miscIncrease) || 0;
-          const totalScore = baseScore + featInc + bgInc + misc;
+          const featIncreaseFromFeats = getFeatIncreaseForAbility(ability);
+          const totalScore = baseScore + featIncreaseFromFeats + bgInc + misc;
           const cost = pointBuyCosts[baseScore] || 0;
           const isBgAbilityScore = isBgAbility(ability);
           const bgBonus = getBgAbilityBonus(ability);
-          const featIncreaseFromFeats = getFeatIncreaseForAbility(ability);
 
           return (
             <div key={ability} className={`ability-score-card ${isBgAbilityScore ? 'bg-ability-score' : ''}`}>
@@ -302,12 +301,12 @@ function WizardStepAbilities({
                 <span className="point-cost">Cost: {cost}</span>
                 {errors[`ability_${index}_baseScore`] && <span className="error-message">{errors[`ability_${index}_baseScore`]}</span>}
               </div>
-              {featInc > 0 && (
+              {featIncreaseFromFeats > 0 && (
                 <div className="form-group ability-score-form-group">
                   <label>Feat Increase</label>
                   <input
                     type="number"
-                    value={featInc}
+                    value={featIncreaseFromFeats}
                     readOnly
                     className="feat-increase-input"
                   />
