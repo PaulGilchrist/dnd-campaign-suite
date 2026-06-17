@@ -52,14 +52,6 @@ npm run test:run                                  # Vitest single run
 npm run test:coverage                             # Vitest with coverage
 ```
 
-## Git Permissions
-
-Read-only inspection only: `git log`, `git show`, `git diff`, `git status`, `git blame`, `git grep`, `git ls-files`, `git stash list`, `git stash show`, `git remote -v`, `git branch`.
-
-**Strictly forbidden:** `commit`, `checkout`, `switch`, `restore`, `push`, `pull`, `fetch`, `merge`, `rebase`, `cherry-pick`, `reset`, `revert`, `clean`, `stash push/pop/drop`, `branch -d/-D`, `tag -d`, `rm`, `mv`.
-
-- mv is ONLY permitted when refactoring a folder into multiple subfolders.
-
 **Always run `npm run lint` and `npm run test:run` after changes.** Lint enforces zero warnings.
 
 ## Code Conventions

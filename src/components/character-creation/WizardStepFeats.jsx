@@ -68,74 +68,90 @@ function WizardStepFeats({ formData, allFeats, onArrayFieldChange, preSelectedFe
             <div
                 key={feat.index || index}
                 className={`list-item feat-item ${isSelected ? 'selected' : ''} ${isPreSelected ? 'pre-selected' : ''}`}
-          onClick={onToggle}
             >
-                <div className="list-item-header">
-                    <div className="list-item-name">
-                        {feat.name}
-                        {isPreSelected && <span className="pre-selected-label">(Pre-selected)</span>}
-                    </div>
-                    {feat.type && <span className="feat-type">{feat.type}</span>}
-                    <div className={`list-item-checkbox ${isSelected ? 'checked' : ''}`}>
-                        {isSelected ? '✓' : ''}
-                    </div>
-                </div>
-
-                <div className="list-item-details">
-                    {isExpanded && (
-                        <div className="list-item-full-details">
-                            {feat.prerequisites && (
-                                <div className="feat-prerequisites">
-                      <strong>Prerequisites:</strong> {renderPrerequisites(feat)}
-                                </div>
-                            )}
-                            {descData.text && (
-                                <div className="feat-description">
-                                    {descData.isHtml ? (
-                                        <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(descData.text) }} />
-                                    ) : (
-                                        descData.text
-                                    )}
-                                </div>
-                            )}
-                            {isSelected && hasAbilityIncrease && (
-                              <div className="feat-buffs">
-                                <strong>Ability Score Increase:</strong>
-                                {featBuffs.abilityScoreIncreases.map((inc, i) => (
-                                  <span key={i} className="feat-buff-tag">
-                                    {inc.isChoice ? `${inc.name} +${inc.amount} (choice)` : `${inc.name} +${inc.amount}`}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                            {isSelected && hasProficiencies && (
-                              <div className="feat-buffs">
-                                <strong>Proficiencies:</strong>
-                                {featBuffs.proficiencies.map((p, i) => (
-                                  <span key={i} className="feat-buff-tag">{p.name}</span>
-                                ))}
-                              </div>
-                            )}
-                            {isSelected && hasResistances && (
-                              <div className="feat-buffs">
-                                <strong>Resistances:</strong>
-                                {featBuffs.resistances.map((r, i) => (
-                                  <span key={i} className="feat-buff-tag">{r}</span>
-                                ))}
-                              </div>
-                            )}
+                <div
+                    className="list-item-body"
+                    onClick={() => {
+                        if (!isPreSelected) {
+                            onToggleExpand();
+                        }
+                    }}
+                >
+                    <div className="list-item-header">
+                        <div className="list-item-name">
+                            {feat.name}
+                            {isPreSelected && <span className="pre-selected-label">(Pre-selected)</span>}
                         </div>
-                    )}
-                    <div className="list-item-full-details">
-                        <button
+                        {feat.type && <span className="feat-type">{feat.type}</span>}
+                        <div
+                            className={`list-item-checkbox ${isSelected ? 'checked' : ''} list-item-checkbox-trigger`}
                             onClick={(e) => {
                                 e.stopPropagation();
-                  onToggleExpand();
+                                if (!isPreSelected) {
+                                    onToggle();
+                                }
                             }}
-                            className="toggle-details-btn"
                         >
-                            {isExpanded ? 'Show Less' : 'Show More'}
-                        </button>
+                            {isSelected ? '✓' : ''}
+                        </div>
+                    </div>
+
+                    <div className="list-item-details">
+                        {isExpanded && (
+                            <div className="list-item-full-details">
+                                {feat.prerequisites && (
+                                    <div className="feat-prerequisites">
+                    <strong>Prerequisites:</strong> {renderPrerequisites(feat)}
+                                    </div>
+                                )}
+                                {descData.text && (
+                                    <div className="feat-description">
+                                        {descData.isHtml ? (
+                                            <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(descData.text) }} />
+                                        ) : (
+                                            descData.text
+                                        )}
+                                    </div>
+                                )}
+                                {isSelected && hasAbilityIncrease && (
+                                  <div className="feat-buffs">
+                                    <strong>Ability Score Increase:</strong>
+                                    {featBuffs.abilityScoreIncreases.map((inc, i) => (
+                                      <span key={i} className="feat-buff-tag">
+                                        {inc.isChoice ? `${inc.name} +${inc.amount} (choice)` : `${inc.name} +${inc.amount}`}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                                {isSelected && hasProficiencies && (
+                                  <div className="feat-buffs">
+                                    <strong>Proficiencies:</strong>
+                                    {featBuffs.proficiencies.map((p, i) => (
+                                      <span key={i} className="feat-buff-tag">{p.name}</span>
+                                    ))}
+                                  </div>
+                                )}
+                                {isSelected && hasResistances && (
+                                  <div className="feat-buffs">
+                                    <strong>Resistances:</strong>
+                                    {featBuffs.resistances.map((r, i) => (
+                                      <span key={i} className="feat-buff-tag">{r}</span>
+                                    ))}
+                                  </div>
+                                )}
+                            </div>
+                        )}
+                        <div className="list-item-full-details">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                      onToggleExpand();
+                                }}
+                                className="toggle-details-btn"
+                            >
+                                {isExpanded ? 'Show Less' : 'Show More'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

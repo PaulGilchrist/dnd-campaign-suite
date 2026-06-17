@@ -217,67 +217,83 @@ function WizardStepSpells({ formData, allSpells, onArrayFieldChange, preSelected
       <div
         key={spell.index || index}
         className={`list-item spell-item ${isSelected ? 'selected' : ''} ${isPreSelected ? 'pre-selected' : ''}`}
-        onClick={isPreSelected ? undefined : onToggle}
       >
-        <div className="list-item-header">
-          <div className="list-item-name">
-            {spell.name}
-            {isPreSelected && <span className="pre-selected-label"> (Auto-assigned)</span>}
-          </div>
-          <span className={`spell-level ${getLevelClass(spell)}`}>
-            {spell.level !== undefined ? spell.level : '0'}
-          </span>
-          <div className={`list-item-checkbox ${(isSelected || isPreSelected) ? 'checked' : ''}`}>
-            {(isSelected || isPreSelected) ? '✓' : ''}
-          </div>
-        </div>
-        
-        <div className="list-item-details">
-          <div className="spell-meta">
-            <span className="spell-school">{spell.school || 'Unknown'}</span>
-            {spell.ritual && <span className="spell-ritual">Ritual</span>}
-            {spell.concentration && <span className="spell-concentration">Concentration</span>}
-            {spell.duration && <span className="spell-duration">Duration: {spell.duration}</span>}
-            {spell.casting_time && <span className="spell-casting-time">Casting: {spell.casting_time}</span>}
-          </div>
-
-          {isExpanded && (
-            <div className="list-item-full-details">
-              <div className="spell-description">
-                {spell.desc && spell.desc[0] && spell.desc[0]}
-              </div>
-              
-              
-              {spell.components && spell.components.length > 0 && (
-                <div className="spell-components">
-                  <strong>Components:</strong> {spell.components.join(', ')}
-                </div>
-              )}
-              
-              {spell.damage && spell.damage.damage_type && (
-                <div className="spell-damage">
-                  <strong>Damage:</strong> {spell.damage.damage_type}
-                </div>
-              )}
-              
-              {spell.material && (
-                <div className="spell-material">
-                  <strong>Material:</strong> {spell.material}
-                </div>
-              )}
+        <div
+          className="list-item-body"
+          onClick={() => {
+            if (!isPreSelected) {
+              onToggleExpand();
+            }
+          }}
+        >
+          <div className="list-item-header">
+            <div className="list-item-name">
+              {spell.name}
+              {isPreSelected && <span className="pre-selected-label"> (Auto-assigned)</span>}
             </div>
-          )}
-
-          <div className="list-item-full-details">
-            <button
+            <span className={`spell-level ${getLevelClass(spell)}`}>
+              {spell.level !== undefined ? spell.level : '0'}
+            </span>
+            <div
+              className={`list-item-checkbox ${(isSelected || isPreSelected) ? 'checked' : ''} list-item-checkbox-trigger`}
               onClick={(e) => {
                 e.stopPropagation();
-                onToggleExpand();
+                if (!isPreSelected) {
+                  onToggle();
+                }
               }}
-              className="toggle-details-btn"
             >
-              {isExpanded ? 'Show Less' : 'Show More'}
-            </button>
+              {(isSelected || isPreSelected) ? '✓' : ''}
+            </div>
+          </div>
+
+          <div className="list-item-details">
+            <div className="spell-meta">
+              <span className="spell-school">{spell.school || 'Unknown'}</span>
+              {spell.ritual && <span className="spell-ritual">Ritual</span>}
+              {spell.concentration && <span className="spell-concentration">Concentration</span>}
+              {spell.duration && <span className="spell-duration">Duration: {spell.duration}</span>}
+              {spell.casting_time && <span className="spell-casting-time">Casting: {spell.casting_time}</span>}
+            </div>
+
+            {isExpanded && (
+              <div className="list-item-full-details">
+                <div className="spell-description">
+                  {spell.desc && spell.desc[0] && spell.desc[0]}
+                </div>
+
+
+                {spell.components && spell.components.length > 0 && (
+                  <div className="spell-components">
+                    <strong>Components:</strong> {spell.components.join(', ')}
+                  </div>
+                )}
+
+                {spell.damage && spell.damage.damage_type && (
+                  <div className="spell-damage">
+                    <strong>Damage:</strong> {spell.damage.damage_type}
+                  </div>
+                )}
+
+                {spell.material && (
+                  <div className="spell-material">
+                    <strong>Material:</strong> {spell.material}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="list-item-full-details">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleExpand();
+                }}
+                className="toggle-details-btn"
+              >
+                {isExpanded ? 'Show Less' : 'Show More'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

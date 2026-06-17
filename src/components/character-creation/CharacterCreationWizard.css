@@ -586,6 +586,19 @@
     opacity: 0.7;
 }
 
+.character-creation-wizard .list-item-body {
+    cursor: pointer;
+}
+
+.character-creation-wizard .list-item-body:hover {
+    border-color: var(--color-primary);
+    background-color: var(--background-color-card-hover);
+}
+
+.character-creation-wizard .list-item-checkbox-trigger {
+    cursor: pointer;
+}
+
 .character-creation-wizard .list-item-header {
     display: flex;
     justify-content: space-between;

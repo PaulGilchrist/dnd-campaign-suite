@@ -35,49 +35,61 @@ function WizardStepMagicItems({ formData, allMagicItems, onArrayFieldChange }) {
             <div
                 key={uniqueKey}
                 className={`list-item magic-item ${isSelected ? 'selected' : ''}`}
-          onClick={onToggle}
             >
-                <div className="list-item-header">
-                    <div className="list-item-name">{item.name}</div>
-                    {item.type && <span className="magic-item-type">{item.type}</span>}
-                    {item.rarity && <span className="magic-item-rarity">{item.rarity}</span>}
-                    <div className={`list-item-checkbox ${isSelected ? 'checked' : ''}`}>
-                        {isSelected ? '✓' : ''}
-                    </div>
-                </div>
-
-                <div className="list-item-details">
-                    {isExpanded && (
-                        <div className="list-item-full-details">
-                            {item.description && (
-                                <div
-                                    className="magic-item-description"
-                                    dangerouslySetInnerHTML={{
-                                        __html: sanitizeHtml(Array.isArray(item.description) ? item.description[0] : item.description)
-                                    }}
-                                />
-                            )}
-                            {item.description && Array.isArray(item.description) && item.description.length > 1 && (
-                                <div
-                                   className="magic-item-more-description"
-                                   dangerouslySetInnerHTML={{
-                                        __html: sanitizeHtml(item.description.slice(1).join('\n'))
-                                    }}
-                                />
-                            )}
-                        </div>
-                    )}
-
-                    <div className="list-item-full-details">
-                        <button
+                <div
+                    className="list-item-body"
+                    onClick={() => {
+                        onToggleExpand();
+                    }}
+                >
+                    <div className="list-item-header">
+                        <div className="list-item-name">{item.name}</div>
+                        {item.type && <span className="magic-item-type">{item.type}</span>}
+                        {item.rarity && <span className="magic-item-rarity">{item.rarity}</span>}
+                        <div
+                            className={`list-item-checkbox ${isSelected ? 'checked' : ''} list-item-checkbox-trigger`}
                             onClick={(e) => {
                                 e.stopPropagation();
-                  onToggleExpand();
+                                onToggle();
                             }}
-                            className="toggle-details-btn"
                         >
-                            {isExpanded ? 'Show Less' : 'Show More'}
-                        </button>
+                            {isSelected ? '✓' : ''}
+                        </div>
+                    </div>
+
+                    <div className="list-item-details">
+                        {isExpanded && (
+                            <div className="list-item-full-details">
+                                {item.description && (
+                                    <div
+                                        className="magic-item-description"
+                                        dangerouslySetInnerHTML={{
+                                            __html: sanitizeHtml(Array.isArray(item.description) ? item.description[0] : item.description)
+                                        }}
+                                    />
+                                )}
+                                {item.description && Array.isArray(item.description) && item.description.length > 1 && (
+                                    <div
+                                       className="magic-item-more-description"
+                                       dangerouslySetInnerHTML={{
+                                            __html: sanitizeHtml(item.description.slice(1).join('\n'))
+                                        }}
+                                    />
+                                )}
+                            </div>
+                        )}
+
+                        <div className="list-item-full-details">
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                      onToggleExpand();
+                                }}
+                                className="toggle-details-btn"
+                            >
+                                {isExpanded ? 'Show Less' : 'Show More'}
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

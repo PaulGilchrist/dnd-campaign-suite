@@ -65,7 +65,7 @@ describe('WizardStepFeats', () => {
   });
 
   it('should handle feat selection', () => {
-    render(
+    const { container } = render(
       <WizardStepFeats
         formData={mockFormData}
         allFeats={mockFeats}
@@ -74,7 +74,9 @@ describe('WizardStepFeats', () => {
       />
     );
 
-    fireEvent.click(screen.getByText('Great Weapon Master'));
+    // Click the checkbox trigger on the first feat item
+    const firstCheckbox = container.querySelectorAll('.list-item-checkbox-trigger')[0];
+    fireEvent.click(firstCheckbox);
 
     expect(mockOnArrayFieldChange).toHaveBeenCalled();
   });
