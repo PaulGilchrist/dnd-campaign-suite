@@ -298,7 +298,7 @@ describe('useWizardFeatBuffs', () => {
       }
     });
 
-    it('should add features as specialActions', () => {
+    it('should not add features to specialActions', () => {
       const formData = { ...baseFormData, feats: ['Tough'] };
       const mockBuffs = {
         abilityScoreIncreases: [],
@@ -317,15 +317,11 @@ describe('useWizardFeatBuffs', () => {
       const updater = actualApplyCall[0];
       if (typeof updater === 'function') {
         const result = updater(formData);
-        expect(result.specialActions).toHaveLength(1);
-        expect(result.specialActions[0].name).toBe('Extra Reach');
-        expect(result.specialActions[0].description).toBe('+5ft reach');
-        expect(result.specialActions[0].type).toBe('passive');
-        expect(result.specialActions[0].source).toBe('feat');
+        expect(result.specialActions).toEqual([]);
       }
     });
 
-    it('should deduplicate features by name when adding specialActions', () => {
+    it('should not modify specialActions when deduplicating features', () => {
       const formData = {
         ...baseFormData,
         feats: ['Tough'],
@@ -348,12 +344,12 @@ describe('useWizardFeatBuffs', () => {
       const updater = actualApplyCall[0];
       if (typeof updater === 'function') {
         const result = updater(formData);
-        // Should still only have 1 action (the existing one, not duplicated)
         expect(result.specialActions).toHaveLength(1);
+        expect(result.specialActions[0].description).toBe('existing');
       }
     });
 
-    it('should handle specialActions that are strings', () => {
+    it('should not modify specialActions that are strings', () => {
       const formData = {
         ...baseFormData,
         feats: ['Tough'],
@@ -377,12 +373,12 @@ describe('useWizardFeatBuffs', () => {
       const updater = actualApplyCall[0];
       if (typeof updater === 'function') {
         const result = updater(formData);
-        // Should have the original string + 1 new action (Existing Action is deduped)
-        expect(result.specialActions).toHaveLength(2);
+        expect(result.specialActions).toHaveLength(1);
+        expect(result.specialActions[0]).toBe('Existing Action');
       }
     });
 
-    it('should default feature type to "passive" when not specified', () => {
+    it('should not add features with unspecified type to specialActions', () => {
       const formData = { ...baseFormData, feats: ['Tough'] };
       const mockBuffs = {
         abilityScoreIncreases: [],
@@ -401,7 +397,7 @@ describe('useWizardFeatBuffs', () => {
       const updater = actualApplyCall[0];
       if (typeof updater === 'function') {
         const result = updater(formData);
-        expect(result.specialActions[0].type).toBe('passive');
+        expect(result.specialActions).toEqual([]);
       }
     });
 
@@ -449,7 +445,7 @@ describe('useWizardFeatBuffs', () => {
       }
     });
 
-    it('should handle specialActions being undefined in prev', () => {
+    it('should not add features when specialActions is undefined in prev', () => {
       const formData = { ...baseFormData, feats: ['Tough'] };
       const mockBuffs = {
         abilityScoreIncreases: [],
@@ -466,7 +462,7 @@ describe('useWizardFeatBuffs', () => {
       const updater = actualApplyCall[0];
       if (typeof updater === 'function') {
         const result = updater({ ...formData, specialActions: undefined });
-        expect(result.specialActions).toHaveLength(1);
+        expect(result.specialActions).toBeUndefined();
       }
     });
   });

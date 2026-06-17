@@ -76,7 +76,7 @@ describe('applyFeatBuffsToFormData', () => {
     );
   });
 
-  it('should add non-ability buffs as specialActions for 2024 ruleset', () => {
+  it('should not add feat features to specialActions for 2024 ruleset', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough'],
@@ -91,17 +91,10 @@ describe('applyFeatBuffsToFormData', () => {
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(formData.specialActions).toEqual([
-      {
-        name: 'Cantrip',
-        description: 'Learn a cantrip',
-        type: 'spell',
-        source: 'feat',
-      },
-    ]);
+    expect(formData.specialActions).toBeUndefined();
   });
 
-  it('should not add speed, initiative, hp_per_level, or hp_flat features as specialActions for 5e ruleset', () => {
+  it('should not add speed, initiative, hp_per_level, or hp_flat features for 5e ruleset', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
@@ -122,7 +115,7 @@ describe('applyFeatBuffsToFormData', () => {
     expect(formData.specialActions).toBeUndefined();
   });
 
-  it('should add passive features as specialActions for 5e ruleset', () => {
+  it('should not add passive features to specialActions for 5e ruleset', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
@@ -135,23 +128,16 @@ describe('applyFeatBuffsToFormData', () => {
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(formData.specialActions).toEqual([
-      {
-        name: 'Passive Benefit',
-        description: 'You can cast detect magic at will',
-        type: 'passive',
-        source: 'feat',
-      },
-    ]);
+    expect(formData.specialActions).toBeUndefined();
   });
 
-  it('should not duplicate specialActions with the same name', () => {
+  it('should not modify specialActions when processing feats', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough', 'Alert'],
       abilities: [{ name: 'Strength', miscBonus: 0 }],
       specialActions: [
-        { name: 'Cantrip', description: 'Learn a cantrip', type: 'spell', source: 'feat' },
+        { name: 'Custom Action', description: 'Already there', type: 'custom' },
       ],
     };
 
@@ -165,12 +151,11 @@ describe('applyFeatBuffsToFormData', () => {
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(formData.specialActions).toHaveLength(2);
-    expect(formData.specialActions.find(a => a.name === 'Cantrip')).toBeDefined();
-    expect(formData.specialActions.find(a => a.name === 'Fire Bolt')).toBeDefined();
+    expect(formData.specialActions).toHaveLength(1);
+    expect(formData.specialActions[0].name).toBe('Custom Action');
   });
 
-  it('should handle formData with no specialActions property', () => {
+  it('should not modify specialActions when formData has no specialActions property', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough'],
@@ -183,11 +168,10 @@ describe('applyFeatBuffsToFormData', () => {
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(formData.specialActions).toBeDefined();
-    expect(formData.specialActions).toHaveLength(1);
+    expect(formData.specialActions).toBeUndefined();
   });
 
-  it('should handle specialActions as array of strings', () => {
+  it('should not modify specialActions when they are array of strings', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough'],
@@ -201,10 +185,7 @@ describe('applyFeatBuffsToFormData', () => {
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(formData.specialActions).toEqual([
-      'Existing Action',
-      { name: 'Cantrip', description: 'Learn a cantrip', type: 'spell', source: 'feat' },
-    ]);
+    expect(formData.specialActions).toEqual(['Existing Action']);
   });
 
   it('should return the computed buffs object', () => {
@@ -267,7 +248,7 @@ describe('applyFeatBuffsToFormData', () => {
     expect(resetMiscBonuses).toHaveBeenCalledWith(formData.abilities);
   });
 
-  it('should not add feature if name already exists in specialActions', () => {
+  it('should not modify specialActions when feature already exists', () => {
     const formData = {
       rules: '2024',
       feats: ['Tough'],
@@ -286,7 +267,7 @@ describe('applyFeatBuffsToFormData', () => {
     expect(formData.specialActions).toHaveLength(1);
   });
 
-  it('should use type "passive" when feature has no type', () => {
+  it('should return buffs with type "passive" when feature has no type', () => {
     const formData = {
       rules: '5e',
       feats: ['Tough'],
@@ -301,13 +282,6 @@ describe('applyFeatBuffsToFormData', () => {
 
     expect(buffs.features).toHaveLength(1);
     expect(buffs.features[0].type).toBe('passive');
-    expect(formData.specialActions).toEqual([
-      {
-        name: 'Passive Benefit',
-        description: 'You can cast detect magic at will',
-        type: 'passive',
-        source: 'feat',
-      },
-    ]);
+    expect(formData.specialActions).toBeUndefined();
   });
 });

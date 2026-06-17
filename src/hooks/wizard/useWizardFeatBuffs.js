@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { computeAllFeatBuffs } from '../../services/character/featBuffService.js';
-import { injectSpecialActions } from '../../services/shared/injectSpecialActions.js';
 import { applyAbilityScoreIncreases, mergeDeduplicated } from '../../services/shared/buffApplier.js';
 
 function buildFormDataWithBuffs(prev, buffs) {
@@ -21,15 +20,6 @@ function buildFormDataWithBuffs(prev, buffs) {
     if (newSkills.length > 0) {
       next.skillProficiencies = [...(prev.skillProficiencies || []), ...newSkills];
     }
-  }
-
-  const existingActions = new Set(
-    (prev.specialActions || []).map(a => (typeof a === 'string' ? a : a.name))
-  );
-  const added = injectSpecialActions(existingActions, buffs.features, { includeAutomation: false });
-  if (added.length > 0) {
-    next.specialActions = next.specialActions || [];
-    next.specialActions.push(...added);
   }
 
   const featProficiencies = (buffs.proficiencies || []).filter(

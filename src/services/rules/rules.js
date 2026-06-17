@@ -847,7 +847,10 @@ const rules = {
             });
         }
 
-        // Merge feat features (passive_buffs, etc.) into their proper categories based on automation.casting_time
+        // Add feat features to their proper action arrays based on casting_time for display
+        // Feat names are stored in the character's JSON and are sufficient to compute
+        // automation when playerStats are computed - feat features are NOT stored in
+        // formData.specialActions during character creation
         const featFeatures = featBuffs.features || [];
         if (featFeatures.length > 0) {
             for (const featFeature of featFeatures) {
@@ -892,14 +895,30 @@ const rules = {
                     }
                 }
             }
+
+            // Re-sort all action arrays after feat features are merged
+            playerStats.actions = uniqBy(playerStats.actions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.bonusActions = uniqBy(playerStats.bonusActions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.reactions = uniqBy(playerStats.reactions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.specialActions = uniqBy(playerStats.specialActions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
         }
 
-        // Re-sort all action arrays after feat features are merged
-        playerStats.actions = uniqBy(playerStats.actions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
-        playerStats.bonusActions = uniqBy(playerStats.bonusActions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
-        playerStats.reactions = uniqBy(playerStats.reactions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
-        playerStats.specialActions = uniqBy(playerStats.specialActions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
-        playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        // Add feat features to allFeatures for automation processing
+        if (featFeatures.length > 0) {
+            featFeatures.forEach(featFeature => {
+                if (!featFeature.name) return;
+                allFeatures.push({
+                    name: featFeature.name,
+                    description: featFeature.description || '',
+                    type: featFeature.type || 'passive',
+                    source: 'feat',
+                    automation: featFeature.automation,
+                });
+            });
+            // Re-process automation with feat features included
+            playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+        }
 
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
         playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
