@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { confirmGnomishLineage } from '../../../services/automation/handlers/class-other/gnomishLineageHandler.js';
-import '../CharSheet.css';
+import { confirmGnomishLineage } from '../../../../services/automation/handlers/class-other/gnomishLineageHandler.js';
+import '../../CharSheet.css';
 
 const GNOME_LINEAGES = [
     { name: 'Deep Gnome', description: 'Darkvision 120 ft. + Magic Stone cantrip. Level 3: Nondetection. Level 5: Passwall.', spellcastingAbility: 'Intelligence', icon: 'fa-eye' },

@@ -4,22 +4,22 @@ import BoonOfEnergyResistanceModal from './BoonOfEnergyResistanceModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js', () => ({
   applyTypeChoice: vi.fn(),
 }));
 
-vi.mock('../../../services/automation/common/choiceStorage.js', () => ({
+vi.mock('../../../../services/automation/common/choiceStorage.js', () => ({
   setChosenRuntimeValue: vi.fn(),
   getChosenRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../services/ui/logService.js', () => ({
+vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as boonHandler from '../../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js';
+import * as boonHandler from '../../../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js';
 
 // ── Test fixtures ──
 

@@ -4,7 +4,7 @@ import GnomishLineageModal from './GnomishLineageModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/class-other/gnomishLineageHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/class-other/gnomishLineageHandler.js', () => ({
   confirmGnomishLineage: vi.fn(async () => ({
     type: 'popup',
     payload: {
@@ -18,7 +18,7 @@ vi.mock('../../../services/automation/handlers/class-other/gnomishLineageHandler
 
 // ── Re-import mocked modules ──
 
-import { confirmGnomishLineage } from '../../../services/automation/handlers/class-other/gnomishLineageHandler.js';
+import { confirmGnomishLineage } from '../../../../services/automation/handlers/class-other/gnomishLineageHandler.js';
 
 // ── Test fixtures ──
 

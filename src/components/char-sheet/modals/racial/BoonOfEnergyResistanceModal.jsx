@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { applyTypeChoice } from '../../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js';
-import '../CharSheet.css';
+import { applyTypeChoice } from '../../../../services/automation/handlers/reactions/boonOfEnergyResistanceHandler.js';
+import '../../CharSheet.css';
 
 function BoonOfEnergyResistanceModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState([]);

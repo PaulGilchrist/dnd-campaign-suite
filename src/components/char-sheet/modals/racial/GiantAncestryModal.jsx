@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { confirmGiantAncestry, getGiantAncestryOptions } from '../../../services/automation/handlers/class-other/giantAncestryHandler.js';
-import '../CharSheet.css';
+import { confirmGiantAncestry, getGiantAncestryOptions } from '../../../../services/automation/handlers/class-other/giantAncestryHandler.js';
+import '../../CharSheet.css';
 
 const GIANT_OPTIONS = getGiantAncestryOptions();
 

@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { executeHandler } from '../../../services/automation/index.js';
-import '../CharSheet.css';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { executeHandler } from '../../../../services/automation/index.js';
+import '../../CharSheet.css';
 
 function BreathWeaponShapeModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(null);

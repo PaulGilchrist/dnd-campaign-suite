@@ -4,18 +4,18 @@ import BreathWeaponShapeModal from './BreathWeaponShapeModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../services/automation/index.js', () => ({
+vi.mock('../../../../services/automation/index.js', () => ({
   executeHandler: vi.fn(() => null),
 }));
 
 // ── Re-import mocked modules ──
 
-import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { executeHandler } from '../../../services/automation/index.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { executeHandler } from '../../../../services/automation/index.js';
 
 // ── Test fixtures ──
 

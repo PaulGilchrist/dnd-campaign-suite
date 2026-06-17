@@ -4,18 +4,18 @@ import ElfisLineageModal from './ElfisLineageModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/class-other/elfishLineageHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/class-other/elfishLineageHandler.js', () => ({
   confirmElfisLineage: vi.fn(),
 }));
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as elfishLineageHandler from '../../../services/automation/handlers/class-other/elfishLineageHandler.js';
+import * as elfishLineageHandler from '../../../../services/automation/handlers/class-other/elfishLineageHandler.js';
 
 // ── Test fixtures ──
 

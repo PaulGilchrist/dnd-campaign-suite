@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { confirmElfisLineage } from '../../../services/automation/handlers/class-other/elfishLineageHandler.js';
-import '../CharSheet.css';
+import { confirmElfisLineage } from '../../../../services/automation/handlers/class-other/elfishLineageHandler.js';
+import '../../CharSheet.css';
 
 const ELVEN_LINEAGES = [
     { name: 'Drow', description: 'Darkvision 120 ft. + Dancing Lights cantrip. Level 3: Faerie Fire. Level 5: Darkness.', spellcastingAbility: 'Charisma', icon: 'fa-d' },

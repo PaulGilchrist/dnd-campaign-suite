@@ -4,7 +4,7 @@ import GiantAncestryModal from './GiantAncestryModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/class-other/giantAncestryHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/class-other/giantAncestryHandler.js', () => ({
   confirmGiantAncestry: vi.fn(() => Promise.resolve(true)),
   getGiantAncestryOptions: vi.fn(() => [
     { name: "Cloud's Jaunt", type: 'teleport', range: '30_ft', description: 'Teleport up to 30 feet to an unoccupied space you can see.', icon: 'fa-cloud' },
@@ -18,7 +18,7 @@ vi.mock('../../../services/automation/handlers/class-other/giantAncestryHandler.
 
 // ── Re-import mocked modules ──
 
-import { getGiantAncestryOptions } from '../../../services/automation/handlers/class-other/giantAncestryHandler.js';
+import { getGiantAncestryOptions } from '../../../../services/automation/handlers/class-other/giantAncestryHandler.js';
 
 // ── Test fixtures ──
 
@@ -179,7 +179,7 @@ describe('GiantAncestryModal', () => {
   // ── Apply / confirm flow ──
 
   it('calls confirmGiantAncestry with correct arguments when selecting', async () => {
-    const { confirmGiantAncestry } = await import('../../../services/automation/handlers/class-other/giantAncestryHandler.js');
+    const { confirmGiantAncestry } = await import('../../../../services/automation/handlers/class-other/giantAncestryHandler.js');
     render(<GiantAncestryModal {...makeProps()} />);
     const radios = document.querySelectorAll('input[type="radio"]');
     fireEvent.click(radios[0]);
@@ -195,7 +195,7 @@ describe('GiantAncestryModal', () => {
   });
 
   it('calls confirmGiantAncestry with second option when selected', async () => {
-    const { confirmGiantAncestry } = await import('../../../services/automation/handlers/class-other/giantAncestryHandler.js');
+    const { confirmGiantAncestry } = await import('../../../../services/automation/handlers/class-other/giantAncestryHandler.js');
     render(<GiantAncestryModal {...makeProps()} />);
     const radios = document.querySelectorAll('input[type="radio"]');
     fireEvent.click(radios[2]);
@@ -222,7 +222,7 @@ describe('GiantAncestryModal', () => {
   });
 
   it('does not call confirmGiantAncestry when no option is selected', async () => {
-    const { confirmGiantAncestry } = await import('../../../services/automation/handlers/class-other/giantAncestryHandler.js');
+    const { confirmGiantAncestry } = await import('../../../../services/automation/handlers/class-other/giantAncestryHandler.js');
     render(<GiantAncestryModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Select Ancestry' }));
