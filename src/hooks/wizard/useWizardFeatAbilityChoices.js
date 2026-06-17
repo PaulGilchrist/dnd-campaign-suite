@@ -38,10 +38,23 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
     }
 
     const choicesWithAbilities = choices.map(choice => {
-      const abilityName = choice.description?.match(/Choose (?:one|any)(?: of the following)?\s*(?:ability\s*score)?\s*from:\s*(.+)$/i)?.[1]?.trim();
-      if (abilityName) {
-        const names = abilityName.split(/,\s+| and /i).map(s => s.trim()).filter(s => s.length > 0);
-        return { ...choice, abilityNames: names };
+      let abilityNames = [];
+
+      const chooseFromMatch = choice.description?.match(/Choose (?:one|any)(?: of the following)?\s*(?:ability\s*score)?\s*from:\s*(.+)$/i);
+      if (chooseFromMatch) {
+        const abilityName = chooseFromMatch[1].trim();
+        abilityNames = abilityName.split(/,\s+| and /i).map(s => s.trim()).filter(s => s.length > 0);
+      } else {
+        const increaseMatch = choice.description?.match(/Increase your (.+?) score/i);
+        if (increaseMatch) {
+          const abilityName = increaseMatch[1];
+          const normalized = abilityName.replace(/,\s*or\s+/i, ', ').replace(/\s+or\s+/g, ', ');
+          abilityNames = normalized.split(', ').map(s => s.trim()).filter(s => s.length > 0);
+        }
+      }
+
+      if (abilityNames.length > 0) {
+        return { ...choice, abilityNames };
       }
       return choice;
     }).filter(c => c.abilityNames && c.abilityNames.length > 0);
