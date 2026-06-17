@@ -335,7 +335,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                             setPopupHtml(html);
                         }
                     }} />
-                      {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml)}>{playerStats.background}</span></div>}
+                      {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml, playerStats.rules || '5e')}>{playerStats.background}</span></div>}
                       <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />
                 </div>
       </div>

@@ -19,6 +19,12 @@ vi.mock('./usePopup.js', () => ({
   },
 }));
 
+vi.mock('../../services/ui/dataLoader.js', () => ({
+  loadBackgroundData: vi.fn(),
+}));
+
+import { loadBackgroundData } from '../../services/ui/dataLoader.js';
+
 describe('useActionPopup', () => {
   describe('buildFeatureDetailHtml', () => {
     it('should return null when entity has no details', () => {
@@ -518,29 +524,23 @@ describe('useActionPopup', () => {
   });
 
   describe('showBackgroundPopup', () => {
-    beforeEach(() => {
-      vi.resetModules();
-    });
-
     afterEach(() => {
-      vi.restoreAllMocks();
+      vi.clearAllMocks();
     });
 
     it('should set popupHtml with basic name and description', async () => {
       const mockBackgrounds = [
         { name: 'Acolyte', description: 'You have spent your life in the service of a temple.' },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Acolyte', setPopupHtml);
+      await freshShow('Acolyte', setPopupHtml, '2024');
 
+      expect(mockFn).toHaveBeenCalledWith('2024');
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Acolyte</b><br/><br/>You have spent your life in the service of a temple.'
       );
@@ -554,16 +554,13 @@ describe('useActionPopup', () => {
           ability_scores: 'Increase two abilities of your choice by 2, or three by 1.',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Ability Scores:</b> Increase two abilities of your choice by 2, or three by 1.'
@@ -578,16 +575,13 @@ describe('useActionPopup', () => {
           feat: 'Tough',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Feat:</b> Tough'
@@ -602,16 +596,13 @@ describe('useActionPopup', () => {
           skill_proficiencies: 'Athletics, Intuition',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Skill Proficiencies:</b> Athletics, Intuition'
@@ -626,16 +617,13 @@ describe('useActionPopup', () => {
           tool_proficiencies: 'One type of gaming set, a musician\'s instrument',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Tool Proficiencies:</b> One type of gaming set, a musician\'s instrument'
@@ -650,16 +638,13 @@ describe('useActionPopup', () => {
           equipment: 'A shield, a suit of leather armor',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Equipment:</b> A shield, a suit of leather armor'
@@ -674,16 +659,13 @@ describe('useActionPopup', () => {
           book: 'Player\'s Handbook',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Source:</b> Player\'s Handbook'
@@ -698,20 +680,16 @@ describe('useActionPopup', () => {
           page: '42',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
-      // When only page is present, there's a leading space from the empty book slot
       expect(setPopupHtml).toHaveBeenCalledWith(
-        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Source:</b>  42'
+        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Source:</b> 42'
       );
     });
 
@@ -724,16 +702,13 @@ describe('useActionPopup', () => {
           page: '42',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Source:</b> Player\'s Handbook 42'
@@ -754,82 +729,114 @@ describe('useActionPopup', () => {
           page: '42',
         },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
       expect(setPopupHtml).toHaveBeenCalledWith(
         '<b>Soldier</b><br/><br/>Warfare is no stranger to you.<br/><br/><b>Ability Scores:</b> STR +2, CON +1<br/><br/><b>Feat:</b> Tough<br/><br/><b>Skill Proficiencies:</b> Athletics, Intuition<br/><br/><b>Tool Proficiencies:</b> Gaming set<br/><br/><b>Equipment:</b> A shield<br/><br/><b>Source:</b> Player\'s Handbook 42'
       );
     });
 
-    it('should not set popupHtml when background is not found', async () => {
+    it('should set error popup when background is not found', async () => {
       const mockBackgrounds = [
         { name: 'Acolyte', description: 'Temple life.' },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Soldier', setPopupHtml);
+      await freshShow('Soldier', setPopupHtml, '2024');
 
-      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setPopupHtml).toHaveBeenCalledWith(
+        '<b>Soldier</b><br/><br/>Background details not found in database.'
+      );
     });
 
-    it('should not set popupHtml when background has no description', async () => {
+    it('should set error popup when background has no description', async () => {
       const mockBackgrounds = [
         { name: 'Acolyte' },
       ];
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve(mockBackgrounds),
-        })
-      );
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Acolyte', setPopupHtml);
+      await freshShow('Acolyte', setPopupHtml, '2024');
 
-      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setPopupHtml).toHaveBeenCalledWith(
+        '<b>Acolyte</b><br/><br/>Background details not found in database.'
+      );
     });
 
-    it('should handle fetch error gracefully (empty array)', async () => {
-      global.fetch = vi.fn(() => Promise.reject(new Error('Network error')));
+    it('should handle fetch error gracefully with error message', async () => {
+      const mockFn = loadBackgroundData;
+      mockFn.mockRejectedValue(new Error('Network error'));
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Acolyte', setPopupHtml);
+      await freshShow('Acolyte', setPopupHtml, '2024');
 
-      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setPopupHtml).toHaveBeenCalledWith(
+        '<b>Acolyte</b><br/><br/>Error loading background details: Network error. Check browser console for more details.'
+      );
     });
 
-    it('should handle empty backgrounds array', async () => {
-      global.fetch = vi.fn(() =>
-        Promise.resolve({
-          json: () => Promise.resolve([]),
-        })
-      );
+    it('should handle empty backgrounds array with error message', async () => {
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue([]);
 
       const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
       const setPopupHtml = vi.fn();
 
-      await freshShow('Acolyte', setPopupHtml);
+      await freshShow('Acolyte', setPopupHtml, '2024');
 
-      expect(setPopupHtml).not.toHaveBeenCalled();
+      expect(setPopupHtml).toHaveBeenCalledWith(
+        '<b>Acolyte</b><br/><br/>Background details not found in database.'
+      );
+    });
+
+    it('should match by index for 5e backgrounds', async () => {
+      const mockBackgrounds = [
+        { index: 'soldier', name: 'Soldier', description: 'Warfare is no stranger to you.' },
+      ];
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
+
+      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
+      const setPopupHtml = vi.fn();
+
+      await freshShow('Soldier', setPopupHtml, '5e');
+
+      expect(setPopupHtml).toHaveBeenCalledWith(
+        '<b>Soldier</b><br/><br/>Warfare is no stranger to you.'
+      );
+    });
+
+    it('should use 5e data when rulesVersion is 5e', async () => {
+      const mockBackgrounds = [
+        { name: 'Soldier', description: '5e soldier description.' },
+      ];
+      const mockFn = loadBackgroundData;
+      mockFn.mockResolvedValue(mockBackgrounds);
+
+      const { showBackgroundPopup: freshShow } = await import('./useActionPopup.js');
+      const setPopupHtml = vi.fn();
+
+      await freshShow('Soldier', setPopupHtml, '5e');
+
+      expect(mockFn).toHaveBeenCalledWith('5e');
+      expect(setPopupHtml).toHaveBeenCalledWith(
+        '<b>Soldier</b><br/><br/>5e soldier description.'
+      );
     });
   });
 });
