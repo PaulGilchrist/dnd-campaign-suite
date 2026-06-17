@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 
-vi.mock('./TrackedResourceInput.jsx', () => ({ default: ({ label, resourceKey, playerName, getMax, deps, campaignName, playerStats }) => (
+vi.mock('./TrackedResourceInput.jsx', () => ({ default: ({ label, resourceKey, _playerName, getMax, _deps, _campaignName, _playerStats }) => (
     <div data-testid={`tracked-resource-${resourceKey}`}>{label}: {getMax()}</div>
 ) }));
 
@@ -41,7 +41,7 @@ vi.mock('../../../services/character/classFeatures.js', () => ({
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-    useRuntimeValue: vi.fn((name, key, campaign) => {
+    useRuntimeValue: vi.fn((name, key, _campaign) => {
         if (key === 'aspectOfTheWildsOption') return 'Owl';
         if (key === 'activeBuffs') return [];
         if (key === 'bardicInspirationUses') return 3;
@@ -51,7 +51,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
         if (key === 'portentDice') return null;
         return null;
     }),
-    getRuntimeValue: vi.fn((name, key, campaign) => {
+    getRuntimeValue: vi.fn((name, key, _campaign) => {
         if (key === 'bardicInspirationUses') return 3;
         if (key === 'portentDice') return null;
         return null;

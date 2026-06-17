@@ -47,10 +47,8 @@ vi.mock('./useLoggedDiceRollUtils.js', () => ({
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { computeDamageAfterEvasion, rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
-import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
-import { saveLastDamageEvent } from './useMetamagic.js';
-import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { hasPotentCantrip } from './useLoggedDiceRollUtils.js';
 import { createSaves } from './useLoggedDiceRollSaves.js';

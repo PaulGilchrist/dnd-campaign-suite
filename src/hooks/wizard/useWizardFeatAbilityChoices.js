@@ -63,7 +63,7 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
       }
     });
     setFeatAbilityAssignments(stored);
-  }, [formData.feats, formData.rules, allFeats]);
+  }, [formData, formData.feats, formData.rules, allFeats]);
 
   const handleFeatAbilityChoice = useCallback((choiceIdx, abilityName) => {
     const currentFormData = formDataRef.current;

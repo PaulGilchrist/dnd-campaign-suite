@@ -53,7 +53,7 @@ vi.mock('./useLoggedDiceRollUtils.js', () => ({
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
-    computeDamageAfterSave: vi.fn((total, success, dcSuccess) => success ? Math.floor(total / 2) : total),
+    computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total),
     rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
 }));
@@ -61,14 +61,11 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
-import { saveLastDamageEvent } from './useMetamagic.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { sendSavePrompt } from '../../services/combat/conditions/savePromptService.js';
-import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
+import { getAffectedCreatures } from '../../services/rules/combat/aoeService.js';
 import {
     readAoeContext,
-    hasPotentCantrip,
     isMagicMissileImmune,
     hasSoulstitchProtection,
     applyMinDamageAdjustment,

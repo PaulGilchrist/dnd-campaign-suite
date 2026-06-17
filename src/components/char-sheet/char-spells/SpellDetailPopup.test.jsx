@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import SpellDetailPopup from './SpellDetailPopup.jsx';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn((name, key, campaign) => {
+    getRuntimeValue: vi.fn((name, key, _campaign) => {
         if (key === 'spell_slots_level_1') return 4;
         if (key === 'spell_slots_level_2') return 3;
         if (key === 'spell_slots_level_3') return 2;

@@ -15,12 +15,12 @@ vi.mock('../ShortRestModal.jsx', () => ({ default: () => <div data-testid="short
 vi.mock('./CharConditions.jsx', () => ({ default: () => <div data-testid="char-conditions">Conditions</div> }));
 
 vi.mock('../../../hooks/runtime/useTrackedResource.js', () => ({
-    default: vi.fn((key, name, init, deps, campaign) => ({ current: init(), update: vi.fn() })),
+    default: vi.fn((key, name, init, _deps, _campaign) => ({ current: init(), update: vi.fn() })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
-    useRuntimeValue: vi.fn((name, key, campaign) => null),
+    useRuntimeValue: vi.fn((_name, _key, _campaign) => null),
     getRuntimeValue: vi.fn(),
 }));
 
@@ -64,7 +64,7 @@ const mockPlayerStats = {
     armorClassFormula: '16 + 2 (shield)',
     hitPoints: 45,
     inventory: { equipped: ['Scale Mail', 'Shield'] },
-    equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', name: 'Shield' }],
+    equipment: [{ name: 'Scale Mail', equipment_category: 'Armor' }, { name: 'Shield', type: 'Shield' }],
     background: 'Soldier',
     immunities: [],
     resistances: [],

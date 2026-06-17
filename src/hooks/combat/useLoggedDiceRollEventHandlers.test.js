@@ -52,7 +52,7 @@ vi.mock('./useLoggedDiceRollUtils.js', () => ({
 }));
 
 import { addExpiration } from '../../services/rules/effects/expirations.js';
-import { rollExpression } from '../../services/dice/diceRoller.js';
+// rollExpression is mocked but not directly imported in this test file
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';

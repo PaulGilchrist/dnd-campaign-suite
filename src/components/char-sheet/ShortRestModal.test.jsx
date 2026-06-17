@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import ShortRestModal from './ShortRestModal.jsx';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn((name, key, campaign) => {
+    getRuntimeValue: vi.fn((name, key, _campaign) => {
         if (key === 'shortRestHitDice') return 8;
         if (key === 'currentHitPoints') return 20;
         if (key === 'sorceryPoints') return 2;
@@ -16,7 +16,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollDice: vi.fn((count, die) => ({ total: count * 4, rolls: Array(count).fill(4) })),
+    rollDice: vi.fn((count, _die) => ({ total: count * 4, rolls: Array(count).fill(4) })),
     rollExpression: vi.fn(() => ({ total: 5, rolls: [5] })),
 }));
 
