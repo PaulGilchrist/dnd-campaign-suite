@@ -1,0 +1,102 @@
+import Popup from '../common/Popup.jsx'
+import MetamagicPopup from './popups/MetamagicPopup.jsx'
+import AidTargetPopup from './popups/AidTargetPopup.jsx'
+import GreaterRestorationPopup from './popups/GreaterRestorationPopup.jsx'
+import RemoveCursePopup from './popups/RemoveCursePopup.jsx'
+import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
+
+export default function CharActionSpellPopups({
+    playerStats,
+    campaignName,
+    selectedActionSpell,
+    setSelectedActionSpell,
+    buildUpcastLevels,
+    handleActionSpellCast,
+    actionPendingMetamagic,
+    actionHandleConfirm,
+    actionHandleSkip,
+    actionPendingAid,
+    actionHandleAidConfirm,
+    actionHandleAidSkip,
+    actionPendingGreaterRestoration,
+    actionHandleGreaterRestorationConfirm,
+    actionHandleGreaterRestorationSkip,
+    actionPendingRemoveCurse,
+    actionHandleRemoveCurseConfirm,
+    actionHandleRemoveCurseSkip,
+    pendingActionMetamagic,
+    handleActionMetamagicConfirm,
+    handleActionMetamagicSkip,
+}) {
+    return (
+        <>
+            {selectedActionSpell && (
+                <Popup onClickOrKeyDown={() => setSelectedActionSpell(null)}>
+                    <SpellDetailPopup
+                        spell={selectedActionSpell}
+                        playerStats={playerStats}
+                        campaignName={campaignName}
+                        playerLevel={playerStats.level}
+                        upcastLevels={buildUpcastLevels(selectedActionSpell)}
+                        onClose={() => setSelectedActionSpell(null)}
+                        onCast={handleActionSpellCast}
+                    />
+                </Popup>
+            )}
+            {actionPendingMetamagic && (
+                <MetamagicPopup
+                    spell={{ name: actionPendingMetamagic.spellName, level: actionPendingMetamagic.spellLevel || 0 }}
+                    playerStats={{ ...playerStats, _metamagicCurrentSP: actionPendingMetamagic._currentSP }}
+                    campaignName={campaignName}
+                    onConfirm={actionHandleConfirm}
+                    onSkip={actionHandleSkip}
+                />
+            )}
+            {actionPendingAid && (
+                <AidTargetPopup
+                    spell={{ name: actionPendingAid.spellName, level: actionPendingAid.spellLevel || 0 }}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    range={actionPendingAid.range}
+                    rangeFt={actionPendingAid.rangeFt}
+                    creatureTargets={actionPendingAid.creatureTargets}
+                    maxTargets={actionPendingAid.maxTargets}
+                    attackerPos={actionPendingAid.attackerPos}
+                    onConfirm={actionHandleAidConfirm}
+                    onSkip={actionHandleAidSkip}
+                />
+            )}
+            {actionPendingGreaterRestoration && (
+                <GreaterRestorationPopup
+                    spell={{ name: actionPendingGreaterRestoration.spellName, level: actionPendingGreaterRestoration.spellLevel || 0 }}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    creatureTargets={actionPendingGreaterRestoration.creatureTargets}
+                    range={actionPendingGreaterRestoration.range}
+                    onConfirm={actionHandleGreaterRestorationConfirm}
+                    onSkip={actionHandleGreaterRestorationSkip}
+                />
+            )}
+            {actionPendingRemoveCurse && (
+                <RemoveCursePopup
+                    spell={{ name: actionPendingRemoveCurse.spellName, level: actionPendingRemoveCurse.spellLevel || 0 }}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    creatureTargets={actionPendingRemoveCurse.creatureTargets}
+                    range={actionPendingRemoveCurse.range}
+                    onConfirm={actionHandleRemoveCurseConfirm}
+                    onSkip={actionHandleRemoveCurseSkip}
+                />
+            )}
+            {pendingActionMetamagic && (
+                <MetamagicPopup
+                    spell={{ name: pendingActionMetamagic.spellName, level: pendingActionMetamagic.spellLevel || 0 }}
+                    playerStats={{ ...playerStats, _metamagicCurrentSP: pendingActionMetamagic._currentSP }}
+                    campaignName={campaignName}
+                    onConfirm={handleActionMetamagicConfirm}
+                    onSkip={handleActionMetamagicSkip}
+                />
+            )}
+        </>
+    )
+}
