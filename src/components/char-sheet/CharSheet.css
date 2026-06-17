@@ -1,5 +1,5 @@
 .char-sheet {
-    max-width: 800px;
+    max-width: 900px;
     padding: 10px;
 }
 
@@ -132,5 +132,6 @@
 @media print {
     .char-sheet {
         padding: 0;
+        max-width: 7.75in;
     }
 }

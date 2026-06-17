@@ -322,7 +322,7 @@ describe('CharSpells', () => {
         />
       );
 
-      expect(screen.getByText(/Concentration, up to 1 min/)).toBeInTheDocument();
+      expect(screen.getByText(/Concentration, 1 min/)).toBeInTheDocument();
     });
 
     it('should render spell with only damage_at_character_level', () => {

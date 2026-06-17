@@ -154,7 +154,7 @@ describe('CharSpells', () => {
        expect(instantElements.length).toBeGreaterThan(0);
           });
 
-    it('should abbreviate "1 reaction" to "R"', () => {
+    it('should display "1 reaction" as "1 Reaction"', () => {
       const statsWithReaction = {
         ...mockPlayerStats,
         spellAbilities: {
