@@ -207,7 +207,26 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
                    }
        if (session.encounterTitle) setEncounterTitle(session.encounterTitle);
           setSelectedMonsters(session.selectedMonsters);
-           }, [campaignName, monsters]); // eslint-disable-line react-hooks/exhaustive-deps
+            }, [campaignName, monsters]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Retroactively compute effectiveXP for loaded encounters when monster data becomes available
+    useEffect(() => {
+      if (!currentEncounterName || selectedMonsters.length === 0 || !monsters.length) return;
+      const hasEffectiveXP = selectedMonsters.some(m => m.xp != null);
+      if (hasEffectiveXP) return;
+      const totalXP = calculateTotalMonsterXP(selectedMonsters);
+      const count = calculateMonsterCount(selectedMonsters);
+      const mult = calculateDifficultyMultiplier(count, filter.playerLevels.length);
+      const newEffectiveXP = Math.round(totalXP * mult);
+      if (newEffectiveXP > 0) {
+        loadEncounterData(currentEncounterName).then(data => {
+          if (data && !data.effectiveXP) {
+            data.effectiveXP = newEffectiveXP;
+            updateEncounter(currentEncounterName, data);
+          }
+        }).catch(() => {});
+      }
+    }, [selectedMonsters, monsters, currentEncounterName, filter.playerLevels]); // eslint-disable-line react-hooks/exhaustive-deps
 
 // Guard to skip persist effect on initial render - lets restore effect run first
    const persisted = useRef(false);
@@ -358,6 +377,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
       description: description,
       lootData,
       encounterCompleted,
+      effectiveXP,
       };
     if (currentEncounterName) {
       // Update existing encounter — no modal needed
@@ -390,22 +410,35 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
                setEncounterCompleted(false);
                setCombatStarted(false);
 
-         const monsterRefs = data.selectedMonsters || [];
-        const resolvedMonsters = monsterRefs.map(ref => {
-          const fullMonster = (monsters || []).find(m => m.index === ref.index);
-          if (fullMonster) {
-            return { ...fullMonster, qty: ref.qty || 1 };
-          }
-          return { ...ref, qty: ref.qty || 1 };
-        });
+          const monsterRefs = data.selectedMonsters || [];
+         const resolvedMonsters = monsterRefs.map(ref => {
+           const fullMonster = (monsters || []).find(m => m.index === ref.index);
+           if (fullMonster) {
+             return { ...fullMonster, qty: ref.qty || 1 };
+           }
+           return { ...ref, qty: ref.qty || 1 };
+         });
 
-        setSelectedMonsters(resolvedMonsters);
+         setSelectedMonsters(resolvedMonsters);
 
-          }
-        } catch (error) {
-       console.error('Failed to load encounter:', error);
-      }
-    };
+         if (!data.effectiveXP && monsterRefs.length > 0) {
+           const totalXP = monsterRefs.reduce((sum, ref) => {
+             const full = (monsters || []).find(m => m.index === ref.index);
+             return sum + ((full?.xp || ref.xp || 0) * (ref.qty || 1));
+           }, 0);
+           const mult = calculateDifficultyMultiplier(
+             monsterRefs.reduce((s, r) => s + (r.qty || 1), 0),
+             filter.playerLevels.length
+           );
+           data.effectiveXP = Math.round(totalXP * mult);
+           updateEncounter(name, data);
+         }
+
+           }
+         } catch (error) {
+        console.error('Failed to load encounter:', error);
+       }
+     };
 
    const logEntry = async (entry) => {
      try { await logService.addEntry(campaignName, entry); } catch { /* ignore */ }

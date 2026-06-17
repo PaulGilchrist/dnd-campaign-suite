@@ -115,13 +115,13 @@ function EncounterModal({ isOpen, onClose, mode, onSave, onLoad, onDelete, onRen
                 <div className="encounter-modal-empty">No saved encounters yet.</div>
               ) : (
                 <ul className="encounter-list">
-                  {encounters.map((enc) => (
+                  {[...encounters].sort((a, b) => (a.effectiveXP || 0) - (b.effectiveXP || 0)).map((enc) => (
                     <li key={enc.name} className="encounter-list-item">
                       <div className="encounter-list-info">
                         <span className="encounter-list-name">{formatEncounterName(enc.name)}</span>
-                        {enc.savedAt && (
-                          <span className="encounter-list-date">
-                            {new Date(enc.savedAt).toLocaleDateString()} {new Date(enc.savedAt).toLocaleTimeString()}
+                        {enc.effectiveXP != null && (
+                          <span className="encounter-list-xp">
+                            {enc.effectiveXP.toLocaleString()} effective XP
                           </span>
                         )}
                         {enc.description && (

@@ -703,9 +703,10 @@
   color: var(--color-text);
 }
 
-.encounter-builder .encounter-list-date {
+.encounter-builder .encounter-list-xp {
   font-size: 0.75rem;
-  color: var(--color-text-muted);
+  color: var(--color-warning);
+  font-weight: 600;
 }
 
 .encounter-builder .encounter-list-actions {

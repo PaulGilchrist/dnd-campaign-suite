@@ -9,7 +9,7 @@ router.get('/api/campaigns/:campaign/encounters', (req, res) => {
   const { campaign } = req.params;
   try {
     const data = readEncounters(campaign);
-    const encounters = data.encounters.map(e => ({ name: e.name, savedAt: e.savedAt }));
+    const encounters = data.encounters.map(e => ({ name: e.name, savedAt: e.savedAt, effectiveXP: e.effectiveXP }));
     res.json({ encounters });
   } catch (error) {
     console.error('Error listing encounters:', error);
