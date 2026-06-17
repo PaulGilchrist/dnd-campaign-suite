@@ -256,6 +256,7 @@ export function createLogAndShow(deps) {
             isAutoCrit: context?.isAutoCrit,
             isCrit,
             isNatural20: r1 === 20,
+            isNatural1: r1 === 1,
             autoDamage,
             autoReroll: context?.autoReroll,
             autoRerollBonus: context?.autoRerollBonus,

@@ -154,6 +154,50 @@ describe('DiceRollResult', () => {
         });
     });
 
+    describe('critical miss', () => {
+        it('shows "Critical Miss!" when isNatural1 is true and rollType is attack', () => {
+            render(
+                <DiceRollResult name="Attack" type="d20" rolls={[1, 15]} bonus={3} rollType="attack" isNatural1={true} />
+            );
+            expect(screen.getByText('Critical Miss!')).toBeInTheDocument();
+        });
+
+        it('does NOT show "Critical Miss!" when isNatural1 is false', () => {
+            render(
+                <DiceRollResult name="Attack" type="d20" rolls={[15, 8]} bonus={3} rollType="attack" isNatural1={false} />
+            );
+            expect(screen.queryByText('Critical Miss!')).not.toBeInTheDocument();
+        });
+
+        it('does NOT show "Critical Miss!" for non-attack roll types (initiative)', () => {
+            render(
+                <DiceRollResult name="Initiative" type="d20" rolls={[1, 10]} bonus={2} rollType="initiative" isNatural1={true} />
+            );
+            expect(screen.queryByText('Critical Miss!')).not.toBeInTheDocument();
+        });
+
+        it('does NOT show "Critical Miss!" for non-attack roll types (check)', () => {
+            render(
+                <DiceRollResult name="Athletics" type="d20" rolls={[1, 8]} bonus={4} rollType="check" isNatural1={true} />
+            );
+            expect(screen.queryByText('Critical Miss!')).not.toBeInTheDocument();
+        });
+
+        it('does NOT show "Critical Miss!" for non-attack roll types (skill)', () => {
+            render(
+                <DiceRollResult name="Stealth" type="d20" rolls={[1, 12]} bonus={5} rollType="skill" isNatural1={true} />
+            );
+            expect(screen.queryByText('Critical Miss!')).not.toBeInTheDocument();
+        });
+
+        it('does NOT show "Critical Miss!" for save rolls', () => {
+            render(
+                <DiceRollResult name="DEX Save" type="d20" rolls={[1, 10]} bonus={2} rollType="save" isNatural1={true} />
+            );
+            expect(screen.queryByText('Critical Miss!')).not.toBeInTheDocument();
+        });
+    });
+
     describe('non-d20 types', () => {
         it('does NOT show advantage/disadvantage toggles for non-d20 types', () => {
             render(

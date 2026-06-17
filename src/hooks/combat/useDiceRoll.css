@@ -46,6 +46,10 @@
     text-transform: uppercase;
 }
 
+.dice-roll-crit-miss {
+    color: #f44336;
+}
+
 .dice-roll-hint {
     font-size: 0.7em;
     color: var(--color-text-muted);

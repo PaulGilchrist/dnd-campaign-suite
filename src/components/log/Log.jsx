@@ -47,6 +47,9 @@ function RollEntry({ entry }) {
             {entry.isAutoMiss ? 'AUTO-MISS' : (entry.hit ? 'HIT' : 'MISS')} {entry.targetAc != null ? `(AC ${entry.targetAc})` : ''}
           </span>
         )}
+        {entry.rollType === 'attack' && entry.isNatural1 && (
+          <span className="log-critical-miss">Critical Miss!</span>
+        )}
         {entry.coverAcBonus > 0 && (
           <span className="log-cover">
             {entry.coverLevel === 'threeQuarter' ? '3/4' : '1/2'} Cover (+{entry.coverAcBonus} AC)

@@ -375,6 +375,18 @@
     background: rgba(244, 67, 54, 0.2);
 }
 
+/* Critical miss banner */
+.log-critical-miss {
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 3px;
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.15);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
 /* Damage type pill */
 .log-damage-type {
     font-size: 0.72rem;
