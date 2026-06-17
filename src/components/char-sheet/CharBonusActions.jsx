@@ -22,6 +22,18 @@ const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 const bonusActionCastingTimes = ['1 bonus action', '1 Bonus Action', 'bonus action', 'Bonus Action'];
 const actionCastingTimes = ['1 action', '1 Action', 'action', 'Action'];
 
+function formatRange(range) {
+    if (!range && range !== 0) return '';
+    let s = String(range);
+    // If it's just a plain number, append ft.
+    if (/^\d+$/.test(s)) return s + ' ft.';
+    s = s.replace(/\b(\d+)\s*feet\b/gi, '$1 ft.');
+    s = s.replace(/\b(\d+)\s*foot\b/gi, '$1 ft.');
+    s = s.replace(/\b(\d+)\s*ft\.?\b/gi, '$1 ft.');
+    s = s.replace(/\b(\d+)\s*mile\b/gi, '$1 ft.');
+    return s;
+}
+
 function isElderChampionActive(playerName, campaignName) {
     try {
         const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
@@ -151,7 +163,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                       {bonusActionAttacks.map((attack) => {
                          return <React.Fragment key={attack.name}>
                               <div className='left'>{attack.name}</div>
-                              <div>{attack.range} ft.</div>
+                               <div>{formatRange(attack.range)}</div>
                                 {attack.saveDc
                                     ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
                                   : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
@@ -164,7 +176,7 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                       {isHordeBreakerAvailable && hordeBreakerAttack && (
                           <React.Fragment>
                               <div className='left'>Horde Breaker</div>
-                              <div>{hordeBreakerAttack.range} ft.</div>
+                               <div>{formatRange(hordeBreakerAttack.range)}</div>
                               <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' ? " stat--penalized" : "")} onClick={() => onAttackClick(hordeBreakerAttack)}>{signFormatter.format(hordeBreakerAttack.hitBonus - exhaustionPenalty)}</div>
                               <div className={hordeBreakerAttack.damage ? "clickable" : ""} onClick={() => !cannotAct && onDamageClick(hordeBreakerAttack)}>{hordeBreakerAttack.damage}</div>
                               <div className='left'>{hordeBreakerAttack.damageType}</div>

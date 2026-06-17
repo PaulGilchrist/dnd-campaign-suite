@@ -42,6 +42,18 @@ import { isEqual } from 'lodash';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
+function formatRange(range) {
+    if (!range && range !== 0) return '';
+    let s = String(range);
+    // If it's just a plain number, append ft.
+    if (/^\d+$/.test(s)) return s + ' ft.';
+    s = s.replace(/\b(\d+)\s*feet\b/gi, '$1 ft.');
+    s = s.replace(/\b(\d+)\s*foot\b/gi, '$1 ft.');
+    s = s.replace(/\b(\d+)\s*ft\.?\b/gi, '$1 ft.');
+    s = s.replace(/\b(\d+)\s*mile\b/gi, '$1 ft.');
+    return s;
+}
+
 function isElderChampionActive(playerName, campaignName) {
     try {
         const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
@@ -714,7 +726,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         if (attack.type != 'Action') return '';
                         return <React.Fragment key={attack.name}>
                             <div className='left clickable' onClick={() => handleActionSpellClick(attack.name)}>{attack.name}</div>
-                            <div>{attack.range} ft.</div>
+                            <div>{formatRange(attack.range)}</div>
                             {attack.saveDc
                                 ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
                                 : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => handleSpellAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
