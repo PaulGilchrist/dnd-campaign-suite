@@ -37,27 +37,38 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
       return;
     }
 
-    const choicesWithAbilities = choices.map(choice => {
-      let abilityNames = [];
+    const expandedChoices = [];
+    choices.forEach(choice => {
+      const base = { ...choice };
+      const amounts = Array.isArray(choice.amount) ? choice.amount : [choice.amount];
+      amounts.forEach(amount => {
+        let abilityNames = [];
 
-      const chooseFromMatch = choice.description?.match(/Choose (?:one|any)(?: of the following)?\s*(?:ability\s*score)?\s*from:\s*(.+)$/i);
-      if (chooseFromMatch) {
-        const abilityName = chooseFromMatch[1].trim();
-        abilityNames = abilityName.split(/,\s+| and /i).map(s => s.trim()).filter(s => s.length > 0);
-      } else {
-        const increaseMatch = choice.description?.match(/Increase your (.+?) score/i);
-        if (increaseMatch) {
-          const abilityName = increaseMatch[1];
-          const normalized = abilityName.replace(/,\s*or\s+/i, ', ').replace(/\s+or\s+/g, ', ');
-          abilityNames = normalized.split(', ').map(s => s.trim()).filter(s => s.length > 0);
+        const chooseFromMatch = base.description?.match(/Choose (?:one|any)(?: of the following)?\s*(?:ability\s*score)?\s*from:\s*(.+)$/i);
+        if (chooseFromMatch) {
+          const abilityName = chooseFromMatch[1].trim();
+          abilityNames = abilityName.split(/,\s+| and /i).map(s => s.trim()).filter(s => s.length > 0);
+        } else {
+          const increaseMatch = base.description?.match(/Increase your (.+?) score/i);
+          if (increaseMatch) {
+            const abilityName = increaseMatch[1];
+            const normalized = abilityName.replace(/,\s*or\s+/i, ', ').replace(/\s+or\s+/g, ', ');
+            abilityNames = normalized.split(', ').map(s => s.trim()).filter(s => s.length > 0);
+          }
         }
-      }
 
-      if (abilityNames.length > 0) {
-        return { ...choice, abilityNames };
-      }
-      return choice;
-    }).filter(c => c.abilityNames && c.abilityNames.length > 0);
+        if (abilityNames.length === 0 && base.scores) {
+          abilityNames = base.scores;
+        }
+
+        if (abilityNames.length === 0) {
+          abilityNames = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
+        }
+
+        expandedChoices.push({ ...base, amount, abilityNames });
+      });
+    });
+    const choicesWithAbilities = expandedChoices;
 
     setFeatAbilityChoices(choicesWithAbilities);
 
@@ -105,8 +116,7 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
         if (choice) {
           const abIdx = getAbilityIndexByName(abilities, chosenAbility);
           if (abIdx !== -1) {
-            const amount = typeof choice.amount === 'number' ? choice.amount : (choice.amount[0] || 1);
-            abilities[abIdx].featIncrease = (abilities[abIdx].featIncrease || 0) + amount;
+            abilities[abIdx].featIncrease = (abilities[abIdx].featIncrease || 0) + choice.amount;
           }
         }
       });

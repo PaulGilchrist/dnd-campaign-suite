@@ -328,8 +328,7 @@ describe('computeFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Strength', amount: 1, isChoice: true, description: '+1 to two abilities' },
-        { name: 'Constitution', amount: 1, isChoice: true, description: '+1 to two abilities' },
+        { name: 'any', amount: 1, isChoice: true, scores: ['Strength', 'Constitution'], description: '+1 to two abilities' },
       ]);
     });
 
@@ -564,8 +563,7 @@ describe('computeFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Intelligence', amount: 1, isChoice: true, description: 'Increase your Intelligence or Wisdom score by 1, to a maximum of 20.' },
-        { name: 'Wisdom', amount: 1, isChoice: true, description: 'Increase your Intelligence or Wisdom score by 1, to a maximum of 20.' },
+        { name: 'any', amount: 1, isChoice: true, scores: ['Intelligence', 'Wisdom'], description: 'Increase your Intelligence or Wisdom score by 1, to a maximum of 20.' },
       ]);
       expect(result.proficiencies).toEqual([
         {
@@ -929,8 +927,7 @@ describe('computeFeatBuffs', () => {
       );
 
       expect(result.abilityScoreIncreases).toEqual([
-        { name: 'Dexterity', amount: 1, isChoice: true, description: 'Increase your Dexterity or Intelligence score by 1, to a maximum of 20.' },
-        { name: 'Intelligence', amount: 1, isChoice: true, description: 'Increase your Dexterity or Intelligence score by 1, to a maximum of 20.' },
+        { name: 'any', amount: 1, isChoice: true, scores: ['Dexterity', 'Intelligence'], description: 'Increase your Dexterity or Intelligence score by 1, to a maximum of 20.' },
       ]);
 
       expect(result.proficiencies).toEqual([

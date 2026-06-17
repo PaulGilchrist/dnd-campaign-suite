@@ -246,7 +246,7 @@ function WizardStepAbilities({
           <div className="bg-ability-assignments">
             {featAbilityChoices.map((choice, idx) => (
               <div key={`feat-${idx}`} className="bg-ability-assignment">
-                <span className="bg-ability-name">Feat ASI {idx + 1} (+{typeof choice.amount === 'number' ? choice.amount : choice.amount[0]}):</span>
+                <span className="bg-ability-name">Feat ASI {idx + 1} (+{choice.amount}):</span>
                 <select
                   value={featAbilityAssignments[idx] || choice.abilityNames[0]}
                   onChange={(e) => handleFeatAbilityChange(idx, e.target.value)}

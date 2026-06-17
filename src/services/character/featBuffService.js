@@ -165,13 +165,22 @@ function parse2024Benefit(benefit, feat) {
             isChoice: true,
             description: benefit.description,
           });
+        } else if (asi.scores.length === 2) {
+          const amount = typeof asi.amount === 'number' ? asi.amount : 1;
+          buffs.abilityScoreIncreases.push({
+            name: 'any',
+            amount,
+            isChoice: true,
+            scores: asi.scores,
+            description: benefit.description,
+          });
         } else {
           const amount = typeof asi.amount === 'number' ? asi.amount : 1;
           asi.scores.forEach(score => {
             buffs.abilityScoreIncreases.push({
               name: score,
               amount,
-              isChoice: asi.scores.length > 1,
+              isChoice: false,
               description: benefit.description,
             });
           });

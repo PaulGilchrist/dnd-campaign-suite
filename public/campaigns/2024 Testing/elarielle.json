@@ -27,7 +27,7 @@
     {
       "name": "Intelligence",
       "baseScore": 15,
-      "featIncrease": 0,
+      "featIncrease": 4,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
@@ -59,7 +59,8 @@
   "expertSkills": [],
   "feats": [
     "Tough",
-    "War Caster"
+    "War Caster",
+    "Ability Score Improvement"
   ],
   "fightingStyles": [],
   "race": {
