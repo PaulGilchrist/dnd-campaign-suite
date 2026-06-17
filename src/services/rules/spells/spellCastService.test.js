@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { refundSpellBreakerSlot } from './spellCastService.js'
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
   getRuntimeValue: vi.fn(() => undefined),
 }))
+
+// Import after mocks are set up
+import { refundSpellBreakerSlot } from './spellCastService.js'
 
 describe('spellCastService', () => {
   beforeEach(() => {
