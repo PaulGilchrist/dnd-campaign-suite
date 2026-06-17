@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import ItemsPanel from './ItemsPanel';
 
 // Mock all SVG imports
@@ -112,6 +112,131 @@ describe('ItemsPanel', () => {
     const labels = ['Altar', 'Arrow Slit Wall', 'Barrel', 'Bed', 'Bookshelf', 'Chair', 'Treasure Chest', 'Crate', 'Door', 'Fire Pit', 'Fountain', 'Pillar', 'Secret Door', 'Stairs', 'Statue', 'Table', 'Torch', 'Trap', 'Spider Web', 'NPC'];
     labels.forEach(label => {
       expect(screen.getByText(label)).toBeInTheDocument();
+    });
+  });
+
+  describe('drag and drop', () => {
+    const getGhostDivs = () =>
+      Array.from(document.body.children).filter(
+        c => c.tagName === 'DIV' && c.style.top === '-9999px'
+      );
+
+    const ghostCleanup = () => {
+      getGhostDivs().forEach(c => c.remove());
+    };
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+      ghostCleanup();
+    });
+
+    const fireDragStart = (labelText) => {
+      const mockDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      const el = screen.getByText(labelText).closest('.items-panel-item');
+      fireEvent.dragStart(el, { dataTransfer: mockDT });
+      return mockDT;
+    };
+
+    it('sets drag data type for indoor item', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      const mockDT = fireDragStart('Barrel');
+      expect(mockDT.setData).toHaveBeenCalledWith('text/plain', 'barrel');
+    });
+
+    it('sets drag data type for outdoor item', () => {
+      render(<ItemsPanel {...defaultProps} mapVariant="outdoor" />);
+      const mockDT = fireDragStart('Tree');
+      expect(mockDT.setData).toHaveBeenCalledWith('text/plain', 'tree');
+    });
+
+    it('sets drag data type for NPC', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      const mockDT = fireDragStart('NPC');
+      expect(mockDT.setData).toHaveBeenCalledWith('text/plain', 'npc');
+    });
+
+    it('sets drag data type for character', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
+      const mockDT = fireDragStart('Goblin');
+      expect(mockDT.setData).toHaveBeenCalledWith('text/plain', 'character:Goblin');
+    });
+
+    it('calls setDragImage for item drag', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      const mockDT = fireDragStart('Barrel');
+      expect(mockDT.setDragImage).toHaveBeenCalled();
+    });
+
+    it('calls setDragImage for NPC drag', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      const mockDT = fireDragStart('NPC');
+      expect(mockDT.setDragImage).toHaveBeenCalled();
+    });
+
+    it('calls setDragImage for character drag', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
+      const mockDT = fireDragStart('Goblin');
+      expect(mockDT.setDragImage).toHaveBeenCalled();
+    });
+
+    it('creates ghost div in DOM for item drag', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      const mockDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      const barrel = screen.getByText('Barrel').closest('.items-panel-item');
+      fireEvent.dragStart(barrel, { dataTransfer: mockDT });
+
+      const ghosts = getGhostDivs();
+      expect(ghosts).toHaveLength(1);
+      expect(ghosts[0].querySelector('svg')).toBeInTheDocument();
+    });
+
+    it('creates ghost div in DOM for NPC drag', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      const mockDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      const npc = screen.getByText('NPC').closest('.items-panel-item');
+      fireEvent.dragStart(npc, { dataTransfer: mockDT });
+
+      const ghosts = getGhostDivs();
+      expect(ghosts).toHaveLength(1);
+      expect(ghosts[0].querySelector('svg')).toBeInTheDocument();
+    });
+
+    it('creates character ghost with initial letter', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
+      const mockDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      const char = screen.getByText('Goblin').closest('.items-panel-item');
+      fireEvent.dragStart(char, { dataTransfer: mockDT });
+
+      const ghosts = getGhostDivs();
+      expect(ghosts).toHaveLength(1);
+      const svg = ghosts[0].querySelector('svg');
+      expect(svg).toBeInTheDocument();
+      const text = svg.querySelector('text');
+      expect(text).toBeInTheDocument();
+      expect(text.textContent).toBe('G');
+    });
+
+    it('removes ghost div from DOM after timeout', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      const mockDT = { setData: vi.fn(), setDragImage: vi.fn() };
+      const barrel = screen.getByText('Barrel').closest('.items-panel-item');
+      fireEvent.dragStart(barrel, { dataTransfer: mockDT });
+
+      expect(getGhostDivs()).toHaveLength(1);
+
+      vi.advanceTimersByTime(0);
+
+      expect(getGhostDivs()).toHaveLength(0);
+    });
+
+    it('shows characters section title when characters are missing from players', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
+      expect(screen.getByText('Characters')).toBeInTheDocument();
     });
   });
 });
