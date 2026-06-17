@@ -7,43 +7,43 @@
       "name": "Strength",
       "baseScore": 8,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 10,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 2,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 10,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     }
   ],
   "background": "Sage",
