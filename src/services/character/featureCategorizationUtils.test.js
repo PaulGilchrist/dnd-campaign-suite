@@ -229,6 +229,34 @@ describe('featureCategorizationUtils', () => {
       expect(result.reactions[0].name).toBe('Slow Fall');
          });
 
+    it('should categorize features by alternative casting_time formats (without "1 " prefix)', () => {
+      const items = [
+        { name: 'Action Feature', description: 'Uses "action" format', automation: { casting_time: 'action', type: 'extra_action' } },
+        { name: 'Bonus Feature', description: 'Uses "bonus action" format', automation: { casting_time: 'bonus action', type: 'self_healing' } },
+        { name: 'Reaction Feature', description: 'Uses "reaction" format', automation: { casting_time: 'reaction', type: 'damage_reduction' } }
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].name).toBe('Action Feature');
+      expect(result.bonusActions).toHaveLength(1);
+      expect(result.bonusActions[0].name).toBe('Bonus Feature');
+      expect(result.reactions).toHaveLength(1);
+      expect(result.reactions[0].name).toBe('Reaction Feature');
+         });
+
+    it('should handle casting_time with extra whitespace', () => {
+      const items = [
+        { name: 'Trimmed Feature', description: 'Has extra spaces', automation: { casting_time: '  1 bonus action  ', type: 'self_healing' } }
+            ];
+
+      const result = categorizeFeatures(items, mockCategories);
+
+      expect(result.bonusActions).toHaveLength(1);
+      expect(result.bonusActions[0].name).toBe('Trimmed Feature');
+         });
+
     it('should prefer casting_time over name-based categorization', () => {
       const items = [
         // "Second Wind" is in mockCategories.actions by name, but casting_time should override

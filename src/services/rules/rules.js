@@ -18,6 +18,7 @@ import { getAttacks as getAttacks2024 } from './core/attackCalc2024.js';
 import { getSpellMaxLevel } from '../shared/spell-utils.js';
 import { loadFeatData, loadSkills, loadBackgroundData } from '../ui/dataLoader.js';
 import { computeAllFeatBuffs } from '../character/featBuffService.js';
+import { getCategories } from '../character/featureCategories.js';
 import {
     collectAutomationFromFeatures,
     collectSaveModifiers,
@@ -410,14 +411,14 @@ const rules = {
                 typeof action === 'string' ? { name: action, description: '', details: null } : action
              );
 
-            const specialActions = uniqBy([
-                 ...playerSpecialActions,
-                 ...features.specialActions,
-                 ...traits.specialActions,
-                 ...(playerStats.magicSpecialActions ? playerStats.magicSpecialActions : []),
-                 ...(playerStats.utilizeSpecialActions ? playerStats.utilizeSpecialActions : []),
-                 ...(playerStats.craftSpecialActions ? playerStats.craftSpecialActions : [])
-             ], 'name').sort((a, b) => a.name.localeCompare(b.name));
+             const specialActions = uniqBy([
+                  ...features.specialActions,
+                  ...traits.specialActions,
+                  ...playerSpecialActions,
+                  ...(playerStats.magicSpecialActions ? playerStats.magicSpecialActions : []),
+                  ...(playerStats.utilizeSpecialActions ? playerStats.utilizeSpecialActions : []),
+                  ...(playerStats.craftSpecialActions ? playerStats.craftSpecialActions : [])
+              ], 'name').sort((a, b) => a.name.localeCompare(b.name));
 
             const characterAdvancement = uniqBy([...features.characterAdvancement, ...traits.characterAdvancement], 'name').sort((a, b) => a.name.localeCompare(b.name));
 
@@ -846,37 +847,48 @@ const rules = {
             });
         }
 
-        // Merge feat features (passive_buffs, etc.) into specialActions for automation pipeline
+        // Merge feat features (passive_buffs, etc.) into their proper categories based on automation.casting_time
         const featFeatures = featBuffs.features || [];
         if (featFeatures.length > 0) {
-            const existingActionNames = new Set(
-                [
-                    ...(playerStats.specialActions || []),
-                    ...(playerStats.actions || []),
-                    ...(playerStats.bonusActions || []),
-                    ...(playerStats.reactions || []),
-                ].map(a => (typeof a === 'string' ? a : a.name))
-            );
             for (const featFeature of featFeatures) {
-                if (featFeature.name && !existingActionNames.has(featFeature.name)) {
-                    if (!playerStats.specialActions) playerStats.specialActions = [];
-                    playerStats.specialActions.push({
-                        name: featFeature.name,
-                        description: featFeature.description || '',
-                        type: featFeature.type || 'passive',
-                        source: 'feat',
-                        automation: featFeature.automation,
-                    });
-                    existingActionNames.add(featFeature.name);
-                    if (featFeature.isBonusAction) {
-                        if (!playerStats.bonusActions) playerStats.bonusActions = [];
-                        playerStats.bonusActions.push({
-                            name: featFeature.name,
-                            description: featFeature.description || '',
-                            type: featFeature.type || 'passive',
-                            source: 'feat',
-                            automation: featFeature.automation,
-                        });
+                if (!featFeature.name) continue;
+
+                const featEntry = {
+                    name: featFeature.name,
+                    description: featFeature.description || '',
+                    type: featFeature.type || 'passive',
+                    source: 'feat',
+                    automation: featFeature.automation,
+                };
+
+                // Categorize by automation.casting_time
+                let castingTime = featFeature.automation?.casting_time;
+                if (castingTime) {
+                    const ct = castingTime;
+                    if (ct === '1 action' && !playerStats.actions?.some(f => f.name === featFeature.name)) {
+                        playerStats.actions = [...(playerStats.actions || []), featEntry];
+                    } else if (ct === '1 bonus action' && !playerStats.bonusActions?.some(f => f.name === featFeature.name)) {
+                        playerStats.bonusActions = [...(playerStats.bonusActions || []), featEntry];
+                    } else if (ct === '1 reaction' && !playerStats.reactions?.some(f => f.name === featFeature.name)) {
+                        playerStats.reactions = [...(playerStats.reactions || []), featEntry];
+                    } else if (ct === 'passive' && !playerStats.characterAdvancement?.some(f => f.name === featFeature.name)) {
+                        playerStats.characterAdvancement = [...(playerStats.characterAdvancement || []), featEntry];
+                    } else {
+                        playerStats.specialActions = [...(playerStats.specialActions || []), featEntry];
+                    }
+                } else {
+                    // No automation.casting_time — go to specialActions unless name matches a category
+                    const featureCategories = getCategories(playerStats.rules || '5e');
+                    if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement?.some(f => f.name === featFeature.name)) {
+                        playerStats.characterAdvancement = [...(playerStats.characterAdvancement || []), featEntry];
+                    } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions?.some(f => f.name === featFeature.name)) {
+                        playerStats.actions = [...(playerStats.actions || []), featEntry];
+                    } else if (featureCategories.bonusActions.includes(featFeature.name) && !playerStats.bonusActions?.some(f => f.name === featFeature.name)) {
+                        playerStats.bonusActions = [...(playerStats.bonusActions || []), featEntry];
+                    } else if (featureCategories.reactions.includes(featFeature.name) && !playerStats.reactions?.some(f => f.name === featFeature.name)) {
+                        playerStats.reactions = [...(playerStats.reactions || []), featEntry];
+                    } else if (!playerStats.specialActions?.some(f => f.name === featFeature.name)) {
+                        playerStats.specialActions = [...(playerStats.specialActions || []), featEntry];
                     }
                 }
             }
@@ -950,23 +962,6 @@ const rules = {
               }
           }
 
-          // Apply feat features to special actions
-        const existingActionNames = new Set(
-            (playerStats.specialActions || []).map(a => a.name)
-        );
-        featBuffs.features.forEach(f => {
-            if (!existingActionNames.has(f.name)) {
-                playerStats.specialActions = playerStats.specialActions || [];
-                playerStats.specialActions.push({
-                    name: f.name,
-                    description: f.description,
-                    type: f.type || 'passive',
-                    source: 'feat',
-                    automation: f.automation,
-                });
-                existingActionNames.add(f.name);
-            }
-        });
 
           // 2024-specific: senses set later (override), 5e-specific: immunities/resistances
           if (is2024(playerStats, playerSummary)) {

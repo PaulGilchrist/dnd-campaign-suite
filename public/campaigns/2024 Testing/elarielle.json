@@ -97,44 +97,7 @@
     "Medicine",
     "Perception"
   ],
-  "specialActions": [
-    {
-      "name": "Increased Hit Points",
-      "description": "Your Hit Point maximum increases by an amount equal to twice your character level when you gain this feat. Whenever you gain a character level thereafter, your Hit Point maximum increases by an additional 2 Hit Points.",
-      "type": "passive",
-      "source": "feat"
-    },
-    {
-      "name": "Defy Death",
-      "description": "You have Advantage on Death Saving Throws.",
-      "type": "passive",
-      "source": "feat"
-    },
-    {
-      "name": "Speedy Recovery",
-      "description": "As a Bonus Action, you can expend one of your Hit Point Dice, roll the die, and regain a number of Hit Points equal to the roll.",
-      "type": "bonus_action",
-      "source": "feat"
-    },
-    {
-      "name": "Concentration",
-      "description": "You have Advantage on Constitution saving throws that you make to maintain Concentration.",
-      "type": "passive",
-      "source": "feat"
-    },
-    {
-      "name": "Reactive Spell",
-      "description": "When a creature provokes an Opportunity Attack from you by leaving your reach, you can take a Reaction to cast a spell at the creature rather than making an Opportunity Attack. The spell must have a casting time of one action and must target only that creature.",
-      "type": "reaction",
-      "source": "feat"
-    },
-    {
-      "name": "Somatic Components",
-      "description": "You can perform the Somatic components of spells even when you have weapons or a Shield in one or both hands.",
-      "type": "passive",
-      "source": "feat"
-    }
-  ],
+  "specialActions": [],
   "spells": [
     "Find Familiar",
     "Fire Bolt",

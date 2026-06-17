@@ -473,6 +473,71 @@ describe('computeFeatBuffs', () => {
       ]);
     });
 
+    it('should parse Durable feat Speedy Recovery with self_healing automation', () => {
+      const result = computeFeatBuffs(
+        {
+          benefits: [
+            {
+              name: 'Ability Score Increase',
+              description: 'Increase your Constitution score by 1, to a maximum of 20.',
+              type: 'ability_score_increase',
+            },
+            {
+              name: 'Defy Death',
+              description: 'You have Advantage on Death Saving Throws.',
+              type: 'passive',
+              automation: {
+                type: 'conditional_advantage',
+                target: 'death_saving_throws',
+                effect: 'advantage',
+                casting_time: 'passive',
+              },
+            },
+            {
+              name: 'Speedy Recovery',
+              description: 'As a Bonus Action, you can expend one of your Hit Point Dice, roll the die, and regain a number of Hit Points equal to the roll.',
+              type: 'bonus_action',
+              automation: {
+                type: 'self_healing',
+                action: 'bonus_action',
+                hitDiceCost: 1,
+                healExpression: 'hit_die_roll',
+                casting_time: '1 bonus action',
+              },
+            },
+          ],
+          ability_score_increase: { scores: ['Constitution'], amount: 1, max_value: 20 },
+        },
+        '2024'
+      );
+
+      expect(result.features).toHaveLength(2);
+      expect(result.features.find(f => f.name === 'Defy Death')).toEqual({
+        name: 'Defy Death',
+        description: 'You have Advantage on Death Saving Throws.',
+        type: 'passive',
+        automation: {
+          type: 'conditional_advantage',
+          target: 'death_saving_throws',
+          effect: 'advantage',
+          casting_time: 'passive',
+        },
+      });
+      expect(result.features.find(f => f.name === 'Speedy Recovery')).toEqual({
+        name: 'Speedy Recovery',
+        description: 'As a Bonus Action, you can expend one of your Hit Point Dice, roll the die, and regain a number of Hit Points equal to the roll.',
+        type: 'bonus_action',
+        automation: {
+          type: 'self_healing',
+          action: 'bonus_action',
+          hitDiceCost: 1,
+          healExpression: 'hit_die_roll',
+          casting_time: '1 bonus action',
+        },
+        isBonusAction: true,
+      });
+    });
+
     it('should parse all three Observant benefits together', () => {
       const result = computeFeatBuffs(
         {
