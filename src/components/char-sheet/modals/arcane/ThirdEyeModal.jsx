@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { applyThirdEye } from '../../../services/automation/handlers/class-wizard/thirdEyeHandler.js';
-import '../CharSheet.css';
+import { applyThirdEye } from '../../../../services/automation/handlers/class-wizard/thirdEyeHandler.js';
+import '../../CharSheet.css';
 
 const THIRD_EYE_OPTIONS = [
     { name: 'Darkvision (120 feet)', description: 'You gain Darkvision out to a range of 120 feet.' },

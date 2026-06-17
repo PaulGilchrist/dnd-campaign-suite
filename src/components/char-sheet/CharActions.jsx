@@ -38,7 +38,7 @@ import HealingIllusionModal from './modals/shared/HealingIllusionModal.jsx'
 import SaveAttackHealModal from './modals/shared/SaveAttackHealModal.jsx'
 import MoonlightStepResourceModal from './modals/MoonlightStepResourceModal.jsx'
 import ConstellationSelectionModal from './modals/ConstellationSelectionModal.jsx'
-import ArcaneChargeModal from './modals/ArcaneChargeModal.jsx'
+import ArcaneChargeModal from './modals/arcane/ArcaneChargeModal.jsx'
 import WarMagicCantripModal from './modals/WarMagicCantripModal.jsx'
 import WarMagicSpellModal from './modals/WarMagicSpellModal.jsx'
 import SacredWeaponModal from './modals/divine/SacredWeaponModal.jsx'
@@ -53,8 +53,8 @@ import BoonOfEnergyResistanceModal from './modals/racial/BoonOfEnergyResistanceM
 import DragonCompanionModal from './modals/DragonCompanionModal.jsx'
 import WildMagicDoubleRollModal from './modals/WildMagicDoubleRollModal.jsx'
 import WildMagicTamedModal from './modals/WildMagicTamedModal.jsx'
-import SoulstitchSpellsModal from './modals/SoulstitchSpellsModal.jsx'
-import IllusoryRealityModal from './modals/IllusoryRealityModal.jsx'
+import SoulstitchSpellsModal from './modals/arcane/SoulstitchSpellsModal.jsx'
+import IllusoryRealityModal from './modals/arcane/IllusoryRealityModal.jsx'
 import CelestialRevelationModal from './modals/CelestialRevelationModal.jsx'
 import ElfisLineageModal from './modals/racial/ElfisLineageModal.jsx'
 import GnomishLineageModal from './modals/racial/GnomishLineageModal.jsx'
@@ -81,12 +81,12 @@ import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDesc
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
-import DivinationSavantModal from './modals/DivinationSavantModal.jsx';
+import DivinationSavantModal from './modals/arcane/DivinationSavantModal.jsx';
 import { onDivinationSavantSelected } from '../../services/automation/handlers/class-wizard/divinationSavantHandler.js';
-import IllusionSavantModal from './modals/IllusionSavantModal.jsx';
+import IllusionSavantModal from './modals/arcane/IllusionSavantModal.jsx';
 import { onIllusionSavantSelected } from '../../services/automation/handlers/class-wizard/illusionSavantHandler.js';
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js';
-import ThirdEyeModal from './modals/ThirdEyeModal.jsx';
+import ThirdEyeModal from './modals/arcane/ThirdEyeModal.jsx';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';

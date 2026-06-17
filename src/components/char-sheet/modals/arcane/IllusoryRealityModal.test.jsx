@@ -4,15 +4,15 @@ import IllusoryRealityModal from './IllusoryRealityModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/class-wizard/illusoryRealityHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/class-wizard/illusoryRealityHandler.js', () => ({
   confirmIllusoryReality: vi.fn(),
 }));
 
-vi.mock('../../../services/ui/logService.js', () => ({
+vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
   setRuntimeBatch: vi.fn(() => Promise.resolve()),
@@ -20,7 +20,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 
 // ── Re-import mocked modules ──
 
-import { confirmIllusoryReality } from '../../../services/automation/handlers/class-wizard/illusoryRealityHandler.js';
+import { confirmIllusoryReality } from '../../../../services/automation/handlers/class-wizard/illusoryRealityHandler.js';
 
 // ── Test fixtures ──
 

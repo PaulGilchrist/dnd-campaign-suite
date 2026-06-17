@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { confirmArcaneCharge } from '../../../services/automation/handlers/class-sorcerer/arcaneChargeHandler.js';
-import '../CharSheet.css';
+import { confirmArcaneCharge } from '../../../../services/automation/handlers/class-sorcerer/arcaneChargeHandler.js';
+import '../../CharSheet.css';
 
 function ArcaneChargeModal({ action, playerStats, campaignName, distance, onClose }) {
     const [applied, setApplied] = useState(false);

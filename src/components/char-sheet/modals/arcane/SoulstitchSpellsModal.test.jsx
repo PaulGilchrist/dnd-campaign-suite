@@ -4,26 +4,26 @@ import SoulstitchSpellsModal from './SoulstitchSpellsModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/class-wizard/soulstitchSpellsHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/class-wizard/soulstitchSpellsHandler.js', () => ({
   applySoulstitchSelection: vi.fn(),
 }));
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => []),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../services/rules/combat/damageUtils.js', () => ({
+vi.mock('../../../../services/rules/combat/damageUtils.js', () => ({
   getCombatContext: vi.fn(() => Promise.resolve({ creatures: [] })),
 }));
 
-vi.mock('../../../services/ui/logService.js', () => ({
+vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Re-import mocked modules ──
 
-import { applySoulstitchSelection } from '../../../services/automation/handlers/class-wizard/soulstitchSpellsHandler.js';
+import { applySoulstitchSelection } from '../../../../services/automation/handlers/class-wizard/soulstitchSpellsHandler.js';
 
 // ── Test fixtures ──
 

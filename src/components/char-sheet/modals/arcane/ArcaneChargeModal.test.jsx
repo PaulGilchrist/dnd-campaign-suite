@@ -4,13 +4,13 @@ import ArcaneChargeModal from './ArcaneChargeModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/class-sorcerer/arcaneChargeHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/class-sorcerer/arcaneChargeHandler.js', () => ({
   confirmArcaneCharge: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
 
-import { confirmArcaneCharge } from '../../../services/automation/handlers/class-sorcerer/arcaneChargeHandler.js';
+import { confirmArcaneCharge } from '../../../../services/automation/handlers/class-sorcerer/arcaneChargeHandler.js';
 
 // ── Test fixtures ──
 

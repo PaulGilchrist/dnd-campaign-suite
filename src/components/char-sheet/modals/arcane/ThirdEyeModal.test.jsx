@@ -4,7 +4,7 @@ import ThirdEyeModal from './ThirdEyeModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/class-wizard/thirdEyeHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/class-wizard/thirdEyeHandler.js', () => ({
   applyThirdEye: vi.fn(() => Promise.resolve({
     type: 'popup',
     payload: {
@@ -15,18 +15,18 @@ vi.mock('../../../services/automation/handlers/class-wizard/thirdEyeHandler.js',
   })),
 }));
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => []),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../services/automation/common/buffToggle.js', () => ({
+vi.mock('../../../../services/automation/common/buffToggle.js', () => ({
   getActiveBuffs: vi.fn(() => []),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as thirdEyeHandler from '../../../services/automation/handlers/class-wizard/thirdEyeHandler.js';
+import * as thirdEyeHandler from '../../../../services/automation/handlers/class-wizard/thirdEyeHandler.js';
 
 // ── Test fixtures ──
 
