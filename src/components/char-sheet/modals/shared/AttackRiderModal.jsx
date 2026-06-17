@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { applyRiderOption } from '../../../services/automation/handlers/combat/attackRiderHandler.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import '../CharSheet.css';
+import { applyRiderOption } from '../../../../services/automation/handlers/combat/attackRiderHandler.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import '../../CharSheet.css';
 
 function AttackRiderModal({ action, playerStats, campaignName, targetName, onClose }) {
     const [selected, setSelected] = useState(null);
@@ -51,7 +51,7 @@ function AttackRiderModal({ action, playerStats, campaignName, targetName, onClo
 
     const handleVtApply = async () => {
         if (!vtSelected) return;
-        const { applyVersatileTrickster } = await import('../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
+        const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
         const vtAction = getRuntimeValue(playerStats.name, 'versatileTricksterAction', campaignName);
         const res = await applyVersatileTrickster(vtAction, playerStats, campaignName, vtSelected);
         setVtResult(res);

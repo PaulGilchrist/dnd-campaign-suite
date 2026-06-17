@@ -1,19 +1,19 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { getDistanceFeet } from '../../../services/rules/combat/rangeValidation.js';
-import { sendSavePrompt, sendSaveResult } from '../../../services/combat/conditions/savePromptService.js';
-import { addEntry } from '../../../services/ui/logService.js';
-import { rollExpression } from '../../../services/dice/diceRoller.js';
-import utils from '../../../services/ui/utils.js';
-import storage from '../../../services/ui/storage.js';
-import { applyHealingDirectly, logHealingToSSE } from '../../../services/automation/common/healingRoll.js';
+import { getDistanceFeet } from '../../../../services/rules/combat/rangeValidation.js';
+import { sendSavePrompt, sendSaveResult } from '../../../../services/combat/conditions/savePromptService.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addExpiration } from '../../../../services/rules/effects/expirations.js';
+import { addEntry } from '../../../../services/ui/logService.js';
+import { rollD20 } from '../../../../services/dice/diceRoller.js';
+import { playerIsImmuneToCondition } from '../../../../services/combat/automation/automationService.js';
+import utils from '../../../../services/ui/utils.js';
+import storage from '../../../../services/ui/storage.js';
 
-function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, featureName, saveType, rangeFeet, damageExpression, damageType, healExpression, onClose }) {
+function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, campaignName, mapData, onClose, characters, featureName = 'Abjure Foes', conditionName = 'frightened', additionalCondition = null, saveType = 'WIS', rangeFeet = 60, durationRounds }) {
     const [selected, setSelected] = useState(new Set());
     const [processing, setProcessing] = useState(false);
     const [results, setResults] = useState([]);
     const [pendingPrompts, setPendingPrompts] = useState([]);
-    const [healedTarget, setHealedTarget] = useState(null);
-    const [healResult, setHealResult] = useState(null);
 
     const eligibleTargets = useMemo(() => {
         if (!combatSummary?.creatures) return [];
@@ -25,7 +25,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
             const dist = getDistanceFeet(attackerPos, { gridX: targetPos.gridX, gridY: targetPos.gridY });
             return dist != null && dist <= rangeFeet;
          });
-      }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet]);
+     }, [combatSummary, attackerName, mapData, attackerPos, rangeFeet]);
 
     const toggleTarget = useCallback((name) => {
         setSelected(prev => {
@@ -36,8 +36,76 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                 next.add(name);
              }
             return next;
-          });
-      }, []);
+         });
+     }, []);
+
+    const applyConditionToCreature = useCallback((targetName, saveDcValue, condName) => {
+        const creature = combatSummary.creatures.find(c => c.name === targetName);
+        if (!creature) return;
+
+        const condKey = condName.toLowerCase();
+
+        const targetCharacter = characters?.find(c => utils.getName(c.name) === targetName);
+        const targetStats = targetCharacter?.computedStats || targetCharacter;
+        if (targetStats && playerIsImmuneToCondition({
+            conditionKey: condKey,
+            playerStats: targetStats,
+            getRuntimeValue,
+            campaignName,
+        })) {
+            return;
+        }
+
+        if (creature.type === 'player') {
+            const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+            const filtered = conditions.filter(c => String(c).toLowerCase() !== condKey);
+            setRuntimeValue(creature.name, 'activeConditions', [...filtered, condKey], campaignName);
+         } else {
+            creature.conditions = (creature.conditions || []).filter(c => c.key !== condKey);
+            creature.conditions.push({
+                id: utils.guid(),
+                key: condKey,
+                label: condName.charAt(0).toUpperCase() + condName.slice(1),
+                dc: saveDcValue,
+                ability: saveType.toLowerCase(),
+             });
+         }
+     }, [combatSummary, campaignName, characters, saveType]);
+
+    const addConditionToCreature = useCallback((targetName, saveDcValue) => {
+        applyConditionToCreature(targetName, saveDcValue, conditionName);
+
+        if (additionalCondition) {
+            applyConditionToCreature(targetName, saveDcValue, additionalCondition);
+        }
+
+        addExpiration(attackerName, targetName, [
+            { type: conditionName.toLowerCase(), condition: conditionName.toLowerCase() },
+            ...(additionalCondition ? [{ type: additionalCondition.toLowerCase(), condition: additionalCondition.toLowerCase() }] : []),
+           ], campaignName, durationRounds);
+
+     }, [attackerName, campaignName, conditionName, additionalCondition, durationRounds, applyConditionToCreature]);
+
+    const logCondition = useCallback((targetName, saveDcValue) => {
+        const conditions = [conditionName.charAt(0).toUpperCase() + conditionName.slice(1)];
+        if (additionalCondition) {
+            conditions.push(additionalCondition.charAt(0).toUpperCase() + additionalCondition.slice(1));
+        }
+        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'condition',
+                action: 'applied',
+                characterName: targetName,
+                condition: conditions.join(' & '),
+                dc: saveDcValue,
+                ability: saveType,
+                sourceName: attackerName,
+                timestamp: Date.now(),
+             }),
+          }).catch(() => {});
+     }, [campaignName, attackerName, conditionName, additionalCondition, saveType]);
 
     const handleApply = useCallback(() => {
         if (selected.size === 0) return;
@@ -52,20 +120,24 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
 
             if (isNpc) {
                 const saveBonus = target?.saveBonuses?.[saveType.toLowerCase()] ?? 0;
-                const roll1 = rollExpression('1d20');
-                const total = roll1?.total ?? roll1;
+                const roll1 = rollD20();
+                const total = roll1 + saveBonus;
                 const success = total >= saveDc;
 
                 sendSaveResult(campaignName, targetName, {
                     promptId: utils.guid(),
                     success,
-                    roll: roll1?.total ?? roll1,
+                    roll: roll1,
                     total,
                     saveBonus,
-                    rawRolls: [roll1?.total ?? roll1, roll1?.total ?? roll1],
+                    rawRolls: [roll1, roll1],
                  });
 
-                npcResults.push({ targetName, success, roll: roll1?.total ?? roll1, total, saveBonus });
+                if (!success) {
+                    addConditionToCreature(targetName, saveDc);
+                 }
+
+                npcResults.push({ targetName, success, roll: roll1, total, saveBonus });
 
                 addEntry(campaignName, {
                     type: 'roll',
@@ -77,7 +149,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                     saveType,
                     saveResult: success ? 'success' : 'failure',
                     total,
-                    rolls: [roll1?.total ?? roll1],
+                    rolls: [roll1],
                     bonus: saveBonus,
                     formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
                     timestamp: Date.now(),
@@ -111,13 +183,19 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
              }
          });
 
+        // Persist all mutations once, then notify subscribers
         storage.set('combatSummary', combatSummary, campaignName);
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+
+        // Log condition applications for failed NPC saves
+        npcResults.filter(r => !r.success).forEach(r => {
+            logCondition(r.targetName, saveDc);
+         });
 
         setResults(npcResults);
         setPendingPrompts(playerPrompts);
 
-      }, [selected, combatSummary, campaignName, saveDc, attackerName, featureName, saveType]);
+     }, [selected, combatSummary, campaignName, saveDc, attackerName, addConditionToCreature, logCondition, featureName, saveType]);
 
     const handleSaveResult = useCallback((event) => {
         const detail = event.detail;
@@ -129,6 +207,11 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
         const pendingTarget = pendingPrompts[pendingIndex];
         const targetName = pendingTarget.targetName;
         const success = detail.success;
+
+        if (!success) {
+            addConditionToCreature(targetName, saveDc);
+            logCondition(targetName, saveDc);
+         }
 
         addEntry(campaignName, {
             type: 'roll',
@@ -146,13 +229,14 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
             timestamp: Date.now(),
          }).catch(() => {});
 
+        // Persist and notify after player save result
         storage.set('combatSummary', combatSummary, campaignName);
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 
         setResults(prev => [...prev, { targetName, success, roll: detail.roll ?? 0, total: detail.total ?? 0, saveBonus: detail.saveBonus ?? 0 }]);
         setPendingPrompts(prev => prev.filter(p => p.promptId !== detail.promptId));
 
-      }, [pendingPrompts, campaignName, attackerName, saveDc, combatSummary, featureName, saveType]);
+     }, [pendingPrompts, campaignName, attackerName, saveDc, combatSummary, addConditionToCreature, logCondition, featureName, saveType]);
 
     React.useEffect(() => {
         if (!processing) return;
@@ -162,56 +246,25 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
 
     const allResolved = processing && pendingPrompts.length === 0 && results.length >= selected.size;
 
-    const handleHeal = useCallback(() => {
-        if (!healedTarget) return;
-        setProcessing(true);
-
-        const rollResult = rollExpression(healExpression);
-        if (!rollResult) {
-            setProcessing(false);
-            return;
+    React.useEffect(() => {
+        if (allResolved && featureName.toLowerCase().includes('turn undead')) {
+            const failedTargets = results.filter(r => !r.success).map(r => r.targetName);
+            if (failedTargets.length > 0) {
+                window.dispatchEvent(new CustomEvent('turn-undead-result', {
+                    detail: {
+                        failedTargets,
+                        attackerName,
+                        saveDc,
+                        saveType,
+                        campaignName,
+                    },
+                }));
+            }
         }
+    }, [allResolved, featureName, results, attackerName, saveDc, saveType, campaignName]);
 
-        const healAmount = rollResult.total;
-        const { newHp, maxHp, actualHeal } = applyHealingDirectly(
-            { name: healedTarget, hitPoints: 0 },
-            healedTarget,
-            healAmount,
-            campaignName
-        );
-
-        logHealingToSSE(campaignName, {
-            targetName: healedTarget,
-            sourceName: featureName,
-            actualHeal,
-            newHp,
-            maxHp,
-        });
-
-        setHealResult({
-            targetName: healedTarget,
-            healAmount,
-            actualHeal,
-            newHp,
-            maxHp,
-            formula: healExpression,
-        });
-
-        addEntry(campaignName, {
-            type: 'roll',
-            name: featureName,
-            characterName: attackerName,
-            rollType: 'healing',
-            targetName: healedTarget,
-            formula: healExpression,
-            total: healAmount,
-            rolls: rollResult.rolls,
-            bonus: 0,
-            timestamp: Date.now(),
-         }).catch(() => {});
-
-        setProcessing(false);
-      }, [healedTarget, healExpression, campaignName, attackerName, featureName]);
+    const conditionLabel = conditionName.charAt(0).toUpperCase() + conditionName.slice(1)
+        + (additionalCondition ? ' & ' + additionalCondition.charAt(0).toUpperCase() + additionalCondition.slice(1) : '');
 
     return (
          <div className="sp-overlay" onClick={onClose}>
@@ -220,11 +273,9 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                      <i className="fa-solid fa-dice-d20"></i> {featureName}
                  </div>
                  <div className="sp-body">
-                     {!processing && !allResolved ? (
+                     {!processing ? (
                          <>
-                             <p>Select creatures within {rangeFeet} feet. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}).</p>
-                             <p className="sp-note">On a failed save, target takes {damageExpression} {damageType} damage. On a successful save, target takes half damage.</p>
-                             <p className="sp-note">After resolving saves, select one creature to heal for {healExpression} HP.</p>
+                             <p>Select creatures within {rangeFeet} feet. Each must make a <strong>{saveType}</strong> saving throw (DC {saveDc}) or become <strong>{conditionLabel}</strong> for 1 minute.</p>
                              <p className="sp-note">Targets selected: {selected.size}/{eligibleTargets.length}</p>
                              <div className="abjure-targets-list">
                                  {eligibleTargets.map(c => (
@@ -249,7 +300,7 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                              <div className="abjure-results-list">
                                  {results.map(r => (
                                      <div key={r.targetName} className={`abjure-result ${r.success ? 'abjure-result-success' : 'abjure-result-fail'}`}>
-                                         <strong>{r.targetName}</strong>: {r.success ? 'Saved' : `Failed — takes ${damageExpression} ${damageType} damage!`}{typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
+                                         <strong>{r.targetName}</strong>: {r.success ? 'Saved — unaffected' : `Failed — ${conditionLabel}!`}{typeof r.roll === 'number' && <> (Roll: {r.roll}{r.saveBonus !== 0 ? ' +' + r.saveBonus : ''} = {r.total})</>}
                                      </div>
                                  ))}
                                  {pendingPrompts.map(p => (
@@ -259,34 +310,13 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                                  ))}
                              </div>
                              {allResolved && (
-                                 <>
-                                     <p className="sp-note" style={{ marginTop: '8px' }}>All targets resolved.</p>
-                                     <p>Select one creature to heal for {healExpression} HP:</p>
-                                     <div className="abjure-targets-list">
-                                         {results.map(r => (
-                                             <label key={r.targetName} className={`abjure-target-row ${healedTarget === r.targetName ? 'abjure-target-selected' : ''}`}>
-                                                 <input
-                                                     type="radio"
-                                                     name="healTarget"
-                                                     checked={healedTarget === r.targetName}
-                                                     onChange={() => setHealedTarget(r.targetName)}
-                                                 />
-                                                 <span className="abjure-target-name">{r.targetName}</span>
-                                             </label>
-                                         ))}
-                                     </div>
-                                     {healResult && (
-                                         <div className="abjure-result abjure-result-success" style={{ marginTop: '8px' }}>
-                                             <strong>{healResult.targetName}</strong> healed for <strong>{healResult.healAmount}</strong> HP (actual: {healResult.actualHeal}). Current HP: {healResult.newHp} / {healResult.maxHp}.
-                                         </div>
-                                     )}
-                                 </>
+                                 <p className="sp-note" style={{ marginTop: '8px' }}>All targets resolved.</p>
                              )}
                          </>
                      )}
                  </div>
                  <div className="sp-actions">
-                     {!processing && !allResolved ? (
+                     {!processing ? (
                          <>
                              <button className="sp-roll-btn" onClick={handleApply} disabled={selected.size === 0} type="button">
                                  <i className="fa-solid fa-dice-d20"></i> {featureName} ({selected.size} target{selected.size !== 1 ? 's' : ''})
@@ -296,18 +326,9 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
                              </button>
                          </>
                      ) : allResolved ? (
-                         <>
-                             {healResult ? (
-                                 <button className="sp-roll-btn" onClick={onClose} type="button">Done</button>
-                             ) : (
-                                 <button className="sp-roll-btn" onClick={handleHeal} disabled={!healedTarget} type="button">
-                                     <i className="fa-solid fa-heart"></i> Heal Selected ({healExpression})
-                                 </button>
-                             )}
-                             <button className="sp-dismiss-btn" onClick={onClose} type="button">
-                                 Cancel
-                             </button>
-                         </>
+                         <button className="sp-roll-btn" onClick={onClose} type="button">
+                             Done
+                         </button>
                      ) : null}
                  </div>
              </div>
@@ -315,4 +336,4 @@ function SaveAttackHealModal({ combatSummary, attackerName, attackerPos, saveDc,
      );
 }
 
-export default SaveAttackHealModal;
+export default SetConditionModal;

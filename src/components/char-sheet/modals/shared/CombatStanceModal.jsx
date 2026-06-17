@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { applyStanceOption } from '../../../services/automation/handlers/combat/combatStanceHandler.js';
-import '../CharSheet.css';
+import { applyStanceOption } from '../../../../services/automation/handlers/combat/combatStanceHandler.js';
+import '../../CharSheet.css';
 
 function CombatStanceModal({ action, playerStats, campaignName, onClose }) {
     const [selected, setSelected] = useState(null);

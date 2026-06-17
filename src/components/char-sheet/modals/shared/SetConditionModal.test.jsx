@@ -4,34 +4,34 @@ import SetConditionModal from './SetConditionModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../../services/rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
   rangeToFeet: vi.fn(() => 60),
 }));
 
-vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
+vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
 }));
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../services/rules/effects/expirations.js', () => ({
+vi.mock('../../../../services/rules/effects/expirations.js', () => ({
   addExpiration: vi.fn(),
 }));
 
-vi.mock('../../../services/ui/logService.js', () => ({
+vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../../../services/dice/diceRoller.js', () => ({
+vi.mock('../../../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
 }));
 
-vi.mock('../../../services/ui/utils.js', () => {
+vi.mock('../../../../services/ui/utils.js', () => {
   let counter = 0;
   const utilsMock = {
     guid: vi.fn(() => `guid-${++counter}`),
@@ -40,16 +40,16 @@ vi.mock('../../../services/ui/utils.js', () => {
   return { default: utilsMock };
 });
 
-vi.mock('../../../services/ui/storage.js', () => ({
+vi.mock('../../../../services/ui/storage.js', () => ({
   default: { set: vi.fn() },
 }));
 
 // ── Re-import mocked modules ──
-import * as savePromptService from '../../../services/combat/conditions/savePromptService.js';
-import * as useRuntimeState from '../../../hooks/runtime/useRuntimeState.js';
-import * as expirations from '../../../services/rules/effects/expirations.js';
-import * as logService from '../../../services/ui/logService.js';
-import * as diceRoller from '../../../services/dice/diceRoller.js';
+import * as savePromptService from '../../../../services/combat/conditions/savePromptService.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as expirations from '../../../../services/rules/effects/expirations.js';
+import * as logService from '../../../../services/ui/logService.js';
+import * as diceRoller from '../../../../services/dice/diceRoller.js';
 
 // ── Test fixtures ──
 

@@ -4,49 +4,49 @@ import SaveAttackHealModal from './SaveAttackHealModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
+vi.mock('../../../../services/rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(() => 10),
 }));
 
-vi.mock('../../../services/combat/conditions/savePromptService.js', () => ({
+vi.mock('../../../../services/combat/conditions/savePromptService.js', () => ({
   sendSavePrompt: vi.fn(),
   sendSaveResult: vi.fn(),
 }));
 
-vi.mock('../../../services/ui/logService.js', () => ({
+vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../services/dice/diceRoller.js', () => ({
+vi.mock('../../../../services/dice/diceRoller.js', () => ({
   rollExpression: vi.fn(() => ({ total: 10, rolls: [10], modifier: 0, formula: '1d20' })),
 }));
 
-vi.mock('../../../services/ui/utils.js', () => ({
+vi.mock('../../../../services/ui/utils.js', () => ({
   default: {
     guid: vi.fn(() => 'test-guid-123'),
   },
 }));
 
-vi.mock('../../../services/ui/storage.js', () => ({
+vi.mock('../../../../services/ui/storage.js', () => ({
   default: {
     set: vi.fn(),
   },
 }));
 
-vi.mock('../../../services/automation/common/healingRoll.js', () => ({
+vi.mock('../../../../services/automation/common/healingRoll.js', () => ({
   applyHealingDirectly: vi.fn(() => ({ newHp: 30, maxHp: 40, actualHeal: 10 })),
   logHealingToSSE: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as rangeValidation from '../../../services/rules/combat/rangeValidation.js';
-import * as savePromptService from '../../../services/combat/conditions/savePromptService.js';
-import * as logService from '../../../services/ui/logService.js';
-import * as diceRoller from '../../../services/dice/diceRoller.js';
-import utils from '../../../services/ui/utils.js';
-import storage from '../../../services/ui/storage.js';
-import * as healingRoll from '../../../services/automation/common/healingRoll.js';
+import * as rangeValidation from '../../../../services/rules/combat/rangeValidation.js';
+import * as savePromptService from '../../../../services/combat/conditions/savePromptService.js';
+import * as logService from '../../../../services/ui/logService.js';
+import * as diceRoller from '../../../../services/dice/diceRoller.js';
+import utils from '../../../../services/ui/utils.js';
+import storage from '../../../../services/ui/storage.js';
+import * as healingRoll from '../../../../services/automation/common/healingRoll.js';
 
 // ── Test fixtures ──
 

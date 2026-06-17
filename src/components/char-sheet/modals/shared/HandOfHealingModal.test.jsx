@@ -4,28 +4,28 @@ import HandOfHealingModal from './HandOfHealingModal.jsx';
 
 // ── Mocked modules (before the component import) ──
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../services/ui/utils.js', () => ({
+vi.mock('../../../../services/ui/utils.js', () => ({
   default: { getName: vi.fn((n) => (typeof n === 'string' ? n : '')) },
 }));
 
-vi.mock('../../../services/ui/storage.js', () => ({
+vi.mock('../../../../services/ui/storage.js', () => ({
   default: { set: vi.fn() },
 }));
 
-vi.mock('../../../services/encounters/combatData.js', () => ({
+vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCombatSummary: vi.fn(() => null),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as useRuntimeState from '../../../hooks/runtime/useRuntimeState.js';
-import storage from '../../../services/ui/storage.js';
-import * as combatData from '../../../services/encounters/combatData.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import storage from '../../../../services/ui/storage.js';
+import * as combatData from '../../../../services/encounters/combatData.js';
 
 // ── Test fixtures ──
 

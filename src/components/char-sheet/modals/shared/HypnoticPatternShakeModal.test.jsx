@@ -4,18 +4,18 @@ import HypnoticPatternShakeModal from './HypnoticPatternShakeModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/index.js', () => ({
+vi.mock('../../../../services/automation/index.js', () => ({
   executeHandler: vi.fn(() => null),
 }));
 
-vi.mock('../../../services/ui/logService.js', () => ({
+vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 // ── Re-import mocked modules ──
 
-import { executeHandler } from '../../../services/automation/index.js';
-import { addEntry } from '../../../services/ui/logService.js';
+import { executeHandler } from '../../../../services/automation/index.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 
 // ── Test fixtures ──
 

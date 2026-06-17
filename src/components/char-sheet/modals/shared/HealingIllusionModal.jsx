@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { logHealingToSSE } from '../../../services/automation/common/healingRoll.js';
-import '../CharSheet.css';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { logHealingToSSE } from '../../../../services/automation/common/healingRoll.js';
+import '../../CharSheet.css';
 
 function HealingIllusionModal({ action, playerStats, campaignName, onClose }) {
     const [targetName, setTargetName] = useState(playerStats.name);

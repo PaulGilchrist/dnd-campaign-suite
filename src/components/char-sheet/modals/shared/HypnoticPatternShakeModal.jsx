@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { executeHandler } from '../../../services/automation/index.js';
-import { addEntry } from '../../../services/ui/logService.js';
+import { executeHandler } from '../../../../services/automation/index.js';
+import { addEntry } from '../../../../services/ui/logService.js';
 
 function HypnoticPatternShakeModal({ attackerName, campaignName, targets, rangeFeet, featureName, onClose }) {
     const [selected, setSelected] = useState(null);

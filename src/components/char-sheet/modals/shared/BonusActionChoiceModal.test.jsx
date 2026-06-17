@@ -4,22 +4,22 @@ import BonusActionChoiceModal from './BonusActionChoiceModal.jsx';
 
 // ── Mocked modules ──
 
-vi.mock('../../../services/automation/handlers/combat/bonusActionChoiceHandler.js', () => ({
+vi.mock('../../../../services/automation/handlers/combat/bonusActionChoiceHandler.js', () => ({
   applyBonusActionChoice: vi.fn(),
 }));
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../services/encounters/combatData.js', () => ({
+vi.mock('../../../../services/encounters/combatData.js', () => ({
   getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 // ── Re-import mocked modules ──
 
-import * as bonusActionHandler from '../../../services/automation/handlers/combat/bonusActionChoiceHandler.js';
+import * as bonusActionHandler from '../../../../services/automation/handlers/combat/bonusActionChoiceHandler.js';
 
 // ── Test fixtures ──
 
