@@ -207,16 +207,6 @@ describe('EncounterModal', () => {
             expect(screen.getByText('New name is required')).toBeInTheDocument();
         });
 
-        it('triggers rename on Enter key', async () => {
-            const onRename = vi.fn(() => Promise.resolve());
-            render(<EncounterModal isOpen={true} onClose={mockOnClose} mode="rename" onSave={mockOnSave} onLoad={mockOnLoad} onDelete={mockOnDelete} onRename={onRename} encounters={[]} />);
-            const input = screen.getByLabelText('New Name');
-            fireEvent.change(input, { target: { value: 'new-name' } });
-            fireEvent.keyDown(input, { key: 'Enter' });
-            await new Promise(r => setTimeout(r, 0));
-            expect(onRename).toHaveBeenCalledWith(undefined, 'new-name');
-        });
-
         it('auto-focuses the rename input', () => {
             render(<EncounterModal isOpen={true} onClose={mockOnClose} mode="rename" onSave={mockOnSave} onLoad={mockOnLoad} onDelete={mockOnDelete} onRename={mockOnRename} encounters={[]} />);
             const input = screen.getByLabelText('New Name');

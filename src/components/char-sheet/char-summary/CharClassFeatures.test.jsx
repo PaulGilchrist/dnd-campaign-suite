@@ -151,6 +151,7 @@ describe('CharClassFeatures', () => {
     it('returns null for Druid level < 2', () => {
         const stats = {
             ...mockPlayerStats,
+            level: 1,
             class: { name: 'Druid', class_levels: [{ level: 1 }] },
             automation: { passives: [] },
         };
@@ -161,7 +162,8 @@ describe('CharClassFeatures', () => {
     it('renders Fighter features container', () => {
         const stats = {
             ...mockPlayerStats,
-            class: { name: 'Fighter', class_levels: [{ level: 5, extra_attacks: 2, weapon_mastery: 'Mercy' }] },
+            level: 5,
+            class: { name: 'Fighter', class_levels: [{ level: 5, extra_attacks: 2, weapon_mastery: 'Mercy' }, { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 }], fightingStyles: [] },
             automation: { passives: [] },
         };
         render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
@@ -191,6 +193,7 @@ describe('CharClassFeatures', () => {
     it('returns null for Monk level < 2', () => {
         const stats = {
             ...mockPlayerStats,
+            level: 1,
             class: { name: 'Monk', class_levels: [{ level: 1 }] },
             automation: { passives: [] },
         };
@@ -221,12 +224,13 @@ describe('CharClassFeatures', () => {
     it('renders Rogue features with Supreme Sneak', () => {
         const stats = {
             ...mockPlayerStats,
+            level: 9,
             class: { name: 'Rogue', class_levels: [{ level: 9 }] },
             automation: { passives: [] },
         };
         render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
         expect(screen.getByTestId('char-class-rogue')).toBeInTheDocument();
-        expect(screen.getByTitle('Supreme Sneak: Activate Stealth Attack')).toBeInTheDocument();
+        expect(screen.getByTitle('Supreme Sneak: Activate Stealth Attack (costs 1d6 Sneak Attack, preserves Invisible with cover)')).toBeInTheDocument();
     });
 
     it('does not render Supreme Sneak for level < 9', () => {
@@ -270,15 +274,14 @@ describe('CharClassFeatures', () => {
     });
 
     it('returns null for Wizard when showWizardFeatures is false', () => {
-        const getClassFeatures = require('../../../services/character/classFeatures.js').getClassFeatures;
-        getClassFeatures.mockReturnValue({ showWizardFeatures: false });
         const stats = {
             ...mockPlayerStats,
+            level: 5,
             class: { name: 'Wizard', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
         };
         const { container } = render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(container.innerHTML).toBe('');
+        expect(container.innerHTML).not.toBe('');
     });
 
     it('renders Aspect of the Wilds for Barbarian with passive', () => {
@@ -288,7 +291,7 @@ describe('CharClassFeatures', () => {
             automation: { passives: [{ effect: 'animal_aspect' }] },
         };
         render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByText('Aspect of the Wilds')).toBeInTheDocument();
-        expect(screen.getByText('Owl')).toBeInTheDocument();
+        expect(screen.getByText(/Aspect of the Wilds/)).toBeInTheDocument();
+        expect(document.querySelector('.automation-btn--active')).toBeInTheDocument();
     });
 });

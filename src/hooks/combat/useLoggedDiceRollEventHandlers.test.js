@@ -137,6 +137,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
 
         it('does nothing when no pending save for promptId', () => {
             setup();
+            window.__pendingSaves = {};
             window.dispatchEvent(new CustomEvent('save-result', {
                 detail: { promptId: 'nonexistent' },
             }));

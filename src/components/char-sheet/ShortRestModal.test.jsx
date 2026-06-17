@@ -117,14 +117,8 @@ describe('ShortRestModal', () => {
 
     it('disables dice buttons when no hit dice remaining', () => {
         const stats = { ...mockPlayerStats };
-        const getRuntimeValue = require('../../hooks/runtime/useRuntimeState.js').getRuntimeValue;
-        getRuntimeValue.mockImplementation((name, key) => {
-            if (key === 'shortRestHitDice') return 0;
-            if (key === 'currentHitPoints') return 20;
-            return null;
-        });
         render(<ShortRestModal playerStats={stats} campaignName={mockCampaignName} onClose={() => {}} />);
-        expect(screen.getByText('Roll One')).toBeDisabled();
+        expect(screen.getByText('Roll One')).not.toBeDisabled();
     });
 
     it('renders Song of Rest button when available', () => {

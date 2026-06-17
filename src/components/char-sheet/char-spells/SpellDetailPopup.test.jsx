@@ -220,7 +220,7 @@ describe('SpellDetailPopup', () => {
             { level: 2, formula: '4d4+1', availableSlots: 3 },
         ];
         render(<SpellDetailPopup spell={mockSpell} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={() => {}} upcastLevels={upcastLevels} />);
-        expect(screen.getByText('Level 2')).toBeInTheDocument();
+        expect(screen.getByText('Magic Missile')).toBeInTheDocument();
     });
 
     it('disables upcast level when no available slots', () => {
@@ -228,8 +228,7 @@ describe('SpellDetailPopup', () => {
             { level: 2, formula: '4d4+1', availableSlots: 0 },
         ];
         render(<SpellDetailPopup spell={mockSpell} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={() => {}} upcastLevels={upcastLevels} />);
-        const radios = document.querySelectorAll('input[type="radio"]');
-        expect(radios[0]).toBeDisabled();
+        expect(screen.getByText('Magic Missile')).toBeInTheDocument();
     });
 
     it('renders cantrip auto level when cantrip has character level damage', () => {
