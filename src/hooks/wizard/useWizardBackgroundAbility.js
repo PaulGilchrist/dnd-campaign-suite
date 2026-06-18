@@ -11,7 +11,7 @@ function parseBackgroundAbilityScores(abilityScoresStr) {
 function getPreSelectedBgAbilities(formData) {
   if (!formData.background || formData.rules !== '2024') return null;
 
-  const abilityKey = `_bg_abilities_${formData.background}`;
+  const abilityKey = `_background_abilities_${formData.background}`;
   const stored = localStorage.getItem(abilityKey);
   if (stored) {
     try {
@@ -26,7 +26,7 @@ function getPreSelectedBgAbilities(formData) {
 function setPreSelectedBgAbilities(formData, abilitiesMap) {
   if (!formData.background || formData.rules !== '2024') return;
 
-  const abilityKey = `_bg_abilities_${formData.background}`;
+  const abilityKey = `_background_abilities_${formData.background}`;
   if (abilitiesMap && Object.keys(abilitiesMap).length > 0) {
     localStorage.setItem(abilityKey, JSON.stringify(abilitiesMap));
   } else {
@@ -44,70 +44,85 @@ function getDefaultBgAbilityAssignments(bgAbilityNames) {
 }
 
 function useWizardBackgroundAbility(formData, setFormData) {
-  const [bgAbilityNames, setBgAbilityNames] = useState([]);
-  const [bgAbilityAssignments, setBgAbilityAssignments] = useState({});
+  const [backgroundAbilityNames, setBackgroundAbilityNames] = useState([]);
+  const [backgroundAbilityAssignments, setBackgroundAbilityAssignments] = useState({});
 
   useEffect(() => {
     const loadBgAbilities = async () => {
       if (formData.rules !== '2024' || !formData.background) {
-        setBgAbilityNames([]);
-        setBgAbilityAssignments({});
+        setBackgroundAbilityNames([]);
+        setBackgroundAbilityAssignments({});
         return;
       }
       try {
         const bgData = await fetchBackgroundData(formData.background, '2024');
         if (bgData?.ability_scores) {
           const names = parseBackgroundAbilityScores(bgData.ability_scores);
-          setBgAbilityNames(names);
+          setBackgroundAbilityNames(names);
           const stored = getPreSelectedBgAbilities(formData);
           if (stored) {
-            setBgAbilityAssignments(stored);
+            setBackgroundAbilityAssignments(stored);
           } else {
-            setBgAbilityAssignments(getDefaultBgAbilityAssignments(names));
+            setBackgroundAbilityAssignments(getDefaultBgAbilityAssignments(names));
           }
         } else {
-          setBgAbilityNames([]);
-          setBgAbilityAssignments({});
+          setBackgroundAbilityNames([]);
+          setBackgroundAbilityAssignments({});
         }
       } catch (error) {
         console.error('Error loading background ability scores:', error);
-        setBgAbilityNames([]);
-        setBgAbilityAssignments({});
+        setBackgroundAbilityNames([]);
+        setBackgroundAbilityAssignments({});
       }
     };
     loadBgAbilities();
   }, [formData]);
 
-  const updateBgAbilityBonus = useCallback((abilityName, bonus) => {
-    const validBonus = Math.max(0, Math.min(2, parseInt(bonus) || 0));
-    setBgAbilityAssignments(prev => {
-      const newAssignments = { ...prev, [abilityName]: validBonus };
-      setPreSelectedBgAbilities(formData, newAssignments);
+  useEffect(() => {
+    if (!formData.background || formData.rules !== '2024' || Object.keys(backgroundAbilityAssignments).length === 0) {
+      return;
+    }
+    let needsUpdate = false;
+    const abilities = (formData.abilities || []).map(ability => {
+      const newIncrease = backgroundAbilityAssignments[ability.name];
+      if (newIncrease !== undefined && ability.backgroundIncrease !== newIncrease) {
+        needsUpdate = true;
+        return { ...ability, backgroundIncrease: newIncrease };
+      }
+      return ability;
+    });
+    if (needsUpdate) {
+      setFormData(p => ({ ...p, abilities }));
+    }
+  }, [backgroundAbilityAssignments, formData.background, formData.rules, setFormData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const updateBackgroundIncrease = useCallback((abilityName, newIncrease) => {
+    const validIncrease = Math.max(0, Math.min(2, parseInt(newIncrease) || 0));
+    setBackgroundAbilityAssignments(prev => {
+      const newAssignments = { ...prev, [abilityName]: validIncrease };
+      setPreSelectedBgAbilities({ rules: formData.rules, background: formData.background }, newAssignments);
       return newAssignments;
     });
-    
-    setFormData(prev => {
-      const abilities = (prev.abilities || []).map(ability => {
+    setFormData(p => {
+      const abilities = (p.abilities || []).map(ability => {
         if (ability.name === abilityName) {
-          const currentBonus = ability.backgroundIncrease || 0;
-          const oldBonus = bgAbilityAssignments[abilityName] || 0;
-          return { ...ability, backgroundIncrease: currentBonus - oldBonus + validBonus };
+          return { ...ability, backgroundIncrease: validIncrease };
         }
         return ability;
       });
-      return { ...prev, abilities };
+      return { ...p, abilities };
     });
-  }, [formData, setFormData, bgAbilityAssignments]);
+  }, [setFormData, formData]);
 
-  const totalAssigned = Object.values(bgAbilityAssignments).reduce((sum, val) => sum + val, 0);
+  const totalAssigned = Object.values(backgroundAbilityAssignments).reduce((sum, val) => sum + val, 0);
   const isValid = totalAssigned === 3;
-  const maxSingleBonus = Math.max(...Object.values(bgAbilityAssignments), 0);
+  const maxSingleBonus = Math.max(...Object.values(backgroundAbilityAssignments), 0);
   const hasMaxSingleBonus = maxSingleBonus > 2;
 
   return {
-    bgAbilityNames,
-    bgAbilityAssignments,
-    updateBgAbilityBonus,
+    backgroundAbilityNames,
+    backgroundAbilityAssignments,
+    updateBackgroundIncrease,
     totalAssigned,
     isValid,
     hasMaxSingleBonus,

@@ -42,9 +42,9 @@ const WizardStepRenderer = React.memo(({
   preSelectedResistances,
   preSelectedImmunities,
   _preSelectedBackgroundAbility,
-  bgAbilityNames,
-  bgAbilityAssignments,
-  bgValidationWarnings,
+  backgroundAbilityNames,
+  backgroundAbilityAssignments,
+  backgroundValidationWarnings,
   skillLimits,
   expertiseLimits,
   skillWarnings,
@@ -69,7 +69,7 @@ const WizardStepRenderer = React.memo(({
   warnings,
   allFeats,
   allMagicItems,
-  updateBgAbilityBonus,
+  updateBackgroundIncrease,
   featAbilityChoices,
   featAbilityAssignments,
   handleFeatAbilityChoice,
@@ -100,9 +100,9 @@ const WizardStepRenderer = React.memo(({
     preSelectedResistances,
     preSelectedImmunities,
     _preSelectedBackgroundAbility,
-    bgAbilityNames,
-    bgAbilityAssignments,
-    bgValidationWarnings,
+    backgroundAbilityNames,
+    backgroundAbilityAssignments,
+    backgroundValidationWarnings,
     skillLimits,
     expertiseLimits,
     skillWarnings,
@@ -127,7 +127,7 @@ const WizardStepRenderer = React.memo(({
     warnings,
     allFeats,
     allMagicItems,
-    updateBgAbilityBonus,
+    updateBackgroundIncrease,
     featAbilityChoices,
     featAbilityAssignments,
     handleFeatAbilityChoice,
@@ -211,7 +211,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
      } = useWizardSpells(formData, setFormData);
 
   // Background ability score choice (2024)
-  const { bgAbilityNames, bgAbilityAssignments, updateBgAbilityBonus, bgValidationWarnings } = useWizardBackgroundAbility(formData, setFormData);
+  const { backgroundAbilityNames, backgroundAbilityAssignments, updateBackgroundIncrease, backgroundValidationWarnings } = useWizardBackgroundAbility(formData, setFormData);
 
 	// Inventory
 	const [tempInventory, setTempInventory] = useState({ backpack: [], equipped: [] });
@@ -342,9 +342,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
         preSelectedFightingStyles={preSelectedFightingStyles}
         preSelectedResistances={preSelectedResistancesList.resistances}
         preSelectedImmunities={preSelectedResistancesList.immunities}
-        bgAbilityNames={bgAbilityNames}
-        bgAbilityAssignments={bgAbilityAssignments}
-        bgValidationWarnings={bgValidationWarnings}
+        backgroundAbilityNames={backgroundAbilityNames}
+        backgroundAbilityAssignments={backgroundAbilityAssignments}
+        backgroundValidationWarnings={backgroundValidationWarnings}
         skillLimits={skillLimits}
         expertiseLimits={expertiseLimits}
         skillWarnings={skillWarnings}
@@ -369,7 +369,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
         warnings={skillWarnings}
         allFeats={feats}
         allMagicItems={magicItems}
-        updateBgAbilityBonus={updateBgAbilityBonus}
+        updateBackgroundIncrease={updateBackgroundIncrease}
         featAbilityChoices={featAbilityChoices}
         featAbilityAssignments={featAbilityAssignments}
         handleFeatAbilityChoice={handleFeatAbilityChoice}
@@ -394,9 +394,9 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
     preSelectedFightingStyles,
     preSelectedResistancesList,
     preSelectedSpells,
-    bgAbilityNames,
-    bgAbilityAssignments,
-    bgValidationWarnings,
+    backgroundAbilityNames,
+    backgroundAbilityAssignments,
+    backgroundValidationWarnings,
     skillLimits,
     expertiseLimits,
     skillWarnings,
@@ -418,7 +418,7 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
     handleFightingStyleToggle,
     handleResistanceToggle,
     handleImmunityToggle,
-    updateBgAbilityBonus,
+    updateBackgroundIncrease,
     featAbilityChoices,
     featAbilityAssignments,
     handleFeatAbilityChoice,

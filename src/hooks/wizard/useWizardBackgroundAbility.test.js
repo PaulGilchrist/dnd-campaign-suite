@@ -31,8 +31,8 @@ describe('useWizardBackgroundAbility', () => {
         useWizardBackgroundAbility(mockFormData5e, mockSetFormData)
       );
 
-      expect(result.current.bgAbilityNames).toEqual([]);
-      expect(result.current.bgAbilityAssignments).toEqual({});
+      expect(result.current.backgroundAbilityNames).toEqual([]);
+      expect(result.current.backgroundAbilityAssignments).toEqual({});
       expect(result.current.totalAssigned).toBe(0);
       expect(result.current.isValid).toBe(false);
       expect(result.current.hasMaxSingleBonus).toBe(false);
@@ -45,8 +45,8 @@ describe('useWizardBackgroundAbility', () => {
         useWizardBackgroundAbility(formData, mockSetFormData)
       );
 
-      expect(result.current.bgAbilityNames).toEqual([]);
-      expect(result.current.bgAbilityAssignments).toEqual({});
+      expect(result.current.backgroundAbilityNames).toEqual([]);
+      expect(result.current.backgroundAbilityAssignments).toEqual({});
     });
 
     it('returns empty state when background is undefined', () => {
@@ -56,7 +56,7 @@ describe('useWizardBackgroundAbility', () => {
         useWizardBackgroundAbility(formData, mockSetFormData)
       );
 
-      expect(result.current.bgAbilityNames).toEqual([]);
+      expect(result.current.backgroundAbilityNames).toEqual([]);
     });
 
     it('returns empty state when background is empty string', () => {
@@ -66,7 +66,7 @@ describe('useWizardBackgroundAbility', () => {
         useWizardBackgroundAbility(formData, mockSetFormData)
       );
 
-      expect(result.current.bgAbilityNames).toEqual([]);
+      expect(result.current.backgroundAbilityNames).toEqual([]);
     });
   });
 
@@ -83,7 +83,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
       });
     });
 
@@ -99,7 +99,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityAssignments).toEqual({
+        expect(result.current.backgroundAbilityAssignments).toEqual({
           Strength: 1,
           Dexterity: 1,
           Constitution: 1,
@@ -109,7 +109,7 @@ describe('useWizardBackgroundAbility', () => {
 
     it('restores previously stored assignments from localStorage', async () => {
       localStorage.setItem(
-        '_bg_abilities_Acolyte',
+        '_background_abilities_Acolyte',
         JSON.stringify({ Strength: 2, Dexterity: 0, Constitution: 1 })
       );
 
@@ -124,7 +124,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityAssignments).toEqual({
+        expect(result.current.backgroundAbilityAssignments).toEqual({
           Strength: 2,
           Dexterity: 0,
           Constitution: 1,
@@ -133,7 +133,7 @@ describe('useWizardBackgroundAbility', () => {
     });
 
     it('handles invalid JSON in localStorage by falling back to defaults', async () => {
-      localStorage.setItem('_bg_abilities_Acolyte', 'not-json');
+      localStorage.setItem('_background_abilities_Acolyte', 'not-json');
 
       vi.mocked(fetchBackgroundData).mockResolvedValue({
         name: 'Acolyte',
@@ -146,7 +146,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityAssignments).toEqual({
+        expect(result.current.backgroundAbilityAssignments).toEqual({
           Strength: 1,
           Dexterity: 1,
           Constitution: 1,
@@ -164,8 +164,8 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual([]);
-        expect(result.current.bgAbilityAssignments).toEqual({});
+        expect(result.current.backgroundAbilityNames).toEqual([]);
+        expect(result.current.backgroundAbilityAssignments).toEqual({});
       });
 
       consoleSpy.mockRestore();
@@ -183,8 +183,8 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual([]);
-        expect(result.current.bgAbilityAssignments).toEqual({});
+        expect(result.current.backgroundAbilityNames).toEqual([]);
+        expect(result.current.backgroundAbilityAssignments).toEqual({});
       });
     });
   });
@@ -202,7 +202,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
       });
     });
 
@@ -218,7 +218,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
       });
     });
 
@@ -234,7 +234,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
       });
     });
 
@@ -250,7 +250,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
       });
     });
 
@@ -266,7 +266,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
       });
     });
 
@@ -282,7 +282,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
       });
     });
 
@@ -298,7 +298,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual([]);
+        expect(result.current.backgroundAbilityNames).toEqual([]);
       });
     });
 
@@ -314,7 +314,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual([]);
+        expect(result.current.backgroundAbilityNames).toEqual([]);
       });
     });
 
@@ -330,7 +330,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength']);
       });
     });
 
@@ -346,7 +346,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual([]);
+        expect(result.current.backgroundAbilityNames).toEqual([]);
       });
     });
 
@@ -362,7 +362,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity']);
       });
     });
 
@@ -378,12 +378,12 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity']);
       });
     });
   });
 
-  describe('updateBgAbilityBonus', () => {
+  describe('updateBackgroundIncrease', () => {
     const formData = { rules: '2024', background: 'Acolyte', abilities: mockAbilities };
 
     beforeEach(() => {
@@ -399,14 +399,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 2);
+        result.current.updateBackgroundIncrease('Strength', 2);
       });
 
-      expect(result.current.bgAbilityAssignments).toEqual({
+      expect(result.current.backgroundAbilityAssignments).toEqual({
         Strength: 2,
         Dexterity: 1,
         Constitution: 1,
@@ -419,21 +419,22 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 2);
+        result.current.updateBackgroundIncrease('Strength', 2);
       });
 
       expect(mockSetFormData).toHaveBeenCalled();
-      const updaterFn = mockSetFormData.mock.calls[0][0];
+      const lastCallIndex = mockSetFormData.mock.calls.length - 1;
+      const updaterFn = mockSetFormData.mock.calls[lastCallIndex][0];
       expect(typeof updaterFn).toBe('function');
 
       const prevFormData = { abilities: mockAbilities };
       const updated = updaterFn(prevFormData);
-      expect(updated.abilities[0].backgroundIncrease).toBe(1);
-      expect(updated.abilities[1].backgroundIncrease).toBe(0);
+      expect(updated.abilities[0].backgroundIncrease).toBe(2);
+      expect(updated.abilities[1].backgroundIncrease).toBe(1);
       expect(updated.abilities[5].backgroundIncrease).toBe(0);
     });
 
@@ -443,14 +444,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', -5);
+        result.current.updateBackgroundIncrease('Strength', -5);
       });
 
-      expect(result.current.bgAbilityAssignments.Strength).toBe(0);
+      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
     });
 
     it('clamps bonus to maximum 2', async () => {
@@ -459,14 +460,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 10);
+        result.current.updateBackgroundIncrease('Strength', 10);
       });
 
-      expect(result.current.bgAbilityAssignments.Strength).toBe(2);
+      expect(result.current.backgroundAbilityAssignments.Strength).toBe(2);
     });
 
     it('handles string numeric bonus values', async () => {
@@ -475,14 +476,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', '1');
+        result.current.updateBackgroundIncrease('Strength', '1');
       });
 
-      expect(result.current.bgAbilityAssignments.Strength).toBe(1);
+      expect(result.current.backgroundAbilityAssignments.Strength).toBe(1);
     });
 
     it('handles non-numeric string by defaulting bonus to 0', async () => {
@@ -491,14 +492,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 'abc');
+        result.current.updateBackgroundIncrease('Strength', 'abc');
       });
 
-      expect(result.current.bgAbilityAssignments.Strength).toBe(0);
+      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
     });
 
     it('handles null bonus value', async () => {
@@ -507,14 +508,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', null);
+        result.current.updateBackgroundIncrease('Strength', null);
       });
 
-      expect(result.current.bgAbilityAssignments.Strength).toBe(0);
+      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
     });
 
     it('handles undefined bonus value', async () => {
@@ -523,14 +524,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', undefined);
+        result.current.updateBackgroundIncrease('Strength', undefined);
       });
 
-      expect(result.current.bgAbilityAssignments.Strength).toBe(0);
+      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
     });
 
     it('handles NaN bonus value', async () => {
@@ -539,14 +540,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', NaN);
+        result.current.updateBackgroundIncrease('Strength', NaN);
       });
 
-      expect(result.current.bgAbilityAssignments.Strength).toBe(0);
+      expect(result.current.backgroundAbilityAssignments.Strength).toBe(0);
     });
 
     it('persists assignments to localStorage after update', async () => {
@@ -555,14 +556,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 2);
+        result.current.updateBackgroundIncrease('Strength', 2);
       });
 
-      const stored = localStorage.getItem('_bg_abilities_Acolyte');
+      const stored = localStorage.getItem('_background_abilities_Acolyte');
       expect(stored).toBeTruthy();
       expect(JSON.parse(stored)).toEqual({ Strength: 2, Dexterity: 1, Constitution: 1 });
     });
@@ -573,22 +574,22 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 2);
+        result.current.updateBackgroundIncrease('Strength', 2);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Dexterity', 0);
+        result.current.updateBackgroundIncrease('Dexterity', 0);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Constitution', 1);
+        result.current.updateBackgroundIncrease('Constitution', 1);
       });
 
-      expect(result.current.bgAbilityAssignments).toEqual({
+      expect(result.current.backgroundAbilityAssignments).toEqual({
         Strength: 2,
         Dexterity: 0,
         Constitution: 1,
@@ -605,11 +606,11 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 2);
+        result.current.updateBackgroundIncrease('Strength', 2);
       });
 
       const updaterFn = mockSetFormData.mock.calls[0][0];
@@ -626,11 +627,11 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 1);
+        result.current.updateBackgroundIncrease('Strength', 1);
       });
 
       const updaterFn = mockSetFormData.mock.calls[0][0];
@@ -641,7 +642,7 @@ describe('useWizardBackgroundAbility', () => {
 
     it('updates backgroundIncrease correctly when previous was 0', async () => {
       localStorage.setItem(
-        '_bg_abilities_Acolyte',
+        '_background_abilities_Acolyte',
         JSON.stringify({ Strength: 1, Dexterity: 1, Constitution: 1 })
       );
 
@@ -650,17 +651,18 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 0);
+        result.current.updateBackgroundIncrease('Strength', 0);
       });
 
-      const updaterFn = mockSetFormData.mock.calls[0][0];
+      const lastCallIndex = mockSetFormData.mock.calls.length - 1;
+      const updaterFn = mockSetFormData.mock.calls[lastCallIndex][0];
       const prevFormData = { abilities: mockAbilities };
       const updated = updaterFn(prevFormData);
-      expect(updated.abilities[0].backgroundIncrease).toBe(-1);
+      expect(updated.abilities[0].backgroundIncrease).toBe(0);
     });
   });
 
@@ -698,7 +700,7 @@ describe('useWizardBackgroundAbility', () => {
 
     it('isValid is true when totalAssigned equals exactly 3', async () => {
       localStorage.setItem(
-        '_bg_abilities_Acolyte',
+        '_background_abilities_Acolyte',
         JSON.stringify({ Strength: 2, Dexterity: 1, Constitution: 0 })
       );
 
@@ -715,7 +717,7 @@ describe('useWizardBackgroundAbility', () => {
 
     it('isValid is false when totalAssigned is not 3', async () => {
       localStorage.setItem(
-        '_bg_abilities_Acolyte',
+        '_background_abilities_Acolyte',
         JSON.stringify({ Strength: 1, Dexterity: 0, Constitution: 0 })
       );
 
@@ -732,7 +734,7 @@ describe('useWizardBackgroundAbility', () => {
 
     it('isValid is false when totalAssigned exceeds 3', async () => {
       localStorage.setItem(
-        '_bg_abilities_Acolyte',
+        '_background_abilities_Acolyte',
         JSON.stringify({ Strength: 2, Dexterity: 2, Constitution: 2 })
       );
 
@@ -760,7 +762,7 @@ describe('useWizardBackgroundAbility', () => {
 
     it('hasMaxSingleBonus is false when max bonus equals exactly 2', async () => {
       localStorage.setItem(
-        '_bg_abilities_Acolyte',
+        '_background_abilities_Acolyte',
         JSON.stringify({ Strength: 2, Dexterity: 1, Constitution: 0 })
       );
 
@@ -776,7 +778,7 @@ describe('useWizardBackgroundAbility', () => {
 
     it('hasMaxSingleBonus is true when any bonus exceeds 2', async () => {
       localStorage.setItem(
-        '_bg_abilities_Acolyte',
+        '_background_abilities_Acolyte',
         JSON.stringify({ Strength: 3, Dexterity: 0, Constitution: 0 })
       );
 
@@ -803,18 +805,18 @@ describe('useWizardBackgroundAbility', () => {
   });
 
   describe('return value structure', () => {
-    it('returns all expected properties and updateBgAbilityBonus is a function', () => {
+    it('returns all expected properties and updateBackgroundIncrease is a function', () => {
       const { result } = renderHook(() =>
         useWizardBackgroundAbility(mockFormData5e, mockSetFormData)
       );
 
-      expect(result.current).toHaveProperty('bgAbilityNames');
-      expect(result.current).toHaveProperty('bgAbilityAssignments');
-      expect(result.current).toHaveProperty('updateBgAbilityBonus');
+      expect(result.current).toHaveProperty('backgroundAbilityNames');
+      expect(result.current).toHaveProperty('backgroundAbilityAssignments');
+      expect(result.current).toHaveProperty('updateBackgroundIncrease');
       expect(result.current).toHaveProperty('totalAssigned');
       expect(result.current).toHaveProperty('isValid');
       expect(result.current).toHaveProperty('hasMaxSingleBonus');
-      expect(typeof result.current.updateBgAbilityBonus).toBe('function');
+      expect(typeof result.current.updateBackgroundIncrease).toBe('function');
     });
   });
 
@@ -831,7 +833,7 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(localStorage.getItem).toHaveBeenCalledWith('_bg_abilities_Sailor');
+        expect(localStorage.getItem).toHaveBeenCalledWith('_background_abilities_Sailor');
       });
     });
 
@@ -855,15 +857,15 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toHaveLength(3);
+        expect(result.current.backgroundAbilityNames).toHaveLength(3);
       });
 
       act(() => {
-        result.current.updateBgAbilityBonus('Strength', 2);
+        result.current.updateBackgroundIncrease('Strength', 2);
       });
 
       expect(localStorage.setItem).toHaveBeenCalledWith(
-        '_bg_abilities_Sailor',
+        '_background_abilities_Sailor',
         expect.any(String)
       );
     });
@@ -889,13 +891,13 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
       });
 
       rerender({ formData: { rules: '2024', background: 'Sailor' } });
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Strength', 'Dexterity', 'Constitution']);
       });
 
       expect(fetchBackgroundData).toHaveBeenCalledTimes(2);
@@ -913,14 +915,14 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
       });
 
       rerender({ formData: { rules: '5e', background: 'Acolyte' } });
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual([]);
-        expect(result.current.bgAbilityAssignments).toEqual({});
+        expect(result.current.backgroundAbilityNames).toEqual([]);
+        expect(result.current.backgroundAbilityAssignments).toEqual({});
       });
     });
 
@@ -941,13 +943,13 @@ describe('useWizardBackgroundAbility', () => {
       );
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Intelligence', 'Wisdom', 'Charisma']);
       });
 
       rerender({ formData: { rules: '2024', background: 'Criminal' } });
 
       await waitFor(() => {
-        expect(result.current.bgAbilityNames).toEqual(['Dexterity', 'Constitution', 'Intelligence']);
+        expect(result.current.backgroundAbilityNames).toEqual(['Dexterity', 'Constitution', 'Intelligence']);
       });
     });
   });

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import './WizardStepAbilities.css';
-import { loadAbilityScores, loadValidationRules } from '../../services/ui/dataLoader.js';
-import { fetchBackgroundData } from '../../services/ui/dataLoader.js';
+import { loadAbilityScores, loadValidationRules, fetchBackgroundData } from '../../services/ui/dataLoader.js';
 import { computeAllFeatBuffs } from '../../services/character/featBuffService.js';
 
 function parseBackgroundAbilityScores(abilityScoresStr) {
@@ -16,21 +15,28 @@ function WizardStepAbilities({
   errors,
   onAbilityBaseScoreChange,
   onAbilityMiscIncreaseChange,
-  onBgAbilityBonusChange,
-  _backgroundAbilityChoices,
-  _preSelectedBackgroundAbility,
+  onBackgroundIncreaseChange,
+  backgroundAbilityChoices,
+  backgroundAbilityAssignments = {},
+  backgroundValidationWarnings = [],
   allFeats,
-  featAbilityChoices,
-  featAbilityAssignments,
+  featAbilityChoices = [],
+  featAbilityAssignments = {},
   onFeatAbilityChoiceChange,
 }) {
   const [pointBuyCosts, setPointBuyCosts] = useState({});
   const [pointsAllowed, setPointsAllowed] = useState(27);
   const [abilityNames, setAbilityNames] = useState(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
-  const [bgAbilityChoices, setBgAbilityChoices] = useState([]);
-  const [bgAbilityAssignments, setBgAbilityAssignments] = useState({});
-  const [bgValidationWarnings, setBgValidationWarnings] = useState([]);
   const [nonChoiceFeatIncreases, setNonChoiceFeatIncreases] = useState({});
+  const [localBackgroundAbilityChoices, setLocalBackgroundAbilityChoices] = useState([]);
+  const [localBackgroundAbilityAssignments, setLocalBackgroundAbilityAssignments] = useState({});
+  const [localBackgroundValidationWarnings, setLocalBackgroundValidationWarnings] = useState([]);
+
+  const useProps = backgroundAbilityChoices !== undefined;
+
+  const effectiveBackgroundAbilityChoices = useProps ? backgroundAbilityChoices : localBackgroundAbilityChoices;
+  const effectiveBackgroundAbilityAssignments = useProps ? backgroundAbilityAssignments : localBackgroundAbilityAssignments;
+  const effectiveBackgroundValidationWarnings = useProps ? backgroundValidationWarnings : localBackgroundValidationWarnings;
 
   useEffect(() => {
     const loadNames = async () => {
@@ -62,54 +68,54 @@ function WizardStepAbilities({
   }, [formData, allFeats]);
 
   useEffect(() => {
-    const loadBgAbilities = async () => {
-      if (formData.rules !== '2024' || !formData.background) {
-        setBgAbilityChoices([]);
-        setBgAbilityAssignments({});
-        setBgValidationWarnings([]);
+    const loadBackgroundAbilities = async () => {
+      if (useProps || formData.rules !== '2024' || !formData.background) {
+        setLocalBackgroundAbilityChoices([]);
+        setLocalBackgroundAbilityAssignments({});
+        setLocalBackgroundValidationWarnings([]);
         return;
       }
       try {
         const bgData = await fetchBackgroundData(formData.background, '2024');
         if (bgData?.ability_scores) {
           const names = parseBackgroundAbilityScores(bgData.ability_scores);
-          setBgAbilityChoices(names);
-          const stored = localStorage.getItem(`_bg_abilities_${formData.background}`);
+          setLocalBackgroundAbilityChoices(names);
+          const stored = localStorage.getItem(`_background_abilities_${formData.background}`);
           if (stored) {
             try {
               const parsed = JSON.parse(stored);
-              setBgAbilityAssignments(parsed);
+              setLocalBackgroundAbilityAssignments(parsed);
             } catch (e) {
               const defaults = {};
               names.forEach(name => { defaults[name] = 1; });
-              setBgAbilityAssignments(defaults);
+              setLocalBackgroundAbilityAssignments(defaults);
             }
           } else {
             const defaults = {};
             names.forEach(name => { defaults[name] = 1; });
-            setBgAbilityAssignments(defaults);
+            setLocalBackgroundAbilityAssignments(defaults);
           }
         } else {
-          setBgAbilityChoices([]);
-          setBgAbilityAssignments({});
+          setLocalBackgroundAbilityChoices([]);
+          setLocalBackgroundAbilityAssignments({});
         }
       } catch (error) {
         console.error('Error loading background ability scores:', error);
-        setBgAbilityChoices([]);
-        setBgAbilityAssignments({});
+        setLocalBackgroundAbilityChoices([]);
+        setLocalBackgroundAbilityAssignments({});
       }
     };
-    loadBgAbilities();
-  }, [formData]);
+    loadBackgroundAbilities();
+  }, [formData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (formData.rules !== '2024' || bgAbilityChoices.length === 0) {
-      setBgValidationWarnings([]);
+    if (useProps || formData.rules !== '2024' || localBackgroundAbilityChoices.length === 0) {
+      setLocalBackgroundValidationWarnings([]);
       return;
     }
 
     const warnings = [];
-    const totalAssigned = Object.values(bgAbilityAssignments).reduce((sum, val) => sum + val, 0);
+    const totalAssigned = Object.values(localBackgroundAbilityAssignments).reduce((sum, val) => sum + val, 0);
 
     if (totalAssigned < 3) {
       warnings.push(`You must assign at least 3 points to your background abilities (+2 and +1, or +1 to all three). Currently assigned: ${totalAssigned}.`);
@@ -119,13 +125,13 @@ function WizardStepAbilities({
       warnings.push(`You have assigned ${totalAssigned} points to background abilities. The maximum is 3 (+2 and +1, or +1 to all three).`);
     }
 
-    const maxBonus = Math.max(...Object.values(bgAbilityAssignments), 0);
-    if (maxBonus > 2) {
+    const maxIncrease = Math.max(...Object.values(localBackgroundAbilityAssignments), 0);
+    if (maxIncrease > 2) {
       warnings.push('No single ability can receive more than +2 from your background.');
     }
 
-    setBgValidationWarnings(warnings);
-  }, [bgAbilityAssignments, bgAbilityChoices, formData.rules]);
+    setLocalBackgroundValidationWarnings(warnings);
+  }, [localBackgroundAbilityAssignments, localBackgroundAbilityChoices, formData.rules]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const loadCosts = async () => {
@@ -148,12 +154,12 @@ function WizardStepAbilities({
 
   const pointsRemaining = pointsAllowed - totalPointsSpent;
 
-  const isBgAbility = (abilityName) => {
-    return bgAbilityChoices.includes(abilityName);
+  const isBackgroundAbility = (abilityName) => {
+    return effectiveBackgroundAbilityChoices.includes(abilityName);
   };
 
-  const getBgAbilityBonus = (abilityName) => {
-    return bgAbilityAssignments[abilityName] || 0;
+  const getBackgroundIncrease = (abilityName) => {
+    return effectiveBackgroundAbilityAssignments[abilityName] || 0;
   };
 
   const getFeatIncreaseForAbility = (abilityName) => {
@@ -171,19 +177,21 @@ function WizardStepAbilities({
     return nonChoice + choiceIncrease;
   };
 
-  const handleBgAbilityChange = (abilityName, newBonus) => {
-    const bonus = Math.max(0, Math.min(2, parseInt(newBonus) || 0));
-    setBgAbilityAssignments(prev => {
-      const newAssignments = { ...prev, [abilityName]: bonus };
-      const bgKey = `_bg_abilities_${formData.background}`;
-      if (Object.keys(newAssignments).length > 0) {
-        localStorage.setItem(bgKey, JSON.stringify(newAssignments));
-      } else {
-        localStorage.removeItem(bgKey);
-      }
-      return newAssignments;
-    });
-    onBgAbilityBonusChange?.(abilityName, bonus);
+  const handleBackgroundIncreaseChange = (abilityName, newIncrease) => {
+    const parsedIncrease = Math.max(0, Math.min(2, parseInt(newIncrease) || 0));
+    if (!useProps) {
+      setLocalBackgroundAbilityAssignments(prev => {
+        const newAssignments = { ...prev, [abilityName]: parsedIncrease };
+        const backgroundKey = `_background_abilities_${formData.background}`;
+        if (Object.keys(newAssignments).length > 0) {
+          localStorage.setItem(backgroundKey, JSON.stringify(newAssignments));
+        } else {
+          localStorage.removeItem(backgroundKey);
+        }
+        return newAssignments;
+      });
+    }
+    onBackgroundIncreaseChange?.(abilityName, parsedIncrease);
   };
 
   const handleFeatAbilityChange = (choiceIdx, abilityName) => {
@@ -203,19 +211,19 @@ function WizardStepAbilities({
         Total score (base + feat + background + misc) cannot exceed 20 for any ability.
       </div>
 
-      {bgAbilityChoices.length > 0 && (
+      {effectiveBackgroundAbilityChoices.length > 0 && (
         <div className="step-description bg-ability-choice">
           <strong>Background Ability Scores ({formData.background}):</strong>
           <div className="bg-ability-rule-text">
             Your background grants ability score increases. Increase one ability by 2 and another by 1, or increase all three by 1. None of these increases can raise a score above 20.
           </div>
           <div className="bg-ability-assignments">
-            {bgAbilityChoices.map((ability) => (
+            {effectiveBackgroundAbilityChoices.map((ability) => (
               <div key={ability} className="bg-ability-assignment">
                 <span className="bg-ability-name">{ability}:</span>
                 <select
-                  value={getBgAbilityBonus(ability)}
-                  onChange={(e) => handleBgAbilityChange(ability, e.target.value)}
+                  value={getBackgroundIncrease(ability)}
+                  onChange={(e) => handleBackgroundIncreaseChange(ability, e.target.value)}
                   className="bg-ability-select"
                 >
                   <option value={0}>+0</option>
@@ -225,9 +233,9 @@ function WizardStepAbilities({
               </div>
             ))}
           </div>
-          {bgValidationWarnings.length > 0 && (
+          {effectiveBackgroundValidationWarnings.length > 0 && (
             <div className="bg-ability-warnings">
-              {bgValidationWarnings.map((warning, index) => (
+              {effectiveBackgroundValidationWarnings.map((warning, index) => (
                 <div key={index} className="bg-ability-warning">
                   <i className="fa-solid fa-triangle-exclamation"></i> {warning}
                 </div>
@@ -266,24 +274,23 @@ function WizardStepAbilities({
         {abilityNames.map((ability, index) => {
           const abilityData = formData.abilities?.[index] || { baseScore: '8', featIncrease: 0, backgroundIncrease: 0, miscIncrease: 0 };
           const baseScore = parseInt(abilityData.baseScore) || 8;
-          const bgInc = parseInt(abilityData.backgroundIncrease) || 0;
-          const misc = parseInt(abilityData.miscIncrease) || 0;
-          const featIncreaseFromFeats = getFeatIncreaseForAbility(ability);
-          const totalScore = baseScore + featIncreaseFromFeats + bgInc + misc;
+          const backgroundIncrease = parseInt(abilityData.backgroundIncrease) || 0;
+          const miscIncrease = parseInt(abilityData.miscIncrease) || 0;
+          const featIncrease = getFeatIncreaseForAbility(ability);
+          const isBackgroundAbilityScore = isBackgroundAbility(ability);
+          const totalScore = baseScore + featIncrease + backgroundIncrease + miscIncrease;
           const cost = pointBuyCosts[baseScore] || 0;
-          const isBgAbilityScore = isBgAbility(ability);
-          const bgBonus = getBgAbilityBonus(ability);
 
           return (
-            <div key={ability} className={`ability-score-card ${isBgAbilityScore ? 'bg-ability-score' : ''}`}>
-              {isBgAbilityScore && (
+            <div key={ability} className={`ability-score-card ${isBackgroundAbilityScore ? 'bg-ability-score' : ''}`}>
+              {isBackgroundAbilityScore && (
                 <div className="bg-ability-badge">
-                  <i className="fa-solid fa-star"></i> Background: +{bgBonus}
+                  <i className="fa-solid fa-star"></i> Background: +{backgroundIncrease}
                 </div>
               )}
-              {featIncreaseFromFeats > 0 && (
+              {featIncrease > 0 && (
                 <div className="feat-increase-badge">
-                  <i className="fa-solid fa-dumbbell"></i> Feat: +{featIncreaseFromFeats}
+                  <i className="fa-solid fa-dumbbell"></i> Feat: +{featIncrease}
                 </div>
               )}
               <h4>{ability}</h4>
@@ -301,28 +308,7 @@ function WizardStepAbilities({
                 <span className="point-cost">Cost: {cost}</span>
                 {errors[`ability_${index}_baseScore`] && <span className="error-message">{errors[`ability_${index}_baseScore`]}</span>}
               </div>
-              {featIncreaseFromFeats > 0 && (
-                <div className="form-group ability-score-form-group">
-                  <label>Feat Increase</label>
-                  <input
-                    type="number"
-                    value={featIncreaseFromFeats}
-                    readOnly
-                    className="feat-increase-input"
-                  />
-                </div>
-              )}
-              {bgInc > 0 && (
-                <div className="form-group ability-score-form-group">
-                  <label>Background Increase</label>
-                  <input
-                    type="number"
-                    value={bgInc}
-                    readOnly
-                    className="feat-increase-input"
-                  />
-                </div>
-              )}
+
               <div className="form-group ability-score-form-group">
                 <label htmlFor={`misc-increase-${index}`}>Misc Increase</label>
                 <input

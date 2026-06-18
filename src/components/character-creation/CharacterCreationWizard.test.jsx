@@ -131,10 +131,10 @@ vi.mock('../../hooks/wizard/useWizardSpells.js', () => ({
 
 vi.mock('../../hooks/wizard/useWizardBackgroundAbility.js', () => ({
   default: vi.fn(() => ({
-    bgAbilityNames: [],
-    bgAbilityAssignments: {},
-    updateBgAbilityBonus: vi.fn(),
-    bgValidationWarnings: [],
+    backgroundAbilityNames: [],
+    backgroundAbilityAssignments: {},
+    updateBackgroundIncrease: vi.fn(),
+    backgroundValidationWarnings: [],
   })),
 }));
 

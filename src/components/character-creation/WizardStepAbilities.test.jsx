@@ -72,9 +72,7 @@ function createMockProps(overrides = {}) {
     errors: {},
     onAbilityBaseScoreChange: vi.fn(),
     onAbilityMiscIncreaseChange: vi.fn(),
-    onBgAbilityBonusChange: vi.fn(),
-    _backgroundAbilityChoices: [],
-    _preSelectedBackgroundAbility: null,
+    onBackgroundIncreaseChange: vi.fn(),
     allFeats: [],
     featAbilityChoices: [],
     featAbilityAssignments: {},
@@ -440,7 +438,7 @@ describe('WizardStepAbilities', () => {
       setupFetchMock('2024', 'Acolyte');
 
       const storedAssignments = { Intelligence: 2, Wisdom: 1, Charisma: 0 };
-      localStorage.setItem('_bg_abilities_Acolyte', JSON.stringify(storedAssignments));
+      localStorage.setItem('_background_abilities_Acolyte', JSON.stringify(storedAssignments));
 
       render(<WizardStepAbilities {...props} />);
 
@@ -454,7 +452,7 @@ describe('WizardStepAbilities', () => {
       expect(selects[2]).toHaveValue('0');
     });
 
-    it('should call onBgAbilityBonusChange when background ability is changed', async () => {
+    it('should call onBackgroundIncreaseChange when background ability is changed', async () => {
       const props = createMockProps({
         formData: { rules: '2024', background: 'Acolyte' },
       });
@@ -469,7 +467,7 @@ describe('WizardStepAbilities', () => {
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2' } });
 
-      expect(props.onBgAbilityBonusChange).toHaveBeenCalledWith('Intelligence', 2);
+      expect(props.onBackgroundIncreaseChange).toHaveBeenCalledWith('Intelligence', 2);
     });
 
     it('should save background ability assignments to localStorage', async () => {
@@ -487,7 +485,7 @@ describe('WizardStepAbilities', () => {
       const selects = screen.getAllByRole('combobox');
       fireEvent.change(selects[0], { target: { value: '2' } });
 
-      expect(localStorage.setItem).toHaveBeenCalledWith('_bg_abilities_Acolyte', expect.stringContaining('Intelligence'));
+      expect(localStorage.setItem).toHaveBeenCalledWith('_background_abilities_Acolyte', expect.stringContaining('Intelligence'));
     });
 
     it('should highlight background abilities in the ability score grid with badge', async () => {
