@@ -1,7 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
-const DIVINATION_SCHOOL = 'Divination';
+const DIVINATION_SCHOOL = 'divination';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

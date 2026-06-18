@@ -3,7 +3,7 @@ import { fetchBackgroundData } from '../../services/ui/dataLoader.js';
 
 function parseBackgroundAbilityScores(abilityScoresStr) {
   if (!abilityScoresStr) return [];
-  return abilityScoresStr.split(/,?\s+and\s+/i)
+  return abilityScoresStr.split(/[,;]|\s+and\s+/i)
     .map(s => s.trim())
     .filter(s => s.length > 0);
 }
