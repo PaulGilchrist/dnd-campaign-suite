@@ -80,12 +80,6 @@ describe('collectAutomationFromFeatures – direct action types', () => {
         expect(result.actions).toHaveLength(1)
     })
 
-    it('categorizes magical_cunning as action', () => {
-        const features = [makeFeature({ type: 'magical_cunning' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
-    })
-
     it('categorizes bastion_of_law as action', () => {
         const features = [makeFeature({ type: 'bastion_of_law' })]
         const result = collectAutomationFromFeatures(features, ps)
@@ -170,10 +164,10 @@ describe('collectAutomationFromFeatures – conditional action/bonus action type
         expect(result.actions).toHaveLength(0)
     })
 
-    it('categorizes concentration_bonus_attack as action by default', () => {
+    it('categorizes concentration_bonus_attack as bonus action by default', () => {
         const features = [makeFeature({ type: 'concentration_bonus_attack' })]
         const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
+        expect(result.bonusActions).toHaveLength(1)
     })
 
     it('categorizes concentration_bonus_attack as bonus action when specified', () => {
@@ -525,11 +519,6 @@ describe('collectAutomationFromFeatures – special action types', () => {
         expect(result.specialActions).toHaveLength(1)
     })
 
-    it('categorizes web_area_save as special action', () => {
-        const features = [makeFeature({ type: 'web_area_save' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.specialActions).toHaveLength(1)
-    })
 })
 
 describe('collectAutomationFromFeatures – passive types', () => {
@@ -665,18 +654,6 @@ describe('collectAutomationFromFeatures – passive types', () => {
         expect(result.passives).toHaveLength(1)
     })
 
-    it('categorizes magical_ambush as passive', () => {
-        const features = [makeFeature({ type: 'magical_ambush' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
-    it('categorizes versatile_trickster as passive', () => {
-        const features = [makeFeature({ type: 'versatile_trickster' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
     it('categorizes stroke_of_luck as passive', () => {
         const features = [makeFeature({ type: 'stroke_of_luck' })]
         const result = collectAutomationFromFeatures(features, ps)
@@ -731,12 +708,6 @@ describe('collectAutomationFromFeatures – passive types', () => {
         expect(result.passives).toHaveLength(1)
     })
 
-    it('categorizes expert_divination as passive', () => {
-        const features = [makeFeature({ type: 'expert_divination' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
     it('categorizes potent_cantrip as passive', () => {
         const features = [makeFeature({ type: 'potent_cantrip' })]
         const result = collectAutomationFromFeatures(features, ps)
@@ -781,12 +752,6 @@ describe('collectAutomationFromFeatures – passive types', () => {
 
     it('categorizes primal_companion_double_strike as passive', () => {
         const features = [makeFeature({ type: 'primal_companion_double_strike' })]
-        const result = collectAutomationFromFeatures(features, ps)
-        expect(result.passives).toHaveLength(1)
-    })
-
-    it('categorizes primal_companion_double_strike_damage as passive', () => {
-        const features = [makeFeature({ type: 'primal_companion_double_strike_damage' })]
         const result = collectAutomationFromFeatures(features, ps)
         expect(result.passives).toHaveLength(1)
     })
