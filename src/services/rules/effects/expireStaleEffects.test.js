@@ -100,8 +100,8 @@ describe('expireStaleEffects', () => {
   });
 
   it('clears stale effects (appliedRound < currentRound)', () => {
-    const staleEntry = { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 1 };
-    const freshEntry = { target: 'Orc', effects: [{ type: 'advantage_on_target' }], appliedRound: 2 };
+    const staleEntry = { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 1, expiryRounds: 1 };
+    const freshEntry = { target: 'Orc', effects: [{ type: 'advantage_on_target' }], appliedRound: 2, expiryRounds: 1 };
     const list = [staleEntry, freshEntry];
 
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
@@ -120,7 +120,7 @@ describe('expireStaleEffects', () => {
   });
 
   it('keeps fresh effects (appliedRound >= currentRound)', () => {
-    const freshEntry = { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 2 };
+    const freshEntry = { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 2, expiryRounds: 1 };
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(2);
     getRuntimeValue.mockReturnValueOnce([freshEntry]);
@@ -164,7 +164,7 @@ describe('expireStaleEffects', () => {
 
   it('clears all entries when every entry is stale', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0, expiryRounds: 1 },
     ];
 
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
@@ -182,9 +182,9 @@ describe('expireStaleEffects', () => {
 
   it('processes multiple stale+fresh entries in a single list', () => {
     const list = [
-      { target: 'A', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0 },
-      { target: 'B', effects: [{ type: 'stunned' }], appliedRound: 1 },
-      { target: 'C', effects: [{ type: 'advantage_on_target' }], appliedRound: 2 },
+      { target: 'A', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0, expiryRounds: 1 },
+      { target: 'B', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 1 },
+      { target: 'C', effects: [{ type: 'advantage_on_target' }], appliedRound: 2, expiryRounds: 1 },
     ];
 
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
@@ -202,7 +202,7 @@ describe('expireStaleEffects', () => {
 
   it('clears advantage_on_target stale effect for matching attacker', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'advantage_on_target' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'advantage_on_target' }], appliedRound: 0, expiryRounds: 1 },
     ];
 
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
@@ -226,7 +226,7 @@ describe('expireStaleEffects', () => {
 
   it('clears stunned condition when stale entry has type/stunned combo', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'stunned', condition: 'stunned' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'stunned', condition: 'stunned' }], appliedRound: 0, expiryRounds: 1 },
     ];
 
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
@@ -250,7 +250,7 @@ describe('expireStaleEffects', () => {
 
   it('uses campaignName in all runtime state calls', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(5);
@@ -300,7 +300,7 @@ describe('expireStaleEffects — additional edge cases', () => {
       ],
     });
     getRuntimeValue.mockReturnValue([
-      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 0, expiryRounds: 1 },
     ]);
 
     expireStaleEffects('MyCampaign');
@@ -322,7 +322,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('clears fly_speed_equals_walk_speed effect via expireStaleEffects', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'fly_speed_equals_walk_speed' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'fly_speed_equals_walk_speed' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -349,7 +349,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('clears remove_active_buff effect via expireStaleEffects', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'remove_active_buff', buffName: 'RecklessAttack' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'remove_active_buff', buffName: 'RecklessAttack' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -370,7 +370,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('clears remove_bardic_inspiration effect via expireStaleEffects', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'remove_bardic_inspiration' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'remove_bardic_inspiration' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -389,7 +389,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('clears inspiring_movement_no_oa effect via expireStaleEffects', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'inspiring_movement_no_oa' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'inspiring_movement_no_oa' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -406,7 +406,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('clears inspiring_movement_granted effect via expireStaleEffects', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'inspiring_movement_granted' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'inspiring_movement_granted' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -423,7 +423,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('clears unbreakable_majesty effect via expireStaleEffects', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'unbreakable_majesty' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'unbreakable_majesty' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -441,7 +441,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('cleared activeBuffs with fly_speed_equals_walk_speed mixed with other buffs', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'fly_speed_equals_walk_speed' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'fly_speed_equals_walk_speed' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -466,7 +466,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('cleared activeBuffs with remove_active_buff mixed with other buffs', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'remove_active_buff', buffName: 'RecklessAttack' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'remove_active_buff', buffName: 'RecklessAttack' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -491,7 +491,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('handles clearing condition type effect via expireStaleEffects', () => {
     const list = [
-      { target: 'Orc', effects: [{ type: 'condition', condition: 'poisoned' }], appliedRound: 0 },
+      { target: 'Orc', effects: [{ type: 'condition', condition: 'poisoned' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getCurrentCombatRound.mockReturnValue(3);
@@ -510,7 +510,7 @@ describe('expireStaleEffects — additional edge cases', () => {
 
   it('removes NPC condition via removeNpcCondition when matching NPC found in combat summary', () => {
     const list = [
-      { target: 'Orc', effects: [{ type: 'condition', condition: 'poisoned' }], appliedRound: 0 },
+      { target: 'Orc', effects: [{ type: 'condition', condition: 'poisoned' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({
       creatures: [

@@ -272,22 +272,13 @@ describe('addExpiration', () => {
     );
   });
 
-  it('uses default expiryRounds of 1 when not provided', () => {
+  it('throws when expiryRounds is not provided', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'pendingExpirations') return [];
       return null;
     });
 
-    addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign');
-
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Caster',
-      'pendingExpirations',
-      expect.arrayContaining([
-        expect.objectContaining({ expiryRounds: 1 })
-      ]),
-      'TestCampaign'
-    );
+    expect(() => addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign')).toThrow('rounds is required');
   });
 
   it('appends to existing expiration list', () => {

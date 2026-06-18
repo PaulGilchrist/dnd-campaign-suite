@@ -93,13 +93,22 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
     }
 
     const results = [];
-    const slotLevel = metaCtx?.slotLevel || spell.level || 9;
-    const healAtSlotLevel = spell.heal_at_slot_level;
-    let totalPool = 700;
-    if (healAtSlotLevel) {
+    if (metaCtx?.slotLevel == null && spell.level == null) {
+        console.error('[massHealService] triggerMassHeal: slot level is missing (metaCtx.slotLevel and spell.level)')
+        throw new Error('slot level is required for mass heal')
+      }
+      const slotLevel = metaCtx?.slotLevel || spell.level;
+      const healAtSlotLevel = spell.heal_at_slot_level;
+      let totalPool = 700;
+      if (healAtSlotLevel) {
         const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
         if (expression && expression !== 'max') {
-            totalPool = parseInt(expression, 10) || 700;
+          const parsed = parseInt(expression, 10);
+          if (Number.isNaN(parsed)) {
+            console.error('[massHealService] triggerMassHeal: heal_at_slot_level expression is not a valid number:', expression)
+            throw new Error('heal_at_slot_level expression must be a valid number for mass heal')
+          }
+          totalPool = parsed;
         }
     }
     let remainingPool = totalPool;

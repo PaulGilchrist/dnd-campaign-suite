@@ -50,13 +50,13 @@ describe('addExpiration', () => {
   it('adds a new expiration entry when no existing list', () => {
     getRuntimeValue.mockReturnValueOnce(null);
 
-    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
+    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 3);
 
     expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', KEY);
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Goblin',
       KEY,
-      [{ target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 1 }],
+      [{ target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 3 }],
       'MyCampaign'
     );
   });
@@ -67,14 +67,14 @@ describe('addExpiration', () => {
     ];
     getRuntimeValue.mockReturnValueOnce(existingList);
 
-    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
+    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 2);
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'Goblin',
       KEY,
       [
         ...existingList,
-        { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 1 },
+        { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 2 },
       ],
       'MyCampaign'
     );
@@ -86,7 +86,7 @@ describe('addExpiration', () => {
     ];
     getRuntimeValue.mockReturnValueOnce(existingList);
 
-    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
+    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 1);
 
     expect(existingList.length).toBe(1);
   });
@@ -95,7 +95,7 @@ describe('addExpiration', () => {
     getCurrentCombatRound.mockReturnValue(5);
     getRuntimeValue.mockReturnValueOnce(null);
 
-    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign');
+    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 3);
 
     const call = setRuntimeValue.mock.calls[0];
     expect(call[2][0].appliedRound).toBe(5);
@@ -108,7 +108,7 @@ describe('addExpiration', () => {
     ];
     getRuntimeValue.mockReturnValueOnce(null);
 
-    addExpiration('Goblin', 'Human', effects, 'MyCampaign');
+    addExpiration('Goblin', 'Human', effects, 'MyCampaign', 5);
 
     const call = setRuntimeValue.mock.calls[0];
     expect(call[2][0].effects).toBe(effects);

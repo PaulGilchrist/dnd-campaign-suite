@@ -1,7 +1,20 @@
 import { executeHandler } from '../../automation/index.js';
 
 export async function triggerSleep(spell, metaCtx, playerStats, campaignName, mapName) {
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
+    let spellSaveDc;
+    if (metaCtx?.spellSaveDc == null) {
+        if (playerStats.spellAbilities?.saveDc == null) {
+          if (playerStats.proficiency == null) {
+            console.error('[sleepService] triggerSleep: playerStats.proficiency is missing')
+            throw new Error('playerStats.proficiency is required for sleep spell')
+          }
+          spellSaveDc = 8 + playerStats.proficiency;
+        } else {
+          spellSaveDc = playerStats.spellAbilities.saveDc;
+        }
+      } else {
+        spellSaveDc = metaCtx.spellSaveDc;
+      }
 
     const action = {
         name: spell.name,
@@ -11,7 +24,13 @@ export async function triggerSleep(spell, metaCtx, playerStats, campaignName, ma
             saveType: 'WIS',
         },
         spell,
-        spellSlotLevel: metaCtx?.slotLevel || spell.level || 1,
+        spellSlotLevel: (() => {
+            if (metaCtx?.slotLevel == null && spell.level == null) {
+                console.error('[sleepService] triggerSleep: slot level is missing (metaCtx.slotLevel and spell.level)')
+                throw new Error('slot level is required for sleep spell')
+            }
+            return metaCtx?.slotLevel || spell.level
+        })(),
     };
 
     try {

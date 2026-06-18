@@ -158,7 +158,11 @@ async function applySuperiorDefenseTurnStart(activeName, playerStats, effect, ca
         return;
     }
 
-    const cost = effect.cost || 3;
+    if (effect.cost == null) {
+        console.error('[expirations] applySuperiorDefenseTurnStart: effect.cost is missing')
+        throw new Error('effect.cost is required for Superior Defense')
+      }
+      const cost = effect.cost
     const maxFocus = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points || 0;
     const currentFocus = Number(getRuntimeValue(activeName, 'focusPoints', campaignName) ?? maxFocus);
 
@@ -281,7 +285,14 @@ async function applyInnerRadianceDamage(activeName, playerStats, effect, campaig
     const damageExpression = effect.damageExpression || 'proficiency_bonus';
     const damageType = effect.damageType || 'Radiant';
     const range = effect.range || '10_ft';
-    const rangeNum = parseInt(range) || 10;
+    const rangeNum = (() => {
+        const parsed = parseInt(range, 10);
+        if (Number.isNaN(parsed)) {
+          console.error('[expirations] applyInnerRadianceDamage: effect.range is not a valid number:', range)
+          throw new Error('effect.range must be a valid number for Inner Radiance')
+        }
+        return parsed
+      })()
 
     const prof = playerStats.proficiency || 0;
 
@@ -363,7 +374,11 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
     const combatData = getCombatSummary(campaignName);
     if (!combatData) return;
     
-    const currentRound = combatData.round || 1;
+    if (combatData.round == null) {
+        console.error('[expirations] applyDreadAmbushSpeedTurnStart: combatData.round is missing')
+        throw new Error('combatData.round is required for Dread Ambush')
+      }
+      const currentRound = combatData.round
     if (currentRound !== 1) return;
     
     const isActive = getRuntimeValue(activeName, 'dreadAmbushSpeedActive', campaignName);
@@ -371,7 +386,14 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
     
     await setRuntimeValue(activeName, 'dreadAmbushSpeedActive', true, campaignName);
     
-    const bonus = parseInt(effect.bonusExpression, 10) || 10;
+    const bonus = (() => {
+        const parsed = parseInt(effect.bonusExpression, 10);
+        if (Number.isNaN(parsed)) {
+          console.error('[expirations] applyDreadAmbushSpeedTurnStart: effect.bonusExpression is not a valid number:', effect.bonusExpression)
+          throw new Error('effect.bonusExpression must be a valid number for Dread Ambush')
+        }
+        return parsed
+      })()
     
     const activeBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName) || [];
     const newBuffs = [...activeBuffs, {
@@ -538,7 +560,13 @@ export function addExpiration(attackerName, targetName, effects, campaignName, r
     const currentRound = getCurrentCombatRound();
     setRuntimeValue(attackerName, KEY, [
          ...list,
-         { target: targetName, effects, appliedRound: currentRound, expiryRounds: rounds || 1 }
+          { target: targetName, effects, appliedRound: currentRound, expiryRounds: (() => {
+            if (rounds == null) {
+              console.error('[expirations] addExpiration: rounds is missing for target:', targetName)
+              throw new Error('rounds is required for addExpiration')
+            }
+            return rounds
+          })() }
      ], campaignName);
 }
 
@@ -601,7 +629,13 @@ export function expireStaleEffects(campaignName) {
 
             let newEntries = [];
             for (const item of list) {
-                const rounds = item.expiryRounds || 1;
+                const rounds = (() => {
+                    if (item.expiryRounds == null) {
+                      console.error('[expirations] expireStaleEffects: expiryRounds is missing for item in', attacker.name)
+                      throw new Error('expiryRounds is required for expireStaleEffects')
+                    }
+                    return item.expiryRounds
+                  })()
                 if (currentRound >= item.appliedRound + rounds) {
                     clearExpirationEffects(item.effects, item.target, attacker.name, campaignName);
                     } else {

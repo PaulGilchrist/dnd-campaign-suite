@@ -485,7 +485,11 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         const computed = player?.computedStats || player;
         if (!computed || computed.class?.name !== 'Ranger') return false;
         const classLevels = computed.class?.class_levels || [];
-        const currentLevel = classLevels.find(cl => cl.level === (player?.level || 1));
+        if (player?.level == null) {
+          console.error('[applyDamage] Relentless Hunter: player level is missing')
+          throw new Error('player level is required for relentless hunter check')
+        }
+        const currentLevel = classLevels.find(cl => cl.level === player.level);
         return (currentLevel?.level || 0) >= 13;
       })();
       if (!relentlessHunterActive) {

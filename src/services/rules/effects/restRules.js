@@ -151,7 +151,11 @@ export async function applyShortRest(playerStats, campaignName) {
       p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
     )
     if (hasNaturalRecovery && playerStats.class?.name === 'Druid') {
-      const druidLevel = playerStats.level || 1
+      if (playerStats.level == null) {
+          console.error('[restRules] applyShortRest: playerStats.level is missing for druid natural recovery')
+          throw new Error('playerStats.level is required for natural recovery')
+        }
+        const druidLevel = playerStats.level
       const maxSlotsToRecover = Math.floor(druidLevel / 2)
       let slotsRecovered = 0
       const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -174,7 +178,11 @@ export async function applyShortRest(playerStats, campaignName) {
       p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels'
     )
     if (hasArcaneRecovery && playerStats.class?.name === 'Wizard') {
-      const wizardLevel = playerStats.level || 1
+      if (playerStats.level == null) {
+          console.error('[restRules] applyShortRest: playerStats.level is missing for wizard arcane recovery')
+          throw new Error('playerStats.level is required for arcane recovery')
+        }
+        const wizardLevel = playerStats.level
       const maxSlotsToRecover = Math.ceil(wizardLevel / 2)
       let slotsRecovered = 0
       // Only recover slots level 5 and lower (no level 6+)
@@ -272,12 +280,16 @@ export async function applyShortRest(playerStats, campaignName) {
      const features = playerStats.characterAdvancement || []
      const feature = features.find(f => f.name === 'Celestial Resilience')
      if (feature) {
-       const warlockLevel = playerStats.level || 0
-       const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-       const selfTempHp = warlockLevel + chaMod
-       if (selfTempHp > 0) {
-         const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
-         updates.tempHp = existingTempHp + selfTempHp
+        if (playerStats.level == null) {
+          console.error('[restRules] applyShortRest: playerStats.level is missing for celestial patron temp HP')
+          throw new Error('playerStats.level is required for celestial patron temp HP')
+        }
+        const warlockLevel = playerStats.level
+        const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
+        const selfTempHp = warlockLevel + chaMod
+        if (selfTempHp > 0) {
+          const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+          updates.tempHp = existingTempHp + selfTempHp
        }
      }
    }
@@ -377,12 +389,16 @@ export async function applyLongRest(playerStats, campaignName) {
        const features = playerStats.characterAdvancement || []
        const feature = features.find(f => f.name === 'Celestial Resilience')
        if (feature) {
-         const warlockLevel = playerStats.level || 0
-         const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-         const selfTempHp = warlockLevel + chaMod
-         if (selfTempHp > 0) {
-           const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
-           setRuntimeValue(name, 'tempHp', existingTempHp + selfTempHp, campaignName, true)
+          if (playerStats.level == null) {
+            console.error('[restRules] applyLongRest: playerStats.level is missing for celestial patron temp HP')
+            throw new Error('playerStats.level is required for celestial patron temp HP')
+          }
+          const warlockLevel = playerStats.level
+          const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
+          const selfTempHp = warlockLevel + chaMod
+          if (selfTempHp > 0) {
+            const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+            setRuntimeValue(name, 'tempHp', existingTempHp + selfTempHp, campaignName, true)
          }
        }
      }

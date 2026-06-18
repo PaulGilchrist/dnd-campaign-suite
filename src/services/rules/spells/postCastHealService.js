@@ -59,8 +59,16 @@ export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, camp
 
     const results = [];
     const prof = playerStats.proficiency || 0;
-    const level = playerStats.level || 1;
-    const slotLevel = metaCtx?.slotLevel || spell.level || 1;
+    if (playerStats.level == null) {
+        console.error('[postCastHealService] triggerPostCastSelfHeals: playerStats.level is missing')
+        throw new Error('playerStats.level is required for post-cast self heals')
+      }
+      const level = playerStats.level
+      if (metaCtx?.slotLevel == null && spell.level == null) {
+        console.error('[postCastHealService] triggerPostCastSelfHeals: slot level is missing (metaCtx.slotLevel and spell.level)')
+        throw new Error('slot level is required for post-cast self heals')
+      }
+      const slotLevel = metaCtx?.slotLevel || spell.level;
 
     for (const heal of selfHeals) {
         if (heal.othersOnly && spell.range === 'Self') {
@@ -109,8 +117,16 @@ export async function triggerPostCastAllyHeals(spell, metaCtx, playerStats, camp
 
     const results = [];
     const prof = playerStats.proficiency || 0;
-    const level = playerStats.level || 1;
-    const slotLevel = metaCtx?.slotLevel || spell.level || 1;
+    if (playerStats.level == null) {
+        console.error('[postCastHealService] triggerPostCastAllyHeals: playerStats.level is missing')
+        throw new Error('playerStats.level is required for post-cast ally heals')
+      }
+      const level = playerStats.level
+      if (metaCtx?.slotLevel == null && spell.level == null) {
+        console.error('[postCastHealService] triggerPostCastAllyHeals: slot level is missing (metaCtx.slotLevel and spell.level)')
+        throw new Error('slot level is required for post-cast ally heals')
+      }
+      const slotLevel = metaCtx?.slotLevel || spell.level;
 
     for (const heal of allyHeals) {
         if (heal.othersOnly && spell.range === 'Self') {

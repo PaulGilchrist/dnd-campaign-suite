@@ -99,7 +99,11 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
             playerStats.class.major.spells.forEach((subclassSpell) => {
                 const spellName = subclassSpell.name || (subclassSpell.spell && subclassSpell.spell.name);
                 if (!spellName) return;
-                const spellLevel = subclassSpell.level || 1;
+                if (subclassSpell.level == null) {
+                    console.error('[spellCalc2024] getSpellAbilities: subclassSpell.level is missing for spell:', subclassSpell.name || (subclassSpell.spell && subclassSpell.spell.name))
+                    throw new Error('subclassSpell.level is required for subclass spells')
+                  }
+                  const spellLevel = subclassSpell.level
                 if (playerStats.level >= spellLevel) {
                     const knownSpell = spellAbilities.spells.find((s) => s.name === spellName);
                     if (knownSpell) {

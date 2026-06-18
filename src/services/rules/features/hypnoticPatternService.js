@@ -4,8 +4,25 @@ export async function triggerHypnoticPattern(spell, metaCtx, playerStats, campai
     const isHypnoticPattern = (spell.name || '').toLowerCase() === 'hypnotic pattern';
     if (!isHypnoticPattern) return null;
 
-    const spellSaveDc = metaCtx?.spellSaveDc || playerStats.spellAbilities?.saveDc || 8 + (playerStats.proficiency || 2);
-    const slotLevel = metaCtx?.slotLevel || spell.level || 3;
+    let spellSaveDc;
+    if (metaCtx?.spellSaveDc == null) {
+        if (playerStats.spellAbilities?.saveDc == null) {
+          if (playerStats.proficiency == null) {
+            console.error('[hypnoticPatternService] triggerHypnoticPattern: playerStats.proficiency is missing')
+            throw new Error('playerStats.proficiency is required for hypnotic pattern')
+          }
+          spellSaveDc = 8 + playerStats.proficiency;
+        } else {
+          spellSaveDc = playerStats.spellAbilities.saveDc;
+        }
+      } else {
+        spellSaveDc = metaCtx.spellSaveDc;
+      }
+    if (metaCtx?.slotLevel == null && spell.level == null) {
+        console.error('[hypnoticPatternService] triggerHypnoticPattern: slot level is missing (metaCtx.slotLevel and spell.level)')
+        throw new Error('slot level is required for hypnotic pattern')
+      }
+      const slotLevel = metaCtx?.slotLevel || spell.level;
 
     const action = {
         name: spell.name,

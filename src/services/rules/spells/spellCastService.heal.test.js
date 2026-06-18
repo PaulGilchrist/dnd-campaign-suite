@@ -290,6 +290,7 @@ describe('executeSpellCast - heal spells', () => {
       const spell = makeSpell({
         name: 'Regenerate', level: 7,
         heal_at_slot_level: { 7: '4d8 + 15' },
+        automation: { bodyPartRegrowMinutes: 2 },
       })
       delete spell.damage
 
@@ -312,6 +313,7 @@ describe('executeSpellCast - heal spells', () => {
       const spell = makeSpell({
         name: 'Regenerate', level: 7,
         heal_at_slot_level: { 7: '4d8 + 15' },
+        automation: { bodyPartRegrowMinutes: 2 },
       })
       delete spell.damage
 
@@ -334,6 +336,7 @@ describe('executeSpellCast - heal spells', () => {
       const spell = makeSpell({
         name: 'Regenerate', level: 7,
         heal_at_slot_level: { 7: '4d8 + 15' },
+        automation: { bodyPartRegrowMinutes: 2 },
       })
       delete spell.damage
 

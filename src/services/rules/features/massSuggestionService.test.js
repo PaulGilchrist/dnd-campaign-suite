@@ -155,26 +155,19 @@ describe('massSuggestionService', () => {
             );
         });
 
-        it('uses default proficiency of 2 when not available', async () => {
+        it('throws when proficiency is not available', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const stats = { name: 'Wizard' };
 
-            await triggerMassSuggestion(
-                { name: 'Mass Suggestion', level: 6 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 10 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
+            await expect(
+                triggerMassSuggestion(
+                    { name: 'Mass Suggestion', level: 6 },
+                    {},
+                    stats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('playerStats.proficiency is required');
         });
 
         it('returns result from executeHandler on success', async () => {
@@ -256,23 +249,18 @@ describe('massSuggestionService', () => {
             );
         });
 
-        it('uses default slot level of 6 when no slot level is provided', async () => {
+        it('throws when slot level is not available', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
-            await triggerMassSuggestion(
-                { name: 'Mass Suggestion' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 6 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
+            await expect(
+                triggerMassSuggestion(
+                    { name: 'Mass Suggestion' },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('slot level is required');
         });
 
         it('hardcodes saveType to WIS', async () => {

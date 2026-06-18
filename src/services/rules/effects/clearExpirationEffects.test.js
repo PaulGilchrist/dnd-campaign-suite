@@ -307,7 +307,7 @@ describe('clearExpirationEffects (via expireStaleEffects)', () => {
 
   it('does not process effects when null through expire path', () => {
     const list = [
-      { target: 'Human', effects: null, appliedRound: 0 },
+      { target: 'Human', effects: null, appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getRuntimeValue.mockReturnValueOnce(list);
@@ -323,7 +323,7 @@ describe('clearExpirationEffects (via expireStaleEffects)', () => {
 
   it('does not process effects when non-array through expire path', () => {
     const list = [
-      { target: 'Human', effects: {}, appliedRound: 0 },
+      { target: 'Human', effects: {}, appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getRuntimeValue.mockReturnValueOnce(list);
@@ -339,7 +339,7 @@ describe('clearExpirationEffects (via expireStaleEffects)', () => {
 
   it('handles advantage_on_target with storedAdv being an empty array', () => {
     const list = [
-      { target: 'Human', effects: [{ type: 'advantage_on_target' }], appliedRound: 0 },
+      { target: 'Human', effects: [{ type: 'advantage_on_target' }], appliedRound: 0, expiryRounds: 1 },
     ];
     getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
     getRuntimeValue.mockImplementation((name, key) => {

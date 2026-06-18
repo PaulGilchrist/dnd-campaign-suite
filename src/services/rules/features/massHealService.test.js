@@ -960,7 +960,7 @@ describe('massHealService', () => {
             expect(result.totalHealed).toBeLessThanOrEqual(200);
         });
 
-        it('handles heal_at_slot_level with parseInt returning NaN', async () => {
+        it('throws when heal_at_slot_level expression is not a valid number', async () => {
             const spell = {
                 name: 'Mass Heal',
                 level: 9,
@@ -975,15 +975,15 @@ describe('massHealService', () => {
                 return null;
             });
 
-            const result = await triggerMassHeal(
-                spell,
-                { slotLevel: 9 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result.totalHealed).toBeLessThanOrEqual(700);
+            await expect(
+                triggerMassHeal(
+                    spell,
+                    { slotLevel: 9 },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('heal_at_slot_level expression must be a valid number');
         });
 
         it('handles placedItems as target sources', async () => {

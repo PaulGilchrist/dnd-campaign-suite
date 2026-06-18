@@ -126,7 +126,16 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
   const cantripSpellAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
   let spellToHit = playerStats.spellAbilities?.toHit || 0;
-  let spellSaveDc = playerStats.spellAbilities?.saveDc || 8 + playerStats.proficiency;
+  let spellSaveDc;
+  if (playerStats.spellAbilities?.saveDc == null) {
+    if (playerStats.proficiency == null) {
+      console.error('[spellCast] executeSpellCast: playerStats.proficiency is missing')
+      throw new Error('playerStats.proficiency is required for spell save DC calculation')
+    }
+    spellSaveDc = 8 + playerStats.proficiency;
+  } else {
+    spellSaveDc = playerStats.spellAbilities.saveDc;
+  }
   if (cantripSpellAbility && playerStats.abilities) {
     const ability = playerStats.abilities.find(a => a.name === cantripSpellAbility);
     if (ability) {
@@ -379,7 +388,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         if (spell.heal_at_slot_level) {
             const target = await getTargetInfo();
             if (target?.name) {
-                const slotLevel = metaCtx?.slotLevel || spell.level || 1;
+                if (metaCtx?.slotLevel == null && spell.level == null) {
+                    console.error('[spellCast] executeSpellCast: slot level is missing (metaCtx.slotLevel and spell.level) for healing spell')
+                    throw new Error('slot level is required for healing spell')
+                  }
+                  const slotLevel = metaCtx?.slotLevel || spell.level;
                 const healAtSlotLevel = spell.heal_at_slot_level;
                 let expression = healAtSlotLevel[slotLevel];
                 if (!expression) {
@@ -761,13 +774,22 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
     const creature = combatSummary.creatures.find(c => c.name === targetName);
     if (!creature) return;
 
-    const slotLevel = metaCtx?.slotLevel || spell.level || 6;
-    const healAtSlotLevel = spell.heal_at_slot_level;
-    let healAmount = 70;
-    if (healAtSlotLevel) {
+    if (metaCtx?.slotLevel == null && spell.level == null) {
+        console.error('[spellCast] triggerHeal: slot level is missing (metaCtx.slotLevel and spell.level)')
+        throw new Error('slot level is required for heal spell')
+      }
+      const slotLevel = metaCtx?.slotLevel || spell.level;
+      const healAtSlotLevel = spell.heal_at_slot_level;
+      let healAmount = 70;
+      if (healAtSlotLevel) {
         const expression = healAtSlotLevel[slotLevel] || healAtSlotLevel[Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b).pop()];
         if (expression) {
-            healAmount = parseInt(expression, 10) || 70;
+          const parsed = parseInt(expression, 10);
+          if (Number.isNaN(parsed)) {
+            console.error('[spellCast] triggerHeal: heal_at_slot_level expression is not a valid number:', expression)
+            throw new Error('heal_at_slot_level expression must be a valid number for heal spell')
+          }
+          healAmount = parsed;
         }
     }
     const maxHp = creature.maxHp || playerStats.hitPoints || 0;
@@ -860,16 +882,20 @@ async function triggerExpertDivination(spell, metaCtx, playerStats, campaignName
 async function applyRegenerateSpell(spell, target, caster, campaignName) {
     const targetName = target.name;
     const casterName = caster.name;
-    const slotLevel = spell.level || 7;
-    const healAtSlotLevel = spell.heal_at_slot_level;
-    let expression = healAtSlotLevel?.[slotLevel];
-    if (!expression) {
+    if (spell.level == null) {
+        console.error('[spellCast] applyRegenerateSpell: spell.level is missing')
+        throw new Error('spell.level is required for regenerate spell')
+      }
+      const slotLevel = spell.level;
+      const healAtSlotLevel = spell.heal_at_slot_level;
+      let expression = healAtSlotLevel?.[slotLevel];
+      if (!expression) {
         const levels = Object.keys(healAtSlotLevel || {}).map(Number).sort((a, b) => a - b);
         const highestBelow = levels.filter(l => l <= slotLevel).pop();
         if (highestBelow) {
-            expression = healAtSlotLevel[highestBelow];
+          expression = healAtSlotLevel[highestBelow];
         }
-    }
+      }
 
     // Apply initial healing
     if (expression) {
@@ -879,7 +905,11 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
             const combatSummary = await getCombatContext(campaignName);
             if (combatSummary) {
                 const creature = combatSummary.creatures.find(c => c.name === targetName);
-                const maxHp = creature?.maxHp || caster.hitPoints || 100;
+                if (creature?.maxHp == null && caster.hitPoints == null) {
+                    console.error('[spellCast] applyRegenerateSpell: max HP is missing for both creature and caster')
+                    throw new Error('max HP is required for regenerate spell')
+                  }
+                  const maxHp = creature?.maxHp || caster.hitPoints;
                 const currentHp = creature?.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
                 const actualHeal = Math.min(result.total, maxHp - currentHp);
                 if (actualHeal > 0) {
@@ -906,7 +936,11 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
     await setRuntimeValue(targetName, 'regenerateSource', casterName, campaignName);
 
     // Track body part regrowth timestamp (2 minutes = 120000ms)
-    const bodyPartRegrowMinutes = spell.automation?.bodyPartRegrowMinutes || 2;
+    if (spell.automation?.bodyPartRegrowMinutes == null) {
+        console.error('[spellCast] applyRegenerateSpell: spell.automation.bodyPartRegrowMinutes is missing')
+        throw new Error('spell.automation.bodyPartRegrowMinutes is required for regenerate spell')
+      }
+      const bodyPartRegrowMinutes = spell.automation.bodyPartRegrowMinutes
     const regrowTimestamp = Date.now() + (bodyPartRegrowMinutes * 60 * 1000);
     await setRuntimeValue(targetName, 'regenerateBodyPartRegrowTime', regrowTimestamp, campaignName);
     await setRuntimeValue(targetName, 'regenerateBodyPartsTracked', true, campaignName);
