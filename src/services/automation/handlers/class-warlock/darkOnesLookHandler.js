@@ -69,7 +69,7 @@ export async function handle(action, playerStats, campaignName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name}: +1d10(${dieRoll}) to ability check/saving throw. Uses remaining: ${currentUses - 1}/${maxUses}.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[darkOnesLook] Error:", e); throw e; });
 
     return infoPopup(action.name, description, auto);
 }

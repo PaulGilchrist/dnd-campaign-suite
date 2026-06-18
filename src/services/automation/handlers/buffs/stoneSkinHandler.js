@@ -80,7 +80,7 @@ export async function applyStoneSkin(action, playerStats, campaignName, targetNa
         description: `${playerStats.name} cast ${action.name} on ${targetName}. Target has Resistance to Bludgeoning, Piercing, and Slashing damage.`,
         targetName,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[stoneSkinHandler] Error:", e); throw e; });
 
     return {
         type: 'popup',

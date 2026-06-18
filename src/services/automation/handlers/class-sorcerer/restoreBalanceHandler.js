@@ -131,7 +131,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName} on ${targetName}. Advantage/Disadvantage neutralized. Uses: ${currentUses - 1}/${usesMax}.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[restoreBalance] Error:", e); throw e; });
 
     return {
         type: 'popup',

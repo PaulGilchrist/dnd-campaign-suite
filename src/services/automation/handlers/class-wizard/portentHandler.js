@@ -88,7 +88,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
         portentDie: chosenDie,
         diceRemaining: remainingDice.length,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[portent] Error:", e); throw e; });
 
     return infoPopup(action.name, description, auto);
 }

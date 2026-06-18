@@ -83,7 +83,7 @@ export function createSaves(deps) {
             characterName: playerName,
             abilityName: 'Glorious Defense',
             description: `${playerName} used Glorious Defense counter-attack against ${targetName || 'attacker'}.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[useLoggedDiceRollSaves] Error:", e); throw e; });
 
         logAndShow(attack.name, attack.hitBonus, 'attack', { targetName, forcedMode: undefined });
     }

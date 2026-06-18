@@ -20,7 +20,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated ${action.name}. Charisma checks have advantage, can reroll failed saving throws, and missed weapon attacks once per turn hit automatically.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[livingLegend] Error:", e); throw e; });
 
     return {
         type: 'popup',

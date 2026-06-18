@@ -114,15 +114,15 @@ describe('inspiringSmiteService', () => {
       expect(result).toBeNull()
     })
 
-    it('handles executeHandler errors gracefully', async () => {
+    it('throws when executeHandler throws an error', async () => {
       const { executeHandler } = await import('../../automation/index.js')
       vi.mocked(executeHandler).mockRejectedValue(new Error('fail'))
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite', name: 'Inspire' }] } }
-      const result = await triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 2 }, stats, 'camp', 'map')
-      expect(consoleSpy).toHaveBeenCalled()
-      expect(result).toBeNull()
+      await expect(
+        triggerInspiringSmite({ name: 'Divine Smite' }, { slotLevel: 2 }, stats, 'camp', 'map')
+      ).rejects.toThrow('fail')
       consoleSpy.mockRestore()
     })
 

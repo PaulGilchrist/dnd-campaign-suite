@@ -24,7 +24,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(entry),
-      }).catch(() => {});
+      }).catch((e) => { console.error("[useLoggedDiceRoll] Error:", e); throw e; });
   }
 
   setupEventListeners({

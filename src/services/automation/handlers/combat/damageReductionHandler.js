@@ -109,7 +109,7 @@ async function handleZeroOnSuccessHalfOnFail(action, playerStats, campaignName) 
         abilityName: featureName,
         description: `${playerName} activated ${featureName}. Next Dex save for half damage: no damage on success, half on fail.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[damageReduction] Error:", e); throw e; });
 
     return {
         type: 'popup',

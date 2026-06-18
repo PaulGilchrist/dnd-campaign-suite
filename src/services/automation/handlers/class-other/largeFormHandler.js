@@ -80,7 +80,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated Large Form for 10 minutes.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[largeForm] Error:", e); throw e; });
 
     return {
         type: 'popup',

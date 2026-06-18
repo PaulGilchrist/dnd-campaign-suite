@@ -470,7 +470,7 @@ describe('triggerPostCastRiderSaves', () => {
     expect(result).toBeNull();
   });
 
-  it('should catch and log errors from handler execution', async () => {
+  it('should throw and log errors from handler execution', async () => {
     const spell = makeSpell({ school: 'enchantment' });
     const ps = makePlayerStats({
       automation: {
@@ -481,19 +481,20 @@ describe('triggerPostCastRiderSaves', () => {
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const result = await triggerPostCastRiderSaves(
-      spell,
-      makeMetaCtx(),
-      ps,
-      campaignName,
-      mapName,
-    );
+    await expect(
+      triggerPostCastRiderSaves(
+        spell,
+        makeMetaCtx(),
+        ps,
+        campaignName,
+        mapName,
+      )
+    ).rejects.toThrow('handler broke');
 
     expect(consoleSpy).toHaveBeenCalledWith(
       '[postCastRider] Failed to execute rider save for Failing Rider:',
       expect.any(Error),
     );
-    expect(result).toBeNull();
 
     consoleSpy.mockRestore();
   });

@@ -40,7 +40,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
         abilityName: 'Flesh to Stone',
         description: `${targetName} makes a CON save (DC ${saveDc}) at end of turn (Flesh to Stone: ${currentSuccesses}/${MAX_SUCCESSES} successes, ${currentFails}/${MAX_FAILS} failures).`,
         promptId,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[fleshToStone] Error:", e); throw e; });
 
     const saveResult = await promise;
 
@@ -65,7 +65,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
                 saveType: 'CON',
                 success: true,
                 description: `${targetName} succeeded on CON save (${newSuccesses}/${MAX_SUCCESSES}). Flesh to Stone ends!`,
-            }).catch(() => {});
+            }).catch((e) => { console.error("[fleshToStone] Error:", e); throw e; });
 
             postLogEntry(campaignName, {
                 type: 'condition',
@@ -98,7 +98,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
             saveType: 'CON',
             success: true,
             description: `${targetName} succeeded on CON save (${newSuccesses}/${MAX_SUCCESSES} successes, ${currentFails}/${MAX_FAILS} failures). Spell continues.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[fleshToStone] Error:", e); throw e; });
 
         return {
             type: 'popup',
@@ -132,7 +132,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
             saveType: 'CON',
             success: false,
             description: `${targetName} failed CON save (${newFails}/${MAX_FAILS})! Turned to stone — Petrified!`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[fleshToStone] Error:", e); throw e; });
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -166,7 +166,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
         saveType: 'CON',
         success: false,
         description: `${targetName} failed CON save (${currentSuccesses}/${MAX_SUCCESSES} successes, ${newFails}/${MAX_FAILS} failures). Flesh hardens...`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[fleshToStone] Error:", e); throw e; });
 
     return {
         type: 'popup',
@@ -272,7 +272,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${casterName} casts Flesh to Stone on ${targetName}! ${targetName} must make a CON save (DC ${dc}) or become Restrained.`,
         promptId,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[fleshToStone] Error:", e); throw e; });
 
     const saveResult = await promise;
 
@@ -296,7 +296,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'CON',
             success: true,
             description: `${targetName} succeeded on CON save against Flesh to Stone. Speed is 0 until the start of ${casterName}'s next turn.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[fleshToStone] Error:", e); throw e; });
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -362,7 +362,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'CON',
         success: false,
         description: `${targetName} failed CON save against Flesh to Stone and is Restrained (1/3 failed saves). After 3 failed saves, ${targetName} becomes Petrified.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[fleshToStone] Error:", e); throw e; });
 
     postLogEntry(campaignName, {
         type: 'condition',

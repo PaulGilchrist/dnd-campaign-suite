@@ -58,7 +58,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: featureName,
             description: `${featureName} deactivated.`,
             timestamp: now,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[stonecunning] Error:", e); throw e; });
 
         return {
             type: 'popup',
@@ -81,7 +81,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${featureName} activated. Tremorsense 60 ft. (${newUses} use${newUses !== 1 ? 's' : ''} remaining).`,
         timestamp: now,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[stonecunning] Error:", e); throw e; });
 
     return {
         type: 'popup',

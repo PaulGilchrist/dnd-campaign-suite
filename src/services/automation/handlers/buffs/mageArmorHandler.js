@@ -81,7 +81,7 @@ export async function applyMageArmor(action, playerStats, campaignName, mapName,
             characterName: playerStats.name,
             abilityName: MAGE_ARMOR_BUFF_NAME,
             description: `${playerStats.name} cast ${MAGE_ARMOR_BUFF_NAME} on ${targetName}. Target's AC increases by 3 (13 + Dex modifier).`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[mageArmorHandler] Error:", e); throw e; });
     }
 
     return {

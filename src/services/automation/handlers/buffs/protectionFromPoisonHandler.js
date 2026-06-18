@@ -111,7 +111,7 @@ export async function applyProtectionFromPoison(action, playerStats, campaignNam
         description: `${playerStats.name} cast ${action.name} on ${targetName}. Poisoned condition removed. Target has Advantage on saves vs Poisoned and Resistance to Poison damage for ${duration}.`,
         targetName,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[protectionFromPoisonHandler] Error:", e); throw e; });
 
     return {
         type: 'popup',

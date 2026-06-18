@@ -14,5 +14,6 @@ export async function triggerRayOfEnfeeblement(spell, metaCtx, playerStats, camp
         await executeHandler(action, playerStats, campaignName, mapName);
     } catch (e) {
         console.error('[rayOfEnfeeblement] Trigger failed:', e);
+        throw e;
     }
 }

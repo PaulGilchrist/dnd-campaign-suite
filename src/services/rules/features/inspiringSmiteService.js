@@ -50,6 +50,7 @@ export async function triggerInspiringSmite(spell, metaCtx, playerStats, campaig
             }
         } catch (e) {
             console.error(`[inspiringSmite] Failed to execute inspiring smite for ${inspiringSmite.name}:`, e);
+            throw e;
         }
     }
 

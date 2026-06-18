@@ -56,7 +56,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     abilityName: featureName,
                     description: `${playerName} expended a Pact Magic spell slot to restore a use of ${featureName}.`,
                     timestamp: Date.now(),
-                }).catch(() => {});
+                }).catch((e) => { console.error("[beguilingDefenses] Error:", e); throw e; });
             } else {
                 return {
                     type: 'popup',
@@ -115,7 +115,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         targetName,
         promptId,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[beguilingDefenses] Error:", e); throw e; });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -131,7 +131,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 formula: 'equal to damage taken (after halving)',
                 description: `${targetName} failed ${saveType} save against ${featureName} and takes Psychic damage equal to the damage dealt to ${playerName} (after halving).`,
                 timestamp: Date.now(),
-            }).catch(() => {});
+            }).catch((e) => { console.error("[beguilingDefenses] Error:", e); throw e; });
         } else {
             addEntry(campaignName, {
                 type: 'save_result',
@@ -142,7 +142,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 success: true,
                 description: `${targetName} succeeded on ${saveType} save — no Psychic damage from ${featureName}.`,
                 timestamp: Date.now(),
-            }).catch(() => {});
+            }).catch((e) => { console.error("[beguilingDefenses] Error:", e); throw e; });
         }
 
         window.removeEventListener('save-result', handleSaveResult);

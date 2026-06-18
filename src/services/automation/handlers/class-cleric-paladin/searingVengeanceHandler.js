@@ -122,7 +122,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         amount: healAmount,
         abilityName: action.name,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[searingVengeance] Error:", e); throw e; });
 
     // Log the damage
     if (damageAmount > 0) {
@@ -134,7 +134,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             total: damageAmount,
             formula: damageExpr,
             description: `${action.name} dealt ${damageAmount} radiant damage to creatures within 30 feet.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[searingVengeance] Error:", e); throw e; });
     }
 
     return {

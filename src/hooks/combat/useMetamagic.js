@@ -84,7 +84,7 @@ export function logMetamagicUse(campaignName, characterName, spellName, options,
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(entry),
-  }).catch(() => {});
+  }).catch((e) => { console.error("[useMetamagic] Error:", e); throw e; });
 }
 
 export default function useMetamagic(playerStats, campaignName) {

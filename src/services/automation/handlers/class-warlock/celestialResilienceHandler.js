@@ -78,7 +78,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         abilityName: action.name,
         description: `${playerStats.name} gained ${result.selfTempHp} temporary hit points from Celestial Resilience.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[celestialResilience] Error:", e); throw e; });
 
     return {
         type: 'popup',

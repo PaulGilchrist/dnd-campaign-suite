@@ -69,7 +69,7 @@ export async function handle(action, playerStats, campaignName) {
         biDieRoll: rollResult.total,
         biDieSize: dieSize,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[bardicInspirationOffense] Error:", e); throw e; });
 
     return {
         type: 'popup',

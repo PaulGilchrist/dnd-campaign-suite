@@ -31,7 +31,7 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
         abilityName: spellName,
         description: `${targetName} makes a WIS save (DC ${saveDc}) at end of turn (${spellName}).`,
         promptId,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[holdMonster] Error:", e); throw e; });
 
     const saveResult = await promise;
 
@@ -54,7 +54,7 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save. ${spellName} ends!`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[holdMonster] Error:", e); throw e; });
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -85,7 +85,7 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save. ${spellName} continues.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[holdMonster] Error:", e); throw e; });
 
     return {
         type: 'popup',
@@ -162,7 +162,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or become Paralyzed.`,
         promptId,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[holdMonster] Error:", e); throw e; });
 
     const saveResult = await promise;
 
@@ -176,7 +176,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save against ${action.name}.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[holdMonster] Error:", e); throw e; });
 
         return {
             type: 'popup',
@@ -232,7 +232,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save against ${action.name} and is Paralyzed. At the end of each of its turns, it repeats the save.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[holdMonster] Error:", e); throw e; });
 
     postLogEntry(campaignName, {
         type: 'condition',

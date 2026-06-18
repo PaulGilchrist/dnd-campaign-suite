@@ -104,7 +104,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                         targetName: playerStats.name,
                         finalDamage: applyResult?.finalDamage,
                         note: 'Overchannel self-damage (ignores resistance/immunity)',
-                    }).catch(() => {});
+                    }).catch((e) => { console.error("[CharSpells] Error:", e); throw e; });
                 }
                 const usesKey = '_Overchannel_uses';
                 const restKey = '_Overchannel_restTimestamp';

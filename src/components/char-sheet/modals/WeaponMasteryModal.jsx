@@ -16,7 +16,7 @@ function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerSta
             getCombatContext(campaignName).then(cs => {
                 const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
                 if (target?.name) setTargetName(target.name);
-            }).catch(() => {});
+            }).catch((e) => { console.error("[WeaponMasteryModal] Error:", e); throw e; });
         }
     }, [targetName, campaignName, playerStats.name]);
 
@@ -27,7 +27,7 @@ function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerSta
                 descMap[m.name] = m.description;
             }
             setMasteryDescriptions(descMap);
-        }).catch(() => {});
+        }).catch((e) => { console.error("[WeaponMasteryModal] Error:", e); throw e; });
     }, []);
 
     const allMasteries = [];

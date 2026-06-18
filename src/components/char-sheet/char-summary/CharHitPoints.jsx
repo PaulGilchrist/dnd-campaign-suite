@@ -41,7 +41,7 @@ function CharHitPoints({ playerStats, campaignName }) {
                       isHealing: delta > 0,
                       isUnconscious: value <= 0,
                   })
-              }).catch(() => {});
+              }).catch((e) => { console.error("[CharHitPoints] Error:", e); throw e; });
           }
 
           if (value > 0) {

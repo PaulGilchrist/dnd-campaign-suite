@@ -44,7 +44,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Fear! ${targetName} must make a WIS save (DC ${dc}) or drop what it's holding and become Frightened.`,
             promptId,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[fear] Error:", e); throw e; });
 
         const saveResult = await promise;
 
@@ -59,7 +59,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: true,
                 description: `${targetName} succeeded on WIS save against Fear.`,
-            }).catch(() => {});
+            }).catch((e) => { console.error("[fear] Error:", e); throw e; });
         } else {
             affectedCount++;
 

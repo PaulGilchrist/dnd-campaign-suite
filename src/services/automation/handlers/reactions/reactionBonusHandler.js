@@ -164,7 +164,7 @@ async function handleBendFate(action, playerStats, campaignName, mapName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName} on ${targetName}. Rolled 1d4: ${d4Roll.total}. Applied as bonus/penalty.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[reactionBonus] Error:", e); throw e; });
 
     return {
         type: 'popup',
@@ -343,7 +343,7 @@ async function handleLeapAside(action, playerStats, campaignName) {
         abilityName: featureName,
         description: `${playerName} activated Leap Aside for ${mountName}. Mount takes no damage on Dex save success, half on fail.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[reactionBonus] Error:", e); throw e; });
 
     return {
         type: 'popup',
@@ -397,7 +397,7 @@ async function handleVeer(action, playerStats, campaignName) {
         abilityName: featureName,
         description: `${playerName} activated Veer for ${mountName}. Attacks hitting the mount can be redirected to you.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[reactionBonus] Error:", e); throw e; });
 
     return {
         type: 'popup',

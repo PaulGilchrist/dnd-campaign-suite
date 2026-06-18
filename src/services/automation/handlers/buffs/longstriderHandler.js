@@ -81,7 +81,7 @@ export async function applyLongstrider(action, playerStats, campaignName, mapNam
             characterName: playerStats.name,
             abilityName: LONGSTRIDER_BUFF_NAME,
             description: `${playerStats.name} cast ${LONGSTRIDER_BUFF_NAME} on ${targetName}. Speed increased by 10 feet.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[longstriderHandler] Error:", e); throw e; });
     }
 
     return {

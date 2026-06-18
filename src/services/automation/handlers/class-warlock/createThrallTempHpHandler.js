@@ -20,7 +20,7 @@ export async function handle(action, playerStats, campaignName) {
     // Resolve temp HP expression
     const tempHpExpression = auto.tempHpExpression || 'warlock level + CHA modifier';
     const level = playerStats.level || 1;
-    const abilities = playerStats.abilities || {};
+    const abilities = Array.isArray(playerStats.abilities) ? playerStats.abilities : [];
     const abilityModifiers = {
         strength: (abilities.find(a => a.name === 'Strength')?.bonus || 0) - Math.floor((level - 1) / 2),
         dexterity: (abilities.find(a => a.name === 'Dexterity')?.bonus || 0) - Math.floor((level - 1) / 2),
@@ -85,7 +85,7 @@ export async function handle(action, playerStats, campaignName) {
         abilityName: featureName,
         description: `${featureName}: ${companion.name} gains ${tempHp} Temporary Hit Points.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[createThrallTempHp] Error:", e); throw e; });
 
     return {
         type: 'popup',

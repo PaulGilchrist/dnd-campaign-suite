@@ -151,7 +151,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName} — ${targetName} must make WIS save (DC ${saveDc}) or be ${conditionName} for 1 minute.`,
         promptId,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[beguilingTwist] Error:", e); throw e; });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -176,7 +176,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 saveType: saveAbility,
                 success: false,
                 description: `${targetName} failed WIS save. ${targetName} is now ${conditionName} for 1 minute.`,
-            }).catch(() => {});
+            }).catch((e) => { console.error("[beguilingTwist] Error:", e); throw e; });
 
             addExpiration(playerName, targetName, [
                 { type: 'condition', condition: condKey }
@@ -191,7 +191,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 saveType: saveAbility,
                 success: true,
                 description: `${targetName} succeeded on WIS save. ${featureName} has no effect.`,
-            }).catch(() => {});
+            }).catch((e) => { console.error("[beguilingTwist] Error:", e); throw e; });
         }
 
         window.removeEventListener('save-result', handleSaveResult);

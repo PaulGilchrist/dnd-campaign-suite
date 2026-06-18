@@ -85,7 +85,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
         abilityName: 'Web',
         description: `${targetName} must make a ${tracking.saveType} save (DC ${tracking.saveDc}) or become Restrained (Web area).`,
         promptId,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[webAreaSave] Error:", e); throw e; });
 
     const saveResult = await promise;
 
@@ -104,7 +104,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
             saveType: tracking.saveType,
             success: false,
             description: `${targetName} failed ${tracking.saveType} save against Web. Becomes Restrained.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[webAreaSave] Error:", e); throw e; });
     } else {
         addEntry(campaignName, {
             type: 'save_result',
@@ -115,7 +115,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
             saveType: tracking.saveType,
             success: true,
             description: `${targetName} succeeded on ${tracking.saveType} save against Web.`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[webAreaSave] Error:", e); throw e; });
     }
 
     return {

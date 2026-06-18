@@ -190,16 +190,16 @@ describe('postCastRiderService', () => {
       expect(executeHandler).toHaveBeenCalled()
     })
 
-    it('catches and logs executeHandler errors', async () => {
+    it('throws when executeHandler errors', async () => {
       executeHandler.mockRejectedValue(new Error('fail'))
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const stats = {
         name: 'Player',
         automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
       }
-      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
-      expect(consoleSpy).toHaveBeenCalled()
-      expect(result).toBeNull()
+      await expect(
+        triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      ).rejects.toThrow('fail')
       consoleSpy.mockRestore()
     })
   })

@@ -49,7 +49,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(entry)
-    }).catch(() => {})
+    }).catch((e) => { console.error("[CharConditions] Error:", e); throw e; })
   }
 
   async function handleConditionSave(conditionKey, saveAbility, saveLabel) {

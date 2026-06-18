@@ -76,7 +76,7 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
     mode: 'cors',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: obj })
-  }).catch(() => {});
+  }).catch((e) => { console.error("[useRuntimeState] Error:", e); throw e; });
 
   notify(characterKey);
 }
@@ -102,7 +102,7 @@ export function setRuntimeObject(characterKey, fullObject, campaignName, skipSyn
         mode: 'cors',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: Object.fromEntries(store) })
-      }).catch(() => {});
+      }).catch((e) => { console.error("[useRuntimeState] Error:", e); throw e; });
     }
 
     notify(characterKey);
@@ -163,7 +163,7 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
     mode: 'cors',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: obj })
-  }).catch(() => {});
+  }).catch((e) => { console.error("[useRuntimeState] Error:", e); throw e; });
 
   notify(characterKey);
 }

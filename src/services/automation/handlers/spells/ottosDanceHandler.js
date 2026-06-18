@@ -30,7 +30,7 @@ export async function processOttoDanceRepeatSave(casterName, targetName, saveDc,
         abilityName: spellName,
         description: `${targetName} makes a WIS save (DC ${saveDc}) to collect itself (${spellName}).`,
         promptId,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[ottosDance] Error:", e); throw e; });
 
     const saveResult = await promise;
 
@@ -55,7 +55,7 @@ export async function processOttoDanceRepeatSave(casterName, targetName, saveDc,
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save. ${spellName} ends!`,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[ottosDance] Error:", e); throw e; });
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -85,7 +85,7 @@ export async function processOttoDanceRepeatSave(casterName, targetName, saveDc,
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save. ${spellName} continues.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[ottosDance] Error:", e); throw e; });
 
     return {
         type: 'popup',
@@ -196,7 +196,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${casterName} casts Otto's Irresistible Dance on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or become Charmed.`,
         promptId,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[ottosDance] Error:", e); throw e; });
 
     const saveResult = await promise;
 
@@ -253,7 +253,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save against Otto's Irresistible Dance and is Charmed with Speed 0. On each of its turns, it can take an action to collect itself and repeat the save.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[ottosDance] Error:", e); throw e; });
 
     postLogEntry(campaignName, {
         type: 'condition',

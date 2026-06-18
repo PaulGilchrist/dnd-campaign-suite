@@ -28,10 +28,11 @@ function HypnoticPatternShakeModal({ attackerName, campaignName, targets, rangeF
                     description: `${attackerName} used an action to shake ${selected} out of its hypnotic stupor.`,
                     targetName: selected,
                     timestamp: Date.now(),
-                }).catch(() => {});
+                }).catch((e) => { console.error("[HypnoticPatternShakeModal] Error:", e); throw e; });
             }
         } catch (e) {
             console.error('[HypnoticPatternShake] Failed:', e);
+            throw e;
         }
 
         setProcessing(false);

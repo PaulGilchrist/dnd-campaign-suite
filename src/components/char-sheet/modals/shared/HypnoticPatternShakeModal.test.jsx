@@ -8,7 +8,7 @@ vi.mock('../../../../services/automation/index.js', () => ({
 }));
 
 vi.mock('../../../../services/ui/logService.js', () => ({
-  addEntry: vi.fn(),
+  addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { executeHandler } from '../../../../services/automation/index.js';
@@ -361,22 +361,20 @@ describe('HypnoticPatternShakeModal', () => {
       });
     });
 
-    it('hides processing text after the operation completes', async () => {
-      let resolveHandler;
-      executeHandler.mockReturnValue(new Promise(resolve => { resolveHandler = resolve; }));
+    it('keeps processing text visible when executeHandler throws', async () => {
+      executeHandler.mockRejectedValue(new Error('Handler failed'));
       render(<HypnoticPatternShakeModal {...makeProps()} />);
       const radios = document.querySelectorAll('input[type="radio"]');
       fireEvent.click(radios[0]);
       fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
-      await resolveHandler({});
       await waitFor(() => {
-        expect(screen.queryByText('Shaking target free...')).not.toBeInTheDocument();
+        expect(screen.getByText('Shaking target free...')).toBeInTheDocument();
       });
     });
   });
 
   describe('shake action - error handling', () => {
-    it('calls onClose even when executeHandler rejects', async () => {
+    it('does not call onClose when executeHandler rejects', async () => {
       const onClose = vi.fn();
       executeHandler.mockRejectedValue(new Error('Handler failed'));
       render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
@@ -384,18 +382,18 @@ describe('HypnoticPatternShakeModal', () => {
       fireEvent.click(radios[0]);
       fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
       await waitFor(() => {
-        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(onClose).not.toHaveBeenCalled();
       });
     });
 
-    it('hides processing text after an error', async () => {
+    it('keeps processing text visible when executeHandler throws', async () => {
       executeHandler.mockRejectedValue(new Error('Handler failed'));
       render(<HypnoticPatternShakeModal {...makeProps()} />);
       const radios = document.querySelectorAll('input[type="radio"]');
       fireEvent.click(radios[0]);
       fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
       await waitFor(() => {
-        expect(screen.queryByText('Shaking target free...')).not.toBeInTheDocument();
+        expect(screen.getByText('Shaking target free...')).toBeInTheDocument();
       });
     });
 

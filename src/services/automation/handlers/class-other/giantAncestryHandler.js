@@ -277,7 +277,7 @@ export async function handleFiresBurn(action, playerStats, campaignName, option)
         total: damageResult?.total ?? 0,
         formula: option.damage,
         description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage to ${targetName}.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); throw e; });
 
     return {
         type: 'popup',
@@ -347,7 +347,7 @@ export async function handleFrostsChill(action, playerStats, campaignName, optio
         total: damageResult?.total ?? 0,
         formula: option.damage,
         description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage and reduce ${targetName}'s speed by 10 feet.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); throw e; });
 
     return {
         type: 'popup',
@@ -509,7 +509,7 @@ export async function handleStormsThunder(action, playerStats, campaignName, _ma
         total: damageResult?.total ?? 0,
         formula: option.damage,
         description: `${playerStats.name} used ${option.name} to deal ${damageDisplay} ${option.damageType} damage to ${targetName} as a reaction.`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[giantAncestry] Error:", e); throw e; });
 
     return {
         type: 'popup',

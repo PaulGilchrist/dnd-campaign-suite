@@ -42,7 +42,7 @@ function DeathSavingThrows({ playerStats, campaignName }) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(entry)
-        }).catch(() => {})
+        }).catch((e) => { console.error("[DeathSavingThrows] Error:", e); throw e; })
     }
 
     const rollDeathSave = () => {

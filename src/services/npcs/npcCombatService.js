@@ -70,5 +70,5 @@ function logInitiativeRoll(campaignName, characterName, roll, initBonus) {
       timestamp: Date.now(),
       id: utils.guid(),
     }),
-  }).catch(() => {});
+  }).catch((e) => { console.error("[npcCombatService] Error:", e); throw e; });
 }

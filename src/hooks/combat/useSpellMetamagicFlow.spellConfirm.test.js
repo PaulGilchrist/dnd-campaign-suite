@@ -233,17 +233,16 @@ describe('useSpellMetamagicFlow — handleAid', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleAidConfirm handles error gracefully', async () => {
+  it('handleAidConfirm throws when applyAidEffect rejects', async () => {
     const { result } = setupAid();
     const automation = await import('../../services/automation/index.js');
     automation.applyAidEffect.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleAidConfirm({ targets: ['Goblin A'] });
-    });
-
-    expect(result.current.pendingAid).toBeNull();
-    expect(addEntry).toHaveBeenCalled();
+    await expect(
+      act(async () => {
+        await result.current.handleAidConfirm({ targets: ['Goblin A'] });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleAidSkip logs entry and clears pending', () => {
@@ -325,16 +324,16 @@ describe('useSpellMetamagicFlow — handleHeroesFeast', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleHeroesFeastConfirm handles error gracefully', async () => {
+  it('handleHeroesFeastConfirm throws when applyHeroesFeastEffect rejects', async () => {
     const { result } = setupHeroesFeast();
     const automation = await import('../../services/automation/index.js');
     automation.applyHeroesFeastEffect.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleHeroesFeastConfirm({ targets: ['Goblin A'] });
-    });
-
-    expect(result.current.pendingHeroesFeast).toBeNull();
+    await expect(
+      act(async () => {
+        await result.current.handleHeroesFeastConfirm({ targets: ['Goblin A'] });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleHeroesFeastSkip logs entry and clears pending', () => {
@@ -409,16 +408,16 @@ describe('useSpellMetamagicFlow — handleGreaterRestoration', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleGreaterRestorationConfirm handles error gracefully', async () => {
+  it('handleGreaterRestorationConfirm throws when confirmGreaterRestoration rejects', async () => {
     const { result } = setupGreaterRestoration();
     const restorationService = await import('../../services/rules/features/greaterRestorationService.js');
     restorationService.confirmGreaterRestoration.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleGreaterRestorationConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(result.current.pendingGreaterRestoration).toBeNull();
+    await expect(
+      act(async () => {
+        await result.current.handleGreaterRestorationConfirm({ targetName: 'Goblin A' });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleGreaterRestorationSkip logs entry and clears pending', () => {
@@ -493,16 +492,16 @@ describe('useSpellMetamagicFlow — handleLesserRestoration', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleLesserRestorationConfirm handles error gracefully', async () => {
+  it('handleLesserRestorationConfirm throws when applyLesserRestorationEffect rejects', async () => {
     const { result } = setupLesserRestoration();
     const automation = await import('../../services/automation/index.js');
     automation.applyLesserRestorationEffect.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleLesserRestorationConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(result.current.pendingLesserRestoration).toBeNull();
+    await expect(
+      act(async () => {
+        await result.current.handleLesserRestorationConfirm({ targetName: 'Goblin A' });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleLesserRestorationSkip logs entry and clears pending', () => {
@@ -576,15 +575,15 @@ describe('useSpellMetamagicFlow — handleRemoveCurse', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleRemoveCurseConfirm handles error gracefully', async () => {
+  it('handleRemoveCurseConfirm throws when confirmRemoveCurse rejects', async () => {
     const { result } = setupRemoveCurse();
     confirmRemoveCurse.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleRemoveCurseConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(result.current.pendingRemoveCurse).toBeNull();
+    await expect(
+      act(async () => {
+        await result.current.handleRemoveCurseConfirm({ targetName: 'Goblin A' });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleRemoveCurseSkip logs entry and clears pending', () => {
@@ -659,16 +658,16 @@ describe('useSpellMetamagicFlow — handleMageArmor', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleMageArmorConfirm handles error gracefully', async () => {
+  it('handleMageArmorConfirm throws when applyMageArmorEffect rejects', async () => {
     const { result } = setupMageArmor();
     const automation = await import('../../services/automation/index.js');
     automation.applyMageArmorEffect.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleMageArmorConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(result.current.pendingMageArmor).toBeNull();
+    await expect(
+      act(async () => {
+        await result.current.handleMageArmorConfirm({ targetName: 'Goblin A' });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleMageArmorSkip logs entry and clears pending', () => {
@@ -743,16 +742,16 @@ describe('useSpellMetamagicFlow — handleShieldOfFaith', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleShieldOfFaithConfirm handles error gracefully', async () => {
+  it('handleShieldOfFaithConfirm throws when applyShieldOfFaithEffect rejects', async () => {
     const { result } = setupShieldOfFaith();
     const automation = await import('../../services/automation/index.js');
     automation.applyShieldOfFaithEffect.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleShieldOfFaithConfirm({ targetName: 'Goblin A' });
-    });
-
-    expect(result.current.pendingShieldOfFaith).toBeNull();
+    await expect(
+      act(async () => {
+        await result.current.handleShieldOfFaithConfirm({ targetName: 'Goblin A' });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleShieldOfFaithSkip logs entry and clears pending', () => {
@@ -833,16 +832,16 @@ describe('useSpellMetamagicFlow — handleProtectionFromEnergy', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleProtectionFromEnergyConfirm handles error gracefully', async () => {
+  it('handleProtectionFromEnergyConfirm throws when applyProtectionFromEnergyHandler rejects', async () => {
     const { result } = setupProtectionFromEnergy();
     const automation = await import('../../services/automation/index.js');
     automation.applyProtectionFromEnergyHandler.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleProtectionFromEnergyConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
-    });
-
-    expect(result.current.pendingProtectionFromEnergy).toBeNull();
+    await expect(
+      act(async () => {
+        await result.current.handleProtectionFromEnergyConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleProtectionFromEnergySkip logs entry and clears pending', () => {
@@ -917,16 +916,16 @@ describe('useSpellMetamagicFlow — handleResistance', () => {
     expect(addEntry).not.toHaveBeenCalled();
   });
 
-  it('handleResistanceConfirm handles error gracefully', async () => {
+  it('handleResistanceConfirm throws when applyResistanceEffect rejects', async () => {
     const { result } = setupResistance();
     const automation = await import('../../services/automation/index.js');
     automation.applyResistanceEffect.mockRejectedValueOnce(new Error('boom'));
 
-    await act(async () => {
-      await result.current.handleResistanceConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
-    });
-
-    expect(result.current.pendingResistance).toBeNull();
+    await expect(
+      act(async () => {
+        await result.current.handleResistanceConfirm({ targetName: 'Goblin A', damageType: 'Fire' });
+      })
+    ).rejects.toThrow('boom');
   });
 
   it('handleResistanceSkip logs entry and clears pending', () => {

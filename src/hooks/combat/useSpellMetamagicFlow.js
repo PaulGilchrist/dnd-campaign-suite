@@ -389,6 +389,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error('[aid] Failed to apply effect:', e);
+      throw e;
     }
   }, [pendingAid, playerStats, campaignName]);
 
@@ -436,6 +437,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error("[heroesFeast] Failed to apply effect:", e);
+      throw e;
     }
   }, [pendingHeroesFeast, playerStats, campaignName]);
 
@@ -483,6 +485,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error('[greaterRestoration] Failed to apply effect:', e);
+      throw e;
     }
   }, [pendingGreaterRestoration, playerStats, campaignName]);
 
@@ -530,6 +533,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error('[lesserRestoration] Failed to apply effect:', e);
+      throw e;
     }
   }, [pendingLesserRestoration, playerStats, campaignName]);
 
@@ -576,6 +580,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error('[removeCurse] Failed to apply effect:', e);
+      throw e;
     }
   }, [pendingRemoveCurse, playerStats, campaignName]);
 
@@ -623,6 +628,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error('[mageArmor] Failed to apply effect:', e);
+      throw e;
     }
   }, [pendingMageArmor, playerStats, campaignName]);
 
@@ -670,6 +676,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error('[protectionFromEnergy] Failed to apply effect:', e);
+      throw e;
     }
   }, [pendingProtectionFromEnergy, playerStats, campaignName]);
 
@@ -717,6 +724,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error('[resistance] Failed to apply effect:', e);
+      throw e;
     }
   }, [pendingResistance, playerStats, campaignName]);
 
@@ -764,6 +772,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       );
     } catch (e) {
       console.error('[shieldOfFaith] Failed to apply effect:', e);
+      throw e;
     }
   }, [pendingShieldOfFaith, playerStats, campaignName]);
 

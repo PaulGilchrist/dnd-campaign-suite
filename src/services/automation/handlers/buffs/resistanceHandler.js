@@ -87,7 +87,7 @@ export async function applyResistance(action, playerStats, campaignName, targetN
         description: `${playerStats.name} cast ${action.name} on ${targetName} for ${damageType} resistance (1d4 reduction).`,
         targetName,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[resistanceHandler] Error:", e); throw e; });
 
     return {
         type: 'popup',

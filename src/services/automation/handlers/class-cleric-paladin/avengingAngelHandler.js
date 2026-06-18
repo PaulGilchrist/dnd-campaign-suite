@@ -42,7 +42,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${action.name} ended.`,
             timestamp: Date.now(),
-        }).catch(() => {});
+        }).catch((e) => { console.error("[avengingAngel] Error:", e); throw e; });
 
         return {
             type: 'popup',
@@ -83,7 +83,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${action.name} activated — Flight 60 ft (hover), Frightful Aura active for 10 minutes.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[avengingAngel] Error:", e); throw e; });
 
     return {
         type: 'popup',

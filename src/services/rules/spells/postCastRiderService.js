@@ -131,6 +131,7 @@ export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, cam
             }
         } catch (e) {
             console.error(`[postCastRider] Failed to execute rider save for ${riderName}:`, e);
+            throw e;
         }
     }
 
@@ -193,6 +194,7 @@ export async function triggerSoulstitchSpells(spell, metaCtx, playerStats, campa
         }
     } catch (e) {
         console.error(`[soulstitch] Failed to execute ${feature.name}:`, e);
+        throw e;
     }
 
     return null;
@@ -272,6 +274,7 @@ export async function triggerSpellThief(spell, metaCtx, playerStats, campaignNam
             }
         } catch (e) {
             console.error(`[spellThief] Failed to execute Spell Thief for ${featureName}:`, e);
+            throw e;
         }
     }
 
@@ -323,6 +326,7 @@ export async function triggerBewitchingMagic(spell, metaCtx, playerStats, campai
             }
         } catch (e) {
             console.error(`[bewitchingMagic] Failed to execute ${feature.name}:`, e);
+            throw e;
         }
     }
 

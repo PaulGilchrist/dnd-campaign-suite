@@ -51,7 +51,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${playerName} used ${featureName} on ${attackerName}, imposing Disadvantage and teleporting 30 feet.`,
         targetName: attackerName,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[shadowyDodge] Error:", e); throw e; });
 
     return infoPopup(featureName, description, auto);
 }

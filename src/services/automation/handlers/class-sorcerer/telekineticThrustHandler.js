@@ -83,7 +83,7 @@ export async function applyTelekineticThrust(action, playerStats, campaignName, 
         saveDc,
         saveType,
         description: `${action.name} — ${targetName} must make a ${saveType} saving throw (DC ${saveDc}).`,
-    }).catch(() => {});
+    }).catch((e) => { console.error("[telekineticThrust] Error:", e); throw e; });
 
     const saveResult = await promise;
     const success = saveResult.success;
@@ -102,7 +102,7 @@ export async function applyTelekineticThrust(action, playerStats, campaignName, 
         bonus: saveResult.saveBonus ?? 0,
         formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[telekineticThrust] Error:", e); throw e; });
 
     if (!success) {
         await applyThrustEffect(action, playerStats, campaignName, targetName, chosenOption);

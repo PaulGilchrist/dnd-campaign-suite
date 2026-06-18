@@ -17,7 +17,7 @@ export default function useDamageClick({
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
         (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
             rollDamage(attack.name, formula, total, rolls, modifier, ctx);
-        }).catch(() => { });
+        }).catch((e) => { console.error("[useDamageClick] Error:", e); throw e; });
     };
 
     const handleDamageClick = async (attack) => {
@@ -613,7 +613,7 @@ export default function useDamageClick({
                                     damageType: spreadDamageType,
                                     targetName: spreadTarget.name,
                                     finalDamage: spreadApplyResult?.finalDamage,
-                                }).catch(() => {});
+                                }).catch((e) => { console.error("[useDamageClick] Error:", e); throw e; });
 
                                 // Update popup to include spread damage info
                                 if (spreadApplyResult) {

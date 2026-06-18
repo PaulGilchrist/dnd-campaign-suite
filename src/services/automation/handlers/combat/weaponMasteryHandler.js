@@ -172,7 +172,7 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
             saveDc,
             description: `${masteryName}: ${targetName || 'target'} must make a DC ${saveDc} ${mastery.saveAbility} save or ${mastery.effect === 'topple' ? 'fall Prone' : 'suffer the effect'}.`,
             promptId,
-        }).catch(() => {});
+        }).catch((e) => { console.error("[weaponMastery] Error:", e); throw e; });
     }
 
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
@@ -240,7 +240,7 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
                 saveType: mastery.saveAbility,
                 success: false,
                 description: `${targetName} failed ${mastery.saveAbility} save. Gains Prone condition.`,
-            }).catch(() => {});
+            }).catch((e) => { console.error("[weaponMastery] Error:", e); throw e; });
             window.removeEventListener('save-result', handleSaveResult);
         };
         window.addEventListener('save-result', handleSaveResult);

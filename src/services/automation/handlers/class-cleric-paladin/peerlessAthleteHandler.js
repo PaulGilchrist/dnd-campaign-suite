@@ -72,7 +72,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated Peerless Athlete for 1 hour.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[peerlessAthlete] Error:", e); throw e; });
 
     return {
         type: 'popup',

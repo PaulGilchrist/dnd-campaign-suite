@@ -1003,7 +1003,7 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
         abilityName: spell.name,
         description: `${casterName} cast ${spell.name} on ${targetName}. Target regains HP and regains 1 HP at start of each turn for 1 hour.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[spellCast] Error:", e); throw e; });
 }
 
 function isMagicMissile(spell) {

@@ -74,7 +74,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
 
     useEffect(() => {
-        computeFeatRangeEffects(playerStats.feats, playerStats.rules, playerStats).then(setFeatRangeEffects).catch(() => { });
+        computeFeatRangeEffects(playerStats.feats, playerStats.rules, playerStats).then(setFeatRangeEffects).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
     }, [playerStats.feats, playerStats.rules, playerStats]);
 
     useEffect(() => {
@@ -144,7 +144,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             targetName: playerStats.name,
                             finalDamage: applyResult?.finalDamage,
                             note: 'Overchannel self-damage (ignores resistance/immunity)',
-                        }).catch(() => {});
+                        }).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
                     }
                     const usesKey = '_Overchannel_uses';
                     const restKey = '_Overchannel_restTimestamp';
@@ -278,7 +278,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
             rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-        }).catch(() => { });
+        }).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
     }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName]);
 
     const {

@@ -224,7 +224,7 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
             data.effectiveXP = newEffectiveXP;
             updateEncounter(currentEncounterName, data);
           }
-        }).catch(() => {});
+        }).catch((e) => { console.error("[EncounterBuilder] Error:", e); throw e; });
       }
     }, [selectedMonsters, monsters, currentEncounterName, filter.playerLevels]); // eslint-disable-line react-hooks/exhaustive-deps
 

@@ -122,7 +122,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         loadNPCs(campaignName).then(response => {
             const withStats = (response.npcs || []).filter(npcHasStatBlock)
             setCampaignNpcs(withStats)
-        }).catch(() => {})
+        }).catch((e) => { console.error("[initiative] Error:", e); throw e; })
     }, [campaignName])
 
     const handleOverlayEvent = React.useCallback((event) => {
@@ -466,7 +466,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 storage.set('combatSummary', combatSummary, campaignName)
                 setCombatSummary(cloneDeep(combatSummary))
             })
-            .catch(() => {})
+            .catch((e) => { console.error("[initiative] Error:", e); throw e; })
         storage.set('combatSummary', combatSummary, campaignName)
         setCombatSummary(cloneDeep(combatSummary))
     }

@@ -68,7 +68,7 @@ export async function handle(action, playerStats, campaignName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name} to add ${modifier} to a D20 test.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch((e) => { console.error("[boonOfFate] Error:", e); throw e; });
 
     return infoPopup(action.name, description, auto);
 }
