@@ -429,7 +429,7 @@ export default function Log({ campaignName, characters }) {
     await addEntry({
       type: 'note',
       characterName: selectedCharacter || 'Anonymous',
-      message: noteText.trim()
+      noteText: noteText.trim()
     });
     setNoteText('');
   };

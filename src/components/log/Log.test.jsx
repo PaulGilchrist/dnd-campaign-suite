@@ -198,7 +198,7 @@ describe('Log', () => {
       fireEvent.click(q('.log-add-btn'));
       await waitFor(() => {
         expect(mockAddEntry).toHaveBeenCalledWith(
-          expect.objectContaining({ type: 'note', message: 'Hello' }),
+          expect.objectContaining({ type: 'note', noteText: 'Hello' }),
         );
       });
     });
