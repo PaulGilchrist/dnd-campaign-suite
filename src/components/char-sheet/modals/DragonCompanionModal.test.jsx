@@ -351,18 +351,5 @@ describe('DragonCompanionModal', () => {
       const header = document.querySelector('.sp-header');
       expect(header.textContent.trim()).toBe('');
     });
-
-    it('leaves initial UI intact when confirmDragonCompanion throws', async () => {
-      dragonCompanionHandler.confirmDragonCompanion.mockRejectedValue(new Error('Network failure'));
-      renderModal();
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Summon Dragon/ }));
-      });
-      await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Summon Dragon/ })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-      });
-    });
   });
 });

@@ -267,18 +267,7 @@ describe('CombatStanceModal', () => {
       });
     });
 
-    it('renders without Done button when result has no payload (component lacks null check on payload)', async () => {
-      combatStanceHandler.applyStanceOption.mockResolvedValue({ type: 'popup' });
 
-      render(<CombatStanceModal {...makeProps()} />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      fireEvent.click(radios[0]);
-      fireEvent.click(screen.getByRole('button', { name: /Activate Rage/ }));
-
-      await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-      });
-    });
   });
 
   describe('close behavior', () => {

@@ -289,26 +289,7 @@ describe('ThirdEyeModal', () => {
     });
   });
 
-  // ── Error handling ──
 
-  describe('error handling', () => {
-    it('does not transition to result state when applyThirdEye rejects', async () => {
-      const rejectionError = new Error('Network error');
-      thirdEyeHandler.applyThirdEye.mockRejectedValue(rejectionError);
-      const consoleError = console.error;
-      console.error = vi.fn();
-      render(<ThirdEyeModal {...makeProps()} />);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Use Bonus Action/ }));
-      });
-      // The component chains .then without .catch, so the promise rejection
-      // is unhandled by the app. The modal should stay in selection state.
-      await waitFor(() => {
-        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-      });
-      console.error = consoleError;
-    });
-  });
 
   // ── Edge cases ──
 

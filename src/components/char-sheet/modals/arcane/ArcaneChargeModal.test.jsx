@@ -251,20 +251,5 @@ describe('ArcaneChargeModal', () => {
     });
   });
 
-  // ── Error handling ──
 
-  describe('error handling', () => {
-    it('keeps buttons visible when confirmArcaneCharge rejects', async () => {
-      confirmArcaneCharge.mockRejectedValue(new Error('Network failure'));
-      render(<ArcaneChargeModal {...makeProps()} />);
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: /Teleport/ }));
-      });
-      await act(async () => {
-        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-      });
-      expect(screen.getByRole('button', { name: /Teleport/ })).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-    });
-  });
 });

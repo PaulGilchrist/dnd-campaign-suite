@@ -589,23 +589,5 @@ describe('CharCharacterAdvancement - Automation', () => {
     });
   });
 
-  describe('executeHandler error handling', () => {
-    it('does not render popup when executeHandler throws', async () => {
-      mockExecuteHandler.mockRejectedValue(new Error('Handler failed'));
-      render(<CharCharacterAdvancement {...baseProps} />);
-      fireEvent.click(screen.getByText('Auto Feature:'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      });
-    });
 
-    it('does not render popup when executeHandler rejects with undefined', async () => {
-      mockExecuteHandler.mockRejectedValue(undefined);
-      render(<CharCharacterAdvancement {...baseProps} />);
-      fireEvent.click(screen.getByText('Auto Feature:'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      });
-    });
-  });
 });

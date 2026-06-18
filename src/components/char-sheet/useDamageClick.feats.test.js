@@ -80,7 +80,7 @@ describe('useDamageClick - feats', () => {
     const mockSetAttackRiderModal = vi.fn();
     const mockPendingDamageRef = { current: null };
 
-    // eslint-disable-next-line react-hooks/rules-of-hooks
+     
     function useDamageClickHook(overrides = {}) {
         const deps = {
             playerStats: mockPlayerStats,

@@ -59,16 +59,8 @@ function getApplyButton() {
   return screen.getByRole('button', { name: /Divine Smite/ });
 }
 
-function getCancelButtons() {
-  return screen.getAllByRole('button', { name: 'Cancel' });
-}
-
 function getHealButton() {
   return screen.getByRole('button', { name: /Heal Selected/ });
-}
-
-function getDoneButton() {
-  return screen.getByRole('button', { name: 'Done' });
 }
 
 // ── Tests ──
