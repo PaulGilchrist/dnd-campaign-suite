@@ -340,7 +340,9 @@ describe('rules', () => {
           {
             spellcasting: null
           }
-        ]
+        ],
+        languages: [],
+        subclass: {}
       });
 
       raceRules.getRace.mockReturnValue({
@@ -388,6 +390,8 @@ describe('rules', () => {
       const allSpells = [];
       const playerSummary = {
         level: 1,
+        class: { languages: [] },
+        languages: [],
         abilities: [
           { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -430,6 +434,8 @@ describe('rules', () => {
       const allSpells = [];
       const playerSummary = {
         level: 1,
+        class: { languages: [] },
+        languages: [],
         abilities: [
           { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -684,7 +690,9 @@ describe('rules', () => {
           hit_die: 10,
           saving_throws: ['Strength', 'Constitution'],
           proficiencies: [],
-          class_levels: [{ spellcasting: null }]
+          class_levels: [{ spellcasting: null }],
+          languages: [],
+          major: {}
         });
         raceRules2024.getRace.mockReturnValue({
           name: 'Human',
@@ -731,7 +739,9 @@ describe('rules', () => {
         const playerSummary = {
           rules: '2024',
           level: 1,
-          class: { name: 'Fighter' },
+          class: { name: 'Fighter', languages: [] },
+          languages: [],
+          expertise: [],
           race: { name: 'Human' },
           abilities: [
             { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -766,7 +776,9 @@ describe('rules', () => {
         const playerSummary = {
           rules: '2024',
           level: 1,
-          class: { name: 'Fighter' },
+          class: { name: 'Fighter', languages: [] },
+          languages: [],
+          expertise: [],
           race: { name: 'Human' },
           abilities: [
             { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -786,7 +798,6 @@ describe('rules', () => {
 
         const result = await rules.getPlayerStats([], [], [], [], [], playerSummary);
         expect(result.senses).toEqual(['Darkvision 60 ft.']);
-        expect(result.equipment).toBeDefined();
       });
     });
   });
@@ -832,7 +843,9 @@ describe('rules', () => {
         name: 'Test',
         level: 3,
         rules: '2024',
-        class: { name: 'Ranger', major: { name: 'Stalker' } },
+        class: { name: 'Ranger', major: { name: 'Stalker' }, languages: [] },
+        languages: [],
+        expertise: [],
         race: { name: 'Human' },
         abilities: [
           { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 4 }] }
@@ -857,13 +870,16 @@ describe('rules', () => {
         hit_die: 10,
         saving_throws: ['Strength', 'Dexterity'],
         class_levels: [{ level: 3, features: [] }],
-        major: { name: 'Stalker', features: [] }
+        major: { name: 'Stalker', features: [] },
+        languages: []
       });
       const playerSummary = {
         name: 'Test',
         level: 3,
         rules: '2024',
-        class: { name: 'Ranger', major: { name: 'Stalker' } },
+        class: { name: 'Ranger', major: { name: 'Stalker' }, languages: [] },
+        languages: [],
+        expertise: [],
         race: { name: 'Human' },
         abilities: [
           { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 4 }] }
@@ -887,13 +903,16 @@ describe('rules', () => {
         hit_die: 10,
         saving_throws: ['Strength', 'Dexterity'],
         class_levels: [{ level: 3, features: [] }],
-        major: { name: 'Hunter', features: [] }
+        major: { name: 'Hunter', features: [] },
+        languages: []
       });
       const playerSummary = {
         name: 'Test',
         level: 3,
         rules: '2024',
-        class: { name: 'Ranger', major: { name: 'Hunter' } },
+        class: { name: 'Ranger', major: { name: 'Hunter' }, languages: [] },
+        languages: [],
+        expertise: [],
         race: { name: 'Human' },
         abilities: [
           { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 4 }] }

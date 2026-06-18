@@ -257,7 +257,8 @@ describe('rules', () => {
         rules: '2024',
         class: { name: 'Fighter', fightingStyles: ['Defense'] },
         abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [] }
+        inventory: { equipped: [] },
+        automation: { passives: [] }
       };
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
       expect(ac).toBe(12); // 10 + 2 (dex), no Defense bonus
@@ -268,7 +269,8 @@ describe('rules', () => {
         rules: '2024',
         class: { name: 'Wizard' },
         abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [], magicItems: [{ name: 'Cloak of Protection' }] }
+        inventory: { equipped: [], magicItems: [{ name: 'Cloak of Protection' }] },
+        automation: { passives: [] }
       };
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
       expect(ac).toBe(12);
@@ -279,7 +281,8 @@ describe('rules', () => {
         rules: '2024',
         class: { name: 'Wizard' },
         abilities: [{ name: 'Dexterity', bonus: 2 }],
-        inventory: { equipped: [], magicItems: [{ name: 'Ring of Protection' }] }
+        inventory: { equipped: [], magicItems: [{ name: 'Ring of Protection' }] },
+        automation: { passives: [] }
       };
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
       expect(ac).toBe(12);
@@ -293,7 +296,8 @@ describe('rules', () => {
           { name: 'Dexterity', bonus: 2 },
           { name: 'Constitution', bonus: 3 }
         ],
-        inventory: { equipped: [] }
+        inventory: { equipped: [] },
+        automation: { passives: [] }
       };
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
       expect(ac).toBe(15); // 10 + 2 + 3
@@ -307,7 +311,8 @@ describe('rules', () => {
           { name: 'Dexterity', bonus: 2 },
           { name: 'Charisma', bonus: 3 }
         ],
-        inventory: { equipped: [] }
+        inventory: { equipped: [] },
+        automation: { passives: [] }
       };
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
       expect(ac).toBe(15); // 10 + 2 (dex) + 3 (cha) for Draconic Sorcery
@@ -321,7 +326,8 @@ describe('rules', () => {
           { name: 'Dexterity', bonus: 2 },
           { name: 'Charisma', bonus: 3 }
         ],
-        inventory: { equipped: ['Leather Armor'] }
+        inventory: { equipped: ['Leather Armor'] },
+        automation: { passives: [] }
       };
       const [ac] = rules.getArmorClass(baseEquipment2024(), playerStats);
       expect(ac).toBe(13); // 11 (leather) + 2 (dex), no Draconic bonus with armor

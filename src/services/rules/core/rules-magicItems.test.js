@@ -13,7 +13,7 @@ describe('rules', () => {
     it('should return null when no magic items', () => {
       const allMagicItems = [];
       const playerSummary = {
-        inventory: {}
+        inventory: { magicItems: [] }
       };
 
       const result = rules.getMagicItems(allMagicItems, playerSummary);
@@ -98,12 +98,12 @@ describe('rules', () => {
 
   describe('2024 ruleset dispatch / getMagicItems', () => {
     it('should return [] instead of null for empty magic items in 2024 mode', () => {
-      const result = rules.getMagicItems([], { inventory: {} }, { rules: '2024' });
+      const result = rules.getMagicItems([], { inventory: { magicItems: [] } }, { rules: '2024' });
       expect(result).toEqual([]);
     });
 
     it('should return null for empty magic items in 5e mode', () => {
-      const result = rules.getMagicItems([], { inventory: {} });
+      const result = rules.getMagicItems([], { inventory: { magicItems: [] } });
       expect(result).toBeNull();
     });
 

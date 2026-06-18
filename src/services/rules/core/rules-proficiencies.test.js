@@ -129,7 +129,8 @@ describe('rules', () => {
     it('should return skill proficiencies when skill=true', () => {
       const playerStats = {
         class: {
-          proficiencies: ['Skill: Arcana', 'Skill: History', 'Tool: Carpenter Tools']
+          proficiencies: ['Skill: Arcana', 'Skill: History', 'Tool: Carpenter Tools'],
+          subclass: {}
         },
         race: {
           starting_proficiencies: ['Skill: Stealth'],
@@ -152,7 +153,8 @@ describe('rules', () => {
     it('should return non-skill proficiencies when skill=false', () => {
       const playerStats = {
         class: {
-          proficiencies: ['Skill: Arcana', 'Tool: Carpenter Tools', 'Armor: Light Armor']
+          proficiencies: ['Skill: Arcana', 'Tool: Carpenter Tools', 'Armor: Light Armor'],
+          subclass: {}
         },
         race: {
           starting_proficiencies: ['Tool: Thief Tools'],
@@ -175,7 +177,8 @@ describe('rules', () => {
     it('should deduplicate proficiencies', () => {
       const playerStats = {
         class: {
-          proficiencies: ['Skill: Arcana']
+          proficiencies: ['Skill: Arcana'],
+          subclass: {}
         },
         race: {
           starting_proficiencies: ['Skill: Arcana'],
@@ -194,7 +197,8 @@ describe('rules', () => {
     it('should return sorted proficiencies', () => {
       const playerStats = {
         class: {
-          proficiencies: ['Skill: Zebrian', 'Skill: Arcana']
+          proficiencies: ['Skill: Zebrian', 'Skill: Arcana'],
+          subclass: {}
         },
         race: {
           starting_proficiencies: [],

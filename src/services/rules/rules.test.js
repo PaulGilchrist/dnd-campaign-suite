@@ -38,7 +38,7 @@ vi.mock('./core/attackCalc2024.js', () => ({
 
 vi.mock('../character/classRules.js', () => ({
   default: {
-    getClass: vi.fn(() => ({ name: 'Fighter' })),
+    getClass: vi.fn(() => ({ name: 'Fighter', languages: [] })),
     getFeatures: vi.fn(() => ({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] })),
     getRangerFeatures: vi.fn(() => ({ extraAttacks: 0 })),
   },
@@ -46,7 +46,7 @@ vi.mock('../character/classRules.js', () => ({
 
 vi.mock('../character/classRules2024.js', () => ({
   default: {
-    getClass: vi.fn(() => ({ name: 'Fighter' })),
+    getClass: vi.fn(() => ({ name: 'Fighter', languages: [] })),
     getFeatures: vi.fn(() => ({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [] })),
   },
 }))
@@ -260,7 +260,7 @@ describe('rules', () => {
     it('returns languages array and count', () => {
       const stats = {
         race: { languages: ['Common'] },
-        class: {},
+        class: { languages: [] },
         languages: [],
       }
       const result = rules.getLanguages(stats, {})
@@ -272,13 +272,13 @@ describe('rules', () => {
   describe('getMagicItems', () => {
     it('returns null when no magic items for 5e', () => {
       const stats = { rules: '5e' }
-      const result = rules.getMagicItems([], {}, stats)
+      const result = rules.getMagicItems([], { inventory: { magicItems: [] } }, stats)
       expect(result).toBeNull()
     })
 
     it('returns empty array when no magic items for 2024', () => {
       const stats = { rules: '2024' }
-      const result = rules.getMagicItems([], {}, stats)
+      const result = rules.getMagicItems([], { inventory: { magicItems: [] } }, stats)
       expect(result).toEqual([])
     })
   })

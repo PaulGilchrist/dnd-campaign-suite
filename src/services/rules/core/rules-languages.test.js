@@ -182,7 +182,7 @@ describe('rules', () => {
       const playerStats = {
         rules: '2024',
         race: { languages: ['Common'] },
-        class: { major: { language_choices: { choose: 3 } } },
+        class: { languages: [], major: { language_choices: { choose: 3 } } },
         level: 1
       };
       const [languagesAllowed] = rules.getLanguages(playerStats);

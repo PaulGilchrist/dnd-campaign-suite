@@ -104,7 +104,11 @@ function applyUmbralSightDarkvision(playerStats, senses) {
  * Adds Truesense with the specified range to player senses.
  */
 function applyTruesightSenses(playerStats, senses) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats.automation?.passives;
+    if (!Array.isArray(passives)) {
+        console.error('rules: expected passives to be an array for', playerStats.name);
+        throw new Error('Missing array: passives for ' + playerStats.name);
+    }
     const truesightPassive = passives.find(p => p.type === 'passive_buff' && p.effect === 'truesight');
     if (!truesightPassive) return senses;
 
@@ -134,7 +138,11 @@ function applyElfisLineageSpeed(playerStats, playerSummary) {
  * Apply speed increase bonuses from passive_buff features (e.g., Boon of Speed, Speedy feat).
  */
 function applySpeedIncreasePassives(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats.automation?.passives;
+    if (!Array.isArray(passives)) {
+        console.error('rules: expected passives to be an array for', playerStats.name);
+        throw new Error('Missing array: passives for ' + playerStats.name);
+    }
     let bonus = 0;
     for (const passive of passives) {
         if (passive.type === 'passive_buff' && passive.effect === 'speed_increase' && passive.bonusExpression) {
@@ -154,7 +162,11 @@ function applySpeedIncreasePassives(playerStats) {
  * One size larger = 2x carrying capacity.
  */
 function applyPowerfulBuild(playerStats) {
-    const traits = playerStats.race?.traits || [];
+    const traits = playerStats.race?.traits;
+    if (!Array.isArray(traits)) {
+        console.error('rules: expected race.traits to be an array for', playerStats.name);
+        throw new Error('Missing array: race.traits for ' + playerStats.name);
+    }
     const hasPowerfulBuild = traits.some(t => t.name === 'Powerful Build');
     if (hasPowerfulBuild) {
         playerStats.sizeMultiplier = 2;
@@ -168,7 +180,11 @@ function applyPowerfulBuild(playerStats) {
  * but you can't stop in the same space."
  */
 function applyHalflingNimbleness(playerStats) {
-    const traits = playerStats.race?.traits || [];
+    const traits = playerStats.race?.traits;
+    if (!Array.isArray(traits)) {
+        console.error('rules: expected race.traits to be an array for', playerStats.name);
+        throw new Error('Missing array: race.traits for ' + playerStats.name);
+    }
     const hasHalflingNimbleness = traits.some(t => t.name === 'Halfling Nimbleness');
     if (hasHalflingNimbleness) {
         playerStats.canMoveThroughCreatureSpace = true;
@@ -252,9 +268,13 @@ const rules = {
            if (is2024(playerStats, playerSummary)) {
                 // 2024: extract skill proficiencies from race trait descriptions and proficiency_choices
                const raceProficiencies = () => {
-                   const extra = [];
-                   const traits = playerStats.race?.traits || [];
-                   traits.forEach(trait => {
+                    const extra = [];
+                    const traits = playerStats.race?.traits;
+                    if (!Array.isArray(traits)) {
+                        console.error('rules: expected race.traits to be an array for', playerStats.name);
+                        throw new Error('Missing array: race.traits for ' + playerStats.name);
+                    }
+                    traits.forEach(trait => {
                        // Parse specific skill names from description text
                        if (trait.description) {
                            const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
@@ -336,8 +356,15 @@ const rules = {
                    skill,
                    pu.getProficiencyChoiceCount,
                     {
-                       raceProficiencies,
-                       bonusSource: playerStats.class.major || {},
+                        raceProficiencies,
+                        bonusSource: (() => {
+                            const val = playerStats.class.major;
+                            if (val == null || typeof val !== 'object') {
+                                console.error('rules: expected class.major to be an object for', playerStats.name);
+                                throw new Error('Missing object: class.major for ' + playerStats.name);
+                            }
+                            return val;
+                        })(),
                        backgroundToolProficiencies,
                        backgroundToolProficiencyChoices,
                     }
@@ -358,7 +385,11 @@ const rules = {
                          }
                      });
                     if (ps.race.subrace) {
-                        extra.push(...(ps.race.subrace.starting_proficiencies || []));
+                        extra.push(...(ps.race.subrace.starting_proficiencies));
+                        if (!Array.isArray(ps.race.subrace.starting_proficiencies)) {
+                            console.error('rules: expected starting_proficiencies to be an array for', ps.name);
+                            throw new Error('Missing array: starting_proficiencies for ' + ps.name);
+                        }
                         if (ps.race.subrace.racial_traits) {
                             ps.race.subrace.racial_traits.forEach(racial_trait => {
                                 if (racial_trait.proficiencies && racial_trait.proficiencies.length > 0) {
@@ -369,7 +400,14 @@ const rules = {
                      }
                     return extra;
                  },
-                bonusSource: playerStats.class.subclass || {},
+                bonusSource: (() => {
+                    const val = playerStats.class.subclass;
+                    if (val == null || typeof val !== 'object') {
+                        console.error('rules: expected class.subclass to be an object for', playerStats.name);
+                        throw new Error('Missing object: class.subclass for ' + playerStats.name);
+                    }
+                    return val;
+                })(),
              }
          );
      },
@@ -382,12 +420,17 @@ const rules = {
 
         if (is2024(playerStats, playerSummary)) {
              // 2024: normalize string actions, include magic/utilize/craft actions
-            const playerActions = (playerStats.actions || []).map(action =>
+            const playerActions = playerStats.actions;
+            if (!Array.isArray(playerActions)) {
+                console.error('rules: expected actions to be an array for', playerStats.name);
+                throw new Error('Missing array: actions for ' + playerStats.name);
+            }
+            const playerActionsMapped = playerActions.map(action =>
                 typeof action === 'string' ? { name: action, description: '', details: null } : action
-             );
+            );
 
             const actions = uniqBy([
-                 ...playerActions,
+                 ...playerActionsMapped,
                  ...features.actions,
                  ...traits.actions,
                  ...(playerStats.magicActions ? playerStats.magicActions : []),
@@ -407,14 +450,19 @@ const rules = {
                  ...traits.reactions
              ], 'name').sort((a, b) => a.name.localeCompare(b.name));
 
-            const playerSpecialActions = (playerStats.specialActions || []).map(action =>
+            const playerSpecialActions = playerStats.specialActions;
+            if (!Array.isArray(playerSpecialActions)) {
+                console.error('rules: expected specialActions to be an array for', playerStats.name);
+                throw new Error('Missing array: specialActions for ' + playerStats.name);
+            }
+            const playerSpecialActionsMapped = playerSpecialActions.map(action =>
                 typeof action === 'string' ? { name: action, description: '', details: null } : action
-             );
+            );
 
              const specialActions = uniqBy([
-                  ...features.specialActions,
-                  ...traits.specialActions,
-                  ...playerSpecialActions,
+                   ...features.specialActions,
+                   ...traits.specialActions,
+                   ...playerSpecialActionsMapped,
                   ...(playerStats.magicSpecialActions ? playerStats.magicSpecialActions : []),
                   ...(playerStats.utilizeSpecialActions ? playerStats.utilizeSpecialActions : []),
                   ...(playerStats.craftSpecialActions ? playerStats.craftSpecialActions : [])
@@ -426,13 +474,33 @@ const rules = {
          }
 
          // 5e: original action handling
-        const actions = uniqBy([...(playerStats.actions || []), ...features.actions, ...traits.actions], 'name').sort((a, b) => a.name.localeCompare(b.name));
-        const bonusActions = uniqBy([...(playerStats.bonusActions || []), ...features.bonusActions, ...traits.bonusActions], 'name').sort((a, b) => a.name.localeCompare(b.name));
-        const reactions = uniqBy([...(playerStats.reactions || []), ...features.reactions, ...traits.reactions], 'name').sort((a, b) => a.name.localeCompare(b.name));
-        const specialActions = uniqBy([...(playerStats.specialActions || []), ...features.specialActions, ...traits.specialActions], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        const actions = playerStats.actions;
+        if (!Array.isArray(actions)) {
+            console.error('rules: expected actions to be an array for', playerStats.name);
+            throw new Error('Missing array: actions for ' + playerStats.name);
+        }
+        const bonusActions = playerStats.bonusActions;
+        if (!Array.isArray(bonusActions)) {
+            console.error('rules: expected bonusActions to be an array for', playerStats.name);
+            throw new Error('Missing array: bonusActions for ' + playerStats.name);
+        }
+        const reactions = playerStats.reactions;
+        if (!Array.isArray(reactions)) {
+            console.error('rules: expected reactions to be an array for', playerStats.name);
+            throw new Error('Missing array: reactions for ' + playerStats.name);
+        }
+        const specialActions = playerStats.specialActions;
+        if (!Array.isArray(specialActions)) {
+            console.error('rules: expected specialActions to be an array for', playerStats.name);
+            throw new Error('Missing array: specialActions for ' + playerStats.name);
+        }
+        const actionsResult = uniqBy([...actions, ...features.actions, ...traits.actions], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        const bonusActionsResult = uniqBy([...bonusActions, ...features.bonusActions, ...traits.bonusActions], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        const reactionsResult = uniqBy([...reactions, ...features.reactions, ...traits.reactions], 'name').sort((a, b) => a.name.localeCompare(b.name));
+        const specialActionsResult = uniqBy([...specialActions, ...features.specialActions, ...traits.specialActions], 'name').sort((a, b) => a.name.localeCompare(b.name));
         const characterAdvancement = uniqBy([...features.characterAdvancement, ...traits.characterAdvancement], 'name').sort((a, b) => a.name.localeCompare(b.name));
 
-        return [actions, bonusActions, reactions, specialActions, characterAdvancement];
+        return [actionsResult, bonusActionsResult, reactionsResult, specialActionsResult, characterAdvancement];
      },
 
      // === SHARED: getArmorClass (mostly shared, 5e-specific features at bottom) ===
@@ -553,8 +621,12 @@ const rules = {
 
           // 2024: Apply ac_bonus from passive_buff automation (e.g., Defense feat)
           if (is2024(playerStats, playerSummary)) {
-              const passives = playerStats.automation?.passives || [];
-              for (const passive of passives) {
+               const passives = playerStats.automation?.passives;
+               if (!Array.isArray(passives)) {
+                   console.error('rules: expected passives to be an array for', playerStats.name);
+                   throw new Error('Missing array: passives for ' + playerStats.name);
+               }
+               for (const passive of passives) {
                   if (passive.type === 'passive_buff' && passive.effect === 'ac_bonus' && passive.bonus) {
                       const bonus = typeof passive.bonus === 'number' ? passive.bonus : parseInt(passive.bonus, 10);
                       if (!isNaN(bonus) && bonus > 0) {
@@ -598,21 +670,36 @@ const rules = {
      },
 
      // === SHARED: getLanguages (handles both rulesets internally) ===
-    getLanguages: (playerStats, playerSummary) => {
-        let languages = [...(playerStats.race?.languages || [])];
-        let languagesAllowed = languages.length;
-        languagesAllowed += 2; // Background languages
-
-        if (playerStats.race.language_choices) {
-            languagesAllowed += playerStats.race.language_choices.choose || 0;
+     getLanguages: (playerStats, playerSummary) => {
+         let languages = playerStats.race?.languages;
+         if (!Array.isArray(languages)) {
+             console.error('rules: expected race.languages to be an array for', playerStats.name);
+             throw new Error('Missing array: race.languages for ' + playerStats.name);
          }
+         languages = [...languages];
+         let languagesAllowed = languages.length;
+         languagesAllowed += 2; // Background languages
 
-        if (playerStats.race.subrace && playerStats.race.subrace.language_options) {
-            languages = [...new Set([...languages, ...(playerStats.race.subrace.languages || [])])];
-            languagesAllowed += playerStats.race.subrace.language_options.choose || 0;
+         if (playerStats.race.language_choices) {
+             languagesAllowed += playerStats.race.language_choices.choose || 0;
+          }
+
+         if (playerStats.race.subrace && playerStats.race.subrace.language_options) {
+             let subraceLanguages = playerStats.race.subrace.languages;
+             if (!Array.isArray(subraceLanguages)) {
+                 console.error('rules: expected subrace.languages to be an array for', playerStats.name);
+                 throw new Error('Missing array: subrace.languages for ' + playerStats.name);
+             }
+             languages = [...new Set([...languages, ...subraceLanguages])];
+             languagesAllowed += playerStats.race.subrace.language_options.choose || 0;
+          }
+
+         let classLanguages = playerStats.class?.languages;
+         if (!Array.isArray(classLanguages)) {
+             console.error('rules: expected class.languages to be an array for', playerStats.name);
+             throw new Error('Missing array: class.languages for ' + playerStats.name);
          }
-
-        languages = [...new Set([...languages, ...(playerStats.class?.languages || [])])];
+         languages = [...new Set([...languages, ...classLanguages])];
 
         if (playerStats.class?.language_choices) {
             let rangerLanguageBonus = playerStats.class.language_choices.choose || 0;
@@ -643,8 +730,12 @@ const rules = {
      },
 
      // === SHARED: getMagicItems (handles both rulesets internally) ===
-    getMagicItems: (allMagicItems, playerSummary, playerStats) => {
-        const inventoryMagicItems = playerSummary.inventory?.magicItems || [];
+     getMagicItems: (allMagicItems, playerSummary, playerStats) => {
+         const inventoryMagicItems = playerSummary.inventory?.magicItems;
+         if (!Array.isArray(inventoryMagicItems)) {
+             console.error('rules: expected inventory.magicItems to be an array for', playerSummary.name || 'unknown');
+             throw new Error('Missing array: inventory.magicItems for ' + (playerSummary.name || 'unknown'));
+         }
 
         if (!allMagicItems || inventoryMagicItems.length === 0) {
              // 2024 returns [], 5e returns null
@@ -714,13 +805,13 @@ const rules = {
 
            [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
 
-         const allFeatures = [
-           ...(playerStats.actions || []),
-           ...(playerStats.bonusActions || []),
-           ...(playerStats.reactions || []),
-           ...(playerStats.specialActions || []),
-           ...(playerStats.characterAdvancement || []),
-         ];
+          const allFeatures = [
+            ...playerStats.actions,
+            ...playerStats.bonusActions,
+            ...playerStats.reactions,
+            ...playerStats.specialActions,
+            ...playerStats.characterAdvancement,
+          ];
 
          // 2024: add background features to automation (e.g., Hermit's Wit)
          if (is2024(playerStats, playerSummary) && playerStats.background) {
@@ -783,13 +874,18 @@ const rules = {
         // Apply proficiency choice feat buffs (e.g., Crafter's 3 Artisan's Tools)
         const featProficiencyChoices = featBuffs.proficiencies.filter(p => p.type === 'proficiency' && p.isChoice);
         if (featProficiencyChoices.length > 0) {
-            const existingProfs = new Set(playerStats.proficiencies || []);
+            let profs = playerStats.proficiencies;
+            if (!Array.isArray(profs)) {
+                console.error('rules: expected proficiencies to be an array for', playerStats.name);
+                throw new Error('Missing array: proficiencies for ' + playerStats.name);
+            }
+            const existingProfs = new Set(profs);
             featProficiencyChoices.forEach(fp => {
                 if (fp.choose && fp.from) {
                     const listName = fp.from[0];
                     const profName = `${fp.choose} from: ${listName}`;
                     if (!existingProfs.has(profName)) {
-                        playerStats.proficiencies = [...(playerStats.proficiencies || []), profName];
+                        playerStats.proficiencies = [...profs, profName];
                         existingProfs.add(profName);
                     }
                 }
@@ -800,7 +896,12 @@ const rules = {
         // When a player has a proficiency choice from a feat that grants expertise,
         // mark any selected skill from that choice list as expertise
         if (is2024(playerStats, playerSummary)) {
-            const expertiseSkills = new Set(playerStats.expertise || []);
+            let expertiseProfs = playerStats.expertise;
+            if (!Array.isArray(expertiseProfs)) {
+                console.error('rules: expected expertise to be an array for', playerStats.name);
+                throw new Error('Missing array: expertise for ' + playerStats.name);
+            }
+            const expertiseSkills = new Set(expertiseProfs);
             // Also support expertSkills field (wizard form field name)
             if (playerStats.expertSkills && Array.isArray(playerStats.expertSkills)) {
                 playerStats.expertSkills.forEach(s => {
@@ -812,9 +913,14 @@ const rules = {
                 if (fp.from) {
                     const listName = fp.from[0];
                     const profName = `${fp.choose} from: ${listName}`;
-                    const existingProfIdx = (playerStats.proficiencies || []).indexOf(profName);
+                    const profs = playerStats.proficiencies;
+                    if (!Array.isArray(profs)) {
+                        console.error('rules: expected proficiencies to be an array for', playerStats.name);
+                        throw new Error('Missing array: proficiencies for ' + playerStats.name);
+                    }
+                    const existingProfIdx = profs.indexOf(profName);
                     if (existingProfIdx !== -1) {
-                        const chosenSkills = (playerStats.proficiencies || []).filter(s => {
+                        const chosenSkills = profs.filter(s => {
                             if (typeof s !== 'string') return false;
                             const match = s.match(/^(\d+) from: (.+)$/);
                             if (!match) return false;
@@ -838,10 +944,15 @@ const rules = {
         // Apply non-choice, non-skill proficiency feat buffs (e.g., Heavily Armored → Heavy Armor)
         const featNonChoiceProfs = featBuffs.proficiencies.filter(p => p.type === 'proficiency' && !p.isChoice);
         if (featNonChoiceProfs.length > 0) {
-            const existingProfs = new Set(playerStats.proficiencies || []);
+            let profs = playerStats.proficiencies;
+            if (!Array.isArray(profs)) {
+                console.error('rules: expected proficiencies to be an array for', playerStats.name);
+                throw new Error('Missing array: proficiencies for ' + playerStats.name);
+            }
+            const existingProfs = new Set(profs);
             featNonChoiceProfs.forEach(fp => {
                 if (fp.name && !existingProfs.has(fp.name)) {
-                    playerStats.proficiencies = [...(playerStats.proficiencies || []), fp.name];
+                    playerStats.proficiencies = [...profs, fp.name];
                     existingProfs.add(fp.name);
                 }
             });
@@ -851,7 +962,11 @@ const rules = {
         // Feat names are stored in the character's JSON and are sufficient to compute
         // automation when playerStats are computed - feat features are NOT stored in
         // formData.specialActions during character creation
-        const featFeatures = featBuffs.features || [];
+        const featFeatures = featBuffs.features;
+        if (!Array.isArray(featFeatures)) {
+            console.error('rules: expected features to be an array for', playerStats.name);
+            throw new Error('Missing array: features for ' + playerStats.name);
+        }
         if (featFeatures.length > 0) {
             for (const featFeature of featFeatures) {
                 if (!featFeature.name) continue;
@@ -868,40 +983,40 @@ const rules = {
                 let castingTime = featFeature.automation?.casting_time;
                 if (castingTime) {
                     const ct = castingTime;
-                    if (ct === '1 action' && !playerStats.actions?.some(f => f.name === featFeature.name)) {
-                        playerStats.actions = [...(playerStats.actions || []), featEntry];
-                    } else if (ct === '1 bonus action' && !playerStats.bonusActions?.some(f => f.name === featFeature.name)) {
-                        playerStats.bonusActions = [...(playerStats.bonusActions || []), featEntry];
-                    } else if (ct === '1 reaction' && !playerStats.reactions?.some(f => f.name === featFeature.name)) {
-                        playerStats.reactions = [...(playerStats.reactions || []), featEntry];
-                    } else if (ct === 'passive' && !playerStats.characterAdvancement?.some(f => f.name === featFeature.name)) {
-                        playerStats.characterAdvancement = [...(playerStats.characterAdvancement || []), featEntry];
+                    if (ct === '1 action' && !playerStats.actions.some(f => f.name === featFeature.name)) {
+                        playerStats.actions = [...playerStats.actions, featEntry];
+                    } else if (ct === '1 bonus action' && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
+                        playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+                    } else if (ct === '1 reaction' && !playerStats.reactions.some(f => f.name === featFeature.name)) {
+                        playerStats.reactions = [...playerStats.reactions, featEntry];
+                    } else if (ct === 'passive' && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
+                        playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
                     } else {
-                        playerStats.specialActions = [...(playerStats.specialActions || []), featEntry];
+                        playerStats.specialActions = [...playerStats.specialActions, featEntry];
                     }
                 } else {
                     // No automation.casting_time — go to specialActions unless name matches a category
                     const featureCategories = getCategories(playerStats.rules || '5e');
-                    if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement?.some(f => f.name === featFeature.name)) {
-                        playerStats.characterAdvancement = [...(playerStats.characterAdvancement || []), featEntry];
-                    } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions?.some(f => f.name === featFeature.name)) {
-                        playerStats.actions = [...(playerStats.actions || []), featEntry];
-                    } else if (featureCategories.bonusActions.includes(featFeature.name) && !playerStats.bonusActions?.some(f => f.name === featFeature.name)) {
-                        playerStats.bonusActions = [...(playerStats.bonusActions || []), featEntry];
-                    } else if (featureCategories.reactions.includes(featFeature.name) && !playerStats.reactions?.some(f => f.name === featFeature.name)) {
-                        playerStats.reactions = [...(playerStats.reactions || []), featEntry];
-                    } else if (!playerStats.specialActions?.some(f => f.name === featFeature.name)) {
-                        playerStats.specialActions = [...(playerStats.specialActions || []), featEntry];
+                    if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
+                        playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
+                    } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions.some(f => f.name === featFeature.name)) {
+                        playerStats.actions = [...playerStats.actions, featEntry];
+                    } else if (featureCategories.bonusActions.includes(featFeature.name) && !playerStats.bonusActions.some(f => f.name === featFeature.name)) {
+                        playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
+                    } else if (featureCategories.reactions.includes(featFeature.name) && !playerStats.reactions.some(f => f.name === featFeature.name)) {
+                        playerStats.reactions = [...playerStats.reactions, featEntry];
+                    } else if (!playerStats.specialActions.some(f => f.name === featFeature.name)) {
+                        playerStats.specialActions = [...playerStats.specialActions, featEntry];
                     }
                 }
             }
 
             // Re-sort all action arrays after feat features are merged
-            playerStats.actions = uniqBy(playerStats.actions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
-            playerStats.bonusActions = uniqBy(playerStats.bonusActions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
-            playerStats.reactions = uniqBy(playerStats.reactions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
-            playerStats.specialActions = uniqBy(playerStats.specialActions || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
-            playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement || [], 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.reactions = uniqBy(playerStats.reactions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.specialActions = uniqBy(playerStats.specialActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement, 'name').sort((a, b) => a.name.localeCompare(b.name));
         }
 
         // Add feat features to allFeatures for automation processing
@@ -962,7 +1077,12 @@ const rules = {
 
           // Add Hunter's Prey: Horde Breaker bonus action attack if the player has the Hunter class
           // The actual choice (Colossus Slayer vs Horde Breaker) is checked at runtime in CharActions.jsx
-          const hasHunterPrey = (playerStats.automation?.passives || []).some(
+           const passivesForHunter = playerStats.automation?.passives;
+           if (!Array.isArray(passivesForHunter)) {
+               console.error('rules: expected passives to be an array for', playerStats.name);
+               throw new Error('Missing array: passives for ' + playerStats.name);
+           }
+           const hasHunterPrey = passivesForHunter.some(
               p => p.type === 'hunter_prey' && p.name === "Hunter's Prey"
           );
           if (hasHunterPrey) {

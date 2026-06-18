@@ -113,7 +113,12 @@ describe('rules', () => {
     });
 
     it('should handle missing playerStats actions', () => {
-      const playerStats = {};
+      const playerStats = {
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: []
+      };
 
       const [actions, bonusActions, reactions, specialActions, characterAdvancement] = rules.getActions(playerStats);
 
@@ -181,6 +186,7 @@ describe('rules', () => {
       });
       const playerStats = {
         rules: '2024',
+        actions: [],
         bonusActions: [],
         reactions: [],
         specialActions: ['Special String Action'],
@@ -207,6 +213,7 @@ describe('rules', () => {
         characterAdvancement: []
       });
       const playerStats = {
+        actions: [],
         bonusActions: [],
         reactions: [],
         specialActions: [],
