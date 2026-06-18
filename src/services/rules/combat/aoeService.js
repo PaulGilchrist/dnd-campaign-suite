@@ -35,14 +35,14 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
   return affected;
 }
 
-export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName) {
+export function processAoeNpcs(combatSummary, affected, rawDamage, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName, characters) {
   const results = [];
   for (const { creature } of affected) {
     if (creature.type !== 'npc') continue;
     const saveResult = rollSaveForCreature(creature, saveType, saveDc);
     const isSoulstitchProtected = hasSoulstitchProtection(creature.name, attackerName, campaignName);
     const finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(rawDamage, saveResult.success, dcSuccess);
-    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, null, false, attackerName);
+    const applyResult = applyDamageToTarget(combatSummary, creature.name, finalDamage, [damageType], campaignName, characters, false, attackerName);
     results.push({
       creatureName: creature.name,
       saveSuccess: isSoulstitchProtected ? true : saveResult.success,

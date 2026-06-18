@@ -225,7 +225,7 @@ describe('executeSpellCast - Magic Missile', () => {
 
     await executeSpellCast(spell, metaCtx, services)
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(), 'Goblin', 15, ['Force'], 'testCampaign', null, false, 'TestWizard'
+      expect.anything(), 'Goblin', 15, ['Force'], 'testCampaign', undefined, false, 'TestWizard'
     )
     expect(logService.addEntry).toHaveBeenCalled()
   })
@@ -300,7 +300,7 @@ describe('executeSpellCast - Magic Missile', () => {
 
     await executeSpellCast(spell, metaCtx, services)
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(), 'Goblin', 25, ['Force'], 'testCampaign', null, false, 'TestWizard'
+      expect.anything(), 'Goblin', 25, ['Force'], 'testCampaign', undefined, false, 'TestWizard'
     )
   })
 
@@ -328,7 +328,7 @@ describe('executeSpellCast - Magic Missile', () => {
 
     await executeSpellCast(spell, metaCtx, services)
     expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-      expect.anything(), 'Goblin', 15, ['Force'], 'testCampaign', null, true, 'TestWizard'
+      expect.anything(), 'Goblin', 15, ['Force'], 'testCampaign', undefined, true, 'TestWizard'
     )
   })
 

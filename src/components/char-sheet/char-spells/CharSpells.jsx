@@ -206,13 +206,13 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       if (meta.metaCtx) {
         const { metaCtx, attackerPos, targetPos } = meta;
         const finalMetaCtx = { ...metaCtx, magicMissileDistribution: distribution };
-        executeSpellCast(spell, finalMetaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, campaignName, mapName });
+        executeSpellCast(spell, finalMetaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, campaignName, mapName, characters });
       } else {
         const slotLevel = spell.level || 1;
         const finalMetaCtx = { magicMissileDistribution: distribution, slotLevel };
-        executeSpellCast(spell, finalMetaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName });
+        executeSpellCast(spell, finalMetaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters });
       }
-    }, [pendingMagicMissile, pendingMagicMissileMeta, rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
+    }, [pendingMagicMissile, pendingMagicMissileMeta, rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters]);
 
     const handleMagicMissileSkip = React.useCallback(() => {
       setPendingMagicMissile(null);
@@ -244,9 +244,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         return;
       }
       const pos = cachedCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName, characters });
       cachedCastPosRef.current = null;
-      }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName]);
+      }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters]);
     const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingShieldOfFaith, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 

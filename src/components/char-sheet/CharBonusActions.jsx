@@ -50,7 +50,7 @@ function isActionSpell(castingTime) {
     return actionCastingTimes.includes(ct);
 }
 
-function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
+function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
     const [popupHtml, setPopupHtml] = useState(null);
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
 
@@ -68,9 +68,9 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
 
     const bonusCastAction = React.useCallback((spell, metaCtx) => {
       const pos = cachedBonusCastPosRef.current;
-      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive: !!displaySaveDcBonus, campaignName, mapName });
+      executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, innateSorceryActive: !!displaySaveDcBonus, campaignName, mapName, characters });
       cachedBonusCastPosRef.current = null;
-      }, [rollAttack, rollDamage, playerStats, getTargetInfo, displaySaveDcBonus, campaignName, mapName]);
+      }, [rollAttack, rollDamage, playerStats, getTargetInfo, displaySaveDcBonus, campaignName, mapName, characters]);
     const { pendingMetamagic, gateMetamagic, handleConfirm, handleSkip } = useSpellMetamagicFlow(playerStats, campaignName, bonusCastAction);
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
 

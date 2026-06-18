@@ -307,7 +307,7 @@ describe('processAoeNpcs', () => {
     processAoeNpcs(cs, [{ creature: npc }], 5, 'Acid', 13, 'strength', 'half', 'MyCampaign', 'TestHero');
 
     expect(applyDamageToTarget).toHaveBeenCalledWith(
-        cs, 'Troll', 5, ['Acid'], 'MyCampaign', null, false, 'TestHero'
+        cs, 'Troll', 5, ['Acid'], 'MyCampaign', undefined, false, 'TestHero'
         // rawDamage goes through computeDamageAfterSave first, then to applyDamageToTarget
     );
   });

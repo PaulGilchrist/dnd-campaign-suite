@@ -601,6 +601,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 getTargetInfo: getTargetInfoFn,
                 campaignName,
                 mapName,
+                characters,
             });
 
             setPopupHtml({
@@ -609,7 +610,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 description: `Divine Intervention cast ${spell.name}. Divine Intervention recharges ${result.rechargeMessage}`,
             });
         }
-    }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction]);
+    }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction, characters]);
 
     const handleDivinationSavantConfirm = React.useCallback(async (spell1, spell2) => {
         if (!divinationSavantModal) return;
@@ -673,9 +674,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const actionCastAction = React.useCallback((spell, metaCtx) => {
         const pos = cachedActionCastPosRef.current;
-        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName, mapName });
+        executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName, mapName, characters });
         cachedActionCastPosRef.current = null;
-    }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName]);
+    }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName, characters]);
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
     const handleActionSpellCast = React.useCallback(async (spell) => {
         setSelectedActionSpell(null);
@@ -806,7 +807,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                     <EmpoweredSpellPopup
                                         state={popupHtml}
                                         onReroll={(lastEvent, chaMod) => {
-                                            executeEmpoweredReroll({ campaignName, playerStats, lastEvent, chaMod }).then(result => {
+                                            executeEmpoweredReroll({ campaignName, playerStats, lastEvent, chaMod, characters }).then(result => {
                                                 if (!result) return;
                                                 if (result.popupState) setPopupHtml(result.popupState);
                                                 if (result.logEntries) {

@@ -20,7 +20,7 @@ import {
     applyMinDamageAdjustment,
 } from './useLoggedDiceRollUtils.js';
 
-function handleOverchannelSelfDamage(characterName, campaignName, context, logEntry) {
+function handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters) {
     if (context?.overchannelActive && context?.overchannelUseCount > 1) {
         const overchannelSpellLevel = context?.overchannelSpellLevel || 1;
         const dicePerLevel = 2 + (context.overchannelUseCount - 1);
@@ -29,7 +29,7 @@ function handleOverchannelSelfDamage(characterName, campaignName, context, logEn
         const necroticResult = rollExpression(necroticFormula);
         if (necroticResult) {
             const casterCombatSummary = getCombatSummary(campaignName);
-            const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
+            const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, characters, true, characterName);
             logEntry({
                 type: 'roll',
                 characterName,
@@ -142,9 +142,9 @@ export function createLogDamageAndShow(deps) {
         const { overlay, players, npcs } = aoeCtx;
         const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
         const npcResults = saveDc && saveType
-            ? processAoeNpcs(combatSummary, affected, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName || characterName)
+            ? processAoeNpcs(combatSummary, affected, adjustedTotal, damageType, saveDc, saveType, dcSuccess, campaignName, attackerName || characterName, characters)
             : affected.map(({ creature }) => {
-                const applyResult = applyDamageToTarget(combatSummary, creature.name, adjustedTotal, [damageType], campaignName, null, false, attackerName || characterName);
+                const applyResult = applyDamageToTarget(combatSummary, creature.name, adjustedTotal, [damageType], campaignName, characters, false, attackerName || characterName);
                 if (applyResult && applyResult.finalDamage > 0) {
                     endInvisibilityOnHostileAction(attackerName || characterName, campaignName);
                 }
@@ -212,7 +212,7 @@ export function createLogDamageAndShow(deps) {
         });
         setPopupHtml(html);
 
-        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry);
+        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
     }
 
     async function handleNpcSaveDamage(name, formula, total, rolls, modifier, context, adjustedTotal, combatSummary) {
@@ -329,7 +329,7 @@ export function createLogDamageAndShow(deps) {
             };
         }
 
-        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry);
+        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 
         if (context?.metamagicHeighten || context?.metamagicCareful || context?.metamagicTwinTarget) {
             saveLastDamageEvent(characterName, {
@@ -643,7 +643,7 @@ export function createLogDamageAndShow(deps) {
             attackerName: attackerName || characterName,
         });
 
-        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry);
+        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 
         return true;
     }
@@ -687,7 +687,7 @@ export function createLogDamageAndShow(deps) {
             }
             const reducedTotal = Math.max(0, adjustedTotal - rayReduction);
             const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
-            applyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, null, ignoreResistance, characterName);
+            applyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName);
             if (rayReduction > 0) {
                 applyResult = { ...applyResult, rayOfEnfeebleReduction: rayReduction };
             }
@@ -804,7 +804,7 @@ export function createLogDamageAndShow(deps) {
             resistanceDetails: applyResult?.resistanceDetails || [],
         });
 
-        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry);
+        handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 
         const popupData = {
             type: 'damage',

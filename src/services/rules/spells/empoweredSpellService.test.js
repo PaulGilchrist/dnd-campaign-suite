@@ -547,7 +547,7 @@ describe('executeEmpoweredReroll', () => {
       expect.any(Number),
       [], // no damageType
       CAMPAIGN,
-      null,
+      undefined,
       false,
       'Xander',
     );

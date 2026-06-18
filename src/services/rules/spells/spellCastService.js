@@ -93,7 +93,7 @@ function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     setRuntimeValue(campaignName, 'targetEffects', effects, campaignName);
 }
 
-export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName }) {
+export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, featEffects, campaignName, mapName, characters }) {
     if (getActiveBuffs(playerStats.name, campaignName).some(b => b.blocksSpellcasting)) {
         console.warn(`[spellCast] ${playerStats.name} cannot cast spells (blocked by active buff)`);
         return;
@@ -640,7 +640,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
       }
         } else {
         if (isMagicMissile(spell)) {
-          await executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo, campaignName, mapName });
+          await executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters });
         } else {
           const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
           const attackCtx = {
@@ -1012,7 +1012,7 @@ function getMagicMissileCount(slotLevel) {
     return 3 + (slotLevel - 1);
 }
 
-async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, playerStats, getTargetInfo: _getTargetInfo, campaignName, mapName: _mapName }) {
+async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, playerStats, getTargetInfo: _getTargetInfo, campaignName, mapName: _mapName, characters }) {
     const slotLevel = metaCtx?.slotLevel || spell.level;
     const numMissiles = getMagicMissileCount(slotLevel);
     const missileDamage = '1d4 + 1';
@@ -1062,7 +1062,7 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
                 }
                 return passives.some(p => p.type === 'auto_effect' && p.effect === 'ignore_resistance');
             })();
-            const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, null, ignoreResistance, casterName);
+            const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, characters, ignoreResistance, casterName);
             if (applyResult && applyResult.finalDamage > 0) {
                 endInvisibilityOnHostileAction(casterName, campaignName);
             }

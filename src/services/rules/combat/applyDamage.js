@@ -101,9 +101,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
 
-   const isPlayer = creature.type === 'player';
-   if (!Array.isArray(characters)) { console.error('[applyDamage] characters is not an array'); throw new Error('characters must be an array'); }
-   const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
+    const isPlayer = creature.type === 'player';
+    if (!Array.isArray(characters)) { console.error('[applyDamage] characters is not an array'); throw new Error('characters must be an array'); }
+    const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
    const playerComputed = playerStats?.computedStats || playerStats;
    if (playerComputed?.resistances == null || !Array.isArray(playerComputed.resistances)) { console.error('[applyDamage] playerComputed.resistances is not an array'); throw new Error('playerComputed.resistances must be an array'); }
    if (playerComputed?.immunities == null || !Array.isArray(playerComputed.immunities)) { console.error('[applyDamage] playerComputed.immunities is not an array'); throw new Error('playerComputed.immunities must be an array'); }

@@ -46,7 +46,7 @@ export function buildEmpoweredSpellState(playerStats) {
     };
 }
 
-export async function executeEmpoweredReroll({ campaignName, playerStats, lastEvent, chaMod }) {
+export async function executeEmpoweredReroll({ campaignName, playerStats, lastEvent, chaMod, characters }) {
     const parsed = parseExpression(lastEvent.damageFormula);
     if (!parsed) return null;
 
@@ -128,7 +128,7 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
             damageDifference,
             lastEvent.damageType ? [lastEvent.damageType] : [],
             campaignName,
-            null,
+            characters,
             false,
             name
         );
