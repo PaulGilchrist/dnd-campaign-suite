@@ -90,7 +90,7 @@ export const publish = (key, data) => {
         if (targetCampaign && client.campaignName && client.campaignName !== targetCampaign) return;
         try {
             client.res.write(`data: ${JSON.stringify({ key, data: unwrapped })}\n\n`);
-           } catch (e) {
+            } catch (_e) {
                // client disconnected
            }
        });

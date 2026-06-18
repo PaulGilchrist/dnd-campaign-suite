@@ -69,7 +69,7 @@ export function applyBonusActionChoice(action, playerStats, campaignName, chosen
     }
 
     // Apply the chosen effect
-    let description = '';
+    let description;
     switch (chosenOption) {
         case 'Dash':
             description = `You take the Dash bonus action. Your movement speed is doubled until the end of the turn.`;

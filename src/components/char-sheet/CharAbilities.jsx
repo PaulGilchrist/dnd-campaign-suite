@@ -24,7 +24,7 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
              if (effect.type === 'Woe' && !effect.isEven) {
                  return -(effect.d6Value || 0);
              }
-         } catch (e) { /* ignore */ }
+          } catch (_e) { /* ignore */ }
          return 0;
      };
 

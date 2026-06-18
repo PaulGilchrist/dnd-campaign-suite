@@ -299,6 +299,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     }
 
     const effect = auto.effect || '';
+
     let result;
 
     if (effect === 'disadvantage_on_attacks_vs_ally') {
@@ -322,13 +323,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 automation: auto,
             },
         };
-    }
-
-    if (effect === 'disadvantage_on_attack_roll') {
+    } else if (effect === 'disadvantage_on_attack_roll') {
         const attackEvent = getLastAttackRoll(attackerName);
-    if (!attackEvent || isStale(attackEvent)) {
-        return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
-    }
+        if (!attackEvent || isStale(attackEvent)) {
+            return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
+        }
         result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
     } else {
         const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);

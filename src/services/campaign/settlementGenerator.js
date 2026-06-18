@@ -219,8 +219,8 @@ export async function generateSettlement(existingSettlements = [], options = {})
   const size = options.size || pick(SIZE_LABELS);
   const culture = pick(SIZE_CULTURE_MAP[size]);
 
-  let name = '';
   const cultureNames = names[culture];
+  let name;
   if (cultureNames && cultureNames[size] && cultureNames[size].length > 0) {
     name = pick(cultureNames[size]);
   } else {
@@ -255,8 +255,8 @@ export async function generateSettlement(existingSettlements = [], options = {})
   const usedShopNames = new Set();
 
   for (const svcType of serviceTypes) {
-    let svcName = '';
     const typeNames = shopNames[svcType];
+    let svcName;
     if (typeNames && typeNames.length > 0) {
       const available = typeNames.filter(n => !usedShopNames.has(n));
       svcName = pick(available.length > 0 ? available : typeNames);

@@ -107,7 +107,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
                     }
                 }
             }
-        } catch (e) { /* fall through to normal OA */ }
+        } catch (_e) { /* fall through to normal OA */ }
         const meleeAttacks = playerStats.attacks.filter(a => a.type === 'Action' && a.range === MELEE_REACH_FEET);
         const attackRoll = meleeAttacks.length > 0 ? meleeAttacks[0] : playerStats.attacks[0];
         if (attackRoll) {

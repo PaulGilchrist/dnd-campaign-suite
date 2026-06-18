@@ -132,7 +132,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 // Offense — add BI die to damage after hitting
                 const combatOptRaw = getRuntimeValue(playerSummary.name, 'bardicInspirationCombatOptions', campaignName);
                 let combatOpts = [];
-                try { combatOpts = JSON.parse(combatOptRaw) || []; } catch (e) { /* combatOpts is not valid JSON, ignore */ }
+                try { combatOpts = JSON.parse(combatOptRaw) || []; } catch (_e) { /* combatOpts is not valid JSON, ignore */ }
 
                 if (combatOpts.includes('defense_add_to_ac') &&
                     !stats.characterAdvancement.some(f => f.name === 'Bardic Inspiration: Defense')) {

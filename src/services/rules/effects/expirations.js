@@ -578,7 +578,7 @@ export function expireStaleEffects(campaignName) {
 
            setRuntimeValue(attacker.name, KEY, newEntries, campaignName);
             }
-         } catch (e) { /* ignore */ }
+          } catch (_e) { /* ignore */ }
 }
 
 function clearExpirationEffects(effects, targetName, attackerName, campaignName) {
@@ -927,7 +927,7 @@ function removeNpcCondition(targetName, conditionName, campaignName) {
             storage.set('combatSummary', combatData, campaignName);
             window.dispatchEvent(new CustomEvent('combat-summary-updated'));
         }
-    } catch (e) { /* ignore */ }
+    } catch (_e) { /* ignore */ }
 }
 
 function removeActiveCondition(targetName, conditionName, campaignName) {

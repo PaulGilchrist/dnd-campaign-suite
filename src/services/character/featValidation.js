@@ -28,8 +28,8 @@ export async function getFeatLimits(formData) {
             allowed += 1;
          }
           }
-     
-    let details = '';
+      
+    let details;
     if (ruleset === '2024') {
         details = originRequired
             ? `Level 1 2024 characters get 1 Origin feat, plus additional feats at levels ${availableLevels.join(', ')}`

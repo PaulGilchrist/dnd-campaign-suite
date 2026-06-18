@@ -48,7 +48,7 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
     const maxTargets = spell.automation?.maxTargets || 6;
     const rangeFt = rangeToFeet(spell.automation?.range || spell.range || '60 feet');
 
-    let targets = [];
+    let targets;
 
     if (rangeFt != null) {
         const casterPos = combatSummary.players?.find(p => p.name === casterName);

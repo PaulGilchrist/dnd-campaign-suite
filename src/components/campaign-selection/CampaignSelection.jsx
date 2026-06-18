@@ -17,7 +17,7 @@ function CampaignSelection({ onCampaignSelect }) {
         const folders = await getCharacterFolders();
         setCampaigns(folders);
         setLoading(false);
-      } catch (err) {
+      } catch (_err) {
         setError('Failed to load campaigns. Please ensure campaign folders exist under ./public/campaigns');
         setLoading(false);
        }
@@ -36,8 +36,8 @@ function CampaignSelection({ onCampaignSelect }) {
           if (onCampaignSelect) {
             onCampaignSelect(campaign, characters);
             }
-          } catch (err) {
-          setError(`Failed to load campaign ${campaign}: ${err.message}`);
+      } catch (_err) {
+          setError(`Failed to load campaign ${campaign}`);
         } finally {
           setLoading(false);
           }

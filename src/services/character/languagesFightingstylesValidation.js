@@ -57,7 +57,7 @@ export async function getFightingStyleLimits(formData) {
     
     let allowed = 0;
     let preSelected = [];
-    let details = '';
+    let details;
     
     if (!classData) {
         return { allowed: 0, preSelected: [], details: 'No class selected' };
@@ -192,7 +192,7 @@ export async function getLanguageLimits(formData) {
     
     let allowed = 0;
     let preSelected = [];
-    let details = '';
+    let details;
     
     if (ruleset === '2024') {
         // 2024 rules: Languages come from race, class, and background

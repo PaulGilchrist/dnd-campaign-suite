@@ -100,7 +100,7 @@ function useMapLoader(campaignName, mapName, characters) {
                     setLoading(false);
                     return;
                 }
-            } catch (err) {
+            } catch (_err) {
                 // ignore, fall through to empty map creation
             }
 

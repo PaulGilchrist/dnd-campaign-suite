@@ -1,7 +1,7 @@
 import { TERRAIN_TYPES } from '../../config/outdoorConfig.js';
 
 function mulberry32(seed) {
-  let t = (seed += 0x6d2b79f5);
+  let t = seed + 0x6d2b79f5;
   return function () {
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);

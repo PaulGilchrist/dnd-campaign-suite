@@ -23,7 +23,7 @@ function BastionOfLawModal({ featureName, targetName, playerName, campaignName, 
     useEffect(() => {
         const spPool = getRuntimeValue(playerName, 'sorceryPoints', campaignName);
         const spMax = 10;
-        const spCurrent = Number(spPool) ?? spMax;
+        const spCurrent = Number(spPool) || spMax;
         const maxSpendable = Math.min(maxSP, spCurrent);
         setSpAmount(Math.max(minSP, Math.min(maxSpendable, spAmount)));
 

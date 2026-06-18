@@ -123,7 +123,7 @@ function getCombatContextSync(campaignName) {
     try {
         const stored = getRuntimeValue(campaignName, 'combatSummary');
         if (stored) return typeof stored === 'string' ? JSON.parse(stored) : stored;
-    } catch (e) { /* ignore */ }
+    } catch (_e) { /* ignore */ }
     return null;
 }
 

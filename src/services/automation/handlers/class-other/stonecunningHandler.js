@@ -25,8 +25,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         usesMax = auto.usesMax != null ? auto.usesMax : 1;
     }
 
-    let usesRemaining = 0;
-    let canUse = false;
+    let usesRemaining, canUse;
 
     if (lastRest && (now - lastRest) < 86400000) {
         const stored = getRuntimeValue(playerName, usesKey, campaignName);

@@ -130,8 +130,6 @@ function resolveDiceExpression(expression, playerStats, slotLevel) {
 
 export function evaluateAutoExpression(expression, playerStats, prof, level, slotLevel) {
     if (!expression) return expression
-    prof = prof || 0
-    level = level || 1
     let expr = resolveDiceExpression(expression, playerStats, slotLevel)
 
     const minMatch = expr.match(/^(.+?)_min_(\d+)$/)
@@ -142,7 +140,7 @@ export function evaluateAutoExpression(expression, playerStats, prof, level, slo
     try {
         const result = new Function(`"use strict"; return (${expr})`)()
         if (typeof result === 'number' && !isNaN(result)) return result
-    } catch (e) { /* not a simple expression, return as string */ }
+    } catch (_e) { /* not a simple expression, return as string */ }
     return expr
 }
 

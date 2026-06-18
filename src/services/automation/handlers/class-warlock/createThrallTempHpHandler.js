@@ -43,7 +43,7 @@ export async function handle(action, playerStats, campaignName) {
         if (typeof result === 'number' && !isNaN(result)) {
             tempHp = Math.max(0, result);
         }
-    } catch (e) {
+    } catch (_e) {
         // If expression evaluation fails, try rolling
         const dieRoll = rollExpression(expr);
         tempHp = dieRoll?.total || 0;

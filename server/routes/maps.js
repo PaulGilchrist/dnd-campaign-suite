@@ -34,7 +34,7 @@ router.get('/api/campaigns/:campaign/maps', (req, res) => {
         const mapContent = JSON.parse(fs.readFileSync(path.join(mapsDir, f), 'utf-8'));
         mapType = mapContent.type || 'indoor';
         if (mapContent.displayName) displayName = mapContent.displayName;
-      } catch (e) { /* ignore */ }
+      } catch (_e) { /* ignore */ }
 
       return {
         name: displayName,

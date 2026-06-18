@@ -295,7 +295,7 @@ const rules = {
                                     extra.push(bg.tool_proficiencies);
                                 }
                             }
-                        } catch (e) {
+                        } catch (_e) {
                             // Background data not available yet, skip
                         }
                     }
@@ -324,7 +324,7 @@ const rules = {
                                     }
                                 }
                             }
-                        } catch (e) {
+                        } catch (_e) {
                             // Background data not available yet, skip
                         }
                     }
@@ -740,11 +740,11 @@ const rules = {
                                  });
                              }
                          });
-                     }
-                 }
-             } catch (e) {
-                 // Background data not available yet, skip
-             }
+                      }
+                  }
+              } catch (_e) {
+                  // Background data not available yet, skip
+              }
          }
 
          playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);

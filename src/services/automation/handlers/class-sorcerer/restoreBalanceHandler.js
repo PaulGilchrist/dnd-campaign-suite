@@ -106,7 +106,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
-    let rollDescription = '';
+    let rollDescription;
 
     if (attackFresh) {
         const { d20, bonus, targetAc, hit } = attackEvent;

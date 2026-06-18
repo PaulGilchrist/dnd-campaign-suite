@@ -74,7 +74,7 @@ export async function handleApply(action, playerStats, campaignName, spAmount, t
     // Check sorcery points availability
     const spPool = getRuntimeValue(playerName, 'sorceryPoints', campaignName);
     const spMax = playerStats.resources?.sorceryPoints?.max || 0;
-    const spCurrent = Number(spPool) ?? spMax;
+    const spCurrent = Number(spPool) || spMax;
 
     if (spCurrent < sp) {
         return {

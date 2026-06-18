@@ -142,7 +142,7 @@ async function handleBendFate(action, playerStats, campaignName, mapName) {
 
     spendSorceryPoints(playerName, 1, campaignName);
 
-    let rollDescription = '';
+    let rollDescription;
     if (attackFresh) {
         const { d20, bonus, targetName: atkTarget, hit } = attackEvent;
         const ac = atkTarget;
@@ -516,7 +516,7 @@ function evaluateUses(expression, playerStats) {
     try {
         const result = new Function(`"use strict"; return (${expr})`)();
         if (typeof result === 'number' && !isNaN(result)) return result;
-    } catch (e) { /* not a simple expression */ }
+    } catch (_e) { /* not a simple expression */ }
     return 0;
 }
 

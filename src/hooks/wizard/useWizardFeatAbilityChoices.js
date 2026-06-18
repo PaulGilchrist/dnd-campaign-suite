@@ -79,7 +79,7 @@ function useWizardFeatAbilityChoices(formData, allFeats, setFormData) {
       if (saved) {
         try {
           stored[key] = JSON.parse(saved);
-        } catch (e) {
+        } catch (_e) {
           stored[key] = choice.abilityNames[0];
         }
       } else {

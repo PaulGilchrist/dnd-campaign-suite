@@ -85,7 +85,7 @@ function WizardStepAbilities({
             try {
               const parsed = JSON.parse(stored);
               setLocalBackgroundAbilityAssignments(parsed);
-            } catch (e) {
+            } catch (_e) {
               const defaults = {};
               names.forEach(name => { defaults[name] = 1; });
               setLocalBackgroundAbilityAssignments(defaults);

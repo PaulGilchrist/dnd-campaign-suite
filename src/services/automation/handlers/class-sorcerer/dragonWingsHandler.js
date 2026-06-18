@@ -24,16 +24,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const lastRest = getRuntimeValue(playerName, restKey, campaignName);
     const now = Date.now();
-    let active = false;
-    let usesRemaining = 0;
+    let active;
     const usesMax = auto.uses ?? 1;
 
     if (lastRest && (now - lastRest) < 86400000) {
         const stored = getRuntimeValue(playerName, usesKey, campaignName);
-        usesRemaining = stored != null ? Number(stored) : usesMax;
-        active = usesRemaining > 0;
+        active = (stored != null ? Number(stored) : usesMax) > 0;
     } else {
-        usesRemaining = usesMax;
         active = true;
     }
 
@@ -42,8 +39,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             spendSorceryPoints(playerName, auto.restoreCost || 3, campaignName);
             await setRuntimeValue(playerName, restKey, now, campaignName);
             await setRuntimeValue(playerName, usesKey, usesMax, campaignName);
-            active = true;
-            usesRemaining = usesMax;
 
             await addEntry(campaignName, {
                 type: 'ability_use',

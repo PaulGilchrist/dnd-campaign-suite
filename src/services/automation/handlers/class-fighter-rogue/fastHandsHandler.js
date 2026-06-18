@@ -65,7 +65,7 @@ export function applyFastHands(action, playerStats, campaignName, chosenOption) 
         setRuntimeValue(playerStats.name, '_FastHands_usedRound', currentRound, campaignName, true);
     }
 
-    let description = '';
+    let description;
     switch (chosenOption) {
         case 'Sleight of Hand':
             description = `You use Fast Hands to make a Dexterity (Sleight of Hand) check — pick pocket, palming a small object, hiding a small item, etc.`;

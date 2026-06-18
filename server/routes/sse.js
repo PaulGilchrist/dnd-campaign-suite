@@ -25,7 +25,7 @@ router.get('/subscribe', (req, res) => {
         for (const [key, value] of Object.entries(snapshot)) {
             const unwrapped = value && typeof value === 'object' && 'value' in value && Object.keys(value).length === 1 ? value.value : value;
             const eventData = `data: ${JSON.stringify({ key: `change-${campaignName}-${key}`, data: unwrapped })}\n\n`;
-            try { res.write(eventData); } catch (e) { break; }
+            try { res.write(eventData); } catch (_e) { break; }
          }
      }
 

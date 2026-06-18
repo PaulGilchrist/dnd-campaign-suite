@@ -33,9 +33,6 @@ export function setupEventListeners(deps) {
             const targetActiveBuffs = getRuntimeValue(e.detail.targetName, 'activeBuffs', pending.campaignName) || [];
             const isShieldActive = Array.isArray(targetActiveBuffs) && targetActiveBuffs.some(b => b.effect === 'shield');
             const isMagicMissile = pending.name && pending.name.toLowerCase() === 'magic missile';
-            if (isShieldActive && isMagicMissile) {
-                finalDamage = 0;
-            }
 
             const ownEvasion = targetChar?.computedStats?.evasionEffects;
             const hasOwnEvasion = !isIncapacitated && pending.dcSuccess === 'half' && ownEvasion?.some(ef => ef.saveType === saveTypeUpper);
@@ -46,7 +43,7 @@ export function setupEventListeners(deps) {
                     return ev?.some(ef => ef.saveType === saveTypeUpper && ef.shareable && ef.shareRange >= 5);
                 });
             const hasEvasion = hasOwnEvasion || hasSharedEvasion;
-            let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterEvasion(
+            let finalDamage = isSoulstitchProtected || (isShieldActive && isMagicMissile) ? 0 : computeDamageAfterEvasion(
                 e.detail.rawDamage, e.detail.success, e.detail.dcSuccess, hasEvasion
             );
 

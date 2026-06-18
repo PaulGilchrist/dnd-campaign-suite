@@ -968,8 +968,8 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
         void target;
 
         const isShieldActive = getRuntimeValue(targetName, 'activeBuffs', campaignName)?.some(b => b.effect === 'shield');
-        let finalDamage = totalTargetDamage;
-        let damageReduced = false;
+        let finalDamage;
+        let damageReduced;
 
         if (isShieldActive) {
             finalDamage = 0;
@@ -983,7 +983,7 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
                 endInvisibilityOnHostileAction(casterName, campaignName);
             }
             finalDamage = applyResult?.finalDamage ?? totalTargetDamage;
-            damageReduced = applyResult?.damageReduced ?? false;
+            damageReduced = applyResult?.damageReduced;
         }
 
         const missileFormula = missileCount === 1 ? missileDamage : `${missileCount}× ${missileDamage}`;

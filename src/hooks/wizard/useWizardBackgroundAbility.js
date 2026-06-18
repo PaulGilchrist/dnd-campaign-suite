@@ -16,7 +16,7 @@ function getPreSelectedBgAbilities(formData) {
   if (stored) {
     try {
       return JSON.parse(stored);
-    } catch (e) {
+    } catch (_e) {
       return null;
     }
   }

@@ -32,7 +32,7 @@ function useMapLoader({ campaignName, characters, mapName, gridSize, setGridSize
                     }
                     return;
                 }
-            } catch (err) {
+            } catch (_err) {
                 // ignore, fall through to empty map creation
             }
 

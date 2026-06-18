@@ -205,8 +205,7 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
         usesMax = auto.usesMax != null ? auto.usesMax : 1;
     }
 
-    let usesRemaining = 0;
-    let canUse = false;
+    let usesRemaining, canUse;
 
     if (lastRest && (now - lastRest) < 43200000) {
         const stored = getRuntimeValue(playerName, usesKey, campaignName);

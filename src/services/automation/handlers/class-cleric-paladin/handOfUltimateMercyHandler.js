@@ -49,7 +49,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const targetName = targetInfo.target.name;
 
-    let targetHp = 0;
+    let targetHp;
     if (targetInfo.target.type === 'player') {
         targetHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? 0;
     } else {

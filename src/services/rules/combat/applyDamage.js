@@ -157,7 +157,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
     // Arcane Ward / Projected Ward: absorb damage before it hits HP
     let wardDamage = finalDamage;
-    let wardAbsorbed = 0;
+    let wardAbsorbed;
     if (isPlayer) {
         const wardActive = getRuntimeValue(creature.name, 'arcaneWardActive', campaignName);
         if (wardActive) {

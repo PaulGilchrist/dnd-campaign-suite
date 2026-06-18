@@ -39,9 +39,9 @@ export default function useLog(campaignName) {
              setLogEntries(prev => {
                   const updated = [...prev, event.data];
                  return updated.slice(-MAX_LOG_ENTRIES);
-                });
-            } catch (err) {
-             // Ignore parse errors for non-log events
+                 });
+            } catch (_err) {
+              // Ignore parse errors for non-log events
             }
           };
 

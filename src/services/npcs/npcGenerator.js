@@ -239,8 +239,8 @@ export async function generateNPC(existingNPCs = []) {
   const race = pick(traits.races);
   const gender = Math.random() > 0.5 ? 'male' : 'female';
 
-  let name = '';
   const raceNames = names[race];
+  let name;
   if (raceNames && raceNames[gender] && raceNames[gender].length > 0) {
     name = pick(raceNames[gender]);
   } else {
