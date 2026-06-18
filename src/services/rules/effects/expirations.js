@@ -240,7 +240,12 @@ async function applyHolyNimbusRadiantDamage(activeName, playerStats, effect, cam
         if (creatureType !== 'fiend' && creatureType !== 'undead') continue;
 
         try {
-            const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
+            const creatureCurrentHp = creature.hit_points?.current ?? creature.currentHp;
+            if (creatureCurrentHp == null) {
+                console.error(`[expirations] Holy Nimbus: hit_points.current not found for creature ${creature.name}`);
+                throw new Error(`Holy Nimbus: hit_points.current not found for creature ${creature.name}`);
+            }
+            const currentHp = creatureCurrentHp;
             const newHp = Math.max(0, currentHp - damage);
             creature.hit_points = creature.hit_points || {};
             creature.hit_points.current = newHp;
@@ -304,7 +309,12 @@ async function applyInnerRadianceDamage(activeName, playerStats, effect, campaig
         const dist = getDistanceFeet(playerCreature.position, creature.position);
         if (dist !== null && dist <= rangeNum) {
             try {
-                const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
+                const creatureCurrentHp = creature.hit_points?.current ?? creature.currentHp;
+                if (creatureCurrentHp == null) {
+                    console.error(`[expirations] Inner Radiance: hit_points.current not found for creature ${creature.name}`);
+                    throw new Error(`Inner Radiance: hit_points.current not found for creature ${creature.name}`);
+                }
+                const currentHp = creatureCurrentHp;
                 const newHp = Math.max(0, currentHp - damage);
                 creature.hit_points = creature.hit_points || {};
                 creature.hit_points.current = newHp;
@@ -336,8 +346,14 @@ async function applyElderChampionRegeneration(activeName, playerStats, effect, c
     const healAmount = effect.healExpression ? evaluateAutoExpression(effect.healExpression, playerStats) : 10;
     if (typeof healAmount !== 'number' || isNaN(healAmount) || healAmount <= 0) return;
 
-    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
-    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[expirations] Elder Champion: hitPoints not found for ${activeName} in ${campaignName}`);
+        throw new Error(`Elder Champion: hitPoints not found for ${activeName}`);
+    }
+    const maxHp = storedMaxHp;
+    const currentHp = storedCurrentHp ?? storedMaxHp;
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
@@ -436,8 +452,14 @@ async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, cam
     const healAmount = effect.healExpression ? evaluateAutoExpression(effect.healExpression, playerStats) : 1;
     if (typeof healAmount !== 'number' || isNaN(healAmount) || healAmount <= 0) return;
 
-    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
-    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[expirations] Regenerate: hitPoints not found for ${activeName} in ${campaignName}`);
+        throw new Error(`Regenerate: hitPoints not found for ${activeName}`);
+    }
+    const maxHp = storedMaxHp;
+    const currentHp = storedCurrentHp ?? storedMaxHp;
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
@@ -445,8 +467,14 @@ async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, cam
 
 async function applyRegenerateBuffHeal(activeName, playerStats, campaignName) {
     const healAmount = 1;
-    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
-    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[expirations] Regenerate: hitPoints not found for ${activeName} in ${campaignName}`);
+        throw new Error(`Regenerate: hitPoints not found for ${activeName}`);
+    }
+    const maxHp = storedMaxHp;
+    const currentHp = storedCurrentHp ?? storedMaxHp;
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
@@ -476,7 +504,12 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
         if (!isGrappled) continue;
 
         try {
-            const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
+            const creatureCurrentHp = creature.hit_points?.current ?? creature.currentHp;
+            if (creatureCurrentHp == null) {
+                console.error(`[expirations] Grapple: hit_points.current not found for creature ${creature.name}`);
+                throw new Error(`Grapple: hit_points.current not found for creature ${creature.name}`);
+            }
+            const currentHp = creatureCurrentHp;
             const newHp = Math.max(0, currentHp - damage);
             creature.hit_points = creature.hit_points || {};
             creature.hit_points.current = newHp;

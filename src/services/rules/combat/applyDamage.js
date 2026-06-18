@@ -183,9 +183,14 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
     let oldHp, newHp;
    if (isPlayer) {
-     oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
-     newHp = Math.max(0, oldHp - wardDamage);
-     setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+      const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
+      if (storedCurrentHp == null) {
+          console.error(`[applyDamage] Arcane Ward: currentHitPoints not found for ${creature.name}`);
+          throw new Error(`Arcane Ward: currentHitPoints not found for ${creature.name}`);
+      }
+      oldHp = storedCurrentHp;
+      newHp = Math.max(0, oldHp - wardDamage);
+      setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
    } else {
      oldHp = creature.currentHp;
      newHp = Math.max(0, oldHp - wardDamage);
@@ -584,7 +589,12 @@ function checkUndyingSentinel(creature, playerComputed, campaignName) {
     const paladinClassLevel = playerComputed?.class?.class_levels?.find(cl => cl.level === playerComputed.level);
     const paladinLevel = paladinClassLevel?.level || playerComputed.level;
     const healAmount = paladinLevel * 3;
-    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
+    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[applyDamage] Undying Sentinel: hitPoints not found for ${creature.name} in ${campaignName}`);
+        throw new Error(`Undying Sentinel: hitPoints not found for ${creature.name}`);
+    }
+    const maxHp = storedMaxHp;
     const newHp = Math.min(1 + healAmount, maxHp);
 
     // Set the runtime HP value
@@ -652,7 +662,12 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
         return { intercepted: false };
     }
 
-    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
+    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[applyDamage] Last Stand: hitPoints not found for ${creature.name} in ${campaignName}`);
+        throw new Error(`Last Stand: hitPoints not found for ${creature.name}`);
+    }
+    const maxHp = storedMaxHp;
     const healAmount = Math.floor(maxHp / 2);
     const newHp = Math.min(1 + healAmount, maxHp);
 
@@ -713,7 +728,12 @@ function checkRelentlessEndurance(creature, playerComputed, campaignName) {
     }
 
     // Relentless Endurance: set HP to 1 instead of 0
-    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
+    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[applyDamage] Relentless Endurance: hitPoints not found for ${creature.name} in ${campaignName}`);
+        throw new Error(`Relentless Endurance: hitPoints not found for ${creature.name}`);
+    }
+    const maxHp = storedMaxHp;
     const newHp = 1;
 
     // Set the runtime HP value

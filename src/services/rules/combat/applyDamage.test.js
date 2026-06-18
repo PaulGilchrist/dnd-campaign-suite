@@ -112,12 +112,13 @@ function createPlayerCharacter(name, extra = {}) {
  *   3) activeConditions → array (use [] when no condition test needed)
  */
 function stubPlayerRuntime(currentHp, conditions = []) {
+  getRuntimeValue.mockReset();
   getRuntimeValue
-    .mockReturnValueOnce([])                        // activeBuffs (line 83)
-    .mockReturnValueOnce(undefined)                 // arcaneWardActive (line 133)
-    .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 157)
-    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check (line 189)
-    .mockReturnValueOnce(conditions);               // activeConditions (line 243)
+    .mockReturnValueOnce([])                        // activeBuffs (line 110)
+    .mockReturnValueOnce(undefined)                 // arcaneWardActive (line 162)
+    .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 186)
+    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check (line 223)
+    .mockReturnValueOnce(conditions);               // activeConditions (line 277)
 }
 
 // ── Tests ───────────────────────────────────────────────────────
@@ -547,13 +548,11 @@ describe('applyDamageToTarget', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'currentHitPoints', 0, 'TestCampaign');
      });
 
-    it('uses default currentHitPoints of 0 from runtime when not set', () => {
+    it('throws when currentHitPoints is not set from runtime', () => {
       stubPlayerRuntime(null);
       const player = createPlayerCreature('Monk');
       const cs = makeCombatSummary([player]);
-      const result = applyDamageToTarget(cs, 'Monk', 5, ['Bludgeoning'], 'TestCampaign', []);
-      expect(result.oldHp).toBe(0);
-      expect(result.newHp).toBe(0);
+      expect(() => applyDamageToTarget(cs, 'Monk', 5, ['Bludgeoning'], 'TestCampaign', [])).toThrow('Arcane Ward: currentHitPoints not found for Monk');
      });
 
     it('dispatches combat-summary-updated for player damage', () => {
@@ -828,6 +827,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     it('merges resistanceTypes from activeBuffs for player', () => {
       getRuntimeValue
         .mockReturnValueOnce([{ resistanceTypes: ['fire'], resistanceTypes2: ['cold'] }]) // activeBuffs
+        .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Wizard');
@@ -843,6 +843,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
           { resistanceTypes: ['fire'] },
           { resistanceTypes: ['fire', 'cold'] },
         ]) // activeBuffs
+        .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Wizard');
@@ -854,6 +855,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     it('handles non-array activeBuffs gracefully', () => {
       getRuntimeValue
         .mockReturnValueOnce('not-an-array') // activeBuffs
+        .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Wizard');
@@ -865,6 +867,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     it('handles null activeBuffs gracefully', () => {
       getRuntimeValue
         .mockReturnValueOnce(null) // activeBuffs
+        .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Wizard');
@@ -876,6 +879,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     it('combines base resistances with buff resistanceTypes', () => {
       getRuntimeValue
         .mockReturnValueOnce([{ resistanceTypes: ['cold'] }]) // activeBuffs
+        .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Paladin');
