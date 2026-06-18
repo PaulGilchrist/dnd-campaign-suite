@@ -1,14 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import BreathWeaponShapeModal from './BreathWeaponShapeModal.jsx';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    setRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../../services/automation/index.js', () => ({
-    executeHandler: vi.fn(),
+    executeHandler: vi.fn(() => Promise.resolve(null)),
 }));
+
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { executeHandler } from '../../../../services/automation/index.js';
 
 const mockAction = {
     name: 'Breath Weapon',
@@ -80,7 +83,7 @@ describe('BreathWeaponShapeModal', () => {
         expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    it('renders Choose Shape button disabled', () => {
+    it('renders Choose Shape button disabled when nothing selected', () => {
         render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
         const buttons = document.querySelectorAll('button');
         const chooseBtn = Array.from(buttons).find(b => b.textContent.includes('Choose Shape'));
@@ -147,22 +150,132 @@ describe('BreathWeaponShapeModal', () => {
         expect(inputs).toHaveLength(2);
     });
 
-    // ── Selection causes component to return null (current behavior) ──
+    // ── Selection behavior ──
 
-    it('returns null after selecting cone radio', () => {
+    it('enables Choose Shape button after selecting cone radio', () => {
         render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
-        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-        const coneInput = document.querySelector('input[type="radio"]');
-        fireEvent.click(coneInput);
-        expect(document.querySelector('.sp-overlay')).not.toBeInTheDocument();
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        const chooseBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape'));
+        expect(chooseBtn).toBeEnabled();
     });
 
-    it('returns null after selecting line radio', () => {
+    it('enables Choose Shape button after selecting line radio', () => {
         render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[1]);
+        const chooseBtn = Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape'));
+        expect(chooseBtn).toBeEnabled();
+    });
+
+    it('modal stays visible after selecting cone radio', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
         expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-        const inputs = document.querySelectorAll('input[type="radio"]');
-        fireEvent.click(inputs[1]);
-        expect(document.querySelector('.sp-overlay')).not.toBeInTheDocument();
+    });
+
+    it('modal stays visible after selecting line radio', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[1]);
+        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
+    });
+
+    it('checks cone radio on click', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        expect(radios[0]).toBeChecked();
+    });
+
+    it('checks line radio on click', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[1]);
+        expect(radios[1]).toBeChecked();
+    });
+
+    it('switches selection when different radio is clicked', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        expect(radios[0]).toBeChecked();
+        fireEvent.click(radios[1]);
+        expect(radios[0]).not.toBeChecked();
+        expect(radios[1]).toBeChecked();
+    });
+
+    // ── Handle choose flow ──
+
+    it('calls setRuntimeValue with correct args when cone selected', async () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        await act(async () => {
+            fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape')));
+        });
+        expect(setRuntimeValue).toHaveBeenCalledWith('DragonbornFighter', '_Breath_Weapon_option', 'cone', 'test-campaign');
+    });
+
+    it('calls setRuntimeValue with correct args when line selected', async () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[1]);
+        await act(async () => {
+            fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape')));
+        });
+        expect(setRuntimeValue).toHaveBeenCalledWith('DragonbornFighter', '_Breath_Weapon_option', 'line', 'test-campaign');
+    });
+
+    it('calls onClose after choosing', async () => {
+        const onClose = vi.fn();
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={onClose} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        await act(async () => {
+            fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape')));
+        });
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls executeHandler after choosing', async () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        await act(async () => {
+            fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape')));
+        });
+        expect(executeHandler).toHaveBeenCalledWith(mockAction, mockPlayerStats, mockCampaignName, null);
+    });
+
+    it('dispatches automation-result event when executeHandler returns a result', async () => {
+        executeHandler.mockResolvedValue({ type: 'popup', payload: { message: 'done' } });
+        const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        await act(async () => {
+            fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape')));
+        });
+        expect(dispatchSpy).toHaveBeenCalledWith(expect.any(CustomEvent));
+        const event = dispatchSpy.mock.calls[0][0];
+        expect(event.type).toBe('automation-result');
+        expect(event.detail).toEqual({ type: 'popup', payload: { message: 'done' } });
+        dispatchSpy.mockRestore();
+    });
+
+    it('does not dispatch automation-result event when executeHandler returns null', async () => {
+        executeHandler.mockResolvedValue(null);
+        const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        await act(async () => {
+            fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape')));
+        });
+        expect(dispatchSpy).not.toHaveBeenCalled();
+        dispatchSpy.mockRestore();
     });
 
     // ── Edge cases ──
@@ -183,5 +296,16 @@ describe('BreathWeaponShapeModal', () => {
         render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
         const matches = screen.getAllByText(/30-foot line/i);
         expect(matches.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('optionKey replaces multiple spaces with single underscore', async () => {
+        const actionWithSpaces = { name: 'Breath  Weapon' };
+        render(<BreathWeaponShapeModal action={actionWithSpaces} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        await act(async () => {
+            fireEvent.click(Array.from(document.querySelectorAll('button')).find(b => b.textContent.includes('Choose Shape')));
+        });
+        expect(setRuntimeValue).toHaveBeenCalledWith('DragonbornFighter', '_Breath_Weapon_option', 'cone', 'test-campaign');
     });
 });
