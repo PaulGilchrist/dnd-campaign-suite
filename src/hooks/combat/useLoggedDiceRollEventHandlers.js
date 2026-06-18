@@ -22,7 +22,7 @@ export function setupEventListeners(deps) {
             const pending = window.__pendingSaves[e.detail.promptId];
             if (!pending) return;
 
-            const combatSummary = getCombatSummary();
+            const combatSummary = getCombatSummary(campaignName);
             const saveTypeUpper = (e.detail.saveType || '').toUpperCase();
             const targetChar = (charactersRef.current || []).find(c => c.name === e.detail.targetName);
             const targetConditions = getRuntimeValue(e.detail.targetName, 'activeConditions', pending.campaignName) || [];
@@ -105,7 +105,7 @@ export function setupEventListeners(deps) {
                 const necroticFormula = `${totalDice}d12`;
                 const necroticResult = rollExpression(necroticFormula);
                 if (necroticResult) {
-                    const casterCombatSummary = getCombatSummary();
+                    const casterCombatSummary = getCombatSummary(campaignName);
                     const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
                     logEntry({
                         type: 'roll',
@@ -233,7 +233,7 @@ export function setupEventListeners(deps) {
                 id: utils.guid(),
             });
 
-            const combatSummary = getCombatSummary();
+            const combatSummary = getCombatSummary(campaignName);
             if (combatSummary) {
                 const creature = combatSummary.creatures.find(c =>
                     c.name === e.detail.targetName || c.name.startsWith(e.detail.targetName + ' ')

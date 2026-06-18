@@ -238,7 +238,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const isPeerlessAthlete = getRuntimeValue(playerStats?.name, 'peerlessAthleteActive', campaignName);
     const isLargeFormActive = getRuntimeValue(playerStats?.name, 'largeFormActive', campaignName);
     const seeInvisibilityActive = Array.isArray(activeBuffs) && activeBuffs.some(b => b.effect === 'see_invisibility');
-    const combatContext = getCombatSummary();
+    const combatContext = getCombatSummary(campaignName);
     const conditionEffects = computeConditionEffects(activeConditions, allSaveModifiers, myTargetEffects, isRaging, shapeShiftActive, isPeerlessAthlete, isLargeFormActive, combatContext, seeInvisibilityActive);
     if (playerStats) {
         const speedHalvedTime = getRuntimeValue(playerStats.name, 'stunned_speedHalved', campaignName);

@@ -210,7 +210,7 @@ async function applyHolyNimbusRadiantDamage(activeName, playerStats, effect, cam
     const holyNimbusActive = getRuntimeValue(activeName, 'holyNimbusActive', campaignName);
     if (!holyNimbusActive) return;
 
-    const combatSummary = getCombatSummary();
+    const combatSummary = getCombatSummary(campaignName);
     if (!combatSummary) return;
 
     const creatures = combatSummary.creatures || [];
@@ -269,7 +269,7 @@ async function applyInnerRadianceDamage(activeName, playerStats, effect, campaig
     const activeBuffs = Array.isArray(innerRadianceActive) ? innerRadianceActive : [];
     if (!activeBuffs.some(b => b.name === 'Inner Radiance')) return;
 
-    const combatSummary = getCombatSummary();
+    const combatSummary = getCombatSummary(campaignName);
     if (!combatSummary) return;
 
     const creatures = combatSummary.creatures || [];
@@ -344,7 +344,7 @@ async function applyElderChampionRegeneration(activeName, playerStats, effect, c
 }
 
 async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, campaignName) {
-    const combatData = getCombatSummary();
+    const combatData = getCombatSummary(campaignName);
     if (!combatData) return;
     
     const currentRound = combatData.round || 1;
@@ -453,7 +453,7 @@ async function applyRegenerateBuffHeal(activeName, playerStats, campaignName) {
 }
 
 async function applyGrappleDamageTurnStart(activeName, playerStats, effect, campaignName) {
-    const combatSummary = getCombatSummary();
+    const combatSummary = getCombatSummary(campaignName);
     if (!combatSummary) return;
 
     const creatures = combatSummary.creatures || [];
@@ -557,7 +557,7 @@ export function expireStaleEffects(campaignName) {
     if (!activeName) return;
 
     try {
-        const combatData = getCombatSummary() || {};
+        const combatData = getCombatSummary(campaignName) || {};
         const creatures = combatData.creatures || [];
 
         for (const attacker of creatures) {
@@ -919,7 +919,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
 function removeNpcCondition(targetName, conditionName, campaignName) {
     try {
-        const combatData = getCombatSummary() || {};
+        const combatData = getCombatSummary(campaignName) || {};
         const creatures = combatData.creatures || [];
         const creature = creatures.find(c => utils.getName(c.name) === utils.getName(targetName));
         if (creature && creature.conditions) {

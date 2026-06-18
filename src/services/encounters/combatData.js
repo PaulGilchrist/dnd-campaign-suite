@@ -58,7 +58,7 @@ export async function loadCurrentCombatRound(campaignName) {
   return cs?.round ?? 1
 }
 
-export function getCurrentCombatRound() {
-  const cs = getCombatSummary()
+export function getCurrentCombatRound(campaignName) {
+  const cs = getCombatSummary(campaignName)
   return cs?.round ?? 1
 }

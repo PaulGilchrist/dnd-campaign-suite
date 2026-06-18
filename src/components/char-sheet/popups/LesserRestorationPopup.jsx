@@ -16,7 +16,7 @@ function conditionMatches(c, targetCondition) {
     return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
 }
 
-export default function LesserRestorationPopup({ spell, _playerStats, _campaignName, creatureTargets, range, onConfirm, onSkip }) {
+export default function LesserRestorationPopup({ spell, _playerStats, campaignName, creatureTargets, range, onConfirm, onSkip }) {
     const [selectedTarget, setSelectedTarget] = useState(null);
     const [targetConditions, setTargetConditions] = useState([]);
     const [selections, setSelections] = useState([]);
@@ -27,7 +27,7 @@ export default function LesserRestorationPopup({ spell, _playerStats, _campaignN
 
         let csConditions = [];
         try {
-            const cs = await getCombatSummary();
+            const cs = await getCombatSummary(campaignName);
             if (cs) {
                 const creature = cs.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {
@@ -41,7 +41,7 @@ export default function LesserRestorationPopup({ spell, _playerStats, _campaignN
             ALLOWED_CONDITIONS.some(ac => conditionMatches(c, ac.key))
         );
         setTargetConditions(applicableConditions);
-    }, []);
+    }, [campaignName]);
 
     const toggleSelection = useCallback((condition) => {
         setSelections(prev => {

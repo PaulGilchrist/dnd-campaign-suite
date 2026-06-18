@@ -89,7 +89,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                 const necroticFormula = `${totalDice}d12`;
                 const necroticResult = rollExpression(necroticFormula);
                 if (necroticResult) {
-                    const combatSummary = getCombatSummary() || { creatures: [] };
+                    const combatSummary = getCombatSummary(campaignName) || { creatures: [] };
                     const applyResult = applyDamageToTarget(combatSummary, playerStats.name, necroticResult.total, ['Necrotic'], campaignName, null, true, playerStats.name);
                     addEntry(campaignName, {
                         type: 'roll',
@@ -224,12 +224,15 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const castAction = React.useCallback((spell, metaCtx) => {
       const isMM = spell.name && spell.name.toLowerCase() === 'magic missile';
       if (isMM) {
+        const cs = getCombatSummary(campaignName);
         const slotLevel = metaCtx?.slotLevel || spell.level;
         const numMissiles = 3 + (slotLevel - 1);
-        const cs = getCombatSummary();
         const creatureTargets = cs?.creatures
           ?.filter(c => c.name !== playerStats.name)
           .map(c => c.name) || [];
+        if (creatureTargets.length === 0) {
+          return;
+        }
         setPendingMagicMissile({
           spell,
           totalMissiles: numMissiles,
@@ -282,8 +285,31 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       setSelectedSpell(null);
 
       await resolveSpellPositions();
+
+      const isMM = spell?.name && spell.name.toLowerCase() === 'magic missile';
+      if (isMM) {
+        const freshCombat = await getCombatContext(campaignName);
+        const creatureTargets = freshCombat?.creatures
+          ?.filter(c => c.name !== playerStats.name)
+          .map(c => c.name) || [];
+        if (creatureTargets.length === 0) {
+          return;
+        }
+        const slotLevel = spell.level || 1;
+        const numMissiles = 3 + (slotLevel - 1);
+        setPendingMagicMissile({
+          spell,
+          totalMissiles: numMissiles,
+          missileDamage: '1d4 + 1',
+          creatureTargets,
+        });
+        setPendingMagicMissileMeta({ spell, metaCtx: {}, attackerPos: cachedCastPosRef.current?.attackerPos, targetPos: cachedCastPosRef.current?.targetPos });
+        cachedCastPosRef.current = null;
+        return;
+      }
+
       gateMetamagic(spell);
-    }, [gateMetamagic, resolveSpellPositions]);
+    }, [gateMetamagic, resolveSpellPositions, campaignName, playerStats.name]);
 
     const executeDamageRoll = (formula, spellName, spell) => {
         const wasCrit = dicePopupHtml?.isCrit;
@@ -361,10 +387,13 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         const mmAfterUpcast = (modifiedSpell) => {
           const slotLevel = modifiedSpell.level || spell.level;
           const numMissiles = 3 + (slotLevel - 1);
-          const cs = getCombatSummary();
+          const cs = getCombatSummary(campaignName);
           const creatureTargets = cs?.creatures
             ?.filter(c => c.name !== playerStats.name)
             .map(c => c.name) || [];
+          if (creatureTargets.length === 0) {
+            return;
+          }
           setPendingMagicMissile({
             spell: modifiedSpell,
             totalMissiles: numMissiles,
@@ -503,7 +532,7 @@ return (
                     )}
                     {pendingMagicMissile && (() => {
                       const { spell, totalMissiles, missileDamage, creatureTargets } = pendingMagicMissile;
-                      const currentTargetName = getTargetFromAttacker(getCombatSummary(), playerStats.name)?.name;
+                      const currentTargetName = getTargetFromAttacker(getCombatSummary(campaignName), playerStats.name)?.name;
                       return (
                         <MagicMissileTargetPopup
                           spell={{ name: spell.name, level: spell.level || 0 }}

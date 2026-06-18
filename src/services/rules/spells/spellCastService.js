@@ -944,7 +944,7 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
         return;
     }
 
-    const combatSummary = getCombatSummary() || { creatures: [] };
+    const combatSummary = getCombatSummary(campaignName) || { creatures: [] };
     const casterName = playerStats.name;
     const logEntries = [];
 

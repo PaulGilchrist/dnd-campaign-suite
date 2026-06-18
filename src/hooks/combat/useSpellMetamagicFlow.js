@@ -6,8 +6,8 @@ import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js'
 import { confirmRemoveCurse } from '../../services/rules/features/removeCurseService.js'
 
-function getCreatureTargets(excludeName) {
-  const cs = getCombatSummary();
+function getCreatureTargets(excludeName, campaignName) {
+  const cs = getCombatSummary(campaignName);
   if (!cs?.creatures) return [];
   return cs.creatures
     .filter(c => c.name !== excludeName)
@@ -35,7 +35,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     const isAid = (spell.name || '').toLowerCase() === 'aid';
 
     if (isLesserRestoration) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -53,7 +53,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     }
 
     if (isGreaterRestoration) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -71,7 +71,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     }
 
     if (isRemoveCurse) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -89,7 +89,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     }
 
     if (isAid) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -109,7 +109,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
 
     const isHeroesFeast = (spell.name || '').toLowerCase() === "heroes' feast";
     if (isHeroesFeast) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -129,7 +129,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
 
     const isMageArmor = (spell.name || '').toLowerCase() === 'mage armor';
     if (isMageArmor) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -148,7 +148,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
 
     const isShieldOfFaith = (spell.name || '').toLowerCase() === 'shield of faith';
     if (isShieldOfFaith) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -167,7 +167,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
 
     const isProtectionFromEnergy = (spell.name || '').toLowerCase() === 'protection from energy';
     if (isProtectionFromEnergy) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -187,7 +187,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
 
     const isResistance = (spell.name || '').toLowerCase() === 'resistance';
     if (isResistance) {
-      const cs = getCombatSummary();
+      const cs = getCombatSummary(campaignName);
       const creatureTargets = cs?.creatures
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
@@ -208,7 +208,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     const multiTargetSpread = getMultiTargetSpreadForSpell(playerStats, spell.name);
 
     if (multiTargetSpread) {
-      const creatureTargets = getCreatureTargets(playerStats?.name);
+      const creatureTargets = getCreatureTargets(playerStats?.name, campaignName);
       if (creatureTargets.length > 0) {
         setPendingMultiTarget({
           spell,

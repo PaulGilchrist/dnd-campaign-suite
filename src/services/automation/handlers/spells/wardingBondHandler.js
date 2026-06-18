@@ -14,7 +14,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const casterName = playerStats.name;
 
-    const combatSummary = getCombatSummary();
+    const combatSummary = getCombatSummary(campaignName);
     let targetName = null;
     if (combatSummary) {
         const target = getTargetFromAttacker(combatSummary, casterName);

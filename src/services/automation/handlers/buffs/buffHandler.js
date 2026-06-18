@@ -91,7 +91,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     let targetName = playerStats.name;
     if (auto?.target === 'willing_creature') {
-        const combatSummary = getCombatSummary();
+        const combatSummary = getCombatSummary(campaignName);
         if (combatSummary) {
             const target = getTargetFromAttacker(combatSummary, playerStats.name);
             if (target) {

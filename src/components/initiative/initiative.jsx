@@ -378,7 +378,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     React.useEffect(() => {
         const handler = () => {
-            const summary = getCombatSummary()
+            const summary = getCombatSummary(campaignName)
             if (summary && JSON.stringify(summary) !== JSON.stringify(combatSummaryRef.current)) {
                 combatSummaryRef.current = summary
                 setCombatSummary(summary)
@@ -390,7 +390,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             window.removeEventListener('initiative-rolled', handler)
             window.removeEventListener('combat-summary-updated', handler)
           }
-      }, [])
+      }, [campaignName])
 
     React.useEffect(() => {
         const handler = (e) => {

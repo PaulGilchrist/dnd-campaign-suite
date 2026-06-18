@@ -10,7 +10,7 @@ import { getCombatSummary } from '../../../encounters/combatData.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 
 function getCreatureTargets(excludeName, withinRangeFt, campaignName, mapName, attackerPos) {
-    const cs = getCombatSummary();
+    const cs = getCombatSummary(campaignName);
     if (!cs?.creatures) return [];
 
     return cs.creatures

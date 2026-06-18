@@ -28,7 +28,7 @@ function handleOverchannelSelfDamage(characterName, campaignName, context, logEn
         const necroticFormula = `${totalDice}d12`;
         const necroticResult = rollExpression(necroticFormula);
         if (necroticResult) {
-            const casterCombatSummary = getCombatSummary();
+            const casterCombatSummary = getCombatSummary(campaignName);
             const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
             logEntry({
                 type: 'roll',

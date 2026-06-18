@@ -21,7 +21,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
 
          // Also check combat summary for conditions stored on NPCs
         try {
-            const combatSummary = getCombatSummary();
+            const combatSummary = getCombatSummary(campaignName);
             if (combatSummary) {
                 const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {
@@ -41,7 +41,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
           } catch { /* ignore */ }
 
         return runtimeConditions;
-    }, [targetName]);
+    }, [targetName, campaignName]);
 
     const getCureableForTarget = useCallback(() => {
         const conditions = getTargetConditions();
@@ -59,7 +59,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
 
          // Also remove from combat summary if present
         try {
-            const combatSummary = getCombatSummary();
+            const combatSummary = getCombatSummary(campaignName);
             if (combatSummary) {
                 const creature = combatSummary.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {

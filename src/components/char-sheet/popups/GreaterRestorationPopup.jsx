@@ -14,7 +14,7 @@ function conditionMatches(c, targetCondition) {
     return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
 }
 
-export default function GreaterRestorationPopup({ spell, _playerStats, _campaignName, creatureTargets, range, onConfirm, onSkip }) {
+export default function GreaterRestorationPopup({ spell, _playerStats, campaignName, creatureTargets, range, onConfirm, onSkip }) {
     const [selectedTarget, setSelectedTarget] = useState(null);
     const [targetConditions, setTargetConditions] = useState([]);
     const [targetExhaustion, setTargetExhaustion] = useState(0);
@@ -29,7 +29,7 @@ export default function GreaterRestorationPopup({ spell, _playerStats, _campaign
 
         let csConditions = [];
         try {
-            const cs = await getCombatSummary();
+            const cs = await getCombatSummary(campaignName);
             if (cs) {
                 const creature = cs.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {
@@ -53,7 +53,7 @@ export default function GreaterRestorationPopup({ spell, _playerStats, _campaign
 
         const hpMaxReduction = getRuntimeValue(targetName, 'hpMaxReduction') || 0;
         setTargetHasHpMaxReduction(hpMaxReduction > 0);
-    }, []);
+    }, [campaignName]);
 
     const toggleSelection = useCallback((type, condition) => {
         setSelections(prev => {

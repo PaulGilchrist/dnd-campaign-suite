@@ -3,8 +3,8 @@ import { getPreCastOptions, getMaxMetamagicPerSpell, computeMetamagicCost, hasAr
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import './MetamagicPopup.css';
 
-function getCreatureTargets(excludeName) {
-  const cs = getCombatSummary();
+function getCreatureTargets(excludeName, campaignName) {
+  const cs = getCombatSummary(campaignName);
   if (!cs?.creatures) return [];
   return cs.creatures
     .filter(c => c.name !== excludeName)
@@ -12,7 +12,6 @@ function getCreatureTargets(excludeName) {
 }
 
 export default function MetamagicPopup({ spell, playerStats, _campaignName, onConfirm, onSkip }) {
-  void _campaignName;
   const spellLevel = spell?.level || 0;
   const currentSP = Number(playerStats._metamagicCurrentSP) || 0;
   const options = getPreCastOptions(playerStats, currentSP, spellLevel);
@@ -23,7 +22,7 @@ export default function MetamagicPopup({ spell, playerStats, _campaignName, onCo
   const [selected, setSelected] = useState([]);
   const [twinTarget, setTwinTarget] = useState('');
   const [psionicActive, setPsionicActive] = useState(false);
-  const creatureTargets = getCreatureTargets(playerStats?.name);
+  const creatureTargets = getCreatureTargets(playerStats?.name, _campaignName);
 
   const apotheosisActive = hasArcaneApotheosis(playerStats, playerStats?.name);
   const { totalCost, waivedName } = computeMetamagicCost(selected, options, playerStats, playerStats?.name);
