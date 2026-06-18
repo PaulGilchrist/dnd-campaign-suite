@@ -42,16 +42,16 @@ describe('wildMagicSurgeService', () => {
             expect(result[1].name).toBe('Surge 2');
         });
 
-        it('returns empty array when no passives exist', () => {
-            expect(getWildMagicSurgeFeatures({})).toEqual([]);
+        it('throws when no passives exist', () => {
+            expect(() => getWildMagicSurgeFeatures({})).toThrow('Expected array, got undefined');
         });
 
-        it('returns empty array when passives is undefined', () => {
-            expect(getWildMagicSurgeFeatures({ automation: {} })).toEqual([]);
+        it('throws when passives is undefined', () => {
+            expect(() => getWildMagicSurgeFeatures({ automation: {} })).toThrow('Expected array, got undefined');
         });
 
-        it('returns empty array when automation is undefined', () => {
-            expect(getWildMagicSurgeFeatures({})).toEqual([]);
+        it('throws when automation is undefined', () => {
+            expect(() => getWildMagicSurgeFeatures({})).toThrow('Expected array, got undefined');
         });
     });
 
@@ -70,8 +70,8 @@ describe('wildMagicSurgeService', () => {
             expect(hasWildMagicSurge(playerStats)).toBe(false);
         });
 
-        it('returns false when no passives exist', () => {
-            expect(hasWildMagicSurge({})).toBe(false);
+        it('throws when no passives exist', () => {
+            expect(() => hasWildMagicSurge({})).toThrow('Expected array, got undefined');
         });
     });
 
@@ -96,8 +96,8 @@ describe('wildMagicSurgeService', () => {
             expect(getControlledChaosFeature(playerStats)).toBeUndefined();
         });
 
-        it('returns undefined when no passives exist', () => {
-            expect(getControlledChaosFeature({})).toBeUndefined();
+        it('throws when no passives exist', () => {
+            expect(() => getControlledChaosFeature({})).toThrow('Expected array, got undefined');
         });
     });
 
@@ -121,8 +121,8 @@ describe('wildMagicSurgeService', () => {
             expect(getTamedSurgeFeature(playerStats)).toBeUndefined();
         });
 
-        it('returns undefined when no passives exist', () => {
-            expect(getTamedSurgeFeature({})).toBeUndefined();
+        it('throws when no passives exist', () => {
+            expect(() => getTamedSurgeFeature({})).toThrow('Expected array, got undefined');
         });
     });
 
@@ -146,8 +146,8 @@ describe('wildMagicSurgeService', () => {
             expect(getFeatsOfChaosFeature(playerStats)).toBeUndefined();
         });
 
-        it('returns undefined when no passives exist', () => {
-            expect(getFeatsOfChaosFeature({})).toBeUndefined();
+        it('throws when no passives exist', () => {
+            expect(() => getFeatsOfChaosFeature({})).toThrow('Expected array, got undefined');
         });
     });
 

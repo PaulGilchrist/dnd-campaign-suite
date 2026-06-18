@@ -13,7 +13,11 @@ function isSorcererSpell(spell, playerStats) {
 }
 
 export function getWildMagicSurgeFeatures(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats?.automation?.passives;
+    if (passives == null) {
+        console.error('[wildMagicSurgeService] Missing array:', passives);
+        throw new Error('Expected array, got ' + passives);
+    }
     return passives.filter(p => p.type === 'wild_magic_surge');
 }
 
@@ -22,17 +26,29 @@ export function hasWildMagicSurge(playerStats) {
 }
 
 export function getControlledChaosFeature(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats?.automation?.passives;
+    if (passives == null) {
+        console.error('[wildMagicSurgeService] Missing array:', passives);
+        throw new Error('Expected array, got ' + passives);
+    }
     return passives.find(p => p.type === 'auto_effect' && p.effect === 'wild_magic_double_roll');
 }
 
 export function getTamedSurgeFeature(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats?.automation?.passives;
+    if (passives == null) {
+        console.error('[wildMagicSurgeService] Missing array:', passives);
+        throw new Error('Expected array, got ' + passives);
+    }
     return passives.find(p => p.type === 'wild_magic_tamed');
 }
 
 export function getFeatsOfChaosFeature(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats?.automation?.passives;
+    if (passives == null) {
+        console.error('[wildMagicSurgeService] Missing array:', passives);
+        throw new Error('Expected array, got ' + passives);
+    }
     return passives.find(p => p.type === 'conditional_advantage' && p.condition === 'feats_of_chaos_active');
 }
 
@@ -71,7 +87,11 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
         }
 
         if (currentUses > 0) {
-            const surgeTable = playerStats.wildMagicSurgeTable || [];
+            const surgeTable = playerStats.wildMagicSurgeTable;
+            if (surgeTable == null) {
+                console.error('[wildMagicSurgeService] Missing array:', surgeTable);
+                throw new Error('Expected array, got ' + surgeTable);
+            }
             const availableSurges = surgeTable.filter(e => e.max < 20);
             if (availableSurges.length > 0) {
                 return {
@@ -128,7 +148,11 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
                 await setRuntimeValue(playerStats.name, 'featsOfChaosActive', true, campaignName, true);
             }
 
-            const surgeTable = playerStats.wildMagicSurgeTable || [];
+            const surgeTable = playerStats.wildMagicSurgeTable;
+            if (surgeTable == null) {
+                console.error('[wildMagicSurgeService] Missing array:', surgeTable);
+                throw new Error('Expected array, got ' + surgeTable);
+            }
             const d20Roll = Math.floor(Math.random() * 20) + 1;
             const surgeEntry = surgeTable.find(e => d20Roll >= e.min && d20Roll <= e.max);
             const effectText = surgeEntry ? surgeEntry.effect : 'Unknown Wild Magic effect.';
@@ -153,6 +177,12 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
         return null;
     }
 
+    const surgeTable = playerStats.wildMagicSurgeTable;
+    if (surgeTable == null) {
+        console.error('[wildMagicSurgeService] Missing array:', surgeTable);
+        throw new Error('Expected array, got ' + surgeTable);
+    }
+
     const action = {
         name: surgeFeature.name,
         automation: {
@@ -160,7 +190,7 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
             trigger: 'after_sorcerer_spell_slot',
             oncePerTurn: surgeFeature.oncePerTurn || false,
         },
-        wildMagicSurgeTable: playerStats.wildMagicSurgeTable || [],
+        wildMagicSurgeTable: surgeTable,
     };
 
     try {
