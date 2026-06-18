@@ -7,60 +7,60 @@
       "name": "Strength",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 12,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 9,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 11,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 9,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     }
   ],
-  "background": "",
+  "background": "Guard",
   "class": {
     "name": "Barbarian",
     "subclass": {
-      "name": "Berserker"
-    }
+      "name": "Path of the Berserker",
+      "type": ""
+    },
+    "divineOrder": "",
+    "primalOrder": ""
   },
   "expertSkills": [],
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Half-Orc",
-    "subrace": {
-      "name": ""
-    }
+    "name": "Orc"
   },
   "immunities": [],
   "inventory": {
@@ -82,12 +82,17 @@
     "magicItems": []
   },
   "languages": [],
-  "resistances": [],
+  "resistances": [
+    "Fire"
+  ],
   "skillProficiencies": [
     "Athletics",
     "Intimidation",
     "Perception",
-    "Survival"
+    "Survival",
+    "Choose any 2 from Animal Handling",
+    "Nature",
+    "or Survival"
   ],
   "specialActions": [],
   "spells": [

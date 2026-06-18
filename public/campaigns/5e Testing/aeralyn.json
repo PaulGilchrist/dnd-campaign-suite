@@ -7,51 +7,54 @@
       "name": "Strength",
       "baseScore": 10,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Constitution",
       "baseScore": 12,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 9,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 11,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Charisma",
       "baseScore": 14,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     }
   ],
-  "background": "",
+  "background": "Acolyte",
   "class": {
     "name": "Bard",
     "subclass": {
-      "name": "Lore"
+      "name": "College of Dance",
+      "type": ""
     },
+    "divineOrder": "",
+    "primalOrder": "",
     "expertise": [
       "Performance",
       "Persuasion"
@@ -61,11 +64,7 @@
   "feats": [],
   "fightingStyles": [],
   "race": {
-    "name": "Genasi",
-    "subrace": {
-      "name": "Air Genasi",
-      "description": ""
-    }
+    "name": "Halfling"
   },
   "immunities": [],
   "inventory": {
@@ -97,7 +96,8 @@
     "Performance",
     "Perception",
     "Persuasion",
-    "Deception"
+    "Deception",
+    "Choose any 3 (see chapter 1)"
   ],
   "specialActions": [],
   "spells": [
