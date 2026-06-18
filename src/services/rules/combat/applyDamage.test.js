@@ -48,7 +48,6 @@ import {
 
 import { rollD20 } from '../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import storage from '../../ui/storage.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
 
@@ -149,17 +148,6 @@ function stubNpcRuntime(currentHp, conditions = []) {
     .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 194)
     .mockReturnValueOnce([])                        // activeBuffs for Warding Bond (line 235)
     .mockReturnValueOnce(conditions);               // activeConditions (line 289)
-}
-
-function stubPlayerRuntimeWithHitPoints(currentHp, conditions = [], maxHp) {
-  getRuntimeValue.mockReset();
-  getRuntimeValue
-    .mockReturnValueOnce([])                        // activeBuffs (line 110)
-    .mockReturnValueOnce(undefined)                 // arcaneWardActive (line 162)
-    .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 186)
-    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check (line 223)
-    .mockReturnValueOnce(conditions)                // activeConditions (line 277)
-    .mockReturnValueOnce(maxHp ?? currentHp);       // hitPoints (called from logDamageApplication)
 }
 
 // ── Tests ───────────────────────────────────────────────────────

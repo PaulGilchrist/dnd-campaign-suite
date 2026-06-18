@@ -73,20 +73,6 @@ function createPlayerCharacterWithComputed(name, computedExtra = {}) {
   };
 }
 
-function createMinimalCharacter(name) {
-  return {
-    name,
-    computedStats: {
-      resistances: [],
-      immunities: [],
-      class_levels: [],
-      equipment: [],
-      characterAdvancement: [],
-      allFeatures: [],
-    },
-  };
-}
-
 describe('applyDamageToTarget — Undying Sentinel', () => {
     function createPaladinWithUndyingSentinel(name, level) {
       return createPlayerCreature(name, {
@@ -391,7 +377,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         const orc = createPlayerCreature('OrcPlayer5');
         const cs = makeCombatSummary([orc]);
 
-        getRuntimeValue.mockImplementation((charName, key, campaignName) => {
+        getRuntimeValue.mockImplementation((charName, key, _) => {
           if (charName === 'OrcPlayer5' && key === 'currentHitPoints') return 10;
           if (charName === 'OrcPlayer5' && key === 'hitPoints') return 100;
           if (charName === 'OrcPlayer5' && key === 'activeConditions') return ['unconscious', 'blinded'];
