@@ -56,14 +56,22 @@ import { addEntry } from '../../../services/ui/logService.js';
 function applyEldritchHex(spell, playerStats, campaignName, targetName) {
     if (spell.name !== 'Hex') return;
 
-    const passives = playerStats.automation?.passives || [];
+    if (playerStats.automation?.passives == null) {
+        console.error('[spellCast] applyEldritchHex: playerStats.automation.passives is missing');
+        throw new Error('playerStats.automation.passives is required for Eldritch Hex');
+    }
+    const passives = playerStats.automation.passives;
     const hasEldritchHex = passives.some(p => p.name === 'Eldritch Hex' && p.type === 'conditional_disadvantage');
     if (!hasEldritchHex) return;
 
     if (!targetName) return;
 
-    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-    const effects = Array.isArray(storedEffects) ? storedEffects : [];
+    const storedEffects = getRuntimeValue(campaignName, 'targetEffects');
+    if (storedEffects == null || typeof storedEffects !== 'object' || !Array.isArray(storedEffects)) {
+        console.error('[spellCast] applyEldritchHex: targetEffects is not an array');
+        throw new Error('targetEffects must be an array');
+    }
+    const effects = storedEffects;
 
     const existingHexIndex = effects.findIndex(
         te => te.target === targetName && te.effect === 'hex_save_disadvantage' && te.source === playerStats.name
@@ -473,7 +481,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                   const action = {
                       name: 'Protection from Energy',
                       spell: spell,
-                      automation: spell.automation || {},
+                      automation: spell.automation ?? {},
                   };
                   await executeProtectionFromEnergy(action, playerStats, campaignName, mapName);
               }
@@ -486,7 +494,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                     const action = {
                         name: 'Protection from Poison',
                         spell: spell,
-                        automation: spell.automation || {},
+                        automation: spell.automation ?? {},
                     };
                     await executeProtectionFromPoison(action, playerStats, campaignName, mapName);
                 }
@@ -499,7 +507,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                     const action = {
                         name: 'Stone Skin',
                         spell: spell,
-                        automation: spell.automation || {},
+                        automation: spell.automation ?? {},
                     };
                     await executeStoneSkin(action, playerStats, campaignName, mapName);
                 }
@@ -517,7 +525,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                     const action = {
                         name: 'Resistance',
                         spell: spell,
-                        automation: spell.automation || {},
+                        automation: spell.automation ?? {},
                     };
                     await executeHandler(action, playerStats, campaignName, mapName);
                 }
@@ -539,7 +547,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
          }
        }
        const distanceFt = getDistanceFeet(attackerPos, targetPos);
-       const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects || {});
+        const rangeResult = computeRangeEffect(effectiveRange, distanceFt, featEffects ?? {});
        if (rangeResult.mode === 'miss') {
          rollContext.isAutoMiss = true;
          rollContext.rangeReason = rangeResult.reason;
@@ -547,10 +555,20 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
      }
    }
 
-    const magicalAmbush = (playerStats.automation?.passives || []).some(
-      p => p.type === 'passive_rule' && p.effect === 'magical_ambush'
-    );
-    const casterConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName) || [];
+    const magicalAmbush = (function() {
+        const passives = playerStats.automation?.passives;
+        if (passives == null) {
+            console.error('[spellCast] magicalAmbush check: playerStats.automation.passives is missing');
+            throw new Error('playerStats.automation.passives is required for magical ambush check');
+        }
+        return passives.some(p => p.type === 'passive_rule' && p.effect === 'magical_ambush');
+    })();
+    const rawConditions = getRuntimeValue(playerStats.name, 'activeConditions', campaignName);
+    if (rawConditions == null || !Array.isArray(rawConditions)) {
+        console.error('[spellCast] casterConditions: activeConditions is not an array');
+        throw new Error('activeConditions must be an array for caster');
+    }
+    const casterConditions = rawConditions;
     const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
 
     const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
@@ -568,9 +586,14 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     let overchannelFormula = empEvocFormula;
     let overchannelActive = false;
     let overchannelUseCount = 0;
-    const overchannelPassives = (playerStats.automation?.passives || []).filter(
-        p => p.type === 'overchannel'
-    );
+    const overchannelPassives = (function() {
+        const passives = playerStats.automation?.passives;
+        if (passives == null) {
+            console.error('[spellCast] overchannelPassives: playerStats.automation.passives is missing');
+            throw new Error('playerStats.automation.passives is required for overchannel check');
+        }
+        return passives.filter(p => p.type === 'overchannel');
+    })();
     if (overchannelPassives.length > 0) {
         const spellLevel = metaCtx?.slotLevel || spell.level;
         const hasDamage = !!spell.damage;
@@ -683,11 +706,19 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 }
 
 async function triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats.automation?.passives;
+    if (passives == null) {
+        console.error('[spellCast] triggerSpellBreakerSlotRetention: playerStats.automation.passives is missing');
+        throw new Error('playerStats.automation.passives is required for spell breaker');
+    }
     const spellBreaker = passives.find(p => p.type === 'passive_rule' && p.effect === 'spell_breaker');
     if (!spellBreaker) return;
 
-    const retentionSpells = spellBreaker.slotRetentionSpells || [];
+    const retentionSpells = spellBreaker.slotRetentionSpells;
+    if (retentionSpells == null || !Array.isArray(retentionSpells)) {
+        console.error('[spellCast] triggerSpellBreakerSlotRetention: slotRetentionSpells is not an array');
+        throw new Error('slotRetentionSpells must be an array');
+    }
     if (!retentionSpells.includes(spell.name)) return;
 
     const slotKey = `spell_slots_level_${spell.level}`;
@@ -725,8 +756,12 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
     }
 
     const conditionsToRemove = ['charmed', 'frightened', 'paralyzed', 'poisoned', 'stunned'];
-    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName);
+    if (storedConditions == null || !Array.isArray(storedConditions)) {
+        console.error('[spellCast] applyPowerWordHealToTarget: activeConditions is not an array');
+        throw new Error('activeConditions must be an array');
+    }
+    const conditions = storedConditions;
     const hasProne = conditions.some(c => String(c).toLowerCase() === 'prone');
     const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
     if (newConditions.length !== conditions.length) {
@@ -801,8 +836,12 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
     }
 
     const conditionsToRemove = ['blinded', 'deafened', 'poisoned'];
-    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
-    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+    const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName);
+    if (storedConditions == null || !Array.isArray(storedConditions)) {
+        console.error('[spellCast] triggerHeal: activeConditions is not an array');
+        throw new Error('activeConditions must be an array');
+    }
+    const conditions = storedConditions;
     const newConditions = conditions.filter(c => !conditionsToRemove.includes(String(c).toLowerCase()));
     if (newConditions.length !== conditions.length) {
         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
@@ -854,7 +893,11 @@ async function triggerExpertDivination(spell, metaCtx, playerStats, campaignName
     }
 
     // Check if player has Expert Divination feature
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats.automation?.passives;
+    if (passives == null) {
+        console.error('[spellCast] triggerExpertDivination: playerStats.automation.passives is missing');
+        throw new Error('playerStats.automation.passives is required for expert divination');
+    }
     const hasExpertDivination = passives.some(p => p.name === 'Expert Divination' && p.type === 'expert_divination');
     if (!hasExpertDivination) {
         return null;
@@ -888,9 +931,13 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
       }
       const slotLevel = spell.level;
       const healAtSlotLevel = spell.heal_at_slot_level;
-      let expression = healAtSlotLevel?.[slotLevel];
+      if (healAtSlotLevel == null || typeof healAtSlotLevel !== 'object') {
+        console.error('[spellCast] applyRegenerateSpell: heal_at_slot_level is not an object');
+        throw new Error('heal_at_slot_level must be an object');
+      }
+      let expression = healAtSlotLevel[slotLevel];
       if (!expression) {
-        const levels = Object.keys(healAtSlotLevel || {}).map(Number).sort((a, b) => a - b);
+        const levels = Object.keys(healAtSlotLevel).map(Number).sort((a, b) => a - b);
         const highestBelow = levels.filter(l => l <= slotLevel).pop();
         if (highestBelow) {
           expression = healAtSlotLevel[highestBelow];
@@ -1009,9 +1056,14 @@ async function executeMagicMissile(spell, metaCtx, { rollDamage: _rollDamage, pl
             finalDamage = 0;
             damageReduced = true;
         } else {
-            const ignoreResistance = (playerStats.automation?.passives || []).some(
-                p => p.type === 'auto_effect' && p.effect === 'ignore_resistance'
-            );
+            const ignoreResistance = (function() {
+                const passives = playerStats.automation?.passives;
+                if (passives == null) {
+                    console.error('[spellCast] executeMagicMissile: playerStats.automation.passives is missing');
+                    throw new Error('playerStats.automation.passives is required for ignore resistance check');
+                }
+                return passives.some(p => p.type === 'auto_effect' && p.effect === 'ignore_resistance');
+            })();
             const applyResult = applyDamageToTarget(combatSummary, targetName, totalTargetDamage, [damageType], campaignName, null, ignoreResistance, casterName);
             if (applyResult && applyResult.finalDamage > 0) {
                 endInvisibilityOnHostileAction(casterName, campaignName);

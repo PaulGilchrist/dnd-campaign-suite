@@ -183,7 +183,10 @@ async function resetMocks() {
     getActiveBuffs: () => [],
   })
   await mock('../../hooks/runtime/useRuntimeState.js', {
-    getRuntimeValue: () => undefined,
+    getRuntimeValue: (key1, key2) => {
+      if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
+      return undefined
+    },
     setRuntimeValue: () => {},
   })
 }

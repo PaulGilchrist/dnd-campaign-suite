@@ -102,10 +102,13 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   if (!creature) return null;
 
    const isPlayer = creature.type === 'player';
-   const playerStats = isPlayer ? (characters || []).find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
+   if (!Array.isArray(characters)) { console.error('[applyDamage] characters is not an array'); throw new Error('characters must be an array'); }
+   const playerStats = isPlayer ? characters.find(c => c.name === targetName || c.name.startsWith(targetName + ' ')) : null;
    const playerComputed = playerStats?.computedStats || playerStats;
-   let resistances = isPlayer ? (playerComputed?.resistances || []) : (creature.resistances || []);
-   const immunities = isPlayer ? (playerComputed?.immunities || []) : (creature.immunities || []);
+   if (playerComputed?.resistances == null || !Array.isArray(playerComputed.resistances)) { console.error('[applyDamage] playerComputed.resistances is not an array'); throw new Error('playerComputed.resistances must be an array'); }
+   if (playerComputed?.immunities == null || !Array.isArray(playerComputed.immunities)) { console.error('[applyDamage] playerComputed.immunities is not an array'); throw new Error('playerComputed.immunities must be an array'); }
+   let resistances = isPlayer ? playerComputed.resistances : (() => { if (creature.resistances == null || !Array.isArray(creature.resistances)) { console.error('[applyDamage] creature.resistances is not an array'); throw new Error('creature.resistances must be an array'); } return creature.resistances; })();
+   const immunities = isPlayer ? playerComputed.immunities : (() => { if (creature.immunities == null || !Array.isArray(creature.immunities)) { console.error('[applyDamage] creature.immunities is not an array'); throw new Error('creature.immunities must be an array'); } return creature.immunities; })();
     if (isPlayer) {
         const rawBuffs = getRuntimeValue(creature.name, 'activeBuffs', campaignName);
         const activeBuffs = Array.isArray(rawBuffs) ? rawBuffs : [];
@@ -125,14 +128,17 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
             }
         }
     }
-    const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes || [], resistances, immunities, ignoreResistance);
+    if (!Array.isArray(damageTypes)) { console.error('[applyDamage] damageTypes is not an array'); throw new Error('damageTypes must be an array'); }
+    const resResult = computeDamageAfterResistancesWithDetails(rawDamage, damageTypes, resistances, immunities, ignoreResistance);
     let finalDamage = resResult.finalDamage;
     let resistanceDetails = resResult.typeDetails;
 
     // Apply damage reduction from features (e.g., Heavy Armor Master)
     let damageReducedByFeature = 0;
     if (isPlayer) {
-        const allEquipment = playerComputed?.equipment || playerStats?.equipment || [];
+        const rawEquipment = playerComputed?.equipment || playerStats?.equipment;
+        if (rawEquipment == null || !Array.isArray(rawEquipment)) { console.error('[applyDamage] equipment is not an array'); throw new Error('equipment must be an array'); }
+        const allEquipment = rawEquipment;
         const equippedArmor = allEquipment.find(e => e.equipped);
         const armorName = equippedArmor?.name;
         let isWearingHeavyArmor = false;
@@ -146,7 +152,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         if (reduction !== null && reduction > 0) {
             damageReducedByFeature = reduction;
             finalDamage = Math.max(0, finalDamage - reduction);
-            const hasResistanceTrigger = (playerComputed.automation?.passives || []).some(
+            const rawPassives = playerComputed.automation?.passives;
+            if (rawPassives == null || !Array.isArray(rawPassives)) { console.error('[applyDamage] passives is not an array'); throw new Error('passives must be an array'); }
+            const hasResistanceTrigger = rawPassives.some(
                 p => p.type === 'damage_reduction' && p.trigger === 'damage_taken_of_chosen_resistance_type'
             );
             if (hasResistanceTrigger) {
@@ -178,7 +186,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
     // Save damage event under target's key for reaction features
     if (isPlayer) {
-        saveDamageEventForTarget(creature.name, rawDamage, damageTypes || [], campaignName);
+        saveDamageEventForTarget(creature.name, rawDamage, damageTypes, campaignName);
     }
 
     let oldHp, newHp;
@@ -200,12 +208,16 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     // Tasha's Hideous Laughter: damage-triggered repeat WIS save with Advantage
     if (wardDamage > 0 && !isPlayer) {
         // For NPCs, check creature.conditions directly (no getRuntimeValue call needed)
-        const hasIncapacitated = (creature.conditions || []).some(c => {
+        const rawConditions = creature.conditions;
+        if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] creature.conditions is not an array'); throw new Error('creature.conditions must be an array'); }
+        const hasIncapacitated = rawConditions.some(c => {
             const condKey = typeof c === 'object' ? c.key : String(c);
             return String(condKey).toLowerCase() === 'incapacitated';
         });
         if (hasIncapacitated) {
-            const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];
+            const rawTargetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName);
+            if (rawTargetEffects == null || !Array.isArray(rawTargetEffects)) { console.error('[applyDamage] targetEffects is not an array'); throw new Error('targetEffects must be an array'); }
+            const targetEffects = rawTargetEffects;
             const tashasEffect = Array.isArray(targetEffects) ? targetEffects.find(
                 te => te.target === creature.name && te.effect === 'tashas_laughter_repeat_save'
             ) : null;
@@ -274,7 +286,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       }
     }
     if (isPlayer) {
-      const conditions = getRuntimeValue(creature.name, 'activeConditions') || [];
+      const rawConditions = getRuntimeValue(creature.name, 'activeConditions');
+      if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
+      const conditions = rawConditions;
       if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
         const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
         setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
@@ -300,9 +314,11 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         });
       }
     } else {
-      const hadFrightened = creature.conditions?.some(c => c.key === 'frightened');
+      const rawConditions = creature.conditions;
+      if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] creature.conditions is not an array'); throw new Error('creature.conditions must be an array'); }
+      const hadFrightened = rawConditions.some(c => c.key === 'frightened');
       if (hadFrightened) {
-        creature.conditions = (creature.conditions || []).filter(c => c.key !== 'frightened');
+        creature.conditions = rawConditions.filter(c => c.key !== 'frightened');
         postLogEntry(campaignName, {
           type: 'condition',
           action: 'removed',
@@ -312,9 +328,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           timestamp: Date.now(),
         });
       }
-      const charmedOnDamage = (creature.conditions || []).find(c => c.key === 'charmed' && c.endsOnDamage);
+      const charmedOnDamage = rawConditions.find(c => c.key === 'charmed' && c.endsOnDamage);
       if (charmedOnDamage) {
-        creature.conditions = (creature.conditions || []).filter(c => c.key !== 'charmed');
+        creature.conditions = rawConditions.filter(c => c.key !== 'charmed');
         postLogEntry(campaignName, {
           type: 'condition',
           action: 'removed',
@@ -330,8 +346,10 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       const attackerBuffs = getRuntimeValue(attackerName, 'activeBuffs', campaignName);
       const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
       if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
-        const attackerConditions = getRuntimeValue(attackerName, 'activeConditions') || [];
-        const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
+        const rawAttackerConditions = getRuntimeValue(attackerName, 'activeConditions');
+        if (rawAttackerConditions == null || !Array.isArray(rawAttackerConditions)) { console.error('[applyDamage] attacker activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
+        const attackerConditions = rawAttackerConditions;
+        const attackerCondArray = attackerConditions;
         const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
         if (filteredConditions.length !== attackerCondArray.length) {
           setRuntimeValue(attackerName, 'activeConditions', filteredConditions, campaignName);
@@ -344,9 +362,11 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       // Supreme Sneak: if Stealth Attack is active, don't remove Invisible condition
       const stealthAttackCost = getRuntimeValue(attackerName, 'stealthAttackCost', campaignName);
       if (stealthAttackCost && stealthAttackCost > 0) {
-        const attackerConditions = getRuntimeValue(attackerName, 'activeConditions') || [];
-        const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
-        const hasInvisible = attackerCondArray.some(c => String(c).toLowerCase() === 'invisible');
+        const rawAttackerConditions2 = getRuntimeValue(attackerName, 'activeConditions');
+        if (rawAttackerConditions2 == null || !Array.isArray(rawAttackerConditions2)) { console.error('[applyDamage] attacker activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
+        const attackerConditions2 = rawAttackerConditions2;
+        const attackerCondArray2 = attackerConditions2;
+        const hasInvisible = attackerCondArray2.some(c => String(c).toLowerCase() === 'invisible');
         if (hasInvisible) {
           // Preserve Invisible condition — don't remove it
           // The stealthAttackCost will be cleared at start of next turn
@@ -364,7 +384,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           const attackerCreature = combatSummary.creatures.find(c => c.name === attackerName);
           if (attackerCreature) {
             const attackerType = (attackerCreature.type || '').toLowerCase();
-            const attackerTemplate = (attackerCreature.template || []).map(t => t.toLowerCase());
+            const attackerTemplate = (() => { const raw = attackerCreature.template; if (raw == null || !Array.isArray(raw)) { console.error('[applyDamage] attacker template is not an array'); throw new Error('attacker template must be an array'); } return raw; }).map(t => t.toLowerCase());
             const isFiendOrUndead = attackerType === 'fiend' || attackerType === 'undead' ||
               attackerTemplate.includes('fiend') || attackerTemplate.includes('undead');
             if (isFiendOrUndead) {
@@ -374,8 +394,10 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
                 const conBonus = attackerCreature.ability_score_modifiers?.CON ?? attackerCreature.ability_score_modifiers?.constitution ?? 0;
                 const saveTotal = saveRoll + conBonus;
                 if (saveTotal < conSaveDc) {
-                  const attackerConditions = getRuntimeValue(attackerName, 'activeConditions') || [];
-                  const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
+                  const rawAttackerConditions = getRuntimeValue(attackerName, 'activeConditions');
+                  if (rawAttackerConditions == null || !Array.isArray(rawAttackerConditions)) { console.error('[applyDamage] attacker activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
+                  const attackerConditions = rawAttackerConditions;
+                  const attackerCondArray = attackerConditions;
                   const existingBlinded = attackerCondArray.find(c => String(c).toLowerCase() === 'blinded');
                   if (!existingBlinded) {
                     setRuntimeValue(attackerName, 'activeConditions', [...attackerCondArray, 'blinded'], campaignName);
@@ -406,13 +428,15 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
    }
 
     if (!isPlayer && wasAlive && isNowUnconscious && finalDamage > 0) {
-      const allCharacters = characters || [];
-      for (const charStats of allCharacters) {
-        const computed = charStats?.computedStats || charStats;
-        if (!computed) continue;
-        const isFiendPatron = computed.class?.subclass?.name === 'Fiend Patron';
-        if (!isFiendPatron) continue;
-        const features = computed.characterAdvancement || [];
+       const allCharacters = characters;
+       for (const charStats of allCharacters) {
+         const computed = charStats?.computedStats || charStats;
+         if (!computed) continue;
+         const isFiendPatron = computed.class?.subclass?.name === 'Fiend Patron';
+         if (!isFiendPatron) continue;
+         const rawFeatures = computed.characterAdvancement;
+         if (rawFeatures == null || !Array.isArray(rawFeatures)) { console.error('[applyDamage] characterAdvancement is not an array'); throw new Error('characterAdvancement must be an array'); }
+         const features = rawFeatures;
         const feature = features.find(f => f.name === "Dark One's Blessing");
         if (!feature || !feature.automation) continue;
         const chaMod = (() => {
@@ -420,7 +444,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
           return cha ? Math.floor((cha.score - 10) / 2) : 0;
         })();
         const warlockLevel = (() => {
-          const cl = (computed.class?.class_levels || []).find(c => c.level === computed.level);
+          const rawClassLevels = computed.class?.class_levels;
+          if (rawClassLevels == null || !Array.isArray(rawClassLevels)) { console.error('[applyDamage] class_levels is not an array'); throw new Error('class_levels must be an array'); }
+          const cl = rawClassLevels.find(c => c.level === computed.level);
           return cl ? cl.level : computed.level;
         })();
         let amount = chaMod + warlockLevel;
@@ -476,15 +502,19 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     if (creature.concentration && finalDamage > 0) {
       const saveBonus = creature?.saveBonuses?.['con'] ?? 0;
       const dragonConstellationActive = (() => {
-        const activeBuffs = getRuntimeValue(creature.name, 'activeBuffs') || [];
+        const rawActiveBuffs = getRuntimeValue(creature.name, 'activeBuffs');
+        if (rawActiveBuffs == null || !Array.isArray(rawActiveBuffs)) { console.error('[applyDamage] activeBuffs is not an array'); throw new Error('activeBuffs must be an array'); }
+        const activeBuffs = rawActiveBuffs;
         return activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
       })();
       const relentlessHunterActive = (() => {
-        const allCharacters = (characters || []);
+        const allCharacters = characters;
         const player = allCharacters.find(c => c.name === creature.name || c.name.startsWith(creature.name + ' '));
         const computed = player?.computedStats || player;
         if (!computed || computed.class?.name !== 'Ranger') return false;
-        const classLevels = computed.class?.class_levels || [];
+        const rawClassLevels = computed.class?.class_levels;
+        if (rawClassLevels == null || !Array.isArray(rawClassLevels)) { console.error('[applyDamage] class_levels is not an array'); throw new Error('class_levels must be an array'); }
+        const classLevels = rawClassLevels;
         if (player?.level == null) {
           console.error('[applyDamage] Relentless Hunter: player level is missing')
           throw new Error('player level is required for relentless hunter check')
@@ -569,7 +599,9 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
 }
 
 function checkUndyingSentinel(creature, playerComputed, campaignName) {
-    const allFeatures = playerComputed?.allFeatures || [];
+    const rawAllFeatures = playerComputed?.allFeatures;
+    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) { console.error('[applyDamage] allFeatures is not an array'); throw new Error('allFeatures must be an array'); }
+    const allFeatures = rawAllFeatures;
     let hasUndyingSentinel = false;
 
     for (const feature of allFeatures) {
@@ -612,7 +644,9 @@ function checkUndyingSentinel(creature, playerComputed, campaignName) {
     setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
 
     // Remove unconscious condition
-    const conditions = getRuntimeValue(creature.name, 'activeConditions', campaignName) || [];
+    const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
+    if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
+    const conditions = rawConditions;
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
     setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
 
@@ -643,7 +677,9 @@ function checkUndyingSentinel(creature, playerComputed, campaignName) {
 }
 
 function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
-    const allFeatures = playerComputed?.allFeatures || [];
+    const rawAllFeatures = playerComputed?.allFeatures;
+    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) { console.error('[applyDamage] allFeatures is not an array'); throw new Error('allFeatures must be an array'); }
+    const allFeatures = rawAllFeatures;
     let hasBoonOfRecovery = false;
 
     for (const feature of allFeatures) {
@@ -682,7 +718,9 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
     setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
     setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
 
-    const conditions = getRuntimeValue(creature.name, 'activeConditions', campaignName) || [];
+    const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
+    if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
+    const conditions = rawConditions;
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
     setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
 
@@ -711,7 +749,9 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
 }
 
 function checkRelentlessEndurance(creature, playerComputed, campaignName) {
-    const allFeatures = playerComputed?.allFeatures || [];
+    const rawAllFeatures = playerComputed?.allFeatures;
+    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) { console.error('[applyDamage] allFeatures is not an array'); throw new Error('allFeatures must be an array'); }
+    const allFeatures = rawAllFeatures;
     let hasRelentlessEndurance = false;
 
     for (const feature of allFeatures) {
@@ -751,7 +791,9 @@ function checkRelentlessEndurance(creature, playerComputed, campaignName) {
     setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
 
     // Remove unconscious condition
-    const conditions = getRuntimeValue(creature.name, 'activeConditions', campaignName) || [];
+    const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
+    if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
+    const conditions = rawConditions;
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
     setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
 

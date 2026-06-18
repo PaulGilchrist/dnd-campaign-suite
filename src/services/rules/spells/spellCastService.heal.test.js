@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
-  getRuntimeValue: vi.fn(() => undefined),
+  getRuntimeValue: vi.fn((_key1, key2) => {
+    if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
+    return undefined
+  }),
 }))
 
 vi.mock('../../dice/diceRoller.js', () => ({
@@ -157,7 +160,10 @@ async function resetMocks() {
   }
 
   await mock('../../hooks/runtime/useRuntimeState.js', {
-    getRuntimeValue: () => undefined,
+    getRuntimeValue: (key1, key2) => {
+      if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
+      return undefined
+    },
     setRuntimeValue: () => {},
   })
   await mock('./postCastRiderService.js', {
