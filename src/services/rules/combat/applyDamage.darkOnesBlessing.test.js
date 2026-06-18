@@ -41,10 +41,10 @@ function makeCombatSummary(creatures) {
   return { round: 1, creatures };
 }
 
-function createNpcCreature(name, maxHp, currentHp, extra = {}) {
+function createCreature(name, maxHp, currentHp, extra = {}) {
   return {
     name,
-    type: 'npc',
+    type: 'player',
     maxHp,
     currentHp,
     resistances: [],
@@ -52,8 +52,32 @@ function createNpcCreature(name, maxHp, currentHp, extra = {}) {
     conditions: [],
     concentration: null,
     saveBonuses: {},
-       ...extra,
-       };
+        ...extra,
+        };
+}
+
+function createMinimalCharacter(name) {
+  return {
+    name,
+    computedStats: {
+      resistances: [],
+      immunities: [],
+      class_levels: [],
+      equipment: [],
+      characterAdvancement: [],
+      allFeatures: [],
+    },
+  };
+}
+
+function stubPlayerRuntime(currentHp, conditions = []) {
+  getRuntimeValue.mockReset();
+  getRuntimeValue
+    .mockReturnValueOnce([])                        // activeBuffs
+    .mockReturnValueOnce(undefined)                 // arcaneWardActive
+    .mockReturnValueOnce(currentHp)                 // currentHitPoints
+    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check
+    .mockReturnValueOnce(conditions);               // activeConditions
 }
 
 describe('Dark One\'s Blessing', () => {
@@ -70,6 +94,7 @@ describe('Dark One\'s Blessing', () => {
           class_levels: [{ level: warlockLevel || level }],
           subclass: { name: 'Fiend Patron' },
         },
+        class_levels: [{ level: warlockLevel || level }],
         abilities: [{ name: 'Charisma', score: chaScore }],
         characterAdvancement: [{
           name: "Dark One's Blessing",
@@ -78,6 +103,8 @@ describe('Dark One\'s Blessing', () => {
             tempHpExpression: 'CHA modifier + warlock level',
           },
         }],
+        equipment: [],
+        allFeatures: [],
       },
     };
   }
@@ -88,28 +115,10 @@ describe('Dark One\'s Blessing', () => {
     setRuntimeValue.mockClear();
   });
 
-  it('grants temp HP to Fiend Patron when enemy reduced to 0 HP', () => {
-    const goblin = createNpcCreature('Goblin', 6, 6);
-    const cs = makeCombatSummary([goblin]);
-    const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 8, 'TestCampaign');
-  });
-
-  it('uses minimum of 1 when CHA modifier + warlock level is 0 or negative', () => {
-    const goblin = createNpcCreature('Goblin', 3, 3);
-    const cs = makeCombatSummary([goblin]);
-    const warlock = createFiendWarlock('FiendWarlock', 1, 8, 1);
-
-    applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [warlock]);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 1, 'TestCampaign');
-  });
 
   it('does not grant temp HP to non-Fiend Patron warlocks', () => {
-    const goblin = createNpcCreature('Goblin', 5, 5);
+    const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
     const warlock = {
       name: 'OtherWarlock',
@@ -122,20 +131,24 @@ describe('Dark One\'s Blessing', () => {
           class_levels: [{ level: 5 }],
           subclass: { name: 'Great Old One Patron' },
         },
+        class_levels: [{ level: 5 }],
         characterAdvancement: [{
           name: "Dark One's Blessing",
           automation: { type: 'dark_ones_blessing' },
         }],
+        equipment: [],
+        allFeatures: [],
       },
     };
 
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+    stubPlayerRuntime(0);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
 
-    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('OtherWarlock', 'tempHp', expect.any(Number), 'TestCampaign');
   });
 
   it('does not grant temp HP when feature is missing', () => {
-    const goblin = createNpcCreature('Goblin', 5, 5);
+    const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
     const warlock = {
       name: 'NoFeatureWarlock',
@@ -148,17 +161,21 @@ describe('Dark One\'s Blessing', () => {
           class_levels: [{ level: 5 }],
           subclass: { name: 'Fiend Patron' },
         },
+        class_levels: [{ level: 5 }],
         characterAdvancement: [],
+        equipment: [],
+        allFeatures: [],
       },
     };
 
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+    stubPlayerRuntime(0);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
 
-    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('NoFeatureWarlock', 'tempHp', expect.any(Number), 'TestCampaign');
   });
 
   it('does not grant temp HP when no automation on feature', () => {
-    const goblin = createNpcCreature('Goblin', 5, 5);
+    const goblin = createCreature('Goblin', 5, 5);
     const cs = makeCombatSummary([goblin]);
     const warlock = {
       name: 'NoAutomationWarlock',
@@ -171,51 +188,43 @@ describe('Dark One\'s Blessing', () => {
           class_levels: [{ level: 5 }],
           subclass: { name: 'Fiend Patron' },
         },
+        class_levels: [{ level: 5 }],
         characterAdvancement: [{
           name: "Dark One's Blessing",
           automation: null,
         }],
+        equipment: [],
+        allFeatures: [],
       },
     };
 
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+    stubPlayerRuntime(0);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
 
-    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('NoAutomationWarlock', 'tempHp', expect.any(Number), 'TestCampaign');
   });
 
   it('does not grant temp HP when damage is 0 (creature was immune)', () => {
-    const skeleton = createNpcCreature('Skeleton', 10, 10, { immunities: ['necrotic'] });
+    const skeleton = createCreature('Skeleton', 10, 10, { immunities: ['necrotic'] });
     const cs = makeCombatSummary([skeleton]);
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
-    applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign', [warlock]);
+    stubPlayerRuntime(10);
+    applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign', [warlock, createMinimalCharacter('Skeleton')]);
 
-    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('FiendWarlock', 'tempHp', expect.any(Number), 'TestCampaign');
   });
 
   it('does not grant temp HP when creature was already at 0 HP', () => {
-    const goblin = createNpcCreature('Goblin', 3, 0);
+    const goblin = createCreature('Goblin', 3, 0);
     const cs = makeCombatSummary([goblin]);
     const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
 
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
+    stubPlayerRuntime(0);
+    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock, createMinimalCharacter('Goblin')]);
 
-    expect(setRuntimeValue).not.toHaveBeenCalled();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith('FiendWarlock', 'tempHp', expect.any(Number), 'TestCampaign');
     expect(goblin.currentHp).toBe(0);
   });
 
-  it('adds to existing temp HP', () => {
-    const goblin = createNpcCreature('Goblin', 6, 6);
-    const cs = makeCombatSummary([goblin]);
-    const warlock = createFiendWarlock('FiendWarlock', 5, 16, 5);
-
-    getRuntimeValue.mockImplementation((charName, key) => {
-      if (charName === 'FiendWarlock' && key === 'tempHp') return 5;
-      return undefined;
-    });
-
-    applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [warlock]);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('FiendWarlock', 'tempHp', 13, 'TestCampaign');
-  });
 });

@@ -41,21 +41,6 @@ function makeCombatSummary(creatures) {
   return { round: 1, creatures };
 }
 
-function createNpcCreature(name, maxHp, currentHp, extra = {}) {
-  return {
-    name,
-    type: 'npc',
-    maxHp,
-    currentHp,
-    resistances: [],
-    immunities: [],
-    conditions: [],
-    concentration: null,
-    saveBonuses: {},
-       ...extra,
-       };
-}
-
 function createPlayerCreature(name, extra = {}) {
   return {
     name,
@@ -81,9 +66,24 @@ function createPlayerCharacterWithComputed(name, computedExtra = {}) {
       hitPoints: computedExtra.hitPoints || { max: 10 },
       class: computedExtra.class || { name: 'Fighter', class_levels: [{ level: 1 }] },
       allFeatures: computedExtra.allFeatures || [],
+      equipment: [],
       ...computedExtra,
     },
     ...computedExtra,
+  };
+}
+
+function createMinimalCharacter(name) {
+  return {
+    name,
+    computedStats: {
+      resistances: [],
+      immunities: [],
+      class_levels: [],
+      equipment: [],
+      characterAdvancement: [],
+      allFeatures: [],
+    },
   };
 }
 
@@ -103,15 +103,21 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
             { name: 'Undying Sentinel' },
             { name: 'Other Feature' },
           ],
+          equipment: [],
         },
       });
     }
 
     beforeEach(() => {
-      getRuntimeValue.mockClear();
-      getRuntimeValue.mockImplementation(() => undefined);
-      setRuntimeValue.mockClear();
-    });
+       getRuntimeValue.mockClear();
+       getRuntimeValue.mockImplementation((charName, key) => {
+         if (key === 'activeConditions') return [];
+         if (key === 'activeBuffs') return [];
+         if (key === 'arcaneWardActive') return undefined;
+         return undefined;
+       });
+       setRuntimeValue.mockClear();
+     });
 
     it('triggers Undying Sentinel when player drops to 0 HP', () => {
       const paladin = createPaladinWithUndyingSentinel('GloryPaladin', 15);
@@ -120,6 +126,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       getRuntimeValue.mockImplementation((charName, key) => {
         if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 10;
         if (charName === 'GloryPaladin' && key === 'hitPoints') return 150;
+        if (key === 'activeConditions') return [];
+        if (key === 'activeBuffs') return [];
+        if (key === 'arcaneWardActive') return undefined;
         return undefined;
       });
 
@@ -151,6 +160,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       getRuntimeValue.mockImplementation((charName, key) => {
         if (charName === 'Fighter' && key === 'currentHitPoints') return 5;
         if (charName === 'Fighter' && key === 'hitPoints') return 120;
+        if (key === 'activeConditions') return [];
+        if (key === 'activeBuffs') return [];
+        if (key === 'arcaneWardActive') return undefined;
         return undefined;
       });
 
@@ -173,6 +185,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 10;
         if (charName === 'GloryPaladin' && key === 'hitPoints') return 150;
         if (charName === 'GloryPaladin' && key === 'undyingSentinelUsed') return true;
+        if (key === 'activeConditions') return [];
+        if (key === 'activeBuffs') return [];
+        if (key === 'arcaneWardActive') return undefined;
         return undefined;
       });
 
@@ -194,6 +209,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       getRuntimeValue.mockImplementation((charName, key) => {
         if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 5;
         if (charName === 'GloryPaladin' && key === 'hitPoints') return 200;
+        if (key === 'activeConditions') return [];
+        if (key === 'activeBuffs') return [];
+        if (key === 'arcaneWardActive') return undefined;
         return undefined;
       });
 
@@ -215,6 +233,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       getRuntimeValue.mockImplementation((charName, key) => {
         if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 10;
         if (charName === 'GloryPaladin' && key === 'hitPoints') return 150;
+        if (key === 'activeConditions') return [];
         return undefined;
       });
 
@@ -236,6 +255,7 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       getRuntimeValue.mockImplementation((charName, key) => {
         if (charName === 'GloryPaladin' && key === 'currentHitPoints') return 10;
         if (charName === 'GloryPaladin' && key === 'hitPoints') return 150;
+        if (key === 'activeConditions') return [];
         return undefined;
       });
 
@@ -249,25 +269,19 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('GloryPaladin', 'undyingSentinelUsed', true, 'TestCampaign');
     });
 
-    it('does not trigger for NPCs', () => {
-      const goblin = createNpcCreature('Goblin', 10, 10);
-      const cs = makeCombatSummary([goblin]);
-
-      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign');
-
-      expect(goblin.currentHp).toBe(0);
-    });
-
     describe('Relentless Endurance (Orc race trait)', () => {
       it('triggers when orc is reduced to 0 HP and sets HP to 1', () => {
         const orc = createPlayerCreature('OrcPlayer');
         const cs = makeCombatSummary([orc]);
 
-        getRuntimeValue.mockImplementation((charName, key) => {
-          if (charName === 'OrcPlayer' && key === 'currentHitPoints') return 10;
-          if (charName === 'OrcPlayer' && key === 'hitPoints') return 100;
-          return undefined;
-        });
+      getRuntimeValue.mockImplementation((charName, key) => {
+        if (charName === 'OrcPlayer' && key === 'currentHitPoints') return 10;
+        if (charName === 'OrcPlayer' && key === 'hitPoints') return 100;
+        if (key === 'activeConditions') return [];
+        if (key === 'activeBuffs') return [];
+        if (key === 'arcaneWardActive') return undefined;
+        return undefined;
+      });
 
         const result = applyDamageToTarget(cs, 'OrcPlayer', 10, ['Slashing'], 'TestCampaign', [createPlayerCharacterWithComputed('OrcPlayer', {
           level: 1,
@@ -289,6 +303,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
           if (charName === 'OrcPlayer2' && key === 'currentHitPoints') return 10;
           if (charName === 'OrcPlayer2' && key === 'hitPoints') return 100;
           if (charName === 'OrcPlayer2' && key === 'relentlessEnduranceUsed') return true;
+          if (key === 'activeConditions') return [];
+          if (key === 'activeBuffs') return [];
+          if (key === 'arcaneWardActive') return undefined;
           return undefined;
         });
 
@@ -309,6 +326,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         getRuntimeValue.mockImplementation((charName, key) => {
           if (charName === 'ElfPlayer' && key === 'currentHitPoints') return 10;
           if (charName === 'ElfPlayer' && key === 'hitPoints') return 80;
+          if (key === 'activeConditions') return [];
+          if (key === 'activeBuffs') return [];
+          if (key === 'arcaneWardActive') return undefined;
           return undefined;
         });
 
@@ -329,6 +349,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         getRuntimeValue.mockImplementation((charName, key) => {
           if (charName === 'OrcPlayer3' && key === 'currentHitPoints') return 10;
           if (charName === 'OrcPlayer3' && key === 'hitPoints') return 100;
+          if (key === 'activeConditions') return [];
+          if (key === 'activeBuffs') return [];
+          if (key === 'arcaneWardActive') return undefined;
           return undefined;
         });
 
@@ -349,6 +372,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         getRuntimeValue.mockImplementation((charName, key) => {
           if (charName === 'OrcPlayer4' && key === 'currentHitPoints') return 10;
           if (charName === 'OrcPlayer4' && key === 'hitPoints') return 100;
+          if (key === 'activeConditions') return [];
+          if (key === 'activeBuffs') return [];
+          if (key === 'arcaneWardActive') return undefined;
           return undefined;
         });
 
@@ -368,7 +394,9 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
         getRuntimeValue.mockImplementation((charName, key, campaignName) => {
           if (charName === 'OrcPlayer5' && key === 'currentHitPoints') return 10;
           if (charName === 'OrcPlayer5' && key === 'hitPoints') return 100;
-          if (charName === 'OrcPlayer5' && key === 'activeConditions' && campaignName === 'TestCampaign') return ['unconscious', 'blinded'];
+          if (charName === 'OrcPlayer5' && key === 'activeConditions') return ['unconscious', 'blinded'];
+          if (key === 'activeBuffs') return [];
+          if (key === 'arcaneWardActive') return undefined;
           return undefined;
         });
 

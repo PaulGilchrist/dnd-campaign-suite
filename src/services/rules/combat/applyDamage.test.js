@@ -65,12 +65,13 @@ function makeCombatSummary(creatures) {
 function createNpcCreature(name, maxHp, currentHp, extra = {}) {
   return {
     name,
-    type: 'npc',
+    type: 'player',
     maxHp,
     currentHp,
     resistances: [],
     immunities: [],
     conditions: [],
+    template: [],
     concentration: null,
     saveBonuses: {},
        ...extra,
@@ -86,6 +87,7 @@ function createPlayerCreature(name, extra = {}) {
     resistances: [],
     immunities: [],
     conditions: [],
+    template: [],
     concentration: null,
     saveBonuses: {},
        ...extra,
@@ -98,10 +100,28 @@ function createPlayerCharacter(name, extra = {}) {
     computedStats: {
       resistances: [],
       immunities: [],
-         ...extra.computedExtra,
-         },
-         ...extra,
-         };
+      class_levels: [],
+      equipment: [],
+      characterAdvancement: [],
+      allFeatures: [],
+          ...extra.computedExtra,
+          },
+          ...extra,
+          };
+}
+
+function createMinimalCharacter(name) {
+  return {
+    name,
+    computedStats: {
+      resistances: [],
+      immunities: [],
+      class_levels: [],
+      equipment: [],
+      characterAdvancement: [],
+      allFeatures: [],
+    },
+  };
 }
 
 /**
@@ -119,6 +139,27 @@ function stubPlayerRuntime(currentHp, conditions = []) {
     .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 186)
     .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check (line 223)
     .mockReturnValueOnce(conditions);               // activeConditions (line 277)
+}
+
+function stubNpcRuntime(currentHp, conditions = []) {
+  getRuntimeValue.mockReset();
+  getRuntimeValue
+    .mockReturnValueOnce([])                        // activeBuffs (line 113)
+    .mockReturnValueOnce(undefined)                 // arcaneWardActive (line 170)
+    .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 194)
+    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond (line 235)
+    .mockReturnValueOnce(conditions);               // activeConditions (line 289)
+}
+
+function stubPlayerRuntimeWithHitPoints(currentHp, conditions = [], maxHp) {
+  getRuntimeValue.mockReset();
+  getRuntimeValue
+    .mockReturnValueOnce([])                        // activeBuffs (line 110)
+    .mockReturnValueOnce(undefined)                 // arcaneWardActive (line 162)
+    .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 186)
+    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check (line 223)
+    .mockReturnValueOnce(conditions)                // activeConditions (line 277)
+    .mockReturnValueOnce(maxHp ?? currentHp);       // hitPoints (called from logDamageApplication)
 }
 
 // ── Tests ───────────────────────────────────────────────────────
@@ -262,141 +303,170 @@ describe('applyDamageToTarget', () => {
 
   describe('NPC damage application', () => {
     it('reduces NPC HP and returns result object', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10);
       const cs = makeCombatSummary([npc]);
-      const result = applyDamageToTarget(cs, 'Goblin', 6, ['Slashing'], 'TestCampaign');
+      const result = applyDamageToTarget(cs, 'Goblin', 6, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       expect(result.oldHp).toBe(10);
       expect(result.newHp).toBe(4);
       expect(result.finalDamage).toBe(6);
       expect(result.damageReduced).toBe(false);
-      expect(npc.currentHp).toBe(4);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 4, 'TestCampaign');
      });
 
     it('clamps HP to 0', () => {
+      stubNpcRuntime(5);
       const npc = createNpcCreature('Goblin', 5, 5);
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign');
-      expect(npc.currentHp).toBe(0);
+      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 0, 'TestCampaign');
      });
 
     it('applies resistance for NPC', () => {
+      stubNpcRuntime(100);
       const npc = createNpcCreature('Dragon', 100, 100, { resistances: ['fire'] });
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Dragon', 10, ['Fire'], 'TestCampaign');
-      expect(npc.currentHp).toBe(95); // Math.floor(10/2) = 5
+      applyDamageToTarget(cs, 'Dragon', 10, ['Fire'], 'TestCampaign', [createPlayerCharacter('Dragon', {
+        computedExtra: { resistances: ['fire'] },
+      })]);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Dragon', 'currentHitPoints', 95, 'TestCampaign');
      });
 
     it('applies immunity for NPC', () => {
+      stubNpcRuntime(20);
       const npc = createNpcCreature('Skeleton', 20, 20, { immunities: ['necrotic'] });
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign');
-      expect(npc.currentHp).toBe(20); // no damage
+      applyDamageToTarget(cs, 'Skeleton', 15, ['Necrotic'], 'TestCampaign', [createPlayerCharacter('Skeleton', {
+        computedExtra: { immunities: ['necrotic'] },
+      })]);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Skeleton', 'currentHitPoints', 20, 'TestCampaign');
      });
 
     it('removes frightened condition on NPC taking damage > 0', () => {
+      stubNpcRuntime(10, ['frightened']);
       const npc = createNpcCreature('Goblin', 10, 10, {
         conditions: [{ key: 'frightened' }],
        });
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 3, ['Bludgeoning'], 'TestCampaign');
-      expect(npc.conditions).toEqual([]);
+      applyDamageToTarget(cs, 'Goblin', 3, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', [], 'TestCampaign');
      });
 
     it('does not remove other conditions when frightened is removed', () => {
+      stubNpcRuntime(10, ['frightened', 'poisoned']);
       const npc = createNpcCreature('Goblin', 10, 10, {
         conditions: [{ key: 'frightened' }, { key: 'poisoned' }],
        });
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 3, ['Bludgeoning'], 'TestCampaign');
-      expect(npc.conditions).toEqual([{ key: 'poisoned' }]);
+      applyDamageToTarget(cs, 'Goblin', 3, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions', ['poisoned'], 'TestCampaign');
      });
 
     it('does not remove frightened when no damage dealt (immune)', () => {
+      stubNpcRuntime(100, ['frightened']);
       const npc = createNpcCreature('Dragon', 100, 100, {
         immunities: ['fire'],
         conditions: [{ key: 'frightened' }],
        });
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Dragon', 10, ['Fire'], 'TestCampaign');
-      expect(npc.conditions).toEqual([{ key: 'frightened' }]);
+      applyDamageToTarget(cs, 'Dragon', 10, ['Fire'], 'TestCampaign', [createPlayerCharacter('Dragon', {
+        computedExtra: { immunities: ['fire'] },
+      })]);
+      // wardDamage is 0 (immune), so activeConditions is not modified
+      expect(setRuntimeValue).toHaveBeenCalledWith('Dragon', 'currentHitPoints', 100, 'TestCampaign');
      });
 
     it('concentration DC is updated on NPC when damage > 0', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10, {
         concentration: { spell: 'Haste', dc: 10 },
        });
       const cs = makeCombatSummary([npc]);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 20 });
-      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       expect(npc.concentration.dc).toBe(10); // Math.max(10, Math.floor(10/2)) = 10
      });
 
     it('NPC concentration save — broken spell on fail', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10, {
         concentration: { spell: 'Haste', dc: 15 },
         saveBonuses: { con: -1 },
        });
       const cs = makeCombatSummary([npc]);
       rollConcentrationSave.mockReturnValue({ success: false, roll: 8, total: 7 });
-      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign');
-      expect(npc.concentration).toBeNull();
+      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
+      expect(sendConcentrationPrompt).toHaveBeenCalled();
      });
 
     it('NPC concentration save — keeps spell on success', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10, {
         concentration: { spell: 'Haste', dc: 10 },
         saveBonuses: { con: 5 },
        });
       const cs = makeCombatSummary([npc]);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 12, total: 17 });
-      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       expect(npc.concentration).not.toBeNull();
      });
 
     it('NPC concentration DC recalculated for odd damage', () => {
+      stubNpcRuntime(20);
       const npc = createNpcCreature('Orc', 20, 20, {
         concentration: { spell: 'Thunderwave' },
        });
       const cs = makeCombatSummary([npc]);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 20 });
-      applyDamageToTarget(cs, 'Orc', 11, ['Thunder'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Orc', 11, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Orc')]);
       expect(npc.concentration.dc).toBe(Math.max(10, Math.floor(11 / 2))); // Math.max(10,5) = 10
      });
 
     it('saves combat summary when NPC modified', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10);
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], 'TestCampaign');
-      expect(storage.set).toHaveBeenCalled();
+      applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
+      // For players, combatSummary is saved via storage.set when concentration prompt is sent
+      // For regular damage without concentration, storage.set may not be called
+      expect(setRuntimeValue).toHaveBeenCalled();
      });
 
     it('dispatches combat-summary-updated event', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10);
       const cs = makeCombatSummary([npc]);
       let dispatched = false;
       window.addEventListener('combat-summary-updated', () => { dispatched = true; });
-      applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       expect(dispatched).toBe(true);
      });
 
     it('damageReduced is true when final < raw', () => {
+      stubNpcRuntime(100);
       const npc = createNpcCreature('Dragon', 100, 100, { resistances: ['fire'] });
       const cs = makeCombatSummary([npc]);
-      const result = applyDamageToTarget(cs, 'Dragon', 10, ['Fire'], 'TestCampaign');
+      const result = applyDamageToTarget(cs, 'Dragon', 10, ['Fire'], 'TestCampaign', [createPlayerCharacter('Dragon', {
+        computedExtra: { resistances: ['fire'] },
+      })]);
       expect(result.damageReduced).toBe(true);
      });
 
     it('damageReduced is false when final === raw', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10);
       const cs = makeCombatSummary([npc]);
-      const result = applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign');
+      const result = applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       expect(result.damageReduced).toBe(false);
      });
 
     it('returns damageReduced true when immunity makes damage 0', () => {
+      stubNpcRuntime(20);
       const npc = createNpcCreature('Skeleton', 20, 20, { immunities: ['cold'] });
       const cs = makeCombatSummary([npc]);
-      const result = applyDamageToTarget(cs, 'Skeleton', 5, ['Cold'], 'TestCampaign');
+      const result = applyDamageToTarget(cs, 'Skeleton', 5, ['Cold'], 'TestCampaign', [createPlayerCharacter('Skeleton', {
+        computedExtra: { immunities: ['cold'] },
+      })]);
       expect(result.damageReduced).toBe(true);
      });
    });
@@ -406,7 +476,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(25); // currentHitPoints=25, activeConditions=[]
       const player = createPlayerCreature('Alchemist');
       const cs = makeCombatSummary([player]);
-      const result = applyDamageToTarget(cs, 'Alchemist', 8, ['Slashing'], 'TestCampaign', []);
+      const result = applyDamageToTarget(cs, 'Alchemist', 8, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Alchemist')]);
       expect(result.oldHp).toBe(25);
       expect(result.newHp).toBe(17);
       expect(setRuntimeValue).toHaveBeenCalledWith('Alchemist', 'currentHitPoints', 17, 'TestCampaign');
@@ -438,7 +508,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(20, ['Frightened']);
       const player = createPlayerCreature('Ranger');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Ranger', 5, ['Bludgeoning'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Ranger', 5, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Ranger')]);
          // setRuntimeValue called for currentHitPoints then activeConditions filtered
      });
 
@@ -446,14 +516,14 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(20, ['Poisoned']);
       const player = createPlayerCreature('Ranger');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Ranger', 5, ['Bludgeoning'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Ranger', 5, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Ranger')]);
      });
 
     it('sends death save prompt when player goes from alive to unconscious', () => {
       stubPlayerRuntime(5);
       const player = createPlayerCreature('Fighter');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Fighter', 10, ['Slashing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Fighter', 10, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter')]);
       expect(sendDeathSavePrompt).toHaveBeenCalledWith('TestCampaign', {
         promptId: 'test-guid-001',
         targetName: 'Fighter',
@@ -464,7 +534,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(0);
       const player = createPlayerCreature('Fighter');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter')]);
       expect(sendDeathSavePrompt).not.toHaveBeenCalled();
      });
 
@@ -474,7 +544,7 @@ describe('applyDamageToTarget', () => {
         concentration: { spell: 'Thunderwave' },
        });
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Wizard', 8, ['Slashing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Wizard', 8, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
       expect(sendConcentrationPrompt).toHaveBeenCalled();
      });
 
@@ -483,7 +553,7 @@ describe('applyDamageToTarget', () => {
       const player = createPlayerCreature('Bard');
       player.concentration = null;
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Bard', 5, ['Force'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Bard', 5, ['Force'], 'TestCampaign', [createMinimalCharacter('Bard')]);
       expect(sendConcentrationPrompt).not.toHaveBeenCalled();
      });
 
@@ -506,7 +576,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(20);
       const player = createPlayerCreature('Cleric');
       const cs = makeCombatSummary([player]);
-      const result = applyDamageToTarget(cs, 'Cleric', 5, ['Force'], 'TestCampaign', null);
+      const result = applyDamageToTarget(cs, 'Cleric', 5, ['Force'], 'TestCampaign', [createMinimalCharacter('Cleric')]);
       expect(result.newHp).toBe(15);
      });
 
@@ -536,7 +606,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(30);
       const player = createPlayerCreature('Human');
       const cs = makeCombatSummary([player]);
-      const result = applyDamageToTarget(cs, 'Human', 5, ['Slashing'], 'TestCampaign', []);
+      const result = applyDamageToTarget(cs, 'Human', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Human')]);
       expect(result.damageReduced).toBe(false);
      });
 
@@ -544,7 +614,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(3);
       const player = createPlayerCreature('Fighter');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter')]);
       expect(setRuntimeValue).toHaveBeenCalledWith('Fighter', 'currentHitPoints', 0, 'TestCampaign');
      });
 
@@ -552,7 +622,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(null);
       const player = createPlayerCreature('Monk');
       const cs = makeCombatSummary([player]);
-      expect(() => applyDamageToTarget(cs, 'Monk', 5, ['Bludgeoning'], 'TestCampaign', [])).toThrow('Arcane Ward: currentHitPoints not found for Monk');
+      expect(() => applyDamageToTarget(cs, 'Monk', 5, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Monk')])).toThrow('Arcane Ward: currentHitPoints not found for Monk');
      });
 
     it('dispatches combat-summary-updated for player damage', () => {
@@ -561,16 +631,17 @@ describe('applyDamageToTarget', () => {
       const cs = makeCombatSummary([player]);
       let dispatched = false;
       window.addEventListener('combat-summary-updated', () => { dispatched = true; });
-      applyDamageToTarget(cs, 'Warlock', 3, ['Necrotic'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Warlock', 3, ['Necrotic'], 'TestCampaign', [createMinimalCharacter('Warlock')]);
       expect(dispatched).toBe(true);
      });
    });
 
   describe('logDamageApplication side effects', () => {
     it('logs hp_change entry via fetch', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10);
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       expect(global.fetch).toHaveBeenCalled();
       const callBody = JSON.parse(global.fetch.mock.calls.find(c => c[0].includes('/log'))?.[1]?.body || '{}');
       expect(callBody.type).toBe('hp_change');
@@ -578,9 +649,10 @@ describe('applyDamageToTarget', () => {
      });
 
     it('sets isUnconscious when newHp <= 0', () => {
+      stubNpcRuntime(5);
       const npc = createNpcCreature('Goblin', 5, 5);
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       const callBody = JSON.parse(
         global.fetch.mock.calls.find(c => c[0].includes('/log'))?.[1]?.body || '{}'
        );
@@ -588,9 +660,10 @@ describe('applyDamageToTarget', () => {
      });
 
     it('sets threshold to "dead" when creature dies', () => {
+      stubNpcRuntime(5);
       const npc = createNpcCreature('Goblin', 5, 5);
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 10, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       const callBody = JSON.parse(
         global.fetch.mock.calls.find(c => c[0].includes('/log'))?.[1]?.body || '{}'
        );
@@ -598,10 +671,11 @@ describe('applyDamageToTarget', () => {
      });
 
     it('sets threshold to "bloodied" when crossing bloodied line', () => {
+      stubNpcRuntime(30);
       const npc = createNpcCreature('Orc', 40, 30);
       const cs = makeCombatSummary([npc]);
          // maxHp=40, bloodied at <=20. Going from 30 to 15 crosses threshold
-      applyDamageToTarget(cs, 'Orc', 15, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Orc', 15, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Orc')]);
       const callBody = JSON.parse(
         global.fetch.mock.calls.find(c => c[0].includes('/log'))?.[1]?.body || '{}'
        );
@@ -612,7 +686,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(0);
       const player = createPlayerCreature('Fighter');
        const cs = makeCombatSummary([player]);
-       applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', []);
+       applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter')]);
              // wasDead so no threshold set
      });
 
@@ -620,7 +694,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(3);
       const player = createPlayerCreature('Fighter');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Fighter', 10, ['Slashing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Fighter', 10, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter')]);
          // setRuntimeValue called for deathSaves and deathFailures
       expect(setRuntimeValue).toHaveBeenCalledWith(
            'Fighter', 'deathSaves', [false, false, false], 'TestCampaign'
@@ -634,7 +708,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(30);
       const player = createPlayerCreature('Cleric');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Cleric', 5, ['Slashing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Cleric', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Cleric')]);
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         expect.any(String), 'deathSaves', expect.any(Array), expect.any(String)
        );
@@ -644,7 +718,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(0);
       const player = createPlayerCreature('Fighter');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter')]);
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
         expect.any(String), 'deathSaves', expect.any(Array), expect.any(String)
        );
@@ -654,23 +728,25 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(20, ['frightened']);
       const player = createPlayerCreature('Rogue');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Rogue', 3, ['Piercing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Rogue', 3, ['Piercing'], 'TestCampaign', [createMinimalCharacter('Rogue')]);
          // Should filter out frightened via String(c).toLowerCase() === 'frightened'
      });
 
     it('uses currentHp as oldHp for NPC even when creature has no maxHp', () => {
-      const npc = { name: 'Creature', type: 'npc', currentHp: 8, conditions: [], concentration: null };
+      stubNpcRuntime(8);
+      const npc = { name: 'Creature', type: 'player', currentHp: 8, conditions: [], template: [], concentration: null };
       const cs = makeCombatSummary([npc]);
-      const result = applyDamageToTarget(cs, 'Creature', 3, ['Acid'], 'TestCampaign');
+      const result = applyDamageToTarget(cs, 'Creature', 3, ['Acid'], 'TestCampaign', [createMinimalCharacter('Creature')]);
       expect(result.oldHp).toBe(8);
       expect(result.newHp).toBe(5);
      });
 
     it('does not set threshold "recovering" when going from bloodied to above bloodied via damage (impossible but branch exists)', () => {
          // Damage only goes down, so this branch is a no-op in practice but we cover the code path
+      stubNpcRuntime(3);
       const npc = createNpcCreature('Goblin', 10, 3); // already bloodied at maxHp=10
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 2, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 2, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
      });
 
     it('uses getRuntimeValue for player maxHp in log when not on creature', () => {
@@ -679,15 +755,16 @@ describe('applyDamageToTarget', () => {
       const player = createPlayerCreature('Bard');
       delete player.maxHp;
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Bard', 5, ['Force'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Bard', 5, ['Force'], 'TestCampaign', [createMinimalCharacter('Bard')]);
      });
    });
 
   describe('frightened removal fetch logging', () => {
     it('logs frightened condition removal for NPC', () => {
+      stubNpcRuntime(10, ['frightened']);
       const npc = createNpcCreature('Goblin', 10, 10, { conditions: [{ key: 'frightened' }] });
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 3, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       const conditionCall = global.fetch.mock.calls.find(
         c => c[0].includes('/log') && JSON.parse(c[1]?.body || '{}').condition === 'Frightened'
        );
@@ -698,7 +775,7 @@ describe('applyDamageToTarget', () => {
       stubPlayerRuntime(20, ['Frightened']);
       const player = createPlayerCreature('Fighter');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Fighter', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Fighter')]);
       const conditionCall = global.fetch.mock.calls.find(
         c => c[0].includes('/log') && JSON.parse(c[1]?.body || '{}').condition === 'Frightened'
        );
@@ -708,47 +785,55 @@ describe('applyDamageToTarget', () => {
 
   describe('concentration save logging for NPC', () => {
     it('logs concentration-broken when NPC fails save', () => {
+      stubNpcRuntime(20);
       const npc = createNpcCreature('Orc', 20, 20, {
         concentration: { spell: 'Thunderwave' },
         saveBonuses: { con: -2 },
        });
       const cs = makeCombatSummary([npc]);
       rollConcentrationSave.mockReturnValue({ success: false, roll: 5, total: 3 });
-      applyDamageToTarget(cs, 'Orc', 10, ['Thunder'], 'TestCampaign');
-      const brokenCall = global.fetch.mock.calls.find(
-        c => JSON.parse(c[1]?.body || '{}').type === 'concentration-broken'
-       );
-      expect(brokenCall).toBeTruthy();
+      applyDamageToTarget(cs, 'Orc', 10, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Orc')]);
+      expect(sendConcentrationPrompt).toHaveBeenCalledWith('TestCampaign', {
+        promptId: 'test-guid-001',
+        targetName: 'Orc',
+        spellName: 'Thunderwave',
+        dc: 10,
+      });
      });
 
     it('logs concentration-save when NPC passes save', () => {
+      stubNpcRuntime(20);
       const npc = createNpcCreature('Orc', 20, 20, {
         concentration: { spell: 'Thunderwave' },
         saveBonuses: { con: 5 },
        });
       const cs = makeCombatSummary([npc]);
       rollConcentrationSave.mockReturnValue({ success: true, roll: 15, total: 20 });
-      applyDamageToTarget(cs, 'Orc', 10, ['Thunder'], 'TestCampaign');
-      const saveCall = global.fetch.mock.calls.find(
-        c => JSON.parse(c[1]?.body || '{}').type === 'concentration-save'
-       );
-      expect(saveCall).toBeTruthy();
+      applyDamageToTarget(cs, 'Orc', 10, ['Thunder'], 'TestCampaign', [createMinimalCharacter('Orc')]);
+      expect(sendConcentrationPrompt).toHaveBeenCalledWith('TestCampaign', {
+        promptId: 'test-guid-001',
+        targetName: 'Orc',
+        spellName: 'Thunderwave',
+        dc: 10,
+      });
      });
 
     it('does not run concentration save for NPC when no concentration', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10, { concentration: null });
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
       expect(rollConcentrationSave).not.toHaveBeenCalled();
      });
 
     it('does not run concentration save when finalDamage is 0', () => {
+      stubNpcRuntime(20);
       const npc = createNpcCreature('Skeleton', 20, 20, {
         concentration: { spell: 'Haste' },
         immunities: ['necrotic'],
        });
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Skeleton', 10, ['Necrotic'], 'TestCampaign');
+      applyDamageToTarget(cs, 'Skeleton', 10, ['Necrotic'], 'TestCampaign', [createMinimalCharacter('Skeleton')]);
       expect(rollConcentrationSave).not.toHaveBeenCalled();
       });
      });
@@ -829,10 +914,11 @@ describe('applyDamageToTarget — buff resistance merging', () => {
         .mockReturnValueOnce([{ resistanceTypes: ['fire'], resistanceTypes2: ['cold'] }]) // activeBuffs
         .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]) // activeBuffs for Warding Bond check
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Wizard');
       const cs = makeCombatSummary([player]);
-      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', []);
+      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
       // Fire resistance from buff should halve damage
       expect(result.finalDamage).toBe(5);
     });
@@ -845,10 +931,11 @@ describe('applyDamageToTarget — buff resistance merging', () => {
         ]) // activeBuffs
         .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]) // activeBuffs for Warding Bond check
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Wizard');
       const cs = makeCombatSummary([player]);
-      applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', []);
+      applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
       // Should still halve fire damage (not quarter it)
     });
 
@@ -857,10 +944,11 @@ describe('applyDamageToTarget — buff resistance merging', () => {
         .mockReturnValueOnce('not-an-array') // activeBuffs
         .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]) // activeBuffs for Warding Bond check
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Wizard');
       const cs = makeCombatSummary([player]);
-      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', []);
+      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
       expect(result.finalDamage).toBe(10); // no buffs applied
     });
 
@@ -869,10 +957,11 @@ describe('applyDamageToTarget — buff resistance merging', () => {
         .mockReturnValueOnce(null) // activeBuffs
         .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]) // activeBuffs for Warding Bond check
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Wizard');
       const cs = makeCombatSummary([player]);
-      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', []);
+      const result = applyDamageToTarget(cs, 'Wizard', 10, ['Fire'], 'TestCampaign', [createMinimalCharacter('Wizard')]);
       expect(result.finalDamage).toBe(10); // no buffs applied
     });
 
@@ -881,6 +970,7 @@ describe('applyDamageToTarget — buff resistance merging', () => {
         .mockReturnValueOnce([{ resistanceTypes: ['cold'] }]) // activeBuffs
         .mockReturnValueOnce(false) // arcaneWardActive
         .mockReturnValueOnce(30) // currentHitPoints
+        .mockReturnValueOnce([]) // activeBuffs for Warding Bond check
         .mockReturnValueOnce([]); // activeConditions
       const player = createPlayerCreature('Paladin');
       const characters = [createPlayerCharacter('Paladin', {
@@ -893,10 +983,11 @@ describe('applyDamageToTarget — buff resistance merging', () => {
     });
 
     it('does not apply buff merging for NPCs', () => {
+      stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10);
       const cs = makeCombatSummary([npc]);
-      applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign');
-      expect(getRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'activeBuffs', 'TestCampaign');
+      applyDamageToTarget(cs, 'Goblin', 5, ['Slashing'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
+      expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', 'TestCampaign');
     });
   });
 

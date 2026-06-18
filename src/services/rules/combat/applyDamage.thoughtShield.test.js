@@ -80,7 +80,11 @@ describe('Thought Shield — Psychic damage reflection', () => {
         immunities: [],
         level: 10,
         class: { name: 'Warlock', class_levels: [{ level: 10 }] },
+        class_levels: [{ level: 10 }],
         characterAdvancement: [{ name: 'Thought Shield' }],
+        equipment: [],
+        allFeatures: [],
+        automation: { passives: [] },
       },
     };
   }
@@ -126,7 +130,11 @@ describe('Thought Shield — Psychic damage reflection', () => {
         immunities: [],
         level: 10,
         class: { name: 'Fighter', class_levels: [{ level: 10 }] },
+        class_levels: [{ level: 10 }],
         characterAdvancement: [],
+        equipment: [],
+        allFeatures: [],
+        automation: { passives: [] },
       },
     };
 
@@ -159,7 +167,7 @@ describe('Thought Shield — Psychic damage reflection', () => {
   it('does not reflect when attacker is the player themselves', () => {
     const warlock = createPlayerWithThoughtShield('Warlock', 20);
     const cs = makeCombatSummary([
-      createNpcCreature('Warlock', 20, 20),
+      { ...createNpcCreature('Warlock', 20, 20), type: 'player' },
       createNpcCreature('Goblin', 10, 10),
     ]);
 
