@@ -803,7 +803,13 @@ const rules = {
             playerStats.equipment = allEquipment;
          }
 
-           [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
+         playerStats.actions = playerStats.actions || [];
+         playerStats.bonusActions = playerStats.bonusActions || [];
+         playerStats.reactions = playerStats.reactions || [];
+         playerStats.specialActions = playerStats.specialActions || [];
+         playerStats.characterAdvancement = playerStats.characterAdvancement || [];
+
+            [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
 
           const allFeatures = [
             ...playerStats.actions,
