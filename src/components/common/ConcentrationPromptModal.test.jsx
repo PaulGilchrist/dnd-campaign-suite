@@ -1,6 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
+import { rollD20 } from '../../services/dice/diceRoller.js'
+import { sendConcentrationResult } from '../../services/combat/conditions/savePromptService.js'
 import ConcentrationPromptModal from './ConcentrationPromptModal.jsx'
 
 vi.mock('../../services/ui/utils.js', () => ({
@@ -10,7 +13,7 @@ vi.mock('../../services/ui/utils.js', () => ({
 }))
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
-  rollD20: vi.fn(() => 10),
+  rollD20: vi.fn(),
 }))
 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({
@@ -48,7 +51,7 @@ vi.mock('./Subscriber.jsx', () => ({
                 dc: 10,
               },
             }),
-        }
+        },
       ),
       React.createElement(
         'button',
@@ -64,13 +67,12 @@ vi.mock('./Subscriber.jsx', () => ({
                 dc: 13,
               },
             }),
-        }
-      )
+        },
+      ),
     )
   },
 }))
 
-// jsdom does not provide EventSource, but the component checks for it
 const MockEventSource = vi.fn()
 MockEventSource.prototype.close = vi.fn()
 
@@ -96,17 +98,23 @@ describe('ConcentrationPromptModal', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     setupGlobalEventSource()
+    // Default: rollD20 returns 10, which succeeds against DC 10
+    vi.mocked(rollD20).mockReturnValue(10)
+  })
+
+  afterEach(() => {
+    delete globalThis.EventSource
   })
 
   it('renders nothing when there are no prompts', () => {
-    const { container } = render(
+    render(
       <ConcentrationPromptModal
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
-    expect(container.querySelector('.cnp-overlay')).not.toBeInTheDocument()
+    expect(screen.queryByText(/must make a/)).not.toBeInTheDocument()
   })
 
   it('renders the modal when a prompt is queued via Subscriber', async () => {
@@ -115,14 +123,13 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
     expect(screen.getByText('testTarget')).toBeInTheDocument()
@@ -139,21 +146,19 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const dismissBtn = screen.getByRole('button', { name: 'Dismiss' })
-    fireEvent.click(dismissBtn)
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
 
     await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/must make a/)).not.toBeInTheDocument()
     })
   })
 
@@ -163,24 +168,20 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/total:/i)).toBeInTheDocument()
     })
-
-    expect(screen.getByText(/CONCENTRATION MAINTAINED/i)).toBeInTheDocument()
   })
 
   it('shows "Done" button after rolling with single prompt', async () => {
@@ -189,18 +190,79 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
+    })
+  })
+
+  it('shows "Next Check" button after rolling when multiple prompts exist', async () => {
+    vi.mocked(rollD20).mockReturnValue(10)
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+    fireEvent.click(screen.getByTestId('subscriber-trigger-second'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Next Check' })).toBeInTheDocument()
+    })
+  })
+
+  it('advances to the next prompt when "Next Check" is clicked', async () => {
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+    fireEvent.click(screen.getByTestId('subscriber-trigger-second'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    // Resolve the first prompt
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Next Check' })).toBeInTheDocument()
+    })
+
+    // Advance to the next prompt
+    fireEvent.click(screen.getByRole('button', { name: 'Next Check' }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/testTarget2/)).toBeInTheDocument()
+      expect(screen.getByText('Haste')).toBeInTheDocument()
+    })
+
+    // Now show Done since only one prompt remains
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
@@ -214,18 +276,16 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[character]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/total:/i)).toBeInTheDocument()
@@ -241,18 +301,16 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
 
     await waitFor(() => {
       expect(eventHandler).toHaveBeenCalled()
@@ -273,14 +331,13 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
     expect(screen.queryByText(/\(1 of/)).not.toBeInTheDocument()
@@ -292,23 +349,21 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
     const overlay = document.querySelector('.cnp-overlay')
-    if (overlay) {
-      fireEvent.click(overlay)
-    }
+    expect(overlay).toBeInTheDocument()
+    fireEvent.click(overlay)
 
     await waitFor(() => {
-      expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument()
+      expect(screen.queryByText(/must make a/)).not.toBeInTheDocument()
     })
   })
 
@@ -318,23 +373,21 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
     const modal = document.querySelector('.cnp-modal')
-    if (modal) {
-      fireEvent.click(modal)
-    }
+    expect(modal).toBeInTheDocument()
+    fireEvent.click(modal)
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
   })
 
@@ -344,18 +397,16 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={['testTarget']}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/total:/i)).toBeInTheDocument()
@@ -368,7 +419,7 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
     expect(screen.queryByRole('button', { name: /roll con save/i })).not.toBeInTheDocument()
@@ -382,12 +433,10 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
     expect(screen.queryByTestId('subscriber')).not.toBeInTheDocument()
-
-    setupGlobalEventSource()
   })
 
   it('shows save bonus breakdown in result', async () => {
@@ -396,18 +445,16 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/d20/i)).toBeInTheDocument()
@@ -420,21 +467,43 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/CONCENTRATION MAINTAINED/i)).toBeInTheDocument()
+    })
+  })
+
+  it('shows failure message when save fails', async () => {
+    vi.mocked(rollD20).mockReturnValue(1)
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/CONCENTRATION BROKEN/i)).toBeInTheDocument()
     })
   })
 
@@ -444,7 +513,7 @@ describe('ConcentrationPromptModal', () => {
         campaignName="my-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
     const subscriber = screen.getByTestId('subscriber')
@@ -457,11 +526,10 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
       expect(screen.getByText(/Concentration Check/i)).toBeInTheDocument()
@@ -477,18 +545,16 @@ describe('ConcentrationPromptModal', () => {
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
 
     await waitFor(() => {
       expect(screen.getByText(/CONCENTRATION MAINTAINED/i)).toBeInTheDocument()
@@ -497,56 +563,79 @@ describe('ConcentrationPromptModal', () => {
     expect(screen.getByText(/vs DC 10/)).toBeInTheDocument()
   })
 
-  it('shows queue count when multiple prompts exist', async () => {
-    render(
-      <ConcentrationPromptModal
-        campaignName="test-campaign"
-        characters={[]}
-        activeMapName={null}
-      />
-    )
-
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
-
-    await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
-    })
-
-    const rollBtn = screen.getByRole('button', { name: /roll con save/i })
-    fireEvent.click(rollBtn)
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
-    })
-
-    const nextBtn = screen.getByRole('button', { name: 'Done' })
-    fireEvent.click(nextBtn)
-
-    expect(screen.queryByText(/must make a/i)).not.toBeInTheDocument()
-  })
-
   it('shows queue info in header when multiple prompts are queued', async () => {
     render(
       <ConcentrationPromptModal
         campaignName="test-campaign"
         characters={[]}
         activeMapName={null}
-      />
+      />,
     )
 
-    const trigger = screen.getByTestId('subscriber-trigger')
-    fireEvent.click(trigger)
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
 
     await waitFor(() => {
-      expect(screen.getByText(/must make a/i)).toBeInTheDocument()
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
     })
 
-    const trigger2 = screen.getByTestId('subscriber-trigger-second')
-    fireEvent.click(trigger2)
+    fireEvent.click(screen.getByTestId('subscriber-trigger-second'))
 
     await waitFor(() => {
       expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument()
     })
+  })
+
+  it('deduplicates prompts with the same promptId', async () => {
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+    // Send a duplicate prompt with the same promptId
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    // Should still show queue count as 1 of 1, not 1 of 2
+    expect(screen.queryByText(/\(1 of 2\)/)).not.toBeInTheDocument()
+  })
+
+  it('calls sendConcentrationResult with correct data after rolling', async () => {
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(sendConcentrationResult).toHaveBeenCalled()
+    })
+
+    const [calledCampaignName, calledTargetName, calledData] = sendConcentrationResult.mock.calls[0]
+    expect(calledCampaignName).toBe('test-campaign')
+    expect(calledTargetName).toBe('testTarget')
+    expect(calledData.promptId).toBe('test-prompt-1')
+    expect(calledData.spellName).toBe('Bless')
+    expect(calledData.dc).toBe(10)
+    expect(calledData.success).toBe(true)
+    expect(calledData.roll).toBe(10)
+    expect(calledData.total).toBe(10)
   })
 })

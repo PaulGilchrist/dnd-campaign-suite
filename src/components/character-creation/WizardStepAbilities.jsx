@@ -133,7 +133,7 @@ function WizardStepAbilities({
         const version = formData.rules || '5e';
         const rules = await loadValidationRules(version);
         setPointBuyCosts(rules.point_buy?.costs || {});
-        setPointsAllowed(rules.point_buy?.total_points ?? 24);
+        setPointsAllowed(rules.point_buy?.total_points ?? 27);
       } catch (error) {
         console.error('Error loading validation rules:', error);
       }
