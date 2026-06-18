@@ -114,11 +114,7 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
     }
 
     // Clean up Multiattack Defense effects at start of each creature's turn
-    const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects');
-    if (!Array.isArray(allTargetEffects)) {
-        console.error('expirations: expected targetEffects to be an array for', campaignName);
-        throw new Error('Missing array: targetEffects for ' + campaignName);
-    }
+    const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
     if (allTargetEffects.length > 0) {
         const cleaned = allTargetEffects.filter(te => te.effect !== 'multiattack_defense');
         if (cleaned.length !== allTargetEffects.length) {
@@ -1091,11 +1087,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                     allBuffs.filter(b => b.name !== effect.buffName),
                     campaignName
                 );
-                const storedEffects = getRuntimeValue(campaignName, 'targetEffects');
-                if (!Array.isArray(storedEffects)) {
-                    console.error('expirations: expected targetEffects to be an array for', campaignName);
-                    throw new Error('Missing array: targetEffects for ' + campaignName);
-                }
+                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
                 setRuntimeValue(
                     campaignName,
                     'targetEffects',
