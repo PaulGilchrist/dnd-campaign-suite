@@ -209,18 +209,18 @@ describe('slowService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('throws when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            const result = await triggerSlow(
-                { name: 'Slow', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
+            await expect(
+                triggerSlow(
+                    { name: 'Slow', level: 3 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                ),
+            ).rejects.toThrow('Handler failed');
         });
 
         it('passes the spell object into the action', async () => {

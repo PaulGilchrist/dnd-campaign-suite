@@ -209,18 +209,18 @@ describe('silenceService', () => {
             );
         });
 
-        it('returns null when executeHandler throws', async () => {
+        it('throws when executeHandler throws', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            const result = await triggerSilence(
-                { name: 'Silence', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
+            await expect(
+                triggerSilence(
+                    { name: 'Silence', level: 2 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                ),
+            ).rejects.toThrow('Handler failed');
         });
 
         it('returns null when executeHandler returns null', async () => {

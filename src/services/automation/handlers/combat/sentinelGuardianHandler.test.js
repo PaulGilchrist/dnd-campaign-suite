@@ -174,7 +174,7 @@ describe('sentinelGuardianHandler.handle', () => {
     expect(result.payload.attack.name).toBe('Mace');
   });
 
-  it('catches and swallows addEntry errors', async () => {
+  it('propagates addEntry errors', async () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
@@ -182,7 +182,7 @@ describe('sentinelGuardianHandler.handle', () => {
     damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
     logService.addEntry.mockRejectedValue(new Error('network'));
 
-    await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
+    await expect(handle(action, ps, campaignName, null)).rejects.toThrow('network');
   });
 
   it('uses action.name in popup when no target', async () => {

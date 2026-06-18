@@ -18,7 +18,7 @@ export async function triggerRemoveCurse(spell, metaCtx, playerStats, campaignNa
         return result;
     } catch (e) {
         console.error('[removeCurse] Failed to execute Remove Curse handler:', e);
-        return null;
+        throw e;
     }
 }
 
@@ -28,6 +28,6 @@ export async function confirmRemoveCurse(action, playerStats, campaignName, mapN
         return appliedResult;
     } catch (e) {
         console.error('[removeCurse] Failed to apply Remove Curse effect:', e);
-        return null;
+        throw e;
     }
 }

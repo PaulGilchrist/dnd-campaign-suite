@@ -21,6 +21,6 @@ export async function triggerFalseLife(spell, metaCtx, playerStats, campaignName
         return result;
     } catch (e) {
         console.error('[falseLife] Failed to execute False Life handler:', e);
-        return null;
+        throw e;
     }
 }

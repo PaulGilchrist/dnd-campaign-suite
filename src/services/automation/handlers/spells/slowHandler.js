@@ -38,7 +38,10 @@ export async function processSlowRepeatSave(casterName, targetName, saveDc, camp
         abilityName: 'Slow (repeat save)',
         description: `${targetName} makes a WIS save (DC ${saveDc}) at end of turn (Slow).`,
         promptId,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const saveResult = await promise;
 
@@ -72,7 +75,10 @@ export async function processSlowRepeatSave(casterName, targetName, saveDc, camp
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save. Slow ends!`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -103,7 +109,10 @@ export async function processSlowRepeatSave(casterName, targetName, saveDc, camp
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save. Slow continues.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -154,7 +163,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Slow! ${targetName} must make a WIS save (DC ${dc}) or be slowed.`,
             promptId,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         const saveResult = await promise;
 
@@ -169,7 +181,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: true,
                 description: `${targetName} succeeded on WIS save against Slow.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         } else {
             affectedCount++;
 
@@ -278,7 +293,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: false,
                 description: `${targetName} failed WIS save against Slow. Speed halved, -2 AC, disadvantage on DEX saves, no reactions, action/bonus action (not both), one attack max. Repeats save at end of each turn.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
             results.push(`${targetName} is slowed.`);
         }

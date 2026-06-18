@@ -453,34 +453,26 @@ describe('executeHandler', () => {
   });
 
   describe('error handling', () => {
-    it('returns error popup when handler throws an exception', async () => {
+    it('re-throws when handler throws an exception', async () => {
       const action = makeAction({ type: 'healing' });
       healingHandler.handle.mockRejectedValue(new Error('handler failed'));
 
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
+      await expect(executeHandler(action, makePlayerStats(), campaignName, mapName)).rejects.toThrow('handler failed');
     });
 
-    it('error popup includes action.name in description', async () => {
+    it('re-throws with original error message', async () => {
       const action = makeAction({ type: 'healing' });
       action.name = 'Cure Wounds';
       healingHandler.handle.mockRejectedValue(new Error('handler failed'));
 
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.payload.description).toBe('Failed to execute Cure Wounds');
+      await expect(executeHandler(action, makePlayerStats(), campaignName, mapName)).rejects.toThrow('handler failed');
     });
 
-    it('error popup has type popup with automation_info payload', async () => {
+    it('re-throws for save_only handler errors', async () => {
       const action = makeAction({ type: 'save_only' });
       saveOnlyHandler.handle.mockRejectedValue(new Error('fail'));
 
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
+      await expect(executeHandler(action, makePlayerStats(), campaignName, mapName)).rejects.toThrow('fail');
     });
 
     it('passes all 4 arguments to handler', async () => {

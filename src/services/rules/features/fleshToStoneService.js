@@ -23,6 +23,6 @@ export async function triggerFleshToStone(spell, metaCtx, playerStats, campaignN
         return result;
     } catch (e) {
         console.error('[fleshToStoneService] Failed to execute Flesh to Stone handler:', e);
-        return null;
+        throw e;
     }
 }

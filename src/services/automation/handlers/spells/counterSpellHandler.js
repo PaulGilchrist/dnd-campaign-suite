@@ -50,7 +50,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${featureName} triggered — ${targetName} must make ${saveType} save (DC ${saveDc})`,
         promptId,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -65,7 +68,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType,
                 success: false,
                 description: `${targetName} failed ${saveType} save. ${targetName}'s spell is countered and wasted.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         } else {
             addEntry(campaignName, {
                 type: 'save_result',
@@ -76,7 +82,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType,
                 success: true,
                 description: `${targetName} succeeded on ${saveType} save. ${featureName} fails to counter the spell.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         }
 
         window.removeEventListener('save-result', handleSaveResult);

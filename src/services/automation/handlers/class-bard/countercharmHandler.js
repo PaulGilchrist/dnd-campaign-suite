@@ -142,7 +142,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
         description: `${playerName} used ${featureName} on ${targetName}.`,
         targetName,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

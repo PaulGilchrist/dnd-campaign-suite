@@ -22,7 +22,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: 'Ray of Enfeeblement',
         description: `${playerStats.name} casts Ray of Enfeeblement on ${targetName}. ${targetName} must make a CON save (DC ${dc}).`,
         promptId,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const saveResult = await promise;
 
@@ -36,7 +39,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'CON',
             success: true,
             description: `${targetName} succeeded on CON save against Ray of Enfeeblement.`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         // Successful save: target has Disadvantage on next attack roll until start of caster's next turn
         const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];

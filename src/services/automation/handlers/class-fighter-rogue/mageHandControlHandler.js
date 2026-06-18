@@ -10,7 +10,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} used ${action.name} to move the spectral hand up to ${range} feet.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

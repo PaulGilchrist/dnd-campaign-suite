@@ -32,7 +32,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: 'Friends',
         description: `${playerStats.name} casts Friends on ${targetName}. ${targetName} must make a WIS save (DC ${dc}) or be Charmed.`,
         promptId,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const saveResult = await promise;
 
@@ -46,7 +49,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save against Friends.`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         // Clear active Friends tracking since spell had no effect
         setRuntimeValue(campaignName, activeKey, null, campaignName);

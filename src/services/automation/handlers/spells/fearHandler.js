@@ -44,7 +44,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Fear! ${targetName} must make a WIS save (DC ${dc}) or drop what it's holding and become Frightened.`,
             promptId,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         const saveResult = await promise;
 
@@ -59,7 +62,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: true,
                 description: `${targetName} succeeded on WIS save against Fear.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         } else {
             affectedCount++;
 

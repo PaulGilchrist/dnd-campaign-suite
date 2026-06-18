@@ -59,7 +59,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
         abilityName: action.name,
         description: `${playerStats.name} gained ${result.amount} temporary hit points from Dark One's Blessing.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

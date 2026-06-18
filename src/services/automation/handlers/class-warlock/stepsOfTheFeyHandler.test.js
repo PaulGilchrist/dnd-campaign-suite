@@ -528,7 +528,7 @@ describe('stepsOfTheFeyHandler.handle', () => {
       expect(abilityUseCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('catches and swallows addEntry errors', async () => {
+    it('propagates addEntry errors', async () => {
       const action = makeAction();
       const ps = makePlayerStats();
 
@@ -542,7 +542,7 @@ describe('stepsOfTheFeyHandler.handle', () => {
       savePrompt.createSaveListener.mockReturnValue({ promptId: 'err-prompt' });
       logService.addEntry.mockRejectedValue(new Error('network'));
 
-      await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
+      await expect(handle(action, ps, campaignName, null)).rejects.toThrow('network');
     });
   });
 

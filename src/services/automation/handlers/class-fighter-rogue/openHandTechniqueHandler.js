@@ -15,7 +15,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${action.name} used${targetName ? ` against ${targetName}` : ''}`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const saveDc = buildSaveDc(auto, playerStats);
 
@@ -82,7 +85,10 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         saveDc,
         saveType,
         description: `${action.name} — ${targetName} must make a ${saveType} saving throw (DC ${saveDc}).`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const saveResult = await promise;
     const success = saveResult.success;
@@ -101,7 +107,10 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         bonus: saveResult.saveBonus ?? 0,
         formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     if (!success) {
         await applyOpenHandEffect(action, playerStats, campaignName, targetName, chosenOption);

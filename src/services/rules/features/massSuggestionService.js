@@ -23,6 +23,6 @@ export async function triggerMassSuggestion(spell, metaCtx, playerStats, campaig
         return result;
     } catch (e) {
         console.error(`[massSuggestionService] Failed to execute ${spell.name} handler:`, e);
-        return null;
+        throw e;
     }
 }

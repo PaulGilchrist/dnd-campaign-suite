@@ -591,22 +591,19 @@ describe('friendsService', () => {
             expect(result).toBe(expectedResult);
         });
 
-        it('returns error popup when executeHandler throws', async () => {
+        it('re-throws executeHandler error', async () => {
             getCombatContext.mockResolvedValue(null);
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            const result = await triggerFriends(
-                { name: 'Friends', level: 0 },
-                { targetName: 'Goblin' },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Friends', description: 'Failed to execute Friends.' },
-            });
+            await expect(
+                triggerFriends(
+                    { name: 'Friends', level: 0 },
+                    { targetName: 'Goblin' },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                ),
+            ).rejects.toThrow('Handler failed');
         });
 
         it('passes the spell object into the action', async () => {

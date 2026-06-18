@@ -197,9 +197,10 @@ describe('postCastRiderService', () => {
         name: 'Player',
         automation: { passives: [{ type: 'post_cast_rider', name: 'Rider' }] },
       }
-      const result = await triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      await expect(
+        triggerPostCastRiderSaves(enchantmentSpell, { slotLevel: 1 }, stats, 'camp', 'map')
+      ).rejects.toThrow('fail')
       expect(consoleSpy).toHaveBeenCalled()
-      expect(result).toBeNull()
       consoleSpy.mockRestore()
     })
   })

@@ -176,18 +176,18 @@ describe('aidSpellService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('throws when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            const result = await triggerAidSpell(
-                { name: 'Aid', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
+            await expect(
+                triggerAidSpell(
+                    { name: 'Aid', level: 2 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                ),
+            ).rejects.toThrow('Handler failed');
         });
 
         it('passes the spell object into the action', async () => {
@@ -351,12 +351,12 @@ describe('aidSpellService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when applyAidEffect throws an error', async () => {
+        it('throws when applyAidEffect throws an error', async () => {
             applyAidEffect.mockRejectedValue(new Error('Aid effect failed'));
 
-            const result = await confirmAidSpell(action, playerStats, campaignName, mapName, targetNames);
-
-            expect(result).toBeNull();
+            await expect(
+                confirmAidSpell(action, playerStats, campaignName, mapName, targetNames),
+            ).rejects.toThrow('Aid effect failed');
         });
 
         it('passes targetNames correctly with multiple targets', async () => {

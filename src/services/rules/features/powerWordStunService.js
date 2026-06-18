@@ -23,6 +23,6 @@ export async function triggerPowerWordStun(spell, metaCtx, playerStats, campaign
         return result;
     } catch (e) {
         console.error(`[powerWordStunService] Failed to execute ${spell.name} handler:`, e);
-        return null;
+        throw e;
     }
 }

@@ -56,7 +56,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} used ${action.name} (Last Stand) to drop to ${newHp} HP instead of 0.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));
 

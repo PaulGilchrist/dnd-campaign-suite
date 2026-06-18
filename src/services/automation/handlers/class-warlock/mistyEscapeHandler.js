@@ -63,7 +63,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} used ${featureName} — Reaction Misty Step cast, Invisible until start of next turn, Dreadful Step WIS save DC ${saveDc} for nearby creatures.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

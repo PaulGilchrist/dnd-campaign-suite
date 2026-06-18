@@ -164,7 +164,10 @@ async function handleBendFate(action, playerStats, campaignName, mapName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName} on ${targetName}. Rolled 1d4: ${d4Roll.total}. Applied as bonus/penalty.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -192,7 +195,10 @@ async function handleAcBonus(action, playerStats, campaignName) {
             characterName: playerName,
             abilityName: action.name,
             description: `${playerName} ended ${action.name}.`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         return {
             type: 'popup',
             payload: {
@@ -217,7 +223,10 @@ async function handleAcBonus(action, playerStats, campaignName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} activated ${action.name}. Proficiency bonus (+${prof}) added to AC as a Reaction.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -244,7 +253,10 @@ async function handleUnbreakableMajesty(action, playerStats, campaignName) {
             characterName: playerName,
             abilityName: action.name,
             description: `${playerName} ended ${action.name}.`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         return {
             type: 'popup',
             payload: {
@@ -273,7 +285,10 @@ async function handleUnbreakableMajesty(action, playerStats, campaignName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} activated ${action.name}. Attacks against them may miss on a failed CHA save (DC ${saveDc}).`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -343,7 +358,10 @@ async function handleLeapAside(action, playerStats, campaignName) {
         abilityName: featureName,
         description: `${playerName} activated Leap Aside for ${mountName}. Mount takes no damage on Dex save success, half on fail.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -397,7 +415,10 @@ async function handleVeer(action, playerStats, campaignName) {
         abilityName: featureName,
         description: `${playerName} activated Veer for ${mountName}. Attacks hitting the mount can be redirected to you.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -493,7 +514,10 @@ async function handleInspiringMovement(action, playerStats, campaignName, mapNam
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${playerStats.name} used ${action.name}.` + (allyName ? ` Ally: ${allyName}.` : ''),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

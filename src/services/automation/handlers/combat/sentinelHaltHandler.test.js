@@ -221,7 +221,7 @@ describe('sentinelHaltHandler.handle', () => {
     expect(result.payload.description).toContain("Goblin's Speed is reduced to 0");
   });
 
-  it('catches and swallows addEntry errors', async () => {
+  it('propagates addEntry errors', async () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
@@ -229,6 +229,6 @@ describe('sentinelHaltHandler.handle', () => {
     damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
     logService.addEntry.mockRejectedValue(new Error('network'));
 
-    await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
+    await expect(handle(action, ps, campaignName, null)).rejects.toThrow('network');
   });
 });

@@ -68,7 +68,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${action.name} activated — ${saveType} save DC ${saveDc}, all targets within ${rangeFeet} ft.`,
-     }).catch(() => {});
+     }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'modal',

@@ -11,7 +11,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${action.name} enabled — next Unarmed Strike damage type will be chosen`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     if (options.length > 0) {
         return {
@@ -55,7 +58,10 @@ export async function applyDamageTypeChoice(action, playerStats, campaignName, c
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${action.name} — damage type set to ${chosen.damageType}`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

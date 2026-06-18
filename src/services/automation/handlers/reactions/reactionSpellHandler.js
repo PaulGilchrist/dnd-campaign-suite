@@ -16,7 +16,7 @@ export async function handle(action, _playerStats, _campaignName) {
     };
 }
 
-export function applyWarCasterReaction(targetName, spellName, spellData, playerStats, campaignName) {
+export async function applyWarCasterReaction(targetName, spellName, spellData, playerStats, campaignName) {
     const stored = getRuntimeValue(campaignName, 'warCasterReactions') || [];
     stored.push({
         targetName,
@@ -27,12 +27,15 @@ export function applyWarCasterReaction(targetName, spellName, spellData, playerS
     });
     setRuntimeValue(campaignName, 'warCasterReactions', stored, campaignName);
 
-    addEntry(campaignName, {
+    await addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: 'War Caster - Reactive Spell',
         description: `War Caster Reactive Spell: Casting ${spellName} as a reaction on ${targetName}.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return { ok: true };
 }

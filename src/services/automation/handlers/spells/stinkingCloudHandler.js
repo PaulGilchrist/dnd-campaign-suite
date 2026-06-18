@@ -48,7 +48,10 @@ export async function processStinkingCloudRepeatSave(casterName, targetName, sav
         abilityName: 'Stinking Cloud (repeat save)',
         description: `${targetName} makes a CON save (DC ${saveDc}) at end of turn (Stinking Cloud).`,
         promptId,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const saveResult = await promise;
 
@@ -69,7 +72,10 @@ export async function processStinkingCloudRepeatSave(casterName, targetName, sav
             saveType: 'CON',
             success: true,
             description: `${targetName} succeeded on CON save. Stinking Cloud ends!`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -100,7 +106,10 @@ export async function processStinkingCloudRepeatSave(casterName, targetName, sav
         saveType: 'CON',
         success: false,
         description: `${targetName} failed CON save and remains Poisoned by Stinking Cloud.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -149,7 +158,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     characterName: casterName,
                     abilityName: action.name,
                     description: `${targetName} is immune to Stinking Cloud (Poison immunity).`,
-                }).catch(() => {});
+                }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
                 results.push(`${targetName} is immune to Stinking Cloud.`);
                 continue;
             }
@@ -168,7 +180,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Stinking Cloud! ${targetName} must make a CON save (DC ${dc}) or become Poisoned.`,
             promptId,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         const saveResult = await promise;
 
@@ -183,7 +198,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'CON',
                 success: true,
                 description: `${targetName} succeeded on CON save against Stinking Cloud.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         } else {
             affectedCount++;
 
@@ -243,7 +261,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'CON',
                 success: false,
                 description: `${targetName} failed CON save against Stinking Cloud and is Poisoned. At the end of its next turn, it repeats the save.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
             results.push(`${targetName} is Poisoned.`);
         }

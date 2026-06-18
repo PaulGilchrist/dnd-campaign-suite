@@ -104,7 +104,10 @@ export async function handleApply(action, playerStats, campaignName, spAmount, t
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} cast ${featureName} on ${targetName}, spending ${sp} Sorcery Points to create a ward with ${sp}d8 dice.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -159,7 +162,10 @@ export async function handleSpendDice(action, playerStats, campaignName, numDice
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} spent ${diceToSpend}d8 from ${featureName} ward on ${wardTarget}, reducing damage by ${totalReduction}. ${remainingDice.length} dice remaining.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

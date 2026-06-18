@@ -23,7 +23,10 @@ export async function handle(action, playerStats, campaignName) {
             characterName: playerName,
             abilityName: action.name,
             description: `${playerName} ended ${action.name}.`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         return {
             type: 'popup',
             payload: {
@@ -70,7 +73,10 @@ export async function handle(action, playerStats, campaignName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} activated ${action.name}. Resistance to all damage except Force for 1 minute or until Incapacitated.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -129,7 +135,10 @@ export async function activateAtTurnStart(playerStats, campaignName) {
         characterName: playerName,
         abilityName: 'Superior Defense',
         description: `${playerName} activated Superior Defense at start of turn. Resistance to all damage except Force.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return { activated: true, remainingFocus: currentFocus - cost };
 }

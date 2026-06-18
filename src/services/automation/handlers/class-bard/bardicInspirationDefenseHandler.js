@@ -42,7 +42,10 @@ export async function handle(action, playerStats, campaignName) {
         biDieRoll: rollResult.total,
         biDieSize: dieSize,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

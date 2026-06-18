@@ -69,7 +69,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${action.name} available${targetName ? ` against ${targetName}` : ''}`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'modal',
@@ -172,7 +175,10 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
             saveDc,
             description: `${masteryName}: ${targetName || 'target'} must make a DC ${saveDc} ${mastery.saveAbility} save or ${mastery.effect === 'topple' ? 'fall Prone' : 'suffer the effect'}.`,
             promptId,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
     }
 
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
@@ -240,7 +246,10 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
                 saveType: mastery.saveAbility,
                 success: false,
                 description: `${targetName} failed ${mastery.saveAbility} save. Gains Prone condition.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
             window.removeEventListener('save-result', handleSaveResult);
         };
         window.addEventListener('save-result', handleSaveResult);

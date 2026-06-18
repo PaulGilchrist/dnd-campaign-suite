@@ -23,6 +23,6 @@ export async function triggerFeignDeath(spell, metaCtx, playerStats, campaignNam
         return result;
     } catch (e) {
         console.error('[feignDeath] Failed to execute Feign Death handler:', e);
-        return null;
+        throw e;
     }
 }

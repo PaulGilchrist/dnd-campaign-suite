@@ -92,7 +92,11 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
 
     for (const target of targets) {
         const targetName = target.name;
-        const currentTempHp = Number(getRuntimeValue(targetName, 'tempHp', campaignName) ?? 0);
+        const storedTempHp = getRuntimeValue(targetName, 'tempHp', campaignName);
+        if (storedTempHp == null) {
+            console.error(`[powerWordFortifyService] tempHp not tracked for ${targetName}`, { stack: new Error().stack });
+        }
+        const currentTempHp = storedTempHp ?? 0;
         const grantAmount = perTarget + (remaining > 0 ? 1 : 0);
         if (remaining > 0) remaining--;
 

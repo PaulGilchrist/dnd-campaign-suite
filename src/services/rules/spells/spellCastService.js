@@ -167,6 +167,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             await triggerFear(spell, fearMetaCtx, playerStats, campaignName, mapName);
             triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
                 console.error('[spellCast] False Life trigger failed:', e);
+                throw e;
             });
             return;
         }
@@ -395,7 +396,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                         if (combatSummary) {
                             const creature = combatSummary.creatures.find(c => c.name === target.name);
                             const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
-                            const currentHp = creature?.currentHp ?? getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? maxHp;
+                            const storedCurrentHp = getRuntimeValue(target.name, 'currentHitPoints', campaignName);
+                            if (creature && storedCurrentHp == null) {
+                                console.error(`[spellCast] currentHitPoints not tracked for ${target.name}`, { creatureCurrentHp: creature?.currentHp, stack: new Error().stack });
+                            }
+                            const currentHp = creature?.currentHp ?? storedCurrentHp ?? maxHp;
                             const actualHeal = maxHp - currentHp;
                             if (actualHeal > 0) {
                                 applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
@@ -421,7 +426,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                             if (combatSummary) {
                                 const creature = combatSummary.creatures.find(c => c.name === target.name);
                                 const maxHp = creature?.maxHp || playerStats.hitPoints || 0;
-                                const currentHp = creature?.currentHp ?? getRuntimeValue(target.name, 'currentHitPoints', campaignName) ?? maxHp;
+                                const storedCurrentHp = getRuntimeValue(target.name, 'currentHitPoints', campaignName);
+                                if (creature && storedCurrentHp == null) {
+                                    console.error(`[spellCast] currentHitPoints not tracked for ${target.name}`, { creatureCurrentHp: creature?.currentHp, stack: new Error().stack });
+                                }
+                                const currentHp = creature?.currentHp ?? storedCurrentHp ?? maxHp;
                                 const actualHeal = Math.min(result.total, maxHp - currentHp);
                                 if (actualHeal > 0) {
                                     applyHealingToTarget(combatSummary, target.name, actualHeal, campaignName);
@@ -447,10 +456,12 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
         triggerFalseLife(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
             console.error('[spellCast] False Life trigger failed:', e);
+            throw e;
         });
 
          triggerHealingWord(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
              console.error('[spellCast] Healing Word trigger failed:', e);
+             throw e;
          });
 
           // Protection from Energy — apply resistance buff to target
@@ -626,6 +637,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast rider save failed:', e);
+        throw e;
     });
 
     const hexTarget = metaCtx?.targetName || (await getTargetInfo())?.name;
@@ -633,39 +645,50 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast self-heal failed:', e);
+        throw e;
     });
     triggerPostCastAllyHeals(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Post-cast ally-heal failed:', e);
+        throw e;
     });
     triggerSmiteOfProtection(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Smite of Protection trigger failed:', e);
+        throw e;
     });
     triggerInspiringSmite(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Inspiring Smite trigger failed:', e);
+        throw e;
     });
     triggerPrimalCompanionSpellShare(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Primal companion spell share failed:', e);
+        throw e;
     });
     triggerSpellThief(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Spell Thief failed:', e);
+        throw e;
     });
     triggerWildMagicSurge(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Wild Magic Surge trigger failed:', e);
+        throw e;
     });
     triggerBewitchingMagic(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Bewitching Magic trigger failed:', e);
+        throw e;
     });
 
     triggerSoulstitchSpells(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Soulstitch Spells trigger failed:', e);
+        throw e;
     });
 
     triggerExpertDivination(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Expert Divination trigger failed:', e);
+        throw e;
     });
 
     triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName).catch(e => {
         console.error('[spellCast] Spell Breaker slot retention trigger failed:', e);
+        throw e;
     });
 }
 
@@ -704,7 +727,11 @@ async function applyPowerWordHealToTarget(targetName, playerStats, campaignName)
     if (!creature) return;
 
     const maxHp = creature.maxHp || playerStats.hitPoints || 0;
-    const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
+    const storedCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    if (storedCurrentHp == null) {
+        console.error(`[spellCast] currentHitPoints not tracked for ${targetName}`, { creatureCurrentHp: creature?.currentHp, stack: new Error().stack });
+    }
+    const currentHp = creature.currentHp ?? storedCurrentHp ?? maxHp;
     const healAmount = maxHp - currentHp;
 
     if (healAmount > 0) {
@@ -771,7 +798,11 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
         }
     }
     const maxHp = creature.maxHp || playerStats.hitPoints || 0;
-    const currentHp = creature.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
+    const storedCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    if (storedCurrentHp == null) {
+        console.error(`[spellCast] currentHitPoints not tracked for ${targetName}`, { creatureCurrentHp: creature?.currentHp, stack: new Error().stack });
+    }
+    const currentHp = creature.currentHp ?? storedCurrentHp ?? maxHp;
     const actualHeal = Math.min(healAmount, maxHp - currentHp);
 
     if (actualHeal > 0) {
@@ -880,7 +911,11 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
             if (combatSummary) {
                 const creature = combatSummary.creatures.find(c => c.name === targetName);
                 const maxHp = creature?.maxHp || caster.hitPoints || 100;
-                const currentHp = creature?.currentHp ?? getRuntimeValue(targetName, 'currentHitPoints', campaignName) ?? maxHp;
+                const storedCurrentHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+                if (creature && storedCurrentHp == null) {
+                    console.error(`[spellCast] currentHitPoints not tracked for ${targetName}`, { creatureCurrentHp: creature?.currentHp, stack: new Error().stack });
+                }
+                const currentHp = creature?.currentHp ?? storedCurrentHp ?? maxHp;
                 const actualHeal = Math.min(result.total, maxHp - currentHp);
                 if (actualHeal > 0) {
                     applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);

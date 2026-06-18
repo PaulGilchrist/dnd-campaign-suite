@@ -28,13 +28,17 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
             }
         }
         if (effect.type === 'condition_removal') {
-            const conditions = getRuntimeValue(activeName, 'activeConditions') || [];
+            const storedConds = getRuntimeValue(activeName, 'activeConditions');
+    if (storedConds == null) {
+        console.error(`[expirations] activeConditions not tracked for ${activeName}`, { stack: new Error().stack });
+    }
+    const condsArr = storedConds || [];
             const removalConditions = new Set(effect.conditions.map(c => c.toLowerCase()));
-            const filtered = conditions.filter(c => {
+            const filtered = condsArr.filter(c => {
                 const condName = String(c).toLowerCase();
                 return !removalConditions.has(condName);
             });
-            if (filtered.length !== conditions.length) {
+            if (filtered.length !== condsArr.length) {
                 setRuntimeValue(activeName, 'activeConditions', filtered, campaignName);
             }
         }
@@ -146,8 +150,12 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
 }
 
 async function applySuperiorDefenseTurnStart(activeName, playerStats, effect, campaignName) {
-    const conditions = getRuntimeValue(activeName, 'activeConditions') || [];
-    const isIncapacitated = conditions.some(c => String(c).toLowerCase() === 'incapacitated');
+    const storedConds = getRuntimeValue(activeName, 'activeConditions');
+    if (storedConds == null) {
+        console.error(`[expirations] activeConditions not tracked for ${activeName}`, { stack: new Error().stack });
+    }
+    const condsArr = storedConds || [];
+    const isIncapacitated = condsArr.some(c => String(c).toLowerCase() === 'incapacitated');
     if (isIncapacitated) {
         return;
     }
@@ -158,7 +166,7 @@ async function applySuperiorDefenseTurnStart(activeName, playerStats, effect, ca
         return;
     }
 
-    const cost = effect.cost || 3;
+    const cost = effect.cost ?? 3;
     const maxFocus = playerStats.class?.class_levels?.find(cl => cl.level === playerStats.level)?.focus_points || 0;
     const currentFocus = Number(getRuntimeValue(activeName, 'focusPoints', campaignName) ?? maxFocus);
 
@@ -191,7 +199,12 @@ async function applyFlurryHealingHarmTurnStart(activeName, playerStats, effect, 
         'WIS modifier minimum 1': 'Math.max(1, WIS modifier)',
     };
     const expr = expressions[effect.usesExpression] || effect.usesExpression;
-    const resolvedExpr = expr.replace(/WIS modifier/gi, playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus || 0);
+    const storedBonus = playerStats.abilities?.find(a => a.name === 'Wisdom')?.bonus;
+    if (storedBonus == null) {
+        console.error(`[expirations] Wisdom ability bonus missing for ${playerStats?.name || 'unknown'}`, { playerStats: JSON.stringify(playerStats), stack: new Error().stack });
+    }
+    const wisBonus = storedBonus || 0;
+    const resolvedExpr = expr.replace(/WIS modifier/gi, wisBonus);
 
     let uses;
     try {
@@ -213,26 +226,44 @@ async function applyHolyNimbusRadiantDamage(activeName, playerStats, effect, cam
     const combatSummary = getCombatSummary(campaignName);
     if (!combatSummary) return;
 
-    const creatures = combatSummary.creatures || [];
-    const damageExpression = effect.damageExpression || 'CHA modifier + proficiency_bonus';
+    const creatures = combatSummary?.creatures;
+    if (creatures == null) {
+        console.error(`[expirations] combatSummary.creatures is null/undefined`, { combatSummary: JSON.stringify(combatSummary), stack: new Error().stack });
+    }
+    const creaturesArr = creatures || [];
 
-    const prof = playerStats.proficiency || 0;
-    const chaMod = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus || 0;
+    const storedDamageExpression = effect.damageExpression;
+    if (storedDamageExpression == null) {
+        console.error(`[expirations] effect.damageExpression is missing for effect ${effect?.name || 'unknown'}`, { effect: JSON.stringify(effect), stack: new Error().stack });
+    }
+    const damageExpression = storedDamageExpression || 'CHA modifier + proficiency_bonus';
+
+    const storedProficiency = playerStats.proficiency;
+    if (storedProficiency == null) {
+        console.error(`[expirations] proficiency is missing for ${playerStats?.name || 'unknown'}`, { playerStats: JSON.stringify(playerStats), stack: new Error().stack });
+    }
+    const proficiency = storedProficiency || 0;
+    const storedChaBonus = playerStats.abilities?.find(a => a.name === 'Charisma')?.bonus;
+    if (storedChaBonus == null) {
+        console.error(`[expirations] Charisma ability bonus missing for ${playerStats?.name || 'unknown'}`, { playerStats: JSON.stringify(playerStats), stack: new Error().stack });
+    }
+    const chaBonus = storedChaBonus || 0;
+    const chaMod = chaBonus;
 
     let expr = damageExpression
-        .replace(/proficiency_bonus/gi, prof)
+        .replace(/proficiency_bonus/gi, proficiency)
         .replace(/CHA modifier/gi, chaMod);
 
     let damage;
     try {
         damage = new Function(`"use strict"; return (${expr})`)();
     } catch {
-        damage = prof + chaMod;
+        damage = proficiency + chaMod;
     }
 
     if (typeof damage !== 'number' || isNaN(damage) || damage <= 0) return;
 
-    for (const creature of creatures) {
+    for (const creature of creaturesArr) {
         const creatureName = utils.getName(creature.name);
         if (creatureName === utils.getName(activeName)) continue;
 
@@ -240,10 +271,19 @@ async function applyHolyNimbusRadiantDamage(activeName, playerStats, effect, cam
         if (creatureType !== 'fiend' && creatureType !== 'undead') continue;
 
         try {
-            const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
-            const newHp = Math.max(0, currentHp - damage);
-            creature.hit_points = creature.hit_points || {};
-            creature.hit_points.current = newHp;
+            const storedCurrentHp = creature.hit_points?.current ?? creature.currentHp;
+            if (storedCurrentHp == null) {
+                console.error(`[expirations] Creature HP missing for ${creatureName} in turn-start effect`, { creature: JSON.stringify(creature), stack: new Error().stack });
+            }
+            const maxHp = storedCurrentHp ?? 0;
+            const newHp = Math.max(0, maxHp - damage);
+            const hitPoints = creature.hit_points;
+            if (hitPoints == null) {
+                console.error(`[expirations] hit_points missing for creature ${creature?.name}`, { creature: JSON.stringify(creature), stack: new Error().stack });
+            }
+            const hitPointsObj = hitPoints || {};
+            hitPointsObj.current = newHp;
+            creature.hit_points = hitPointsObj;
             if (creature.currentHp != null) {
                 creature.currentHp = newHp;
             }
@@ -272,27 +312,55 @@ async function applyInnerRadianceDamage(activeName, playerStats, effect, campaig
     const combatSummary = getCombatSummary(campaignName);
     if (!combatSummary) return;
 
-    const creatures = combatSummary.creatures || [];
-    const damageExpression = effect.damageExpression || 'proficiency_bonus';
-    const damageType = effect.damageType || 'Radiant';
-    const range = effect.range || '10_ft';
-    const rangeNum = parseInt(range) || 10;
+    const creatures = combatSummary?.creatures;
+    if (creatures == null) {
+        console.error(`[expirations] combatSummary.creatures is null/undefined`, { combatSummary: JSON.stringify(combatSummary), stack: new Error().stack });
+    }
+    const creaturesArr = creatures || [];
 
-    const prof = playerStats.proficiency || 0;
+    const storedDamageExpression = effect.damageExpression;
+    if (storedDamageExpression == null) {
+        console.error(`[expirations] effect.damageExpression is missing for effect ${effect?.name || 'unknown'}`, { effect: JSON.stringify(effect), stack: new Error().stack });
+    }
+    const damageExpression = storedDamageExpression || 'proficiency_bonus';
+
+    const storedDamageType = effect.damageType;
+    if (storedDamageType == null) {
+        console.error(`[expirations] effect.damageType is missing for effect ${effect?.name || 'unknown'}`, { effect: JSON.stringify(effect), stack: new Error().stack });
+    }
+    const damageType = storedDamageType || 'Radiant';
+
+    const storedRange = effect.range;
+    if (storedRange == null) {
+        console.error(`[expirations] effect.range is missing`, { effect: JSON.stringify(effect), stack: new Error().stack });
+    }
+    const range = storedRange || '10_ft';
+
+    const parsedRange = parseInt(range, 10);
+    if (isNaN(parsedRange)) {
+        console.error(`[expirations] effect.range could not be parsed as number: ${range}`, { effect: JSON.stringify(effect), stack: new Error().stack });
+    }
+    const rangeNum = parsedRange || 10;
+
+    const storedProficiency = playerStats.proficiency;
+    if (storedProficiency == null) {
+        console.error(`[expirations] proficiency is missing for ${playerStats?.name || 'unknown'}`, { playerStats: JSON.stringify(playerStats), stack: new Error().stack });
+    }
+    const proficiency = storedProficiency || 0;
 
     let expr = damageExpression
-        .replace(/proficiency_bonus/gi, prof);
+        .replace(/proficiency_bonus/gi, proficiency);
 
     let damage;
     try {
         damage = new Function(`"use strict"; return (${expr})`)();
     } catch {
-        damage = prof;
+        damage = proficiency;
     }
 
     if (typeof damage !== 'number' || isNaN(damage) || damage <= 0) return;
 
-    for (const creature of creatures) {
+    for (const creature of creaturesArr) {
         const creatureName = utils.getName(creature.name);
         if (creatureName === utils.getName(activeName)) continue;
 
@@ -304,10 +372,19 @@ async function applyInnerRadianceDamage(activeName, playerStats, effect, campaig
         const dist = getDistanceFeet(playerCreature.position, creature.position);
         if (dist !== null && dist <= rangeNum) {
             try {
-                const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
-                const newHp = Math.max(0, currentHp - damage);
-                creature.hit_points = creature.hit_points || {};
-                creature.hit_points.current = newHp;
+                const storedCurrentHp = creature.hit_points?.current ?? creature.currentHp;
+                if (storedCurrentHp == null) {
+                    console.error(`[expirations] Creature HP missing for ${creatureName}`, { creature: JSON.stringify(creature), stack: new Error().stack });
+                }
+                const maxHp = storedCurrentHp ?? 0;
+                const newHp = Math.max(0, maxHp - damage);
+                const hitPoints = creature.hit_points;
+                if (hitPoints == null) {
+                    console.error(`[expirations] hit_points missing for creature ${creature?.name}`, { creature: JSON.stringify(creature), stack: new Error().stack });
+                }
+                const hitPointsObj = hitPoints || {};
+                hitPointsObj.current = newHp;
+                creature.hit_points = hitPointsObj;
                 if (creature.currentHp != null) {
                     creature.currentHp = newHp;
                 }
@@ -336,8 +413,16 @@ async function applyElderChampionRegeneration(activeName, playerStats, effect, c
     const healAmount = effect.healExpression ? evaluateAutoExpression(effect.healExpression, playerStats) : 10;
     if (typeof healAmount !== 'number' || isNaN(healAmount) || healAmount <= 0) return;
 
-    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
-    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[expirations] hitPoints not tracked for ${activeName} in Elder Champion Regeneration`, { playerStatsHitPoints: playerStats.hitPoints, stack: new Error().stack });
+    }
+    if (storedCurrentHp == null && storedMaxHp == null) {
+        console.error(`[expirations] Neither hitPoints nor currentHitPoints tracked for ${activeName} in Elder Champion Regeneration`, { stack: new Error().stack });
+    }
+    const maxHp = storedMaxHp ?? playerStats.hitPoints;
+    const currentHp = storedCurrentHp ?? storedMaxHp ?? maxHp;
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
@@ -355,7 +440,11 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
     
     await setRuntimeValue(activeName, 'dreadAmbushSpeedActive', true, campaignName);
     
-    const bonus = parseInt(effect.bonusExpression, 10) || 10;
+    const parsedBonus = parseInt(effect.bonusExpression, 10);
+    if (isNaN(parsedBonus)) {
+        console.error(`[expirations] effect.bonusExpression could not be parsed: ${effect.bonusExpression}`, { effect: JSON.stringify(effect), stack: new Error().stack });
+    }
+    const bonus = parsedBonus || 10;
     
     const activeBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName) || [];
     const newBuffs = [...activeBuffs, {
@@ -368,37 +457,49 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
 }
 
 async function applyHeroismTempHp(activeName, playerStats, effect, campaignName) {
-    const activeBuffs = getRuntimeValue(activeName, 'activeBuffs') || [];
-    const heroismBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Heroism') : null;
+    const storedBuffs = getRuntimeValue(activeName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${activeName}`, { stack: new Error().stack });
+    }
+    const buffsArr = storedBuffs || [];
+    const heroismBuff = Array.isArray(buffsArr) ? buffsArr.find(b => b.name === 'Heroism') : null;
     if (!heroismBuff) return;
 
     const tempHpAmount = Number(heroismBuff.tempHpAmount) || 0;
     if (tempHpAmount <= 0) return;
 
-    const existingTempHp = Number(getRuntimeValue(activeName, 'tempHp') || 0);
+    const existingTempHp = Number(getRuntimeValue(activeName, 'tempHp') ?? 0);
     const newTempHp = Math.max(existingTempHp, tempHpAmount);
     await setRuntimeValue(activeName, 'tempHp', newTempHp, campaignName);
 }
 
 async function applyUmbralSightTurnStart(activeName, playerStats, effect, campaignName) {
     const inDarkness = getRuntimeValue(activeName, 'umbralSightDarknessActive', campaignName);
-    const storedConditions = getRuntimeValue(activeName, 'activeConditions') || [];
-    const hasInvisible = storedConditions.some(c => String(c).toLowerCase() === 'invisible');
+    const storedConds = getRuntimeValue(activeName, 'activeConditions');
+    if (storedConds == null) {
+        console.error(`[expirations] activeConditions not tracked for ${activeName}`, { stack: new Error().stack });
+    }
+    const condsArr = storedConds || [];
+    const hasInvisible = condsArr.some(c => String(c).toLowerCase() === 'invisible');
 
     if (inDarkness && !hasInvisible) {
-        const newConditions = [...storedConditions, 'invisible'];
+        const newConditions = [...condsArr, 'invisible'];
         await setRuntimeValue(activeName, 'activeConditions', newConditions, campaignName);
     } else if (!inDarkness && hasInvisible) {
-        const filtered = storedConditions.filter(c => String(c).toLowerCase() !== 'invisible');
+        const filtered = condsArr.filter(c => String(c).toLowerCase() !== 'invisible');
         await setRuntimeValue(activeName, 'activeConditions', filtered, campaignName);
     }
 }
 
 async function applySteadyAimClearTurnStart(activeName, playerStats, effect, campaignName) {
     // Clear speed_zero condition and movement flag at start of next turn
-    const storedConds = getRuntimeValue(activeName, 'activeConditions') || [];
-    const filtered = storedConds.filter(c => String(c).toLowerCase() !== 'speed_zero');
-    if (filtered.length !== storedConds.length) {
+    const storedConds = getRuntimeValue(activeName, 'activeConditions');
+    if (storedConds == null) {
+        console.error(`[expirations] activeConditions not tracked for ${activeName}`, { stack: new Error().stack });
+    }
+    const condsArr = storedConds || [];
+    const filtered = condsArr.filter(c => String(c).toLowerCase() !== 'speed_zero');
+    if (filtered.length !== condsArr.length) {
         await setRuntimeValue(activeName, 'activeConditions', filtered, campaignName);
     }
     await setRuntimeValue(activeName, 'steadyAimMovedThisTurn', false, campaignName);
@@ -412,8 +513,12 @@ async function applySupremeSneakTurnStart(activeName, playerStats, effect, campa
     const stealthAttackCost = getRuntimeValue(activeName, 'stealthAttackCost', campaignName);
     if (!stealthAttackCost || stealthAttackCost <= 0) return;
 
-    const storedConditions = getRuntimeValue(activeName, 'activeConditions') || [];
-    const hasInvisible = storedConditions.some(c => String(c).toLowerCase() === 'invisible');
+    const storedConds = getRuntimeValue(activeName, 'activeConditions');
+    if (storedConds == null) {
+        console.error(`[expirations] activeConditions not tracked for ${activeName}`, { stack: new Error().stack });
+    }
+    const condsArr = storedConds || [];
+    const hasInvisible = condsArr.some(c => String(c).toLowerCase() === 'invisible');
 
     if (hasInvisible) {
         // Preserve Invisible condition — don't remove it
@@ -436,8 +541,16 @@ async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, cam
     const healAmount = effect.healExpression ? evaluateAutoExpression(effect.healExpression, playerStats) : 1;
     if (typeof healAmount !== 'number' || isNaN(healAmount) || healAmount <= 0) return;
 
-    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
-    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[expirations] hitPoints not tracked for ${activeName} in Regenerate Turn Start`, { playerStatsHitPoints: playerStats.hitPoints, stack: new Error().stack });
+    }
+    if (storedCurrentHp == null && storedMaxHp == null) {
+        console.error(`[expirations] Neither hitPoints nor currentHitPoints tracked for ${activeName} in Regenerate Turn Start`, { stack: new Error().stack });
+    }
+    const maxHp = storedMaxHp ?? playerStats.hitPoints;
+    const currentHp = storedCurrentHp ?? storedMaxHp ?? maxHp;
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
@@ -445,8 +558,16 @@ async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, cam
 
 async function applyRegenerateBuffHeal(activeName, playerStats, campaignName) {
     const healAmount = 1;
-    const maxHp = getRuntimeValue(activeName, 'hitPoints', campaignName) ?? playerStats.hitPoints ?? 100;
-    const currentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName) ?? getRuntimeValue(activeName, 'hitPoints', campaignName) ?? maxHp;
+    const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName);
+    if (storedMaxHp == null) {
+        console.error(`[expirations] hitPoints not tracked for ${activeName} in Regenerate Buff Heal`, { playerStatsHitPoints: playerStats.hitPoints, stack: new Error().stack });
+    }
+    if (storedCurrentHp == null && storedMaxHp == null) {
+        console.error(`[expirations] Neither hitPoints nor currentHitPoints tracked for ${activeName} in Regenerate Buff Heal`, { stack: new Error().stack });
+    }
+    const maxHp = storedMaxHp ?? playerStats.hitPoints;
+    const currentHp = storedCurrentHp ?? storedMaxHp ?? maxHp;
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
@@ -457,8 +578,17 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
     if (!combatSummary) return;
 
     const creatures = combatSummary.creatures || [];
-    const damageExpression = effect.damageExpression || '1d4';
-    const damageType = effect.damageType || 'Bludgeoning';
+    const storedDamageExpression = effect.damageExpression;
+    if (storedDamageExpression == null) {
+        console.error(`[expirations] effect.damageExpression is missing for effect ${effect?.name || 'unknown'}`, { effect: JSON.stringify(effect), stack: new Error().stack });
+    }
+    const damageExpression = storedDamageExpression || '1d4';
+
+    const storedDamageType = effect.damageType;
+    if (storedDamageType == null) {
+        console.error(`[expirations] effect.damageType is missing for effect ${effect?.name || 'unknown'}`, { effect: JSON.stringify(effect), stack: new Error().stack });
+    }
+    const damageType = storedDamageType || 'Bludgeoning';
 
     const damage = evaluateAutoExpression(damageExpression, playerStats);
 
@@ -468,18 +598,31 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
         const creatureName = utils.getName(creature.name);
         if (creatureName === utils.getName(activeName)) continue;
 
-        const conditions = creature.conditions || [];
-        const isGrappled = conditions.some(c => {
+        const conditions = creature.conditions;
+        if (conditions == null) {
+            console.error(`[expirations] conditions missing for creature ${creature?.name}`, { creature: JSON.stringify(creature), stack: new Error().stack });
+        }
+        const conditionsArr = conditions || [];
+        const isGrappled = conditionsArr.some(c => {
             const cStr = typeof c === 'object' ? String(c.key || '') : String(c);
             return cStr.toLowerCase() === 'grappled';
         });
         if (!isGrappled) continue;
 
         try {
-            const currentHp = creature.hit_points?.current ?? creature.currentHp ?? 0;
-            const newHp = Math.max(0, currentHp - damage);
-            creature.hit_points = creature.hit_points || {};
-            creature.hit_points.current = newHp;
+            const storedCurrentHp = creature.hit_points?.current ?? creature.currentHp;
+            if (storedCurrentHp == null) {
+                console.error(`[expirations] Creature HP missing for ${creatureName}`, { creature: JSON.stringify(creature), stack: new Error().stack });
+            }
+            const maxHp = storedCurrentHp ?? 0;
+            const newHp = Math.max(0, maxHp - damage);
+            const hitPoints = creature.hit_points;
+            if (hitPoints == null) {
+                console.error(`[expirations] hit_points missing for creature ${creature?.name}`, { creature: JSON.stringify(creature), stack: new Error().stack });
+            }
+            const hitPointsObj = hitPoints || {};
+            hitPointsObj.current = newHp;
+            creature.hit_points = hitPointsObj;
             if (creature.currentHp != null) {
                 creature.currentHp = newHp;
             }
@@ -519,7 +662,11 @@ export function clearAllExpirationEffects(characterName, campaignName) {
     const charLower = characterName.toLowerCase();
 
      // --- "From me": clear all effects I have on other targets ---
-    const myList = getRuntimeValue(characterName, KEY) || [];
+    const storedExpirations = getRuntimeValue(characterName, KEY);
+    if (storedExpirations == null) {
+        console.error(`[expirations] pendingExpirations not tracked for ${characterName}`, { stack: new Error().stack });
+    }
+    const myList = storedExpirations || [];
     for (const entry of myList) {
         clearExpirationEffects(entry.effects, entry.target, characterName, campaignName);
       }
@@ -531,7 +678,11 @@ export function clearAllExpirationEffects(characterName, campaignName) {
         if (!key || key === 'combatSummary' || key === 'activeCreatureName') continue;
         if (key.toLowerCase() === charLower) continue;
 
-       const list = getRuntimeValue(key, KEY) || [];
+        const storedExpirations = getRuntimeValue(key, KEY);
+        if (storedExpirations == null) {
+            console.error(`[expirations] pendingExpirations not tracked for ${key}`, { stack: new Error().stack });
+        }
+        const list = storedExpirations || [];
         if (!list.length) continue;
 
         let kept = [];
@@ -557,7 +708,11 @@ export function expireStaleEffects(campaignName) {
     if (!activeName) return;
 
     try {
-        const combatData = getCombatSummary(campaignName) || {};
+        const storedCombatData = getCombatSummary(campaignName);
+        if (storedCombatData == null) {
+            console.error(`[expirations] combatData is null for campaign ${campaignName}`, { stack: new Error().stack });
+        }
+        const combatData = storedCombatData || {};
         const creatures = combatData.creatures || [];
 
         for (const attacker of creatures) {
@@ -609,9 +764,17 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 }
 
             case 'fly_speed_equals_walk_speed': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                const conditionSet = new Set(Array.isArray(conditions) ? conditions : []);
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr = storedBuffs || [];
+                const storedConds = getRuntimeValue(targetName, 'activeConditions');
+    if (storedConds == null) {
+        console.error(`[expirations] activeConditions not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const condsArr = storedConds || [];
+                const conditionSet = new Set(Array.isArray(condsArr) ? condsArr : []);
                 if (conditionSet.has('incapacitated')) {
                     addEntry(campaignName, {
                         type: 'ability_use',
@@ -621,11 +784,11 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                         timestamp: Date.now(),
                     }).catch(() => {});
                 }
-                if (Array.isArray(buffs)) {
+                if (Array.isArray(buffsArr)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        buffs.filter(b => b.effect !== 'fly_speed_equals_walk_speed'),
+                        buffsArr.filter(b => b.effect !== 'fly_speed_equals_walk_speed'),
                         campaignName
                     );
                 }
@@ -633,12 +796,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'fly_speed_20_hover': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(buffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr2 = storedBuffs || [];
+                if (Array.isArray(buffsArr2)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        buffs.filter(b => b.effect !== 'fly_speed_20_hover'),
+                        buffsArr2.filter(b => b.effect !== 'fly_speed_20_hover'),
                         campaignName
                     );
                 }
@@ -646,12 +813,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'dragon_wings': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(buffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr3 = storedBuffs || [];
+                if (Array.isArray(buffsArr3)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        buffs.filter(b => b.effect !== 'dragon_wings'),
+                        buffsArr3.filter(b => b.effect !== 'dragon_wings'),
                         campaignName
                     );
                 }
@@ -659,12 +830,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'ice_walk': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(buffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr4 = storedBuffs || [];
+                if (Array.isArray(buffsArr4)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        buffs.filter(b => b.effect !== 'ice_walk'),
+                        buffsArr4.filter(b => b.effect !== 'ice_walk'),
                         campaignName
                     );
                 }
@@ -672,12 +847,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'speed_boost': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(buffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr5 = storedBuffs || [];
+                if (Array.isArray(buffsArr5)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        buffs.filter(b => b.effect !== 'speed_boost'),
+                        buffsArr5.filter(b => b.effect !== 'speed_boost'),
                         campaignName
                     );
                 }
@@ -685,27 +864,35 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_active_buff': {
-                const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                const wasHaste = Array.isArray(allBuffs) && allBuffs.some(b => b.name === effect.buffName && b.effect === 'haste');
-                if (Array.isArray(allBuffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr6 = storedBuffs || [];
+                const wasHaste = Array.isArray(buffsArr6) && buffsArr6.some(b => b.name === effect.buffName && b.effect === 'haste');
+                if (Array.isArray(buffsArr6)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        allBuffs.filter(b => b.name !== effect.buffName),
+                        buffsArr6.filter(b => b.name !== effect.buffName),
                         campaignName
                     );
                 }
                 if (wasHaste) {
-                    const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
-                    const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-                    const hasSpeedZero = conditions.some(c => String(c).toLowerCase() === 'speed_zero');
-                    const hasIncapacitated = conditions.some(c => String(c).toLowerCase() === 'incapacitated');
+                    const storedConds = getRuntimeValue(targetName, 'activeConditions');
+    if (storedConds == null) {
+        console.error(`[expirations] activeConditions not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const condsArr2 = storedConds || [];
+                    const conditions2 = Array.isArray(condsArr2) ? condsArr2 : [];
+                    const hasSpeedZero = conditions2.some(c => String(c).toLowerCase() === 'speed_zero');
+                    const hasIncapacitated = conditions2.some(c => String(c).toLowerCase() === 'incapacitated');
                     const newConditions = [
-                        ...conditions.filter(c => String(c).toLowerCase() !== 'speed_zero'),
+                        ...conditions2.filter(c => String(c).toLowerCase() !== 'speed_zero'),
                         'speed_zero',
                         ...(!hasIncapacitated ? ['incapacitated'] : []),
                     ];
-                    if (newConditions.length !== conditions.length || !hasSpeedZero) {
+                    if (newConditions.length !== conditions2.length || !hasSpeedZero) {
                         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
                     }
                     const lethargyKey = `_hasteLethargy_${targetName.replace(/\s+/g, '_')}`;
@@ -720,12 +907,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'peerless_athlete_end': {
                 setRuntimeValue(targetName, 'peerlessAthleteActive', false, campaignName);
-                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(buffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr7 = storedBuffs || [];
+                if (Array.isArray(buffsArr7)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        buffs.filter(b => b.effect !== 'peerless_athlete'),
+                        buffsArr7.filter(b => b.effect !== 'peerless_athlete'),
                         campaignName
                     );
                 }
@@ -734,12 +925,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'large_form_end': {
                 setRuntimeValue(targetName, 'largeFormActive', false, campaignName);
-                const buffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(buffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr8 = storedBuffs || [];
+                if (Array.isArray(buffsArr8)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        buffs.filter(b => b.effect !== 'large_form'),
+                        buffsArr8.filter(b => b.effect !== 'large_form'),
                         campaignName
                     );
                 }
@@ -801,12 +996,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'remove_feign_death_buff': {
                 // Custom cleanup for Feign Death: remove the buff and all associated conditions
-                const feignBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(feignBuffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr9 = storedBuffs || [];
+                if (Array.isArray(buffsArr9)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        feignBuffs.filter(b => b.name !== effect.buffName),
+                        buffsArr9.filter(b => b.name !== effect.buffName),
                         campaignName
                     );
                 }
@@ -830,12 +1029,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_heroes_feast_buff': {
-                const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(allBuffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr10 = storedBuffs || [];
+                if (Array.isArray(buffsArr10)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        allBuffs.filter(b => b.name !== effect.buffName),
+                        buffsArr10.filter(b => b.name !== effect.buffName),
                         campaignName
                     );
                 }
@@ -858,12 +1061,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_aid_buff': {
-                const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(allBuffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr11 = storedBuffs || [];
+                if (Array.isArray(buffsArr11)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        allBuffs.filter(b => b.name !== effect.buffName),
+                        buffsArr11.filter(b => b.name !== effect.buffName),
                         campaignName
                     );
                 }
@@ -882,12 +1089,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_heroism_buff': {
-                const allBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
-                if (Array.isArray(allBuffs)) {
+                const storedBuffs = getRuntimeValue(targetName, 'activeBuffs');
+    if (storedBuffs == null) {
+        console.error(`[expirations] activeBuffs not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const buffsArr12 = storedBuffs || [];
+                if (Array.isArray(buffsArr12)) {
                     setRuntimeValue(
                         targetName,
                         'activeBuffs',
-                        allBuffs.filter(b => b.name !== effect.buffName),
+                        buffsArr12.filter(b => b.name !== effect.buffName),
                         campaignName
                     );
                 }
@@ -919,7 +1130,11 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
 function removeNpcCondition(targetName, conditionName, campaignName) {
     try {
-        const combatData = getCombatSummary(campaignName) || {};
+        const storedCombatData = getCombatSummary(campaignName);
+        if (storedCombatData == null) {
+            console.error(`[expirations] combatData is null for campaign ${campaignName}`, { stack: new Error().stack });
+        }
+        const combatData = storedCombatData || {};
         const creatures = combatData.creatures || [];
         const creature = creatures.find(c => utils.getName(c.name) === utils.getName(targetName));
         if (creature && creature.conditions) {
@@ -931,8 +1146,12 @@ function removeNpcCondition(targetName, conditionName, campaignName) {
 }
 
 function removeActiveCondition(targetName, conditionName, campaignName) {
-    const condList = getRuntimeValue(targetName, 'activeConditions') || [];
-    if (!Array.isArray(condList)) return;
-    const filtered = condList.filter(c => utils.getName(c) !== utils.getName(conditionName));
+    const storedConds = getRuntimeValue(targetName, 'activeConditions');
+    if (storedConds == null) {
+        console.error(`[expirations] activeConditions not tracked for ${targetName}`, { stack: new Error().stack });
+    }
+    const condsArr = storedConds || [];
+    if (!Array.isArray(condsArr)) return;
+    const filtered = condsArr.filter(c => utils.getName(c) !== utils.getName(conditionName));
     setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 }

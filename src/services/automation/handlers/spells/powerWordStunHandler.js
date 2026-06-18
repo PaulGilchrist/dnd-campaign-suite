@@ -28,7 +28,10 @@ export async function processPowerWordStunRepeatSave(casterName, targetName, sav
         abilityName: spellName,
         description: `${targetName} makes a CON save (DC ${saveDc}) at end of turn (${spellName}).`,
         promptId,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const saveResult = await promise;
 
@@ -51,7 +54,10 @@ export async function processPowerWordStunRepeatSave(casterName, targetName, sav
             saveType: 'CON',
             success: true,
             description: `${targetName} succeeded on CON save. ${spellName} ends!`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -82,7 +88,10 @@ export async function processPowerWordStunRepeatSave(casterName, targetName, sav
         saveType: 'CON',
         success: false,
         description: `${targetName} failed CON save. ${spellName} continues.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',
@@ -228,7 +237,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'CON',
         success: false,
         description: description,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

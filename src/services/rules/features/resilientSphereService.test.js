@@ -239,18 +239,18 @@ describe('resilientSphereService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('throws when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            const result = await triggerResilientSphere(
-                { name: 'Resilient Sphere', level: 4 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
+            await expect(
+                triggerResilientSphere(
+                    { name: 'Resilient Sphere', level: 4 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                ),
+            ).rejects.toThrow('Handler failed');
         });
 
         it('passes the spell object into the action', async () => {

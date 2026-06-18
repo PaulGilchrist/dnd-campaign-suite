@@ -152,7 +152,7 @@ export async function triggerFriends(spell, metaCtx, playerStats, campaignName, 
         return result;
     } catch (e) {
         console.error('[friendsService] Failed to execute Friends handler:', e);
-        return { type: 'popup', payload: { type: 'automation_info', name: 'Friends', description: `Failed to execute Friends.` } };
+        throw e;
     }
 }
 

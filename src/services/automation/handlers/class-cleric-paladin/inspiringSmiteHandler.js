@@ -85,7 +85,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} used ${action.name} (2d8 + ${playerStats.level} = ${tempHpAmount} temp HP). Targets: ${targetList}`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'roll',

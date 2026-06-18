@@ -51,7 +51,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${playerName} used ${featureName} on ${attackerName}, imposing Disadvantage and teleporting 30 feet.`,
         targetName: attackerName,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return infoPopup(featureName, description, auto);
 }

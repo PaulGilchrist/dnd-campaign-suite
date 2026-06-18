@@ -61,7 +61,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name}: regained 1 spell slot of level ${bestLevel} after casting ${spell.name} with a level ${spellSlotLevel} slot.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

@@ -85,7 +85,10 @@ export async function handle(action, playerStats, campaignName) {
         abilityName: featureName,
         description: `${featureName}: ${companion.name} gains ${tempHp} Temporary Hit Points.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

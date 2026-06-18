@@ -47,7 +47,10 @@ export async function applyChoice(playerStats, campaignName, choice) {
         characterName: playerStats.name,
         abilityName: "Defensive Tactics",
         description: `Defensive Tactics choice: ${choice}`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

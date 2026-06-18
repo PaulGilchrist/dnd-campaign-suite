@@ -928,32 +928,47 @@ const rules = {
         const dexAbility = playerStats.abilities.find((ability) => ability.name === 'Dexterity');
         playerStats.initiative = dexAbility.bonus;
         // Add Dread Ambush initiative bonus (WIS modifier) for Gloom Stalkers
-        const dreadAmbushPassive = (playerStats.automation?.passives ?? []).find(
+        const storedPassives = playerStats.automation?.passives;
+        if (storedPassives == null) {
+            console.error(`[rules] automation.passives missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
+        }
+        const passives = storedPassives || [];
+        const dreadAmbushPassive = passives.find(
             p => p.type === 'passive_rule' && p.effect === 'dread_ambush_initiative'
         );
         if (dreadAmbushPassive) {
             const wisAbility = playerStats.abilities.find((ability) => ability.name === 'Wisdom');
-            playerStats.initiative += (wisAbility?.bonus || 0);
+            const storedWisBonus = wisAbility?.bonus;
+            if (storedWisBonus == null) {
+                console.error(`[rules] Wisdom bonus missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
+            }
+            const wisBonus = storedWisBonus || 0;
+            playerStats.initiative += wisBonus;
         }
         // Add initiative_bonus from passive_buff (e.g., Alert feat)
-        const initiativeBonusPassives = (playerStats.automation?.passives ?? []).filter(
+        const initiativeBonusPassives = passives.filter(
             p => p.type === 'passive_buff' && p.effect === 'initiative_bonus'
         );
         for (const passive of initiativeBonusPassives) {
-            const bonus = evaluateAutoExpression(passive.bonusExpression || '0', playerStats);
+            const storedBonusExpr = passive.bonusExpression;
+            if (storedBonusExpr == null) {
+                console.error(`[rules] bonusExpression missing for passive ${passive.name || 'unknown'}`, { stack: new Error().stack });
+            }
+            const bonusExpr = storedBonusExpr || '0';
+            const bonus = evaluateAutoExpression(bonusExpr, playerStats);
             if (typeof bonus === 'number' && !isNaN(bonus)) {
                 playerStats.initiative += bonus;
             }
         }
-        playerStats.initiativeAdvantage = (playerStats.automation?.passives ?? []).some(
+        playerStats.initiativeAdvantage = passives.some(
             p => p.type === 'passive_rule' && p.effect === 'initiative_advantage'
         );
         // Alert: can't be surprised while conscious
-        playerStats.noSurprise = (playerStats.automation?.passives ?? []).some(
+        playerStats.noSurprise = passives.some(
             p => p.type === 'passive_buff' && p.effect === 'no_surprise'
         );
         // Alert: unseen attackers don't gain advantage on attacks against you
-        playerStats.unseenAttackerAdvantageNegate = (playerStats.automation?.passives ?? []).some(
+        playerStats.unseenAttackerAdvantageNegate = passives.some(
             p => p.type === 'passive_buff' && p.effect === 'unseen_attacker_advantage_negate'
         );
          [playerStats.armorClass, playerStats.armorClassFormula] = rules.getArmorClass(allEquipment, playerStats, playerSummary);

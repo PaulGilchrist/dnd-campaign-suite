@@ -91,7 +91,7 @@ describe('reactionSpellHandler.applyWarCasterReaction', () => {
 
     useRuntimeState.getRuntimeValue.mockReturnValue([]);
 
-    const result = applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
+    const result = await applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
 
     expect(result).toEqual({ ok: true });
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
@@ -117,7 +117,7 @@ describe('reactionSpellHandler.applyWarCasterReaction', () => {
       { targetName: 'Orc', spellName: 'Magic Missile' },
     ]);
 
-    applyWarCasterReaction('Goblin', 'Fireball', spellData, ps, campaignName);
+    await applyWarCasterReaction('Goblin', 'Fireball', spellData, ps, campaignName);
 
     const calls = useRuntimeState.setRuntimeValue.mock.calls;
     const storedCall = calls.find(c => c[1] === 'warCasterReactions');
@@ -131,7 +131,7 @@ describe('reactionSpellHandler.applyWarCasterReaction', () => {
     useRuntimeState.getRuntimeValue.mockReturnValue([]);
 
     const before = Date.now();
-    applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
+    await applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
     const after = Date.now();
 
     const calls = useRuntimeState.setRuntimeValue.mock.calls;
@@ -147,7 +147,7 @@ describe('reactionSpellHandler.applyWarCasterReaction', () => {
 
     useRuntimeState.getRuntimeValue.mockReturnValue([]);
 
-    applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
+    await applyWarCasterReaction('Goblin', 'Burning Hands', spellData, ps, campaignName);
 
     expect(logService.addEntry).toHaveBeenCalledWith(
       campaignName,
@@ -160,15 +160,13 @@ describe('reactionSpellHandler.applyWarCasterReaction', () => {
     );
   });
 
-  it('catches and swallows addEntry errors', async () => {
+  it('propagates addEntry errors', async () => {
     const ps = makePlayerStats();
     const spellData = { name: 'Fireball', level: 3 };
 
     useRuntimeState.getRuntimeValue.mockReturnValue([]);
     logService.addEntry.mockRejectedValue(new Error('network'));
 
-    const result = applyWarCasterReaction('Goblin', 'Fireball', spellData, ps, campaignName);
-
-    expect(result).toEqual({ ok: true });
+    await expect(applyWarCasterReaction('Goblin', 'Fireball', spellData, ps, campaignName)).rejects.toThrow('network');
   });
 });

@@ -686,7 +686,7 @@ describe('wildMagicSurgeService', () => {
             expect(result).toBeNull();
         });
 
-        it('handles executeHandler error gracefully', async () => {
+        it('re-throws executeHandler error', async () => {
             const playerStats = { ...basePlayerStats };
             const spell = { name: 'Fire Bolt', level: 1 };
 
@@ -697,15 +697,15 @@ describe('wildMagicSurgeService', () => {
 
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            const result = await triggerWildMagicSurge(
-                spell,
-                { slotLevel: 1 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
+            await expect(
+                triggerWildMagicSurge(
+                    spell,
+                    { slotLevel: 1 },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('Handler failed');
         });
 
         it('uses spell.level when metaCtx has no slotLevel', async () => {

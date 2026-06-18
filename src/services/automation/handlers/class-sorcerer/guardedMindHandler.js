@@ -41,7 +41,10 @@ export async function handle(action, playerStats, campaignName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} used ${action.name} to end ${removedList} conditions. Psionic Energy: ${currentUses - 1}/${defaultMax}.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

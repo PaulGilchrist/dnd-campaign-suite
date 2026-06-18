@@ -23,6 +23,6 @@ export async function triggerSlow(spell, metaCtx, playerStats, campaignName, map
         return result;
     } catch (e) {
         console.error(`[slowService] Failed to execute ${spell.name} handler:`, e);
-        return null;
+        throw e;
     }
 }

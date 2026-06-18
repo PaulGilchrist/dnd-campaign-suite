@@ -755,7 +755,7 @@ describe('bardicInspirationOffenseHandler.handle', () => {
       );
     });
 
-    it('does not propagate addEntry rejection', async () => {
+    it('propagates addEntry rejection', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
@@ -764,11 +764,7 @@ describe('bardicInspirationOffenseHandler.handle', () => {
       useMetamagic.getLastDamageEvent.mockReturnValue(null);
       logService.addEntry.mockRejectedValue(new Error('log service failed'));
 
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      // Should still return success popup despite addEntry failure
-      expect(result.payload.description).toContain('rolled **5**');
+      await expect(handle(action, ps, campaignName)).rejects.toThrow('log service failed');
     });
 
     it('calls getRuntimeValue with correct key for bardicInspirationDie', async () => {

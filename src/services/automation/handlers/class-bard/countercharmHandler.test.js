@@ -1026,7 +1026,7 @@ describe('countercharmHandler.handle', () => {
       });
     });
 
-    it('should swallow addEntry errors', async () => {
+    it('propagates addEntry errors', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -1041,8 +1041,7 @@ describe('countercharmHandler.handle', () => {
       rangeToFeet.mockReturnValue(30);
       addEntry.mockReturnValue(Promise.reject(new Error('log error')));
 
-      // Should not throw
-      await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
+      await expect(handle(action, ps, campaignName, null)).rejects.toThrow('log error');
     });
   });
 

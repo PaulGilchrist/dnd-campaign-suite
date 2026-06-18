@@ -49,7 +49,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: buffName,
             description: `${playerName} cast ${buffName} — a ${aoeRadius}-foot-radius sphere of silence is created. Creatures inside are Deafened and immune to Thunder damage. Verbal spell components cannot be used inside.`,
             timestamp: Date.now(),
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
     } else {
         setRuntimeValue(playerName, SILENCE_KEY, false, campaignName);
         setRuntimeValue(playerName, SILENCE_CENTER_KEY, null, campaignName);

@@ -83,7 +83,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} used Steady Aim — Speed 0 until end of turn, Advantage on next attack roll.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     let description = `${action.name} activated! You have Advantage on your next attack roll.`;
     if (hasRovingAim) {

@@ -41,7 +41,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${action.name} triggered — target ${targetName} must make ${auto.saveType || 'CON'} save (DC ${saveDc})`,
         promptId,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -62,7 +65,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'CON',
                 success: true,
                 description: `${targetName} succeeded on ${auto.saveType || 'CON'} save. Speed halved until start of next turn.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
             addExpiration(playerStats.name, targetName, [
                 { type: 'stunned', condition: 'speed_halved' },
@@ -81,7 +87,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'CON',
                 success: false,
                 description: `${targetName} failed ${auto.saveType || 'CON'} save. Stunned until start of next turn.`,
-            }).catch(() => {});
+            }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
             addExpiration(playerStats.name, targetName, [
                 { type: 'stunned', condition: 'stunned' }

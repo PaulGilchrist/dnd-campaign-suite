@@ -105,12 +105,12 @@ describe('damageTypeModifierHandler.handle', () => {
     );
   });
 
-  it('catches and swallows addEntry errors', async () => {
+  it('propagates addEntry errors', async () => {
     const action = makeAction({ options: [] });
     const ps = makePlayerStats();
     logService.addEntry.mockRejectedValue(new Error('network'));
 
-    await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
+    await expect(handle(action, ps, campaignName, null)).rejects.toThrow('network');
   });
 });
 
@@ -191,14 +191,12 @@ describe('damageTypeModifierHandler.applyDamageTypeChoice', () => {
     expect(result.payload.automation).toBe(action.automation);
   });
 
-  it('catches and swallows addEntry errors', async () => {
+  it('propagates addEntry errors', async () => {
     const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
     const ps = makePlayerStats();
     logService.addEntry.mockRejectedValue(new Error('network'));
 
-    const result = await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
-
-    expect(result).not.toBeNull();
+    await expect(applyDamageTypeChoice(action, ps, campaignName, 'Thunder')).rejects.toThrow('network');
   });
 
   it('uses current combat round from cache', async () => {

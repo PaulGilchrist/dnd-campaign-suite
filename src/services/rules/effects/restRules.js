@@ -4,7 +4,11 @@ import { clearAllExpirationEffects } from './expirations.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 
 export function getHitDieSize(playerStats) {
-  const hitDieStr = playerStats?.class?.hit_point_die || playerStats?.class?.hit_die;
+  const storedHitDie = playerStats?.class?.hit_point_die || playerStats?.class?.hit_die;
+  if (storedHitDie == null) {
+    console.error(`[restRules] hit_point_die/hit_die missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+  }
+  const hitDieStr = storedHitDie || 8;
 
   if (hitDieStr != null) {
     const die = parseInt(String(hitDieStr).replace(/[^0-9]/g, ''), 10);
@@ -27,8 +31,16 @@ const SHORT_REST_RESOURCE_LABELS = [
 ];
 
 export function getShortRestResourceLabels(playerStats) {
-    const className = playerStats?.class?.name;
-    const subclassName = playerStats?.class?.subclass?.name || playerStats?.class?.major?.name;
+    const storedClassName = playerStats?.class?.name;
+    if (storedClassName == null) {
+        console.error(`[restRules] class.name missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+    }
+    const className = storedClassName;
+    const storedSubclassName = playerStats?.class?.subclass?.name || playerStats?.class?.major?.name;
+    if (storedSubclassName == null) {
+        console.error(`[restRules] subclass.name/major.name missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+    }
+    const subclassName = storedSubclassName;
 
     return SHORT_REST_RESOURCE_LABELS.filter(entry => {
         if (!entry.classes.includes(className)) return false;
@@ -124,8 +136,16 @@ export async function applyShortRest(playerStats, campaignName) {
 
   if (playerStats.class?.name === 'Fighter') {
     const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
-    const maxSW = classLevel?.second_wind || 0;
-    const currentSW = Number(getRuntimeValue(name, 'secondWindUses', campaignName) ?? 0);
+    const storedSecondWind = classLevel?.second_wind;
+    if (storedSecondWind == null) {
+      console.error(`[restRules] second_wind missing for ${name}`, { stack: new Error().stack });
+    }
+    const maxSW = storedSecondWind || 0;
+    const storedSecondWindUses = getRuntimeValue(name, 'secondWindUses', campaignName);
+    if (storedSecondWindUses == null) {
+      console.error(`[restRules] secondWindUses not tracked for ${name}`, { stack: new Error().stack });
+    }
+    const currentSW = Number(storedSecondWindUses ?? 0);
     if (currentSW < maxSW) {
       updates.secondWindUses = Math.min(maxSW, currentSW + 1);
     }
@@ -151,15 +171,27 @@ export async function applyShortRest(playerStats, campaignName) {
       p => p.type === 'resource_restoration' && p.resourceKey === 'naturalRecoverySlots'
     )
     if (hasNaturalRecovery && playerStats.class?.name === 'Druid') {
-      const druidLevel = playerStats.level || 1
+      const storedLevel = playerStats.level;
+      if (storedLevel == null) {
+        console.error(`[restRules] level missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+      }
+      const druidLevel = storedLevel || 1
       const maxSlotsToRecover = Math.floor(druidLevel / 2)
       let slotsRecovered = 0
       const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
       for (const level of slotLevels) {
         if (slotsRecovered >= maxSlotsToRecover) break
         const slotKey = `spell_slots_level_${level}`
-        const max = playerStats.spellAbilities?.[slotKey] || 0
-        const current = Number(getRuntimeValue(name, slotKey) ?? max)
+        const storedSlotMax = playerStats.spellAbilities?.[slotKey];
+        if (storedSlotMax == null) {
+          console.error(`[restRules] spellAbilities[${slotKey}] missing for ${name}`, { stack: new Error().stack });
+        }
+        const max = storedSlotMax || 0;
+        const storedSlotCurrent = getRuntimeValue(name, slotKey);
+        if (storedSlotCurrent == null) {
+          console.error(`[restRules] slot current not tracked for ${name} key=${slotKey}`, { stack: new Error().stack });
+        }
+        const current = Number(storedSlotCurrent ?? max)
         const available = max - current
         if (available > 0) {
           const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered)
@@ -174,7 +206,11 @@ export async function applyShortRest(playerStats, campaignName) {
       p => p.type === 'resource_restoration' && p.resourceKey === 'arcaneRecoveryLevels'
     )
     if (hasArcaneRecovery && playerStats.class?.name === 'Wizard') {
-      const wizardLevel = playerStats.level || 1
+      const storedWizardLevel = playerStats.level;
+      if (storedWizardLevel == null) {
+        console.error(`[restRules] level missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+      }
+      const wizardLevel = storedWizardLevel || 1
       const maxSlotsToRecover = Math.ceil(wizardLevel / 2)
       let slotsRecovered = 0
       // Only recover slots level 5 and lower (no level 6+)
@@ -182,8 +218,16 @@ export async function applyShortRest(playerStats, campaignName) {
       for (const level of slotLevels) {
         if (slotsRecovered >= maxSlotsToRecover) break
         const slotKey = `spell_slots_level_${level}`
-        const max = playerStats.spellAbilities?.[slotKey] || 0
-        const current = Number(getRuntimeValue(name, slotKey) ?? max)
+        const storedSlotMax = playerStats.spellAbilities?.[slotKey];
+        if (storedSlotMax == null) {
+          console.error(`[restRules] spellAbilities[${slotKey}] missing for ${name}`, { stack: new Error().stack });
+        }
+        const max = storedSlotMax || 0;
+        const storedSlotCurrent = getRuntimeValue(name, slotKey);
+        if (storedSlotCurrent == null) {
+          console.error(`[restRules] slot current not tracked for ${name} key=${slotKey}`, { stack: new Error().stack });
+        }
+        const current = Number(storedSlotCurrent ?? max)
         const available = max - current
         if (available > 0) {
           const toRecover = Math.min(available, maxSlotsToRecover - slotsRecovered)
@@ -248,9 +292,17 @@ export async function applyShortRest(playerStats, campaignName) {
       const slotLevels = [1, 2, 3, 4, 5, 6, 7, 8, 9]
       for (const level of slotLevels) {
         const slotKey = `spell_slots_level_${level}`
-        const max = playerStats.spellAbilities?.[slotKey] || 0
+        const storedSlotMax = playerStats.spellAbilities?.[slotKey];
+        if (storedSlotMax == null) {
+          console.error(`[restRules] spellAbilities[${slotKey}] missing for ${name}`, { stack: new Error().stack });
+        }
+        const max = storedSlotMax || 0
         if (max > 0) {
-          const current = Number(getRuntimeValue(name, slotKey) ?? max)
+          const storedSlotCurrent = getRuntimeValue(name, slotKey);
+          if (storedSlotCurrent == null) {
+            console.error(`[restRules] slot current not tracked for ${name} key=${slotKey}`, { stack: new Error().stack });
+          }
+          const current = Number(storedSlotCurrent ?? max)
           if (current < max) {
             updates[slotKey] = max
           }
@@ -263,7 +315,11 @@ export async function applyShortRest(playerStats, campaignName) {
         p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
     )
     if (hasBolsteringTreats) {
-      const craftCount = playerStats.proficiency || 0
+      const storedProficiency = playerStats.proficiency;
+      if (storedProficiency == null) {
+        console.error(`[restRules] proficiency missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+      }
+      const craftCount = storedProficiency || 0
       updates.chefBolsteringTreats = craftCount
     }
 
@@ -272,11 +328,23 @@ export async function applyShortRest(playerStats, campaignName) {
      const features = playerStats.characterAdvancement || []
      const feature = features.find(f => f.name === 'Celestial Resilience')
      if (feature) {
-       const warlockLevel = playerStats.level || 0
-       const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-       const selfTempHp = warlockLevel + chaMod
-       if (selfTempHp > 0) {
-         const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+        const storedLevel = playerStats.level;
+        if (storedLevel == null) {
+          console.error(`[restRules] level missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+        }
+        const warlockLevel = storedLevel || 0
+        const storedCharismaBonus = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus;
+        if (storedCharismaBonus == null) {
+          console.error(`[restRules] Charisma bonus missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+        }
+        const chaMod = storedCharismaBonus || 0
+        const selfTempHp = warlockLevel + chaMod
+        if (selfTempHp > 0) {
+          const storedTempHp = getRuntimeValue(name, 'tempHp', campaignName);
+          if (storedTempHp == null) {
+            console.error(`[restRules] tempHp not tracked for ${name}`, { stack: new Error().stack });
+          }
+          const existingTempHp = Number(storedTempHp || 0)
          updates.tempHp = existingTempHp + selfTempHp
        }
      }
@@ -374,14 +442,26 @@ export async function applyLongRest(playerStats, campaignName) {
 
     // Celestial Resilience: Grant temp HP on long rest for Celestial Patron
      if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {
-       const features = playerStats.characterAdvancement || []
-       const feature = features.find(f => f.name === 'Celestial Resilience')
-       if (feature) {
-         const warlockLevel = playerStats.level || 0
-         const chaMod = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus || 0
-         const selfTempHp = warlockLevel + chaMod
-         if (selfTempHp > 0) {
-           const existingTempHp = Number(getRuntimeValue(name, 'tempHp', campaignName) || 0)
+        const features = playerStats.characterAdvancement || []
+        const feature = features.find(f => f.name === 'Celestial Resilience')
+        if (feature) {
+          const storedLevel = playerStats.level;
+          if (storedLevel == null) {
+            console.error(`[restRules] level missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+          }
+          const warlockLevel = storedLevel || 0
+          const storedCharismaBonus = (playerStats.abilities || []).find(a => a.name === 'Charisma')?.bonus;
+          if (storedCharismaBonus == null) {
+            console.error(`[restRules] Charisma bonus missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+          }
+          const chaMod = storedCharismaBonus || 0
+          const selfTempHp = warlockLevel + chaMod
+          if (selfTempHp > 0) {
+            const storedTempHp = getRuntimeValue(name, 'tempHp', campaignName);
+            if (storedTempHp == null) {
+              console.error(`[restRules] tempHp not tracked for ${name}`, { stack: new Error().stack });
+            }
+            const existingTempHp = Number(storedTempHp || 0)
            setRuntimeValue(name, 'tempHp', existingTempHp + selfTempHp, campaignName, true)
          }
        }
@@ -432,7 +512,11 @@ export async function applyLongRest(playerStats, campaignName) {
         p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'
     )
     if (hasBolsteringTreats) {
-        const craftCount = playerStats.proficiency || 0
+        const storedProficiency = playerStats.proficiency;
+        if (storedProficiency == null) {
+            console.error(`[restRules] proficiency missing for ${playerStats?.name || 'unknown'}`, { stack: new Error().stack });
+        }
+        const craftCount = storedProficiency || 0
         setRuntimeValue(name, 'chefBolsteringTreats', craftCount, campaignName, true)
     }
 }

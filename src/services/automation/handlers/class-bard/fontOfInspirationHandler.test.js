@@ -526,7 +526,7 @@ describe('fontOfInspirationHandler.handle', () => {
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('should catch and suppress addEntry errors', async () => {
+    it('propagates addEntry errors', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       useRuntimeState.getRuntimeValue
@@ -534,10 +534,7 @@ describe('fontOfInspirationHandler.handle', () => {
         .mockReturnValueOnce(4);
       logService.addEntry.mockRejectedValue(new Error('db error'));
 
-      // Should not throw
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
+      await expect(handle(action, ps, campaignName, null)).rejects.toThrow('db error');
     });
 
     it('should use 0 as default bonus when Charisma is undefined', async () => {

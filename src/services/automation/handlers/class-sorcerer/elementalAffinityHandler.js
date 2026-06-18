@@ -16,7 +16,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             characterName: playerStats.name,
             abilityName: name,
             description: `${name} — damage type is ${chosenType}`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
         return {
             type: 'modal',
@@ -62,7 +65,10 @@ export async function applyTypeChoice(action, playerStats, campaignName, chosenT
         characterName: playerStats.name,
         abilityName: name,
         description: `${name} — damage type ${isChange ? 'changed to' : 'set to'} ${chosenType}`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

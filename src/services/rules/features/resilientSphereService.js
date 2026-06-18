@@ -24,6 +24,6 @@ export async function triggerResilientSphere(spell, metaCtx, playerStats, campai
         return result;
     } catch (e) {
         console.error(`[resilientSphereService] Failed to execute ${spell.name} handler:`, e);
-        return null;
+        throw e;
     }
 }

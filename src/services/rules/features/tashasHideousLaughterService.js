@@ -23,6 +23,6 @@ export async function triggerTashasHideousLaughter(spell, metaCtx, playerStats, 
         return result;
     } catch (e) {
         console.error(`[tashasHideousLaughter] Failed to execute ${spell.name} handler:`, e);
-        return null;
+        throw e;
     }
 }

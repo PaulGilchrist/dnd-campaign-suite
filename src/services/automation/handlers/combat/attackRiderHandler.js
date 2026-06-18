@@ -17,7 +17,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${action.name} used${targetName ? ` against ${targetName}` : ''}`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     if (options.length > 0 && (auto.chooseOne || (auto.maxEffects || 1) > 1)) {
         return {
@@ -437,5 +440,8 @@ async function applyCunningStrikeCost(playerStats, campaignName, costD6) {
         characterName: playerStats.name,
         abilityName: 'Cunning Strike',
         description: `Forgoing ${costD6}d6 Sneak Attack damage dice for Cunning Strike cost.`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 }

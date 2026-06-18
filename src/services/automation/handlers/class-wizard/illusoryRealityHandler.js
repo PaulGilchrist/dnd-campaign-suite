@@ -62,7 +62,10 @@ export async function confirmIllusoryReality(action, playerStats, campaignName, 
         abilityName: featureName,
         description: `${playerName} used ${featureName} — the object "${trimmedName}" becomes real for 1 minute.`,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

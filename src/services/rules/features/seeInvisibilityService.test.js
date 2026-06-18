@@ -124,18 +124,18 @@ describe('seeInvisibilityService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('throws when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            const result = await triggerSeeInvisibility(
-                { name: 'See Invisibility', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
+            await expect(
+                triggerSeeInvisibility(
+                    { name: 'See Invisibility', level: 2 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                ),
+            ).rejects.toThrow('Handler failed');
         });
 
         it('passes the spell object into the action', async () => {

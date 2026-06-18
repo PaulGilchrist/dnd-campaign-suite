@@ -376,7 +376,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
             description: `${playerName} used ${featureName} to impose Disadvantage on attacks against ${targetInfo.target.name}.`,
             targetName: targetInfo.target.name,
             timestamp: Date.now(),
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
         return result;
     }
 
@@ -394,7 +397,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
         description: `${playerName} used ${featureName} on ${attackerName}.`,
         targetName: attackerName,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return result;
 }

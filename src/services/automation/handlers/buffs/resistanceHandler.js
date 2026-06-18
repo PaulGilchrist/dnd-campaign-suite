@@ -87,7 +87,10 @@ export async function applyResistance(action, playerStats, campaignName, targetN
         description: `${playerStats.name} cast ${action.name} on ${targetName} for ${damageType} resistance (1d4 reduction).`,
         targetName,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     return {
         type: 'popup',

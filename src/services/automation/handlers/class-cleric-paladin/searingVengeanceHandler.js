@@ -112,7 +112,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${action.name} used on ${targetName || 'target'} — healed for ${healAmount} HP, ${damageAmount} radiant damage to nearby creatures, Blinded until end of turn`,
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     // Log the healing
     await addEntry(campaignName, {
@@ -122,7 +125,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         amount: healAmount,
         abilityName: action.name,
         timestamp: Date.now(),
-    }).catch(() => {});
+    }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
 
     // Log the damage
     if (damageAmount > 0) {
@@ -134,7 +140,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             total: damageAmount,
             formula: damageExpr,
             description: `${action.name} dealt ${damageAmount} radiant damage to creatures within 30 feet.`,
-        }).catch(() => {});
+        }).catch(function(e) {
+                            console.error("[automation] Failed to log entry:", e);
+                            throw e;
+                        });
     }
 
     return {

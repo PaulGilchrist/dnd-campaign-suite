@@ -106,7 +106,7 @@ describe('superiorDefenseHandler', () => {
         expect(result.payload.name).toBe('Superior Defense');
       });
 
-      it('should handle addEntry rejection gracefully', async () => {
+      it('propagates addEntry rejection', async () => {
         runtimeState.getRuntimeValue.mockReturnValue([
           { name: 'Superior Defense' },
         ]);
@@ -117,9 +117,7 @@ describe('superiorDefenseHandler', () => {
           automation: { type: 'superior_defense' },
         };
 
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toBe('Superior Defense ended.');
+        await expect(handle(action, makePlayerStats(), campaignName)).rejects.toThrow('Network error');
       });
     });
 
@@ -361,7 +359,7 @@ describe('superiorDefenseHandler', () => {
         );
       });
 
-      it('should handle addEntry rejection during activation gracefully', async () => {
+      it('propagates addEntry rejection during activation', async () => {
         runtimeState.getRuntimeValue
           .mockReturnValueOnce([])
           .mockReturnValueOnce(6);
@@ -372,9 +370,7 @@ describe('superiorDefenseHandler', () => {
           automation: { type: 'superior_defense' },
         };
 
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('activated');
+        await expect(handle(action, makePlayerStats(), campaignName)).rejects.toThrow('Network error');
       });
 
       it('should use default cost of 3 when auto.cost is undefined', async () => {
@@ -815,10 +811,7 @@ describe('superiorDefenseHandler', () => {
           },
         });
 
-        const result = await activateAtTurnStart(ps, campaignName);
-
-        expect(result.activated).toBe(true);
-      });
+        await expect(activateAtTurnStart(ps, campaignName)).rejects.toThrow('Network error');
 
       it('should use maxFocus as fallback when focusPoints not in runtime state', async () => {
         runtimeState.getRuntimeValue.mockImplementation((name, key) => {

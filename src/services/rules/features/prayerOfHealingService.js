@@ -110,9 +110,19 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
             continue;
         }
 
-        const maxHp = target.maxHp || playerStats.hitPoints || 0;
+        const storedMaxHp = target.maxHp;
+        if (storedMaxHp == null) {
+            console.error(`[prayerOfHealingService] maxHp missing for target ${target.name || 'unknown'}`, { stack: new Error().stack });
+        }
+        const maxHp = storedMaxHp || playerStats.hitPoints || 0;
         const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-        const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+        let currentHp;
+        if (storedHp != null && storedHp !== '') {
+            currentHp = Number(storedHp);
+        } else {
+            console.error(`[prayerOfHealingService] storedHp not tracked for target ${targetName}, defaulting to maxHp`, { stack: new Error().stack });
+            currentHp = maxHp;
+        }
         const actualHeal = Math.min(healAmount, maxHp - currentHp);
 
         if (actualHeal > 0) {

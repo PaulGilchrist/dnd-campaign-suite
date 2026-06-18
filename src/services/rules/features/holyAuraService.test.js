@@ -234,19 +234,20 @@ describe('holyAuraService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null and logs error when executeHandler throws', async () => {
+        it('throws and logs error when executeHandler throws', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
             const consoleSpy = vi.spyOn(console, 'error');
 
-            const result = await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+            await expect(
+                triggerHolyAura(
+                    { name: 'Holy Aura', level: 9 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                ),
+            ).rejects.toThrow('Handler failed');
 
-            expect(result).toBeNull();
             expect(consoleSpy).toHaveBeenCalledWith(
                 '[holyAura] Trigger failed:',
                 expect.any(Error),

@@ -1104,7 +1104,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       });
     });
 
-    it('should catch and suppress addEntry errors', async () => {
+    it('propagates addEntry errors', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
       const spell = {
@@ -1116,18 +1116,18 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       getCombatContext.mockResolvedValue(baseCombatSummary);
       addEntry.mockReturnValue(Promise.reject(new Error('log error')));
 
-      const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
-      );
-
-      expect(result).not.toBeNull();
+      await expect(
+        applyMultiTarget(
+          action,
+          ps,
+          campaignName,
+          mapName,
+          'Goblin',
+          'Orc',
+          spell,
+          metaCtx
+        )
+      ).rejects.toThrow('log error');
     });
   });
 

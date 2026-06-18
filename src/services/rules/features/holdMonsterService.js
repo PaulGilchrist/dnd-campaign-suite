@@ -25,6 +25,6 @@ export async function triggerHoldMonster(spell, metaCtx, playerStats, campaignNa
         return result;
     } catch (e) {
         console.error(`[holdMonsterService] Failed to execute ${spell.name} handler:`, e);
-        return null;
+        throw e;
     }
 }

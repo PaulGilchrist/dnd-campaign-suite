@@ -42,7 +42,7 @@ export async function triggerSilence(spell, metaCtx, playerStats, campaignName, 
         return result;
     } catch (e) {
         console.error('[silence] Failed to execute handler:', e);
-        return null;
+        throw e;
     }
 }
 

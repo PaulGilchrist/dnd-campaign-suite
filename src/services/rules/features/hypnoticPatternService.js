@@ -23,6 +23,6 @@ export async function triggerHypnoticPattern(spell, metaCtx, playerStats, campai
         return result;
     } catch (e) {
         console.error(`[hypnoticPatternService] Failed to execute ${spell.name} handler:`, e);
-        return null;
+        throw e;
     }
 }

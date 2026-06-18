@@ -48,9 +48,25 @@ export async function triggerHealingWord(spell, metaCtx, playerStats, campaignNa
     if (!result) return null;
 
     const healAmount = result.total;
-    const maxHp = combatSummary.creatures.find(c => c.name === targetName)?.maxHp || playerStats.hitPoints || 0;
+    const creatures = combatSummary?.creatures;
+    if (creatures == null) {
+        console.error(`[healingWordService] combatSummary.creatures missing`, { stack: new Error().stack });
+    }
+    const creaturesArr = creatures || [];
+    const foundCreature = creaturesArr.find(c => c.name === targetName);
+    const creatureMaxHp = foundCreature?.maxHp;
+    if (creatureMaxHp == null) {
+        console.error(`[healingWordService] maxHp missing for target ${targetName}`, { stack: new Error().stack });
+    }
+    const maxHp = creatureMaxHp || playerStats.hitPoints || 0;
     const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-    const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
+    let currentHp;
+    if (storedHp != null && storedHp !== '') {
+        currentHp = Number(storedHp);
+    } else {
+        console.error(`[healingWordService] storedHp not tracked for target ${targetName}, defaulting to maxHp`, { stack: new Error().stack });
+        currentHp = maxHp;
+    }
     const actualHeal = Math.min(healAmount, maxHp - currentHp);
 
     if (actualHeal > 0) {
