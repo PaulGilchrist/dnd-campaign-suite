@@ -258,19 +258,16 @@ function countSpellsByLevel(selectedSpells, allSpells) {
     return counts;
    }
 
-   selectedSpells.forEach(spellName => {
-     const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
-     if (spell) {
-       if (spell.level == null) {
-         console.error(`[spellLimits] Spell ${spellName} has no level defined`, { spell: JSON.stringify(spell), stack: new Error().stack });
-       }
-       const level = spell.level ?? 0;
-       const levelKey = level === 0 ? 'cantrip' : `level${level}`;
-       if (counts[levelKey] !== undefined) {
-         counts[levelKey]++;
-       }
-     }
-   });
+  selectedSpells.forEach(spellName => {
+    const spell = allSpells.find(s => s.name === spellName || s.index === spellName);
+    if (spell) {
+      const level = spell.level !== undefined ? spell.level : 0;
+      const levelKey = level === 0 ? 'cantrip' : `level${level}`;
+      if (counts[levelKey] !== undefined) {
+        counts[levelKey]++;
+      }
+    }
+  });
 
   return counts;
 }

@@ -18,7 +18,7 @@ export async function triggerGreaterRestoration(spell, metaCtx, playerStats, cam
         return result;
     } catch (e) {
         console.error('[greaterRestoration] Failed to execute Greater Restoration handler:', e);
-        throw e;
+        return null;
     }
 }
 
@@ -28,6 +28,6 @@ export async function confirmGreaterRestoration(action, playerStats, campaignNam
         return appliedResult;
     } catch (e) {
         console.error('[greaterRestoration] Failed to apply Greater Restoration effect:', e);
-        throw e;
+        return null;
     }
 }

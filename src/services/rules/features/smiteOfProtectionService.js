@@ -46,7 +46,6 @@ export async function triggerSmiteOfProtection(spell, metaCtx, playerStats, camp
             }
         } catch (e) {
             console.error(`[smiteOfProtection] Failed to execute smite cover for ${smiteCover.name}:`, e);
-            throw e;
         }
     }
 

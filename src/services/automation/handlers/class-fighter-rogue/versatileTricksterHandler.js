@@ -69,10 +69,7 @@ export async function applyVersatileTrickster(action, playerStats, campaignName,
         characterName: playerStats.name,
         abilityName: 'Versatile Trickster',
         description: `Trip applied to ${secondaryTargetName} (secondary target via Versatile Trickster).`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

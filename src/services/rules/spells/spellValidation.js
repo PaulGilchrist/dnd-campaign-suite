@@ -384,10 +384,7 @@ export async function validateSpells(formData, selectedSpells, allSpells, versio
      }
     
     const spellClasses = spellData.classes || [];
-    if (spellData.level == null) {
-      console.error(`[spellValidation] Spell ${spellName} has no level defined`, { spellData: JSON.stringify(spellData), stack: new Error().stack });
-    }
-    const _spellLevel = spellData.level ?? 0;
+    const _spellLevel = spellData.level !== undefined ? spellData.level : 0;
     void _spellLevel;
     
     // Check if spell is allowed by class

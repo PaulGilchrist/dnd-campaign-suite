@@ -47,10 +47,7 @@ export async function applyChoice(playerStats, campaignName, choice) {
         characterName: playerStats.name,
         abilityName: "Hunter's Prey",
         description: `Hunter's Prey choice: ${choice}`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

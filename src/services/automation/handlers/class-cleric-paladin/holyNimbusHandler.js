@@ -68,10 +68,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated Holy Nimbus. Aura of Protection gains holy power for 10 minutes.`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

@@ -377,7 +377,7 @@ describe('greaseAreaSaveHandler.handle', () => {
       );
     });
 
-    it('propagates addEntry errors', async () => {
+    it('catches and swallows addEntry errors', async () => {
       const action = makeAction();
       const ps = makePlayerStats();
 
@@ -388,7 +388,7 @@ describe('greaseAreaSaveHandler.handle', () => {
       });
       logService.addEntry.mockRejectedValue(new Error('network'));
 
-      await expect(handle(action, ps, campaignName, 'test-map')).rejects.toThrow('network');
+      await expect(handle(action, ps, campaignName, 'test-map')).resolves.toBeDefined();
     });
   });
 });

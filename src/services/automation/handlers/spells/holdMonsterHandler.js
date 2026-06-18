@@ -31,10 +31,7 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
         abilityName: spellName,
         description: `${targetName} makes a WIS save (DC ${saveDc}) at end of turn (${spellName}).`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -57,10 +54,7 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save. ${spellName} ends!`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -91,10 +85,7 @@ export async function processHoldMonsterRepeatSave(casterName, targetName, saveD
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save. ${spellName} continues.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',
@@ -171,10 +162,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or become Paralyzed.`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -188,10 +176,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save against ${action.name}.`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         return {
             type: 'popup',
@@ -247,10 +232,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save against ${action.name} and is Paralyzed. At the end of each of its turns, it repeats the save.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     postLogEntry(campaignName, {
         type: 'condition',

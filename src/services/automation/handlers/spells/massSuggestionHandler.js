@@ -48,10 +48,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Mass Suggestion! ${targetName} must make a WIS save (DC ${dc}) or become Charmed.`,
             promptId,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         const saveResult = await promise;
 
@@ -66,10 +63,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: true,
                 description: `${targetName} succeeded on WIS save against Mass Suggestion.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         } else {
             affectedCount++;
 

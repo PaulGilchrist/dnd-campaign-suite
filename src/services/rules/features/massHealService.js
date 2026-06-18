@@ -93,11 +93,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
     }
 
     const results = [];
-    const storedSlotLevel = metaCtx?.slotLevel || spell.level;
-    if (storedSlotLevel == null) {
-        console.error(`[massHealService] slotLevel missing`, { stack: new Error().stack });
-    }
-    const slotLevel = storedSlotLevel || 9;
+    const slotLevel = metaCtx?.slotLevel || spell.level || 9;
     const healAtSlotLevel = spell.heal_at_slot_level;
     let totalPool = 700;
     if (healAtSlotLevel) {
@@ -110,19 +106,9 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
 
     for (const target of targets) {
         const targetName = target.name;
-        const storedMaxHp = target.maxHp;
-        if (storedMaxHp == null) {
-            console.error(`[massHealService] maxHp missing for target ${target.name || 'unknown'}`, { stack: new Error().stack });
-        }
-        const maxHp = storedMaxHp || playerStats.hitPoints || 0;
+        const maxHp = target.maxHp || playerStats.hitPoints || 0;
         const storedHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
-        let currentHp;
-        if (storedHp != null && storedHp !== '') {
-            currentHp = Number(storedHp);
-        } else {
-            console.error(`[massHealService] storedHp not tracked for target ${targetName}, defaulting to maxHp`, { stack: new Error().stack });
-            currentHp = maxHp;
-        }
+        const currentHp = storedHp != null && storedHp !== '' ? Number(storedHp) : maxHp;
         const healAmount = Math.min(totalPool - (totalPool - remainingPool), maxHp - currentHp);
         const actualHeal = Math.min(healAmount, remainingPool);
 

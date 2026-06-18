@@ -20,10 +20,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated ${action.name}. Charisma checks have advantage, can reroll failed saving throws, and missed weapon attacks once per turn hit automatically.`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

@@ -46,10 +46,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 abilityName: featureName,
                 description: `${playerName} restored Dragon Wings by spending ${auto.restoreCost || 3} Sorcery Points.`,
                 timestamp: now,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
 
             return {
                 type: 'popup',
@@ -88,10 +85,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: featureName,
             description: `${featureName} deactivated.`,
             timestamp: now,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         return {
             type: 'popup',
@@ -122,10 +116,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${featureName} activated (Bonus Action, ${auto.duration || '1 hour'}). Fly Speed 60 feet (hover).`,
         timestamp: now,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

@@ -156,10 +156,7 @@ export async function handleConfirm(action, playerStats, campaignName, _mapName,
         description: `${playerName} used an action to shake ${targetName} out of its hypnotic stupor.`,
         targetName,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

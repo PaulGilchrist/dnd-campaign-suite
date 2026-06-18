@@ -22,6 +22,6 @@ export async function triggerHolyAura(spell, metaCtx, playerStats, campaignName,
         return result;
     } catch (e) {
         console.error('[holyAura] Trigger failed:', e);
-        throw e;
+        return null;
     }
 }

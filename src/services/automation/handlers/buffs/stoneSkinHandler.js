@@ -80,10 +80,7 @@ export async function applyStoneSkin(action, playerStats, campaignName, targetNa
         description: `${playerStats.name} cast ${action.name} on ${targetName}. Target has Resistance to Bludgeoning, Piercing, and Slashing damage.`,
         targetName,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

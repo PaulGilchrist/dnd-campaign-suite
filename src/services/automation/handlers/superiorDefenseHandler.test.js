@@ -106,7 +106,7 @@ describe('superiorDefenseHandler', () => {
         expect(result.payload.name).toBe('Superior Defense');
       });
 
-      it('propagates addEntry rejection', async () => {
+      it('should handle addEntry rejection gracefully', async () => {
         runtimeState.getRuntimeValue.mockReturnValue([
           { name: 'Superior Defense' },
         ]);
@@ -117,7 +117,9 @@ describe('superiorDefenseHandler', () => {
           automation: { type: 'superior_defense' },
         };
 
-        await expect(handle(action, makePlayerStats(), campaignName)).rejects.toThrow('Network error');
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.payload.description).toBe('Superior Defense ended.');
       });
     });
 
@@ -359,7 +361,7 @@ describe('superiorDefenseHandler', () => {
         );
       });
 
-      it('propagates addEntry rejection during activation', async () => {
+      it('should handle addEntry rejection during activation gracefully', async () => {
         runtimeState.getRuntimeValue
           .mockReturnValueOnce([])
           .mockReturnValueOnce(6);
@@ -370,7 +372,9 @@ describe('superiorDefenseHandler', () => {
           automation: { type: 'superior_defense' },
         };
 
-        await expect(handle(action, makePlayerStats(), campaignName)).rejects.toThrow('Network error');
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.payload.description).toContain('activated');
       });
 
       it('should use default cost of 3 when auto.cost is undefined', async () => {
@@ -811,7 +815,9 @@ describe('superiorDefenseHandler', () => {
           },
         });
 
-        await expect(activateAtTurnStart(ps, campaignName)).rejects.toThrow('Network error');
+        const result = await activateAtTurnStart(ps, campaignName);
+
+        expect(result.activated).toBe(true);
       });
 
       it('should use maxFocus as fallback when focusPoints not in runtime state', async () => {

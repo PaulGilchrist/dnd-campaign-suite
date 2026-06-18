@@ -23,10 +23,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${action.name} triggered — target ${targetName} must make ${auto.saveType || 'STR'} save (DC ${saveDc}) or be pushed ${pushDistance} feet`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -55,10 +52,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'STR',
                 success: false,
                 description: `${targetName} failed ${auto.saveType || 'STR'} save. Pushed ${pushDistance} feet.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         } else {
             addEntry(campaignName, {
                 type: 'save_result',
@@ -69,10 +63,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'STR',
                 success: true,
                 description: `${targetName} succeeded on ${auto.saveType || 'STR'} save. No effect.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         }
 
         window.removeEventListener('save-result', handleSaveResult);

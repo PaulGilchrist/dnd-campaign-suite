@@ -48,87 +48,40 @@ export function computeTrackedResources(playerStats) {
   const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level)
   const resources = {}
 
-  const storedHp = playerStats.hitPoints;
-  if (storedHp == null) {
-    console.error(`[trackedResources] hitPoints missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const hitPoints = storedHp || 0
+  const hitPoints = playerStats.hitPoints || 0
   resources.hitPoints = { current: hitPoints, max: hitPoints }
   resources.currentHitPoints = { current: hitPoints, max: hitPoints }
 
   for (const level of SPELL_SLOT_LEVELS) {
     const key = `spell_slots_level_${level}`
-    const storedSpellSlot = playerStats.spellAbilities?.[key];
-    if (storedSpellSlot == null) {
-      console.error(`[trackedResources] spellAbilities[${key}] missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-    }
-    const spellSlot = storedSpellSlot ?? 0;
-    const max = spellSlot;
+    const max = playerStats.spellAbilities?.[key] ?? 0
     resources[key] = { current: max, max }
   }
 
-  const storedLevel = playerStats.level;
-  if (storedLevel == null) {
-    console.error(`[trackedResources] level missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const level = storedLevel || 0;
-  const shortRestHitDice = level
+  const shortRestHitDice = playerStats.level || 0
   resources.shortRestHitDice = { current: shortRestHitDice, max: shortRestHitDice }
 
-  const storedMaxSP = features?.maxSorceryPoints;
-  if (storedMaxSP == null) {
-    console.error(`[trackedResources] maxSorceryPoints missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxSP = storedMaxSP || 0
+  const maxSP = features?.maxSorceryPoints || 0
   resources.sorceryPoints = { current: maxSP, max: maxSP }
 
-  const storedMaxIS = features?.maxInnateSorcery;
-  if (storedMaxIS == null) {
-    console.error(`[trackedResources] maxInnateSorcery missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxIS = storedMaxIS || 0
+  const maxIS = features?.maxInnateSorcery || 0
   resources.innateSorceryUses = { current: maxIS, max: maxIS }
 
-  const storedFocus = classLevel?.focus_points || features?.maxFocusPoints;
-  if (storedFocus == null) {
-    console.error(`[trackedResources] focus_points missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxFP = storedFocus || 0
+  const maxFP = classLevel?.focus_points || features?.maxFocusPoints || 0
   resources.focusPoints = { current: maxFP, max: maxFP }
   resources.kiPoints = { current: maxFP, max: maxFP }
 
-  const storedMaxCD = features?.maxChannelDivinity;
-  if (storedMaxCD == null) {
-    console.error(`[trackedResources] maxChannelDivinity missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxCD = storedMaxCD || 0
+  const maxCD = features?.maxChannelDivinity || 0
   resources.channelDivinityCharges = { current: maxCD, max: maxCD }
 
-  const storedCharisma = playerStats.abilities?.find(a => a.name === 'Charisma');
-  if (storedCharisma == null) {
-    console.error(`[trackedResources] Charisma ability missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const charisma = storedCharisma;
-  const storedChaBonus = charisma?.bonus;
-  if (storedChaBonus == null) {
-    console.error(`[trackedResources] Charisma bonus missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const chaBonus = storedChaBonus || 0;
-  const maxBI = chaBonus
+  const charisma = playerStats.abilities?.find(a => a.name === 'Charisma')
+  const maxBI = charisma?.bonus || 0
   resources.bardicInspirationUses = { current: maxBI, max: maxBI }
 
-  const storedMaxWS = features?.maxWildShapeUses;
-  if (storedMaxWS == null) {
-    console.error(`[trackedResources] maxWildShapeUses missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxWS = storedMaxWS || 0
+  const maxWS = features?.maxWildShapeUses || 0
   resources.wildShapeUses = { current: maxWS, max: maxWS }
 
-  const storedSW = classLevel?.second_wind;
-  if (storedSW == null) {
-    console.error(`[trackedResources] second_wind missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxSW = storedSW || 0
+  const maxSW = classLevel?.second_wind || 0
   resources.secondWindUses = { current: maxSW, max: maxSW }
   resources.secondwindUses = { current: maxSW, max: maxSW }
 
@@ -139,11 +92,7 @@ export function computeTrackedResources(playerStats) {
     if (is2024) {
       maxAS = playerStats.level >= 17 ? 2 : (playerStats.level >= 2 ? 1 : 0)
     } else {
-      const storedAS = classLevel?.class_specific?.action_surges;
-      if (storedAS == null) {
-        console.error(`[trackedResources] action_surges missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-      }
-      maxAS = storedAS || 0
+      maxAS = classLevel?.class_specific?.action_surges || 0
     }
   }
   resources.actionSurgeUses = { current: maxAS, max: maxAS }
@@ -152,17 +101,9 @@ export function computeTrackedResources(playerStats) {
   const isBarbarian = playerStats.class?.name === 'Barbarian'
   let maxRage = 0
   if (isBarbarian) {
-    const storedRages = classLevel?.rages;
-    if (storedRages == null) {
-      console.error(`[trackedResources] rages missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-    }
-    const storedRageCount = classLevel?.class_specific?.rage_count;
-    if (storedRageCount == null) {
-      console.error(`[trackedResources] rage_count missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-    }
     maxRage = is2024
-      ? (storedRages || 0)
-      : (storedRageCount || 0)
+      ? (classLevel?.rages || 0)
+      : (classLevel?.class_specific?.rage_count || 0)
   }
   resources.ragePoints = { current: maxRage, max: maxRage }
 
@@ -172,15 +113,7 @@ export function computeTrackedResources(playerStats) {
 
   let maxSD = 0
   if (isFighter) {
-    const storedMajorName = playerStats.class.major?.name;
-    if (storedMajorName == null) {
-      console.error(`[trackedResources] class.major.name missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-    }
-    const storedSubclassName = playerStats.class.subclass?.name;
-    if (storedSubclassName == null) {
-      console.error(`[trackedResources] class.subclass.name missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-    }
-    const majorName = storedMajorName || storedSubclassName;
+    const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name
     const isBattleMaster = majorName === 'Battle Master'
     if (isBattleMaster) {
       maxSD = is2024 ? 4 : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4))
@@ -188,71 +121,34 @@ export function computeTrackedResources(playerStats) {
   }
   resources.superiorityDice = { current: maxSD, max: maxSD }
 
-  const storedMajorName2 = playerStats.class.major?.name;
-  if (storedMajorName2 == null) {
-    console.error(`[trackedResources] class.major.name missing for energy check (${playerStats.name || 'unknown'})`, { stack: new Error().stack });
-  }
-  const storedSubclassName2 = playerStats.class.subclass?.name;
-  if (storedSubclassName2 == null) {
-    console.error(`[trackedResources] class.subclass.name missing for energy check (${playerStats.name || 'unknown'})`, { stack: new Error().stack });
-  }
-  const className = storedMajorName2 || storedSubclassName2;
-  const hasEnergy = classLevel?.energy && classLevel.energy.required_major === className
-  const storedEnergyDieNum = classLevel?.energy?.energy_die_num;
-  if (storedEnergyDieNum == null) {
-    console.error(`[trackedResources] energy_die_num missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxPE = hasEnergy ? (storedEnergyDieNum || 0) : 0
+  const hasEnergy = classLevel?.energy && classLevel.energy.required_major
+    === (playerStats.class.major?.name || playerStats.class.subclass?.name)
+  const maxPE = hasEnergy ? (classLevel?.energy?.energy_die_num || 0) : 0
   resources.psionicEnergy = { current: maxPE, max: maxPE }
 
-  const storedAR = features?.arcaneRecoveryLevels;
-  if (storedAR == null) {
-    console.error(`[trackedResources] arcaneRecoveryLevels missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxAR = storedAR || 0
+  const maxAR = features?.arcaneRecoveryLevels || 0
   resources.arcaneRecoveryLevels = { current: maxAR, max: maxAR }
 
   const isWarlock = playerStats.class?.name === 'Warlock'
   let maxPM = 0
   if (isWarlock) {
-    const storedPactLevels = classLevel?.pact_slot_levels;
-    if (storedPactLevels == null) {
-      console.error(`[trackedResources] pact_slot_levels missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-    }
-    const storedPactSlots = classLevel?.class_specific?.pact_slots;
-    if (storedPactSlots == null) {
-      console.error(`[trackedResources] pact_slots missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-    }
     maxPM = is2024
-      ? (storedPactLevels || 0)
-      : (storedPactSlots || 0)
+      ? (classLevel?.pact_slot_levels || 0)
+      : (classLevel?.class_specific?.pact_slots || 0)
   }
   resources.warlockPactMagic = { current: maxPM, max: maxPM }
 
-  const storedPassives = playerStats.automation?.passives;
-  if (storedPassives == null) {
-    console.error(`[trackedResources] automation.passives missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const hasRestoration = (storedPassives || [])
+  const hasRestoration = (playerStats.automation?.passives ?? [])
     .some(a => a.type === 'resource_restoration')
   resources.sorcerousRestorationUses = { current: hasRestoration ? 1 : 0, max: hasRestoration ? 1 : 0 }
 
-  const storedUM = features?.uncannymetabolismUses;
-  if (storedUM == null) {
-    console.error(`[trackedResources] uncannymetabolismUses missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const maxUM = (storedUM || 0)
+  const maxUM = (features?.uncannymetabolismUses || 0)
   resources.uncannymetabolismUses = { current: maxUM, max: maxUM }
 
   const isLucky = (playerStats.feats || []).some(f =>
     f.name?.toLowerCase().includes('lucky')
   )
-  const storedLevel2 = playerStats.level;
-  if (storedLevel2 == null) {
-    console.error(`[trackedResources] level missing for lucky points (${playerStats.name || 'unknown'})`, { stack: new Error().stack });
-  }
-  const level2 = storedLevel2 || 0;
-  const maxLP = isLucky ? (3 + Math.floor(level2 / 2)) : 0
+  const maxLP = isLucky ? (3 + Math.floor((playerStats.level || 0) / 2)) : 0
   resources.luckyPoints = { current: maxLP, max: maxLP }
 
   const isCleric = playerStats.class?.name === 'Cleric'
@@ -263,11 +159,7 @@ export function computeTrackedResources(playerStats) {
   const maxWB = isMonk && playerStats.level >= 6 ? 1 : 0
   resources.wholenessofbodyUses = { current: maxWB, max: maxWB }
 
-  const storedWis = playerStats.abilities?.find(a => a.name === 'Wisdom');
-  if (storedWis == null) {
-    console.error(`[trackedResources] Wisdom ability missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-  }
-  const wis = storedWis;
+  const wis = playerStats.abilities?.find(a => a.name === 'Wisdom')
   const maxWP = wis ? Math.max(wis.bonus, 1) : 1
   resources.warPriestUses = { current: maxWP, max: maxWP }
 

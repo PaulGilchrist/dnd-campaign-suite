@@ -98,11 +98,7 @@ export function isPreCastOption(option) {
 }
 
 export function hasArcaneApotheosis(stats, playerName) {
-    const storedPassives = stats?.automation?.passives;
-    if (storedPassives == null) {
-        console.error(`[metamagicRules] automation.passives missing`, { stack: new Error().stack });
-    }
-    const passives = storedPassives || [];
+    const passives = stats?.automation?.passives ?? [];
     const hasFeature = passives.some(p => p.name === 'Arcane Apotheosis');
     if (!hasFeature) return false;
     const buffs = getRuntimeValue(playerName, 'activeBuffs') || [];

@@ -50,10 +50,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${casterName} casts ${action.name} on ${targetName}! ${targetName} must make a DEX save (DC ${dc}) or be enclosed in a Resilient Sphere.`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -67,10 +64,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'DEX',
             success: true,
             description: `${targetName} succeeded on DEX save against ${action.name}.`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         return {
             type: 'popup',
@@ -116,10 +110,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'DEX',
         success: false,
         description: `${targetName} failed DEX save against ${action.name} and is enclosed in a Resilient Sphere.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

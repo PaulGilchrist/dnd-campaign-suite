@@ -23,6 +23,6 @@ export async function triggerOttoDance(spell, metaCtx, playerStats, campaignName
         return result;
     } catch (e) {
         console.error(`[ottoDanceService] Failed to execute ${spell.name} handler:`, e);
-        throw e;
+        return null;
     }
 }

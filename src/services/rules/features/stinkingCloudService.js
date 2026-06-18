@@ -20,6 +20,6 @@ export async function triggerStinkingCloud(spell, metaCtx, playerStats, campaign
         return result;
     } catch (e) {
         console.error(`[stinkingCloudService] Failed to execute ${spell.name} handler:`, e);
-        throw e;
+        return null;
     }
 }

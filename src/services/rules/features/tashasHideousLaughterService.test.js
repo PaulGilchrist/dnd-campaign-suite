@@ -101,18 +101,18 @@ describe('tashasHideousLaughterService', () => {
             expect(result).toEqual({ type: 'popup' });
         });
 
-        it('throws when executeHandler throws an error', async () => {
+        it('returns null when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            await expect(
-                triggerTashasHideousLaughter(
-                    { name: "Tasha's Hideous Laughter", level: 1 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow('Handler failed');
+            const result = await triggerTashasHideousLaughter(
+                { name: "Tasha's Hideous Laughter", level: 1 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeNull();
         });
 
         it('returns null when executeHandler returns null', async () => {

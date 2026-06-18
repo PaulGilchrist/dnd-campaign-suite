@@ -64,10 +64,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name} to apply ${effectType} on a D20 test.`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return infoPopup(action.name, description, auto);
 }

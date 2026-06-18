@@ -50,10 +50,7 @@ export async function processTashasLaughterRepeatSave(casterName, targetName, sa
         abilityName: "Tasha's Hideous Laughter (repeat save)",
         description: `${targetName} makes a WIS save (DC ${saveDc}) at end of turn (Tasha's Hideous Laughter).`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -79,10 +76,7 @@ export async function processTashasLaughterRepeatSave(casterName, targetName, sa
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save. Tasha's Hideous Laughter ends!`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -113,10 +107,7 @@ export async function processTashasLaughterRepeatSave(casterName, targetName, sa
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save and remains Prone and Incapacitated.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',
@@ -167,10 +158,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Tasha's Hideous Laughter! ${targetName} must make a WIS save (DC ${dc}) or become Prone and Incapacitated.`,
             promptId,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         const saveResult = await promise;
 
@@ -185,10 +173,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: true,
                 description: `${targetName} succeeded on WIS save against Tasha's Hideous Laughter.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         } else {
             affectedCount++;
 
@@ -255,10 +240,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: false,
                 description: `${targetName} failed WIS save against Tasha's Hideous Laughter and is Prone and Incapacitated. At the end of each of its turns and each time it takes damage, it repeats the save.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
 
             results.push(`${targetName} is Prone and Incapacitated.`);
         }

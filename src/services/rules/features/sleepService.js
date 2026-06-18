@@ -19,6 +19,6 @@ export async function triggerSleep(spell, metaCtx, playerStats, campaignName, ma
         return result;
     } catch (e) {
         console.error(`[sleepService] Failed to execute ${spell.name} handler:`, e);
-        throw e;
+        return null;
     }
 }

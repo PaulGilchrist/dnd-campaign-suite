@@ -581,14 +581,14 @@ describe('handleInspiringMovement — log and payload', () => {
     );
   });
 
-  it('propagates addEntry errors on Inspiring Movement', async () => {
+  it('catches and swallows addEntry errors on Inspiring Movement', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ effect: 'inspiring_movement' });
 
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
     logService.addEntry.mockRejectedValue(new Error('fail'));
 
-    await expect(handle(action, ps, campaignName, mapName)).rejects.toThrow('fail');
+    await expect(handle(action, ps, campaignName, mapName)).resolves.toBeDefined();
   });
 
   it('returns popup with correct payload structure', async () => {

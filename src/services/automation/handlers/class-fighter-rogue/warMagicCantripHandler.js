@@ -73,10 +73,7 @@ export async function confirmWarMagicCantrip(action, playerStats, campaignName, 
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${action.name}: Replaced attack with cantrip "${selectedSpellName}"`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

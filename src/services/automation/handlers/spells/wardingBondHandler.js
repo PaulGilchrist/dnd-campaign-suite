@@ -95,10 +95,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${casterName} cast ${action.name} on ${targetName}.`,
         targetName,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

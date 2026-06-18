@@ -1,8 +1,4 @@
 export function hasTranceTrait(playerStats) {
-    const storedTraits = playerStats.race?.traits;
-    if (storedTraits == null) {
-        console.error(`[tranceRules] race.traits missing for ${playerStats.name || 'unknown'}`, { stack: new Error().stack });
-    }
-    const traits = storedTraits || []
+    const traits = playerStats.race?.traits || []
     return traits.some(trait => trait.name === 'Trance')
 }

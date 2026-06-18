@@ -291,18 +291,18 @@ describe('holdMonsterService', () => {
             expect(result).toBeNull();
         });
 
-        it('throws when executeHandler throws an error', async () => {
+        it('returns null when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            await expect(
-                triggerHoldMonster(
-                    { name: 'Hold Monster', level: 7 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow('Handler failed');
+            const result = await triggerHoldMonster(
+                { name: 'Hold Monster', level: 7 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeNull();
         });
 
         it('passes the spell object into the action', async () => {

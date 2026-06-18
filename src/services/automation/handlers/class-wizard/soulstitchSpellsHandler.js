@@ -88,10 +88,7 @@ export async function applySoulstitchSelection(action, playerStats, campaignName
         characterName: playerName,
         abilityName: featureName,
         description: `${featureName}: ${selectedNames.length} creature(s) chosen for automatic save success: ${selectedNames.join(', ')}`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

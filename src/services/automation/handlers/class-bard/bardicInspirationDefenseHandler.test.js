@@ -352,7 +352,7 @@ describe('bardicInspirationDefenseHandler.handle', () => {
       expect(result.payload.name).toBe('Defend with Inspiration');
     });
 
-    it('propagates addEntry rejection', async () => {
+    it('does not propagate addEntry rejection', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
@@ -360,7 +360,11 @@ describe('bardicInspirationDefenseHandler.handle', () => {
       diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
       logService.addEntry.mockRejectedValue(new Error('log service failed'));
 
-      await expect(handle(action, ps, campaignName)).rejects.toThrow('log service failed');
+      const result = await handle(action, ps, campaignName);
+
+      expect(result.type).toBe('popup');
+      // Should still return success popup despite addEntry failure
+      expect(result.payload.description).toContain('rolled **5**');
     });
 
     it('calls getRuntimeValue with correct key for bardicInspirationDie', async () => {

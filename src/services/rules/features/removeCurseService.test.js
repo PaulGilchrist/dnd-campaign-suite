@@ -203,33 +203,31 @@ describe('removeCurseService', () => {
             expect(result).toBeNull();
         });
 
-        it('throws when executeHandler throws an error', async () => {
+        it('returns null when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            await expect(
-                triggerRemoveCurse(
-                    { name: 'Remove Curse', level: 2 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow('Handler failed');
+            const result = await triggerRemoveCurse(
+                { name: 'Remove Curse', level: 2 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeNull();
         });
 
-        it('throws and logs error when executeHandler throws', async () => {
+        it('logs error when executeHandler throws', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             executeHandler.mockRejectedValue(new Error('Connection refused'));
 
-            await expect(
-                triggerRemoveCurse(
-                    { name: 'Remove Curse', level: 2 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow('Connection refused');
+            await triggerRemoveCurse(
+                { name: 'Remove Curse', level: 2 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
 
             expect(consoleSpy).toHaveBeenCalledWith(
                 '[removeCurse] Failed to execute Remove Curse handler:',
@@ -349,38 +347,37 @@ describe('removeCurseService', () => {
             expect(result).toBeNull();
         });
 
-        it('throws when applyRemoveCurseEffect throws an error', async () => {
+        it('returns null when applyRemoveCurseEffect throws an error', async () => {
             applyRemoveCurseEffect.mockRejectedValue(new Error('Application failed'));
 
-            await expect(
-                confirmRemoveCurse(
-                    action,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                    { type: 'popup' },
-                ),
-            ).rejects.toThrow('Application failed');
+            const result = await confirmRemoveCurse(
+                action,
+                playerStats,
+                campaignName,
+                mapName,
+                { type: 'popup' },
+            );
+
+            expect(result).toBeNull();
         });
 
-        it('throws and logs error when applyRemoveCurseEffect throws', async () => {
+        it('logs error when applyRemoveCurseEffect throws', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             applyRemoveCurseEffect.mockRejectedValue(new Error('Database error'));
 
-            await expect(
-                confirmRemoveCurse(
-                    action,
-                    playerStats,
-                    campaignName,
-                    mapName,
-                    { type: 'popup' },
-                ),
-            ).rejects.toThrow('Database error');
+            const result = await confirmRemoveCurse(
+                action,
+                playerStats,
+                campaignName,
+                mapName,
+                { type: 'popup' },
+            );
 
             expect(consoleSpy).toHaveBeenCalledWith(
                 '[removeCurse] Failed to apply Remove Curse effect:',
                 expect.any(Error),
             );
+            expect(result).toBeNull();
             consoleSpy.mockRestore();
         });
 

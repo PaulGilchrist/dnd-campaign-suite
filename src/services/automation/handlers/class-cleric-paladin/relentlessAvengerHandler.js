@@ -15,10 +15,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${action.name} used${targetName ? ` against ${targetName}` : ''}`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     if (!targetName) {
         return {

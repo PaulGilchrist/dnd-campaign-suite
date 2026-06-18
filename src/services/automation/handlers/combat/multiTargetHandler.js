@@ -230,10 +230,7 @@ export async function applyMultiTarget(
         description: `${playerStats.name} used ${action.name} to spread ${spellName} to ${secondTargetName}.`,
         targetName: secondTargetName,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

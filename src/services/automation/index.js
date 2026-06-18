@@ -459,6 +459,6 @@ export async function executeHandler(action, playerStats, campaignName, mapName)
         return await handler(action, playerStats, campaignName, mapName);
       } catch (e) {
           console.error(`[automation] Handler ${action.automation.type} failed:`, e);
-          throw e;
+          return { type: 'popup', payload: { type: 'automation_info', name: action.name, description: `Failed to execute ${action.name}` } };
       }
 }

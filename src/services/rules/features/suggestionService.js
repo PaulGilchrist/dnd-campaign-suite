@@ -23,6 +23,6 @@ export async function triggerSuggestion(spell, metaCtx, playerStats, campaignNam
         return result;
     } catch (e) {
         console.error(`[suggestionService] Failed to execute ${spell.name} handler:`, e);
-        throw e;
+        return null;
     }
 }

@@ -58,10 +58,7 @@ export async function applyStealthAttack(action, playerStats, campaignName, cost
         characterName: playerStats.name,
         abilityName: action.name,
         description: `Stealth Attack enabled — next attack will cost ${costD6}d6 Sneak Attack dice and preserve Invisible condition with cover.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

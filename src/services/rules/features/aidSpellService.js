@@ -23,7 +23,7 @@ export async function triggerAidSpell(spell, metaCtx, playerStats, campaignName,
         return result;
     } catch (e) {
         console.error('[aidSpell] Failed to execute Aid handler:', e);
-        throw e;
+        return null;
     }
 }
 
@@ -33,6 +33,6 @@ export async function confirmAidSpell(action, playerStats, campaignName, mapName
         return result;
     } catch (e) {
         console.error('[aidSpell] Failed to apply Aid effect:', e);
-        throw e;
+        return null;
     }
 }

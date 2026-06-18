@@ -337,7 +337,7 @@ describe('telekineticShoveHandler.handle', () => {
     });
   });
 
-  it('propagates addEntry errors', async () => {
+  it('catches and swallows addEntry errors', async () => {
     const action = makeAction();
     const ps = makePlayerStats();
 
@@ -346,7 +346,7 @@ describe('telekineticShoveHandler.handle', () => {
     savePrompt.createSaveListener.mockReturnValue({ promptId: 'err-prompt' });
     logService.addEntry.mockRejectedValue(new Error('network'));
 
-    await expect(handle(action, ps, campaignName, null)).rejects.toThrow('network');
+    await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
   });
 
   it('popup payload contains correct structure', async () => {

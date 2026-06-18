@@ -42,10 +42,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${action.name} ended.`,
             timestamp: Date.now(),
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         return {
             type: 'popup',
@@ -86,10 +83,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${action.name} activated — Flight 60 ft (hover), Frightful Aura active for 10 minutes.`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

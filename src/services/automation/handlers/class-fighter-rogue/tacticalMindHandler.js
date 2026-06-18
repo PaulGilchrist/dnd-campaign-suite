@@ -53,10 +53,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
         description: `${playerName} used ${action.name}: +${d10Roll} to ${checkName} (d20 ${d20} + ${checkBonus} = ${originalTotal} → ${modifiedTotal}).`,
         d10Roll,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return infoPopup(action.name, description, auto);
 }

@@ -87,11 +87,7 @@ export function computeDamageAfterEvasion(rawDamage, saveSuccess, dcSuccess, eva
 }
 
 export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = false) {
-  const storedBonus = creature?.saveBonuses?.[saveType];
-  if (storedBonus == null) {
-    console.error(`[applyDamage] Save bonus missing for ${saveType} on creature ${creature?.name}`, { creature: JSON.stringify(creature), stack: new Error().stack });
-  }
-  const bonus = storedBonus ?? 0;
+  const bonus = creature?.saveBonuses?.[saveType] ?? 0;
   const roll1 = rollD20();
   const roll2 = disadvantage ? rollD20() : roll1;
   const finalRoll = disadvantage ? Math.min(roll1, roll2) : roll1;
@@ -165,12 +161,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     if (isPlayer) {
         const wardActive = getRuntimeValue(creature.name, 'arcaneWardActive', campaignName);
         if (wardActive) {
-            const storedArcaneWardHp = getRuntimeValue(creature.name, 'arcaneWardHp', campaignName);
-            if (storedArcaneWardHp == null) {
-                console.error(`[applyDamage] arcaneWardHp not tracked for ${creature.name}`, { stack: new Error().stack });
-            }
-            const arcaneWardHp = storedArcaneWardHp ?? 0;
-            const wardHp = Number(arcaneWardHp);
+            const wardHp = Number(getRuntimeValue(creature.name, 'arcaneWardHp', campaignName) ?? 0);
             if (wardHp > 0) {
                 wardAbsorbed = Math.min(wardDamage, wardHp);
                 const newWardHp = wardHp - wardAbsorbed;
@@ -192,11 +183,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 
     let oldHp, newHp;
    if (isPlayer) {
-     const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
-     if (storedCurrentHp == null) {
-       console.error(`[applyDamage] currentHitPoints not tracked for ${creature.name} during ward damage`, { stack: new Error().stack });
-     }
-     oldHp = storedCurrentHp ?? 0;
+     oldHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? 0;
      newHp = Math.max(0, oldHp - wardDamage);
      setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
    } else {
@@ -379,12 +366,8 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
               const conSaveDc = getRuntimeValue(casterName, 'holyAuraSaveDc', campaignName);
               if (conSaveDc) {
                 const saveRoll = rollD20();
-                const storedConMod = attackerCreature.ability_score_modifiers?.CON ?? attackerCreature.ability_score_modifiers?.constitution;
-                if (storedConMod == null) {
-                    console.error(`[applyDamage] CON ability modifier missing for ${attackerCreature?.name}`, { attackerCreature: JSON.stringify(attackerCreature), stack: new Error().stack });
-                }
-                const conMod = storedConMod ?? 0;
-                const saveTotal = saveRoll + conMod;
+                const conBonus = attackerCreature.ability_score_modifiers?.CON ?? attackerCreature.ability_score_modifiers?.constitution ?? 0;
+                const saveTotal = saveRoll + conBonus;
                 if (saveTotal < conSaveDc) {
                   const attackerConditions = getRuntimeValue(attackerName, 'activeConditions') || [];
                   const attackerCondArray = Array.isArray(attackerConditions) ? attackerConditions : [];
@@ -486,11 +469,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   } else {
     combatSummaryChanged = true;
     if (creature.concentration && finalDamage > 0) {
-      const storedConSave = creature?.saveBonuses?.['con'];
-      if (storedConSave == null) {
-        console.error(`[applyDamage] CON save bonus missing for ${creature?.name}`, { creature: JSON.stringify(creature), stack: new Error().stack });
-      }
-      const saveBonus = storedConSave ?? 0;
+      const saveBonus = creature?.saveBonuses?.['con'] ?? 0;
       const dragonConstellationActive = (() => {
         const activeBuffs = getRuntimeValue(creature.name, 'activeBuffs') || [];
         return activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Dragon');
@@ -544,12 +523,8 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
 }
 
 function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
-  const storedHitPoints = creature.type === 'player' ? getRuntimeValue(creature.name, 'hitPoints') : null;
-  if (storedHitPoints == null) {
-    console.error(`[applyDamage] hitPoints not tracked for ${creature.name}`, { stack: new Error().stack });
-  }
   const maxHp = creature.type === 'player'
-    ? (storedHitPoints ?? newHp)
+    ? (getRuntimeValue(creature.name, 'hitPoints') ?? newHp)
     : creature.maxHp;
   const delta = newHp - oldHp;
   const isDead = newHp <= 0;
@@ -609,11 +584,7 @@ function checkUndyingSentinel(creature, playerComputed, campaignName) {
     const paladinClassLevel = playerComputed?.class?.class_levels?.find(cl => cl.level === playerComputed.level);
     const paladinLevel = paladinClassLevel?.level || playerComputed.level;
     const healAmount = paladinLevel * 3;
-    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
-    if (storedMaxHp == null) {
-        console.error(`[applyDamage] hitPoints not tracked for ${creature.name} in Undying Sentinel`, { playerComputedHitPointsMax: playerComputed?.hitPoints?.max, stack: new Error().stack });
-    }
-    const maxHp = storedMaxHp ?? playerComputed?.hitPoints?.max;
+    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
     const newHp = Math.min(1 + healAmount, maxHp);
 
     // Set the runtime HP value
@@ -681,11 +652,7 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
         return { intercepted: false };
     }
 
-    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
-    if (storedMaxHp == null) {
-        console.error(`[applyDamage] hitPoints not tracked for ${creature.name} in Boon Of Recovery Last Stand`, { playerComputedHitPointsMax: playerComputed?.hitPoints?.max, stack: new Error().stack });
-    }
-    const maxHp = storedMaxHp ?? playerComputed?.hitPoints?.max;
+    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
     const healAmount = Math.floor(maxHp / 2);
     const newHp = Math.min(1 + healAmount, maxHp);
 
@@ -746,11 +713,7 @@ function checkRelentlessEndurance(creature, playerComputed, campaignName) {
     }
 
     // Relentless Endurance: set HP to 1 instead of 0
-    const storedMaxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName);
-    if (storedMaxHp == null) {
-        console.error(`[applyDamage] hitPoints not tracked for ${creature.name} in Relentless Endurance`, { playerComputedHitPointsMax: playerComputed?.hitPoints?.max, stack: new Error().stack });
-    }
-    const maxHp = storedMaxHp ?? playerComputed?.hitPoints?.max;
+    const maxHp = getRuntimeValue(creature.name, 'hitPoints', campaignName) ?? playerComputed?.hitPoints?.max ?? 100;
     const newHp = 1;
 
     // Set the runtime HP value

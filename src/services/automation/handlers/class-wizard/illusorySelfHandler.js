@@ -65,10 +65,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     abilityName: featureName,
                     description: `${playerName} expended a level ${spellSlot.level} spell slot to restore a use of ${featureName}.`,
                     timestamp: Date.now(),
-                }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+                }).catch(() => {});
             } else {
                 return {
                     type: 'popup',
@@ -112,10 +109,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${playerName} used ${featureName} — ${attackerName}'s attack misses due to illusory duplicate.`,
         targetName: attackerName,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     let description = `<b>${featureName}</b><br/><br/>`;
     description += `Attacker: <b>${attackerName}</b><br/><br/>`;

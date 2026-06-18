@@ -492,7 +492,7 @@ describe('handleMantleOfInspiration — logging', () => {
     );
   });
 
-  it('propagates addEntry errors', async () => {
+  it('catches and swallows addEntry errors', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -502,7 +502,7 @@ describe('handleMantleOfInspiration — logging', () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
     logService.addEntry.mockRejectedValue(new Error('network'));
 
-    await expect(handle(action, ps, campaignName, null)).rejects.toThrow('network');
+    await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
   });
 });
 

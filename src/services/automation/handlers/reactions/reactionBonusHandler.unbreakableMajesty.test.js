@@ -210,14 +210,14 @@ describe('handleUnbreakableMajesty — deactivation', () => {
     expect(result.payload.automation).toBe(action.automation);
   });
 
-  it('propagates addEntry errors on deactivation', async () => {
+  it('catches and swallows addEntry errors on deactivation', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ effect: 'miss_on_failed_save' });
 
     useRuntimeState.getRuntimeValue.mockReturnValue(true);
     logService.addEntry.mockRejectedValue(new Error('network fail'));
 
-    await expect(handle(action, ps, campaignName, 'DungeonMap')).rejects.toThrow('network fail');
+    await expect(handle(action, ps, campaignName, 'DungeonMap')).resolves.toBeDefined();
   });
 });
 
@@ -438,14 +438,14 @@ describe('handleUnbreakableMajesty — activation', () => {
     expect(activeCall[2]).toBe(true);
   });
 
-  it('propagates addEntry errors on activation', async () => {
+  it('catches and swallows addEntry errors on activation', async () => {
     const ps = makePlayerStats();
     const action = makeAction({ effect: 'miss_on_failed_save' });
 
     useRuntimeState.getRuntimeValue.mockReturnValue(false);
     logService.addEntry.mockRejectedValue(new Error('fail'));
 
-    await expect(handle(action, ps, campaignName, 'DungeonMap')).rejects.toThrow('fail');
+    await expect(handle(action, ps, campaignName, 'DungeonMap')).resolves.toBeDefined();
   });
 
   it('first call activates (wasActive=false)', async () => {

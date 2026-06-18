@@ -151,10 +151,7 @@ export function getNearestPlacedItem(placedItems, targetName, attackerPos) {
 
 export function isHostileNPC(npc) {
   if (!npc) return false
-  if (npc.attitude == null) {
-    console.error(`[rangeValidation] NPC attitude is null/undefined, defaulting to hostile`, { npc: JSON.stringify(npc), stack: new Error().stack });
-    return true
-  }
+  if (npc.attitude == null) return true
   const attitude = npc.attitude.toLowerCase()
   return attitude === 'negative' || attitude === 'extreme opposition'
 }

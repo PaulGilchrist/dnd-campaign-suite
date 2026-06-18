@@ -57,10 +57,7 @@ async function handleAcBonus(action, playerStats, campaignName) {
         abilityName: action.name,
         description: `${playerName} activated ${action.name}. CHA modifier (${chaBonus}, min +1) added to AC as a Reaction.`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',
@@ -128,10 +125,7 @@ async function handleCounterAttack(action, playerStats, campaignName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name} to make a weapon attack against ${targetName || 'attacker'}.`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'attack_roll',

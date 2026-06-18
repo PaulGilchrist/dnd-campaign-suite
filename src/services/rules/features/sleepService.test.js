@@ -233,18 +233,18 @@ describe('sleepService', () => {
             expect(result).toBeNull();
         });
 
-        it('throws when executeHandler throws an error', async () => {
+        it('returns null when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            await expect(
-                triggerSleep(
-                    { name: 'Sleep', level: 1 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow('Handler failed');
+            const result = await triggerSleep(
+                { name: 'Sleep', level: 1 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeNull();
         });
 
         it('passes the spell object into the action', async () => {

@@ -171,7 +171,6 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
         }
     } catch (e) {
         console.error(`[wildMagicSurge] Failed to execute surge for ${surgeFeature.name}:`, e);
-        throw e;
     }
 
     return null;

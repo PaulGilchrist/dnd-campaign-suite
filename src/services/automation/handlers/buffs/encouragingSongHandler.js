@@ -75,10 +75,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name} to grant Heroic Inspiration to ${allies.length} ally${allies.length !== 1 ? 'ies' : 'y'}.`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

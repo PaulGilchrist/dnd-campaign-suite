@@ -134,10 +134,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${featureName} triggered — ${playerName} must make ${auto.saveType || 'CON'} save (DC ${saveDc})`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -156,10 +153,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'CON',
                 success: true,
                 description: `${playerName} succeeded on ${auto.saveType || 'CON'} save. Relentless Rage sets Hit Points to ${healAmount}.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
 
             window.dispatchEvent(new CustomEvent('combat-summary-updated'));
         } else {
@@ -172,10 +166,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'CON',
                 success: false,
                 description: `${playerName} failed ${auto.saveType || 'CON'} save. Relentless Rage does not activate.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         }
 
         await setRuntimeValue(playerName, usesKey, currentUses + 1, campaignName);

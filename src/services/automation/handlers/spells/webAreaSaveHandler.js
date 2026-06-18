@@ -85,10 +85,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
         abilityName: 'Web',
         description: `${targetName} must make a ${tracking.saveType} save (DC ${tracking.saveDc}) or become Restrained (Web area).`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -107,10 +104,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
             saveType: tracking.saveType,
             success: false,
             description: `${targetName} failed ${tracking.saveType} save against Web. Becomes Restrained.`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
     } else {
         addEntry(campaignName, {
             type: 'save_result',
@@ -121,10 +115,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
             saveType: tracking.saveType,
             success: true,
             description: `${targetName} succeeded on ${tracking.saveType} save against Web.`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
     }
 
     return {

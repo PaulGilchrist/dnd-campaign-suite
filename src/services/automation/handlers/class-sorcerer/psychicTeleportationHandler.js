@@ -36,10 +36,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName}: Teleported up to ${teleportDistance} feet (Rolled ${psionicDieSize} for ${dieRoll} × 10). Psionic Energy: ${currentUses - 1}/${defaultMax}.`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

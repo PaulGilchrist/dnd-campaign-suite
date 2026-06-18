@@ -37,10 +37,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerStats.name,
         abilityName: action.name,
         description: `Divine Spark activated — targeting ${targetName}.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'modal',

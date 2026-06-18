@@ -46,10 +46,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     abilityName: featureName,
                     description: `${playerName} expended a Pact Magic spell slot to restore a use of ${featureName}.`,
                     timestamp: Date.now(),
-                }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+                }).catch(() => {});
             } else {
                 return {
                     type: 'popup',
@@ -143,10 +140,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         targetName,
         promptId,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -162,10 +156,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 success: false,
                 description: `${targetName} failed ${saveType} save — Clairvoyant Combatant active. Target has Disadvantage on attacks against you, you have Advantage on attacks against target.`,
                 timestamp: Date.now(),
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         } else {
             // Target succeeded — remove the effects
             const filteredEffects = (getRuntimeValue(campaignName, 'targetEffects', campaignName) || []).filter(
@@ -191,10 +182,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 success: true,
                 description: `${targetName} succeeded on ${saveType} save — Clairvoyant Combatant has no effect.`,
                 timestamp: Date.now(),
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         }
 
         window.removeEventListener('save-result', handleSaveResult);

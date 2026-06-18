@@ -81,10 +81,7 @@ export async function applyShieldOfFaith(action, playerStats, campaignName, mapN
             characterName: playerStats.name,
             abilityName: SHIELD_OF_FAITH_BUFF_NAME,
             description: `${playerStats.name} cast ${SHIELD_OF_FAITH_BUFF_NAME} on ${targetName}. Target's AC increases by 2.`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
     }
 
     return {

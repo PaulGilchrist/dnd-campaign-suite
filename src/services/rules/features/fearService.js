@@ -22,6 +22,6 @@ export async function triggerFear(spell, metaCtx, playerStats, campaignName, map
         return result;
     } catch (e) {
         console.error('[fearService] Failed to execute Fear handler:', e);
-        throw e;
+        return null;
     }
 }

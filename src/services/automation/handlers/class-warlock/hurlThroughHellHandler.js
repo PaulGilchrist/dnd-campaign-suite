@@ -46,10 +46,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     abilityName: featureName,
                     description: `${playerName} expended a Pact Magic spell slot to restore a use of ${featureName}.`,
                     timestamp: Date.now(),
-                }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+                }).catch(() => {});
             } else {
                 return {
                     type: 'popup',
@@ -143,10 +140,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         targetName,
         promptId,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -172,10 +166,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     success: false,
                     description: `${targetName} failed ${saveType} save — hurled through the lower planes.`,
                     timestamp: Date.now(),
-                }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+                }).catch(() => {});
 
                 addEntry(campaignName, {
                     type: 'damage_roll',
@@ -185,10 +176,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     formula: damageExpression,
                     description: `${targetName} takes ${damageTotal} ${damageType} damage from Hurl Through Hell.`,
                     timestamp: Date.now(),
-                }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+                }).catch(() => {});
             } else {
                 addEntry(campaignName, {
                     type: 'save_result',
@@ -199,10 +187,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     success: false,
                     description: `${targetName} (Fiend) failed ${saveType} save — hurled through the lower planes but takes no Psychic damage.`,
                     timestamp: Date.now(),
-                }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+                }).catch(() => {});
             }
         } else {
             addEntry(campaignName, {
@@ -214,10 +199,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 success: true,
                 description: `${targetName} succeeded on ${saveType} save — not hurled through the lower planes.`,
                 timestamp: Date.now(),
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         }
 
         window.removeEventListener('save-result', handleSaveResult);

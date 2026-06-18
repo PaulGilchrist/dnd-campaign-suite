@@ -132,18 +132,18 @@ describe('rayOfEnfeeblementService', () => {
             expect(result).toBeUndefined();
         });
 
-        it('throws when executeHandler throws an error', async () => {
+        it('returns undefined when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            await expect(
-                triggerRayOfEnfeeblement(
-                    { name: 'Ray of Enfeeblement', level: 2 },
-                    { targetName: 'Goblin' },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow('Handler failed');
+            const result = await triggerRayOfEnfeeblement(
+                { name: 'Ray of Enfeeblement', level: 2 },
+                { targetName: 'Goblin' },
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeUndefined();
         });
 
         it('passes campaignName and mapName to executeHandler', async () => {
@@ -211,19 +211,17 @@ describe('rayOfEnfeeblementService', () => {
             );
         });
 
-        it('throws and logs error to console when executeHandler throws', async () => {
+        it('logs error to console when executeHandler throws', async () => {
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             executeHandler.mockRejectedValue(new Error('Connection failed'));
 
-            await expect(
-                triggerRayOfEnfeeblement(
-                    { name: 'Ray of Enfeeblement', level: 2 },
-                    { targetName: 'Goblin' },
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow('Connection failed');
+            await triggerRayOfEnfeeblement(
+                { name: 'Ray of Enfeeblement', level: 2 },
+                { targetName: 'Goblin' },
+                playerStats,
+                campaignName,
+                mapName,
+            );
 
             expect(consoleSpy).toHaveBeenCalledWith(
                 '[rayOfEnfeeblement] Trigger failed:',

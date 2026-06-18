@@ -44,10 +44,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Hypnotic Pattern! ${targetName} must make a WIS save (DC ${dc}) or become Charmed, Incapacitated, and have Speed 0.`,
             promptId,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         const saveResult = await promise;
 
@@ -62,10 +59,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: true,
                 description: `${targetName} succeeded on WIS save against Hypnotic Pattern.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         } else {
             affectedCount++;
 

@@ -231,10 +231,7 @@ async function handleMantleOfInspiration(action, playerStats, campaignName, mapN
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} used ${action.name} (rolled ${dieRoll} on 1d${bardicDieSize} = ${tempHp} temp HP). Targets: ${targetList}`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'roll',

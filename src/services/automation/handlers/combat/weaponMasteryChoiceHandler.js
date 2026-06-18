@@ -37,10 +37,7 @@ export async function applyMasterySelection(masteryName, playerStats, campaignNa
         characterName: playerStats.name,
         abilityName: 'Weapon Master - Mastery Property',
         description: `Selected mastery property: ${masteryName}`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',
@@ -60,10 +57,7 @@ async function handleMasterySelection(action, playerStats, campaignName, chosenM
         characterName: playerStats.name,
         abilityName: 'Weapon Master - Mastery Property',
         description: `Mastery property: ${chosenMastery} (previously selected)`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

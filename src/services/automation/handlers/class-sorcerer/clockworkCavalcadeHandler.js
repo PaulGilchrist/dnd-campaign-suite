@@ -46,10 +46,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 abilityName: featureName,
                 description: `${playerName} restored Clockwork Cavalcade by spending 7 Sorcery Points.`,
                 timestamp: now,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         } else {
             return {
                 type: 'popup',
@@ -79,10 +76,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName}.`,
         timestamp: now,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

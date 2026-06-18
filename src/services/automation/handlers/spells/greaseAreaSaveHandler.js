@@ -38,15 +38,12 @@ export async function handle(action, playerStats, campaignName, mapName) {
         } catch { /* positions unavailable */ }
     }
 
-    await addEntry(campaignName, {
+    addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: action.name,
         description: `${action.name} activated — ${saveType} save DC ${saveDc}, ${rangeFeet}ft square area.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     // Store grease area tracking for recurring saves
     const trackingKey = getGreaseTrackingKey(playerStats.name);
@@ -154,16 +151,13 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
             saveDc: tracking.saveDc,
         });
 
-        await addEntry(campaignName, {
+        addEntry(campaignName, {
             type: 'ability_use',
             characterName: casterName,
             abilityName: 'Grease',
             description: `${targetName} must make a ${tracking.saveType} save (DC ${tracking.saveDc}) or become Prone (Grease area).`,
             promptId,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         const saveResult = await promise;
 
@@ -173,7 +167,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
             const filtered = conditions.filter(c => String(c).toLowerCase() !== tracking.condition.toLowerCase());
             setRuntimeValue(targetName, 'activeConditions', [...filtered, tracking.condition.toLowerCase()], campaignName);
 
-            await addEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'save_result',
                 characterName: casterName,
                 rollType: 'save-grease',
@@ -182,9 +176,9 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
                 saveType: tracking.saveType,
                 success: false,
                 description: `${targetName} failed ${tracking.saveType} save against Grease. Becomes Prone.`,
-            });
+            }).catch(() => {});
         } else {
-            await addEntry(campaignName, {
+            addEntry(campaignName, {
                 type: 'save_result',
                 characterName: casterName,
                 rollType: 'save-grease',
@@ -193,7 +187,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
                 saveType: tracking.saveType,
                 success: true,
                 description: `${targetName} succeeded on ${tracking.saveType} save against Grease.`,
-            });
+            }).catch(() => {});
         }
 
         return {

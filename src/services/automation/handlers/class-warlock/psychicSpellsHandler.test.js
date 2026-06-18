@@ -1,12 +1,8 @@
 import { isPsychicSpellsActive, getPsychicSpellsConfig, handle } from './psychicSpellsHandler.js';
 import { collectAutomationFromFeatures } from '../../../combat/automation/automationCollector.js';
 import { psionicHandlers } from '../../../combat/automation/automationInfoBuilder/psionic.js';
-import * as logService from '../../../ui/logService.js';
 
 describe('psychicSpellsHandler', () => {
-    beforeEach(() => {
-        logService.addEntry.mockResolvedValue(undefined);
-    });
     describe('isPsychicSpellsActive', () => {
         it('should return true when psychic_spells passive exists', () => {
             const playerStats = {

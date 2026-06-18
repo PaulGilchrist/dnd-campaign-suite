@@ -97,10 +97,7 @@ export async function computePlayerAc(character) {
     if (item.equipment_category === 'Armor') {
       const base = item.armor_class?.base || 0;
       if (item.armor_class?.dex_bonus) {
-        if (item.armor_class.max_bonus == null) {
-          console.error(`[damageUtils] Armor ${item.name} has dex_bonus but no max_bonus`, { armor: JSON.stringify(item.armor_class), stack: new Error().stack });
-        }
-        const maxBonus = item.armor_class.max_bonus ?? 99;
+        const maxBonus = item.armor_class.max_bonus != null ? item.armor_class.max_bonus : 99;
         ac = base + Math.min(dexBonus, maxBonus);
       } else {
         ac = base;

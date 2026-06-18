@@ -142,10 +142,7 @@ export async function applyWarpingImplosion(action, playerStats, campaignName, t
         abilityName: featureName,
         description: `${playerName} used ${featureName}: Teleported up to 120 feet. ${targets?.length || 0} creature(s) in 30-foot emanation made STR save (DC ${saveDcValue}).`,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const descriptionParts = [
         `${featureName}: Teleported to an unoccupied space within 120 feet.`,

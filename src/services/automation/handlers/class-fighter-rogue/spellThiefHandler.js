@@ -67,10 +67,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName} — ${targetName} must make INT save (DC ${saveDc}) or lose the spell.`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -105,10 +102,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'INT',
                 success: false,
                 description: `${targetName} failed INT save. Spell negated. ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
 
             window.dispatchEvent(new CustomEvent('combat-summary-updated'));
         } else {
@@ -121,10 +115,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'INT',
                 success: true,
                 description: `${targetName} succeeded on INT save. ${featureName} has no effect.`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
         }
 
         window.removeEventListener('save-result', handleSaveResult);

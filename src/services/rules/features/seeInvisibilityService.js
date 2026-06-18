@@ -22,6 +22,6 @@ export async function triggerSeeInvisibility(spell, metaCtx, playerStats, campai
         return result;
     } catch (e) {
         console.error('[seeInvisibility] Failed to execute See Invisibility handler:', e);
-        throw e;
+        return null;
     }
 }

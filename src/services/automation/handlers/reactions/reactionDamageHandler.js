@@ -173,10 +173,7 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
         abilityName: action.name,
         description: `${action.name} triggered — ${targetName} must make ${auto.saveType || 'CON'} save (DC ${saveDc})`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -192,10 +189,7 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
                     total: damageResult.total,
                     formula: auto.damageExpression,
                     description: `${action.name} dealt ${damageResult.total} ${auto.damageType || 'Necrotic'} damage to ${targetName}.`,
-                }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+                }).catch(() => {});
             }
         }
 

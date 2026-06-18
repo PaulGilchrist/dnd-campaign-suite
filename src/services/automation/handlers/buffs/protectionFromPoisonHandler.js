@@ -111,10 +111,7 @@ export async function applyProtectionFromPoison(action, playerStats, campaignNam
         description: `${playerStats.name} cast ${action.name} on ${targetName}. Poisoned condition removed. Target has Advantage on saves vs Poisoned and Resistance to Poison damage for ${duration}.`,
         targetName,
         timestamp: Date.now(),
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

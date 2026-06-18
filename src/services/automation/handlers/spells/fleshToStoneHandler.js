@@ -40,10 +40,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
         abilityName: 'Flesh to Stone',
         description: `${targetName} makes a CON save (DC ${saveDc}) at end of turn (Flesh to Stone: ${currentSuccesses}/${MAX_SUCCESSES} successes, ${currentFails}/${MAX_FAILS} failures).`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -68,10 +65,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
                 saveType: 'CON',
                 success: true,
                 description: `${targetName} succeeded on CON save (${newSuccesses}/${MAX_SUCCESSES}). Flesh to Stone ends!`,
-            }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+            }).catch(() => {});
 
             postLogEntry(campaignName, {
                 type: 'condition',
@@ -104,10 +98,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
             saveType: 'CON',
             success: true,
             description: `${targetName} succeeded on CON save (${newSuccesses}/${MAX_SUCCESSES} successes, ${currentFails}/${MAX_FAILS} failures). Spell continues.`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         return {
             type: 'popup',
@@ -141,10 +132,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
             saveType: 'CON',
             success: false,
             description: `${targetName} failed CON save (${newFails}/${MAX_FAILS})! Turned to stone — Petrified!`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -178,10 +166,7 @@ export async function processFleshToStoneRepeatSave(casterName, targetName, save
         saveType: 'CON',
         success: false,
         description: `${targetName} failed CON save (${currentSuccesses}/${MAX_SUCCESSES} successes, ${newFails}/${MAX_FAILS} failures). Flesh hardens...`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',
@@ -252,10 +237,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             characterName: casterName,
             abilityName: action.name,
             description: `${targetName} is a Construct and automatically succeeds on the save against Flesh to Stone.`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         // Constructs still get Speed 0 until start of your next turn
         const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
@@ -290,10 +272,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${casterName} casts Flesh to Stone on ${targetName}! ${targetName} must make a CON save (DC ${dc}) or become Restrained.`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -317,10 +296,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'CON',
             success: true,
             description: `${targetName} succeeded on CON save against Flesh to Stone. Speed is 0 until the start of ${casterName}'s next turn.`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -386,10 +362,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'CON',
         success: false,
         description: `${targetName} failed CON save against Flesh to Stone and is Restrained (1/3 failed saves). After 3 failed saves, ${targetName} becomes Petrified.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     postLogEntry(campaignName, {
         type: 'condition',

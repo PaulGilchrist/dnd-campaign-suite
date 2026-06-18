@@ -35,10 +35,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} used ${action.name} to reduce damage by ${reduction} (Rolled ${psionicDieSize} for ${dieValue} + INT ${intMod}).`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',

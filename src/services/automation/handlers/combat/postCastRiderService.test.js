@@ -481,20 +481,19 @@ describe('triggerPostCastRiderSaves', () => {
 
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    await expect(
-      triggerPostCastRiderSaves(
-        spell,
-        makeMetaCtx(),
-        ps,
-        campaignName,
-        mapName,
-      )
-    ).rejects.toThrow('handler broke');
+    const result = await triggerPostCastRiderSaves(
+      spell,
+      makeMetaCtx(),
+      ps,
+      campaignName,
+      mapName,
+    );
 
     expect(consoleSpy).toHaveBeenCalledWith(
       '[postCastRider] Failed to execute rider save for Failing Rider:',
       expect.any(Error),
     );
+    expect(result).toBeNull();
 
     consoleSpy.mockRestore();
   });

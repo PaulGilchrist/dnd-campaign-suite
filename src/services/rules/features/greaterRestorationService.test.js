@@ -217,18 +217,18 @@ describe('greaterRestorationService', () => {
             expect(result).toBeNull();
         });
 
-        it('throws when executeHandler throws an error', async () => {
+        it('returns null when executeHandler throws an error', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
-            await expect(
-                triggerGreaterRestoration(
-                    { name: 'Greater Restoration', level: 5 },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow('Handler failed');
+            const result = await triggerGreaterRestoration(
+                { name: 'Greater Restoration', level: 5 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeNull();
         });
     });
 
@@ -267,12 +267,12 @@ describe('greaterRestorationService', () => {
             expect(output).toBe(applied);
         });
 
-        it('throws when applyGreaterRestorationEffect throws', async () => {
+        it('returns null when applyGreaterRestorationEffect throws', async () => {
             applyGreaterRestorationEffect.mockRejectedValue(new Error('Effect failed'));
 
-            await expect(
-                confirmGreaterRestoration(action, playerStats, campaignName, mapName, result),
-            ).rejects.toThrow('Effect failed');
+            const output = await confirmGreaterRestoration(action, playerStats, campaignName, mapName, result);
+
+            expect(output).toBeNull();
         });
 
         it('returns null when applyGreaterRestorationEffect returns null', async () => {

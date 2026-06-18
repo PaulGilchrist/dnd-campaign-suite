@@ -30,10 +30,7 @@ export async function processOttoDanceRepeatSave(casterName, targetName, saveDc,
         abilityName: spellName,
         description: `${targetName} makes a WIS save (DC ${saveDc}) to collect itself (${spellName}).`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -58,10 +55,7 @@ export async function processOttoDanceRepeatSave(casterName, targetName, saveDc,
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save. ${spellName} ends!`,
-        }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+        }).catch(() => {});
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -91,10 +85,7 @@ export async function processOttoDanceRepeatSave(casterName, targetName, saveDc,
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save. ${spellName} continues.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     return {
         type: 'popup',
@@ -205,10 +196,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${casterName} casts Otto's Irresistible Dance on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or become Charmed.`,
         promptId,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     const saveResult = await promise;
 
@@ -265,10 +253,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save against Otto's Irresistible Dance and is Charmed with Speed 0. On each of its turns, it can take an action to collect itself and repeat the save.`,
-    }).catch(function(e) {
-                            console.error("[automation] Failed to log entry:", e);
-                            throw e;
-                        });
+    }).catch(() => {});
 
     postLogEntry(campaignName, {
         type: 'condition',
