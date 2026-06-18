@@ -31,7 +31,7 @@ describe('postCastHealService', () => {
     })
 
     it('returns false when no passives', () => {
-      expect(hasPostCastSelfHeal({})).toBe(false)
+      expect(hasPostCastSelfHeal({ automation: { passives: [] } })).toBe(false)
     })
   })
 

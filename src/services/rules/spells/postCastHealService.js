@@ -25,13 +25,25 @@ function isHealingSpell(spell) {
 }
 
 function getPostCastSelfHeals(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = playerStats.automation?.passives;
+    if (passives == null) {
+        console.error('[postCastHealService] Missing array:', passives);
+        throw new Error('Expected array, got ' + passives);
+    }
     return passives.filter(p => p.type === 'post_cast_self_heal');
 }
 
 function getPostCastAllyHeals(playerStats) {
-    const passives = playerStats.automation?.passives || [];
-    const activeBuffs = playerStats.activeBuffs || [];
+    const passives = playerStats.automation?.passives;
+    if (passives == null) {
+        console.error('[postCastHealService] Missing array:', passives);
+        throw new Error('Expected array, got ' + passives);
+    }
+    const activeBuffs = playerStats.activeBuffs;
+    if (activeBuffs == null) {
+        console.error('[postCastHealService] Missing array:', activeBuffs);
+        throw new Error('Expected array, got ' + activeBuffs);
+    }
     const starryFormActive = activeBuffs.some(b => b.name === 'Starry Form' && b.constellation === 'Chalice');
     if (!starryFormActive) {
         return [];
