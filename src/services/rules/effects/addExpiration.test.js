@@ -48,7 +48,7 @@ describe('addExpiration', () => {
   });
 
   it('adds a new expiration entry when no existing list', () => {
-    getRuntimeValue.mockReturnValueOnce(null);
+    getRuntimeValue.mockReturnValueOnce([]);
 
     addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 3);
 
@@ -93,7 +93,7 @@ describe('addExpiration', () => {
 
   it('uses current combat round from getCurrentCombatRound', () => {
     getCurrentCombatRound.mockReturnValue(5);
-    getRuntimeValue.mockReturnValueOnce(null);
+    getRuntimeValue.mockReturnValueOnce([]);
 
     addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 3);
 
@@ -106,7 +106,7 @@ describe('addExpiration', () => {
       { type: 'stunned', condition: 'speed_halved' },
       { type: 'advantage_on_target' },
     ];
-    getRuntimeValue.mockReturnValueOnce(null);
+    getRuntimeValue.mockReturnValueOnce([]);
 
     addExpiration('Goblin', 'Human', effects, 'MyCampaign', 5);
 

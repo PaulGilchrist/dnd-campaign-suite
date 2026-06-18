@@ -55,6 +55,10 @@ describe('applyTurnStartEffects', () => {
     resetMocks();
     getRuntimeValue.mockReset();
     setRuntimeValue.mockReset();
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
   });
 
   it('returns early when activeName is null', () => {
@@ -68,13 +72,14 @@ describe('applyTurnStartEffects', () => {
   });
 
   it('returns early when playerStats has no turnStartEffects', () => {
-    applyTurnStartEffects('TestCharacter', {}, 'TestCampaign');
+    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
   it('grants hasInspiration when turnStartEffects contains heroic_inspiration and not already set', () => {
     getRuntimeValue.mockImplementation((name, prop) => {
       if (prop === 'hasInspiration') return false;
+      if (prop === 'targetEffects') return [];
       return null;
     });
 
@@ -93,6 +98,7 @@ describe('applyTurnStartEffects', () => {
   it('does NOT grant hasInspiration when already set to true', () => {
     getRuntimeValue.mockImplementation((name, prop) => {
       if (prop === 'hasInspiration') return true;
+      if (prop === 'targetEffects') return [];
       return null;
     });
 
@@ -106,6 +112,7 @@ describe('applyTurnStartEffects', () => {
   it('ignores unknown effect types', () => {
     getRuntimeValue.mockImplementation((name, prop) => {
       if (prop === 'hasInspiration') return false;
+      if (prop === 'targetEffects') return [];
       return null;
     });
 
@@ -119,6 +126,7 @@ describe('applyTurnStartEffects', () => {
   it('removes conditions at turn start when condition_removal effect is present', () => {
     getRuntimeValue.mockImplementation((name, prop) => {
       if (prop === 'activeConditions') return ['charmed', 'poisoned', 'blinded'];
+      if (prop === 'targetEffects') return [];
       return null;
     });
 
@@ -141,6 +149,7 @@ describe('applyTurnStartEffects', () => {
   it('does not call setRuntimeValue when no matching conditions to remove', () => {
     getRuntimeValue.mockImplementation((name, prop) => {
       if (prop === 'activeConditions') return ['blinded', 'grappled'];
+      if (prop === 'targetEffects') return [];
       return null;
     });
 
@@ -158,6 +167,7 @@ describe('applyTurnStartEffects', () => {
   it('handles case-insensitive condition matching', () => {
     getRuntimeValue.mockImplementation((name, prop) => {
       if (prop === 'activeConditions') return ['CHARMED', 'Poisoned', 'Blinded'];
+      if (prop === 'targetEffects') return [];
       return null;
     });
 
@@ -182,7 +192,8 @@ describe('applyTurnStartEffects', () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'umbralSightDarknessActive') return true;
         if (prop === 'activeConditions') return ['fatigued'];
-        return null;
+        if (prop === 'targetEffects') return [];
+      return null;
       });
 
       await applyTurnStartEffects('TestCharacter', {
@@ -201,7 +212,8 @@ describe('applyTurnStartEffects', () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'umbralSightDarknessActive') return false;
         if (prop === 'activeConditions') return ['fatigued', 'invisible'];
-        return null;
+        if (prop === 'targetEffects') return [];
+      return null;
       });
 
       await applyTurnStartEffects('TestCharacter', {
@@ -220,7 +232,8 @@ describe('applyTurnStartEffects', () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'umbralSightDarknessActive') return true;
         if (prop === 'activeConditions') return ['fatigued', 'invisible'];
-        return null;
+        if (prop === 'targetEffects') return [];
+      return null;
       });
 
       await applyTurnStartEffects('TestCharacter', {
@@ -237,6 +250,7 @@ describe('applyTurnStartEffects', () => {
         if (name === 'Target' && prop === 'regenerateActive') return true;
         if (name === 'Target' && prop === 'currentHitPoints') return 10;
         if (name === 'Target' && prop === 'hitPoints') return 20;
+        if (prop === 'targetEffects') return [];
         return undefined;
       });
       setRuntimeValue.mockResolvedValue(undefined);
@@ -254,6 +268,7 @@ describe('addExpiration', () => {
   it('adds an expiration entry to the attacker runtime store', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'pendingExpirations') return [];
+      if (key === 'targetEffects') return [];
       return null;
     });
 
@@ -275,6 +290,7 @@ describe('addExpiration', () => {
   it('throws when expiryRounds is not provided', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'pendingExpirations') return [];
+      if (key === 'targetEffects') return [];
       return null;
     });
 
@@ -284,6 +300,7 @@ describe('addExpiration', () => {
   it('appends to existing expiration list', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'pendingExpirations') return [{ target: 'ExistingTarget', expiryRounds: 2 }];
+      if (key === 'targetEffects') return [];
       return null;
     });
 
@@ -304,6 +321,7 @@ describe('addExpiration', () => {
     getCurrentCombatRound.mockReturnValue(10);
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'pendingExpirations') return [];
+      if (key === 'targetEffects') return [];
       return null;
     });
 
@@ -348,6 +366,7 @@ describe('clearAllExpirationEffects', () => {
   it('clears pending expirations from the character', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'pendingExpirations') return [{ target: 'Target', effects: [], appliedRound: 1, expiryRounds: 1 }];
+      if (key === 'targetEffects') return [];
       return null;
     });
 
@@ -391,6 +410,7 @@ describe('expireStaleEffects', () => {
     });
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'pendingExpirations') return [];
+      if (key === 'targetEffects') return [];
       return null;
     });
 
@@ -412,6 +432,7 @@ describe('expireStaleEffects', () => {
           { target: 'ValidTarget', effects: [{ type: 'blinded' }], appliedRound: 8, expiryRounds: 3 },
         ];
       }
+      if (key === 'targetEffects') return [];
       return null;
     });
 
@@ -432,6 +453,7 @@ describe('expireStaleEffects', () => {
     });
     getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'pendingExpirations') return [];
+      if (key === 'targetEffects') return [];
       return null;
     });
 

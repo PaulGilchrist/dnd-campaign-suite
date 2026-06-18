@@ -54,6 +54,7 @@ function setupLocalStorageScan(keysMap, myPendingList) {
             return myPendingList;
         }
     }
+    if (key === 'activeConditions') return [];
     return null;
    });
 }
@@ -82,12 +83,13 @@ describe('clearAllExpirationEffects', () => {
       { target: 'Orc', effects: [{ type: 'advantage_on_target' }], appliedRound: 2 },
     ];
 
-    getRuntimeValue.mockReturnValueOnce(myList);
-
-    getRuntimeValue
-      .mockReturnValueOnce(null)
-      .mockReturnValueOnce([])
-      .mockReturnValueOnce([]);
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'activeConditions') return [];
+      if (key === KEY && name === 'Goblin') return myList;
+      if (key === KEY) return [];
+      if (key.startsWith('_advantageOn_')) return [];
+      return null;
+    });
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');
 
@@ -99,8 +101,13 @@ describe('clearAllExpirationEffects', () => {
       { target: 'Human', effects: [{ type: 'stunned', condition: 'speed_halved' }], appliedRound: 1 },
     ];
 
-    getRuntimeValue.mockReturnValueOnce(myList);
-    getRuntimeValue.mockReturnValue(null);
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'activeConditions') return [];
+      if (key === KEY && name === 'Goblin') return myList;
+      if (key === KEY) return [];
+      if (key.startsWith('_advantageOn_')) return [];
+      return null;
+    });
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');
 
@@ -187,7 +194,7 @@ describe('clearAllExpirationEffects', () => {
   });
 
   it('does not iterate localStorage when characterName has no local storage match', () => {
-    getRuntimeValue.mockReturnValueOnce(null);
+    getRuntimeValue.mockReturnValueOnce([]);
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');
 

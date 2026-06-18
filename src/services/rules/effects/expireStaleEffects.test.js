@@ -329,6 +329,8 @@ describe('expireStaleEffects — additional edge cases', () => {
 
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return list;
+      if (name === 'Human' && key === 'activeBuffs') return [];
+      if (name === 'Human' && key === 'activeConditions') return [];
       return null;
     });
 
@@ -356,6 +358,8 @@ describe('expireStaleEffects — additional edge cases', () => {
 
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return list;
+      if (name === 'Human' && key === 'activeBuffs') return [];
+      if (name === 'Human' && key === 'activeConditions') return [];
       return null;
     });
 
@@ -452,6 +456,7 @@ describe('expireStaleEffects — additional edge cases', () => {
         { effect: 'fly_speed_equals_walk_speed', duration: 3 },
         { effect: 'double_move', duration: 2 },
       ];
+      if (name === 'Human' && key === 'activeConditions') return [];
       return null;
     });
 

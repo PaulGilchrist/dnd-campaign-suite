@@ -44,6 +44,11 @@ describe('clearExpirationEffects (via clearAllExpirationEffects)', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
+      return null;
+    });
   });
 
   it('does nothing when effects is null', () => {
@@ -96,6 +101,9 @@ describe('clearExpirationEffects (via clearAllExpirationEffects)', () => {
     ];
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
+      if (key === `_advantageOn_Human`) return [];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -112,6 +120,8 @@ describe('clearExpirationEffects (via clearAllExpirationEffects)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
       if (key === `_advantageOn_Human`) return ['Orc', 'Elf'];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -129,6 +139,8 @@ describe('clearExpirationEffects (via clearAllExpirationEffects)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
       if (key === `_advantageOn_Human`) return ['Orc', 'Human', 'Elf'];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -149,6 +161,8 @@ describe('clearExpirationEffects (via clearAllExpirationEffects)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
       if (key === `_advantageOn_Human`) return ['Human'];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -179,6 +193,11 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
   beforeEach(() => {
     resetMocks();
     stubUtilsNameIdentity();
+    getRuntimeValue.mockImplementation((name, key) => {
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
+      return null;
+    });
   });
 
   it('removes active condition when getRuntimeValue returns an array', () => {
@@ -188,6 +207,8 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
       if (name === 'Human' && key === 'activeConditions') return ['stunned', 'poisoned'];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -201,20 +222,19 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
     );
   });
 
-  it('does nothing when activeConditions is not an array', () => {
+  it('throws when activeConditions is not an array', () => {
     const myList = [
       { target: 'Human', effects: [{ type: 'stunned', condition: 'stunned' }], appliedRound: 1 },
     ];
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
       if (name === 'Human' && key === 'activeConditions') return 'stunned';
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
-    clearAllExpirationEffects('Goblin', 'MyCampaign');
-
-    const condCall = setRuntimeValue.mock.calls.find((c) => c[1] === 'activeConditions');
-    expect(condCall).toBeUndefined();
+    expect(() => clearAllExpirationEffects('Goblin', 'MyCampaign')).toThrow('Missing array: activeConditions for Human');
   });
 
   it('uses utils.getName for condition comparison in removeActiveCondition', () => {
@@ -224,6 +244,8 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
       if (name === 'Human' && key === 'activeConditions') return ['STUNNED'];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -244,6 +266,8 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
       if (name === 'Human' && key === 'activeConditions') return ['stunned'];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -264,6 +288,8 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
       if (name === 'Human' && key === 'activeConditions') return ['frightened', 'stunned', 'blinded'];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -283,6 +309,8 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
     ];
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return myList;
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
@@ -345,6 +373,8 @@ describe('clearExpirationEffects (via expireStaleEffects)', () => {
     getRuntimeValue.mockImplementation((name, key) => {
       if (name === 'Goblin' && key === KEY) return list;
       if (key === `_advantageOn_Human`) return [];
+      if (key === 'activeConditions') return [];
+      if (key === KEY) return [];
       return null;
     });
 
