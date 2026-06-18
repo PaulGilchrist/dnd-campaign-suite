@@ -93,6 +93,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
         ],
         inventory: { equipped: [] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Fighter' },
       });
 
@@ -113,6 +115,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
         ],
         inventory: { equipped: ['Shortbow'] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Fighter' },
       };
 
@@ -143,6 +147,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 10, abilityImprovements: 0, miscBonus: 0, bonus: 0 },
         ],
         inventory: { equipped: ['Longsword'] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Fighter' },
       };
 
@@ -173,6 +179,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
         ],
         inventory: { equipped: ['Rapier'] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Fighter' },
       };
 
@@ -203,6 +211,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
         ],
         inventory: { equipped: ['Shortsword', 'Dagger'] },
+        automation: { passives: [], bonusActions: [] },
+        activeBuffs: [],
         class: { name: 'Fighter' },
       };
 
@@ -238,6 +248,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
         ],
         inventory: { equipped: [] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Monk' },
       };
 
@@ -261,6 +273,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
         ],
         inventory: { equipped: [] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Fighter' },
       };
 
@@ -280,6 +294,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 14, abilityImprovements: 0, miscBonus: 0, bonus: 2 },
         ],
         inventory: { equipped: [] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Wizard' },
         spellAbilities: {
           modifier: 4,
@@ -307,6 +323,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
         ],
         inventory: { equipped: ['Shortbow'] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Ranger' },
       };
 
@@ -338,6 +356,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 16, abilityImprovements: 0, miscBonus: 0, bonus: 3 },
         ],
         inventory: { equipped: ['Shortbow', 'Longsword'] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Fighter' },
       };
 
@@ -362,6 +382,8 @@ describe('attackCalc2024', () => {
           { name: 'Dexterity', baseScore: 18, abilityImprovements: 0, miscBonus: 0, bonus: 4 },
         ],
         inventory: { equipped: ['Shortbow', 'Quarterstaff'] },
+        automation: { passives: [] },
+        activeBuffs: [],
         class: { name: 'Monk' },
         spellAbilities: {
           modifier: 3,
