@@ -143,8 +143,11 @@ describe('metamagicRules', () => {
       expect(getMaxMetamagicPerSpell({ rules: '2024', level: 5 }, 'player')).toBe(1)
     })
 
-    it('returns 1 for 2024 ruleset at level 6 with no Innate Sorcery buff', () => {
+    it('returns 1 for 2024 ruleset at level 6 with no Innate Sorcery buff', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      vi.mocked(getRuntimeValue).mockReturnValue([])
       expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'player')).toBe(1)
+      vi.mocked(getRuntimeValue).mockRestore()
     })
 
     it('returns 2 for 2024 ruleset at level 6 with Innate Sorcery buff', async () => {
@@ -175,9 +178,12 @@ describe('metamagicRules', () => {
       expect(hasArcaneApotheosis(stats, 'player')).toBe(false)
     })
 
-    it('returns false when Arcane Apotheosis present but no Innate Sorcery buff', () => {
+    it('returns false when Arcane Apotheosis present but no Innate Sorcery buff', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      vi.mocked(getRuntimeValue).mockReturnValue([])
       const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } }
       expect(hasArcaneApotheosis(stats, 'player')).toBe(false)
+      vi.mocked(getRuntimeValue).mockRestore()
     })
 
     it('returns true when Arcane Apotheosis and Innate Sorcery buff present', async () => {
@@ -225,7 +231,8 @@ describe('metamagicRules', () => {
     })
 
     it('returns empty array when not found', () => {
-      expect(getPsionicSpellsList({})).toEqual([])
+      const stats = { automation: { passives: [] } }
+      expect(getPsionicSpellsList(stats)).toEqual([])
     })
   })
 
@@ -265,7 +272,8 @@ describe('metamagicRules', () => {
     })
 
     it('returns false when no passives', () => {
-      expect(hasPsionicSorcery({})).toBe(false)
+      const stats = { automation: { passives: [] } }
+      expect(hasPsionicSorcery(stats)).toBe(false)
     })
   })
 })

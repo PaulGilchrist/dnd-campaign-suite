@@ -87,8 +87,9 @@ export function getChaModifier(stats) {
 
 export function getMaxMetamagicPerSpell(stats, playerName) {
   if (stats?.rules === '2024' && (stats.level || 0) >= 6) {
-     const buffs = getRuntimeValue(playerName, 'activeBuffs') || [];
-     return Array.isArray(buffs) && buffs.some(b => b.name === 'Innate Sorcery') ? 2 : 1;
+     const buffs = getRuntimeValue(playerName, 'activeBuffs');
+      if (buffs == null) { console.error('[metamagicRules] Missing array:', buffs); throw new Error('Expected array, got ' + buffs); }
+      return Array.isArray(buffs) && buffs.some(b => b.name === 'Innate Sorcery') ? 2 : 1;
    }
   return 1;
 }
@@ -101,7 +102,8 @@ export function hasArcaneApotheosis(stats, playerName) {
     const passives = stats?.automation?.passives ?? [];
     const hasFeature = passives.some(p => p.name === 'Arcane Apotheosis');
     if (!hasFeature) return false;
-    const buffs = getRuntimeValue(playerName, 'activeBuffs') || [];
+    const buffs = getRuntimeValue(playerName, 'activeBuffs');
+    if (buffs == null) { console.error('[metamagicRules] Missing array:', buffs); throw new Error('Expected array, got ' + buffs); }
     return Array.isArray(buffs) && buffs.some(b => b.name === 'Innate Sorcery');
  }
 
@@ -129,7 +131,8 @@ export function computeMetamagicCost(selectedOptionNames, optionsList, stats, pl
  }
 
 export function getPsionicSpellsList(playerStats) {
-    const passives = playerStats?.automation?.passives || [];
+    const passives = playerStats?.automation?.passives;
+    if (passives == null) { console.error('[metamagicRules] Missing array:', passives); throw new Error('Expected array, got ' + passives); }
     for (const passive of passives) {
         if (passive.type === 'psionic_spells_list' && Array.isArray(passive.psionicSpells)) {
             return passive.psionicSpells;
@@ -145,7 +148,8 @@ export function isPsionicSpell(playerStats, spellName) {
 }
 
 export function hasPsionicSorcery(playerStats) {
-    const passives = playerStats?.automation?.passives || [];
+    const passives = playerStats?.automation?.passives;
+    if (passives == null) { console.error('[metamagicRules] Missing array:', passives); throw new Error('Expected array, got ' + passives); }
     return passives.some(p => p.type === 'psionic_sorcery');
 }
 
