@@ -3,6 +3,8 @@ import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { playerIsImmuneToCondition } from '../../../combat/automation/automationImmunities.js';
+import * as mapsService from '../../../maps/mapsService.js';
+import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 
 /**
  * Web spell area save handler for 2024 ruleset.
@@ -29,14 +31,12 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
     // If there's a map and a center position, check if target is still in the area
     if (mapName && tracking.center) {
         try {
-            const mapsService = await import('../../../maps/mapsService.js');
             const mapData = await mapsService.loadMapData(campaignName, mapName);
             const targetPos = mapData?.players?.find(p => p.name === targetName) ||
                               mapData?.placedItems?.find(i => i.name === targetName);
 
             if (!targetPos) return null;
 
-            const { getDistanceFeet } = await import('../../../rules/combat/rangeValidation.js');
             const dist = getDistanceFeet(tracking.center, {
                 gridX: targetPos.gridX,
                 gridY: targetPos.gridY,
@@ -60,7 +60,7 @@ export async function processWebAreaSave(casterName, targetName, campaignName, m
     const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
     if (targetCharacter?.type === 'player') {
         const targetStats = {
-            computedStats: (await import('../../../../hooks/runtime/useRuntimeState.js')).getRuntimeValue(targetName, 'computedStats', campaignName),
+            computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
         };
         if (playerIsImmuneToCondition({
             conditionKey: 'restrained',
@@ -140,7 +140,6 @@ export async function handle(action, playerStats, campaignName, mapName) {
     let mapData = null;
     if (mapName) {
         try {
-            const mapsService = await import('../../../maps/mapsService.js');
             mapData = await mapsService.loadMapData(campaignName, mapName);
             const casterPlayer = mapData?.players?.find(p => p.name === playerStats.name);
             if (casterPlayer) {

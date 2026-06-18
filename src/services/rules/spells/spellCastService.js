@@ -435,7 +435,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                         }
                     } else {
                         let resolvedExpression = expression.replace(/\bMOD\b/g, String(spellCastingMod));
-                        const { rollExpression } = await import('../../dice/diceRoller.js');
                         const result = rollExpression(resolvedExpression);
                         if (result) {
                             const combatSummary = await getCombatContext(campaignName);
@@ -946,7 +945,6 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
 
     // Apply initial healing
     if (expression) {
-        const { rollExpression } = await import('../../dice/diceRoller.js');
         const result = rollExpression(expression);
         if (result) {
             const combatSummary = await getCombatContext(campaignName);

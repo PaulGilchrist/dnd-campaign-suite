@@ -5,6 +5,15 @@ import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCa
 import { getCombatSummary } from '../../services/encounters/combatData.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js'
 import { confirmRemoveCurse } from '../../services/rules/features/removeCurseService.js'
+import {
+    applyAidEffect,
+    applyHeroesFeastEffect,
+    applyLesserRestorationEffect,
+    applyMageArmorEffect,
+    applyProtectionFromEnergyHandler,
+    applyResistanceEffect,
+    applyShieldOfFaithEffect,
+} from '../../services/automation/index.js'
 
 function getCreatureTargets(excludeName, campaignName) {
   const cs = getCombatSummary(campaignName);
@@ -379,7 +388,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyAidEffect } = await import('../../services/automation/index.js');
       await applyAidEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'aid', range: pending.range, maxTargets: pending.maxTargets } },
         playerStats,
@@ -427,7 +435,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyHeroesFeastEffect } = await import('../../services/automation/index.js');
       await applyHeroesFeastEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'heroes_feast', range: pending.range, maxTargets: pending.maxTargets } },
         playerStats,
@@ -523,7 +530,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyLesserRestorationEffect } = await import('../../services/automation/index.js');
       await applyLesserRestorationEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'lesser_restoration', range: pending.range } },
         playerStats,
@@ -618,7 +624,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyMageArmorEffect } = await import('../../services/automation/index.js');
       await applyMageArmorEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'mage_armor', range: pending.range } },
         playerStats,
@@ -666,7 +671,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyProtectionFromEnergyHandler } = await import('../../services/automation/index.js');
       await applyProtectionFromEnergyHandler(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'protection_from_energy', damageTypes: pending.damageTypes } },
         playerStats,
@@ -714,7 +718,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyResistanceEffect } = await import('../../services/automation/index.js');
       await applyResistanceEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'damage_reduction', reductionExpression: '1d4', damageTypes: [], trigger: 'damage_taken_of_chosen_resistance_type' } },
         playerStats,
@@ -762,7 +765,6 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     try {
-      const { applyShieldOfFaithEffect } = await import('../../services/automation/index.js');
       await applyShieldOfFaithEffect(
         { name: pending.spellName, spell: pending.spell, automation: { type: 'shield_of_faith', range: pending.range } },
         playerStats,

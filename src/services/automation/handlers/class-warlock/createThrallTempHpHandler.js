@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
@@ -54,7 +55,7 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     // Find the summoned companion in combat context
-    const cs = await import('../../../rules/combat/damageUtils.js').then(m => m.getCombatContext(campaignName));
+    const cs = await getCombatContext(campaignName);
     if (!cs || !cs.creatures) {
         return null;
     }

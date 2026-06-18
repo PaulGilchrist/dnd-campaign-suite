@@ -7,7 +7,7 @@ export default defineConfig({
         react()
     ],
     build: {
-        chunkSizeWarningLimit: 2000,
+        chunkSizeWarningLimit: 3000,
         rollupOptions: {
             output: {
                 entryFileNames: 'assets/index.js',

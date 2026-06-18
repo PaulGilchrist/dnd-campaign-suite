@@ -3,6 +3,8 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
+import { addExpiration } from '../../../rules/effects/expirations.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
 /**
  * Process a repeated CON save for a creature already Stunned by Power Word Stun.
@@ -200,7 +202,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         setRuntimeValue(targetName, 'activeConditions', [...(getRuntimeValue(targetName, 'activeConditions', campaignName) || []), 'speed_zero'], campaignName);
 
         // Set expiration: speed_zero ends at start of caster's next turn
-        const { addExpiration } = await import('../../../../services/rules/effects/expirations.js');
         addExpiration(casterName, targetName, [
             { type: 'speed_zero', condition: 'speed_zero' },
         ], campaignName, 1);
@@ -238,9 +239,4 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: description,
         },
     };
-}
-
-async function getCombatContext(campaignName) {
-    const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
-    return getCombatContext(campaignName);
 }

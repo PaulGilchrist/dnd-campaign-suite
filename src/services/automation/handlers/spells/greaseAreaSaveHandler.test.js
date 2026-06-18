@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
+  createSaveListener: vi.fn(),
 }));
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -551,14 +552,11 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
     });
     rangeValidation.getDistanceFeet.mockReturnValue(5);
 
-    // Mock the dynamic import's createSaveListener
     const mockPromise = Promise.resolve({ success: false });
-    vi.doMock('../../common/savePrompt.js', () => ({
-      createSaveListener: () => ({
-        promptId: 'grease-save-prompt',
-        promise: mockPromise,
-      }),
-    }));
+    vi.mocked(savePrompt.createSaveListener).mockReturnValue({
+      promptId: 'grease-save-prompt',
+      promise: mockPromise,
+    });
 
     const result = await processGreaseAreaSave('TestWizard', 'Goblin', campaignName, 'test-map');
 
@@ -591,12 +589,10 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
     });
     rangeValidation.getDistanceFeet.mockReturnValue(5);
 
-    vi.doMock('../../common/savePrompt.js', () => ({
-      createSaveListener: () => ({
-        promptId: 'grease-save-success',
-        promise: Promise.resolve({ success: true }),
-      }),
-    }));
+    vi.mocked(savePrompt.createSaveListener).mockReturnValue({
+      promptId: 'grease-save-success',
+      promise: Promise.resolve({ success: true }),
+    });
 
     const result = await processGreaseAreaSave('TestWizard', 'Goblin', campaignName, 'test-map');
 
@@ -641,12 +637,10 @@ describe('greaseAreaSaveHandler.processGreaseAreaSave', () => {
     });
     rangeValidation.getDistanceFeet.mockReturnValue(5);
 
-    vi.doMock('../../common/savePrompt.js', () => ({
-      createSaveListener: () => ({
-        promptId: 'grease-cond-prompt',
-        promise: Promise.resolve({ success: false }),
-      }),
-    }));
+    vi.mocked(savePrompt.createSaveListener).mockReturnValue({
+      promptId: 'grease-cond-prompt',
+      promise: Promise.resolve({ success: false }),
+    });
 
     await processGreaseAreaSave('TestWizard', 'Goblin', campaignName, 'test-map');
 

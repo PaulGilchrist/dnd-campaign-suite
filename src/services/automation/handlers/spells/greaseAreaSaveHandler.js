@@ -1,4 +1,4 @@
-import { buildSaveDc } from '../../common/savePrompt.js';
+import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
@@ -126,7 +126,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
         const targetCharacter = (await getCombatContext(campaignName))?.creatures?.find(c => c.name === targetName);
         if (targetCharacter?.type === 'player') {
             const targetStats = {
-                computedStats: (await import('../../../../hooks/runtime/useRuntimeState.js')).getRuntimeValue(targetName, 'computedStats', campaignName),
+                computedStats: getRuntimeValue(targetName, 'computedStats', campaignName),
             };
             if (playerIsImmuneToCondition({
                 conditionKey: tracking.condition.toLowerCase(),
@@ -144,7 +144,6 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
         if (isAlreadyProne) return null;
 
         // Trigger save for this creature
-        const { createSaveListener } = await import('../../common/savePrompt.js');
         const { promptId, promise } = createSaveListener(campaignName, {
             targetName,
             saveType: tracking.saveType,
