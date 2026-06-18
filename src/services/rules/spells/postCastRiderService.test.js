@@ -51,8 +51,8 @@ describe('postCastRiderService', () => {
       expect(result).toHaveLength(2)
     })
 
-    it('returns empty when no passives', () => {
-      expect(getPostCastRiderSaves({})).toEqual([])
+    it('throws when automation.passives is missing', () => {
+      expect(() => getPostCastRiderSaves({})).toThrow('Expected array')
     })
   })
 
@@ -64,8 +64,8 @@ describe('postCastRiderService', () => {
       expect(getSpellThiefFeatures(stats)).toHaveLength(1)
     })
 
-    it('returns empty when no spell_thief passives', () => {
-      expect(getSpellThiefFeatures({})).toEqual([])
+    it('throws when automation.passives is missing', () => {
+      expect(() => getSpellThiefFeatures({})).toThrow('Expected array')
     })
   })
 
@@ -75,8 +75,8 @@ describe('postCastRiderService', () => {
       expect(hasSpellThief(stats)).toBe(true)
     })
 
-    it('returns false when no spell_thief features', () => {
-      expect(hasSpellThief({})).toBe(false)
+    it('throws when automation.passives is missing', () => {
+      expect(() => hasSpellThief({})).toThrow('Expected array')
     })
   })
 
@@ -88,8 +88,8 @@ describe('postCastRiderService', () => {
       expect(getMultiTargetSpreads(stats)).toHaveLength(1)
     })
 
-    it('returns empty when no multi_target_spread passives', () => {
-      expect(getMultiTargetSpreads({})).toEqual([])
+    it('throws when automation.passives is missing', () => {
+      expect(() => getMultiTargetSpreads({})).toThrow('Expected array')
     })
   })
 
@@ -112,8 +112,8 @@ describe('postCastRiderService', () => {
       expect(getMultiTargetSpreadForSpell(stats, 'Iceball')).toBeNull()
     })
 
-    it('returns null when no spreads', () => {
-      expect(getMultiTargetSpreadForSpell({}, 'Fireball')).toBeNull()
+    it('throws when automation.passives is missing', () => {
+      expect(() => getMultiTargetSpreadForSpell({}, 'Fireball')).toThrow('Expected array')
     })
   })
 
@@ -123,8 +123,8 @@ describe('postCastRiderService', () => {
       expect(hasPostCastRiderSave(stats)).toBe(true)
     })
 
-    it('returns false when no rider saves', () => {
-      expect(hasPostCastRiderSave({})).toBe(false)
+    it('throws when automation.passives is missing', () => {
+      expect(() => hasPostCastRiderSave({})).toThrow('Expected array')
     })
   })
 
@@ -210,8 +210,8 @@ describe('postCastRiderService', () => {
       expect(getSoulstitchFeatures(stats)).toHaveLength(1)
     })
 
-    it('returns empty when no soulstitch features', () => {
-      expect(getSoulstitchFeatures({})).toEqual([])
+    it('throws when automation.passives is missing', () => {
+      expect(() => getSoulstitchFeatures({})).toThrow('Expected array')
     })
   })
 
@@ -221,8 +221,8 @@ describe('postCastRiderService', () => {
       expect(hasSoulstitchSpells(stats)).toBe(true)
     })
 
-    it('returns false when no soulstitch features', () => {
-      expect(hasSoulstitchSpells({})).toBe(false)
+    it('throws when automation.passives is missing', () => {
+      expect(() => hasSoulstitchSpells({})).toThrow('Expected array')
     })
   })
 
@@ -230,8 +230,8 @@ describe('postCastRiderService', () => {
     const evocationSpell = { name: 'Fireball', school: 'Evocation', dc: { dc_type: 'CON' } }
     const nonEvocationSpell = { name: 'Charm Person', school: 'Enchantment', dc: { dc_type: 'WIS' } }
 
-    it('returns null when no soulstitch features', async () => {
-      const result = await triggerSoulstitchSpells(evocationSpell, {}, {}, 'camp', 'map')
+    it('throws when no soulstitch features', async () => {
+      const result = await triggerSoulstitchSpells(evocationSpell, {}, { automation: { passives: [] } }, 'camp', 'map')
       expect(result).toBeNull()
     })
 
@@ -263,8 +263,8 @@ describe('postCastRiderService', () => {
       expect(getEmpoweredEvocationFeatures(stats)).toHaveLength(1)
     })
 
-    it('returns empty when no empowered_evocation passives', () => {
-      expect(getEmpoweredEvocationFeatures({})).toEqual([])
+    it('throws when automation.passives is missing', () => {
+      expect(() => getEmpoweredEvocationFeatures({})).toThrow('Expected array')
     })
   })
 
@@ -274,8 +274,8 @@ describe('postCastRiderService', () => {
       expect(hasEmpoweredEvocation(stats)).toBe(true)
     })
 
-    it('returns false when no empowered evocation features', () => {
-      expect(hasEmpoweredEvocation({})).toBe(false)
+    it('throws when automation.passives is missing', () => {
+      expect(() => hasEmpoweredEvocation({})).toThrow('Expected array')
     })
   })
 
@@ -350,8 +350,8 @@ describe('postCastRiderService', () => {
       expect(getBewitchingMagicFeatures(stats)).toHaveLength(1)
     })
 
-    it('returns empty when no bewitching_magic passives', () => {
-      expect(getBewitchingMagicFeatures({})).toEqual([])
+    it('throws when automation.passives is missing', () => {
+      expect(() => getBewitchingMagicFeatures({})).toThrow('Expected array')
     })
   })
 

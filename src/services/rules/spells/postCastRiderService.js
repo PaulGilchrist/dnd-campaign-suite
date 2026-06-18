@@ -15,12 +15,22 @@ function usesSpellSlot(spell, metaCtx) {
 }
 
 export function getPostCastRiderSaves(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const rawPassives = playerStats.automation?.passives;
+    if (rawPassives == null) {
+        console.error('[postCastRiderService] Missing array:', rawPassives);
+        throw new Error('Expected array, got ' + rawPassives);
+    }
+    const passives = rawPassives;
     return passives.filter(p => p.type === 'post_cast_rider' || (p.type === 'passive_rule' && p.riderSave));
 }
 
 export function getSpellThiefFeatures(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const rawPassives = playerStats.automation?.passives;
+    if (rawPassives == null) {
+        console.error('[postCastRiderService] Missing array:', rawPassives);
+        throw new Error('Expected array, got ' + rawPassives);
+    }
+    const passives = rawPassives;
     return passives.filter(p => p.type === 'spell_thief');
 }
 
@@ -29,14 +39,24 @@ export function hasSpellThief(playerStats) {
 }
 
 export function getMultiTargetSpreads(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const rawPassives = playerStats.automation?.passives;
+    if (rawPassives == null) {
+        console.error('[postCastRiderService] Missing array:', rawPassives);
+        throw new Error('Expected array, got ' + rawPassives);
+    }
+    const passives = rawPassives;
     return passives.filter(p => p.type === 'multi_target_spread');
 }
 
 export function getMultiTargetSpreadForSpell(playerStats, spellName) {
     const spreads = getMultiTargetSpreads(playerStats);
     for (const spread of spreads) {
-        const filter = spread.spellFilter || [];
+        const rawFilter = spread.spellFilter;
+        if (rawFilter == null) {
+            console.error('[postCastRiderService] Missing array:', rawFilter);
+            throw new Error('Expected array, got ' + rawFilter);
+        }
+        const filter = rawFilter;
         if (filter.includes(spellName)) {
             return spread;
         }
@@ -120,7 +140,12 @@ export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, cam
 const EVOCATION_SCHOOL = 'Evocation';
 
 export function getSoulstitchFeatures(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const rawPassives = playerStats.automation?.passives;
+    if (rawPassives == null) {
+        console.error('[postCastRiderService] Missing array:', rawPassives);
+        throw new Error('Expected array, got ' + rawPassives);
+    }
+    const passives = rawPassives;
     return passives.filter(p => p.type === 'soulstitch_spells');
 }
 
@@ -174,7 +199,12 @@ export async function triggerSoulstitchSpells(spell, metaCtx, playerStats, campa
 }
 
 export function getEmpoweredEvocationFeatures(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const rawPassives = playerStats.automation?.passives;
+    if (rawPassives == null) {
+        console.error('[postCastRiderService] Missing array:', rawPassives);
+        throw new Error('Expected array, got ' + rawPassives);
+    }
+    const passives = rawPassives;
     return passives.filter(p => p.type === 'empowered_evocation');
 }
 
@@ -249,7 +279,12 @@ export async function triggerSpellThief(spell, metaCtx, playerStats, campaignNam
 }
 
 export function getBewitchingMagicFeatures(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const rawPassives = playerStats.automation?.passives;
+    if (rawPassives == null) {
+        console.error('[postCastRiderService] Missing array:', rawPassives);
+        throw new Error('Expected array, got ' + rawPassives);
+    }
+    const passives = rawPassives;
     return passives.filter(p => p.type === 'bewitching_magic');
 }
 

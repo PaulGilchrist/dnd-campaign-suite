@@ -65,9 +65,9 @@ describe('getPostCastRiderSaves', () => {
     expect(getPostCastRiderSaves(ps)).toEqual([]);
   });
 
-  it('should return empty array when passives is undefined', () => {
+  it('throws when passives is undefined', () => {
     const ps = makePlayerStats({ automation: {} });
-    expect(getPostCastRiderSaves(ps)).toEqual([]);
+    expect(() => getPostCastRiderSaves(ps)).toThrow('Expected array');
   });
 
   it('should filter for post_cast_rider type passives', () => {
