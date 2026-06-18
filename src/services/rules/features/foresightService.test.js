@@ -311,22 +311,20 @@ describe('foresightService', () => {
             expect(newEffects[1].target).toBe('Fighter');
         });
 
-        it('handles null targetEffects by treating as empty array', async () => {
+        it('throws when targetEffects is null', async () => {
             mockGetRuntimeValue
                 .mockReturnValueOnce([])
                 .mockReturnValueOnce(null);
 
-            await triggerForesight(
-                { name: 'Foresight' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            const newEffects = mockSetRuntimeValue.mock.calls[1][2];
-            expect(newEffects).toHaveLength(1);
-            expect(newEffects[0].target).toBe('Wizard');
+            await expect(
+                triggerForesight(
+                    { name: 'Foresight' },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                ),
+            ).rejects.toThrow('Expected array, got null');
         });
 
         it('handles non-array targetEffects by treating as empty array', async () => {

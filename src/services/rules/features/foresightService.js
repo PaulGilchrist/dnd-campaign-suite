@@ -29,8 +29,12 @@ export async function triggerForesight(spell, metaCtx, playerStats, campaignName
     //
     // The spell ends early if you cast it again, so remove any existing Foresight
     // from this caster before applying the new one.
-    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-    const effects = Array.isArray(storedEffects) ? storedEffects : [];
+    const rawEffects = getRuntimeValue(campaignName, 'targetEffects');
+    if (rawEffects == null) {
+        console.error('[foresightService] Missing array:', rawEffects);
+        throw new Error('Expected array, got ' + rawEffects);
+    }
+    const effects = Array.isArray(rawEffects) ? rawEffects : [];
     const filtered = effects.filter(te => !(te.effect === 'foresight' && te.source === playerStats.name));
 
     const foresightEffect = {
