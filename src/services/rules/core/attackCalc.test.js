@@ -245,19 +245,19 @@ describe('attackCalc', () => {
         { name: 'Fire Bolt', prepared: 'Always' },
         { name: 'Magic Missile', prepared: 'Prepared' },
       ];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, saveDc: 13 });
+      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, toHit: 7, saveDc: 13 });
 
       expect(result).toHaveLength(2);
       expect(result[0].name).toBe('Fire Bolt');
       expect(result[0].damage).toBe('1d10');
-      expect(result[0].hitBonus).toBe(4);
+      expect(result[0].hitBonus).toBe(7);
     });
 
     it('should build save-based spell attacks with save info', () => {
       const playerSpells = [
         { name: 'Sacred Flame', prepared: 'Always' },
       ];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, saveDc: 13 });
+      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, toHit: 7, saveDc: 13 });
 
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Sacred Flame');
@@ -273,24 +273,24 @@ describe('attackCalc', () => {
         { name: 'Mage Hand', damage: null, range: '30 feet', casting_time: '1 action', level: 0, classes: ['Wizard'] },
       ];
       const playerSpells = [{ name: 'Mage Hand', prepared: 'Always' }];
-      const result = buildSpellAttacks(playerSpells, spellsWithNoDamage, { modifier: 4 });
+      const result = buildSpellAttacks(playerSpells, spellsWithNoDamage, { modifier: 4, toHit: 7 });
       expect(result).toHaveLength(0);
     });
 
     it('should skip unprepared spells', () => {
       const playerSpells = [{ name: 'Magic Missile', prepared: '' }];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4 });
+      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, toHit: 7 });
       expect(result).toHaveLength(0);
     });
 
     it('should handle empty spell list', () => {
-      const result = buildSpellAttacks([], allSpells, { modifier: 4 });
+      const result = buildSpellAttacks([], allSpells, { modifier: 4, toHit: 7 });
       expect(result).toHaveLength(0);
     });
 
     it('should include spell not found in catalog with prepared flag and damage', () => {
       const playerSpells = [{ name: 'Custom Spell', prepared: 'Always', damage: { damage_type: 'Force' }, range: '60 feet', casting_time: '1 action' }];
-      const result = buildSpellAttacks(playerSpells, [], { modifier: 4 });
+      const result = buildSpellAttacks(playerSpells, [], { modifier: 4, toHit: 7 });
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe('Custom Spell');
       expect(result[0].damageType).toBe('Force');
@@ -298,13 +298,13 @@ describe('attackCalc', () => {
 
     it('should skip spell not in catalog when unprepared', () => {
       const playerSpells = [{ name: 'Custom Spell', prepared: '' }];
-      const result = buildSpellAttacks(playerSpells, [], { modifier: 4 });
+      const result = buildSpellAttacks(playerSpells, [], { modifier: 4, toHit: 7 });
       expect(result).toHaveLength(0);
     });
 
     it('should skip spell not in catalog when casting time is not combat-relevant', () => {
       const playerSpells = [{ name: 'Ritual Spell', prepared: 'Always', damage: { damage_type: 'Force' }, range: '30 feet', casting_time: '1 minute' }];
-      const result = buildSpellAttacks(playerSpells, [], { modifier: 4 });
+      const result = buildSpellAttacks(playerSpells, [], { modifier: 4, toHit: 7 });
       expect(result).toHaveLength(0);
     });
 
@@ -313,7 +313,7 @@ describe('attackCalc', () => {
         { name: 'Charm Spell', damage: { damage_at_character_level: { '1': '2d6' }, damage_at_slot_level: {} }, damage_type: 'Psychic', range: '60 feet', casting_time: '1 action', level: 1, classes: ['Bard'] },
       ];
       const playerSpells = [{ name: 'Charm Spell', prepared: 'Prepared' }];
-      const result = buildSpellAttacks(playerSpells, allSpellsWithCharLevel, { modifier: 3 });
+      const result = buildSpellAttacks(playerSpells, allSpellsWithCharLevel, { modifier: 3, toHit: 6 });
       expect(result).toHaveLength(1);
       expect(result[0].damage).toBe('2d6');
     });
@@ -323,7 +323,7 @@ describe('attackCalc', () => {
         { name: 'Fire Bolt', prepared: 'Always' },
         { name: 'Fire Bolt', prepared: 'Prepared' },
       ];
-      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4 });
+      const result = buildSpellAttacks(playerSpells, allSpells, { modifier: 4, toHit: 7 });
       expect(result).toHaveLength(1);
     });
   });
@@ -441,12 +441,13 @@ describe('attackCalc', () => {
         spellAbilities: {
           spells: [{ name: 'Fire Bolt', prepared: 'Always' }],
           modifier: 4,
+          toHit: 7,
         },
       });
       const result = getAttacks(allEquipment, allSpells, playerStats);
       const spellAttacks = result.filter(a => a.name === 'Fire Bolt');
       expect(spellAttacks).toHaveLength(1);
-      expect(spellAttacks[0].hitBonus).toBe(4);
+      expect(spellAttacks[0].hitBonus).toBe(7);
     });
 
     it('should return empty when no weapons or spells', () => {

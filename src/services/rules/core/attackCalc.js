@@ -191,7 +191,7 @@ export function buildSpellAttacks(playerSpells, allSpells, spellAbilities, playe
             attackEntry.saveType = spell.dc.dc_type;
             attackEntry.saveSuccess = spell.dc.dc_success;
          } else {
-            attackEntry.hitBonus = spellAbilities.modifier;
+            attackEntry.hitBonus = spellAbilities.toHit;
          }
         attacks.push(attackEntry);
     });
