@@ -62,7 +62,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
     const targets = [];
 
     if (casterGridPos) {
-        const sortedCreatures = [...(combatSummary.creatures || [])]
+        const sortedCreatures = [...(() => { const x = combatSummary.creatures; if (x == null) { console.error('[massHealService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()]
             .filter(c => c.name !== casterName)
             .map(c => {
                 const targetPlayer = combatSummary.players?.find(p => p.name === c.name);
@@ -82,7 +82,7 @@ export async function triggerMassHeal(spell, metaCtx, playerStats, campaignName,
             targets.push(item.creature);
         }
     } else {
-        const eligible = (combatSummary.creatures || [])
+        const eligible = (() => { const x = combatSummary.creatures; if (x == null) { console.error('[massHealService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()
             .filter(c => c.name !== casterName)
             .slice(0, maxTargets);
         targets.push(...eligible);

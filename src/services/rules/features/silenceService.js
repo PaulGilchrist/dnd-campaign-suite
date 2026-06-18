@@ -60,7 +60,7 @@ export function getSilenceRadius(playerName, campaignName) {
 }
 
 export function getSilenceSource(playerName, campaignName) {
-    const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
+    const activeBuffs = (() => { const x = getRuntimeValue(playerName, 'activeBuffs', campaignName); if (x == null) { console.error('[silenceService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })();
     const buff = activeBuffs.find(b => b.effect === SILENCE_EFFECT);
     return buff?.sourceCharacter || null;
 }
@@ -78,8 +78,8 @@ export function getCreaturesInSilenceZone(casterName, campaignName) {
 
     const centerGrid = { gridX: casterPos.gridX, gridY: casterPos.gridY };
     const allCreatures = [
-        ...(combatSummary.players || []),
-        ...(combatSummary.creatures || []),
+        ...(() => { const x = combatSummary.players; if (x == null) { console.error('[silenceService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })(),
+        ...(() => { const x = combatSummary.creatures; if (x == null) { console.error('[silenceService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })(),
     ];
 
     return allCreatures.filter(c => {
@@ -108,8 +108,8 @@ export function isCreatureInSilenceZone(targetName, casterName, campaignName) {
     if (!combatSummary) return false;
 
     const allCreatures = [
-        ...(combatSummary.players || []),
-        ...(combatSummary.creatures || []),
+        ...(() => { const x = combatSummary.players; if (x == null) { console.error('[silenceService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })(),
+        ...(() => { const x = combatSummary.creatures; if (x == null) { console.error('[silenceService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })(),
     ];
 
     const targetCreature = allCreatures.find(c => c.name === targetName);
@@ -134,7 +134,7 @@ export function shouldHaveDeafenedFromSilence(targetName, campaignName) {
 
 export function getSilenceDeafenedSources(targetName, campaignName) {
     const sources = [];
-    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
+    const activeBuffs = (() => { const x = getRuntimeValue(targetName, 'activeBuffs', campaignName); if (x == null) { console.error('[silenceService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })();
     for (const buff of activeBuffs) {
         if (buff.effect === SILENCE_EFFECT && buff.sourceCharacter) {
             if (isCreatureInSilenceZone(targetName, buff.sourceCharacter, campaignName)) {

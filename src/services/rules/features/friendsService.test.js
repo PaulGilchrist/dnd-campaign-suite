@@ -883,15 +883,7 @@ describe('friendsService', () => {
                 return null;
             });
 
-            endFriendsOnHostileAction(casterName, campaignName);
-
-            // No conditions to filter, but should still clear active target
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                campaignName,
-                `_activeFriends_Wizard`,
-                null,
-                campaignName,
-            );
+            expect(() => endFriendsOnHostileAction(casterName, campaignName)).toThrow('Expected array, got null');
         });
 
         it('handles empty conditions array', () => {

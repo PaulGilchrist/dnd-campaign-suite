@@ -53,12 +53,12 @@ describe('inspiringSmiteService', () => {
       expect(result[0].name).toBe('Inspiring Smite 1')
     })
 
-    it('returns empty array when no passives exist', () => {
-      expect(getInspiringSmitePassives({})).toEqual([])
+    it('throws when no passives exist', () => {
+      expect(() => getInspiringSmitePassives({})).toThrow('Expected array, got undefined')
     })
 
-    it('returns empty array when passives is undefined', () => {
-      expect(getInspiringSmitePassives({ automation: {} })).toEqual([])
+    it('throws when passives is undefined', () => {
+      expect(() => getInspiringSmitePassives({ automation: {} })).toThrow('Expected array, got undefined')
     })
   })
 
@@ -73,8 +73,8 @@ describe('inspiringSmiteService', () => {
       expect(hasInspiringSmite(stats)).toBe(false)
     })
 
-    it('returns false when no passives', () => {
-      expect(hasInspiringSmite({})).toBe(false)
+    it('throws when no passives', () => {
+      expect(() => hasInspiringSmite({})).toThrow('Expected array, got undefined')
     })
   })
 

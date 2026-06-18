@@ -813,15 +813,13 @@ describe('powerWordFortifyService', () => {
             });
             rangeToFeet.mockReturnValue(60);
 
-            const result = await triggerPowerWordFortify(
+            await expect(triggerPowerWordFortify(
                 validSpell,
                 {},
                 playerStats,
                 campaignName,
                 mapName,
-            );
-
-            expect(result).toEqual({ noTargets: true });
+            )).rejects.toThrow('Expected array, got null');
         });
 
         it('handles getRuntimeValue returning undefined', async () => {

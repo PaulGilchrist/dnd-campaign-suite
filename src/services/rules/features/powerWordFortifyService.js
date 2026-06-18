@@ -55,7 +55,7 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
         const casterGridPos = casterPos ? { gridX: casterPos.gridX, gridY: casterPos.gridY } : null;
 
         if (casterGridPos) {
-            targets = [...(combatSummary.creatures || [])]
+            targets = [...(() => { const x = combatSummary.creatures; if (x == null) { console.error('[powerWordFortifyService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()]
                 .filter(c => c.name !== casterName)
                 .map(c => {
                     const targetPlayer = combatSummary.players?.find(p => p.name === c.name);
@@ -72,12 +72,12 @@ export async function triggerPowerWordFortify(spell, metaCtx, playerStats, campa
                 .slice(0, maxTargets)
                 .map(item => item.creature);
         } else {
-            targets = (combatSummary.creatures || [])
+            targets = (() => { const x = combatSummary.creatures; if (x == null) { console.error('[powerWordFortifyService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()
                 .filter(c => c.name !== casterName)
                 .slice(0, maxTargets);
         }
     } else {
-        targets = (combatSummary.creatures || [])
+        targets = (() => { const x = combatSummary.creatures; if (x == null) { console.error('[powerWordFortifyService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()
             .filter(c => c.name !== casterName)
             .slice(0, maxTargets);
     }

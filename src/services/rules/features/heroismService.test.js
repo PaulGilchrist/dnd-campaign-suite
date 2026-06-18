@@ -502,12 +502,7 @@ describe('heroismService', () => {
         it('handles null activeBuffs by treating as empty', () => {
             getRuntimeValue.mockReturnValue(null);
 
-            removeHeroismBuff('Target', campaignName);
-
-            const buffCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffCalls.length).toBe(0);
+            expect(() => removeHeroismBuff('Target', campaignName)).toThrow('Expected array, got null');
         });
 
         it('handles non-array targetEffects by treating as empty', () => {
@@ -526,14 +521,13 @@ describe('heroismService', () => {
         });
 
         it('handles null targetEffects', () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'Target' && prop === 'activeBuffs') return [];
+                if (key === campaignName && prop === 'targetEffects') return null;
+                return null;
+            });
 
-            removeHeroismBuff('Target', campaignName);
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects',
-            );
-            expect(effectCalls.length).toBe(0);
+            expect(() => removeHeroismBuff('Target', campaignName)).toThrow('Expected array, got null');
         });
 
         it('handles empty activeBuffs array', () => {

@@ -52,7 +52,7 @@ describe('smiteOfProtectionService', () => {
         });
 
         it('returns empty array when no passives', () => {
-            expect(getSmiteOfProtectionPassives({})).toEqual([]);
+            expect(() => getSmiteOfProtectionPassives({})).toThrow('Expected array, got undefined');
         });
     });
 

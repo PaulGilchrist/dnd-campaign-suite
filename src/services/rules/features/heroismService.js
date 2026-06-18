@@ -65,7 +65,11 @@ export function removeHeroismBuff(targetName, campaignName) {
         setRuntimeValue(targetName, 'activeBuffs', filtered, campaignName);
     }
 
-    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+    const storedEffects = (() => {
+        const x = getRuntimeValue(campaignName, 'targetEffects');
+        if (x == null) { console.error('[heroismService] Missing array:', x); throw new Error('Expected array, got ' + x); }
+        return x;
+    })();
     const effects = Array.isArray(storedEffects) ? storedEffects : [];
     const filteredEffects = effects.filter(te => !(te.effect === 'heroism' && te.source === HEROISM_BUFF_NAME));
     if (filteredEffects.length !== effects.length) {

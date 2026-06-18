@@ -39,7 +39,7 @@ describe('primalCompanionSpellShareService', () => {
 
         it('returns false when automation is null', () => {
             const playerStats = { automation: null };
-            expect(hasShareSpells(playerStats)).toBe(false);
+            expect(() => hasShareSpells(playerStats)).toThrow('Expected array, got undefined');
         });
 
         it('returns false when passives is empty', () => {

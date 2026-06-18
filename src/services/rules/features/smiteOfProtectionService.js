@@ -7,7 +7,11 @@ export function isDivineSmite(spell) {
 }
 
 export function getSmiteOfProtectionPassives(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = (() => {
+        const x = playerStats.automation?.passives;
+        if (x == null) { console.error('[smiteOfProtectionService] Missing array:', x); throw new Error('Expected array, got ' + x); }
+        return x;
+    })();
     return passives.filter(p => p.type === 'post_cast_smite_cover');
 }
 

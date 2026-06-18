@@ -76,7 +76,7 @@ export async function triggerMassHealingWord(spell, metaCtx, playerStats, campai
 
     const casterName = playerStats.name;
     const maxTargets = 6;
-    const targets = (combatSummary.creatures || [])
+    const targets = (() => { const x = combatSummary.creatures; if (x == null) { console.error('[massHealingWordService] Missing array:', x); throw new Error('Expected array, got ' + x); } return x; })()
         .filter(c => c.name !== casterName)
         .slice(0, maxTargets);
 

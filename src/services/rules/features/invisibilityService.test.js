@@ -159,27 +159,7 @@ describe('invisibilityService', () => {
                 { name: 'Invisibility', duration: '1_hour' },
             ]);
 
-            endInvisibilityOnHostileAction(invisibleName, campaignName);
-
-            // conditions null || [] = [], filtered [] same length, so no conditions set
-            // but activeBuffs IS updated and key IS cleared
-            const condCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'activeConditions',
-            );
-            expect(condCalls).toHaveLength(0);
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                invisibleName,
-                'activeBuffs',
-                [],
-                campaignName,
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                campaignName,
-                `_activeInvisibility_${invisibleName}`,
-                null,
-                campaignName,
-            );
+            expect(() => endInvisibilityOnHostileAction(invisibleName, campaignName)).toThrow('Expected array, got null');
         });
 
         it('removes invisible condition case-insensitively', () => {

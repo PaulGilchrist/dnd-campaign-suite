@@ -1036,15 +1036,13 @@ describe('massCureWoundsService', () => {
                 creatures: undefined,
             });
 
-            const result = await triggerMassCureWounds(
+            await expect(triggerMassCureWounds(
                 massCureWoundsSpell,
                 { slotLevel: 5 },
                 basePlayerStats,
                 campaignName,
                 'testMap',
-            );
-
-            expect(result).toEqual({ noTargets: true });
+            )).rejects.toThrow('Expected array, got undefined');
         });
 
         it('handles casters with no grid position and enough creatures', async () => {

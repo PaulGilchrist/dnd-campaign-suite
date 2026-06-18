@@ -593,15 +593,13 @@ describe('massHealService', () => {
             getCombatContext.mockResolvedValue(emptyCombat);
             getRuntimeValue.mockReturnValue(0);
 
-            const result = await triggerMassHeal(
+            await expect(triggerMassHeal(
                 massHealSpell,
                 {},
                 playerStats,
                 campaignName,
                 mapName,
-            );
-
-            expect(result.noTargets).toBe(true);
+            )).rejects.toThrow('Expected array, got undefined');
         });
 
         it('handles missing metaCtx slotLevel', async () => {
@@ -1015,15 +1013,13 @@ describe('massHealService', () => {
             getCombatContext.mockResolvedValue({});
             getRuntimeValue.mockReturnValue(0);
 
-            const result = await triggerMassHeal(
+            await expect(triggerMassHeal(
                 massHealSpell,
                 {},
                 playerStats,
                 campaignName,
                 mapName,
-            );
-
-            expect(result.noTargets).toBe(true);
+            )).rejects.toThrow('Expected array, got undefined');
         });
 
         it('handles undefined creatures in combatSummary', async () => {
@@ -1032,15 +1028,13 @@ describe('massHealService', () => {
             });
             getRuntimeValue.mockReturnValue(0);
 
-            const result = await triggerMassHeal(
+            await expect(triggerMassHeal(
                 massHealSpell,
                 {},
                 playerStats,
                 campaignName,
                 mapName,
-            );
-
-            expect(result.noTargets).toBe(true);
+            )).rejects.toThrow('Expected array, got undefined');
         });
     });
 });

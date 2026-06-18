@@ -4,7 +4,11 @@ import { executeHandler } from '../../automation/index.js';
 const SPELL_SHARE_FEATURE_NAME = 'Share Spells';
 
 export function getShareSpellsFeature(playerStats) {
-    const passives = playerStats.automation?.passives || [];
+    const passives = (() => {
+        const x = playerStats.automation?.passives;
+        if (x == null) { console.error('[primalCompanionSpellShareService] Missing array:', x); throw new Error('Expected array, got ' + x); }
+        return x;
+    })();
     return passives.find(p => p.type === 'primal_companion_spell_share');
 }
 

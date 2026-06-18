@@ -148,14 +148,13 @@ describe('prayerOfHealingService', () => {
                 players: [{ name: 'Cleric', gridX: 1, gridY: 1 }],
             });
 
-            const result = await triggerPrayerOfHealing(
+            await expect(triggerPrayerOfHealing(
                 { name: 'Prayer of Healing', level: 1 },
                 {},
                 playerStats,
                 campaignName,
                 mapName,
-            );
-            expect(result).toEqual({ noTargets: true });
+            )).rejects.toThrow('Expected array, got undefined');
         });
 
         it('excludes the caster from targets', async () => {
@@ -832,29 +831,25 @@ describe('prayerOfHealingService', () => {
                 placedItems: [],
             });
 
-            const result = await triggerPrayerOfHealing(
+            await expect(triggerPrayerOfHealing(
                 { name: 'Prayer of Healing', level: 1 },
                 {},
                 playerStats,
                 campaignName,
                 mapName,
-            );
-
-            expect(result).toEqual({ noTargets: true });
+            )).rejects.toThrow('Expected array, got null');
         });
 
         it('handles null combatSummary.players and null combatSummary.creatures', async () => {
             getCombatContext.mockResolvedValue({});
 
-            const result = await triggerPrayerOfHealing(
+            await expect(triggerPrayerOfHealing(
                 { name: 'Prayer of Healing', level: 1 },
                 {},
                 playerStats,
                 campaignName,
                 mapName,
-            );
-
-            expect(result).toEqual({ noTargets: true });
+            )).rejects.toThrow('Expected array, got undefined');
         });
 
         it('handles applyHealingToTarget returning null', async () => {
