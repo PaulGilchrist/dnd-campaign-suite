@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useSpellMetamagicFlow } from './useSpellMetamagicFlow.js';
+import { getCurrentSorceryPoints, getMaxSorceryPoints } from './useMetamagic.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js';
@@ -489,15 +490,29 @@ describe('useSpellMetamagicFlow — spell-specific gate paths', () => {
 
 describe('useSpellMetamagicFlow — psionic sorcery gate', () => {
   beforeEach(() => {
-    getCombatSummary.mockClear();
-    getMultiTargetSpreadForSpell.mockClear();
-    isPsionicSpell.mockClear();
-    hasPsionicSorcery.mockClear();
+    getCurrentSorceryPoints.mockReset();
+    getMaxSorceryPoints.mockReset();
+    getCombatSummary.mockReset();
+    getMultiTargetSpreadForSpell.mockReset();
+    isPsionicSpell.mockReset();
+    hasPsionicSorcery.mockReset();
+    getCurrentSorceryPoints.mockReturnValue(5);
+    getMaxSorceryPoints.mockReturnValue(10);
+    getCombatSummary.mockReturnValue({
+      creatures: [
+        { name: 'Goblin A' },
+        { name: 'Goblin B' },
+        { name: 'Goblin C' },
+      ],
+    });
+    getMultiTargetSpreadForSpell.mockReturnValue(null);
+    isPsionicSpell.mockReturnValue(false);
+    hasPsionicSorcery.mockReturnValue(false);
   });
 
   it('sets isPsionic and psionicCost on pendingMetamagic for psionic spells', () => {
-    isPsionicSpell.mockImplementation(() => true);
-    hasPsionicSorcery.mockImplementation(() => true);
+    isPsionicSpell.mockReturnValue(true);
+    hasPsionicSorcery.mockReturnValue(true);
 
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
@@ -514,8 +529,8 @@ describe('useSpellMetamagicFlow — psionic sorcery gate', () => {
   });
 
   it('sets isPsionic to false when hasPsionicSorcery is false', () => {
-    isPsionicSpell.mockImplementation(() => true);
-    hasPsionicSorcery.mockImplementation(() => false);
+    isPsionicSpell.mockReturnValue(true);
+    hasPsionicSorcery.mockReturnValue(false);
 
     const onExecute = vi.fn();
     const { result } = renderHook(() =>
@@ -532,8 +547,8 @@ describe('useSpellMetamagicFlow — psionic sorcery gate', () => {
   });
 
   it('sets isPsionic to false when isPsionicSpell is false', () => {
-    isPsionicSpell.mockImplementation(() => false);
-    hasPsionicSorcery.mockImplementation(() => true);
+    isPsionicSpell.mockReturnValue(false);
+    hasPsionicSorcery.mockReturnValue(true);
 
     const onExecute = vi.fn();
     const { result } = renderHook(() =>

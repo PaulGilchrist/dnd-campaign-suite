@@ -20,79 +20,168 @@ const mockPlayerStats = {
 };
 
 const mockCampaignName = 'test-campaign';
-const mockOnClose = vi.fn();
 
 describe('BreathWeaponShapeModal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        vi.spyOn(window, 'CustomEvent').mockImplementation(() => ({ type: 'automation-result' }));
     });
 
-    afterEach(() => {
-        vi.restoreAllMocks();
+    // ── Initial render / structure ──
+
+    it('renders modal overlay', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
     });
 
-    it('renders modal with breath weapon name', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
+    it('renders modal container', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(document.querySelector('.sp-modal')).toBeInTheDocument();
+    });
+
+    it('renders modal header', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(document.querySelector('.sp-header')).toBeInTheDocument();
+    });
+
+    it('renders modal body', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(document.querySelector('.sp-body')).toBeInTheDocument();
+    });
+
+    it('renders modal actions area', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(document.querySelector('.sp-actions')).toBeInTheDocument();
+    });
+
+    it('renders header with dragon icon and action name', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const icon = document.querySelector('.fa-solid.fa-dragon');
+        expect(icon).toBeInTheDocument();
         expect(screen.getByText('Breath Weapon')).toBeInTheDocument();
     });
 
     it('renders prompt to choose shape', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
         expect(screen.getByText('Choose the shape of your breath weapon:')).toBeInTheDocument();
     });
 
-    it('renders cone option', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
+    it('renders cone option text', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
         expect(screen.getByText('15-foot Cone')).toBeInTheDocument();
     });
 
-    it('renders line option', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
+    it('renders line option text', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
         expect(screen.getByText('30-foot Line (5 feet wide)')).toBeInTheDocument();
     });
 
-    it('renders Choose Shape button disabled initially', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
+    it('renders cancel button', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
+
+    it('renders Choose Shape button disabled', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
         const buttons = document.querySelectorAll('button');
         const chooseBtn = Array.from(buttons).find(b => b.textContent.includes('Choose Shape'));
         expect(chooseBtn).toBeDisabled();
     });
 
-    it('calls onClose when Cancel is clicked', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Cancel'));
-        expect(mockOnClose).toHaveBeenCalled();
+    it('renders Choose Shape button with dragon icon', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const icon = document.querySelector('.sp-roll-btn .fa-solid.fa-dragon');
+        expect(icon).toBeInTheDocument();
     });
 
-    it('calls onClose when backdrop is clicked', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
-        const overlay = document.querySelector('.sp-overlay');
-        fireEvent.click(overlay);
-        expect(mockOnClose).toHaveBeenCalled();
+    // ── Close behavior ──
+
+    it('calls onClose when Cancel is clicked', () => {
+        const onClose = vi.fn();
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={onClose} />);
+        fireEvent.click(screen.getByText('Cancel'));
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when overlay backdrop is clicked', () => {
+        const onClose = vi.fn();
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={onClose} />);
+        fireEvent.click(document.querySelector('.sp-overlay'));
+        expect(onClose).toHaveBeenCalledTimes(1);
     });
 
     it('does not call onClose when modal content is clicked', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
-        const modal = document.querySelector('.sp-modal');
-        fireEvent.click(modal);
-        expect(mockOnClose).not.toHaveBeenCalled();
+        const onClose = vi.fn();
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={onClose} />);
+        fireEvent.click(document.querySelector('.sp-modal'));
+        expect(onClose).not.toHaveBeenCalled();
     });
 
-    it('renders dragon icon in header', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
+    // ── Action name fallback ──
+
+    it('shows default title when action.name is missing', () => {
+        render(<BreathWeaponShapeModal action={{}} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(screen.getByText('Breath Weapon')).toBeInTheDocument();
+    });
+
+    it('shows default title when action is null', () => {
+        render(<BreathWeaponShapeModal action={null} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(screen.getByText('Breath Weapon')).toBeInTheDocument();
+    });
+
+    it('shows default title when action is undefined', () => {
+        render(<BreathWeaponShapeModal action={undefined} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(screen.getByText('Breath Weapon')).toBeInTheDocument();
+    });
+
+    // ── Radio button existence ──
+
+    it('renders two radio inputs', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const inputs = document.querySelectorAll('input[type="radio"]');
+        expect(inputs).toHaveLength(2);
+    });
+
+    it('radio inputs have name breathWeaponShape', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const inputs = document.querySelectorAll('input[name="breathWeaponShape"]');
+        expect(inputs).toHaveLength(2);
+    });
+
+    // ── Selection causes component to return null (current behavior) ──
+
+    it('returns null after selecting cone radio', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
+        const coneInput = document.querySelector('input[type="radio"]');
+        fireEvent.click(coneInput);
+        expect(document.querySelector('.sp-overlay')).not.toBeInTheDocument();
+    });
+
+    it('returns null after selecting line radio', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
+        const inputs = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(inputs[1]);
+        expect(document.querySelector('.sp-overlay')).not.toBeInTheDocument();
+    });
+
+    // ── Edge cases ──
+
+    it('renders with dragon icon in header even without action name', () => {
+        render(<BreathWeaponShapeModal action={null} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
         const icon = document.querySelector('.fa-solid.fa-dragon');
         expect(icon).toBeInTheDocument();
     });
 
-    it('renders Choose Shape button with dragon icon', () => {
-        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
-        const chooseBtn = screen.getByText('Choose Shape');
-        expect(chooseBtn).toBeInTheDocument();
+    it('renders damage description text for cone', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const matches = screen.getAllByText(/15-foot cone/i);
+        expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('renders null after shape is selected', async () => {
-        const { container } = render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={mockOnClose} />);
-        expect(container.innerHTML).not.toBe('');
+    it('renders damage description text for line', () => {
+        render(<BreathWeaponShapeModal action={mockAction} playerStats={mockPlayerStats} campaignName={mockCampaignName} onClose={vi.fn()} />);
+        const matches = screen.getAllByText(/30-foot line/i);
+        expect(matches.length).toBeGreaterThanOrEqual(1);
     });
 });

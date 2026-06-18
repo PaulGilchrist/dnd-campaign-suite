@@ -6,7 +6,7 @@ import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getMultiTargetSpreadForSpell } from '../../services/rules/spells/postCastRiderService.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js';
 import { confirmRemoveCurse } from '../../services/rules/features/removeCurseService.js';
-import { spendSorceryPoints, getCurrentSorceryPoints, getMaxSorceryPoints } from './useMetamagic.js';
+import { spendSorceryPoints } from './useMetamagic.js';
 
 vi.mock('./useMetamagic.js', () => ({
   getCurrentSorceryPoints: vi.fn(() => 5),
