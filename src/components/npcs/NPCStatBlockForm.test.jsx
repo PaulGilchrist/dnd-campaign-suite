@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import NPCStatBlockForm from './NPCStatBlockForm';
 
@@ -18,56 +18,54 @@ const defaultFormData = {
   damageImmunities: [],
   conditionImmunities: ['charmed'],
   actions: [
-    { name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8+3', damage_type_primary: 'slashing', description: 'Melee Weapon Attack.' },
+    { name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8+3', damage_type_primary: 'slashing', damage_dice_secondary: '', damage_type_secondary: '', description: 'Melee Weapon Attack.' },
   ],
   traits: 'Darkvision.',
   reactions: 'Reaction text.',
 };
 
-describe('NPCStatBlockForm', () => {
-  it('renders combat stats section', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
+describe('NPCStatBlockForm rendering', () => {
+  it('renders all section headings', () => {
+    render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
     expect(screen.getByText('Combat Stats')).toBeInTheDocument();
-  });
-
-  it('renders HP input', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    expect(inputs.length).toBeGreaterThan(0);
-  });
-
-  it('renders Hit Dice input', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    expect(inputs.length).toBeGreaterThan(3);
-  });
-
-  it('renders Speed input', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    expect(inputs.length).toBeGreaterThan(4);
-  });
-
-  it('renders Initiative Bonus input', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="number"]');
-    expect(inputs.length).toBe(8);
-  });
-
-  it('renders ability scores section', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
     expect(screen.getByText('Ability Scores')).toBeInTheDocument();
+    expect(screen.getByText('Skill Bonuses')).toBeInTheDocument();
+    expect(screen.getByText('Defenses')).toBeInTheDocument();
+    expect(screen.getByText('Actions')).toBeInTheDocument();
+    expect(screen.getByText('Traits')).toBeInTheDocument();
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
   });
 
-  it('renders all ability labels', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
+  it('renders combat stat inputs with correct values', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const acInput = container.querySelector('input[placeholder="10"]');
+    expect(acInput).toBeInTheDocument();
+    expect(acInput.value).toBe('15');
+
+    const hpInput = container.querySelector('input[placeholder="e.g., 45"]');
+    expect(hpInput).toBeInTheDocument();
+    expect(hpInput.value).toBe('45');
+
+    const hitDiceInput = container.querySelector('input[placeholder="e.g., 6d8"]');
+    expect(hitDiceInput).toBeInTheDocument();
+    expect(hitDiceInput.value).toBe('6d8');
+  });
+
+  it('renders speed input with walk value', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const speedInput = container.querySelector('input[placeholder="30 ft."]');
+    expect(speedInput).toBeInTheDocument();
+    expect(speedInput.value).toBe('30 ft.');
+  });
+
+  it('renders initiative bonus input', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const initiativeInput = container.querySelector('input[placeholder="+0"][type="number"]');
+    expect(initiativeInput).toBeInTheDocument();
+  });
+
+  it('renders all six ability labels', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
     expect(container.textContent).toContain('STR');
     expect(container.textContent).toContain('DEX');
     expect(container.textContent).toContain('CON');
@@ -76,173 +74,228 @@ describe('NPCStatBlockForm', () => {
     expect(container.textContent).toContain('CHA');
   });
 
-  it('renders ability score inputs', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="number"]');
-    expect(inputs.length).toBe(8);
+  it('renders ability score inputs with correct values', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const inputs = container.querySelectorAll('.npcs-ability-input');
+    expect(inputs).toHaveLength(6);
+    expect(inputs[0].value).toBe('10');
+    expect(inputs[1].value).toBe('14');
+    expect(inputs[2].value).toBe('12');
+    expect(inputs[3].value).toBe('8');
+    expect(inputs[4].value).toBe('10');
+    expect(inputs[5].value).toBe('7');
   });
 
-  it('renders ability modifiers', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    expect(container.textContent).toContain('+2');
-    expect(container.textContent).toContain('+1');
+  it('renders ability modifiers with correct sign', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const mods = container.querySelectorAll('.npcs-ability-mod');
+    expect(mods).toHaveLength(6);
+    expect(mods[0].textContent).toBe('+0');
+    expect(mods[1].textContent).toBe('+2');
+    expect(mods[2].textContent).toBe('+1');
+    expect(mods[3].textContent).toBe('-1');
+    expect(mods[4].textContent).toBe('+0');
+    expect(mods[5].textContent).toBe('-2');
   });
 
-  it('renders saving throw inputs', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    expect(inputs.length).toBeGreaterThan(6);
+  it('renders saving throw inputs with correct values', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const saveInputs = [...container.querySelectorAll('.npcs-save-input')];
+    expect(saveInputs).toHaveLength(6);
+    expect(saveInputs[0].value).toBe('+2');
+    expect(saveInputs[1].value).toBe('+4');
+    expect(saveInputs.slice(2).every(i => i.value === '')).toBe(true);
   });
 
-  it('renders skills section', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    expect(screen.getByText('Skill Bonuses')).toBeInTheDocument();
+  it('renders skill rows with correct values', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const skillNames = container.querySelectorAll('.npcs-skill-name');
+    const skillBonuses = container.querySelectorAll('.npcs-skill-bonus');
+    expect(skillNames).toHaveLength(2);
+    expect(skillBonuses).toHaveLength(2);
+    expect(skillNames[0].value).toBe('perception');
+    expect(skillBonuses[0].value).toBe('+3');
+    expect(skillNames[1].value).toBe('stealth');
+    expect(skillBonuses[1].value).toBe('+5');
   });
 
-  it('renders skill rows', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const skillInputs = container.querySelectorAll('.npcs-skill-name');
-    expect(skillInputs.length).toBe(2);
-  });
-
-  it('renders add skill button', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
+  it('renders add skill and remove skill buttons', () => {
+    render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
     expect(screen.getByRole('button', { name: /Add Skill/i })).toBeInTheDocument();
-  });
-
-  it('renders remove skill buttons', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
     const removeButtons = screen.getAllByRole('button', { name: /Remove skill/i });
-    expect(removeButtons.length).toBe(2);
+    expect(removeButtons).toHaveLength(2);
   });
 
-  it('renders defenses section', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    expect(screen.getByText('Defenses')).toBeInTheDocument();
+  it('renders defense inputs as comma-separated values', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const resistInput = container.querySelector('input[placeholder="fire, cold, poison"]');
+    const immuneInput = container.querySelector('input[placeholder="necrotic, psychic"]');
+    const condInput = container.querySelector('input[placeholder="charmed, frightened"]');
+    expect(resistInput.value).toBe('fire');
+    expect(immuneInput.value).toBe('');
+    expect(condInput.value).toBe('charmed');
   });
 
-  it('renders damage resistances input', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    expect(inputs.length).toBeGreaterThan(7);
+  it('renders action fields with correct values', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const actionNames = container.querySelectorAll('.npcs-action-name');
+    expect(actionNames).toHaveLength(1);
+    expect(actionNames[0].value).toBe('Longsword');
+
+    const atkBonuses = container.querySelectorAll('.npcs-action-bonus');
+    expect(atkBonuses[0].value).toBe('+5');
+
+    const dmgDice = container.querySelectorAll('.npcs-action-damage');
+    expect(dmgDice[0].value).toBe('1d8+3');
+
+    const dmgTypes = container.querySelectorAll('.npcs-action-damage-type');
+    expect(dmgTypes[0].value).toBe('slashing');
   });
 
-  it('renders damage immunities input', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    expect(inputs.length).toBeGreaterThan(8);
+  it('renders action description textarea', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const desc = container.querySelector('.npcs-action-desc');
+    expect(desc).toBeInTheDocument();
+    expect(desc.value).toBe('Melee Weapon Attack.');
   });
 
-  it('renders condition immunities input', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    expect(inputs.length).toBeGreaterThan(9);
-  });
-
-  it('renders actions section', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    expect(screen.getByText('Actions')).toBeInTheDocument();
-  });
-
-  it('renders action fields', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const actionNameInputs = container.querySelectorAll('.npcs-action-name');
-    expect(actionNameInputs.length).toBe(1);
-    expect(actionNameInputs[0].value).toBe('Longsword');
-  });
-
-  it('renders add action button', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
+  it('renders add action and remove action buttons', () => {
+    render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
     expect(screen.getByRole('button', { name: /Add Action/i })).toBeInTheDocument();
-  });
-
-  it('renders remove action buttons', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
     const removeButtons = screen.getAllByRole('button', { name: /Remove action/i });
-    expect(removeButtons.length).toBe(1);
+    expect(removeButtons).toHaveLength(1);
   });
 
-  it('renders traits textarea', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    expect(screen.getByText('Traits')).toBeInTheDocument();
+  it('renders traits and reactions textareas', () => {
+    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={vi.fn()} />);
+    const textareas = container.querySelectorAll('textarea');
+    expect(textareas).toHaveLength(3);
+    expect(textareas[1].value).toBe('Darkvision.');
+    expect(textareas[2].value).toBe('Reaction text.');
   });
 
-  it('renders reactions textarea', () => {
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  it('handles ability score change', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="number"]');
-    fireEvent.change(inputs[0], { target: { value: '18' } });
-    expect(setFormData).toHaveBeenCalled();
-  });
-
-  it('handles save bonus change', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    fireEvent.change(inputs[0], { target: { value: '+5' } });
-    expect(setFormData).toHaveBeenCalled();
-  });
-
-  it('handles skill bonus change', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    fireEvent.change(inputs[1], { target: { value: '+10' } });
-    expect(setFormData).toHaveBeenCalled();
-  });
-
-  it('handles action change', () => {
-    const setFormData = vi.fn();
-    const { container } = render(<NPCStatBlockForm formData={defaultFormData} setFormData={setFormData} />);
-    const inputs = container.querySelectorAll('input[type="text"]');
-    const actionNameInput = [...inputs].find(i => i.placeholder?.includes('Action name'));
-    if (actionNameInput) {
-      fireEvent.change(actionNameInput, { target: { value: 'New Action' } });
-      expect(setFormData).toHaveBeenCalled();
-    }
+  it('renders with negative ability modifier without extra plus sign', () => {
+    const data = {
+      ...defaultFormData,
+      abilityScores: { str: 6, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+    };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const mods = container.querySelectorAll('.npcs-ability-mod');
+    expect(mods[0].textContent).toBe('-2');
   });
 
   it('renders with empty skillBonuses', () => {
-    const formData = { ...defaultFormData, skillBonuses: {} };
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={formData} setFormData={setFormData} />);
+    const data = { ...defaultFormData, skillBonuses: {} };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
     expect(screen.getByText('Skill Bonuses')).toBeInTheDocument();
+    expect(container.querySelectorAll('.npcs-skill-name')).toHaveLength(0);
   });
 
   it('renders with no actions', () => {
-    const formData = { ...defaultFormData, actions: [] };
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={formData} setFormData={setFormData} />);
+    const data = { ...defaultFormData, actions: [] };
+    render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
     expect(screen.getByText('Actions')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Add Action/i })).toBeInTheDocument();
   });
 
-  it('renders with empty arrays for resistances', () => {
-    const formData = { ...defaultFormData, damageResistances: [], damageImmunities: [], conditionImmunities: [] };
-    const setFormData = vi.fn();
-    render(<NPCStatBlockForm formData={formData} setFormData={setFormData} />);
-    expect(screen.getByText('Defenses')).toBeInTheDocument();
+  it('renders with empty arrays for all defenses', () => {
+    const data = {
+      ...defaultFormData,
+      damageResistances: [],
+      damageImmunities: [],
+      conditionImmunities: [],
+    };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const allTextInputs = container.querySelectorAll('input[type="text"]');
+    const resistInput = [...allTextInputs].find(i => i.placeholder === 'fire, cold, poison');
+    expect(resistInput.value).toBe('');
+  });
+
+  it('renders with null armorClass', () => {
+    const data = { ...defaultFormData, armorClass: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const acInput = container.querySelector('input[placeholder="10"]');
+    expect(acInput.value).toBe('');
+  });
+
+  it('renders with undefined abilityScores', () => {
+    const data = { ...defaultFormData, abilityScores: undefined };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const inputs = container.querySelectorAll('.npcs-ability-input');
+    expect(inputs).toHaveLength(6);
+    expect(inputs[0].value).toBe('10');
+  });
+
+  it('renders with null speed', () => {
+    const data = { ...defaultFormData, speed: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const speedInput = container.querySelector('input[placeholder="30 ft."]');
+    expect(speedInput.value).toBe('');
+  });
+
+  it('renders with null savingThrowBonuses', () => {
+    const data = { ...defaultFormData, savingThrowBonuses: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const saveInputs = [...container.querySelectorAll('.npcs-save-input')];
+    expect(saveInputs).toHaveLength(6);
+    expect(saveInputs.every(i => i.value === '')).toBe(true);
+  });
+
+  it('renders multiple actions', () => {
+    const data = {
+      ...defaultFormData,
+      actions: [
+        { name: 'Longsword', attack_bonus: '+5', damage_dice_primary: '1d8+3', damage_type_primary: 'slashing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
+        { name: 'Shortbow', attack_bonus: '+4', damage_dice_primary: '1d6+2', damage_type_primary: 'piercing', damage_dice_secondary: '', damage_type_secondary: '', description: '' },
+      ],
+    };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const actionNames = container.querySelectorAll('.npcs-action-name');
+    expect(actionNames).toHaveLength(2);
+    expect(actionNames[0].value).toBe('Longsword');
+    expect(actionNames[1].value).toBe('Shortbow');
+  });
+
+  it('renders with null hitPoints (falls back to empty string)', () => {
+    const data = { ...defaultFormData, hitPoints: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const hpInput = container.querySelector('input[placeholder="e.g., 45"]');
+    expect(hpInput.value).toBe('');
+  });
+
+  it('renders with null hitDice (falls back to empty string)', () => {
+    const data = { ...defaultFormData, hitDice: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const hdInput = container.querySelector('input[placeholder="e.g., 6d8"]');
+    expect(hdInput.value).toBe('');
+  });
+
+  it('renders with null traits (falls back to empty string)', () => {
+    const data = { ...defaultFormData, traits: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const textareas = container.querySelectorAll('textarea');
+    const traitsTextarea = [...textareas].find(t => t.placeholder.includes('Special traits'));
+    expect(traitsTextarea.value).toBe('');
+  });
+
+  it('renders with null reactions (falls back to empty string)', () => {
+    const data = { ...defaultFormData, reactions: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const textareas = container.querySelectorAll('textarea');
+    const reactionsTextarea = [...textareas].find(t => t.placeholder.includes('Reactions'));
+    expect(reactionsTextarea.value).toBe('');
+  });
+
+  it('renders action with undefined fields (falls back to empty string)', () => {
+    const data = {
+      ...defaultFormData,
+      actions: [
+        { name: undefined, attack_bonus: undefined, damage_dice_primary: undefined, damage_type_primary: undefined, damage_dice_secondary: undefined, damage_type_secondary: undefined, description: undefined },
+      ],
+    };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const actionNames = container.querySelectorAll('.npcs-action-name');
+    expect(actionNames[0].value).toBe('');
+    expect(container.querySelector('.npcs-action-desc').value).toBe('');
   });
 });

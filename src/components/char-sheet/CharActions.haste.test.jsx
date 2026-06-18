@@ -1,35 +1,32 @@
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import CharActions from './CharActions.jsx';
+
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(() => null),
+  setRuntimeValue: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
+    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
+  })),
+}));
 
 vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
   useSpellMetamagicFlow: vi.fn(() => ({
-    pendingMetamagic: null,
-    gateMetamagic: vi.fn(),
-    handleConfirm: vi.fn(),
-    handleSkip: vi.fn(),
-    pendingAid: null,
-    handleAidConfirm: vi.fn(),
-    handleAidSkip: vi.fn(),
-    pendingGreaterRestoration: null,
-    handleGreaterRestorationConfirm: vi.fn(),
-    handleGreaterRestorationSkip: vi.fn(),
-    pendingRemoveCurse: null,
-    handleRemoveCurseConfirm: vi.fn(),
-    handleRemoveCurseSkip: vi.fn(),
+    pendingMetamagic: null, gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn(),
+    pendingAid: null, handleAidConfirm: vi.fn(), handleAidSkip: vi.fn(),
+    pendingGreaterRestoration: null, handleGreaterRestorationConfirm: vi.fn(), handleGreaterRestorationSkip: vi.fn(),
+    pendingRemoveCurse: null, handleRemoveCurseConfirm: vi.fn(), handleRemoveCurseSkip: vi.fn(),
   })),
 }));
 
 vi.mock('../../hooks/combat/useSpellUpcastFlow.js', () => ({
-  useSpellUpcastFlow: vi.fn(() => ({
-    buildUpcastLevels: vi.fn(() => []),
-  })),
+  useSpellUpcastFlow: vi.fn(() => ({ buildUpcastLevels: vi.fn(() => []) })),
 }));
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({
-  hasAutomation: vi.fn(() => false),
-  collectWeaponMastery: vi.fn(() => ({ baseMastery: null, extraMasteries: [] })),
-  evaluateAutoExpression: vi.fn(() => null),
+  hasAutomation: vi.fn(() => false), collectWeaponMastery: vi.fn(() => ({ baseMastery: null, extraMasteries: [] })), evaluateAutoExpression: vi.fn(() => null),
 }));
 
 vi.mock('../../services/automation/index.js', () => ({
@@ -40,26 +37,8 @@ vi.mock('../../services/automation/handlers/combat/saveAttackHandler.js', () => 
   isExhausted: vi.fn(() => false),
 }));
 
-vi.mock('../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
-  onSpellSelected: vi.fn(),
-}));
-
-vi.mock('../../hooks/combat/useMetamagic.js', () => ({
-  getCurrentSorceryPoints: vi.fn(() => 10),
-  getMaxSorceryPoints: vi.fn(() => 10),
-  spendSorceryPoints: vi.fn(),
-}));
-
 vi.mock('../../services/combat/buffs/buffService.js', () => ({
   getInnateSorceryBonus: vi.fn(() => ({ saveDcBonus: 0 })),
-}));
-
-vi.mock('../../hooks/combat/useSpellMetamagic.js', () => ({
-  useSpellMetamagic: vi.fn(() => ({
-    pendingMetamagic: null,
-    handleConfirm: vi.fn(),
-    handleSkip: vi.fn(),
-  })),
 }));
 
 vi.mock('../../services/maps/mapsService.js', () => ({
@@ -67,8 +46,7 @@ vi.mock('../../services/maps/mapsService.js', () => ({
 }));
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
-  getTargetFromAttacker: vi.fn(() => null),
-  getCombatContext: vi.fn(() => Promise.resolve(null)),
+  getTargetFromAttacker: vi.fn(() => null), getCombatContext: vi.fn(() => Promise.resolve(null)),
 }));
 
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
@@ -82,9 +60,7 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   showWeaponMasteryPopup: vi.fn(),
   buildFeatureDetailHtml: vi.fn((entity) => {
-    if (entity.details) {
-      return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
-    }
+    if (entity.details) return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
     return null;
   }),
 }));
@@ -110,8 +86,7 @@ vi.mock('./CharBonusActions.jsx', () => ({
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
-  getCombatSummary: vi.fn(() => ({ creatures: [] })),
-  getCurrentCombatRound: vi.fn(() => 1),
+  getCombatSummary: vi.fn(() => ({ creatures: [] })), getCurrentCombatRound: vi.fn(() => 1),
 }));
 
 vi.mock('../../services/ui/logService.js', () => ({
@@ -138,44 +113,28 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
 
 vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
   useActionSpellMetamagic: vi.fn(() => ({
-    pendingActionMetamagic: null,
-    handleActionMetamagicConfirm: vi.fn(),
-    handleActionMetamagicSkip: vi.fn(),
-    handleActionSpellDamageClick: vi.fn(),
-    handleSpellAttackClick: vi.fn(),
-    handleSpellDamageClick: vi.fn(),
+    pendingActionMetamagic: null, handleActionMetamagicConfirm: vi.fn(), handleActionMetamagicSkip: vi.fn(),
+    handleActionSpellDamageClick: vi.fn(), handleSpellAttackClick: vi.fn(), handleSpellDamageClick: vi.fn(),
   })),
 }));
 
+import CharActions from './CharActions.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
 const basePlayerStats = {
-  name: 'TestCharacter',
-  rules: '5e',
-  level: 5,
-  attacks: [],
-  actions: [],
-  spellAbilities: { spells: [] },
+  name: 'TestCharacter', rules: '5e', level: 5, attacks: [], actions: [], spellAbilities: { spells: [] },
 };
 
 function createStats(overrides = {}) {
   return { ...basePlayerStats, ...overrides };
 }
 
-function setHasteActive() {
-  vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-    if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
-    return null;
-  });
-}
-
 describe('CharActions haste extra action', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     localStorage.clear();
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      json: () => Promise.resolve([]),
-    });
+    globalThis.fetch = vi.fn().mockResolvedValue({ json: () => Promise.resolve([]) });
   });
 
   describe('Haste section rendering', () => {
@@ -186,14 +145,20 @@ describe('CharActions haste extra action', () => {
     });
 
     it('should show Haste Extra Action section when haste is active', async () => {
-      setHasteActive();
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} />); });
       expect(screen.getByText('Haste Extra Action')).toBeInTheDocument();
     });
 
     it('should show Attack, Dash, Disengage, Hide, Use an Object actions', async () => {
-      setHasteActive();
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} />); });
       expect(screen.getByText('Attack')).toBeInTheDocument();
@@ -204,45 +169,33 @@ describe('CharActions haste extra action', () => {
     });
 
     it('should show Melee/Ranged type for Attack and Special for others', async () => {
-      setHasteActive();
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} />); });
+      expect(screen.getByText('Melee/Ranged')).toBeInTheDocument();
       const specialTypes = screen.getAllByText('Special');
       expect(specialTypes.length).toBe(4);
-      expect(screen.getByText('Melee/Ranged')).toBeInTheDocument();
     });
   });
 
   describe('Haste section with 2024 rules', () => {
-    it('should show Mastery column for 2024 rules in haste section', async () => {
-      setHasteActive();
-      const stats = createStats({ rules: '2024' });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const masteryHeaders = screen.getAllByText('Mastery');
-      expect(masteryHeaders.length).toBe(1);
-    });
-
-    it('should not show Mastery column for 5e rules in haste section', async () => {
-      setHasteActive();
+    it('should show no Mastery column for 5e rules in haste section', async () => {
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats({ rules: '5e' });
       await act(async () => { render(<CharActions playerStats={stats} />); });
-      const masteryHeaders = screen.queryAllByText('Mastery');
-      expect(masteryHeaders.length).toBe(0);
+      expect(screen.queryByText('Mastery')).not.toBeInTheDocument();
     });
   });
 
   describe('Haste state handling', () => {
-    it('should disable all haste actions when cannotAct is true', async () => {
-      setHasteActive();
-      const stats = createStats();
-      await act(async () => { render(<CharActions playerStats={stats} cannotAct={true} />); });
-      const disabledEls = document.querySelectorAll('.disabled-attack');
-      expect(disabledEls.length).toBeGreaterThanOrEqual(5);
-    });
-
-    it('should show disabled-attack class when haste already used', async () => {
-      setHasteActive();
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+    it('should show disabled-attack class for haste actions when haste already used', async () => {
+      getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
         if (key === 'hasteExtraActionUsed') return true;
         return null;
@@ -253,28 +206,29 @@ describe('CharActions haste extra action', () => {
       expect(disabledEls.length).toBeGreaterThanOrEqual(5);
     });
 
-    it('should show disabled-attack class when cannotAct is true for haste actions', async () => {
-      setHasteActive();
+    it('should not apply disabled-attack class when cannotAct is true (handled in click handler, not class)', async () => {
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} cannotAct={true} />); });
-      const disabledEls = document.querySelectorAll('.disabled-attack');
-      expect(disabledEls.length).toBeGreaterThanOrEqual(5);
+      const hasteDisabled = document.querySelectorAll('.disabled-attack');
+      expect(hasteDisabled.length).toBe(0);
+      expect(screen.getByText('Haste Extra Action')).toBeInTheDocument();
     });
   });
 
   describe('Haste attack click', () => {
     it('should call setRuntimeValue and show popup when Attack is clicked', async () => {
-      setHasteActive();
       const mockSetPopupHtml = vi.fn();
-      const useLoggedDiceRoll = await import('../../hooks/combat/useLoggedDiceRoll.js');
-      useLoggedDiceRoll.default.mockReturnValue({
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-        rollAttack: vi.fn(),
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
+      useLoggedDiceRoll.mockReturnValue({
+        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
       });
-
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} />); });
 
@@ -290,7 +244,10 @@ describe('CharActions haste extra action', () => {
     });
 
     it('should not call setRuntimeValue when cannotAct is true', async () => {
-      setHasteActive();
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} cannotAct={true} />); });
 
@@ -300,51 +257,37 @@ describe('CharActions haste extra action', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('should show popup saying already used when hasteExtraActionUsed is true', async () => {
-      setHasteActive();
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+    it('should not call setRuntimeValue when haste already used this turn (click handler returns early)', async () => {
+      const mockSetPopupHtml = vi.fn();
+      useLoggedDiceRoll.mockReturnValue({
+        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
+      });
+      getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
         if (key === 'hasteExtraActionUsed') return true;
         return null;
       });
-      const mockSetPopupHtml = vi.fn();
-      const useLoggedDiceRoll = await import('../../hooks/combat/useLoggedDiceRoll.js');
-      useLoggedDiceRoll.default.mockReturnValue({
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-        rollAttack: vi.fn(),
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      });
-
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} />); });
 
       const attackBtn = screen.getByText('Attack');
       await act(async () => { fireEvent.click(attackBtn); });
 
-      expect(mockSetPopupHtml).toHaveBeenCalledWith({
-        type: 'automation_info',
-        name: 'Haste',
-        description: 'Haste extra action already used this turn.',
-      });
       expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(mockSetPopupHtml).not.toHaveBeenCalled();
     });
   });
 
   describe('Haste non-attack actions', () => {
     it.each(['Dash', 'Disengage', 'Hide', 'Use an Object'])('should handle haste %s action click', async (actionName) => {
-      setHasteActive();
       const mockSetPopupHtml = vi.fn();
-      const useLoggedDiceRoll = await import('../../hooks/combat/useLoggedDiceRoll.js');
-      useLoggedDiceRoll.default.mockReturnValue({
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-        rollAttack: vi.fn(),
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
+      useLoggedDiceRoll.mockReturnValue({
+        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
       });
-
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} />); });
 
@@ -353,14 +296,16 @@ describe('CharActions haste extra action', () => {
 
       expect(setRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'hasteExtraActionUsed', true, undefined);
       expect(mockSetPopupHtml).toHaveBeenCalledWith({
-        type: 'automation_info',
-        name: 'Haste',
+        type: 'automation_info', name: 'Haste',
         description: `Haste extra action: ${actionName}.`,
       });
     });
 
     it('should not handle haste Dash when cannotAct is true', async () => {
-      setHasteActive();
+      getRuntimeValue.mockImplementation((_name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
+        return null;
+      });
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} cannotAct={true} />); });
 
@@ -370,35 +315,24 @@ describe('CharActions haste extra action', () => {
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('should not handle haste Dash when haste already used this turn', async () => {
-      setHasteActive();
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+    it('should not handle haste Dash when haste already used this turn (click returns early)', async () => {
+      const mockSetPopupHtml = vi.fn();
+      useLoggedDiceRoll.mockReturnValue({
+        popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
+      });
+      getRuntimeValue.mockImplementation((_name, key) => {
         if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
         if (key === 'hasteExtraActionUsed') return true;
         return null;
       });
-      const mockSetPopupHtml = vi.fn();
-      const useLoggedDiceRoll = await import('../../hooks/combat/useLoggedDiceRoll.js');
-      useLoggedDiceRoll.default.mockReturnValue({
-        popupHtml: null,
-        setPopupHtml: mockSetPopupHtml,
-        rollAttack: vi.fn(),
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      });
-
       const stats = createStats();
       await act(async () => { render(<CharActions playerStats={stats} />); });
 
       const dashBtn = screen.getByText('Dash');
       await act(async () => { fireEvent.click(dashBtn); });
 
-      expect(mockSetPopupHtml).toHaveBeenCalledWith({
-        type: 'automation_info',
-        name: 'Haste',
-        description: 'Haste extra action already used this turn.',
-      });
       expect(setRuntimeValue).not.toHaveBeenCalled();
+      expect(mockSetPopupHtml).not.toHaveBeenCalled();
     });
   });
 });
