@@ -13,8 +13,6 @@ export function dispatchUnbreakableMajestySave(campaignName, defenderName, attac
 }
 
 export function readAoeContext(_campaignName) {
-  // AOE context is now managed via server/SSE only — returns null
-  // Callers should get AOE data from the initiative component state
   return null;
 }
 

@@ -10,17 +10,12 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
-const mockGetCurrentCombatRound = vi.fn();
-vi.mock('../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: () => mockGetCurrentCombatRound(),
-}));
-
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(),
 }));
 
 vi.mock('../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
+    getCurrentCombatRound: vi.fn(),
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -83,10 +78,11 @@ describe('useModalHandlers', () => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
         setRuntimeValue.mockReturnValue(undefined);
-        mockGetCurrentCombatRound.mockReturnValue(1);
+        getCurrentCombatRound.mockReturnValue(1);
         rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
         getCombatContext.mockResolvedValue(null);
         getDistanceFeet.mockReturnValue(5);
+        globalThis.Math.random = () => 20;
     });
 
     describe('handleMasteryClose', () => {
@@ -362,6 +358,7 @@ describe('useModalHandlers', () => {
                 creatures: [{ name: 'Goblin', ac: 10 }],
             });
             rollExpression.mockReturnValue({ total: 2, rolls: [2], modifier: 0 });
+            globalThis.Math.random = () => 10;
 
             const { handleCleaveAttack } = useModalHandlers(deps);
             await handleCleaveAttack('Goblin');
@@ -400,6 +397,7 @@ describe('useModalHandlers', () => {
                 creatures: [{ name: 'Goblin', ac: 20 }],
             });
             rollExpression.mockReturnValue(null);
+            globalThis.Math.random = () => 1;
 
             const { handleCleaveAttack } = useModalHandlers(deps);
             await handleCleaveAttack('Goblin');

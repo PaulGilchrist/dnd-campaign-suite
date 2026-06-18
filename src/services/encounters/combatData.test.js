@@ -33,7 +33,7 @@ describe('combatData', () => {
 
     it('returns data from API and updates cache when campaignName provided', async () => {
       getCombatContextSpy.mockResolvedValue({ round: 5, creatures: [] });
-      const { loadCombatSummary, setCombatSummaryCache, getCombatSummary } = await import('./combatData.js');
+      const { loadCombatSummary, getCombatSummary } = await import('./combatData.js');
       const result = await loadCombatSummary('testCampaign');
       expect(result).toEqual({ round: 5, creatures: [] });
       // Verify cache was updated

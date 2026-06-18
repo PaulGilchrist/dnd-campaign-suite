@@ -353,7 +353,7 @@ describe('storage', () => {
         it('uses utils.getName to derive the key', async () => {
             const getNameSpy = vi.spyOn(utils, 'getName').mockReturnValue('PlayerOne');
             vi.spyOn(storage, 'get').mockResolvedValueOnce({});
-            const setSpy = vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
+            vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
 
             await storage.setProperty('PlayerOne', 'hp', 50);
             expect(getNameSpy).toHaveBeenCalledWith('PlayerOne');
