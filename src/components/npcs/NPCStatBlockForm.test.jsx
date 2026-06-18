@@ -298,4 +298,39 @@ describe('NPCStatBlockForm rendering', () => {
     expect(actionNames[0].value).toBe('');
     expect(container.querySelector('.npcs-action-desc').value).toBe('');
   });
+
+  it('renders initiativeBonus with null (falls back via nullish coalescing)', () => {
+    const data = { ...defaultFormData, initiativeBonus: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const initInput = container.querySelector('input[placeholder="+0"][type="number"]');
+    expect(initInput.value).toBe('');
+  });
+
+  it('renders with null skillBonuses (falls back via ||)', () => {
+    const data = { ...defaultFormData, skillBonuses: null };
+    render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    expect(screen.getByText('Skill Bonuses')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Remove skill/i })).not.toBeInTheDocument();
+  });
+
+  it('renders with null damageResistances (falls back via ||)', () => {
+    const data = { ...defaultFormData, damageResistances: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const resistInput = container.querySelector('input[placeholder="fire, cold, poison"]');
+    expect(resistInput.value).toBe('');
+  });
+
+  it('renders with null damageImmunities (falls back via ||)', () => {
+    const data = { ...defaultFormData, damageImmunities: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const immuneInput = container.querySelector('input[placeholder="necrotic, psychic"]');
+    expect(immuneInput.value).toBe('');
+  });
+
+  it('renders with null conditionImmunities (falls back via ||)', () => {
+    const data = { ...defaultFormData, conditionImmunities: null };
+    const { container } = render(<NPCStatBlockForm formData={data} setFormData={vi.fn()} />);
+    const condInput = container.querySelector('input[placeholder="charmed, frightened"]');
+    expect(condInput.value).toBe('');
+  });
 });

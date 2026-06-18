@@ -16,7 +16,7 @@ vi.mock('../../../services/ui/logService.js', () => ({
 }))
 
 vi.mock('../../shared/logPoster.js', () => ({
-  postLogEntry: vi.fn(),
+  postLogEntry: vi.fn(() => Promise.resolve()),
 }))
 
 vi.mock('../../automation/index.js', () => ({
