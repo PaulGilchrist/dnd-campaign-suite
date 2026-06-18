@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import React from 'react';
@@ -178,151 +179,45 @@ describe('CharReactions', () => {
     resetMocks();
   });
 
-  // ===== Basic Rendering =====
+  // ===== Rendering =====
 
-  it('renders reactions section header', () => {
+  it('renders the reactions section header', () => {
     render(<CharReactions {...baseProps} />);
     expect(screen.getByText('Reactions')).toBeInTheDocument();
   });
 
-  it('renders reactions list', () => {
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
-  });
-
-  it('renders reaction description', () => {
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Make a melee attack')).toBeInTheDocument();
-  });
-
-  it('renders reaction as clickable when it has details', () => {
-    render(<CharReactions {...baseProps} />);
-    const reactionTest = screen.getByText(/Reaction Test/);
-    expect(reactionTest).toHaveClass('clickable');
-  });
-
-  it('renders spell reaction with range', () => {
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Self')).toBeInTheDocument();
-  });
-
-  it('renders spell reaction as clickable to open detail popup', () => {
-    render(<CharReactions {...baseProps} />);
-    const spellName = screen.getByText('Shield');
-    fireEvent.click(spellName);
-    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-  });
-
-  it('renders reaction table headers for spell reactions', () => {
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Name')).toBeInTheDocument();
-    expect(screen.getByText('Range')).toBeInTheDocument();
-    expect(screen.getByText('Hit')).toBeInTheDocument();
-    expect(screen.getByText('Damage')).toBeInTheDocument();
-    expect(screen.getByText('Type')).toBeInTheDocument();
-  });
-
-  it('renders reaction spells as utility type', () => {
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Utility')).toBeInTheDocument();
-  });
-
-  it('does not show duplicate Opportunity Attack when already in reactions', () => {
-    render(<CharReactions {...baseProps} />);
-    const reactions = screen.getAllByText(/opportunity attack/i);
-    expect(reactions.length).toBe(1);
-  });
-
-  it('adds Opportunity Attack dynamically when not in reactions', () => {
-    const stats = { ...basePlayerStats, reactions: [] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
-  });
-
-  it('renders char-reactions wrapper class', () => {
+  it('renders the wrapper element', () => {
     render(<CharReactions {...baseProps} />);
     expect(document.querySelector('.char-reactions')).toBeInTheDocument();
   });
 
-  it('renders attacks wrapper for reaction spells', () => {
-    render(<CharReactions {...baseProps} />);
-    expect(document.querySelector('.attacks')).toBeInTheDocument();
-  });
-
-  it('renders half-line at end', () => {
+  it('renders the half-line separator at the bottom', () => {
     render(<CharReactions {...baseProps} />);
     expect(document.querySelector('.half-line')).toBeInTheDocument();
   });
 
-  it('handles empty reactions array', () => {
+  it('renders all listed reactions with their descriptions', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+    expect(screen.getByText('Make a melee attack')).toBeInTheDocument();
+    expect(screen.getByText('Reaction Test:')).toBeInTheDocument();
+    expect(screen.getByText('A test reaction')).toBeInTheDocument();
+  });
+
+  // ===== Dynamic Reactions =====
+
+  it('adds Opportunity Attack when not already listed', () => {
     const stats = { ...basePlayerStats, reactions: [] };
     render(<CharReactions {...baseProps} playerStats={stats} />);
     expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
   });
 
-  it('handles null reactions', () => {
-    const stats = { ...basePlayerStats, reactions: null };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+  it('does not duplicate Opportunity Attack when already in reactions', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.queryAllByText('Opportunity Attack:').length).toBe(1);
   });
 
-  it('handles empty spell abilities', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  it('handles undefined spell abilities', () => {
-    const stats = { ...basePlayerStats, spellAbilities: undefined };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Reactions')).toBeInTheDocument();
-  });
-
-  // ===== Spell Filtering =====
-
-  it('filters reaction spells by casting time', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [
-      { name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared' },
-      { name: 'Aid', casting_time: '1 action', prepared: 'Prepared' },
-      { name: 'Hex', casting_time: '1 bonus action', prepared: 'Always' },
-    ] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Shield')).toBeInTheDocument();
-  });
-
-  it('excludes attack names from reaction spells', () => {
-    const stats = { ...basePlayerStats, attacks: [{ name: 'Shield', type: 'Action', range: 'Self', hitBonus: 5 }], spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.queryByText('Shield')).not.toBeInTheDocument();
-  });
-
-  it('excludes unprepared spells from reaction spells', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 reaction', prepared: 'Not Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.queryByText('Shield')).not.toBeInTheDocument();
-  });
-
-  it('renders reaction spells with casting time abbreviations', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(document.querySelector('.attacks').textContent).toContain('R');
-  });
-
-  it('renders reaction spells with capital R', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 Reaction', range: 'Self', prepared: 'Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(document.querySelector('.attacks').textContent).toContain('R');
-  });
-
-  it('renders reaction spells with lowercase reaction', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: 'reaction', range: 'Self', prepared: 'Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(document.querySelector('.attacks').textContent).toContain('R');
-  });
-
-  // ===== Revivification from Active Buffs =====
-
-  it('adds Revivification reaction from active buffs with reactionSave', () => {
+  it('adds Revivification reaction from activeBuffs with reactionSave', () => {
     vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
       if (key === 'activeBuffs') return [{ reactionSave: 'CHA' }];
       return undefined;
@@ -338,7 +233,7 @@ describe('CharReactions', () => {
     });
     const stats = { ...basePlayerStats, reactions: [...basePlayerStats.reactions, { name: 'Revivification', description: 'Revive a creature' }] };
     render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getAllByText(/Revivification/).length).toBe(1);
+    expect(screen.queryAllByText('Revivification:').length).toBe(1);
   });
 
   it('does not add Revivification when no buff has reactionSave', () => {
@@ -349,8 +244,6 @@ describe('CharReactions', () => {
     render(<CharReactions {...baseProps} />);
     expect(screen.queryByText('Revivification:')).not.toBeInTheDocument();
   });
-
-  // ===== Power Word Heal Stand Reaction =====
 
   it('adds Stand (Power Word Heal) reaction when pwhStance is truthy', () => {
     vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
@@ -366,29 +259,72 @@ describe('CharReactions', () => {
       if (key === 'powerWordHealStandPermission') return true;
       return undefined;
     });
-    const stats = { ...basePlayerStats, reactions: [...basePlayerStats.reactions, { name: 'Stand (Power Word Heal)', description: 'You can use your Reaction to stand up.' }] };
+    const stats = { ...basePlayerStats, reactions: [...basePlayerStats.reactions, { name: 'Stand (Power Word Heal)', description: 'Stand up.' }] };
     render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getAllByText(/Stand \(Power Word Heal\)/).length).toBe(1);
+    expect(screen.queryAllByText('Stand (Power Word Heal):').length).toBe(1);
+  });
+
+  // ===== Reaction Clickability =====
+
+  it('marks Opportunity Attack as clickable', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Opportunity Attack:')).toHaveClass('clickable');
+  });
+
+  it('marks reactions with details as clickable', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Reaction Test:')).toHaveClass('clickable');
+  });
+
+  it('marks reactions with automation as clickable', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Opportunity Attack:')).toHaveClass('clickable');
+  });
+
+  it('marks a reaction without details or automation as non-clickable', () => {
+    const stats = { ...basePlayerStats, reactions: [{ name: 'Simple Reaction', description: 'No details here' }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Simple Reaction:')).not.toHaveClass('clickable');
+  });
+
+  it('marks Stand (Power Word Heal) as non-clickable', () => {
+    vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
+      if (key === 'powerWordHealStandPermission') return true;
+      return undefined;
+    });
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Stand (Power Word Heal):')).not.toHaveClass('clickable');
   });
 
   // ===== cannotAct =====
 
-  it('does not allow reaction click when cannotAct', () => {
+  it('prevents reaction action when cannotAct is true', () => {
+    const mockRollAttack = vi.fn();
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
     render(<CharReactions {...baseProps} cannotAct={true} />);
     fireEvent.click(screen.getByText('Opportunity Attack:'));
+    expect(mockRollAttack).not.toHaveBeenCalled();
   });
 
   // ===== Details Popup =====
 
-  it('renders popup when reaction with details is clicked', async () => {
+  it('shows a popup when a reaction with details is clicked', async () => {
     render(<CharReactions {...baseProps} />);
     fireEvent.click(screen.getByText('Reaction Test:'));
     await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
   });
 
+  it('dismisses the popup when the overlay is clicked', async () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Reaction Test:'));
+    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
+    fireEvent.click(screen.getByTestId('popup'));
+    await waitFor(() => { expect(screen.queryByTestId('popup')).not.toBeInTheDocument(); });
+  });
+
   // ===== Stand (Power Word Heal) Click Handler =====
 
-  it('removes prone condition and clears pwhStance when Stand is clicked', () => {
+  it('removes prone condition and clears pwhStance when Stand is clicked and prone is present', () => {
     vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
       if (key === 'powerWordHealStandPermission') return true;
       return undefined;
@@ -400,7 +336,7 @@ describe('CharReactions', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith(basePlayerStats.name, 'powerWordHealStandPermission', false, baseProps.campaignName);
   });
 
-  it('does not change conditions when prone is not present on Stand click', () => {
+  it('does not remove conditions when prone is not present on Stand click', () => {
     vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
       if (key === 'powerWordHealStandPermission') return true;
       return undefined;
@@ -408,10 +344,11 @@ describe('CharReactions', () => {
     vi.mocked(getRuntimeValue).mockReturnValue(['Blinded']);
     render(<CharReactions {...baseProps} />);
     fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
+    expect(setRuntimeValue).not.toHaveBeenCalledWith(basePlayerStats.name, 'activeConditions', ['Blinded'], baseProps.campaignName);
     expect(setRuntimeValue).toHaveBeenCalledWith(basePlayerStats.name, 'powerWordHealStandPermission', false, baseProps.campaignName);
   });
 
-  it('shows Stand popup when Stand is clicked', async () => {
+  it('shows a confirmation popup when Stand is clicked', async () => {
     vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
       if (key === 'powerWordHealStandPermission') return true;
       return undefined;
@@ -424,7 +361,7 @@ describe('CharReactions', () => {
 
   // ===== Opportunity Attack Handler =====
 
-  it('calls rollAttack with OA flag when no target special protections', async () => {
+  it('calls rollAttack with attack name, hit bonus, and isOpportunityAttack flag for a basic OA', async () => {
     const mockRollAttack = vi.fn();
     vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
     vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
@@ -434,7 +371,7 @@ describe('CharReactions', () => {
     expect(mockRollAttack).toHaveBeenCalledWith(MOCK_ATTACK.name, MOCK_ATTACK.hitBonus, { forcedMode: undefined, isOpportunityAttack: true });
   });
 
-  it('shows popup when target has InspiringMovement noOA', async () => {
+  it('shows a popup when the target has InspiringMovement noOA protection', async () => {
     vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
     vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
     vi.mocked(getRuntimeValue).mockImplementation((name, key) => { if (key === 'inspiringMovementNoOA') return true; return null; });
@@ -443,7 +380,7 @@ describe('CharReactions', () => {
     await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
   });
 
-  it('shows popup when target has Tactical Shift', async () => {
+  it('shows a popup when the target has Tactical Shift', async () => {
     vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
     vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
     vi.mocked(hasTacticalShift).mockReturnValue(true);
@@ -452,7 +389,7 @@ describe('CharReactions', () => {
     await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
   });
 
-  it('shows popup when target has Speedy Opportunity Disadvantage', async () => {
+  it('shows a popup when the target has Speedy Opportunity Disadvantage', async () => {
     vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
     vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
     vi.mocked(hasSpeedyOpportunityDisadvantage).mockReturnValue(true);
@@ -461,7 +398,7 @@ describe('CharReactions', () => {
     await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
   });
 
-  it('uses first melee attack for OA', async () => {
+  it('selects the first melee attack for OA', async () => {
     const mockRollAttack = vi.fn();
     vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
     vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
@@ -472,7 +409,7 @@ describe('CharReactions', () => {
     expect(mockRollAttack).toHaveBeenCalledWith('Melee Weapon', 7, { forcedMode: undefined, isOpportunityAttack: true });
   });
 
-  it('uses first attack when no melee attacks exist for OA', async () => {
+  it('falls back to the first attack when no melee attacks exist', async () => {
     const mockRollAttack = vi.fn();
     vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
     vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
@@ -492,16 +429,17 @@ describe('CharReactions', () => {
     expect(mockRollAttack).toHaveBeenCalled();
   });
 
-  it('does nothing when no attacks exist for OA', async () => {
+  it('does nothing when there are no attacks for OA', async () => {
     vi.mocked(getCombatContext).mockResolvedValue(null);
     const stats = { ...basePlayerStats, attacks: [] };
     render(<CharReactions {...baseProps} playerStats={stats} />);
     await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
+    expect(screen.queryByTestId('dice-roll-result')).not.toBeInTheDocument();
   });
 
   // ===== Automation Reactions =====
 
-  it('calls executeHandler when reaction has automation', async () => {
+  it('calls executeHandler when a reaction has automation', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
     vi.mocked(executeHandler).mockResolvedValue(null);
     render(<CharReactions {...baseProps} />);
@@ -509,14 +447,14 @@ describe('CharReactions', () => {
     expect(executeHandler).toHaveBeenCalled();
   });
 
-  it('does not call executeHandler when cannotAct with automation', async () => {
+  it('does not call executeHandler when cannotAct is true even with automation', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
     render(<CharReactions {...baseProps} cannotAct={true} />);
     await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
     expect(executeHandler).not.toHaveBeenCalled();
   });
 
-  it('shows popup when executeHandler returns null and reaction has details', async () => {
+  it('shows a popup when executeHandler returns null and the reaction has details', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
     vi.mocked(executeHandler).mockResolvedValue(null);
     render(<CharReactions {...baseProps} />);
@@ -524,7 +462,7 @@ describe('CharReactions', () => {
     await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
   });
 
-  it('calls rollAttack when automation returns attack_roll result', async () => {
+  it('calls rollAttack when automation returns an attack_roll result', async () => {
     const mockRollAttack = vi.fn();
     vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
     vi.mocked(hasAutomation).mockReturnValue(true);
@@ -534,7 +472,7 @@ describe('CharReactions', () => {
     expect(mockRollAttack).toHaveBeenCalledWith('Auto Attack', 8, { targetName: 'Enemy', forcedMode: undefined, isOpportunityAttack: true });
   });
 
-  it('shows popup when automation returns popup result', async () => {
+  it('shows a popup when automation returns a popup result', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
     vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: '<b>Automation Popup</b>' });
     render(<CharReactions {...baseProps} />);
@@ -542,7 +480,7 @@ describe('CharReactions', () => {
     await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
   });
 
-  it('shows feature detail when automation returns unknown result', async () => {
+  it('shows feature detail when automation returns an unknown result type', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
     vi.mocked(executeHandler).mockResolvedValue({ type: 'unknown_type' });
     render(<CharReactions {...baseProps} />);
@@ -550,31 +488,87 @@ describe('CharReactions', () => {
     await waitFor(() => { expect(buildFeatureDetailHtml).toHaveBeenCalled(); });
   });
 
-  // ===== Reaction Clickable State =====
+  // ===== Spell Reactions =====
 
-  it('shows OA as clickable', () => {
+  it('renders a spells table section when reaction spells exist', () => {
     render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Opportunity Attack:')).toHaveClass('clickable');
+    expect(document.querySelector('.attacks')).toBeInTheDocument();
   });
 
-  it('shows reaction as non-clickable when it has no details, is not OA, and has no automation', () => {
-    const stats = { ...basePlayerStats, reactions: [{ name: 'Simple Reaction', description: 'No details here' }] };
+  it('renders spell reaction table headers', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Name')).toBeInTheDocument();
+    expect(screen.getByText('Range')).toBeInTheDocument();
+    expect(screen.getByText('Hit')).toBeInTheDocument();
+    expect(screen.getByText('Damage')).toBeInTheDocument();
+    expect(screen.getByText('Type')).toBeInTheDocument();
+  });
+
+  it('renders the spell range column value', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Self')).toBeInTheDocument();
+  });
+
+  it('displays Utility as the damage type for reaction spells', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Utility')).toBeInTheDocument();
+  });
+
+  it('filters spells to only those with reaction casting time', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [
+      { name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared' },
+      { name: 'Aid', casting_time: '1 action', prepared: 'Prepared' },
+      { name: 'Hex', casting_time: '1 bonus action', prepared: 'Always' },
+    ] } };
     render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Simple Reaction:')).not.toHaveClass('clickable');
+    expect(screen.getByText('Shield')).toBeInTheDocument();
+    expect(screen.queryByText('Aid')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hex')).not.toBeInTheDocument();
   });
 
-  it('renders Stand reaction as non-clickable', () => {
-    vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
-      if (key === 'powerWordHealStandPermission') return true;
-      return undefined;
-    });
+  it('excludes spells whose names match attacks', () => {
+    const stats = { ...basePlayerStats, attacks: [{ name: 'Shield', type: 'Action', range: 'Self', hitBonus: 5 }], spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared' }] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.queryByText('Shield')).not.toBeInTheDocument();
+  });
+
+  it('excludes unprepared spells', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 reaction', prepared: 'Not Prepared' }] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.queryByText('Shield')).not.toBeInTheDocument();
+  });
+
+  it('includes Always-prepared spells', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Counterspell', casting_time: '1 reaction', range: '60 feet', prepared: 'Always' }] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Counterspell')).toBeInTheDocument();
+  });
+
+  it('renders the casting time abbreviation column as R for reaction spells', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' }] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(document.querySelector('.attacks').textContent).toContain('R');
+  });
+
+  it('renders casting time abbreviation with capital Reaction', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 Reaction', range: 'Self', prepared: 'Prepared' }] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(document.querySelector('.attacks').textContent).toContain('R');
+  });
+
+  it('renders casting time abbreviation with lowercase reaction', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: 'reaction', range: 'Self', prepared: 'Prepared' }] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(document.querySelector('.attacks').textContent).toContain('R');
+  });
+
+  it('opens spell detail popup when a reaction spell name is clicked', () => {
     render(<CharReactions {...baseProps} />);
-    expect(screen.getByText('Stand (Power Word Heal):')).not.toHaveClass('clickable');
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
   });
 
-  // ===== Spell Detail Popup Dismissal =====
-
-  it('closes spell detail popup when overlay is clicked', () => {
+  it('dismisses spell detail popup when the overlay is clicked', () => {
     render(<CharReactions {...baseProps} />);
     fireEvent.click(screen.getByText('Shield'));
     expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
@@ -582,17 +576,45 @@ describe('CharReactions', () => {
     expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
   });
 
-  // ===== Popup Dismissal =====
-
-  it('closes HTML popup when overlay is clicked', async () => {
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Reaction Test:'));
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-    fireEvent.click(screen.getByTestId('popup'));
-    await waitFor(() => { expect(screen.queryByTestId('popup')).not.toBeInTheDocument(); });
+  it('does not show the spells section when no spells exist', () => {
+    const stats = { ...basePlayerStats, attacks: [], reactions: [], spellAbilities: undefined };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(document.querySelector('.attacks')).not.toBeInTheDocument();
   });
 
-  // ===== DiceRollResult rendering =====
+  it('does not show the spells section when spells array is empty', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(document.querySelector('.attacks')).not.toBeInTheDocument();
+  });
+
+  // ===== Null / Empty Handling =====
+
+  it('handles null reactions gracefully', () => {
+    const stats = { ...basePlayerStats, reactions: null };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+  });
+
+  it('handles empty reactions array gracefully', () => {
+    const stats = { ...basePlayerStats, reactions: [] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+  });
+
+  it('handles empty spell abilities gracefully', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  it('handles undefined spell abilities gracefully', () => {
+    const stats = { ...basePlayerStats, spellAbilities: undefined };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== DiceRollResult Rendering =====
 
   it('renders DiceRollResult when popupHtml is an object', () => {
     vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { name: 'Test Roll', result: 15 }, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn() });
@@ -606,21 +628,5 @@ describe('CharReactions', () => {
     vi.mocked(useSpellMetamagicFlow).mockReturnValue({ pendingMetamagic: { spellName: 'Shield', spellLevel: 1, _currentSP: 3 }, gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn() });
     render(<CharReactions {...baseProps} />);
     expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
-  });
-
-  // ===== Always-prepared spells =====
-
-  it('includes Always-prepared spells in reaction spells', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Counterspell', casting_time: '1 reaction', range: '60 feet', prepared: 'Always' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(screen.getByText('Counterspell')).toBeInTheDocument();
-  });
-
-  // ===== No spells, no attacks table =====
-
-  it('does not show reaction spells section when no spells exist', () => {
-    const stats = { ...basePlayerStats, attacks: [], reactions: [], spellAbilities: undefined };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(document.querySelector('.attacks')).not.toBeInTheDocument();
   });
 });

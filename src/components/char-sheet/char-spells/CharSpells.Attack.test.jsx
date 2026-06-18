@@ -1,4 +1,5 @@
-import { render, screen, fireEvent } from '@testing-library/react';
+// @improved-by-ai
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
 
@@ -17,6 +18,7 @@ vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
     setPopupHtml: vi.fn(),
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
+    quickRollPlayerSave: vi.fn(),
   })),
 }));
 
@@ -57,11 +59,7 @@ vi.mock('../../../services/ui/sanitize.js', () => ({
 vi.mock('./CharSpellSlots.jsx', () => ({
   default: function MockCharSpellSlots() {
     return <div data-testid="char-spell-slots">Spell Slots</div>;
-    },
-}));
-
-vi.mock('lodash', () => ({
-  cloneDeep: vi.fn(obj => JSON.parse(JSON.stringify(obj))),
+  },
 }));
 
 vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
@@ -118,6 +116,16 @@ vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
 }));
 
+const baseProps = {
+  playerStats: mockPlayerStats,
+  handleTogglePreparedSpells: mockHandleTogglePreparedSpells,
+  campaignName: 'test-campaign',
+};
+
+function renderCharSpells(props = {}) {
+  return render(<CharSpells {...baseProps} {...props} />);
+}
+
 describe('CharSpells', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -128,74 +136,102 @@ describe('CharSpells', () => {
     }));
   });
 
-  describe('Spell attack', () => {
-    it('should render the spell attack to-hit label as clickable', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+  describe('Spell attack to-hit', () => {
+    it('should render the spell attack to-hit label as clickable when not disabled', () => {
+      renderCharSpells();
 
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
       expect(attackLabel).toHaveClass('clickable');
     });
 
-    it('should show spell detail popup with cast button when spell name is clicked', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+    it('should display the correct to-hit modifier value', () => {
+      renderCharSpells();
 
-      const fireballLink = screen.getByText('Fireball');
-      fireEvent.click(fireballLink);
-
-      // Spell detail popup should show with Cast button
-      expect(screen.getByText('Cast Spell')).toBeInTheDocument();
+      // toHit is 5, exhaustionPenalty is 0, so +5
+      expect(screen.getByText('+5')).toBeInTheDocument();
     });
 
-    it('should show metamagic popup for sorcerer spell attack', () => {
-      const statsWithSorcerer = {
-        ...mockPlayerStats,
-        class: { name: 'Sorcerer' },
-      };
+    it('should apply exhaustion penalty to the to-hit display', () => {
+      renderCharSpells({ exhaustionPenalty: 2 });
 
-      render(
-        <CharSpells
-          playerStats={statsWithSorcerer}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      // toHit is 5, exhaustionPenalty is 2, so +3
+      expect(screen.getByText('+3')).toBeInTheDocument();
+    });
+
+    it('should apply exhaustion penalty to the modifier display', () => {
+      renderCharSpells({ exhaustionPenalty: 1 });
+
+      // modifier is 3, exhaustionPenalty is 1, so +2
+      expect(screen.getByText('+2')).toBeInTheDocument();
+    });
+
+    it('should render the attack label with disabled-attack class when cannotAct is true', () => {
+      renderCharSpells({ cannotAct: true });
 
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      fireEvent.click(attackLabel);
-
-      // Sorcerer path shows metamagic popup
-      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
+      expect(attackLabel).toHaveClass('disabled-attack');
     });
 
-    it('should call rollAttack for non-sorcerer spell attack', () => {
+    it('should render the attack label with stat--penalized class when cannotAct is true', () => {
+      renderCharSpells({ cannotAct: true });
+
+      const attackLabel = screen.getByText(/Attack \(to hit\):/);
+      expect(attackLabel).toHaveClass('stat--penalized');
+    });
+
+    it('should not call rollAttack when cannotAct is true', () => {
       const mockRollAttack = vi.fn();
       useLoggedDiceRoll.mockImplementation(() => ({
         popupHtml: null,
         setPopupHtml: vi.fn(),
         rollAttack: mockRollAttack,
         rollDamage: vi.fn(),
+        quickRollPlayerSave: vi.fn(),
       }));
 
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      renderCharSpells({ cannotAct: true });
+
+      const attackLabel = screen.getByText(/Attack \(to hit\):/);
+      fireEvent.click(attackLabel);
+
+      expect(mockRollAttack).not.toHaveBeenCalled();
+    });
+
+    it('should call rollAttack with correct arguments for a non-sorcerer', () => {
+      const mockRollAttack = vi.fn();
+      useLoggedDiceRoll.mockImplementation(() => ({
+        popupHtml: null,
+        setPopupHtml: vi.fn(),
+        rollAttack: mockRollAttack,
+        rollDamage: vi.fn(),
+        quickRollPlayerSave: vi.fn(),
+      }));
+
+      renderCharSpells();
 
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
       fireEvent.click(attackLabel);
 
       expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', 5, expect.any(Object));
+    });
+
+    it('should subtract exhaustion penalty from rollAttack to-hit value', () => {
+      const mockRollAttack = vi.fn();
+      useLoggedDiceRoll.mockImplementation(() => ({
+        popupHtml: null,
+        setPopupHtml: vi.fn(),
+        rollAttack: mockRollAttack,
+        rollDamage: vi.fn(),
+        quickRollPlayerSave: vi.fn(),
+      }));
+
+      renderCharSpells({ exhaustionPenalty: 2 });
+
+      const attackLabel = screen.getByText(/Attack \(to hit\):/);
+      fireEvent.click(attackLabel);
+
+      // toHit 5 - exhaustionPenalty 2 = 3
+      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', 3, expect.any(Object));
     });
 
     it('should pass disadvantage mode when conditionAttackMode is disadvantage', () => {
@@ -205,50 +241,145 @@ describe('CharSpells', () => {
         setPopupHtml: vi.fn(),
         rollAttack: mockRollAttack,
         rollDamage: vi.fn(),
+        quickRollPlayerSave: vi.fn(),
       }));
 
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          conditionAttackMode='disadvantage'
-        />
-      );
+      renderCharSpells({ conditionAttackMode: 'disadvantage' });
 
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
       fireEvent.click(attackLabel);
 
-      expect(mockRollAttack).toHaveBeenCalled();
-      const args = mockRollAttack.mock.calls[0];
-      expect(args[2]).toMatchObject({ forcedMode: 'disadvantage' });
+      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expect.any(Number), expect.objectContaining({ forcedMode: 'disadvantage' }));
     });
 
-    it('should not allow spell attack click when cannotAct is true', () => {
+    it('should pass advantage mode when conditionAttackMode is advantage', () => {
       const mockRollAttack = vi.fn();
       useLoggedDiceRoll.mockImplementation(() => ({
         popupHtml: null,
         setPopupHtml: vi.fn(),
         rollAttack: mockRollAttack,
         rollDamage: vi.fn(),
+        quickRollPlayerSave: vi.fn(),
       }));
 
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          cannotAct
-        />
-      );
+      renderCharSpells({ conditionAttackMode: 'advantage' });
 
       const attackLabel = screen.getByText(/Attack \(to hit\):/);
       fireEvent.click(attackLabel);
 
-      // rollAttack should NOT be called when cannotAct is true
-      expect(mockRollAttack).not.toHaveBeenCalled();
+      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expect.any(Number), expect.objectContaining({ forcedMode: 'advantage' }));
     });
   });
 
-  describe('Cantrip damage', () => {
+  describe('Spell attack with innate sorcery advantage', () => {
+    it('should not pass innate advantage when conditionAttackMode overrides for non-sorcerer', async () => {
+      const mockRollAttack = vi.fn();
+
+      useLoggedDiceRoll.mockImplementation(() => ({
+        popupHtml: null,
+        setPopupHtml: vi.fn(),
+        rollAttack: mockRollAttack,
+        rollDamage: vi.fn(),
+        quickRollPlayerSave: vi.fn(),
+      }));
+
+      renderCharSpells({ conditionAttackMode: 'disadvantage' });
+
+      const attackLabel = screen.getByText(/Attack \(to hit\):/);
+      await act(async () => {
+        fireEvent.click(attackLabel);
+      });
+
+      // conditionAttackMode 'disadvantage' should take precedence over innate advantage
+      expect(mockRollAttack).toHaveBeenCalledWith('Spell Attack', expect.any(Number), expect.objectContaining({ forcedMode: 'disadvantage' }));
+    });
+  });
+
+  describe('Spell attack with sorcerer metamagic', () => {
+    it('should show metamagic popup when sorcerer clicks spell attack', () => {
+      const statsWithSorcerer = {
+        ...mockPlayerStats,
+        class: { name: 'Sorcerer' },
+      };
+
+      renderCharSpells({ playerStats: statsWithSorcerer });
+
+      const attackLabel = screen.getByText(/Attack \(to hit\):/);
+      fireEvent.click(attackLabel);
+
+      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
+    });
+
+    it('should not show metamagic popup for non-sorcerer clicking spell attack', () => {
+      const mockRollAttack = vi.fn();
+      useLoggedDiceRoll.mockImplementation(() => ({
+        popupHtml: null,
+        setPopupHtml: vi.fn(),
+        rollAttack: mockRollAttack,
+        rollDamage: vi.fn(),
+        quickRollPlayerSave: vi.fn(),
+      }));
+
+      renderCharSpells();
+
+      const attackLabel = screen.getByText(/Attack \(to hit\):/);
+      fireEvent.click(attackLabel);
+
+      expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
+      expect(mockRollAttack).toHaveBeenCalled();
+    });
+
+    it('should dismiss metamagic popup when sorcerer confirms spell attack metamagic', async () => {
+      const statsWithSorcerer = {
+        ...mockPlayerStats,
+        class: { name: 'Sorcerer' },
+      };
+
+      renderCharSpells({ playerStats: statsWithSorcerer });
+
+      const attackLabel = screen.getByText(/Attack \(to hit\):/);
+      await act(async () => {
+        fireEvent.click(attackLabel);
+      });
+
+      expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
+
+      await act(async () => {
+        const confirmButton = screen.getByTestId('mock-confirm');
+        fireEvent.click(confirmButton);
+      });
+
+      // After confirming, the popup should be dismissed
+      expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Spell detail popup', () => {
+    it('should show spell detail popup when spell name is clicked', () => {
+      renderCharSpells();
+
+      const fireballLink = screen.getByText('Fireball');
+      fireEvent.click(fireballLink);
+
+      expect(screen.getByText('Cast Spell')).toBeInTheDocument();
+    });
+
+    it('should close spell detail popup when close button is clicked', () => {
+      renderCharSpells();
+
+      const fireballLink = screen.getByText('Fireball');
+      fireEvent.click(fireballLink);
+
+      expect(screen.getByText('Cast Spell')).toBeInTheDocument();
+
+      const closeButton = screen.getByText('Close');
+      fireEvent.click(closeButton);
+
+      expect(screen.queryByText('Cast Spell')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('Cantrip damage display', () => {
     it('should use the highest available cantrip damage level at or below player level', () => {
       const statsWithCantripDamage = {
         ...mockPlayerStats,
@@ -277,12 +408,7 @@ describe('CharSpells', () => {
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithCantripDamage}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      renderCharSpells({ playerStats: statsWithCantripDamage });
 
       // Player level 5, so highest available <= 5 is '5' => 2d10
       expect(screen.getByText('2d10 Fire')).toBeInTheDocument();
@@ -315,36 +441,30 @@ describe('CharSpells', () => {
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithCantripDamage}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      renderCharSpells({ playerStats: statsWithCantripDamage });
 
       // Player level 0, no levels <= 0, so it falls back to first key
       expect(screen.getByText('1d10 Fire')).toBeInTheDocument();
     });
 
-    it('should render cantrip with multi-level damage showing highest applicable level', () => {
-      const statsWithCantrip = {
+    it('should use the first damage level for non-cantrips regardless of player level', () => {
+      const statsWithLevelSpell = {
         ...mockPlayerStats,
-        level: 5,
+        level: 11,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
           spells: [
             {
-              name: 'Fire Bolt',
-              level: 0,
+              name: 'Scorching Ray',
+              level: 2,
               casting_time: '1 action',
               range: '120 feet',
               duration: 'Instantaneous',
               components: ['V', 'S'],
               damage: {
                 damage_at_slot_level: {
-                  '1': '1d10',
-                  '5': '2d10',
-                  '11': '3d10',
+                  '2': '3d6',
+                  '5': '4d6',
                 },
                 damage_type: 'Fire',
               },
@@ -354,15 +474,165 @@ describe('CharSpells', () => {
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithCantrip}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      renderCharSpells({ playerStats: statsWithLevelSpell });
 
-      // Player level 5, so highest available <= 5 is '5' => 2d10
-      expect(screen.getByText('2d10 Fire')).toBeInTheDocument();
+      // Non-cantrips use the first key of damage_at_slot_level, which is '2' => 3d6
+      expect(screen.getByText('3d6 Fire')).toBeInTheDocument();
+    });
+
+    it('should use damage_at_character_level when damage_at_slot_level is absent', () => {
+      const statsWithCharacterLevelDamage = {
+        ...mockPlayerStats,
+        level: 11,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Custom Spell',
+              level: 1,
+              casting_time: '1 action',
+              range: '60 feet',
+              duration: 'Instantaneous',
+              components: ['V'],
+              damage: {
+                damage_at_character_level: {
+                  '1': '2d6',
+                  '5': '3d6',
+                },
+                damage_type: 'Acid',
+              },
+              prepared: 'Always',
+            },
+          ],
+        },
+      };
+
+      renderCharSpells({ playerStats: statsWithCharacterLevelDamage });
+
+      // Non-cantrips use the first key of damage_at_character_level, which is '1' => 2d6
+      expect(screen.getByText('2d6 Acid')).toBeInTheDocument();
+    });
+
+    it('should display damage with save DC info for spells with a save DC', () => {
+      const statsWithSaveDc = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Fireball',
+              level: 3,
+              casting_time: '1 action',
+              range: '150 feet',
+              duration: 'Instantaneous',
+              components: ['V', 'S', 'M'],
+              damage: {
+                damage_at_slot_level: {
+                  '3': '8d6',
+                },
+                damage_type: 'Fire',
+              },
+              dc: {
+                dc_type: 'DEX',
+                dc_success: 'half',
+              },
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
+
+      renderCharSpells({ playerStats: statsWithSaveDc });
+
+      expect(screen.getByText('8d6 Fire (DEX half)')).toBeInTheDocument();
+    });
+
+    it('should display negates for spell save DC with negates success', () => {
+      const statsWithNegates = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Frostbite',
+              level: 0,
+              casting_time: '1 action',
+              range: '60 feet',
+              duration: 'Instantaneous',
+              components: ['V', 'S'],
+              damage: {
+                damage_at_slot_level: {
+                  '1': '1d6',
+                },
+                damage_type: 'Cold',
+              },
+              dc: {
+                dc_type: 'CON',
+                dc_success: 'negates',
+              },
+              prepared: 'Always',
+            },
+          ],
+        },
+      };
+
+      renderCharSpells({ playerStats: statsWithNegates });
+
+      expect(screen.getByText('1d6 Cold (CON negates)')).toBeInTheDocument();
+    });
+  });
+
+  describe('Spell attack stat--penalized class on to-hit span', () => {
+    it('should render stat--penalized class on to-hit span when conditionAttackMode is disadvantage', () => {
+      renderCharSpells({ conditionAttackMode: 'disadvantage' });
+
+      const abilitiesDiv = document.querySelector('.spell-abilities');
+      const spans = abilitiesDiv.querySelectorAll('span');
+      const penaltySpan = Array.from(spans).find(s => s.classList.contains('stat--penalized'));
+
+      expect(penaltySpan).toBeTruthy();
+      expect(penaltySpan.textContent).toBe('+5');
+    });
+
+    it('should render stat--penalized class on to-hit span when exhaustionPenalty is positive', () => {
+      renderCharSpells({ exhaustionPenalty: 1 });
+
+      const abilitiesDiv = document.querySelector('.spell-abilities');
+      const spans = abilitiesDiv.querySelectorAll('span');
+      const penaltySpan = Array.from(spans).find(s => s.classList.contains('stat--penalized'));
+
+      expect(penaltySpan).toBeTruthy();
+      expect(penaltySpan.textContent).toBe('+4');
+    });
+  });
+
+  describe('Spell attack with null/undefined values', () => {
+    it('should render spell attack when toHit is zero', () => {
+      const statsWithZeroToHit = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          toHit: 0,
+        },
+      };
+
+      renderCharSpells({ playerStats: statsWithZeroToHit });
+
+      expect(screen.getByText('+0')).toBeInTheDocument();
+    });
+
+    it('should render spell attack when modifier is zero', () => {
+      const statsWithZeroModifier = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          modifier: 0,
+        },
+      };
+
+      renderCharSpells({ playerStats: statsWithZeroModifier });
+
+      expect(screen.getByText('+0')).toBeInTheDocument();
     });
   });
 });

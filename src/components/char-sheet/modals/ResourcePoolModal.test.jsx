@@ -1,8 +1,9 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ResourcePoolModal from './ResourcePoolModal.jsx';
 
-// ── Mocked modules (before the component import) ──
+// ── Mocked modules ──
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
@@ -51,7 +52,7 @@ function makeAutomation(overrides = {}) {
 
 // ── Test helpers ──
 
-function setupRuntimeMock(returnValues = {}) {
+function setupRuntimeMock(returnValues) {
   useRuntimeState.getRuntimeValue.mockImplementation((name, key) =>
     returnValues[key] ?? null
   );
@@ -77,7 +78,8 @@ function renderModal(playerStats, automation, campaignName, onClose) {
 describe('ResourcePoolModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
+    // Reset combat round to default (1) so tests that don't override it are deterministic
+    combatData.getCurrentCombatRound.mockReturnValue(1);
   });
 
   // ── Rendering ──
@@ -85,6 +87,18 @@ describe('ResourcePoolModal', () => {
   it('renders title "Wild Resurgence"', () => {
     renderModal(makePlayerStats(), makeAutomation());
     expect(screen.getByText('Wild Resurgence')).toBeInTheDocument();
+  });
+
+  it('renders subtitle text', () => {
+    renderModal(makePlayerStats(), makeAutomation());
+    expect(
+      screen.getByText(/Convert between Wild Shape uses and spell slots/i)
+    ).toBeInTheDocument();
+  });
+
+  it('renders Cancel button', () => {
+    renderModal(makePlayerStats(), makeAutomation());
+    expect(screen.getByRole('button', { name: /Cancel/i })).toBeInTheDocument();
   });
 
   // ── Modal close interactions ──
@@ -126,13 +140,13 @@ describe('ResourcePoolModal', () => {
     renderModal(
       makePlayerStats(),
       makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
-     );
-     // The h4 heading "Spell Slot → Wild Shape" uniquely identifies the section
-    expect(screen.getByRole('heading', { name: /Spell Slot.*Wild Shape/i })).toBeInTheDocument();
-   });
+    );
+    expect(
+      screen.getByRole('heading', { name: /Spell Slot.*Wild Shape/i })
+    ).toBeInTheDocument();
+  });
 
   it('does not show forward section when no conversion configured', () => {
-    setupRuntimeMock({});
     renderModal(makePlayerStats(), makeAutomation());
     expect(screen.queryByText(/Spell Slot.*Wild Shape/i)).not.toBeInTheDocument();
   });
@@ -144,6 +158,24 @@ describe('ResourcePoolModal', () => {
       makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
     );
     expect(screen.getByText(/Use must be 0 to convert/i)).toBeInTheDocument();
+  });
+
+  it('shows blocked message with correct count of remaining wild shape uses', () => {
+    setupRuntimeMock({ wildShapeUses: 3 });
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
+    );
+    expect(screen.getByText(/You have 3 Wild Shape uses remaining/i)).toBeInTheDocument();
+  });
+
+  it('shows blocked message with singular "use" when wildShapeUses is 1', () => {
+    setupRuntimeMock({ wildShapeUses: 1 });
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
+    );
+    expect(screen.getByText(/You have 1 Wild Shape use remaining/i)).toBeInTheDocument();
   });
 
   it('shows "already used this round" message when fwdUsedRound === currentRound', () => {
@@ -164,12 +196,25 @@ describe('ResourcePoolModal', () => {
       makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
     );
     expect(screen.getByRole('table')).toBeInTheDocument();
-    // Verify radio buttons are present for level selection
     const radios = document.querySelectorAll('input[type="radio"][name="slotLevel"]');
     expect(radios.length).toBeGreaterThan(0);
   });
 
-  it('forward conversion spends a spell slot and gains wild shape use', () => {
+  it('disables radio buttons for levels with 0 available slots', () => {
+    combatData.getCurrentCombatRound.mockReturnValue(1);
+    setupRuntimeMock({ wildShapeUses: 0 });
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
+    );
+    const level4Row = [...document.querySelectorAll('.resource-pool-table tbody tr')].find(
+      (row) => row.children[0]?.textContent === '4'
+    );
+    const radio = level4Row.querySelector('input[type="radio"]');
+    expect(radio.disabled).toBe(true);
+  });
+
+  it('forwards conversion spends a spell slot and gains wild shape use', () => {
     combatData.getCurrentCombatRound.mockReturnValue(1);
     setupRuntimeMock({ wildShapeUses: 0, spell_slots_level_2: 3 });
     const handleClose = vi.fn();
@@ -181,35 +226,77 @@ describe('ResourcePoolModal', () => {
     );
 
     // Select level 2 radio button
-    const radios = document.querySelectorAll('input[type="radio"][name="slotLevel"]');
-    for (const r of radios) {
-      if (!r.disabled && r.getAttribute('checked') === null) {
-        // Check which level this is by context
-        const row = r.closest('tr');
-        const cells = row.children;
-        if (cells[0].textContent === '2' && !r.disabled) {
-          fireEvent.click(r);
-          break;
-        }
-      }
-    }
+    const level2Row = [...document.querySelectorAll('.resource-pool-table tbody tr')].find(
+      (row) => row.children[0]?.textContent === '2'
+    );
+    const radio = level2Row.querySelector('input[type="radio"]');
+    fireEvent.click(radio);
 
     // Click the convert button
     fireEvent.click(screen.getByRole('button', { name: /Expend Level 2 Slot/i }));
 
-    // Verify setRuntimeBatch was called with correct updates
     expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
       'Druid1',
       expect.objectContaining({
-        spell_slots_level_2: 2, // 3 - 1 = 2
-        wildShapeUses: 1, // 0 + 1 = 1
+        spell_slots_level_2: 2,
+        wildShapeUses: 1,
         wildResurgenceFwdUsedRound: 1,
       }),
       'test-campaign'
     );
 
-    // Verify onClose was called
     expect(handleClose).toHaveBeenCalled();
+  });
+
+  it('does not fire forward conversion when selected level has 0 slots', () => {
+    combatData.getCurrentCombatRound.mockReturnValue(1);
+    setupRuntimeMock({ wildShapeUses: 0, spell_slots_level_1: 0 });
+    const handleClose = vi.fn();
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' }),
+      'test-campaign',
+      handleClose
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Expend Level 1 Slot/i }));
+
+    expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+    expect(handleClose).not.toHaveBeenCalled();
+  });
+
+  it('expend button is disabled when canForward is false', () => {
+    combatData.getCurrentCombatRound.mockReturnValue(1);
+    // currentSlots[1] = 0 because runtime returns 0, so canForward is false
+    setupRuntimeMock({ wildShapeUses: 0, spell_slots_level_1: 0 });
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
+    );
+    const button = screen.getByRole('button', { name: /Expend Level 1 Slot/i });
+    expect(button.disabled).toBe(true);
+  });
+
+  it('forward conversion does not fire when prereqs not met (wild shape uses remaining)', () => {
+    combatData.getCurrentCombatRound.mockReturnValue(1);
+    setupRuntimeMock({ wildShapeUses: 2 });
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
+    );
+    expect(screen.getByText(/Use must be 0 to convert/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Expend Level/i })).not.toBeInTheDocument();
+  });
+
+  it('forward conversion does not fire when already used this round', () => {
+    combatData.getCurrentCombatRound.mockReturnValue(1);
+    setupRuntimeMock({ wildShapeUses: 0, wildResurgenceFwdUsedRound: 1 });
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
+    );
+    expect(screen.getByText(/Already used this conversion this round/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Expend Level/i })).not.toBeInTheDocument();
   });
 
   // ── Archdruid / Nature Magician (wild shape -> spell slot at level = 2x uses) ──
@@ -227,7 +314,6 @@ describe('ResourcePoolModal', () => {
   });
 
   it('does not show archdruid section when conversionRate is missing', () => {
-    setupRuntimeMock({ wildShapeUses: 1 });
     renderModal(
       makePlayerStats(),
       makeAutomation({
@@ -238,44 +324,46 @@ describe('ResourcePoolModal', () => {
     expect(screen.queryByText('Nature Magician')).not.toBeInTheDocument();
   });
 
-  // ── Reverse conversion (wild shape -> level 1 slot, once per long rest) ──
-
-  it('shows reverse conversion section when automation.reverseConversion is wild_shape_to_spell_slot', () => {
-    setupRuntimeMock({ wildShapeUses: 1 });
+  it('shows archdruid uses table with correct number of rows', () => {
+    setupRuntimeMock({ wildShapeUses: 3 });
     renderModal(
       makePlayerStats(),
       makeAutomation({
-        reverseConversion: 'wild_shape_to_spell_slot',
-       })
-     );
-      // The h4 heading "Wild Shape → Spell Slot" uniquely identifies the section
-      // (subtitle paragraph also contains both terms, so we query by role)
-    expect(screen.getByRole('heading', { name: /Wild Shape.*Spell Slot/i })).toBeInTheDocument();
-   });
+        conversion: 'wild_shape_to_spell_slot',
+        conversionRate: '2_levels_per_use',
+      })
+    );
+    const rows = document.querySelectorAll('.resource-pool-table tbody tr');
+    // min(currentWS, 4) = min(3, 4) = 3 rows
+    expect(rows.length).toBe(3);
+  });
 
-  it('reverse conversion calls setRuntimeBatch and onClose when convert button clicked', () => {
-    setupRuntimeMock({ wildShapeUses: 1, spell_slots_level_1: 2 });
-    const handleClose = vi.fn();
+  it('archdruid shows correct slot level mapping (uses * 2)', () => {
+    setupRuntimeMock({ wildShapeUses: 3 });
     renderModal(
       makePlayerStats(),
-      makeAutomation({ reverseConversion: 'wild_shape_to_spell_slot' }),
-      'test-campaign',
-      handleClose
+      makeAutomation({
+        conversion: 'wild_shape_to_spell_slot',
+        conversionRate: '2_levels_per_use',
+      })
     );
+    const rows = document.querySelectorAll('.resource-pool-table tbody tr');
+    // Row 1: uses=1, level=2; Row 2: uses=2, level=4; Row 3: uses=3, level=6
+    expect(rows[0].children[1].textContent).toBe('2');
+    expect(rows[1].children[1].textContent).toBe('4');
+    expect(rows[2].children[1].textContent).toBe('6');
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /Convert 1 Wild Shape.*Level 1 Slot/i }));
-
-    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
-      'Druid1',
-      expect.objectContaining({
-        wildShapeUses: 0, // 1 - 1 = 0
-        spell_slots_level_1: 3, // min(4, 2 + 1) = 3
-        wildResurgenceReversedThisRest: true,
-      }),
-      'test-campaign'
+  it('archdruid section shows blocked message when no wild shape uses remaining', () => {
+    setupRuntimeMock({ wildShapeUses: 0 });
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({
+        conversion: 'wild_shape_to_spell_slot',
+        conversionRate: '2_levels_per_use',
+      })
     );
-
-    expect(handleClose).toHaveBeenCalled();
+    expect(screen.getByText(/no Wild Shape uses remaining/i)).toBeInTheDocument();
   });
 
   it('archdruid conversion calls setRuntimeBatch and onClose when convert button clicked', () => {
@@ -291,7 +379,6 @@ describe('ResourcePoolModal', () => {
       handleClose
     );
 
-    // The default archdruidUses is 1, which maps to level 2 (1 * 2 = 2)
     fireEvent.click(
       screen.getByRole('button', { name: /Convert 1 Wild Shape.*Level 2 Slot/i })
     );
@@ -299,8 +386,8 @@ describe('ResourcePoolModal', () => {
     expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
       'Druid1',
       expect.objectContaining({
-        wildShapeUses: 1, // 2 - 1 = 1
-        spell_slots_level_2: 2, // min(max, 1 + 1) = 2
+        wildShapeUses: 1,
+        spell_slots_level_2: 2,
       }),
       'test-campaign'
     );
@@ -308,27 +395,114 @@ describe('ResourcePoolModal', () => {
     expect(handleClose).toHaveBeenCalled();
   });
 
-  it('forward conversion does not fire button when canForward is false', () => {
-    combatData.getCurrentCombatRound.mockReturnValue(1);
-      // wildShapeUses defaults to maxWS=2 when not in mock, so currentWS !== 0
-     // This means fwdPrereqsMet is false → no Expend button rendered (blocked message shown)
-    setupRuntimeMock({});
+  it('archdruid converts correct number of uses to target level', () => {
+    // currentWS=3, archdruidUses default=1, targetLevel=2
+    // Converting 1 use -> level 2 slot
+    setupRuntimeMock({ wildShapeUses: 3, spell_slots_level_2: 1 });
+    const handleClose = vi.fn();
     renderModal(
       makePlayerStats(),
-      makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
-      );
+      makeAutomation({
+        conversion: 'wild_shape_to_spell_slot',
+        conversionRate: '2_levels_per_use',
+      }),
+      'test-campaign',
+      handleClose
+    );
 
-     // Should see the blocked message instead of a radio table + button
-    expect(screen.getByText(/Use must be 0 to convert/i)).toBeInTheDocument();
-      // No expend-level button should exist at all
-    expect(screen.queryByRole('button', { name: /Expend Level/i })).not.toBeInTheDocument();
-    });
+    fireEvent.click(
+      screen.getByRole('button', { name: /Convert 1 Wild Shape.*Level 2 Slot/i })
+    );
+
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'Druid1',
+      expect.objectContaining({
+        wildShapeUses: 2, // 3 - 1 = 2
+        spell_slots_level_2: 2, // min(max, 1 + 1) = 2
+      }),
+      'test-campaign'
+    );
+    expect(handleClose).toHaveBeenCalled();
+  });
+
+  it('archdruid conversion does not fire when target level has 0 slots', () => {
+    setupRuntimeMock({ wildShapeUses: 2, spell_slots_level_4: 0 });
+    const handleClose = vi.fn();
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({
+        conversion: 'wild_shape_to_spell_slot',
+        conversionRate: '2_levels_per_use',
+      }),
+      'test-campaign',
+      handleClose
+    );
+
+    // Select 2 uses (maps to level 4) but level 4 has 0 slots
+    const row2 = [...document.querySelectorAll('.resource-pool-table tbody tr')][1];
+    const radio = row2.querySelector('input[type="radio"]');
+    fireEvent.click(radio);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Convert 2 Wild Shape.*Level 4 Slot/i })
+    );
+
+    expect(useRuntimeState.setRuntimeBatch).not.toHaveBeenCalled();
+    expect(handleClose).not.toHaveBeenCalled();
+  });
+
+  // ── Reverse conversion (wild shape -> level 1 slot, once per long rest) ──
+
+  it('shows reverse conversion section when automation.reverseConversion is wild_shape_to_spell_slot', () => {
+    setupRuntimeMock({ wildShapeUses: 1 });
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ reverseConversion: 'wild_shape_to_spell_slot' })
+    );
+    expect(
+      screen.getByRole('heading', { name: /Wild Shape.*Spell Slot/i })
+    ).toBeInTheDocument();
+  });
+
+  it('does not show reverse section when reverseConversion is not configured', () => {
+    renderModal(makePlayerStats(), makeAutomation());
+    expect(
+      screen.queryByRole('heading', { name: /Wild Shape.*Spell Slot/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('reverse conversion calls setRuntimeBatch and onClose when convert button clicked', () => {
+    setupRuntimeMock({ wildShapeUses: 1, spell_slots_level_1: 2 });
+    const handleClose = vi.fn();
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ reverseConversion: 'wild_shape_to_spell_slot' }),
+      'test-campaign',
+      handleClose
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Convert 1 Wild Shape.*Level 1 Slot/i })
+    );
+
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'Druid1',
+      expect.objectContaining({
+        wildShapeUses: 0,
+        spell_slots_level_1: 3,
+        wildResurgenceReversedThisRest: true,
+      }),
+      'test-campaign'
+    );
+
+    expect(handleClose).toHaveBeenCalled();
+  });
 
   it('reverse conversion does not fire when prereqs not met', () => {
-    setupRuntimeMock({}); // wildShapeUses defaults to maxWS=2, but let's ensure revUsedThisRest is true
+    setupRuntimeMock({});
     useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
       if (key === 'wildShapeUses') return 1;
-      if (key === 'wildResurgenceReversedThisRest') return true; // already used this rest
+      if (key === 'wildResurgenceReversedThisRest') return true;
       return null;
     });
 
@@ -340,18 +514,6 @@ describe('ResourcePoolModal', () => {
     expect(screen.getByText(/Already used this conversion this Long Rest/i)).toBeInTheDocument();
   });
 
-  it('archdruid section shows blocked message when no wild shape uses remaining', () => {
-    setupRuntimeMock({ wildShapeUses: 0 });
-    renderModal(
-      makePlayerStats(),
-      makeAutomation({
-        conversion: 'wild_shape_to_spell_slot',
-        conversionRate: '2_levels_per_use',
-      })
-    );
-    expect(screen.getByText(/no Wild Shape uses remaining/i)).toBeInTheDocument();
-  });
-
   it('reverse section shows blocked message when no wild shape uses remaining', () => {
     setupRuntimeMock({ wildShapeUses: 0 });
     renderModal(
@@ -359,5 +521,95 @@ describe('ResourcePoolModal', () => {
       makeAutomation({ reverseConversion: 'wild_shape_to_spell_slot' })
     );
     expect(screen.getByText(/no Wild Shape uses remaining/i)).toBeInTheDocument();
+  });
+
+  // ── Edge cases ──
+
+  it('reverse conversion caps spell slot at max slots', () => {
+    // maxSlots[1] = 4 from playerStats, currentSlots[1] = 4 (already full)
+    setupRuntimeMock({ wildShapeUses: 1, spell_slots_level_1: 4 });
+    const handleClose = vi.fn();
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ reverseConversion: 'wild_shape_to_spell_slot' }),
+      'test-campaign',
+      handleClose
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /Convert 1 Wild Shape.*Level 1 Slot/i })
+    );
+
+    // Math.min(maxSlots[1], currentSlots[1] + 1) = min(4, 5) = 4
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'Druid1',
+      expect.objectContaining({
+        wildShapeUses: 0,
+        spell_slots_level_1: 4,
+        wildResurgenceReversedThisRest: true,
+      }),
+      'test-campaign'
+    );
+
+    expect(handleClose).toHaveBeenCalled();
+  });
+
+  it('forward conversion uses runtime value for spell slots when available', () => {
+    combatData.getCurrentCombatRound.mockReturnValue(1);
+    // Runtime value overrides maxSlots: level 1 has 1 slot available (max is 4)
+    setupRuntimeMock({ wildShapeUses: 0, spell_slots_level_1: 1 });
+    const handleClose = vi.fn();
+    renderModal(
+      makePlayerStats(),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' }),
+      'test-campaign',
+      handleClose
+    );
+
+    const level1Row = [...document.querySelectorAll('.resource-pool-table tbody tr')].find(
+      (row) => row.children[0]?.textContent === '1'
+    );
+    expect(level1Row.children[1].textContent).toBe('1 / 4');
+
+    const radio = level1Row.querySelector('input[type="radio"]');
+    fireEvent.click(radio);
+
+    fireEvent.click(screen.getByRole('button', { name: /Expend Level 1 Slot/i }));
+
+    // currentSlots[1] - 1 = 1 - 1 = 0
+    expect(useRuntimeState.setRuntimeBatch).toHaveBeenCalledWith(
+      'Druid1',
+      expect.objectContaining({
+        spell_slots_level_1: 0,
+        wildShapeUses: 1,
+        wildResurgenceFwdUsedRound: 1,
+      }),
+      'test-campaign'
+    );
+
+    expect(handleClose).toHaveBeenCalled();
+  });
+
+  it('handles missing playerStats.spellAbilities gracefully', () => {
+    combatData.getCurrentCombatRound.mockReturnValue(1);
+    setupRuntimeMock({ wildShapeUses: 0 });
+    renderModal(
+      makePlayerStats({ spellAbilities: undefined }),
+      makeAutomation({ conversion: 'spell_slot_to_wild_shape' })
+    );
+    // All levels should show 0 available
+    const rows = document.querySelectorAll('.resource-pool-table tbody tr');
+    expect(rows.length).toBe(9);
+    for (const row of rows) {
+      expect(row.children[1].textContent).toContain('0 / 0');
+    }
+  });
+
+  it('handles missing _trackedResources gracefully', () => {
+    renderModal(
+      makePlayerStats({ _trackedResources: undefined }),
+      makeAutomation()
+    );
+    expect(screen.getByText('Wild Resurgence')).toBeInTheDocument();
   });
 });

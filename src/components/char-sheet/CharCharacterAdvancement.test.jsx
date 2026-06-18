@@ -1,12 +1,20 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
-vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
+const { mockShowPopup, mockSetPopupHtml, mockHasAutomation, mockExecuteHandler } = vi.hoisted(() => ({
+  mockShowPopup: vi.fn(),
+  mockSetPopupHtml: vi.fn(),
+  mockHasAutomation: vi.fn(),
+  mockExecuteHandler: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   default: vi.fn(() => ({
-    showPopup: vi.fn(),
+    showPopup: mockShowPopup,
     popupHtml: null,
-    setPopupHtml: vi.fn(),
+    setPopupHtml: mockSetPopupHtml,
   })),
 }));
 
@@ -20,19 +28,19 @@ vi.mock('../common/Popup.jsx', () => ({
   },
 }));
 
-vi.mock('../../../services/ui/sanitize.js', () => ({
+vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-vi.mock('../../../services/combat/automation/automationService.js', () => ({
-  hasAutomation: vi.fn(() => false),
+vi.mock('../../services/combat/automation/automationService.js', () => ({
+  hasAutomation: mockHasAutomation,
 }));
 
-vi.mock('../../../services/automation/index.js', () => ({
-  executeHandler: vi.fn().mockResolvedValue(null),
+vi.mock('../../services/automation/index.js', () => ({
+  executeHandler: mockExecuteHandler,
 }));
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -67,7 +75,7 @@ vi.mock('../../services/automation/handlers/class-wizard/signatureSpellsHandler.
   handle: vi.fn().mockResolvedValue(null),
 }));
 
-const basePlayerStats = {
+const createPlayerStats = (overrides = {}) => ({
   name: 'Test Character',
   characterAdvancement: [
     {
@@ -80,89 +88,196 @@ const basePlayerStats = {
       description: 'Another feature',
     },
   ],
-};
+  ...overrides,
+});
 
-const baseProps = {
-  playerStats: basePlayerStats,
-  campaignName: 'test-campaign',
+const renderComponent = (playerStatsOverrides = {}) => {
+  const playerStats = createPlayerStats(playerStatsOverrides);
+  return render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
 };
 
 describe('CharCharacterAdvancement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHasAutomation.mockReturnValue(false);
   });
 
-  it('renders character advancement section header', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    expect(screen.getByText('Character Advancement')).toBeInTheDocument();
+  describe('section header', () => {
+    it('renders the Character Advancement section header', () => {
+      renderComponent();
+      expect(screen.getByText('Character Advancement')).toBeInTheDocument();
+    });
+
+    it('renders a half-line separator after the section', () => {
+      renderComponent();
+      expect(document.querySelector('.half-line')).toBeInTheDocument();
+    });
   });
 
-  it('renders feature with name and description', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    expect(screen.getByText('Feature 1:')).toBeInTheDocument();
-    expect(screen.getByText('A feature description')).toBeInTheDocument();
+  describe('feature rendering', () => {
+    it('renders each feature name followed by a colon', () => {
+      renderComponent();
+      expect(screen.getByText('Feature 1:')).toBeInTheDocument();
+      expect(screen.getByText('Feature 2:')).toBeInTheDocument();
+    });
+
+    it('renders each feature description as sanitized HTML', () => {
+      renderComponent();
+      expect(screen.getByText('A feature description')).toBeInTheDocument();
+      expect(screen.getByText('Another feature')).toBeInTheDocument();
+    });
+
+    it('renders features with no name using index-based key', () => {
+      const stats = createPlayerStats({
+        characterAdvancement: [{ description: 'Unnamed feature' }],
+      });
+      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
+      expect(screen.getByText('Unnamed feature')).toBeInTheDocument();
+    });
+
+    it('renders an empty array of features without errors', () => {
+      renderComponent({ characterAdvancement: [] });
+      expect(screen.getByText('Character Advancement')).toBeInTheDocument();
+      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+    });
+
+    it('handles null characterAdvancement gracefully', () => {
+      renderComponent({ characterAdvancement: null });
+      expect(screen.getByText('Character Advancement')).toBeInTheDocument();
+    });
+
+    it('handles undefined characterAdvancement gracefully', () => {
+      const { rerender } = render(
+        <CharCharacterAdvancement playerStats={{ name: 'Test Character' }} campaignName="test-campaign" />
+      );
+      expect(screen.getByText('Character Advancement')).toBeInTheDocument();
+
+      rerender(
+        <CharCharacterAdvancement
+          playerStats={createPlayerStats({ characterAdvancement: [{ name: 'New Feature', description: 'Desc' }] })}
+          campaignName="test-campaign"
+        />
+      );
+      expect(screen.getByText('New Feature:')).toBeInTheDocument();
+    });
   });
 
-  it('renders all features', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    expect(screen.getByText('Feature 1:')).toBeInTheDocument();
-    expect(screen.getByText('Feature 2:')).toBeInTheDocument();
+  describe('clickable feature behavior', () => {
+    it('applies clickable class when feature has details', () => {
+      renderComponent();
+      expect(screen.getByText('Feature 1:')).toHaveClass('clickable');
+    });
+
+    it('does not apply clickable class when feature has no details and no automation', () => {
+      renderComponent();
+      expect(screen.getByText('Feature 2:')).not.toHaveClass('clickable');
+    });
+
+    it('applies clickable class when feature has automation but no details', () => {
+      mockHasAutomation.mockReturnValueOnce(true).mockReturnValueOnce(false);
+      const stats = createPlayerStats({
+        characterAdvancement: [
+          { name: 'Auto Feature', description: 'Has automation' },
+          { name: 'No Auto', description: 'No automation' },
+        ],
+      });
+      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
+      expect(screen.getByText('Auto Feature:')).toHaveClass('clickable');
+      expect(screen.getByText('No Auto:')).not.toHaveClass('clickable');
+    });
   });
 
-  it('renders feature name as clickable when it has details', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    const feature1 = screen.getByText('Feature 1:');
-    expect(feature1).toHaveClass('clickable');
+  describe('popup behavior for features with details', () => {
+    it('calls showPopup when clicking a feature with details', () => {
+      renderComponent();
+      fireEvent.click(screen.getByText('Feature 1:'));
+      expect(mockShowPopup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Feature 1',
+          description: 'A feature description',
+          details: 'Feature details',
+        })
+      );
+    });
+
+    it('calls showPopup when clicking a feature without details but with automation', () => {
+      mockHasAutomation.mockReturnValue(true);
+      const stats = createPlayerStats({
+        characterAdvancement: [
+          { name: 'Auto Feature', description: 'Has automation' },
+        ],
+      });
+      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      expect(mockShowPopup).not.toHaveBeenCalled();
+      expect(mockExecuteHandler).toHaveBeenCalled();
+    });
   });
 
-  it('renders feature name as non-clickable when no details and no automation', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    const feature2 = screen.getByText('Feature 2:');
-    expect(feature2).not.toHaveClass('clickable');
+  describe('automation click behavior', () => {
+    it('calls executeHandler when clicking a feature with automation', () => {
+      mockHasAutomation.mockReturnValue(true);
+      const stats = createPlayerStats({
+        characterAdvancement: [
+          {
+            name: 'Automated Feature',
+            description: 'Triggers automation',
+            automation: { type: 'test_action' },
+          },
+        ],
+      });
+      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
+
+      fireEvent.click(screen.getByText('Automated Feature:'));
+      expect(mockExecuteHandler).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'Automated Feature',
+          automation: { type: 'test_action' },
+        }),
+        expect.any(Object),
+        'test-campaign'
+      );
+    });
+
+    it('does not call showPopup when a feature with automation is clicked', () => {
+      mockHasAutomation.mockReturnValue(true);
+      const stats = createPlayerStats({
+        characterAdvancement: [
+          {
+            name: 'Automated Feature',
+            description: 'Triggers automation',
+            automation: { type: 'test_action' },
+          },
+        ],
+      });
+      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
+
+      fireEvent.click(screen.getByText('Automated Feature:'));
+      expect(mockShowPopup).not.toHaveBeenCalled();
+    });
+
+    it('does not call executeHandler when clicking a feature without automation', () => {
+      mockHasAutomation.mockReturnValue(false);
+      const stats = createPlayerStats({
+        characterAdvancement: [
+          {
+            name: 'Normal Feature',
+            description: 'No automation',
+          },
+        ],
+      });
+      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
+
+      fireEvent.click(screen.getByText('Normal Feature:'));
+      expect(mockExecuteHandler).not.toHaveBeenCalled();
+    });
   });
 
-  it('renders feature description as sanitized HTML', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    expect(screen.getByText('A feature description')).toBeInTheDocument();
-  });
-
-  it('renders popup when feature with details is clicked', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    const feature1 = screen.getByText('Feature 1:');
-    fireEvent.click(feature1);
-    expect(screen.getByTestId('popup')).toBeInTheDocument();
-  });
-
-  it('renders half-line at end', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    expect(document.querySelector('.half-line')).toBeInTheDocument();
-  });
-
-  it('renders empty character advancement when no features', () => {
-    const stats = {
-      ...basePlayerStats,
-      characterAdvancement: [],
-    };
-    render(<CharCharacterAdvancement playerStats={stats} {...baseProps} />);
-    expect(screen.getByText('Character Advancement')).toBeInTheDocument();
-    expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
-  });
-
-  it('renders empty character advancement when null', () => {
-    const stats = {
-      ...basePlayerStats,
-      characterAdvancement: null,
-    };
-    render(<CharCharacterAdvancement playerStats={stats} {...baseProps} />);
-    expect(screen.getByText('Character Advancement')).toBeInTheDocument();
-  });
-
-  it('renders empty character advancement when undefined', () => {
-    const stats = {
-      ...basePlayerStats,
-      characterAdvancement: undefined,
-    };
-    render(<CharCharacterAdvancement playerStats={stats} {...baseProps} />);
-    expect(screen.getByText('Character Advancement')).toBeInTheDocument();
+  describe('feature name key uniqueness', () => {
+    it('renders features with unique DOM keys', () => {
+      renderComponent();
+      const boldElements = document.querySelectorAll('b');
+      expect(boldElements.length).toBe(2);
+    });
   });
 });

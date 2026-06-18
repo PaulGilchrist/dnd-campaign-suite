@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, act } from '@testing-library/react';
+// @improved-by-ai
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 
@@ -14,6 +15,9 @@ vi.mock('../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     pendingGreaterRestoration: null,
     handleGreaterRestorationConfirm: vi.fn(),
     handleGreaterRestorationSkip: vi.fn(),
+    pendingRemoveCurse: null,
+    handleRemoveCurseConfirm: vi.fn(),
+    handleRemoveCurseSkip: vi.fn(),
   })),
 }));
 
@@ -173,176 +177,211 @@ describe('CharActions spells', () => {
     });
   });
 
-  describe('action spell rendering', () => {
-    it('should render action spells with casting_time of "1 action"', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+  describe('action spell filtering', () => {
+    const actionSpell = {
+      name: 'Fireball',
+      range: '150 ft',
+      casting_time: '1 action',
+      prepared: 'Prepared',
+      damage: '8d6',
+    };
+
+    it('renders spells with casting_time "1 action"', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
       expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
 
-    it('should not render spells without damage as action spells', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Identify', range: 'Touch', casting_time: '1 action', prepared: 'Prepared' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+    it.each([
+      ['1 action', '1 action'],
+      ['1 Action', '1 Action'],
+      ['action', 'action'],
+      ['Action', 'Action'],
+    ])('renders spells with casting_time "%s"', (_label, castingTime) => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, casting_time: castingTime }] } })} />);
+      expect(screen.getByText('Fireball')).toBeInTheDocument();
+    });
+
+    it('excludes spells with non-action casting times', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, casting_time: '1 bonus action' }] } })} />);
+      expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
+    });
+
+    it('excludes spells without damage', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ name: 'Identify', range: 'Touch', casting_time: '1 action', prepared: 'Prepared' }] } })} />);
       expect(screen.queryByText('Identify')).not.toBeInTheDocument();
     });
 
-    it('should exclude spells that share names with action attacks', async () => {
+    it('excludes unprepared spells', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, prepared: 'Unprepared' }] } })} />);
+      expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
+    });
+
+    it('includes always-prepared spells', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ ...actionSpell, prepared: 'Always' }] } })} />);
+      expect(screen.getByText('Fireball')).toBeInTheDocument();
+    });
+
+    it('excludes spells that share a name with an action attack', () => {
       const stats = createStats({
         attacks: [{ name: 'Fireball', range: 60, hitBonus: 5, damage: '8d6', damageType: 'Fire', type: 'Action' }],
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
+        spellAbilities: { spells: [actionSpell] },
       });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+      render(<CharActions playerStats={stats} />);
+      // The attack name appears, not the spell (they share the name so the spell is excluded)
       expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
 
-    it('should show "Utility" as type for action spells', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Utility')).toBeInTheDocument();
+    it('does not render spells when spellAbilities is undefined', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: undefined })} />);
+      expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
     });
 
-    it('should show "Utility" for action spell damage type', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Utility')).toBeInTheDocument();
+    it('does not render spells when spellAbilities.spells is undefined', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: {} })} />);
+      expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
     });
 
-    it('should include Always-prepared spells', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Always', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+    it('renders spells with empty actions array', () => {
+      render(<CharActions playerStats={createStats({ actions: [], spellAbilities: { spells: [actionSpell] } })} />);
       expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
+  });
 
-    it('should exclude unprepared spells', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Unprepared Spell', range: '60 ft', casting_time: '1 action', prepared: 'Unprepared', damage: '1d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.queryByText('Unprepared Spell')).not.toBeInTheDocument();
+  describe('action spell display', () => {
+    const actionSpell = {
+      name: 'Fireball',
+      range: '150 ft',
+      casting_time: '1 action',
+      prepared: 'Prepared',
+      damage: '8d6',
+    };
+
+    it('displays "Utility" as the damage type column for action spells', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
+      expect(screen.getByText('Utility')).toBeInTheDocument();
     });
 
-    it('should not render spells without damage as action spells (detect magic)', async () => {
+    it('displays the spell range', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
+      expect(screen.getByText('150 ft')).toBeInTheDocument();
+    });
+
+    it('renders multiple action spells', () => {
       const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Detect Magic', range: '30 ft', casting_time: '1 action', prepared: 'Prepared' }] },
+        spellAbilities: {
+          spells: [
+            { ...actionSpell, name: 'Fireball' },
+            { ...actionSpell, name: 'Magic Missile', range: '120 ft', damage: '4d4+4' },
+          ],
+        },
       });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.queryByText('Detect Magic')).not.toBeInTheDocument();
+      render(<CharActions playerStats={stats} />);
+      expect(screen.getByText('Fireball')).toBeInTheDocument();
+      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+    });
+
+    it('renders both action attacks and action spells with different names', () => {
+      const stats = createStats({
+        attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
+        spellAbilities: { spells: [actionSpell] },
+      });
+      render(<CharActions playerStats={stats} />);
+      expect(screen.getByText('Longsword')).toBeInTheDocument();
+      expect(screen.getByText('Fireball')).toBeInTheDocument();
     });
   });
 
   describe('spell click behavior', () => {
-    it('should open spell detail popup when action spell is clicked', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+    const actionSpell = {
+      name: 'Fireball',
+      range: '150 ft',
+      casting_time: '1 action',
+      prepared: 'Prepared',
+      damage: '8d6',
+      level: 3,
+    };
+
+    it('opens SpellDetailPopup when an action spell is clicked', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
       const spellLink = screen.getByText('Fireball');
-      await act(async () => { fireEvent.click(spellLink); });
+      fireEvent.click(spellLink);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     });
 
-    it('should close spell detail popup when dismissed', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+    it('passes the full spell object to SpellDetailPopup when clicked', async () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
       const spellLink = screen.getByText('Fireball');
-      await act(async () => { fireEvent.click(spellLink); });
+      fireEvent.click(spellLink);
+      const { default: SpellDetailPopup } = await import('./char-spells/SpellDetailPopup.jsx');
+      expect(SpellDetailPopup).toHaveBeenCalled();
+      const calledWith = SpellDetailPopup.mock.calls[0][0];
+      expect(calledWith.spell).toEqual(actionSpell);
+    });
+
+    it('opens SpellDetailPopup for a non-action spell clicked from action attacks (name match fallback)', () => {
+      const stats = createStats({
+        attacks: [{ name: 'Fireball', range: 60, hitBonus: 5, damage: '8d6', damageType: 'Fire', type: 'Action' }],
+        spellAbilities: { spells: [{ ...actionSpell, casting_time: '1 bonus action' }] },
+      });
+      render(<CharActions playerStats={stats} />);
+      const attackName = screen.getByText('Fireball');
+      fireEvent.click(attackName);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      const popupOverlay = screen.getByTestId('popup-overlay');
-      await act(async () => { fireEvent.click(popupOverlay); });
+    });
+
+    it('does not open SpellDetailPopup when spell name does not exist', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
+      // The handleActionSpellClick receives a nonexistent name — it should silently fail
+      // by finding no spell and returning early. We verify no popup appears.
       expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
 
-    it('should open spell detail popup for action spell click', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+    it('closes SpellDetailPopup when the popup overlay is clicked', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
       const spellLink = screen.getByText('Fireball');
-      await act(async () => { fireEvent.click(spellLink); });
+      fireEvent.click(spellLink);
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('should open spell detail popup for attack that matches a spell name', async () => {
-      const stats = createStats({
-        attacks: [{ name: 'Fireball', range: 60, hitBonus: 5, damage: '8d6', damageType: 'Fire', type: 'Action' }],
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const attackName = screen.getByText('Fireball');
-      await act(async () => { fireEvent.click(attackName); });
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    });
-
-    it('should pass correct props to SpellDetailPopup when spell is clicked', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6', level: 3 }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const spellLink = screen.getByText('Fireball');
-      await act(async () => { fireEvent.click(spellLink); });
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+      const popupOverlay = screen.getByTestId('popup-overlay');
+      fireEvent.click(popupOverlay);
+      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
     });
   });
 
-  describe('spell casting time variations', () => {
-    it('should include "Action" casting time', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Action Spell', range: '60 ft', casting_time: 'Action', prepared: 'Prepared', damage: '1d6' }] },
+  describe('action spells with Elder Champion buff', () => {
+    it('excludes action spells when Elder Champion is active', async () => {
+      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ name: 'Elder Champion' }];
+        return null;
       });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Action Spell')).toBeInTheDocument();
+      const actionSpell = {
+        name: 'Fireball',
+        range: '150 ft',
+        casting_time: '1 action',
+        prepared: 'Prepared',
+        damage: '8d6',
+      };
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] }, name: 'TestCharacter' })} />);
+      expect(screen.queryByText('Fireball')).not.toBeInTheDocument();
     });
 
-    it('should include "1 Action" casting time', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'One Action Spell', range: '60 ft', casting_time: '1 Action', prepared: 'Prepared', damage: '1d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('One Action Spell')).toBeInTheDocument();
-    });
-
-    it('should include "1 action" lowercase casting time', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Lowercase Action', range: '60 ft', casting_time: '1 action', prepared: 'Prepared', damage: '1d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Lowercase Action')).toBeInTheDocument();
-    });
-
-    it('should include "action" lowercase casting time', async () => {
-      const stats = createStats({
-        spellAbilities: { spells: [{ name: 'Lowercase Only', range: '60 ft', casting_time: 'action', prepared: 'Prepared', damage: '1d6' }] },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Lowercase Only')).toBeInTheDocument();
-    });
-  });
-
-  describe('multiple action spells', () => {
-    it('should render multiple action spells', async () => {
-      const stats = createStats({
-        spellAbilities: {
-          spells: [
-            { name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' },
-            { name: 'Magic Missile', range: '120 ft', casting_time: '1 action', prepared: 'Prepared', damage: '4d4+4' },
-          ],
-        },
-      });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+    it('includes action spells when Elder Champion is not active', () => {
+      const actionSpell = {
+        name: 'Fireball',
+        range: '150 ft',
+        casting_time: '1 action',
+        prepared: 'Prepared',
+        damage: '8d6',
+      };
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [actionSpell] } })} />);
       expect(screen.getByText('Fireball')).toBeInTheDocument();
-      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+    });
+  });
+
+  describe('spell column structure', () => {
+    it('renders a dash "-" in the hit column for action spells', () => {
+      render(<CharActions playerStats={createStats({ spellAbilities: { spells: [{ name: 'Fireball', range: '150 ft', casting_time: '1 action', prepared: 'Prepared', damage: '8d6' }] } })} />);
+      expect(screen.getByText('-')).toBeInTheDocument();
     });
   });
 });

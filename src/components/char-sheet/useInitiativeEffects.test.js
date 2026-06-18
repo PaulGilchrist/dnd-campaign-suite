@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useInitiativeEffects from './useInitiativeEffects.js';
 
@@ -22,7 +23,8 @@ import { rollExpression } from '../../services/dice/diceRoller.js';
 import utils from '../../services/ui/utils.js';
 
 describe('useInitiativeEffects', () => {
-    const mockPlayerStats = {
+    const campaignName = 'test-campaign';
+    const defaultPlayerStats = {
         name: 'TestMonk',
         level: 15,
         class: {
@@ -37,265 +39,1178 @@ describe('useInitiativeEffects', () => {
         actions: [],
     };
 
-    const mockCampaignName = 'test-campaign';
-    const mockRollDamage = vi.fn();
-
     beforeEach(() => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
-        setRuntimeValue.mockReturnValue(undefined);
         rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
-        utils.getName.mockImplementation((n) => n);
     });
 
-    function createHook() {
-        return renderHook(() => useInitiativeEffects(mockPlayerStats, mockCampaignName, mockRollDamage));
+    afterEach(() => {
+        utils.getName.mockRestore?.();
+    });
+
+    function renderHookWithStats(stats = defaultPlayerStats) {
+        return renderHook(() =>
+            useInitiativeEffects(stats, campaignName, vi.fn())
+        );
     }
 
+    function dispatchInitiativeRoll(detail) {
+        window.dispatchEvent(
+            new CustomEvent('initiative-rolled', { detail })
+        );
+    }
+
+    function dispatchTurnUndeadResult(detail) {
+        window.dispatchEvent(
+            new CustomEvent('turn-undead-result', { detail })
+        );
+    }
+
+    describe('initialization', () => {
+        it('returns undefined (hook has no return value)', () => {
+            const { result } = renderHookWithStats();
+            expect(result.current).toBeUndefined();
+        });
+
+        it('registers event listeners on mount', () => {
+            const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+            renderHookWithStats();
+            expect(addEventListenerSpy).toHaveBeenCalledWith(
+                'initiative-rolled',
+                expect.any(Function)
+            );
+            expect(addEventListenerSpy).toHaveBeenCalledWith(
+                'turn-undead-result',
+                expect.any(Function)
+            );
+            addEventListenerSpy.mockRestore();
+        });
+    });
+
     describe('initiative-rolled event', () => {
-        it('does nothing when event detail is missing', () => {
-            createHook();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: null }));
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('does nothing when characterName is missing from event', () => {
-            createHook();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { roll: 15 } }));
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('does nothing when rolling name does not match player name', () => {
-            createHook();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', {
-                detail: { characterName: 'OtherPlayer', roll: 15 },
-            }));
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('recovers focus points when hasFocusPointsAction and not perfect focus', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'uncannyMetabolismUsed') return null;
-                if (key === 'focusPoints') return 3;
-                return null;
+        describe('guard clauses', () => {
+            it('does nothing when event detail is null', () => {
+                renderHookWithStats();
+                dispatchInitiativeRoll(null);
+                expect(setRuntimeValue).not.toHaveBeenCalled();
             });
-            const stats = {
-                ...mockPlayerStats,
-                actions: [{ automation: { type: 'initiative_action', effect: 'other' } }],
-                class: { ...mockPlayerStats.class, class_levels: [{ level: 15, focus_points: 6 }] },
-            };
-            const { rerender } = renderHook(() => useInitiativeEffects(stats, mockCampaignName, mockRollDamage));
-            rerender();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', {
-                detail: { characterName: 'TestMonk', roll: 15 },
-            }));
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 6, 'test-campaign');
+
+            it('does nothing when event detail is undefined', () => {
+                renderHookWithStats();
+                dispatchInitiativeRoll(undefined);
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when detail has no characterName', () => {
+                renderHookWithStats();
+                dispatchInitiativeRoll({ roll: 15 });
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when characterName is an empty string', () => {
+                renderHookWithStats();
+                dispatchInitiativeRoll({ characterName: '', roll: 15 });
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when rolling name does not match player name', () => {
+                renderHookWithStats();
+                dispatchInitiativeRoll({
+                    characterName: 'OtherPlayer',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+            });
         });
 
-        it('recovers focus points to 4 with perfect focus when <= 3', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'uncannyMetabolismUsed') return null;
-                if (key === 'focusPoints') return 2;
-                return null;
+        describe('player name matching', () => {
+            it('matches when names are identical', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'focusPoints') return 3;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'other',
+                            },
+                        },
+                    ],
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    6,
+                    campaignName
+                );
             });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    ...mockPlayerStats.automation,
-                    passives: [{ type: 'passive_rule', effect: 'perfect_focus' }],
-                },
-                class: { ...mockPlayerStats.class, class_levels: [{ level: 15, focus_points: 4 }] },
-            };
-            const { rerender } = renderHook(() => useInitiativeEffects(stats, mockCampaignName, mockRollDamage));
-            rerender();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', {
-                detail: { characterName: 'TestMonk', roll: 15 },
-            }));
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'focusPoints', 4, 'test-campaign');
+
+            it('handles name normalization via utils.getName', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'focusPoints') return 3;
+                    return null;
+                });
+                utils.getName.mockImplementation((n) => n);
+                const stats = {
+                    ...defaultPlayerStats,
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'other',
+                            },
+                        },
+                    ],
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalled();
+            });
         });
 
-        it('does not recover focus points with perfect focus when uncanny metabolism was used', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'uncannyMetabolismUsed') return true;
-                if (key === 'focusPoints') return 2;
-                return null;
+        describe('focus points recovery (Uncanny Metabolism)', () => {
+            it('recovers to max when current is below max', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'uncannyMetabolismUsed') return null;
+                    if (key === 'focusPoints') return 3;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'other',
+                            },
+                        },
+                    ],
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    6,
+                    campaignName
+                );
             });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    ...mockPlayerStats.automation,
-                    passives: [{ type: 'passive_rule', effect: 'perfect_focus' }],
-                },
-            };
-            const { rerender } = renderHook(() => useInitiativeEffects(stats, mockCampaignName, mockRollDamage));
-            rerender();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', {
-                detail: { characterName: 'TestMonk', roll: 15 },
-            }));
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestMonk', 'focusPoints', expect.any(Number), 'test-campaign');
+
+            it('does not recover when already at max', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'uncannyMetabolismUsed') return null;
+                    if (key === 'focusPoints') return 6;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'other',
+                            },
+                        },
+                    ],
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('does not recover when no focus points action exists', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'focusPoints') return 2;
+                    return null;
+                });
+                renderHookWithStats();
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('does not recover when max focus points is 0', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'focusPoints') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        class_levels: [{ level: 15, focus_points: 0 }],
+                    },
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'other',
+                            },
+                        },
+                    ],
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('excludes wild_shape_regen_on_initiative from focus points check', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'focusPoints') return 3;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'wild_shape_regen_on_initiative',
+                            },
+                        },
+                    ],
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
         });
 
-        it('recovers wild shape use with evergreen wild shape', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'uncannyMetabolismUsed') return null;
-                if (key === 'wildShapeUses') return 0;
-                return null;
+        describe('perfect focus (Monk level 15 passive)', () => {
+            it('recovers to 4 when current is <= 3 and below max', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'uncannyMetabolismUsed') return null;
+                    if (key === 'focusPoints') return 2;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        passives: [
+                            {
+                                type: 'passive_rule',
+                                effect: 'perfect_focus',
+                            },
+                        ],
+                    },
+                    class: {
+                        ...defaultPlayerStats.class,
+                        class_levels: [
+                            { level: 15, focus_points: 4 },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    4,
+                    campaignName
+                );
             });
-            const stats = {
-                ...mockPlayerStats,
-                level: 18,
-                actions: [{ automation: { type: 'initiative_action', effect: 'wild_shape_regen_on_initiative' } }],
-                class: { ...mockPlayerStats.class, class_levels: [{ level: 18, wild_shape: 3 }] },
-            };
-            const { rerender } = renderHook(() => useInitiativeEffects(stats, mockCampaignName, mockRollDamage));
-            rerender();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', {
-                detail: { characterName: 'TestMonk', roll: 15 },
-            }));
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'wildShapeUses', 1, 'test-campaign');
+
+            it('recovers to max when max is less than 4', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'uncannyMetabolismUsed') return null;
+                    if (key === 'focusPoints') return 2;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        passives: [
+                            {
+                                type: 'passive_rule',
+                                effect: 'perfect_focus',
+                            },
+                        ],
+                    },
+                    class: {
+                        ...defaultPlayerStats.class,
+                        class_levels: [
+                            { level: 15, focus_points: 3 },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    3,
+                    campaignName
+                );
+            });
+
+            it('does not recover when current is above threshold', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'uncannyMetabolismUsed') return null;
+                    if (key === 'focusPoints') return 4;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        passives: [
+                            {
+                                type: 'passive_rule',
+                                effect: 'perfect_focus',
+                            },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('does not recover when uncanny metabolism was used', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'uncannyMetabolismUsed') return true;
+                    if (key === 'focusPoints') return 2;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        passives: [
+                            {
+                                type: 'passive_rule',
+                                effect: 'perfect_focus',
+                            },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'focusPoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
         });
 
-        it('recovers rage uses with persistent rage', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'uncannyMetabolismUsed') return null;
-                if (key === 'ragePoints') return 1;
-                return null;
+        describe('wild shape recovery (Archdruid)', () => {
+            it('recovers 1 use when all uses expended', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'wildShapeUses') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    level: 18,
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'wild_shape_regen_on_initiative',
+                            },
+                        },
+                    ],
+                    class: {
+                        ...defaultPlayerStats.class,
+                        class_levels: [
+                            { level: 18, wild_shape: 3 },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'wildShapeUses',
+                    1,
+                    campaignName
+                );
             });
-            const stats = {
-                ...mockPlayerStats,
-                class: { ...mockPlayerStats.class, name: 'Barbarian', class_levels: [{ level: 15, rages: 4 }] },
-                automation: {
-                    ...mockPlayerStats.automation,
-                    passives: [{ type: 'passive_rule', effect: 'persistent_rage' }],
-                },
-            };
-            const { rerender } = renderHook(() => useInitiativeEffects(stats, mockCampaignName, mockRollDamage));
-            rerender();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', {
-                detail: { characterName: 'TestMonk', roll: 15 },
-            }));
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'ragePoints', 4, 'test-campaign');
+
+            it('does not recover when uses remain', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'wildShapeUses') return 1;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    level: 18,
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'wild_shape_regen_on_initiative',
+                            },
+                        },
+                    ],
+                    class: {
+                        ...defaultPlayerStats.class,
+                        class_levels: [
+                            { level: 18, wild_shape: 3 },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'wildShapeUses',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('does not recover when max wild shape is 0', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'wildShapeUses') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    level: 18,
+                    actions: [
+                        {
+                            automation: {
+                                type: 'initiative_action',
+                                effect: 'wild_shape_regen_on_initiative',
+                            },
+                        },
+                    ],
+                    class: {
+                        ...defaultPlayerStats.class,
+                        class_levels: [
+                            { level: 18, wild_shape: 0 },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'wildShapeUses',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('does not recover when no evergreen action exists', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'wildShapeUses') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    level: 18,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        class_levels: [
+                            { level: 18, wild_shape: 3 },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'wildShapeUses',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
         });
 
-        it('regains bardic inspiration with superior inspiration', () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'uncannyMetabolismUsed') return null;
-                if (key === 'focusPoints') return null;
-                if (key === 'bardicInspirationUses') return 0;
-                return null;
+        describe('rage recovery (Persistent Rage)', () => {
+            it('recovers to max when below max', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'ragePoints') return 1;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Barbarian',
+                        class_levels: [{ level: 15, rages: 4 }],
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        passives: [
+                            {
+                                type: 'passive_rule',
+                                effect: 'persistent_rage',
+                            },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'ragePoints',
+                    4,
+                    campaignName
+                );
             });
-            const stats = {
-                ...mockPlayerStats,
-                class: { ...mockPlayerStats.class, name: 'Bard' },
-                automation: {
-                    ...mockPlayerStats.automation,
-                    actions: [{ type: 'initiative_action', effect: 'regain_bardic_inspiration_on_initiative' }],
-                },
-                proficiency: 6,
-            };
-            const { rerender } = renderHook(() => useInitiativeEffects(stats, mockCampaignName, mockRollDamage));
-            rerender();
-            window.dispatchEvent(new CustomEvent('initiative-rolled', {
-                detail: { characterName: 'TestMonk', roll: 15 },
-            }));
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'bardicInspirationUses', 2, 'test-campaign');
+
+            it('does not recover when already at max', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'ragePoints') return 4;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Barbarian',
+                        class_levels: [{ level: 15, rages: 4 }],
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        passives: [
+                            {
+                                type: 'passive_rule',
+                                effect: 'persistent_rage',
+                            },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'ragePoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('does not recover when rage count is 0', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'ragePoints') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Barbarian',
+                        class_levels: [{ level: 15, rages: 0 }],
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        passives: [
+                            {
+                                type: 'passive_rule',
+                                effect: 'persistent_rage',
+                            },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'ragePoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('does not recover for non-Barbarian classes', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'ragePoints') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Monk',
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        passives: [
+                            {
+                                type: 'passive_rule',
+                                effect: 'persistent_rage',
+                            },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'ragePoints',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+        });
+
+        describe('bardic inspiration recovery (Superior Inspiration)', () => {
+            it('recovers to min target when below target', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'bardicInspirationUses') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Bard',
+                        class_levels: [{ level: 20 }],
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
+                                type: 'initiative_action',
+                                effect:
+                                    'regain_bardic_inspiration_on_initiative',
+                            },
+                        ],
+                    },
+                    proficiency: 6,
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'bardicInspirationUses',
+                    2,
+                    campaignName
+                );
+            });
+
+            it('uses proficiency when class level has no bardic_inspiration_uses', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'bardicInspirationUses') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Bard',
+                        class_levels: [{ level: 20 }],
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
+                                type: 'initiative_action',
+                                effect:
+                                    'regain_bardic_inspiration_on_initiative',
+                            },
+                        ],
+                    },
+                    proficiency: 6,
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                // maxBI = 6, minTarget = 2, so newBI = min(6, 2) = 2
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'TestMonk',
+                    'bardicInspirationUses',
+                    2,
+                    campaignName
+                );
+            });
+
+            it('caps at max when max is less than target', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'bardicInspirationUses') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    name: 'Bard',
+                    level: 20,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Bard',
+                        class_levels: [
+                            {
+                                level: 20,
+                                bardic_inspiration_uses: 1,
+                            },
+                        ],
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
+                                type: 'initiative_action',
+                                effect:
+                                    'regain_bardic_inspiration_on_initiative',
+                            },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'Bard',
+                    roll: 15,
+                });
+                // maxBI = 1, minTarget = 2, so newBI = min(1, 2) = 1
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    'Bard',
+                    'bardicInspirationUses',
+                    1,
+                    campaignName
+                );
+            });
+
+            it('does not recover when already at or above target', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'bardicInspirationUses') return 2;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Bard',
+                        class_levels: [{ level: 20 }],
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
+                                type: 'initiative_action',
+                                effect:
+                                    'regain_bardic_inspiration_on_initiative',
+                            },
+                        ],
+                    },
+                    proficiency: 6,
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'bardicInspirationUses',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
+
+            it('does not recover for non-Bard classes', () => {
+                getRuntimeValue.mockImplementation((_name, key) => {
+                    if (key === 'bardicInspirationUses') return 0;
+                    return null;
+                });
+                const stats = {
+                    ...defaultPlayerStats,
+                    class: {
+                        ...defaultPlayerStats.class,
+                        name: 'Monk',
+                    },
+                    automation: {
+                        ...defaultPlayerStats.automation,
+                        actions: [
+                            {
+                                type: 'initiative_action',
+                                effect:
+                                    'regain_bardic_inspiration_on_initiative',
+                            },
+                        ],
+                    },
+                };
+                renderHookWithStats(stats);
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                    'TestMonk',
+                    'bardicInspirationUses',
+                    expect.any(Number),
+                    campaignName
+                );
+            });
         });
     });
 
     describe('turn-undead-result event', () => {
-        it('applies searing undead radiant damage to failed targets', () => {
-            const stats = {
-                ...mockPlayerStats,
+        function createClericStats() {
+            return {
+                ...defaultPlayerStats,
                 name: 'Cleric',
                 automation: {
-                    ...mockPlayerStats.automation,
-                    actions: [{ name: 'Searing Undead', type: 'damage_bonus', trigger: 'turn_undead_fail', damageType: 'Radiant' }],
+                    ...defaultPlayerStats.automation,
+                    actions: [
+                        {
+                            name: 'Searing Undead',
+                            type: 'damage_bonus',
+                            trigger: 'turn_undead_fail',
+                            damageType: 'Radiant',
+                        },
+                    ],
                 },
                 abilities: [{ name: 'Wisdom', bonus: 4 }],
             };
-            rollExpression.mockReturnValue({ total: 4, rolls: [4], modifier: 0 });
-            const { rerender } = renderHook(() => useInitiativeEffects(stats, mockCampaignName, mockRollDamage));
-            rerender();
-            window.dispatchEvent(new CustomEvent('turn-undead-result', {
-                detail: {
+        }
+
+        describe('guard clauses', () => {
+            it('does nothing when event detail is null', () => {
+                const rollDamage = vi.fn();
+                renderHook(() =>
+                    useInitiativeEffects(createClericStats(), campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult(null);
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when event detail is undefined', () => {
+                const rollDamage = vi.fn();
+                renderHook(() =>
+                    useInitiativeEffects(createClericStats(), campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult(undefined);
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when attackerName does not match player', () => {
+                const rollDamage = vi.fn();
+                renderHook(() =>
+                    useInitiativeEffects(createClericStats(), campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'OtherCleric',
+                    campaignName,
+                    failedTargets: ['Goblin'],
+                });
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when campaignName does not match', () => {
+                const rollDamage = vi.fn();
+                renderHook(() =>
+                    useInitiativeEffects(createClericStats(), campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
                     attackerName: 'Cleric',
-                    campaignName: 'test-campaign',
+                    campaignName: 'other-campaign',
+                    failedTargets: ['Goblin'],
+                });
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when no searing undead action exists', () => {
+                const rollDamage = vi.fn();
+                renderHook(() =>
+                    useInitiativeEffects(defaultPlayerStats, campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'TestMonk',
+                    campaignName,
+                    failedTargets: ['Goblin'],
+                });
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when rollExpression returns null', () => {
+                const rollDamage = vi.fn();
+                rollExpression.mockReturnValue(null);
+                renderHook(() =>
+                    useInitiativeEffects(createClericStats(), campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'Cleric',
+                    campaignName,
+                    failedTargets: ['Goblin'],
+                });
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('successful damage application', () => {
+            it('applies radiant damage to each failed target', () => {
+                const rollDamage = vi.fn();
+                const stats = createClericStats();
+                rollExpression.mockReturnValue({
+                    total: 4,
+                    rolls: [4],
+                    modifier: 0,
+                });
+                renderHook(() =>
+                    useInitiativeEffects(stats, campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'Cleric',
+                    campaignName,
                     failedTargets: ['Goblin', 'Zombie'],
                     saveDc: 13,
                     saveType: 'WIS',
-                },
-            }));
-            expect(mockRollDamage).toHaveBeenCalledTimes(2);
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Searing Undead',
-                '4d8',
-                4,
-                [4],
-                0,
-                expect.objectContaining({
-                    damageType: 'Radiant',
+                });
+                expect(rollDamage).toHaveBeenCalledTimes(2);
+                expect(rollDamage).toHaveBeenCalledWith(
+                    'Searing Undead',
+                    '4d8',
+                    4,
+                    [4],
+                    0,
+                    expect.objectContaining({
+                        damageType: 'Radiant',
+                        attackerName: 'Cleric',
+                        targetName: 'Goblin',
+                        saveDc: 13,
+                        saveType: 'WIS',
+                        dcSuccess: false,
+                    })
+                );
+                expect(rollDamage).toHaveBeenCalledWith(
+                    'Searing Undead',
+                    '4d8',
+                    4,
+                    [4],
+                    0,
+                    expect.objectContaining({
+                        targetName: 'Zombie',
+                    })
+                );
+            });
+
+            it('uses Wisdom bonus for damage dice count', () => {
+                const rollDamage = vi.fn();
+                const stats = {
+                    ...createClericStats(),
+                    abilities: [{ name: 'Wisdom', bonus: 3 }],
+                };
+                rollExpression.mockReturnValue({
+                    total: 3,
+                    rolls: [3],
+                    modifier: 0,
+                });
+                renderHook(() =>
+                    useInitiativeEffects(stats, campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
                     attackerName: 'Cleric',
-                })
-            );
-        });
-
-        it('does nothing when attackerName does not match player', () => {
-            createHook();
-            window.dispatchEvent(new CustomEvent('turn-undead-result', {
-                detail: {
-                    attackerName: 'OtherCleric',
-                    campaignName: 'test-campaign',
+                    campaignName,
                     failedTargets: ['Goblin'],
-                },
-            }));
-            expect(mockRollDamage).not.toHaveBeenCalled();
-        });
+                    saveDc: 13,
+                    saveType: 'WIS',
+                });
+                expect(rollDamage).toHaveBeenCalledWith(
+                    'Searing Undead',
+                    '3d8',
+                    3,
+                    [3],
+                    0,
+                    expect.any(Object)
+                );
+            });
 
-        it('does nothing when campaignName does not match', () => {
-            createHook();
-            window.dispatchEvent(new CustomEvent('turn-undead-result', {
-                detail: {
-                    attackerName: 'TestMonk',
-                    campaignName: 'other-campaign',
+            it('uses minimum 1 Wisdom modifier for dice count', () => {
+                const rollDamage = vi.fn();
+                const stats = {
+                    ...createClericStats(),
+                    abilities: [{ name: 'Wisdom', bonus: -2 }],
+                };
+                rollExpression.mockReturnValue({
+                    total: 1,
+                    rolls: [1],
+                    modifier: 0,
+                });
+                renderHook(() =>
+                    useInitiativeEffects(stats, campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'Cleric',
+                    campaignName,
                     failedTargets: ['Goblin'],
-                },
-            }));
-            expect(mockRollDamage).not.toHaveBeenCalled();
-        });
+                });
+                expect(rollDamage).toHaveBeenCalledWith(
+                    'Searing Undead',
+                    '1d8',
+                    1,
+                    [1],
+                    0,
+                    expect.any(Object)
+                );
+            });
 
-        it('does nothing when no searing undead action exists', () => {
-            createHook();
-            window.dispatchEvent(new CustomEvent('turn-undead-result', {
-                detail: {
-                    attackerName: 'TestMonk',
-                    campaignName: 'test-campaign',
+            it('uses damageType from action or defaults to Radiant', () => {
+                const rollDamage = vi.fn();
+                const stats = {
+                    ...createClericStats(),
+                    automation: {
+                        ...createClericStats().automation,
+                        actions: [
+                            {
+                                name: 'Searing Undead',
+                                type: 'damage_bonus',
+                                trigger: 'turn_undead_fail',
+                                // no damageType specified
+                            },
+                        ],
+                    },
+                };
+                rollExpression.mockReturnValue({
+                    total: 4,
+                    rolls: [4],
+                    modifier: 0,
+                });
+                renderHook(() =>
+                    useInitiativeEffects(stats, campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'Cleric',
+                    campaignName,
                     failedTargets: ['Goblin'],
-                },
-            }));
-            expect(mockRollDamage).not.toHaveBeenCalled();
-        });
+                });
+                expect(rollDamage).toHaveBeenCalledWith(
+                    expect.any(String),
+                    expect.any(String),
+                    expect.any(Number),
+                    expect.any(Array),
+                    expect.any(Number),
+                    expect.objectContaining({
+                        damageType: 'Radiant',
+                    })
+                );
+            });
 
-        it('does nothing when rollExpression returns null', () => {
-            rollExpression.mockReturnValue(null);
-            createHook();
-            window.dispatchEvent(new CustomEvent('turn-undead-result', {
-                detail: {
-                    attackerName: 'TestMonk',
-                    campaignName: 'test-campaign',
-                    failedTargets: ['Goblin'],
-                },
-            }));
-            expect(mockRollDamage).not.toHaveBeenCalled();
+            it('does nothing when failedTargets is empty', () => {
+                const rollDamage = vi.fn();
+                const stats = createClericStats();
+                rollExpression.mockReturnValue({
+                    total: 4,
+                    rolls: [4],
+                    modifier: 0,
+                });
+                renderHook(() =>
+                    useInitiativeEffects(stats, campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'Cleric',
+                    campaignName,
+                    failedTargets: [],
+                });
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
         });
     });
 
     describe('cleanup', () => {
-        it('removes event listeners on unmount', () => {
-            const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-            const { unmount } = createHook();
+        it('removes both event listeners on unmount', () => {
+            const removeEventListenerSpy = vi.spyOn(
+                window,
+                'removeEventListener'
+            );
+            const { unmount } = renderHookWithStats();
             unmount();
-            expect(removeEventListenerSpy).toHaveBeenCalledWith('initiative-rolled', expect.any(Function));
-            expect(removeEventListenerSpy).toHaveBeenCalledWith('turn-undead-result', expect.any(Function));
+            expect(removeEventListenerSpy).toHaveBeenCalledWith(
+                'initiative-rolled',
+                expect.any(Function)
+            );
+            expect(removeEventListenerSpy).toHaveBeenCalledWith(
+                'turn-undead-result',
+                expect.any(Function)
+            );
             removeEventListenerSpy.mockRestore();
         });
     });

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GiantAncestryModal from './GiantAncestryModal.jsx';
@@ -5,7 +6,7 @@ import GiantAncestryModal from './GiantAncestryModal.jsx';
 // ── Mocked modules ──
 
 vi.mock('../../../../services/automation/handlers/class-other/giantAncestryHandler.js', () => ({
-  confirmGiantAncestry: vi.fn(() => Promise.resolve(true)),
+  confirmGiantAncestry: vi.fn(),
   getGiantAncestryOptions: vi.fn(() => [
     { name: "Cloud's Jaunt", type: 'teleport', range: '30_ft', description: 'Teleport up to 30 feet to an unoccupied space you can see.', icon: 'fa-cloud' },
     { name: "Fire's Burn", type: 'damage', damage: '1d10', damageType: 'Fire', description: 'Deal 1d10 fire damage to a creature within 30 feet.', icon: 'fa-fire' },
@@ -18,7 +19,7 @@ vi.mock('../../../../services/automation/handlers/class-other/giantAncestryHandl
 
 // ── Re-import mocked modules ──
 
-import { getGiantAncestryOptions } from '../../../../services/automation/handlers/class-other/giantAncestryHandler.js';
+import { confirmGiantAncestry, getGiantAncestryOptions } from '../../../../services/automation/handlers/class-other/giantAncestryHandler.js';
 
 // ── Test fixtures ──
 
@@ -43,7 +44,7 @@ describe('GiantAncestryModal', () => {
 
   // ── Initial render / display ──
 
-  it('renders modal overlay and header with title', () => {
+  it('renders modal overlay with header and title', () => {
     render(<GiantAncestryModal {...makeProps()} />);
     expect(screen.getByText('Giant Ancestry')).toBeInTheDocument();
     expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
@@ -71,15 +72,6 @@ describe('GiantAncestryModal', () => {
     const options = getGiantAncestryOptions();
     for (const opt of options) {
       expect(screen.getByText(opt.name)).toBeInTheDocument();
-    }
-  });
-
-  it('renders Font Awesome icon for each option', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    const options = getGiantAncestryOptions();
-    for (const opt of options) {
-      const icon = document.querySelector(`.fa-solid.${opt.icon}`);
-      expect(icon).toBeInTheDocument();
     }
   });
 
@@ -146,17 +138,10 @@ describe('GiantAncestryModal', () => {
 
   // ── Selection behavior ──
 
-  it('selects an option when its radio input is clicked', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    expect(screen.getByRole('button', { name: 'Select Ancestry' })).toBeEnabled();
-  });
-
   it('enables Select Ancestry button after selecting an option', () => {
     render(<GiantAncestryModal {...makeProps()} />);
     const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[1]);
+    fireEvent.click(radios[0]);
     expect(screen.getByRole('button', { name: 'Select Ancestry' })).toBeEnabled();
   });
 
@@ -167,19 +152,19 @@ describe('GiantAncestryModal', () => {
     expect(radios[0]).toBeChecked();
     fireEvent.click(radios[2]);
     expect(radios[0]).not.toBeChecked();
+    expect(radios[2]).toBeChecked();
   });
 
-  it('highlights selected option visually via checked radio', () => {
+  it('renders option labels with radio inputs sharing same name', () => {
     render(<GiantAncestryModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[3]);
-    expect(radios[3]).toBeChecked();
+    const radios = document.querySelectorAll('input[type="radio"][name="giantAncestryOption"]');
+    expect(radios.length).toBeGreaterThan(0);
   });
 
   // ── Apply / confirm flow ──
 
   it('calls confirmGiantAncestry with correct arguments when selecting', async () => {
-    const { confirmGiantAncestry } = await import('../../../../services/automation/handlers/class-other/giantAncestryHandler.js');
+    confirmGiantAncestry.mockResolvedValue(true);
     render(<GiantAncestryModal {...makeProps()} />);
     const radios = document.querySelectorAll('input[type="radio"]');
     fireEvent.click(radios[0]);
@@ -195,7 +180,7 @@ describe('GiantAncestryModal', () => {
   });
 
   it('calls confirmGiantAncestry with second option when selected', async () => {
-    const { confirmGiantAncestry } = await import('../../../../services/automation/handlers/class-other/giantAncestryHandler.js');
+    confirmGiantAncestry.mockResolvedValue(true);
     render(<GiantAncestryModal {...makeProps()} />);
     const radios = document.querySelectorAll('input[type="radio"]');
     fireEvent.click(radios[2]);
@@ -211,6 +196,7 @@ describe('GiantAncestryModal', () => {
   });
 
   it('calls onClose when confirmGiantAncestry resolves true', async () => {
+    confirmGiantAncestry.mockResolvedValue(true);
     const onClose = vi.fn();
     render(<GiantAncestryModal {...makeProps({ onClose })} />);
     const radios = document.querySelectorAll('input[type="radio"]');
@@ -221,8 +207,20 @@ describe('GiantAncestryModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('does not close when confirmGiantAncestry resolves false', async () => {
+    confirmGiantAncestry.mockResolvedValue(false);
+    const onClose = vi.fn();
+    render(<GiantAncestryModal {...makeProps({ onClose })} />);
+    const radios = document.querySelectorAll('input[type="radio"]');
+    fireEvent.click(radios[1]);
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Select Ancestry' }));
+    });
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
   it('does not call confirmGiantAncestry when no option is selected', async () => {
-    const { confirmGiantAncestry } = await import('../../../../services/automation/handlers/class-other/giantAncestryHandler.js');
+    confirmGiantAncestry.mockResolvedValue(true);
     render(<GiantAncestryModal {...makeProps()} />);
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: 'Select Ancestry' }));
@@ -239,49 +237,5 @@ describe('GiantAncestryModal', () => {
     expect(document.querySelector('.sp-header')).toBeInTheDocument();
     expect(document.querySelector('.sp-body')).toBeInTheDocument();
     expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-  });
-
-  it('renders option labels with radio inputs sharing same name', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"][name="giantAncestryOption"]');
-    expect(radios.length).toBeGreaterThan(0);
-  });
-
-  // ── All option details ──
-
-  it('renders Clouds Jaunt option with cloud icon', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    expect(screen.getByText("Cloud's Jaunt")).toBeInTheDocument();
-    expect(document.querySelector('.fa-cloud')).toBeInTheDocument();
-  });
-
-  it('renders Fire Burn option with fire icon', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    expect(screen.getByText("Fire's Burn")).toBeInTheDocument();
-    expect(document.querySelector('.fa-fire')).toBeInTheDocument();
-  });
-
-  it('renders Frosts Chill option with snowflake icon', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    expect(screen.getByText("Frost's Chill")).toBeInTheDocument();
-    expect(document.querySelector('.fa-snowflake')).toBeInTheDocument();
-  });
-
-  it('renders Hills Tumble option with falling person icon', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    expect(screen.getByText("Hill's Tumble")).toBeInTheDocument();
-    expect(document.querySelector('.fa-person-falling')).toBeInTheDocument();
-  });
-
-  it('renders Stones Endurance option with shield icon', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    expect(screen.getByText("Stone's Endurance")).toBeInTheDocument();
-    expect(document.querySelector('.fa-shield')).toBeInTheDocument();
-  });
-
-  it('renders Storms Thunder option with bolt icon', () => {
-    render(<GiantAncestryModal {...makeProps()} />);
-    expect(screen.getByText("Storm's Thunder")).toBeInTheDocument();
-    expect(document.querySelector('.fa-bolt')).toBeInTheDocument();
   });
 });

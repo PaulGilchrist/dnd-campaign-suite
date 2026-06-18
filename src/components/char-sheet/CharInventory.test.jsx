@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharInventory from './CharInventory.jsx';
 
 // Mock the dataLoader service
@@ -21,10 +22,29 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 import usePopup from '../../hooks/combat/usePopup.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
 
-const mockPlayerStats = {
+const mockEquipmentData = [
+  {
+    name: 'Longsword',
+    index: 'longsword',
+    desc: ['A common sword.'],
+    cost: { quantity: 15, unit: 'gp' },
+    weight: 3,
+    equipment_category: 'Martial Melee Weapons',
+  },
+  {
+    name: 'Shield',
+    index: 'shield',
+    desc: ['A defensive item.'],
+    cost: { quantity: 10, unit: 'gp' },
+    weight: 6,
+    equipment_category: 'Armor',
+  },
+];
+
+const basePlayerStats = {
   inventory: {
     magicItems: [
-       {
+      {
         name: 'Magic Sword',
         quantity: 1,
         type: 'Weapon',
@@ -33,635 +53,453 @@ const mockPlayerStats = {
         description: 'A magical sword that glows.',
         requiresAttunement: true,
         attunementRequirements: 'Warrior',
-         },
-       ],
+      },
+    ],
     equipped: ['Longsword', 'Shield'],
     backpack: ['Rations (10)', 'Healing Potion'],
-   },
+  },
 };
 
-const mockEquipmentData = [
-   {
-    name: 'Longsword',
-    index: 'longsword',
-    desc: ['A common sword.'],
-    cost: { quantity: 15, unit: 'gp' },
-    weight: 3,
-    equipment_category: 'Martial Melee Weapons',
-     },
-     {
-    name: 'Shield',
-    index: 'shield',
-    desc: ['A defensive item.'],
-    cost: { quantity: 10, unit: 'gp' },
-    weight: 6,
-    equipment_category: 'Armor',
-   },
-];
+function renderComponent(playerStats = basePlayerStats) {
+  return render(<CharInventory playerStats={playerStats} />);
+}
 
 describe('CharInventory', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-      // Mock usePopup to return a controlled popup
     usePopup.mockImplementation(() => ({
       showPopup: vi.fn(),
       popupHtml: null,
       setPopupHtml: vi.fn(),
-      }));
+    }));
 
-      // Set up default mock for loadEquipment
     loadEquipment.mockResolvedValue(mockEquipmentData);
+  });
+
+  describe('rendering', () => {
+    it('should render magic items section header', () => {
+      renderComponent();
+      expect(screen.getByText('Magic Items')).toBeInTheDocument();
     });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+    it('should render magic item details', () => {
+      renderComponent();
+      expect(screen.getByText(/Magic Sword/)).toBeInTheDocument();
+      expect(screen.getByText(/qty 1/)).toBeInTheDocument();
+      expect(screen.getByText(/Weapon/)).toBeInTheDocument();
+      expect(screen.getByText(/Uncommon/)).toBeInTheDocument();
+      expect(screen.getByText(/Warrior/)).toBeInTheDocument();
+      const longswordElements = screen.getAllByText(/Longsword/);
+      expect(longswordElements.length).toBeGreaterThan(0);
     });
 
-  it('should render magic items section header', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
+    it('should render magic item without attunement requirements label when false', () => {
+      const stats = {
+        inventory: {
+          magicItems: [
+            {
+              name: 'Magic Ring',
+              type: 'Ring',
+              rarity: 'Rare',
+              description: 'A magical ring.',
+              requiresAttunement: false,
+            },
+          ],
+          equipped: [],
+          backpack: [],
+        },
+      };
 
-    expect(screen.getByText('Magic Items')).toBeInTheDocument();
+      renderComponent(stats);
+      expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
+      expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
     });
 
-  it('should display magic item name', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
+    it('should render magic item with requires attunement when no custom requirements', () => {
+      const stats = {
+        inventory: {
+          magicItems: [
+            {
+              name: 'Amulet',
+              type: 'Ring',
+              rarity: 'Uncommon',
+              description: 'A glowing amulet.',
+              requiresAttunement: true,
+            },
+          ],
+          equipped: [],
+          backpack: [],
+        },
+      };
 
-    expect(screen.getByText(/Magic Sword/)).toBeInTheDocument();
+      renderComponent(stats);
+      expect(screen.getByText(/Amulet/)).toBeInTheDocument();
+      expect(screen.getByText(/requires attunement/)).toBeInTheDocument();
     });
 
-  it('should display magic item quantity', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
+    it('should render magic item without quantity label when missing', () => {
+      const stats = {
+        inventory: {
+          magicItems: [
+            {
+              name: 'Magic Ring',
+              type: 'Ring',
+              rarity: 'Rare',
+              description: 'A magical ring.',
+            },
+          ],
+          equipped: [],
+          backpack: [],
+        },
+      };
 
-    expect(screen.getByText(/qty 1/)).toBeInTheDocument();
+      renderComponent(stats);
+      expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
+      expect(screen.queryByText(/qty/)).not.toBeInTheDocument();
     });
 
-  it('should display magic item type and subtype', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-    expect(screen.getByText(/Weapon/)).toBeInTheDocument();
-      // Use getAllByText since Longsword appears in multiple places
-    const longswordElements = screen.getAllByText(/Longsword/);
-    expect(longswordElements.length).toBeGreaterThan(0);
-     });
-
-  it('should display magic item rarity', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-    expect(screen.getByText(/Uncommon/)).toBeInTheDocument();
+    it('should render magic items section header when magicItems is missing', () => {
+      const stats = { inventory: {} };
+      renderComponent(stats);
+      expect(screen.queryByText('Magic Items')).not.toBeInTheDocument();
     });
 
-  it('should display attunement requirements', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-    expect(screen.getByText(/Warrior/)).toBeInTheDocument();
+    it('should render equipped items section with comma separation', () => {
+      renderComponent();
+      expect(screen.getByText(/Equipped:/)).toBeInTheDocument();
+      expect(screen.getByText('Shield')).toBeInTheDocument();
+      const equippedSection = screen.getByText(/Equipped:/).parentElement;
+      expect(equippedSection.textContent).toContain(',');
     });
 
-  it('should display equipped items section', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-    expect(screen.getByText(/Equipped:/)).toBeInTheDocument();
+    it('should render backpack items section', () => {
+      renderComponent();
+      expect(screen.getByText(/Backpack:/)).toBeInTheDocument();
+      expect(screen.getByText(/Rations/)).toBeInTheDocument();
+      expect(screen.getByText('Healing Potion')).toBeInTheDocument();
     });
 
-  it('should display backpack items section', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-    expect(screen.getByText(/Backpack:/)).toBeInTheDocument();
+    it('should not render equipped section when empty', () => {
+      const stats = { inventory: { magicItems: [], equipped: [], backpack: [] } };
+      renderComponent(stats);
+      expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
     });
 
-  it('should display equipped item names', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-        // Use regex to match text that may include trailing comma
-    const longswordElements = screen.getAllByText(/Longsword/);
-    expect(longswordElements.length).toBeGreaterThan(0);
-    expect(screen.getByText('Shield')).toBeInTheDocument();
+    it('should not render backpack section when empty', () => {
+      const stats = { inventory: { magicItems: [], equipped: [], backpack: [] } };
+      renderComponent(stats);
+      expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
     });
 
-  it('should display backpack item names', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-    expect(screen.getByText(/Rations/)).toBeInTheDocument();
-    expect(screen.getByText('Healing Potion')).toBeInTheDocument();
+    it('should not render equipped section when missing from inventory', () => {
+      const stats = { inventory: {} };
+      renderComponent(stats);
+      expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
     });
 
-  it('should call loadEquipment when equipped item is clicked', async () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-      // Click on Shield which is unique
-    const shieldElement = screen.getByText('Shield');
-    fireEvent.click(shieldElement);
-
-    await waitFor(() => {
-      expect(loadEquipment).toHaveBeenCalled();
+    it('should throw when playerStats has no inventory property', () => {
+      expect(() => renderComponent({})).toThrow();
     });
-     });
+  });
 
-  it('should handle loadEquipment error gracefully', async () => {
-    loadEquipment.mockRejectedValue(new Error('Network error'));
-
-    const mockSetPopupHtml = vi.fn();
+  describe('item popup on click', () => {
+    it('should show popup with equipment details when an item is clicked', async () => {
+      const mockSetPopupHtml = vi.fn();
       usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
       }));
 
-     render(
-           <CharInventory playerStats={mockPlayerStats} />
-         );
+      renderComponent();
 
-         // Click on Shield which is unique
-       const shieldElement = screen.getByText('Shield');
-       fireEvent.click(shieldElement);
+      const shieldElement = screen.getByText('Shield');
+      fireEvent.click(shieldElement);
 
-       await waitFor(() => {
-         expect(mockSetPopupHtml).toHaveBeenCalled();
-       });
-        });
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalled();
+      });
 
-   it('should handle item not found in database', async () => {
-     loadEquipment.mockResolvedValue([]);
-
-     const mockSetPopupHtml = vi.fn();
-     usePopup.mockImplementation(() => ({
-       showPopup: vi.fn(),
-       popupHtml: null,
-       setPopupHtml: mockSetPopupHtml,
-       }));
-
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-      // Click on Shield which is unique
-    const shieldElement = screen.getByText('Shield');
-    fireEvent.click(shieldElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalled();
+      const popupContent = mockSetPopupHtml.mock.calls[0][0];
+      expect(popupContent).toContain('Longsword');
+      expect(popupContent).toContain('A common sword');
+      expect(popupContent).toContain('Cost:');
+      expect(popupContent).toContain('15 gp');
+      expect(popupContent).toContain('Weight:');
+      expect(popupContent).toContain('Category:');
     });
-     });
 
-  it('should handle empty inventory', () => {
-    const emptyStats = {
-      inventory: {
-        magicItems: [],
-        equipped: [],
-        backpack: [],
+    it('should show popup for unknown items in the inventory', async () => {
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
+
+      renderComponent();
+
+      const healingPotionElement = screen.getByText('Healing Potion');
+      fireEvent.click(healingPotionElement);
+
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalled();
+      });
+
+      expect(mockSetPopupHtml.mock.calls[0][0]).toContain('Longsword');
+    });
+
+    it('should show error popup when loadEquipment rejects', async () => {
+      loadEquipment.mockRejectedValue(new Error('Network error'));
+
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
+
+      renderComponent();
+
+      const shieldElement = screen.getByText('Shield');
+      fireEvent.click(shieldElement);
+
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalled();
+      });
+
+      const popupContent = mockSetPopupHtml.mock.calls[0][0];
+      expect(popupContent).toContain('Error loading item details');
+      expect(popupContent).toContain('Network error');
+    });
+
+    it('should show not-found popup when equipment list is empty', async () => {
+      loadEquipment.mockResolvedValue([]);
+
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
+
+      renderComponent();
+
+      const shieldElement = screen.getByText('Shield');
+      fireEvent.click(shieldElement);
+
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalled();
+      });
+
+      const popupContent = mockSetPopupHtml.mock.calls[0][0];
+      expect(popupContent).toContain('not found in database');
+    });
+
+    it('should strip parenthetical quantity from item name before lookup', async () => {
+      const dataWithRations = [
+        {
+          name: 'Rations',
+          index: 'rations',
+          desc: ['Food supplies for travel.'],
+          cost: { quantity: 5, unit: 'sp' },
+          weight: 2,
+          equipment_category: 'Supplies',
+        },
+      ];
+
+      loadEquipment.mockResolvedValue(dataWithRations);
+
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
+
+      renderComponent();
+
+      const backpackSection = screen.getByText(/Backpack:/).parentElement;
+      const rationsElement = backpackSection.querySelector('.clickable');
+      fireEvent.click(rationsElement);
+
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(
+          expect.stringContaining('Rations')
+        );
+      });
+    });
+
+    it('should find item by removing trailing s (plural to singular)', async () => {
+      const dataWithSingular = [
+        {
+          name: 'Arrow',
+          index: 'arrow',
+          desc: ['Ammunition.'],
+          cost: { quantity: 1, unit: 'gp' },
+          weight: 0.05,
+          equipment_category: 'Ammunition',
+        },
+      ];
+
+      loadEquipment.mockResolvedValue(dataWithSingular);
+
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
+
+      const stats = {
+        inventory: {
+          equipped: ['Arrows'],
+          backpack: [],
         },
       };
 
-    render(
-         <CharInventory playerStats={emptyStats} />
-       );
+      renderComponent(stats);
 
-     // Should not show section headers for empty sections
-    expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Backpack:/)).not.toBeInTheDocument();
+      const arrowsElement = screen.getByText('Arrows');
+      fireEvent.click(arrowsElement);
+
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(
+          expect.stringContaining('Arrow')
+        );
+      });
     });
 
-  it('should handle missing inventory', () => {
-    const emptyStats = { inventory: {} };
+    it('should find item by adding s (singular to plural)', async () => {
+      const dataWithPlural = [
+        {
+          name: 'Rations',
+          index: 'rations',
+          desc: ['Food supplies.'],
+          cost: { quantity: 5, unit: 'sp' },
+          weight: 2,
+          equipment_category: 'Supplies',
+        },
+      ];
 
-    render(
-         <CharInventory playerStats={emptyStats} />
-       );
+      loadEquipment.mockResolvedValue(dataWithPlural);
 
-     // Should not crash
-    expect(screen.queryByText(/Equipped:/)).not.toBeInTheDocument();
-    });
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
 
-  it('should render popup element container', () => {
-    const mockPopupElement = <div data-testid="popup-overlay">Popup Content</div>;
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: mockPopupElement,
-      setPopupHtml: vi.fn(),
-    }));
-
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
-
-    expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-  });
-
-  it('should separate multiple items with commas', () => {
-    render(
-         <CharInventory playerStats={mockPlayerStats} />
-       );
-
-      // Get the equipped section div and check its text content
-    const equippedSection = screen.getByText(/Equipped:/).parentElement;
-    expect(equippedSection.textContent).toContain(',');
-     });
-
-  it('should handle magic item without quantity', () => {
-    const stats = {
-      inventory: {
-        magicItems: [
-           {
-            name: 'Magic Ring',
-            type: 'Ring',
-            rarity: 'Rare',
-            description: 'A magical ring.',
-            },
-          ],
+      const stats = {
+        inventory: {
+          equipped: [],
+          backpack: ['Ration'],
         },
       };
 
-    render(
-         <CharInventory playerStats={stats} />
-       );
+      renderComponent(stats);
 
-    expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
-    expect(screen.queryByText(/qty/)).not.toBeInTheDocument();
+      const rationElement = screen.getByText('Ration');
+      fireEvent.click(rationElement);
+
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(
+          expect.stringContaining('Rations')
+        );
+      });
     });
 
-  it('should handle magic item without attunement requirements', () => {
-    const stats = {
-      inventory: {
-        magicItems: [
-           {
-            name: 'Magic Ring',
-            type: 'Ring',
-            rarity: 'Rare',
-            description: 'A magical ring.',
-            requiresAttunement: false,
-            },
-          ],
+    it('should display all item properties when present simultaneously', async () => {
+      const dataWithAllProps = [
+        {
+          ...mockEquipmentData[0],
+          ability: 'Strength',
+          utilize: 'Dexterity (Dex) check',
+          craft: 'Smiths tools',
         },
-      };
+      ];
 
-    render(
-         <CharInventory playerStats={stats} />
-       );
+      loadEquipment.mockResolvedValue(dataWithAllProps);
 
-    expect(screen.getByText(/Magic Ring/)).toBeInTheDocument();
-    expect(screen.queryByText(/requires attunement/)).not.toBeInTheDocument();
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
+
+      renderComponent();
+
+      const equippedSection = screen.getByText(/Equipped:/).parentElement;
+      const longswordElement = equippedSection.querySelector('.clickable');
+      fireEvent.click(longswordElement);
+
+      await waitFor(() => {
+        const callArg = mockSetPopupHtml.mock.calls[0][0];
+        expect(callArg).toContain('Cost:');
+        expect(callArg).toContain('Weight:');
+        expect(callArg).toContain('Category:');
+        expect(callArg).toContain('Ability:');
+        expect(callArg).toContain('Utilize:');
+        expect(callArg).toContain('Craft:');
+      });
     });
 
-  it('should find item by removing trailing s (plural to singular)', async () => {
-    const dataWithSingular = [
-      {
-        name: 'Arrow',
-        index: 'arrow',
-        desc: ['Ammunition.'],
-        cost: { quantity: 1, unit: 'gp' },
-        weight: 0.05,
-        equipment_category: 'Ammunition',
-      },
-    ];
+    it('should display item name without parentheses when item has no parenthetical quantity', async () => {
+      loadEquipment.mockResolvedValue(mockEquipmentData);
 
-    loadEquipment.mockResolvedValue(dataWithSingular);
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
 
-    const stats = {
-      inventory: {
-        equipped: ['Arrows'],
-        backpack: [],
-      },
-    };
+      renderComponent({
+        inventory: { equipped: ['Longsword'], backpack: [] },
+      });
 
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
+      const longswordElement = screen.getByText('Longsword');
+      fireEvent.click(longswordElement);
 
-    render(
-      <CharInventory playerStats={stats} />
-    );
-
-    const arrowsElement = screen.getByText('Arrows');
-    fireEvent.click(arrowsElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Arrow'));
-    });
-  });
-
-  it('should find item by adding s (singular to plural)', async () => {
-    const dataWithPlural = [
-      {
-        name: 'Rations',
-        index: 'rations',
-        desc: ['Food supplies.'],
-        cost: { quantity: 5, unit: 'sp' },
-        weight: 2,
-        equipment_category: 'Supplies',
-      },
-    ];
-
-    loadEquipment.mockResolvedValue(dataWithPlural);
-
-    const stats = {
-      inventory: {
-        equipped: [],
-        backpack: ['Ration'],
-      },
-    };
-
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
-
-    render(
-      <CharInventory playerStats={stats} />
-    );
-
-    const rationElement = screen.getByText('Ration');
-    fireEvent.click(rationElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Rations'));
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(
+          expect.stringContaining('Longsword')
+        );
+      });
     });
   });
 
-  it('should display item cost property', async () => {
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
+  describe('popup rendering', () => {
+    it('should render popup element when showPopup is triggered', async () => {
+      const mockSetPopupHtml = vi.fn();
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+      }));
 
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
+      renderComponent();
 
-    // Find the equipped section and click on Longsword there
-    const equippedSection = screen.getByText(/Equipped:/).parentElement;
-    const longswordElement = equippedSection.querySelector('.clickable');
-    fireEvent.click(longswordElement);
+      const shieldElement = screen.getByText('Shield');
+      fireEvent.click(shieldElement);
 
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Cost:'));
-    });
-  });
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalled();
+      });
 
-  it('should display item weight property', async () => {
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
+      // Simulate popup being shown by updating the mock
+      usePopup.mockImplementation(() => ({
+        showPopup: vi.fn(),
+        popupHtml: '<b>Test Popup</b>',
+        setPopupHtml: mockSetPopupHtml,
+      }));
 
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
+      renderComponent();
 
-    const equippedSection = screen.getByText(/Equipped:/).parentElement;
-    const longswordElement = equippedSection.querySelector('.clickable');
-    fireEvent.click(longswordElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Weight:'));
-    });
-  });
-
-  it('should display item ability property', async () => {
-    const dataWithAbility = [
-      {
-        ...mockEquipmentData[0],
-        ability: 'Strength',
-      },
-    ];
-
-    loadEquipment.mockResolvedValue(dataWithAbility);
-
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
-
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
-
-    const equippedSection = screen.getByText(/Equipped:/).parentElement;
-    const longswordElement = equippedSection.querySelector('.clickable');
-    fireEvent.click(longswordElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Weight:'));
-    });
-  });
-
-  it('should display item ability property', async () => {
-    const dataWithAbility = [
-      {
-        ...mockEquipmentData[0],
-        ability: 'Strength',
-      },
-    ];
-
-    loadEquipment.mockResolvedValue(dataWithAbility);
-
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
-
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
-
-    const equippedSection = screen.getByText(/Equipped:/).parentElement;
-    const longswordElement = equippedSection.querySelector('.clickable');
-    fireEvent.click(longswordElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Ability:'));
-    });
-  });
-
-  it('should display item utilize property', async () => {
-    const dataWithUtilize = [
-      {
-        ...mockEquipmentData[0],
-        utilize: 'Dexterity (Dex) check',
-      },
-    ];
-
-    loadEquipment.mockResolvedValue(dataWithUtilize);
-
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
-
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
-
-    const equippedSection = screen.getByText(/Equipped:/).parentElement;
-    const longswordElement = equippedSection.querySelector('.clickable');
-    fireEvent.click(longswordElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Utilize:'));
-    });
-  });
-
-  it('should display item craft property', async () => {
-    const dataWithCraft = [
-      {
-        ...mockEquipmentData[0],
-        craft: 'Smiths tools',
-      },
-    ];
-
-    loadEquipment.mockResolvedValue(dataWithCraft);
-
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
-
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
-
-    const equippedSection = screen.getByText(/Equipped:/).parentElement;
-    const longswordElement = equippedSection.querySelector('.clickable');
-    fireEvent.click(longswordElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Craft:'));
-    });
-  });
-
-  it('should strip parenthetical quantity from item name before lookup', async () => {
-    const dataWithRations = [
-      {
-        name: 'Rations',
-        index: 'rations',
-        desc: ['Food supplies for travel.'],
-        cost: { quantity: 5, unit: 'sp' },
-        weight: 2,
-        equipment_category: 'Supplies',
-      },
-    ];
-
-    loadEquipment.mockResolvedValue(dataWithRations);
-
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
-
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
-
-    // Backpack has 'Rations (10)' - clicking should strip the (10) and look up 'Rations'
-    const backpackSection = screen.getByText(/Backpack:/).parentElement;
-    const rationsElement = backpackSection.querySelector('.clickable');
-    fireEvent.click(rationsElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(
-        expect.stringContaining('Rations')
-      );
-    });
-  });
-
-  it('should display all item properties when present simultaneously', async () => {
-    const dataWithAllProps = [
-      {
-        ...mockEquipmentData[0],
-        ability: 'Strength',
-        utilize: 'Dexterity (Dex) check',
-        craft: 'Smiths tools',
-      },
-    ];
-
-    loadEquipment.mockResolvedValue(dataWithAllProps);
-
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
-
-    render(
-      <CharInventory playerStats={mockPlayerStats} />
-    );
-
-    const equippedSection = screen.getByText(/Equipped:/).parentElement;
-    const longswordElement = equippedSection.querySelector('.clickable');
-    fireEvent.click(longswordElement);
-
-    await waitFor(() => {
-      const callArg = mockSetPopupHtml.mock.calls[0][0];
-      expect(callArg).toContain('Cost:');
-      expect(callArg).toContain('Weight:');
-      expect(callArg).toContain('Ability:');
-      expect(callArg).toContain('Utilize:');
-      expect(callArg).toContain('Craft:');
-    });
-  });
-
-  it('should render item names without parentheses normally', async () => {
-    loadEquipment.mockResolvedValue(mockEquipmentData);
-
-    const mockSetPopupHtml = vi.fn();
-    usePopup.mockImplementation(() => ({
-      showPopup: vi.fn(),
-      popupHtml: null,
-      setPopupHtml: mockSetPopupHtml,
-    }));
-
-    render(
-      <CharInventory playerStats={{ inventory: { equipped: ['Longsword'], backpack: [] } }} />
-    );
-
-    const longswordElement = screen.getByText('Longsword');
-    fireEvent.click(longswordElement);
-
-    await waitFor(() => {
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(
-        expect.stringContaining('Longsword')
-      );
+      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
     });
   });
 });

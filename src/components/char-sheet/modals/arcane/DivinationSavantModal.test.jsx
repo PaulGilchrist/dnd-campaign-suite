@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import DivinationSavantModal from './DivinationSavantModal.jsx';
@@ -20,14 +21,12 @@ const basePayload = {
   selectedSpells: [],
 };
 
-const baseProps = {
-  payload: basePayload,
-  onConfirm: vi.fn(),
-  onClose: vi.fn(),
-};
-
 function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
+  return {
+    payload: { ...basePayload, ...(overrides?.payload || {}) },
+    onConfirm: overrides?.onConfirm ?? vi.fn(),
+    onClose: overrides?.onClose ?? vi.fn(),
+  };
 }
 
 // ── Tests ──
@@ -37,56 +36,65 @@ describe('DivinationSavantModal', () => {
     vi.clearAllMocks();
   });
 
-  // ── Initial render / display ──
+  // ── Initial render ──
 
-  it('renders modal overlay with test id', () => {
+  it('renders the modal overlay with the correct test id', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     expect(document.querySelector('[data-testid="divination-savant-modal"]')).toBeInTheDocument();
   });
 
-  it('renders modal header with title', () => {
+  it('renders the modal title and description', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     expect(screen.getByText('Divination Savant')).toBeInTheDocument();
-  });
-
-  it('renders description text explaining the feature', () => {
-    render(<DivinationSavantModal {...makeProps()} />);
     expect(screen.getByText(/Choose two Wizard spells from the Divination school/)).toBeInTheDocument();
   });
 
-  it('renders two spell select dropdowns', () => {
-    render(<DivinationSavantModal {...makeProps()} />);
-    const selects = document.querySelectorAll('select');
-    expect(selects).toHaveLength(2);
-  });
-
-  it('renders labels for both spell selectors', () => {
+  it('renders two spell select dropdowns with labels', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     expect(screen.getByText('Divination spell 1:')).toBeInTheDocument();
     expect(screen.getByText('Divination spell 2:')).toBeInTheDocument();
+    expect(document.querySelectorAll('select')).toHaveLength(2);
   });
 
-  it('renders all divination options in each dropdown', () => {
+  it('populates each dropdown with all divination options and a default placeholder', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     const selects = document.querySelectorAll('select');
     selects.forEach((select) => {
+      expect(select.querySelector('option[value=""]')).toHaveTextContent(
+        '-- Select a Divination spell (level 2 or lower) --',
+      );
       divinationSpells.forEach((spell) => {
         expect(select.querySelector(`option[value="${spell}"]`)).toBeInTheDocument();
       });
     });
   });
 
-  it('renders confirm button', () => {
+  it('renders Confirm Selection button', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeInTheDocument();
   });
 
-  it('disables confirm button when no spells selected', () => {
+  it('renders popup-overlay and popup-modal CSS classes', () => {
+    render(<DivinationSavantModal {...makeProps()} />);
+    expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
+    expect(document.querySelector('.popup-modal')).toBeInTheDocument();
+  });
+
+  // ── Button disabled state ──
+
+  it('disables the confirm button when no spells are selected', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeDisabled();
   });
 
-  it('disables confirm button when both spells are the same', () => {
+  it('disables the confirm button when only one spell is selected', () => {
+    render(<DivinationSavantModal {...makeProps()} />);
+    const selects = document.querySelectorAll('select');
+    fireEvent.change(selects[0], { target: { value: 'Identify' } });
+    expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeDisabled();
+  });
+
+  it('disables the confirm button when both spells are identical', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     const selects = document.querySelectorAll('select');
     fireEvent.change(selects[0], { target: { value: 'Identify' } });
@@ -94,7 +102,7 @@ describe('DivinationSavantModal', () => {
     expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeDisabled();
   });
 
-  it('enables confirm button when two different spells are selected', () => {
+  it('enables the confirm button when two different spells are selected', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     const selects = document.querySelectorAll('select');
     fireEvent.change(selects[0], { target: { value: 'Identify' } });
@@ -102,48 +110,100 @@ describe('DivinationSavantModal', () => {
     expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeEnabled();
   });
 
-  // ── Existing selection display ──
-
-  it('shows current selection text when spells are pre-selected', () => {
-    render(<DivinationSavantModal {...makeProps({ payload: { ...basePayload, selectedSpells: ['Secret Page', 'Silent Image'] } })} />);
-    expect(screen.getByText(/Current:/)).toBeInTheDocument();
-    const paragraphs = document.querySelectorAll('p');
-    const currentPara = Array.from(paragraphs).find(p => p.textContent.includes('Current:'));
-    expect(currentPara.textContent).toContain('Secret Page');
-    expect(currentPara.textContent).toContain('Silent Image');
+  it('re-disables the confirm button when a selected spell reverts to empty', () => {
+    render(<DivinationSavantModal {...makeProps()} />);
+    const selects = document.querySelectorAll('select');
+    fireEvent.change(selects[0], { target: { value: 'Identify' } });
+    fireEvent.change(selects[1], { target: { value: 'Augury' } });
+    expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeEnabled();
+    fireEvent.change(selects[1], { target: { value: '' } });
+    expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeDisabled();
   });
 
-  it('does not show current selection text when no spells pre-selected', () => {
+  // ── Pre-selected spells ──
+
+  it('displays the current selection when spells are pre-selected', () => {
+    render(
+      <DivinationSavantModal
+        {...makeProps({ payload: { ...basePayload, selectedSpells: ['Secret Page', 'Silent Image'] } })}
+      />,
+    );
+    expect(screen.getByText(/Current:/)).toBeInTheDocument();
+    expect(document.querySelector('.popup-modal b')).toHaveTextContent('Secret Page');
+    expect(document.querySelectorAll('.popup-modal b')[1]).toHaveTextContent('Silent Image');
+  });
+
+  it('does not display current selection text when no spells are pre-selected', () => {
     render(<DivinationSavantModal {...makeProps()} />);
     expect(screen.queryByText(/Current:/)).not.toBeInTheDocument();
   });
 
-  // ── Spell selection via dropdowns ──
-
-  it('updates first spell selection onChange', () => {
-    render(<DivinationSavantModal {...makeProps()} />);
-    const selects = document.querySelectorAll('select');
-    fireEvent.change(selects[0], { target: { value: 'Identify' } });
-    expect(selects[0].value).toBe('Identify');
+  it('does not display current selection text when selectedSpells is undefined', () => {
+    render(<DivinationSavantModal {...makeProps({ payload: { ...basePayload, selectedSpells: undefined } })} />);
+    expect(screen.queryByText(/Current:/)).not.toBeInTheDocument();
   });
 
-  it('updates second spell selection onChange', () => {
-    render(<DivinationSavantModal {...makeProps()} />);
-    const selects = document.querySelectorAll('select');
-    fireEvent.change(selects[1], { target: { value: 'Augury' } });
-    expect(selects[1].value).toBe('Augury');
-  });
-
-  it('initializes first spell from pre-selected spells', () => {
-    render(<DivinationSavantModal {...makeProps({ payload: { ...basePayload, selectedSpells: ['Secret Page', 'Silent Image'] } })} />);
+  it('initializes both dropdowns with pre-selected values', () => {
+    render(
+      <DivinationSavantModal
+        {...makeProps({ payload: { ...basePayload, selectedSpells: ['Secret Page', 'Silent Image'] } })}
+      />,
+    );
     const selects = document.querySelectorAll('select');
     expect(selects[0].value).toBe('Secret Page');
     expect(selects[1].value).toBe('Silent Image');
   });
 
+  it('initializes both dropdowns with empty values when no pre-selected spells', () => {
+    render(<DivinationSavantModal {...makeProps()} />);
+    const selects = document.querySelectorAll('select');
+    expect(selects[0].value).toBe('');
+    expect(selects[1].value).toBe('');
+  });
+
+  it('initializes both dropdowns with empty values when selectedSpells is undefined', () => {
+    render(<DivinationSavantModal {...makeProps({ payload: { ...basePayload, selectedSpells: undefined } })} />);
+    const selects = document.querySelectorAll('select');
+    expect(selects[0].value).toBe('');
+    expect(selects[1].value).toBe('');
+  });
+
+  // ── Spell selection changes ──
+
+  it('updates the confirm button state when the first spell changes', () => {
+    render(<DivinationSavantModal {...makeProps()} />);
+    const selects = document.querySelectorAll('select');
+    const btn = screen.getByRole('button', { name: 'Confirm Selection' });
+    fireEvent.change(selects[0], { target: { value: 'Identify' } });
+    expect(btn).toBeDisabled();
+    fireEvent.change(selects[1], { target: { value: 'Augury' } });
+    expect(btn).toBeEnabled();
+  });
+
+  it('updates the confirm button state when the second spell changes', () => {
+    render(<DivinationSavantModal {...makeProps()} />);
+    const selects = document.querySelectorAll('select');
+    const btn = screen.getByRole('button', { name: 'Confirm Selection' });
+    fireEvent.change(selects[1], { target: { value: 'Augury' } });
+    expect(btn).toBeDisabled();
+    fireEvent.change(selects[0], { target: { value: 'Identify' } });
+    expect(btn).toBeEnabled();
+  });
+
+  it('allows re-selecting a different spell after an initial selection', () => {
+    const onConfirm = vi.fn();
+    render(<DivinationSavantModal {...makeProps({ onConfirm })} />);
+    const selects = document.querySelectorAll('select');
+    fireEvent.change(selects[0], { target: { value: 'Identify' } });
+    fireEvent.change(selects[0], { target: { value: 'Augury' } });
+    fireEvent.change(selects[1], { target: { value: 'Secret Page' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Selection' }));
+    expect(onConfirm).toHaveBeenCalledWith('Augury', 'Secret Page');
+  });
+
   // ── Confirm interaction ──
 
-  it('calls onConfirm with selected spells when confirm clicked', () => {
+  it('calls onConfirm with both selected spells when confirm is clicked', () => {
     const onConfirm = vi.fn();
     render(<DivinationSavantModal {...makeProps({ onConfirm })} />);
     const selects = document.querySelectorAll('select');
@@ -153,14 +213,18 @@ describe('DivinationSavantModal', () => {
     expect(onConfirm).toHaveBeenCalledWith('Identify', 'Augury');
   });
 
-  it('calls onConfirm with pre-selected values when confirm clicked without changes', () => {
+  it('calls onConfirm with pre-selected values when confirm is clicked without changes', () => {
     const onConfirm = vi.fn();
-    render(<DivinationSavantModal {...makeProps({ payload: { ...basePayload, selectedSpells: ['Augury', 'Secret Page'] }, onConfirm })} />);
+    render(
+      <DivinationSavantModal
+        {...makeProps({ payload: { ...basePayload, selectedSpells: ['Augury', 'Secret Page'] }, onConfirm })}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Selection' }));
     expect(onConfirm).toHaveBeenCalledWith('Augury', 'Secret Page');
   });
 
-  it('does not call onConfirm when confirm is disabled', () => {
+  it('does not call onConfirm when confirm is clicked but is disabled', () => {
     const onConfirm = vi.fn();
     render(<DivinationSavantModal {...makeProps({ onConfirm })} />);
     fireEvent.click(screen.getByRole('button', { name: 'Confirm Selection' }));
@@ -176,26 +240,44 @@ describe('DivinationSavantModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('does not close when clicking inside the modal content', () => {
+  it('does not call onClose when clicking inside the modal content', () => {
     const onClose = vi.fn();
     render(<DivinationSavantModal {...makeProps({ onClose })} />);
     fireEvent.click(document.querySelector('.popup-modal'));
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  // ── Modal structure ──
+  // ── Edge cases ──
 
-  it('renders with popup-overlay and popup-modal CSS classes', () => {
-    render(<DivinationSavantModal {...makeProps()} />);
-    expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
-    expect(document.querySelector('.popup-modal')).toBeInTheDocument();
+  it('renders selects with only the default option when divinationOptions is empty', () => {
+    render(<DivinationSavantModal {...makeProps({ payload: { ...basePayload, divinationOptions: [] } })} />);
+    const selects = document.querySelectorAll('select');
+    expect(selects).toHaveLength(2);
+    selects.forEach((select) => {
+      expect(select.querySelectorAll('option')).toHaveLength(1);
+      expect(select.querySelector('option')).toHaveTextContent(
+        '-- Select a Divination spell (level 2 or lower) --',
+      );
+    });
   });
 
-  it('does not trigger onClose when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<DivinationSavantModal {...makeProps({ onClose })} />);
-    const modal = document.querySelector('.popup-modal');
-    fireEvent.click(modal);
-    expect(onClose).not.toHaveBeenCalled();
+  it('disables confirm when divinationOptions is empty', () => {
+    render(<DivinationSavantModal {...makeProps({ payload: { ...basePayload, divinationOptions: [] } })} />);
+    expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeDisabled();
+  });
+
+  it('uses internal state for unknown pre-selected spells so confirm remains enabled', () => {
+    const onConfirm = vi.fn();
+    render(
+      <DivinationSavantModal
+        {...makeProps({ payload: { ...basePayload, selectedSpells: ['Unknown Spell', 'Another Unknown'] }, onConfirm })}
+      />,
+    );
+    const selects = document.querySelectorAll('select');
+    expect(selects[0].value).toBe('');
+    expect(selects[1].value).toBe('');
+    expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm Selection' }));
+    expect(onConfirm).toHaveBeenCalledWith('Unknown Spell', 'Another Unknown');
   });
 });

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import GreaterRestorationPopup from './GreaterRestorationPopup.jsx';
@@ -32,6 +33,28 @@ function makeProps(overrides = {}) {
     };
 }
 
+/**
+ * Default runtime state mock: no conditions, no exhaustion, no buffs,
+ * no ability reductions, no hp max reduction. Returns null for unknown keys.
+ */
+function defaultRuntimeState(overrides = {}) {
+    return {
+        activeConditions: [],
+        exhaustionLevel: 0,
+        activeBuffs: [],
+        abilityReductions: {},
+        hpMaxReduction: 0,
+        ...overrides,
+    };
+}
+
+function applyRuntimeState(runtimeState) {
+    getRuntimeValue.mockImplementation((key, prop) => {
+        if (prop in runtimeState) return runtimeState[prop];
+        return null;
+    });
+}
+
 // ── Tests ──
 
 describe('GreaterRestorationPopup', () => {
@@ -41,59 +64,63 @@ describe('GreaterRestorationPopup', () => {
 
     // ── Default render ──
 
-    it('renders the popup overlay and modal', () => {
+    it('renders the popup overlay, modal, and spell heading', () => {
         render(<GreaterRestorationPopup {...makeProps()} />);
         expect(screen.getByRole('heading', { name: /greater restoration/i })).toBeInTheDocument();
+        expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
+        expect(document.querySelector('.popup-modal')).toBeInTheDocument();
     });
 
-    it('displays the spell name and level in the spell name section', () => {
+    it('displays the spell name, level, and school in the spell name section', () => {
         render(<GreaterRestorationPopup {...makeProps()} />);
-        expect(screen.getByRole('heading', { name: /greater restoration/i })).toBeInTheDocument();
         const spellName = document.querySelector('.metamagic-spell-name');
         expect(spellName.textContent).toContain('Greater Restoration');
         expect(spellName.textContent).toContain('Level 5');
         expect(spellName.textContent).toContain('Abjuration');
     });
 
-    it('shows the spell description text', () => {
+    it('renders the spell description with range', () => {
         render(<GreaterRestorationPopup {...makeProps()} />);
         expect(screen.getByText(/Choose a creature within/)).toBeInTheDocument();
-        expect(screen.getByText(/60 ft/)).toBeInTheDocument();
+        expect(screen.getByText('60 ft')).toBeInTheDocument();
     });
 
-    it('displays all creature targets in the target list', () => {
+    it('renders a health icon in the heading', () => {
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        expect(document.querySelector('.fa-hand-holding-medical')).toBeInTheDocument();
+    });
+
+    it('renders all creature targets in the target list', () => {
         render(<GreaterRestorationPopup {...makeProps()} />);
         creatureTargets.forEach(name => {
             expect(screen.getByText(name)).toBeInTheDocument();
         });
     });
 
-    it('renders Cancel button', () => {
+    it('renders Cancel and Cast buttons', () => {
         render(<GreaterRestorationPopup {...makeProps()} />);
         expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
-
-    it('renders Cast Greater Restoration button', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
         expect(screen.getByText('Cast Greater Restoration')).toBeInTheDocument();
     });
 
-    it('disables Cast button when no target is selected', () => {
+    it('disables the Cast button before any target is selected', () => {
         render(<GreaterRestorationPopup {...makeProps()} />);
         expect(screen.getByText('Cast Greater Restoration')).toBeDisabled();
     });
 
+    it('renders with the expected structural CSS classes', () => {
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
+        expect(document.querySelector('.popup-modal')).toBeInTheDocument();
+        expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
+        expect(document.querySelector('.metamagic-popup-inner')).toBeInTheDocument();
+        expect(document.querySelector('.metamagic-actions')).toBeInTheDocument();
+    });
+
     // ── Target selection ──
 
-    it('selects a target when clicking on it', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 1;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('selects a target and shows its removable effects', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'], exhaustionLevel: 1 }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -104,35 +131,19 @@ describe('GreaterRestorationPopup', () => {
         expect(screen.getByText(/Effects to remove from Goblin/)).toBeInTheDocument();
     });
 
-    it('highlights the selected target visually', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('highlights the selected target with a checkmark prefix', async () => {
+        applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
-            expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
+            expect(screen.getByText(/\u2713 Goblin/)).toBeInTheDocument();
         });
-        // Check that the checkmark prefix is shown for the selected target
-        expect(screen.getByText('✓ Goblin')).toBeInTheDocument();
     });
 
     it('changes selection when clicking a different target', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -145,21 +156,25 @@ describe('GreaterRestorationPopup', () => {
         await waitFor(() => {
             expect(screen.getByText(/Effects to remove from Orc/)).toBeInTheDocument();
         });
-        expect(screen.queryByText('✓ Goblin')).not.toBeInTheDocument();
-        expect(screen.getByText('✓ Orc')).toBeInTheDocument();
+        expect(screen.queryByText(/\u2713 Goblin/)).not.toBeInTheDocument();
+        expect(screen.getByText(/\u2713 Orc/)).toBeInTheDocument();
+    });
+
+    it('shows no removable effects message for a target with no effects', async () => {
+        applyRuntimeState(defaultRuntimeState());
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/No removable effects found on this target/)).toBeInTheDocument();
+        });
     });
 
     // ── Conditions from runtime state ──
 
     it('shows charmed condition when target has it in runtime state', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -170,14 +185,7 @@ describe('GreaterRestorationPopup', () => {
     });
 
     it('shows petrified condition when target has it in runtime state', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['petrified'];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['petrified'] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -187,15 +195,8 @@ describe('GreaterRestorationPopup', () => {
         });
     });
 
-    it('does not show conditions that the target does not have', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('does not show a condition the target does not have', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -203,26 +204,32 @@ describe('GreaterRestorationPopup', () => {
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
         });
-        // Check that only one "Petrified condition" option exists (not in description)
-        const petrifiedElements = document.querySelectorAll('[style*="padding: 6px 10px"]');
-        const petrifiedOptions = Array.from(petrifiedElements).filter(el =>
-            el.textContent.includes('Petrified') && el.textContent.includes('condition')
+        // Use querySelector to target only the selectable effect items, not the description paragraph
+        const petrifiedEffects = document.querySelectorAll(
+            '[style*="padding: 6px 10px"]:not([style*="font-style: italic"])'
+        );
+        const petrifiedOptions = Array.from(petrifiedEffects).filter(el =>
+            el.textContent.trim().startsWith('Petrified')
         );
         expect(petrifiedOptions.length).toBe(0);
     });
 
+    it('matches conditions case-insensitively', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['CHARMED'] }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
+        });
+    });
+
     // ── Conditions from combat summary ──
 
-    it('shows conditions from combat summary when not in runtime state', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
-        getCombatSummary.mockReturnValue({
+    it('falls back to combat summary conditions when runtime state is empty', async () => {
+        applyRuntimeState(defaultRuntimeState());
+        getCombatSummary.mockResolvedValue({
             creatures: [{ name: 'Goblin', conditions: [{ key: 'charmed' }] }],
         });
 
@@ -234,15 +241,8 @@ describe('GreaterRestorationPopup', () => {
     });
 
     it('merges conditions from runtime state and combat summary', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
-        getCombatSummary.mockReturnValue({
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
+        getCombatSummary.mockResolvedValue({
             creatures: [{ name: 'Goblin', conditions: [{ key: 'petrified' }] }],
         });
 
@@ -251,25 +251,46 @@ describe('GreaterRestorationPopup', () => {
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
         });
-        // Check that Petrified condition option exists in the effects section
-        const petrifiedElements = document.querySelectorAll('[style*="padding: 6px 10px"]');
-        const petrifiedOptions = Array.from(petrifiedElements).filter(el =>
-            el.textContent.includes('Petrified') && el.textContent.includes('condition')
-        );
-        expect(petrifiedOptions.length).toBe(1);
+        // Use querySelector to target only the selectable effect items, not the description paragraph
+        await waitFor(() => {
+            const petrifiedEffects = document.querySelectorAll(
+                '[style*="padding: 6px 10px"]:not([style*="font-style: italic"])'
+            );
+            const petrifiedOptions = Array.from(petrifiedEffects).filter(el =>
+                el.textContent.trim().startsWith('Petrified')
+            );
+            expect(petrifiedOptions.length).toBe(1);
+        });
+    });
+
+    it('ignores combat summary conditions for a different creature', async () => {
+        applyRuntimeState(defaultRuntimeState());
+        getCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Orc', conditions: [{ key: 'charmed' }] }],
+        });
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/No removable effects found on this target/)).toBeInTheDocument();
+        });
+    });
+
+    it('handles combat summary error gracefully', async () => {
+        applyRuntimeState(defaultRuntimeState());
+        getCombatSummary.mockRejectedValue(new Error('network error'));
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/No removable effects found on this target/)).toBeInTheDocument();
+        });
     });
 
     // ── Exhaustion ──
 
     it('shows exhaustion option when target has exhaustion level > 0', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 2;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ exhaustionLevel: 2 }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -280,14 +301,7 @@ describe('GreaterRestorationPopup', () => {
     });
 
     it('does not show exhaustion option when target has no exhaustion', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ exhaustionLevel: 0 }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -300,15 +314,8 @@ describe('GreaterRestorationPopup', () => {
 
     // ── Curse ──
 
-    it('shows curse option when target has cursed active buff', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [{ type: 'cursed' }];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('shows curse option when target has active buff with type "cursed"', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeBuffs: [{ type: 'cursed' }] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -318,15 +325,8 @@ describe('GreaterRestorationPopup', () => {
         });
     });
 
-    it('shows curse option when active buff has cursed property', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [{ cursed: true }];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('shows curse option when active buff has a truthy cursed property', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeBuffs: [{ cursed: true }] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -337,14 +337,7 @@ describe('GreaterRestorationPopup', () => {
     });
 
     it('does not show curse option when target has no cursed buffs', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [{ type: 'buff' }];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ activeBuffs: [{ type: 'buff' }] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -358,14 +351,7 @@ describe('GreaterRestorationPopup', () => {
     // ── Ability reduction ──
 
     it('shows ability score reduction option when target has ability reductions', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') { return { STR: -2 }; }
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ abilityReductions: { STR: -2 } }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -376,14 +362,7 @@ describe('GreaterRestorationPopup', () => {
     });
 
     it('does not show ability score reduction when target has no reductions', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ abilityReductions: {} }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -397,14 +376,7 @@ describe('GreaterRestorationPopup', () => {
     // ── HP max reduction ──
 
     it('shows HP max reduction option when target has hpMaxReduction > 0', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 5;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ hpMaxReduction: 5 }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -415,14 +387,7 @@ describe('GreaterRestorationPopup', () => {
     });
 
     it('does not show HP max reduction when target has no hpMaxReduction', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ hpMaxReduction: 0 }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -433,37 +398,10 @@ describe('GreaterRestorationPopup', () => {
         expect(screen.queryByText(/Hit Point maximum reduction/)).not.toBeInTheDocument();
     });
 
-    // ── No removable effects ──
-
-    it('shows "no removable effects" message when target has no effects', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
-        getCombatSummary.mockReturnValue(null);
-
-        render(<GreaterRestorationPopup {...makeProps()} />);
-        fireEvent.click(screen.getByText('Goblin'));
-        await waitFor(() => {
-            expect(screen.getByText(/No removable effects found on this target/)).toBeInTheDocument();
-        });
-    });
-
     // ── Selection toggling ──
 
-    it('toggles exhaustion selection when clicked', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 1;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('toggles exhaustion selection on and off', async () => {
+        applyRuntimeState(defaultRuntimeState({ exhaustionLevel: 1 }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -473,21 +411,14 @@ describe('GreaterRestorationPopup', () => {
         });
 
         fireEvent.click(screen.getByText(/Exhaustion level \(current: 1\)/));
-        expect(screen.getByText('✓ Exhaustion level (current: 1)')).toBeInTheDocument();
+        expect(screen.getByText(/\u2713 Exhaustion level \(current: 1\)/)).toBeInTheDocument();
 
         fireEvent.click(screen.getByText(/Exhaustion level \(current: 1\)/));
-        expect(screen.queryByText('✓ Exhaustion level (current: 1)')).not.toBeInTheDocument();
+        expect(screen.queryByText(/\u2713 Exhaustion level \(current: 1\)/)).not.toBeInTheDocument();
     });
 
-    it('toggles condition selection when clicked', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('toggles condition selection on and off', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -497,21 +428,14 @@ describe('GreaterRestorationPopup', () => {
         });
 
         fireEvent.click(screen.getByText(/Charmed condition/));
-        expect(screen.getByText('✓ Charmed condition')).toBeInTheDocument();
+        expect(screen.getByText(/\u2713 Charmed condition/)).toBeInTheDocument();
 
         fireEvent.click(screen.getByText(/Charmed condition/));
-        expect(screen.queryByText('✓ Charmed condition')).not.toBeInTheDocument();
+        expect(screen.queryByText(/\u2713 Charmed condition/)).not.toBeInTheDocument();
     });
 
-    it('toggles curse selection when clicked', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [{ type: 'cursed' }];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('toggles curse selection on and off', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeBuffs: [{ type: 'cursed' }] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -521,21 +445,14 @@ describe('GreaterRestorationPopup', () => {
         });
 
         fireEvent.click(screen.getByText(/Curse/));
-        expect(screen.getByText(text => text.includes('✓') && text.includes('Curse'))).toBeInTheDocument();
+        expect(screen.getByText(text => text.includes('\u2713') && text.includes('Curse'))).toBeInTheDocument();
 
         fireEvent.click(screen.getByText(/Curse/));
-        expect(screen.queryByText(text => text.includes('✓') && text.includes('Curse'))).not.toBeInTheDocument();
+        expect(screen.queryByText(text => text.includes('\u2713') && text.includes('Curse'))).not.toBeInTheDocument();
     });
 
-    it('toggles ability score reduction selection when clicked', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return { STR: -2 };
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('toggles ability score reduction selection on and off', async () => {
+        applyRuntimeState(defaultRuntimeState({ abilityReductions: { STR: -2 } }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -545,21 +462,14 @@ describe('GreaterRestorationPopup', () => {
         });
 
         fireEvent.click(screen.getByText(/Ability score reduction/));
-        expect(screen.getByText('✓ Ability score reduction')).toBeInTheDocument();
+        expect(screen.getByText(/\u2713 Ability score reduction/)).toBeInTheDocument();
 
         fireEvent.click(screen.getByText(/Ability score reduction/));
-        expect(screen.queryByText('✓ Ability score reduction')).not.toBeInTheDocument();
+        expect(screen.queryByText(/\u2713 Ability score reduction/)).not.toBeInTheDocument();
     });
 
-    it('toggles HP max reduction selection when clicked', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 3;
-            return null;
-        });
+    it('toggles HP max reduction selection on and off', async () => {
+        applyRuntimeState(defaultRuntimeState({ hpMaxReduction: 3 }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -569,23 +479,21 @@ describe('GreaterRestorationPopup', () => {
         });
 
         fireEvent.click(screen.getByText(/Hit Point maximum reduction/));
-        expect(screen.getByText('✓ Hit Point maximum reduction')).toBeInTheDocument();
+        expect(screen.getByText(/\u2713 Hit Point maximum reduction/)).toBeInTheDocument();
 
         fireEvent.click(screen.getByText(/Hit Point maximum reduction/));
-        expect(screen.queryByText('✓ Hit Point maximum reduction')).not.toBeInTheDocument();
+        expect(screen.queryByText(/\u2713 Hit Point maximum reduction/)).not.toBeInTheDocument();
     });
 
     // ── Multiple selections ──
 
     it('allows selecting multiple effects at once', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 1;
-            if (prop === 'activeBuffs') return [{ type: 'cursed' }];
-            if (prop === 'abilityReductions') return { STR: -2 };
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({
+            activeConditions: ['charmed'],
+            exhaustionLevel: 1,
+            activeBuffs: [{ type: 'cursed' }],
+            abilityReductions: { STR: -2 },
+        }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -594,32 +502,21 @@ describe('GreaterRestorationPopup', () => {
             expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
         });
 
-        // Select exhaustion
         fireEvent.click(screen.getByText(/Exhaustion level \(current: 1\)/));
-        // Select charmed
         fireEvent.click(screen.getByText(/Charmed condition/));
-        // Select curse
         fireEvent.click(screen.getByText(/Curse/));
-        // Select ability reduction
         fireEvent.click(screen.getByText(/Ability score reduction/));
 
-        expect(screen.getByText('✓ Exhaustion level (current: 1)')).toBeInTheDocument();
-        expect(screen.getByText('✓ Charmed condition')).toBeInTheDocument();
-        expect(screen.getByText(text => text.includes('✓') && text.includes('Curse'))).toBeInTheDocument();
-        expect(screen.getByText('✓ Ability score reduction')).toBeInTheDocument();
+        expect(screen.getByText(/\u2713 Exhaustion level \(current: 1\)/)).toBeInTheDocument();
+        expect(screen.getByText(/\u2713 Charmed condition/)).toBeInTheDocument();
+        expect(screen.getByText(text => text.includes('\u2713') && text.includes('Curse'))).toBeInTheDocument();
+        expect(screen.getByText(/\u2713 Ability score reduction/)).toBeInTheDocument();
     });
 
     // ── Confirm button state ──
 
     it('enables Cast button when target is selected and at least one effect is selected', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -628,23 +525,14 @@ describe('GreaterRestorationPopup', () => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
         });
 
-        // Still disabled because no selections yet
         expect(screen.getByText('Cast Greater Restoration')).toBeDisabled();
 
-        // Select the charmed condition
         fireEvent.click(screen.getByText(/Charmed condition/));
         expect(screen.getByText('Cast Greater Restoration')).toBeEnabled();
     });
 
-    it('keeps Cast button disabled when target is selected but no effects are selected', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+    it('keeps Cast button disabled when target is selected but no effects are available', async () => {
+        applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps()} />);
@@ -655,18 +543,29 @@ describe('GreaterRestorationPopup', () => {
         expect(screen.getByText('Cast Greater Restoration')).toBeDisabled();
     });
 
+    it('keeps Cast button disabled when target is selected but no effects are chosen', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
+        });
+
+        expect(screen.getByText('Cast Greater Restoration')).toBeDisabled();
+    });
+
     // ── Confirm action ──
 
-    it('calls onConfirm with target name and selections when Cast button is clicked', async () => {
+    it('calls onConfirm with target name and selections when Cast is clicked', async () => {
         const onConfirm = vi.fn();
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['charmed'];
-            if (prop === 'exhaustionLevel') return 2;
-            if (prop === 'activeBuffs') return [{ type: 'cursed' }];
-            if (prop === 'abilityReductions') return { STR: -2 };
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState({
+            activeConditions: ['charmed'],
+            exhaustionLevel: 2,
+            activeBuffs: [{ type: 'cursed' }],
+            abilityReductions: { STR: -2 },
+        }));
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
@@ -675,7 +574,6 @@ describe('GreaterRestorationPopup', () => {
             expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
         });
 
-        // Select exhaustion and charmed
         fireEvent.click(screen.getByText(/Exhaustion level \(current: 2\)/));
         fireEvent.click(screen.getByText(/Charmed condition/));
 
@@ -690,6 +588,33 @@ describe('GreaterRestorationPopup', () => {
         });
     });
 
+    it('calls onConfirm with ability_reduction and hp_max_reduction types', async () => {
+        const onConfirm = vi.fn();
+        applyRuntimeState(defaultRuntimeState({
+            abilityReductions: { DEX: -4 },
+            hpMaxReduction: 10,
+        }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Hit Point maximum reduction/)).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByText(/Ability score reduction/));
+        fireEvent.click(screen.getByText(/Hit Point maximum reduction/));
+
+        fireEvent.click(screen.getByText('Cast Greater Restoration'));
+        expect(onConfirm).toHaveBeenCalledWith({
+            targetName: 'Goblin',
+            selections: [
+                { type: 'ability_reduction' },
+                { type: 'hp_max_reduction' },
+            ],
+        });
+    });
+
     it('does not call onConfirm when no target is selected', () => {
         const onConfirm = vi.fn();
         render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
@@ -699,14 +624,7 @@ describe('GreaterRestorationPopup', () => {
 
     it('does not call onConfirm when target is selected but no effects are selected', async () => {
         const onConfirm = vi.fn();
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
@@ -737,19 +655,11 @@ describe('GreaterRestorationPopup', () => {
 
     it('does not call onSkip when modal content is clicked', () => {
         const onSkip = vi.fn();
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return [];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
-        });
+        applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
         render(<GreaterRestorationPopup {...makeProps({ onSkip })} />);
         fireEvent.click(screen.getByText('Goblin'));
-        // Click somewhere inside the modal content (the description text)
         fireEvent.click(screen.getByText(/Choose a creature within/));
         expect(onSkip).not.toHaveBeenCalled();
     });
@@ -782,58 +692,20 @@ describe('GreaterRestorationPopup', () => {
         expect(screen.getByText(/Level 5/)).toBeInTheDocument();
     });
 
-    // ── CSS classes ──
+    // ── Empty creature targets ──
 
-    it('renders with popup-overlay class', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
-        expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
-    });
-
-    it('renders with popup-modal class', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
-        expect(document.querySelector('.popup-modal')).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-popup class', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
-        expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-popup-inner class', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
-        expect(document.querySelector('.metamagic-popup-inner')).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-actions class', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
-        expect(document.querySelector('.metamagic-actions')).toBeInTheDocument();
-    });
-
-    // ── Health icon ──
-
-    it('renders health icon in heading', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
-        const icon = document.querySelector('.fa-hand-holding-medical');
-        expect(icon).toBeInTheDocument();
-    });
-
-    // ── Case-insensitive condition matching ──
-
-    it('matches conditions case-insensitively', async () => {
-        getRuntimeValue.mockImplementation((key, prop) => {
-            if (prop === 'activeConditions') return ['CHARMED'];
-            if (prop === 'exhaustionLevel') return 0;
-            if (prop === 'activeBuffs') return [];
-            if (prop === 'abilityReductions') return {};
-            if (prop === 'hpMaxReduction') return 0;
-            return null;
+    it('renders without target list when creatureTargets is empty', () => {
+        render(<GreaterRestorationPopup {...makeProps({ creatureTargets: [] })} />);
+        expect(screen.getByText('Cast Greater Restoration')).toBeDisabled();
+        creatureTargets.forEach(name => {
+            expect(screen.queryByText(name)).not.toBeInTheDocument();
         });
-        getCombatSummary.mockReturnValue(null);
+    });
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
-        fireEvent.click(screen.getByText('Goblin'));
-        await waitFor(() => {
-            expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
-        });
+    // ── Range display ──
+
+    it('renders the provided range in the description', () => {
+        render(<GreaterRestorationPopup {...makeProps({ range: '30 ft' })} />);
+        expect(screen.getByText('30 ft')).toBeInTheDocument();
     });
 });

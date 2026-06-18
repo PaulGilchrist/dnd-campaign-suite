@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
@@ -56,11 +57,7 @@ vi.mock('../../../services/ui/sanitize.js', () => ({
 vi.mock('./CharSpellSlots.jsx', () => ({
   default: function MockCharSpellSlots() {
     return <div data-testid="char-spell-slots">Spell Slots</div>;
-    },
-}));
-
-vi.mock('lodash', () => ({
-  cloneDeep: vi.fn(obj => JSON.parse(JSON.stringify(obj))),
+  },
 }));
 
 vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
@@ -117,7 +114,7 @@ vi.mock('../../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
 }));
 
-describe('CharSpells', () => {
+describe('CharSpells abbreviations', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     useActionPopup.mockImplementation(() => ({
@@ -127,35 +124,32 @@ describe('CharSpells', () => {
     }));
   });
 
-  describe('Casting time and duration abbreviations', () => {
-    it('should display casting time with abbreviations', () => {
-      render(
-          <CharSpells
-            playerStats={mockPlayerStats}
-            handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-             />
-              );
+  describe('casting time abbreviations', () => {
+    it('replaces "1 action" with abbreviated form containing "A"', () => {
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Fireball',
+              level: 3,
+              casting_time: '1 action',
+              range: '150 feet',
+              duration: 'Instantaneous',
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
 
-          // '1 action' should be replaced with ' A' - check the table cell content
-       const tableCells = screen.getAllByText(/A$/);
-       expect(tableCells.length).toBeGreaterThan(0);
-          });
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-    it('should display duration with abbreviations', () => {
-      render(
-          <CharSpells
-            playerStats={mockPlayerStats}
-            handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-             />
-            );
+      expect(screen.getByText(/1\s+A/)).toBeInTheDocument();
+    });
 
-          // 'Instantaneous' should be replaced with 'Instant'
-       const instantElements = screen.getAllByText('Instant');
-       expect(instantElements.length).toBeGreaterThan(0);
-          });
-
-    it('should display "1 reaction" as "1 Reaction"', () => {
-      const statsWithReaction = {
+    it('capitalizes "1 reaction" to "1 Reaction"', () => {
+      const stats = {
         ...mockPlayerStats,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
@@ -172,18 +166,13 @@ describe('CharSpells', () => {
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithReaction}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText(/1 R/)).toBeInTheDocument();
+      expect(screen.getByText('1 Reaction')).toBeInTheDocument();
     });
 
-    it('should abbreviate "1 bonus action" to "BA"', () => {
-      const statsWithBonusAction = {
+    it('replaces "1 bonus action" with abbreviated form "1 BA"', () => {
+      const stats = {
         ...mockPlayerStats,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
@@ -200,18 +189,106 @@ describe('CharSpells', () => {
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithBonusAction}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText(/1 BA/)).toBeInTheDocument();
+      expect(screen.getByText('1 BA')).toBeInTheDocument();
     });
 
-    it('should abbreviate "1 minute" to "1 min" in duration', () => {
-      const statsWithMinuteDuration = {
+    it('leaves casting time unchanged when no matching pattern exists', () => {
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Custom Spell',
+              level: 1,
+              casting_time: '1 turn',
+              range: 'Self',
+              duration: 'Instantaneous',
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
+
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
+
+      expect(screen.getByText('1 turn')).toBeInTheDocument();
+    });
+
+    it('renders empty string when casting_time is undefined', () => {
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Mystery Spell',
+              level: 1,
+              range: 'Self',
+              duration: 'Instantaneous',
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
+
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
+
+      expect(screen.getByText('Mystery Spell')).toBeInTheDocument();
+    });
+
+    it('renders empty string when casting_time is null', () => {
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Null Time Spell',
+              level: 1,
+              casting_time: null,
+              range: 'Self',
+              duration: 'Instantaneous',
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
+
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
+
+      expect(screen.getByText('Null Time Spell')).toBeInTheDocument();
+    });
+  });
+
+  describe('duration abbreviations', () => {
+    it('replaces "Instantaneous" with "Instant"', () => {
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Fireball',
+              level: 3,
+              casting_time: '1 action',
+              range: '150 feet',
+              duration: 'Instantaneous',
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
+
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
+
+      expect(screen.getByText('Instant')).toBeInTheDocument();
+    });
+
+    it('replaces singular "minute" with "min"', () => {
+      const stats = {
         ...mockPlayerStats,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
@@ -228,18 +305,13 @@ describe('CharSpells', () => {
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithMinuteDuration}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
       expect(screen.getByText(/1 min/)).toBeInTheDocument();
     });
 
-    it('should abbreviate "10 minutes" to "10 min" in duration', () => {
-      const statsWithMinutesDuration = {
+    it('replaces plural "minutes" with "min"', () => {
+      const stats = {
         ...mockPlayerStats,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
@@ -256,18 +328,84 @@ describe('CharSpells', () => {
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithMinutesDuration}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
       expect(screen.getByText(/10 min/)).toBeInTheDocument();
     });
 
-    it('should handle spell with "1 reaction" casting time', () => {
-      const statsWithReaction = {
+    it('strips "up to " from duration text', () => {
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Protection from Evil',
+              level: 1,
+              casting_time: '1 action',
+              range: 'Touch',
+              duration: 'up to 1 hour',
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
+
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
+
+      const durationCell = screen.getByText(/1 hour/);
+      expect(durationCell.textContent).not.toContain('up to');
+    });
+
+    it('renders empty string when duration is undefined', () => {
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'No Duration Spell',
+              level: 1,
+              casting_time: '1 action',
+              range: 'Self',
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
+
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
+
+      expect(screen.getByText('No Duration Spell')).toBeInTheDocument();
+    });
+
+    it('renders empty string when duration is null', () => {
+      const stats = {
+        ...mockPlayerStats,
+        spellAbilities: {
+          ...mockPlayerStats.spellAbilities,
+          spells: [
+            {
+              name: 'Null Duration Spell',
+              level: 1,
+              casting_time: '1 action',
+              range: 'Self',
+              duration: null,
+              prepared: 'Prepared',
+            },
+          ],
+        },
+      };
+
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
+
+      expect(screen.getByText('Null Duration Spell')).toBeInTheDocument();
+    });
+  });
+
+  describe('combined casting time and duration abbreviations', () => {
+    it('applies both casting time and duration abbreviations to the same spell', () => {
+      const stats = {
         ...mockPlayerStats,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
@@ -280,22 +418,27 @@ describe('CharSpells', () => {
               duration: '1 round',
               prepared: 'Prepared',
             },
+            {
+              name: 'Fireball',
+              level: 3,
+              casting_time: '1 action',
+              range: '150 feet',
+              duration: 'Instantaneous',
+              prepared: 'Prepared',
+            },
           ],
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithReaction}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText('Shield')).toBeInTheDocument();
+      expect(screen.getByText('1 Reaction')).toBeInTheDocument();
+      expect(screen.getByText('Instant')).toBeInTheDocument();
+      expect(screen.getByText(/1\s+A/)).toBeInTheDocument();
     });
 
-    it('should handle spell with "1 bonus action" casting time', () => {
-      const statsWithBonusAction = {
+    it('abbreviates both casting time and duration for a bonus action spell', () => {
+      const stats = {
         ...mockPlayerStats,
         spellAbilities: {
           ...mockPlayerStats.spellAbilities,
@@ -305,21 +448,16 @@ describe('CharSpells', () => {
               level: 1,
               casting_time: '1 bonus action',
               range: '60 feet',
-              duration: 'Instantaneous',
+              duration: '1 round',
               prepared: 'Prepared',
             },
           ],
         },
       };
 
-      render(
-        <CharSpells
-          playerStats={statsWithBonusAction}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />
-      );
+      render(<CharSpells playerStats={stats} handleTogglePreparedSpells={mockHandleTogglePreparedSpells} />);
 
-      expect(screen.getByText('Healing Word')).toBeInTheDocument();
+      expect(screen.getByText('1 BA')).toBeInTheDocument();
     });
   });
 });

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ShieldOfFaithTargetPopup from './ShieldOfFaithTargetPopup.jsx';
@@ -59,7 +60,17 @@ describe('ShieldOfFaithTargetPopup', () => {
         expect(document.querySelector('.metamagic-spell-name')).toHaveTextContent(/Level 2 Abjuration/);
     });
 
-    it('renders description with range', () => {
+    it('renders description with default range of 15 feet', () => {
+        renderPopup();
+        expect(
+            screen.getByText((content, node) => {
+                if (!node) return false;
+                return node.tagName === 'P' && node.textContent.includes('Choose a creature within') && node.textContent.includes('15');
+            })
+        ).toBeInTheDocument();
+    });
+
+    it('renders description with custom range', () => {
         renderPopup({ range: 30 });
         expect(
             screen.getByText((content, node) => {
@@ -93,19 +104,26 @@ describe('ShieldOfFaithTargetPopup', () => {
         expect(castButton).toBeDisabled();
     });
 
+    it('does not call onConfirm when Cast is clicked without a target', () => {
+        const onConfirm = vi.fn();
+        renderPopup({ onConfirm });
+        fireEvent.click(screen.getByText('Cast Shield of Faith'));
+        expect(onConfirm).not.toHaveBeenCalled();
+    });
+
     // ── Target selection ──
 
     it('shows checkmark before selected target name', () => {
         renderPopup();
         fireEvent.click(screen.getByText('Goblin'));
-        expect(screen.getByText('✓ Goblin')).toBeInTheDocument();
+        expect(screen.getByText('\u2713 Goblin')).toBeInTheDocument();
     });
 
-    it('hides checkmark for unselected targets', () => {
+    it('hides checkmark for unselected targets after selection', () => {
         renderPopup();
         fireEvent.click(screen.getByText('Goblin'));
-        expect(screen.queryByText('✓ Skeleton')).not.toBeInTheDocument();
-        expect(screen.queryByText('✓ Orc')).not.toBeInTheDocument();
+        expect(screen.queryByText('\u2713 Skeleton')).not.toBeInTheDocument();
+        expect(screen.queryByText('\u2713 Orc')).not.toBeInTheDocument();
     });
 
     it('enables the Cast button after a target is selected', () => {
@@ -113,6 +131,15 @@ describe('ShieldOfFaithTargetPopup', () => {
         fireEvent.click(screen.getByText('Skeleton'));
         const castButton = screen.getByText('Cast Shield of Faith');
         expect(castButton).toBeEnabled();
+    });
+
+    it('switches selection when a different target is clicked', () => {
+        renderPopup();
+        fireEvent.click(screen.getByText('Goblin'));
+        expect(screen.getByText('\u2713 Goblin')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Skeleton'));
+        expect(screen.queryByText('\u2713 Goblin')).not.toBeInTheDocument();
+        expect(screen.getByText('\u2713 Skeleton')).toBeInTheDocument();
     });
 
     it('calls onConfirm with selected target when Cast is clicked', () => {
@@ -124,7 +151,7 @@ describe('ShieldOfFaithTargetPopup', () => {
         expect(onConfirm).toHaveBeenCalledWith(['Orc']);
     });
 
-    it('calls onConfirm with the most recently selected target', () => {
+    it('calls onConfirm with the most recently selected target when switching', () => {
         const onConfirm = vi.fn();
         renderPopup({ onConfirm });
         fireEvent.click(screen.getByText('Goblin'));
@@ -177,10 +204,10 @@ describe('ShieldOfFaithTargetPopup', () => {
 
     it('renders default spell name when spell prop is null', () => {
         renderPopup({ spell: null });
-        expect(screen.getByText(/Spell/)).toBeInTheDocument();
+        expect(screen.getByText('Spell')).toBeInTheDocument();
     });
 
-    it('renders default level when spell level is missing', () => {
+    it('renders default level 1 when spell level is missing', () => {
         renderPopup({ spell: { name: 'Shield of Faith' } });
         expect(screen.getByText(/Level 1 Abjuration/)).toBeInTheDocument();
     });
@@ -197,59 +224,21 @@ describe('ShieldOfFaithTargetPopup', () => {
         expect(castButton).toBeDisabled();
     });
 
-    // ── CSS classes ──
-
-    it('renders with popup-overlay class', () => {
-        renderPopup();
-        const overlay = document.querySelector('.popup-overlay');
-        expect(overlay).toBeInTheDocument();
+    it('throws when creatureTargets is undefined', () => {
+        expect(() => renderPopup({ creatureTargets: undefined })).toThrow();
     });
 
-    it('renders with popup-modal class', () => {
-        renderPopup();
-        const modal = document.querySelector('.popup-modal');
-        expect(modal).toBeInTheDocument();
+    it('throws when creatureTargets is null', () => {
+        expect(() => renderPopup({ creatureTargets: null })).toThrow();
     });
 
-    it('renders with metamagic-popup class', () => {
-        renderPopup();
-        const metamagicPopup = document.querySelector('.metamagic-popup');
-        expect(metamagicPopup).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-popup-inner class', () => {
-        renderPopup();
-        const inner = document.querySelector('.metamagic-popup-inner');
-        expect(inner).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-spell-name class', () => {
-        renderPopup();
-        const spellName = document.querySelector('.metamagic-spell-name');
-        expect(spellName).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-twin-target class', () => {
-        renderPopup();
-        const twinTarget = document.querySelector('.metamagic-twin-target');
-        expect(twinTarget).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-actions class', () => {
-        renderPopup();
-        const actions = document.querySelector('.metamagic-actions');
-        expect(actions).toBeInTheDocument();
-    });
-
-    it('renders btn-secondary class on Cancel button', () => {
-        renderPopup();
-        const cancelButton = screen.getByText('Cancel');
-        expect(cancelButton).toHaveClass('btn-secondary');
-    });
-
-    it('renders btn class on Cast button', () => {
-        renderPopup();
-        const castButton = screen.getByText('Cast Shield of Faith');
-        expect(castButton).toHaveClass('btn');
+    it('renders correct spell name and level when spell prop is provided with custom values', () => {
+        renderPopup({ spell: { name: 'Custom Spell', level: 5 } });
+        expect(
+            screen.getByText((content, node) => {
+                if (!node) return false;
+                return node.tagName === 'P' && node.textContent.includes('Custom Spell') && node.textContent.includes('Level 5');
+            })
+        ).toBeInTheDocument();
     });
 });

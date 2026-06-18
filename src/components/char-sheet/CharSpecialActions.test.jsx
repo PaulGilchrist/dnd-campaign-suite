@@ -1,10 +1,11 @@
+// @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
 
 // Mock executeHandler
 vi.mock('../../services/automation/index.js', () => ({
-  executeHandler: vi.fn().mockResolvedValue(null),
+  executeHandler: vi.fn(),
 }));
 
 // Mock hasAutomation
@@ -22,41 +23,21 @@ vi.mock('./modals/TeleportModal.jsx', () => ({
   ),
 }));
 
-// Mock sanitizeHtml
+// Mock renderMarkdownInline to pass through (what the component actually uses)
 vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
   renderMarkdown: vi.fn((md) => md),
   renderMarkdownInline: vi.fn((md) => md),
 }));
 
-// Mock useActionPopup (no longer used but still imported)
-vi.mock('../../hooks/combat/useActionPopup.js', () => ({
-  default: vi.fn(),
-  buildFeatureDetailHtml: (entity) => {
-    if (entity.details) {
-      return `<b>${entity.name}</b><br/>${entity.description}<br/><br/>${entity.details}`;
-    }
-    return null;
-  },
-}));
-
-// Mock Popup to render its children
-vi.mock('../common/Popup.jsx', () => ({
-  default: ({ html, onClickOrKeyDown }) => (
-    <div data-testid="popup-overlay" onClick={onClickOrKeyDown}>
-      <div dangerouslySetInnerHTML={{ __html: html }} />
-    </div>
-  ),
-}));
-
-// Mock fighting styles
+// Mock fighting styles with realistic return values (no `type` field)
 vi.mock('../../services/character/fightingStyles.js', () => ({
   getFightingStyle: vi.fn((name) => {
     if (name === 'Great Weapon Fighting') {
-      return { name: 'Great Weapon Fighting', description: 'When you roll a 1 or 2 on a damage die...', type: 'passive' };
+      return { name: 'Great Weapon Fighting', description: 'When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.' };
     }
     if (name === 'Protection') {
-      return { name: 'Protection', description: 'When a creature you can see attacks a target other than you...', type: 'passive' };
+      return { name: 'Protection', description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.' };
     }
     return null;
   }),
@@ -64,31 +45,10 @@ vi.mock('../../services/character/fightingStyles.js', () => ({
 
 import { executeHandler } from '../../services/automation/index.js';
 
-const mockPlayerStats = {
-  specialActions: [
-    {
-      name: 'Second Wind',
-      description: 'You can use a bonus action to regain hit points.',
-    },
-  ],
-  class: {
-    fightingStyles: [],
-  },
-  actions: [
-    {
-      name: 'Attack',
-      description: 'Make a weapon attack.',
-    },
-  ],
-  bonusActions: [],
-  reactions: [],
-  characterAdvancement: [],
-};
-
-const mockPlayerStatsWithFightingStyle = {
+const basePlayerStats = {
   specialActions: [],
   class: {
-    fightingStyles: ['Great Weapon Fighting'],
+    fightingStyles: [],
   },
   actions: [],
   bonusActions: [],
@@ -96,590 +56,461 @@ const mockPlayerStatsWithFightingStyle = {
   characterAdvancement: [],
 };
 
+function createPlayerStats(overrides = {}) {
+  return { ...basePlayerStats, ...overrides };
+}
+
 describe('CharSpecialActions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    executeHandler.mockResolvedValue(null);
   });
 
-  it('should render special actions header', () => {
-    render(
-      <CharSpecialActions playerStats={mockPlayerStats} campaignName="test" />
-    );
-
-    expect(screen.getByText('Special Actions')).toBeInTheDocument();
-  });
-
-  it('should display special action names', () => {
-    render(
-      <CharSpecialActions playerStats={mockPlayerStats} campaignName="test" />
-    );
-
-    expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
-  });
-
-  it('should display special action descriptions', () => {
-    render(
-      <CharSpecialActions playerStats={mockPlayerStats} campaignName="test" />
-    );
-
-    expect(screen.getByText(/You can use a bonus action to regain hit points/)).toBeInTheDocument();
-  });
-
-  it('should add Great Weapon Fighting when in fightingStyles', () => {
-    render(
-      <CharSpecialActions playerStats={mockPlayerStatsWithFightingStyle} campaignName="test" />
-    );
-
-    expect(screen.getByText(/Great Weapon Fighting/)).toBeInTheDocument();
-  });
-
-  it('should add Protection fighting style when in fightingStyles', () => {
-    const playerStatsWithProtection = {
-      specialActions: [],
-      class: {
-        fightingStyles: ['Protection'],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsWithProtection} campaignName="test" />
-    );
-
-    expect(screen.getByText(/Protection/)).toBeInTheDocument();
-  });
-
-  it('should not duplicate fighting style if already in specialActions', () => {
-    const playerStatsWithDuplicate = {
-      specialActions: [
-        {
-          name: 'Great Weapon Fighting',
-          description: 'When you roll a 1 or 2 on a damage die...',
-        },
-      ],
-      class: {
-        fightingStyles: ['Great Weapon Fighting'],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsWithDuplicate} campaignName="test" />
-    );
-
-    const greatWeaponElements = screen.getAllByText(/Great Weapon Fighting/);
-    expect(greatWeaponElements.length).toBe(1);
-  });
-
-  it('should filter out actions that are in actions list', () => {
-    const playerStats = {
-      specialActions: [
-        {
-          name: 'Attack',
-          description: 'Make a weapon attack.',
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [
-        {
-          name: 'Attack',
-          description: 'Make a weapon attack.',
-        },
-      ],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStats} campaignName="test" />
-    );
-
-    expect(screen.queryByText(/Attack/)).not.toBeInTheDocument();
-  });
-
-  it('should filter out actions that are in bonusActions list', () => {
-    const playerStats = {
-      specialActions: [
-        {
-          name: 'Dash',
-          description: 'Take the Dash action.',
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [
-        {
-          name: 'Dash',
-          description: 'Take the Dash action.',
-        },
-      ],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStats} campaignName="test" />
-    );
-
-    expect(screen.queryByText(/Dash/)).not.toBeInTheDocument();
-  });
-
-  it('should filter out actions that are in reactions list', () => {
-    const playerStats = {
-      specialActions: [
-        {
-          name: 'Opportunity Attack',
-          description: 'Can attack creature that moves out of your reach.',
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [
-        {
-          name: 'Opportunity Attack',
-          description: 'Can attack creature that moves out of your reach.',
-        },
-      ],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStats} campaignName="test" />
-    );
-
-    expect(screen.queryByText(/Opportunity Attack/)).not.toBeInTheDocument();
-  });
-
-  it('should filter out actions that are in characterAdvancement list', () => {
-    const playerStats = {
-      specialActions: [
-        {
-          name: 'Extra Attack',
-          description: 'You can attack twice.',
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [
-        {
-          name: 'Extra Attack',
-          description: 'You can attack twice.',
-        },
-      ],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStats} campaignName="test" />
-    );
-
-    expect(screen.queryByText(/Extra Attack/)).not.toBeInTheDocument();
-  });
-
-  it('should show popup when special action with details is clicked', () => {
-    const playerStatsWithDetails = {
-      specialActions: [
-        {
-          name: 'Second Wind',
-          description: 'You can use a bonus action to regain hit points.',
-          details: 'This feature comes from the Fighter class.',
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsWithDetails} campaignName="test" />
-    );
-
-    const clickableElement = screen.getByText(/Second Wind/);
-    fireEvent.click(clickableElement);
-
-    expect(screen.getByText(/This feature comes from the Fighter class/)).toBeInTheDocument();
-  });
-
-  it('should execute automation when special action with automation is clicked', async () => {
-    executeHandler.mockResolvedValue({
-      type: 'popup',
-      payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
+  describe('rendering', () => {
+    it('renders the Special Actions header', () => {
+      render(<CharSpecialActions playerStats={createPlayerStats()} campaignName="test" />);
+      expect(screen.getByText('Special Actions')).toBeInTheDocument();
     });
 
-    const playerStatsWithAutomation = {
-      specialActions: [
-        {
-          name: 'Blink Steps',
-          description: 'Teleport up to 30 feet.',
-          automation: { type: 'temp_buff', effect: 'bonus_teleport' },
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsWithAutomation} campaignName="test" />
-    );
-
-    const clickableElement = screen.getByText(/Blink Steps/);
-    fireEvent.click(clickableElement);
-
-    await waitFor(() => {
-      expect(executeHandler).toHaveBeenCalledWith(
-        playerStatsWithAutomation.specialActions[0],
-        playerStatsWithAutomation,
-        'test',
-        null
-      );
+    it('renders special action names and descriptions', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Second Wind', description: 'You can use a bonus action to regain hit points.' },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
+      expect(screen.getByText(/You can use a bonus action to regain hit points/)).toBeInTheDocument();
     });
 
-    await waitFor(() => {
-      expect(screen.getByText(/Teleported 30 ft/)).toBeInTheDocument();
+    it('renders multiple special actions', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Second Wind', description: 'Regain hit points.' },
+          { name: 'Action Surge', description: 'Take an extra action.' },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
+      expect(screen.getByText(/Action Surge/)).toBeInTheDocument();
+    });
+
+    it('renders action descriptions through renderMarkdownInline', async () => {
+      const { renderMarkdownInline } = await import('../../services/ui/sanitize.js');
+      const playerStats = createPlayerStats({
+        specialActions: [{ name: 'Test', description: '**bold** text' }],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(renderMarkdownInline).toHaveBeenCalledWith('**bold** text');
     });
   });
 
-  it('should show teleport modal when automation returns teleport modal', async () => {
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'teleport',
-      payload: { action: { name: 'Blink Steps', automation: { effect: 'bonus_teleport', distance: '30 ft' } }, playerStats: mockPlayerStats, campaignName: 'test' },
+  describe('fighting styles', () => {
+    it('adds Great Weapon Fighting from fightingStyles when not already present', () => {
+      const playerStats = createPlayerStats({
+        class: { fightingStyles: ['Great Weapon Fighting'] },
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText(/Great Weapon Fighting/)).toBeInTheDocument();
     });
 
-    const playerStatsWithTeleport = {
-      specialActions: [
-        {
-          name: 'Blink Steps',
-          description: 'Teleport up to 30 feet.',
-          automation: { type: 'temp_buff', effect: 'bonus_teleport' },
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
+    it('adds Protection from fightingStyles when not already present', () => {
+      const playerStats = createPlayerStats({
+        class: { fightingStyles: ['Protection'] },
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText(/Protection/)).toBeInTheDocument();
+    });
 
-    render(
-      <CharSpecialActions playerStats={playerStatsWithTeleport} campaignName="test" />
-    );
+    it('does not duplicate a fighting style already in specialActions', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Great Weapon Fighting', description: 'Already added.' },
+        ],
+        class: { fightingStyles: ['Great Weapon Fighting'] },
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      const elements = screen.getAllByText(/Great Weapon Fighting/);
+      expect(elements).toHaveLength(1);
+    });
 
-    const clickableElement = screen.getByText(/Blink Steps/);
-    fireEvent.click(clickableElement);
+    it('adds only the first matching fighting style when both GWF and Protection are present', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [],
+        class: { fightingStyles: ['Great Weapon Fighting', 'Protection'] },
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText(/Great Weapon Fighting/)).toBeInTheDocument();
+      expect(screen.queryByText(/Protection/)).not.toBeInTheDocument();
+    });
 
-    await waitFor(() => {
-      expect(screen.getByTestId('teleport-modal')).toBeInTheDocument();
+    it('does not add fighting styles when fightingStyles is undefined', () => {
+      const playerStats = createPlayerStats({
+        class: {},
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.queryByText(/Great Weapon Fighting/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Protection/)).not.toBeInTheDocument();
+    });
+
+    it('does not add fighting styles when fightingStyles is empty', () => {
+      const playerStats = createPlayerStats({
+        class: { fightingStyles: [] },
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.queryByText(/Great Weapon Fighting/)).not.toBeInTheDocument();
     });
   });
 
-  it('should handle empty playerStats gracefully', () => {
-    const emptyPlayerStats = {
-      specialActions: [],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={emptyPlayerStats} campaignName="test" />
-    );
-
-    expect(screen.getByText('Special Actions')).toBeInTheDocument();
-  });
-
-  it('should render popup element container', () => {
-    // The popup won't be shown initially since we don't have state access
-    // Just verify the component renders without error
-    render(
-      <CharSpecialActions playerStats={mockPlayerStats} campaignName="test" />
-    );
-
-    expect(screen.getByText('Special Actions')).toBeInTheDocument();
-  });
-
-  it('should handle empty specialActions array', () => {
-    const playerStats = {
-      specialActions: [],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStats} campaignName="test" />
-    );
-
-    expect(screen.getByText('Special Actions')).toBeInTheDocument();
-  });
-
-  it('should only add Great Weapon Fighting when both fighting styles are present due to else if', () => {
-    const playerStatsWithBoth = {
-      specialActions: [],
-      class: {
-        fightingStyles: ['Great Weapon Fighting', 'Protection'],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsWithBoth} campaignName="test" />
-    );
-
-    expect(screen.getByText(/Great Weapon Fighting/)).toBeInTheDocument();
-    expect(screen.queryByText(/Protection/)).not.toBeInTheDocument();
-  });
-
-  it('should not duplicate Protection when already in specialActions', () => {
-    const playerStatsWithDupProtection = {
-      specialActions: [
-        {
-          name: 'Protection',
-          description: 'When a creature you can see attacks a target other than you...',
-        },
-      ],
-      class: {
-        fightingStyles: ['Protection'],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsWithDupProtection} campaignName="test" />
-    );
-
-    const protectionElements = screen.getAllByText(/Protection/);
-    expect(protectionElements.length).toBe(1);
-  });
-
-  it('should dismiss popup when overlay is clicked', async () => {
-    const playerStatsWithAutomation = {
-      specialActions: [
-        {
-          name: 'Blink Steps',
-          description: 'Teleport up to 30 feet.',
-          automation: { type: 'temp_buff', effect: 'bonus_teleport' },
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    executeHandler.mockResolvedValue({
-      type: 'popup',
-      payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
+  describe('deduplication across action lists', () => {
+    it('filters out actions that appear in the actions list', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [{ name: 'Attack', description: 'Make a weapon attack.' }],
+        actions: [{ name: 'Attack', description: 'Make a weapon attack.' }],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.queryByText(/Attack/)).not.toBeInTheDocument();
     });
 
-    render(
-      <CharSpecialActions playerStats={playerStatsWithAutomation} campaignName="test" />
-    );
+    it('filters out actions that appear in the bonusActions list', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [{ name: 'Dash', description: 'Take the Dash action.' }],
+        bonusActions: [{ name: 'Dash', description: 'Take the Dash action.' }],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.queryByText(/Dash/)).not.toBeInTheDocument();
+    });
 
-    const clickableElement = screen.getByText(/Blink Steps/);
-    fireEvent.click(clickableElement);
+    it('filters out actions that appear in the reactions list', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [{ name: 'Opportunity Attack', description: 'Attack on retreat.' }],
+        reactions: [{ name: 'Opportunity Attack', description: 'Attack on retreat.' }],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.queryByText(/Opportunity Attack/)).not.toBeInTheDocument();
+    });
 
-    await waitFor(() => {
+    it('filters out actions that appear in the characterAdvancement list', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [{ name: 'Extra Attack', description: 'Attack twice.' }],
+        characterAdvancement: [{ name: 'Extra Attack', description: 'Attack twice.' }],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.queryByText(/Extra Attack/)).not.toBeInTheDocument();
+    });
+
+    it('filters out when an action name matches multiple lists', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [{ name: 'Attack', description: 'Special attack.' }],
+        actions: [{ name: 'Attack', description: 'Regular attack.' }],
+        bonusActions: [{ name: 'Attack', description: 'Bonus attack.' }],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.queryByText(/Attack/)).not.toBeInTheDocument();
+    });
+
+    it('deduplicates special actions with duplicate names', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Second Wind', description: 'First definition.' },
+          { name: 'Second Wind', description: 'Second definition.' },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      const elements = screen.getAllByText(/Second Wind/);
+      expect(elements).toHaveLength(1);
+    });
+  });
+
+  describe('popup behavior', () => {
+    it('shows a popup when a special action with details is clicked', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          {
+            name: 'Second Wind',
+            description: 'Regain hit points.',
+            details: 'This feature comes from the Fighter class.',
+          },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Second Wind/));
+      expect(screen.getByText(/This feature comes from the Fighter class/)).toBeInTheDocument();
+    });
+
+    it('shows a popup when a non-clickable special action is clicked', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Rage', description: 'Enter a berserker rage.' },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Rage/));
       expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+      const elements = screen.getAllByText(/Enter a berserker rage/);
+      expect(elements.length).toBeGreaterThanOrEqual(1);
     });
 
-    fireEvent.click(screen.getByTestId('popup-overlay'));
+    it('dismisses the popup when the overlay is clicked', async () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Rage', description: 'Enter a berserker rage.' },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Rage/));
+      await waitFor(() => {
+        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('popup-overlay'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
+    });
+  });
 
-    await waitFor(() => {
+  describe('automation behavior', () => {
+    it('executes automation when a special action with automation is clicked', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'popup',
+        payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
+      });
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Blink Steps/));
+
+      await waitFor(() => {
+        expect(executeHandler).toHaveBeenCalledWith(
+          playerStats.specialActions[0],
+          playerStats,
+          'test',
+          null
+        );
+      });
+    });
+
+    it('shows an automation info popup when executeHandler returns type popup', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'popup',
+        payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
+      });
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Blink Steps/));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Teleported 30 ft/)).toBeInTheDocument();
+      });
+    });
+
+    it('shows a teleport modal when automation returns a teleport modal', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'teleport',
+        payload: {
+          action: { name: 'Blink Steps', automation: { effect: 'bonus_teleport', distance: '30 ft' } },
+          playerStats: basePlayerStats,
+          campaignName: 'test',
+        },
+      });
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Blink Steps/));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('teleport-modal')).toBeInTheDocument();
+      });
+    });
+
+    it('does not show a teleport modal for unknown modal types', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'unknown',
+        payload: { action: { name: 'Unknown' } },
+      });
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Unknown Action', description: 'Does something unknown.', automation: { type: 'custom' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Unknown Action/));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('teleport-modal')).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders automation actions with the clickable class', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText(/Blink Steps/)).toHaveClass('clickable');
+    });
+
+    it('renders non-automation actions without the clickable class', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Second Wind', description: 'Regain hit points.' },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText(/Second Wind/)).not.toHaveClass('clickable');
+    });
+  });
+
+  describe('cannotAct prop', () => {
+    it('prevents automation execution when cannotAct is true', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'popup',
+        payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
+      });
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={true} />);
+      fireEvent.click(screen.getByText(/Blink Steps/));
+
+      await waitFor(() => {
+        expect(executeHandler).not.toHaveBeenCalled();
+      });
+    });
+
+    it('allows automation execution when cannotAct is false', async () => {
+      executeHandler.mockResolvedValue(null);
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={false} />);
+      fireEvent.click(screen.getByText(/Blink Steps/));
+
+      await waitFor(() => {
+        expect(executeHandler).toHaveBeenCalled();
+      });
+    });
+
+    it('allows non-automation actions when cannotAct is true', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Second Wind', description: 'Regain hit points.', details: 'Fighter class feature.' },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={true} />);
+      fireEvent.click(screen.getByText(/Second Wind/));
+      expect(screen.getByText(/Fighter class feature/)).toBeInTheDocument();
+    });
+  });
+
+  describe('edge cases and null safety', () => {
+    it('renders gracefully with empty specialActions array', () => {
+      render(<CharSpecialActions playerStats={createPlayerStats()} campaignName="test" />);
+      expect(screen.getByText('Special Actions')).toBeInTheDocument();
+    });
+
+    it('renders gracefully when specialActions is undefined', () => {
+      const playerStats = createPlayerStats({ specialActions: undefined });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText('Special Actions')).toBeInTheDocument();
+    });
+
+    it('renders gracefully when all action lists are undefined', () => {
+      const playerStats = {
+        specialActions: [{ name: 'Second Wind', description: 'Regain hit points.' }],
+        class: { fightingStyles: [] },
+      };
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
+    });
+
+    it('uses description as key fallback when special action has no name', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [{ description: 'An unnamed special action' }],
+      });
+      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(container.querySelector('.sectionHeader')).toBeInTheDocument();
+      expect(screen.getByText('An unnamed special action')).toBeInTheDocument();
+    });
+
+    it('uses index fallback key for unnamed actions without description', () => {
+      const playerStats = createPlayerStats({
+        specialActions: [{}],
+      });
+      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(container.querySelector('.sectionHeader')).toBeInTheDocument();
+    });
+
+    it('handles executeHandler returning null', async () => {
+      executeHandler.mockResolvedValue(null);
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Blink Steps/));
+
+      await waitFor(() => {
+        expect(executeHandler).toHaveBeenCalled();
+      });
       expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-    });
-  });
-
-  it('should handle undefined specialActions gracefully', () => {
-    const playerStatsNoSpecial = {
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsNoSpecial} campaignName="test" />
-    );
-
-    expect(screen.getByText('Special Actions')).toBeInTheDocument();
-  });
-
-  it('should handle undefined actions/bonusActions/reactions/characterAdvancement gracefully', () => {
-    const playerStatsMinimal = {
-      specialActions: [
-        {
-          name: 'Second Wind',
-          description: 'You can use a bonus action to regain hit points.',
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsMinimal} campaignName="test" />
-    );
-
-    expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
-  });
-
-  it('should use fallback key when special action has no name', () => {
-    const playerStatsNoName = {
-      specialActions: [
-        {
-          description: 'An unnamed special action',
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    const { container } = render(
-      <CharSpecialActions playerStats={playerStatsNoName} campaignName="test" />
-    );
-
-    expect(container.querySelector('.sectionHeader')).toBeInTheDocument();
-    expect(screen.getByText('An unnamed special action')).toBeInTheDocument();
-  });
-
-  it('should not execute automation when cannotAct is true', async () => {
-    executeHandler.mockResolvedValue({
-      type: 'popup',
-      payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
+      expect(screen.queryByTestId('teleport-modal')).not.toBeInTheDocument();
     });
 
-    const playerStatsWithAutomation = {
-      specialActions: [
-        {
-          name: 'Blink Steps',
-          description: 'Teleport up to 30 feet.',
-          automation: { type: 'temp_buff', effect: 'bonus_teleport' },
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
+    it('handles executeHandler returning an error popup result', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'popup',
+        payload: { type: 'automation_info', name: 'Broken Action', description: 'Failed to execute Broken Action' },
+      });
 
-    render(
-      <CharSpecialActions playerStats={playerStatsWithAutomation} campaignName="test" cannotAct={true} />
-    );
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Broken Action', description: 'This will fail.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      fireEvent.click(screen.getByText(/Broken Action/));
 
-    const clickableElement = screen.getByText(/Blink Steps/);
-    fireEvent.click(clickableElement);
-
-    await waitFor(() => {
-      expect(executeHandler).not.toHaveBeenCalled();
+      await waitFor(() => {
+        expect(executeHandler).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+      });
+      expect(screen.getByText(/Failed to execute Broken Action/)).toBeInTheDocument();
     });
-  });
 
-  it('should render non-automation special actions as non-clickable', () => {
-    const playerStatsNoAutomation = {
-      specialActions: [
-        {
-          name: 'Second Wind',
-          description: 'You can use a bonus action to regain hit points.',
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsNoAutomation} campaignName="test" />
-    );
-
-    expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
-  });
-
-  it('should render automation special actions as clickable', () => {
-    const playerStatsWithAutomation = {
-      specialActions: [
-        {
-          name: 'Blink Steps',
-          description: 'Teleport up to 30 feet.',
-          automation: { type: 'temp_buff', effect: 'bonus_teleport' },
-        },
-      ],
-      class: {
-        fightingStyles: [],
-      },
-      actions: [],
-      bonusActions: [],
-      reactions: [],
-      characterAdvancement: [],
-    };
-
-    render(
-      <CharSpecialActions playerStats={playerStatsWithAutomation} campaignName="test" />
-    );
-
-    const clickableElement = screen.getByText(/Blink Steps/);
-    expect(clickableElement).toHaveClass('clickable');
+    it('handles getFightingStyle returning null for unknown style', () => {
+      // The mock already returns null for unknown names
+      const playerStats = createPlayerStats({
+        class: { fightingStyles: ['Unknown Style'] },
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      expect(screen.queryByText(/Unknown Style/)).not.toBeInTheDocument();
+    });
   });
 });

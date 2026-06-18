@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import BoonOfEnergyResistanceModal from './BoonOfEnergyResistanceModal.jsx';
 
 // ── Mocked modules ──
@@ -23,40 +24,32 @@ import * as boonHandler from '../../../../services/automation/handlers/reactions
 
 // ── Test fixtures ──
 
-const baseAction = {
-  name: 'Boon Of Energy Resistance',
-  damageTypes: ['Acid', 'Cold', 'Fire', 'Lightning'],
-  maxSelections: 2,
-};
+const defaultDamageTypes = ['Acid', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Poison', 'Psychic', 'Radiant', 'Thunder'];
 
-const basePlayerStats = {
-  name: 'TestCharacter',
-  level: 5,
-};
-
-const baseProps = {
-  action: baseAction,
-  playerStats: basePlayerStats,
-  campaignName: 'test-campaign',
-  onClose: vi.fn(),
-};
-
-function makeProps(overrides) {
-  return { ...baseProps, ...(overrides || {}) };
+function makeBaseAction(overrides) {
+  return {
+    name: 'Boon Of Energy Resistance',
+    damageTypes: ['Acid', 'Cold', 'Fire', 'Lightning'],
+    maxSelections: 2,
+    automation: { type: 'test', validTypes: defaultDamageTypes },
+    ...overrides,
+  };
 }
 
-function makeAction(overrides) {
-  const base = { ...baseAction };
-  if (overrides) {
-    for (const key of Object.keys(overrides)) {
-      if (typeof overrides[key] === 'object' && !Array.isArray(overrides[key]) && overrides[key] !== null) {
-        base[key] = { ...base[key], ...overrides[key] };
-      } else {
-        base[key] = overrides[key];
-      }
-    }
-  }
-  return base;
+function makeProps(overrides) {
+  return {
+    action: makeBaseAction(),
+    playerStats: { name: 'TestCharacter', level: 5 },
+    campaignName: 'test-campaign',
+    onClose: vi.fn(),
+    ...overrides,
+  };
+}
+
+// ── Helpers ──
+
+function renderModal(props) {
+  return render(<BoonOfEnergyResistanceModal {...makeProps(props)} />);
 }
 
 // ── Tests ──
@@ -64,7 +57,6 @@ function makeAction(overrides) {
 describe('BoonOfEnergyResistanceModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
     boonHandler.applyTypeChoice.mockResolvedValue({
       type: 'popup',
       payload: {
@@ -75,439 +67,376 @@ describe('BoonOfEnergyResistanceModal', () => {
     });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   // ── Initial render / display ──
 
-  it('renders modal overlay', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-  });
+  describe('initial render', () => {
+    it('renders the modal with overlay, header, body, and actions sections', () => {
+      renderModal();
+      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
+      expect(document.querySelector('.sp-header')).toBeInTheDocument();
+      expect(document.querySelector('.sp-body')).toBeInTheDocument();
+      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
+    });
 
-  it('renders modal container', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-  });
+    it('renders the header with shield icon and action name', () => {
+      renderModal();
+      expect(document.querySelector('.fa-shield-halved')).toBeInTheDocument();
+      expect(screen.getByText('Boon Of Energy Resistance')).toBeInTheDocument();
+    });
 
-  it('renders modal header', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(document.querySelector('.sp-header')).toBeInTheDocument();
-  });
+    it('renders damage type selection instructions when no existing types', () => {
+      renderModal();
+      expect(screen.getByText(/Choose 2 damage types/)).toBeInTheDocument();
+    });
 
-  it('renders modal body', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(document.querySelector('.sp-body')).toBeInTheDocument();
-  });
+    it('shows selection counter starting at zero', () => {
+      renderModal();
+      expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
+    });
 
-  it('renders modal actions', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-  });
+    it('renders all damage types from action.damageTypes as checkboxes', () => {
+      renderModal();
+      expect(screen.getByLabelText('Acid')).toBeInTheDocument();
+      expect(screen.getByLabelText('Cold')).toBeInTheDocument();
+      expect(screen.getByLabelText('Fire')).toBeInTheDocument();
+      expect(screen.getByLabelText('Lightning')).toBeInTheDocument();
+    });
 
-  it('renders header with shield icon and action name', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    const icon = document.querySelector('.fa-shield-halved');
-    expect(icon).toBeInTheDocument();
-    expect(screen.getByText('Boon Of Energy Resistance')).toBeInTheDocument();
-  });
+    it('does not render damage types not listed in action.damageTypes', () => {
+      renderModal();
+      expect(screen.queryByLabelText('Necrotic')).not.toBeInTheDocument();
+      expect(screen.queryByLabelText('Thunder')).not.toBeInTheDocument();
+    });
 
-  it('renders damage type selection instructions when no existing types', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(screen.getByText(/Choose 2 damage types/)).toBeInTheDocument();
-  });
+    it('renders Cancel and Choose Damage Types buttons', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Choose Damage Types' })).toBeInTheDocument();
+    });
 
-  it('shows selection counter', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
-  });
+    it('renders Font Awesome shield icon on the apply button', () => {
+      renderModal();
+      expect(document.querySelector('.sp-roll-btn .fa-shield-halved')).toBeInTheDocument();
+    });
 
-  it('renders all damage types as checkboxes', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(screen.getByLabelText('Acid')).toBeInTheDocument();
-    expect(screen.getByLabelText('Cold')).toBeInTheDocument();
-    expect(screen.getByLabelText('Fire')).toBeInTheDocument();
-    expect(screen.getByLabelText('Lightning')).toBeInTheDocument();
-  });
+    it('disables the apply button when no types are selected', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: 'Choose Damage Types' })).toBeDisabled();
+    });
 
-  it('does not render damage types not in action.damageTypes', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(screen.queryByLabelText('Necrotic')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Poison')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Psychic')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Radiant')).not.toBeInTheDocument();
-    expect(screen.queryByLabelText('Thunder')).not.toBeInTheDocument();
-  });
-
-  it('renders Cancel button', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-  });
-
-  it('renders apply button with correct label for new selection', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(screen.getByRole('button', { name: 'Choose Damage Types' })).toBeInTheDocument();
-  });
-
-  it('disables apply button when no types selected', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    const applyBtn = screen.getByRole('button', { name: 'Choose Damage Types' });
-    expect(applyBtn).toBeDisabled();
-  });
-
-  it('renders Font Awesome shield icon in header', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    const icon = document.querySelector('.fa-shield-halved');
-    expect(icon).toBeInTheDocument();
-  });
-
-  it('renders Font Awesome shield icon on apply button', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    const icon = document.querySelector('.sp-roll-btn .fa-shield-halved');
-    expect(icon).toBeInTheDocument();
+    it('does not show the Done button on initial render', () => {
+      renderModal();
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    });
   });
 
   // ── Default values when action is null/missing ──
 
-  it('uses default damage types when action is null', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: null })} />);
-    expect(screen.getByLabelText('Acid')).toBeInTheDocument();
-    expect(screen.getByLabelText('Thunder')).toBeInTheDocument();
-  });
+  describe('defaults when action fields are missing', () => {
+    it('falls back to all nine energy types when action is null', () => {
+      renderModal({ action: null });
+      for (const type of defaultDamageTypes) {
+        expect(screen.getByLabelText(type)).toBeInTheDocument();
+      }
+    });
 
-  it('uses default max selection of 2 when action.maxSelections is missing', () => {
-    const actionWithoutMax = { name: 'Test', damageTypes: ['Fire'] };
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionWithoutMax })} />);
-    expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
-  });
+    it('falls back to maxSelections of 2 when action.maxSelections is missing', () => {
+      renderModal({ action: makeBaseAction({ maxSelections: undefined }) });
+      expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
+    });
 
-  it('uses default action name when action.name is missing', () => {
-    const actionWithoutName = { damageTypes: ['Fire'] };
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionWithoutName })} />);
-    expect(screen.getByText('Boon Of Energy Resistance')).toBeInTheDocument();
+    it('falls back to default name when action.name is missing', () => {
+      renderModal({ action: makeBaseAction({ name: undefined }) });
+      expect(screen.getByText('Boon Of Energy Resistance')).toBeInTheDocument();
+    });
   });
 
   // ── Existing types display ──
 
-  it('shows change instruction when existing types provided', () => {
-    const actionWithExisting = makeAction({
-      existingTypes: ['Fire', 'Cold'],
+  describe('existing types UI', () => {
+    it('shows change instruction when existing types are provided', () => {
+      renderModal({ action: makeBaseAction({ existingTypes: ['Fire', 'Cold'] }) });
+      expect(screen.getByText(/Change your chosen damage types/)).toBeInTheDocument();
+      expect(screen.getByText(/currently Fire, Cold/)).toBeInTheDocument();
     });
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionWithExisting })} />);
-    expect(screen.getByText(/Change your chosen damage types/)).toBeInTheDocument();
-    expect(screen.getByText(/currently Fire, Cold/)).toBeInTheDocument();
-  });
 
-  it('marks existing types with "current" label', () => {
-    const actionWithExisting = makeAction({
-      existingTypes: ['Fire'],
+    it('marks existing types with a "current" label', () => {
+      renderModal({ action: makeBaseAction({ existingTypes: ['Fire'] }) });
+      expect(screen.getByText('(current)')).toBeInTheDocument();
     });
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionWithExisting })} />);
-    expect(screen.getByText('(current)')).toBeInTheDocument();
-  });
 
-  it('renders apply button with change label when existing types provided', () => {
-    const actionWithExisting = makeAction({
-      existingTypes: ['Fire'],
+    it('changes the apply button label to "Change Damage Types" when existing types exist', () => {
+      renderModal({ action: makeBaseAction({ existingTypes: ['Fire'] }) });
+      expect(screen.getByRole('button', { name: 'Change Damage Types' })).toBeInTheDocument();
     });
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionWithExisting })} />);
-    expect(screen.getByRole('button', { name: 'Change Damage Types' })).toBeInTheDocument();
   });
 
   // ── Overlay click behavior ──
 
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<BoonOfEnergyResistanceModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
+  describe('overlay click behavior', () => {
+    it('calls onClose when the overlay background is clicked', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+      fireEvent.click(document.querySelector('.sp-overlay'));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
 
-  it('does not close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<BoonOfEnergyResistanceModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-modal'));
-    expect(onClose).not.toHaveBeenCalled();
+    it('does not close when clicking inside the modal content', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+      fireEvent.click(document.querySelector('.sp-modal'));
+      expect(onClose).not.toHaveBeenCalled();
+    });
   });
 
   // ── Cancel button ──
 
-  it('calls onClose when Cancel button is clicked', () => {
-    const onClose = vi.fn();
-    render(<BoonOfEnergyResistanceModal {...makeProps({ onClose })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
+  describe('Cancel button', () => {
+    it('calls onClose when Cancel is clicked', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ── Checkbox selection ──
 
-  it('selects a damage type when its checkbox is clicked', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    expect(screen.getByLabelText('Fire')).toBeChecked();
-  });
+  describe('checkbox selection', () => {
+    it('selects a damage type when its checkbox is clicked', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      expect(screen.getByLabelText('Fire')).toBeChecked();
+    });
 
-  it('updates selection counter after selecting a type', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    expect(screen.getByText(/Selected: 1 \/ 2/)).toBeInTheDocument();
-  });
+    it('deselects a damage type when its checkbox is clicked again', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      expect(screen.getByLabelText('Fire')).toBeChecked();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      expect(screen.getByLabelText('Fire')).not.toBeChecked();
+    });
 
-  it('deselects a damage type when its checkbox is clicked again', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    expect(screen.getByLabelText('Fire')).toBeChecked();
-    fireEvent.click(screen.getByLabelText('Fire'));
-    expect(screen.getByLabelText('Fire')).not.toBeChecked();
-  });
+    it('updates the selection counter after toggling types', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      expect(document.querySelector('.sp-body p:nth-of-type(2)')).toHaveTextContent('Selected: 1 / 2');
+      fireEvent.click(screen.getByLabelText('Cold'));
+      expect(document.querySelector('.sp-body p:nth-of-type(2)')).toHaveTextContent('Selected: 2 / 2');
+      fireEvent.click(screen.getByLabelText('Fire'));
+      expect(document.querySelector('.sp-body p:nth-of-type(2)')).toHaveTextContent('Selected: 1 / 2');
+      fireEvent.click(screen.getByLabelText('Cold'));
+      expect(document.querySelector('.sp-body p:nth-of-type(2)')).toHaveTextContent('Selected: 0 / 2');
+    });
 
-  it('updates selection counter to 0 after deselecting', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Fire'));
-    expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
-  });
+    it('prevents selecting more than maxSelections types', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Cold'));
+      fireEvent.click(screen.getByLabelText('Acid'));
+      expect(screen.getByLabelText('Acid')).not.toBeChecked();
+      expect(screen.getByText(/Selected: 2 \/ 2/)).toBeInTheDocument();
+    });
 
-  it('allows selecting up to maxSelections types', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Cold'));
-    expect(screen.getByText(/Selected: 2 \/ 2/)).toBeInTheDocument();
-  });
+    it('disables unchecked checkboxes when at max selection', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Cold'));
+      expect(screen.getByLabelText('Acid')).toBeDisabled();
+      expect(screen.getByLabelText('Lightning')).toBeDisabled();
+    });
 
-  it('prevents selecting more than maxSelections types', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Cold'));
-    fireEvent.click(screen.getByLabelText('Acid'));
-    expect(screen.getByLabelText('Acid')).not.toBeChecked();
-    expect(screen.getByText(/Selected: 2 \/ 2/)).toBeInTheDocument();
-  });
+    it('keeps selected checkboxes enabled when at max selection', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Cold'));
+      expect(screen.getByLabelText('Fire')).not.toBeDisabled();
+      expect(screen.getByLabelText('Cold')).not.toBeDisabled();
+    });
 
-  it('disables checkboxes for unselected types when at max', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Cold'));
-    expect(screen.getByLabelText('Acid')).toBeDisabled();
-    expect(screen.getByLabelText('Lightning')).toBeDisabled();
-  });
+    it('re-enables other checkboxes after deselecting a type at max', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Cold'));
+      expect(screen.getByLabelText('Acid')).toBeDisabled();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      expect(screen.getByLabelText('Acid')).not.toBeDisabled();
+    });
 
-  it('does not disable checkboxes for already selected types when at max', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Cold'));
-    expect(screen.getByLabelText('Fire')).not.toBeDisabled();
-    expect(screen.getByLabelText('Cold')).not.toBeDisabled();
-  });
-
-  it('allows deselecting a type when at max to make room for another', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Cold'));
-    expect(screen.getByLabelText('Acid')).toBeDisabled();
-    fireEvent.click(screen.getByLabelText('Fire'));
-    expect(screen.getByLabelText('Acid')).not.toBeDisabled();
-  });
-
-  it('selects a different type after deselecting one', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Cold'));
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Acid'));
-    expect(screen.getByLabelText('Acid')).toBeChecked();
-    expect(screen.getByLabelText('Fire')).not.toBeChecked();
+    it('swaps a selected type for a different one via deselect then select', () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Cold'));
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Acid'));
+      expect(screen.getByLabelText('Acid')).toBeChecked();
+      expect(screen.getByLabelText('Fire')).not.toBeChecked();
+    });
   });
 
   // ── Apply flow ──
 
-  it('does not call applyTypeChoice when no types are selected', async () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+  describe('apply flow', () => {
+    it('does not call applyTypeChoice when no types are selected', async () => {
+      renderModal();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+      });
+      expect(boonHandler.applyTypeChoice).not.toHaveBeenCalled();
     });
-    expect(boonHandler.applyTypeChoice).not.toHaveBeenCalled();
-  });
 
-  it('calls applyTypeChoice when types are selected and apply is clicked', async () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Cold'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+    it('calls applyTypeChoice with correct arguments when types are selected', async () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Cold'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+      });
+      expect(boonHandler.applyTypeChoice).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'Boon Of Energy Resistance' }),
+        { name: 'TestCharacter', level: 5 },
+        'test-campaign',
+        ['Fire', 'Cold']
+      );
     });
-    expect(boonHandler.applyTypeChoice).toHaveBeenCalledWith(
-      baseAction,
-      basePlayerStats,
-      'test-campaign',
-      ['Fire', 'Cold']
-    );
-  });
 
-  it('shows applied state after successful apply', async () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+    it('shows applied state after successful apply: Done button replaces selection UI', async () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+      });
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Choose Damage Types' })).not.toBeInTheDocument();
+      });
     });
-    await waitFor(() => {
-      expect(screen.queryByText(/Choose Damage Types/)).not.toBeInTheDocument();
-    });
-  });
 
-  it('displays result description after apply', async () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+    it('hides selection UI after apply', async () => {
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+      });
+      await waitFor(() => {
+        expect(screen.queryByText(/Selected:/)).not.toBeInTheDocument();
+      });
     });
-    await waitFor(() => {
-      const body = document.querySelector('.sp-body');
-      expect(body).toBeInTheDocument();
-    });
-  });
 
-  it('shows Done button after apply', async () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+    it('renders the handler result description via dangerouslySetInnerHTML', async () => {
+      const mockResult = {
+        payload: {
+          description: '<p>Fire and Cold selected.</p>',
+        },
+      };
+      boonHandler.applyTypeChoice.mockResolvedValue(mockResult);
+      renderModal();
+      fireEvent.click(screen.getByLabelText('Fire'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+      });
+      await waitFor(() => {
+        const body = document.querySelector('.sp-body');
+        expect(body.innerHTML).toContain('<p>Fire and Cold selected.</p>');
+      });
     });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-    });
-  });
 
-  it('hides Cancel button after apply', async () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+    it('calls onClose when Done is clicked after apply', async () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+      fireEvent.click(screen.getByLabelText('Fire'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+      });
+      await waitFor(() => {
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-    });
-  });
 
-  it('hides selection UI after apply', async () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/Selected: 1 \/ 2/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('calls onClose when Done button is clicked after apply', async () => {
-    const onClose = vi.fn();
-    render(<BoonOfEnergyResistanceModal {...makeProps({ onClose })} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
-    });
-    await waitFor(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders result with dangerouslySetInnerHTML content', async () => {
-    const mockResult = {
-      payload: {
-        description: '<p>Fire and Cold selected.</p>',
-      },
-    };
-    boonHandler.applyTypeChoice.mockResolvedValue(mockResult);
-    const { getByLabelText } = render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    fireEvent.click(getByLabelText('Fire'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
-    });
-    await waitFor(() => {
-      const body = document.querySelector('.sp-body');
-      expect(body.innerHTML).toContain('<p>Fire and Cold selected.</p>');
+    it('does not call applyTypeChoice when the apply button is clicked but selection is empty', async () => {
+      renderModal();
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose Damage Types' }));
+      });
+      expect(boonHandler.applyTypeChoice).not.toHaveBeenCalled();
     });
   });
 
   // ── Apply with existing types ──
 
-  it('calls applyTypeChoice with existing types action', async () => {
-    const actionWithExisting = makeAction({
-      existingTypes: ['Fire'],
+  describe('apply with existing types', () => {
+    it('calls applyTypeChoice with the action containing existing types', async () => {
+      const actionWithExisting = makeBaseAction({ existingTypes: ['Fire'] });
+      renderModal({ action: actionWithExisting });
+      fireEvent.click(screen.getByLabelText('Cold'));
+      fireEvent.click(screen.getByLabelText('Lightning'));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Change Damage Types' }));
+      });
+      expect(boonHandler.applyTypeChoice).toHaveBeenCalledWith(
+        expect.objectContaining({ existingTypes: ['Fire'] }),
+        { name: 'TestCharacter', level: 5 },
+        'test-campaign',
+        ['Cold', 'Lightning']
+      );
     });
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionWithExisting })} />);
-    fireEvent.click(screen.getByLabelText('Cold'));
-    fireEvent.click(screen.getByLabelText('Lightning'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Change Damage Types' }));
-    });
-    expect(boonHandler.applyTypeChoice).toHaveBeenCalledWith(
-      actionWithExisting,
-      basePlayerStats,
-      'test-campaign',
-      ['Cold', 'Lightning']
-    );
   });
 
   // ── Custom maxSelections ──
 
-  it('respects custom maxSelections value', () => {
-    const actionWithMax3 = makeAction({ maxSelections: 3 });
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionWithMax3 })} />);
-    expect(document.querySelector('.sp-body').textContent).toContain('Selected: 0 / 3');
-  });
+  describe('custom maxSelections', () => {
+    it('uses the custom maxSelections value in the counter', () => {
+      renderModal({ action: makeBaseAction({ maxSelections: 3 }) });
+      expect(screen.getByText(/Selected: 0 \/ 3/)).toBeInTheDocument();
+    });
 
-  it('allows selecting up to custom maxSelections', () => {
-    const actionWithMax3 = makeAction({ maxSelections: 3 });
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionWithMax3 })} />);
-    fireEvent.click(screen.getByLabelText('Fire'));
-    fireEvent.click(screen.getByLabelText('Cold'));
-    fireEvent.click(screen.getByLabelText('Acid'));
-    expect(screen.getByText(/Selected: 3 \/ 3/)).toBeInTheDocument();
-    expect(screen.getByLabelText('Lightning')).toBeDisabled();
+    it('allows selecting up to the custom maxSelections', () => {
+      renderModal({ action: makeBaseAction({ maxSelections: 3 }) });
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Cold'));
+      fireEvent.click(screen.getByLabelText('Acid'));
+      expect(screen.getByText(/Selected: 3 \/ 3/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Lightning')).toBeDisabled();
+    });
+
+    it('prevents selecting beyond the custom maxSelections', () => {
+      renderModal({ action: makeBaseAction({ maxSelections: 1 }) });
+      fireEvent.click(screen.getByLabelText('Fire'));
+      fireEvent.click(screen.getByLabelText('Cold'));
+      expect(screen.getByLabelText('Fire')).toBeChecked();
+      expect(screen.getByLabelText('Cold')).not.toBeChecked();
+      expect(screen.getByText(/Selected: 1 \/ 1/)).toBeInTheDocument();
+    });
   });
 
   // ── Edge cases ──
 
-  it('renders with empty damageTypes array', () => {
-    const actionEmptyTypes = makeAction({ damageTypes: [] });
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionEmptyTypes })} />);
-    const typeLabels = document.querySelectorAll('label');
-    expect(typeLabels.length).toBe(0);
-  });
+  describe('edge cases', () => {
+    it('renders with no checkboxes when damageTypes is empty', () => {
+      renderModal({ action: makeBaseAction({ damageTypes: [] }) });
+      const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+      expect(checkboxes).toHaveLength(0);
+    });
 
-  it('renders with empty existingTypes array as no existing', () => {
-    const actionEmptyExisting = makeAction({ existingTypes: [] });
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: actionEmptyExisting })} />);
-    expect(document.querySelector('.sp-body').textContent).toContain('Choose 2 damage types');
-    expect(screen.queryByText(/(current)/)).not.toBeInTheDocument();
-  });
+    it('treats empty existingTypes array as no existing types', () => {
+      renderModal({ action: makeBaseAction({ existingTypes: [] }) });
+      expect(screen.getByText(/Choose 2 damage types/)).toBeInTheDocument();
+      expect(screen.queryByText(/(current)/)).not.toBeInTheDocument();
+    });
 
-  it('renders with all default damage types when action is null', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps({ action: null })} />);
-    expect(screen.getByLabelText('Acid')).toBeInTheDocument();
-    expect(screen.getByLabelText('Cold')).toBeInTheDocument();
-    expect(screen.getByLabelText('Fire')).toBeInTheDocument();
-    expect(screen.getByLabelText('Lightning')).toBeInTheDocument();
-    expect(screen.getByLabelText('Necrotic')).toBeInTheDocument();
-    expect(screen.getByLabelText('Poison')).toBeInTheDocument();
-    expect(screen.getByLabelText('Psychic')).toBeInTheDocument();
-    expect(screen.getByLabelText('Radiant')).toBeInTheDocument();
-    expect(screen.getByLabelText('Thunder')).toBeInTheDocument();
-  });
+    it('renders all nine default damage types when action is null', () => {
+      renderModal({ action: null });
+      for (const type of defaultDamageTypes) {
+        expect(screen.getByLabelText(type)).toBeInTheDocument();
+      }
+    });
 
-  it('does not show applied state on initial render', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
-  });
-
-  it('shows selection UI on initial render', () => {
-    render(<BoonOfEnergyResistanceModal {...makeProps()} />);
-    expect(document.querySelector('.sp-body').textContent).toContain('Choose 2 damage types');
-    expect(screen.getByRole('button', { name: 'Choose Damage Types' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    it('does not show applied state on initial render with null action', () => {
+      renderModal({ action: null });
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    });
   });
 });

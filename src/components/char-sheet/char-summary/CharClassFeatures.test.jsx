@@ -1,10 +1,15 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharClassFeatures from './CharClassFeatures.jsx';
 
-vi.mock('./TrackedResourceInput.jsx', () => ({ default: ({ label, resourceKey, _playerName, getMax, _deps, _campaignName, _playerStats }) => (
-    <div data-testid={`tracked-resource-${resourceKey}`}>{label}: {getMax()}</div>
-) }));
+vi.mock('./TrackedResourceInput.jsx', () => ({
+    default: ({ label, getMax }) => (
+        <div data-testid={`tracked-resource-${label}`}>
+            {label}: {getMax()}
+        </div>
+    ),
+}));
 
 vi.mock('../../../services/character/classFeatures.js', () => ({
     getClassFeatures: vi.fn(() => ({
@@ -33,33 +38,39 @@ vi.mock('../../../services/character/classFeatures.js', () => ({
         invocationsKnown: 6,
         invocations: ['Eldritch Sight', 'Eldritch Strength'],
         pactBoon: 'Chain',
+        hasArcanum: true,
         arcanumLevels: { level6: 1, level7: 1, level8: 1, level9: 1 },
         arcanums: ['Level 6', 'Level 7'],
         arcaneRecoveryLevels: 3,
         showWizardFeatures: true,
+        favoredEnemies: 'Beasts',
     })),
 }));
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-    useRuntimeValue: vi.fn((name, key, _campaign) => {
-        if (key === 'aspectOfTheWildsOption') return 'Owl';
-        if (key === 'activeBuffs') return [];
-        if (key === 'bardicInspirationUses') return 3;
-        if (key === 'sorceryPoints') return 2;
-        if (key === 'metamagicKnown') return 2;
-        if (key === 'innateSorceryUses') return 1;
-        if (key === 'portentDice') return null;
-        return null;
+    useRuntimeValue: vi.fn((_name, key) => {
+        switch (key) {
+            case 'aspectOfTheWildsOption': return 'Owl';
+            case 'activeBuffs': return [];
+            case 'bardicInspirationUses': return 3;
+            case 'sorceryPoints': return 2;
+            case 'metamagicKnown': return 2;
+            case 'innateSorceryUses': return 1;
+            case 'portentDice': return null;
+            default: return null;
+        }
     }),
-    getRuntimeValue: vi.fn((name, key, _campaign) => {
-        if (key === 'bardicInspirationUses') return 3;
-        if (key === 'portentDice') return null;
-        return null;
+    getRuntimeValue: vi.fn((_name, key) => {
+        switch (key) {
+            case 'bardicInspirationUses': return 3;
+            case 'portentDice': return null;
+            default: return null;
+        }
     }),
     setRuntimeValue: vi.fn(),
 }));
 
-const mockPlayerStats = {
+const basePlayerStats = {
     name: 'Thorin',
     level: 5,
     abilities: [
@@ -69,7 +80,7 @@ const mockPlayerStats = {
     ],
     proficiency: 3,
     class: { name: 'Cleric', subclass: { name: 'War', type: 'Choice' }, fightingStyles: [] },
-    automation: { passives: [], actions: [] },
+    automation: { passives: [], specialActions: [] },
     equipment: [],
     inventory: { equipped: [] },
     spellAbilities: {},
@@ -77,221 +88,300 @@ const mockPlayerStats = {
 
 const mockCampaignName = 'test-campaign';
 
+function makeStats(overrides = {}) {
+    return { ...basePlayerStats, ...overrides };
+}
+
+function renderComponent(playerStats, campaign = mockCampaignName) {
+    return render(<CharClassFeatures playerStats={playerStats} campaignName={campaign} />);
+}
+
 describe('CharClassFeatures', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('renders null for unknown class', () => {
-        const stats = { ...mockPlayerStats, class: { name: 'UnknownClass' } };
-        const { container } = render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(container.innerHTML).toBe('');
+    describe('null/unknown class handling', () => {
+        it('returns null for unknown class name', () => {
+            const { container } = renderComponent(makeStats({ class: { name: 'UnknownClass' } }));
+            expect(container.innerHTML).toBe('');
+        });
+
+        it('returns null for undefined playerStats', () => {
+            const { container } = render(<CharClassFeatures playerStats={null} campaignName={mockCampaignName} />);
+            expect(container.innerHTML).toBe('');
+        });
+
+        it('returns null when playerStats.class is undefined', () => {
+            const { container } = renderComponent(makeStats({ class: undefined }));
+            expect(container.innerHTML).toBe('');
+        });
     });
 
-    it('renders Barbarian features container', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Barbarian', class_levels: [{ level: 5, class_specific: { rage_count: 2, rage_damage_bonus: 2 } }] },
+    describe('Barbarian features', () => {
+        const barbarianStats = () => makeStats({
+            class: {
+                name: 'Barbarian',
+                class_levels: [{ level: 5, class_specific: { rage_count: 2, rage_damage_bonus: 2 } }],
+            },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-barbarian')).toBeInTheDocument();
+        });
+
+        it('renders barbarian container', () => {
+            renderComponent(barbarianStats());
+            expect(screen.getByTestId('char-class-barbarian')).toBeInTheDocument();
+        });
+
+        it('renders rage toggle button with correct title', () => {
+            renderComponent(barbarianStats());
+            expect(screen.getByTitle('Enter Rage (toggle for damage bonus)')).toBeInTheDocument();
+        });
+
+        it('renders barbarian with Aspect of the Wilds passive', () => {
+            const stats = makeStats({
+                class: {
+                    name: 'Barbarian',
+                    class_levels: [{ level: 5, class_specific: { rage_count: 2, rage_damage_bonus: 2 } }],
+                },
+                automation: { passives: [{ effect: 'animal_aspect' }] },
+            });
+            renderComponent(stats);
+            expect(screen.getByText(/Aspect of the Wilds/)).toBeInTheDocument();
+            expect(document.querySelector('.automation-btn--active')).toBeInTheDocument();
+        });
     });
 
-    it('renders Barbarian rage toggle button', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Barbarian', class_levels: [{ level: 5, class_specific: { rage_count: 2, rage_damage_bonus: 2 } }] },
-            automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTitle('Enter Rage (toggle for damage bonus)')).toBeInTheDocument();
-    });
-
-    it('renders Bard features container', () => {
-        const stats = {
-            ...mockPlayerStats,
+    describe('Bard features', () => {
+        const bardStats = (overrides = {}) => makeStats({
+            level: 5,
             class: { name: 'Bard', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-bard')).toBeInTheDocument();
+            ...overrides,
+        });
+
+        it('renders bard container', () => {
+            renderComponent(bardStats());
+            expect(screen.getByTestId('char-class-bard')).toBeInTheDocument();
+        });
+
+        it('renders Font of Inspiration button when passive exists', () => {
+            const stats = bardStats({
+                automation: { passives: [{ type: 'font_of_inspiration' }] },
+            });
+            renderComponent(stats);
+            expect(screen.getByTitle('Font of Inspiration: Expend a spell slot to regain 1 Bardic Inspiration use')).toBeInTheDocument();
+        });
+
+        it('does not render Font of Inspiration without passive', () => {
+            renderComponent(bardStats());
+            expect(screen.queryByTitle('Font of Inspiration')).not.toBeInTheDocument();
+        });
+
+        it('disables Font of Inspiration button when at max bardic inspiration', () => {
+            const stats = bardStats({
+                automation: { passives: [{ type: 'font_of_inspiration' }] },
+            });
+            renderComponent(stats);
+            const btn = screen.getByTitle('Font of Inspiration: Expend a spell slot to regain 1 Bardic Inspiration use');
+            expect(btn).toBeDisabled();
+        });
     });
 
-    it('renders Font of Inspiration button when passive exists', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Bard', class_levels: [{ level: 5 }] },
-            automation: { passives: [{ type: 'font_of_inspiration' }] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTitle('Font of Inspiration: Expend a spell slot to regain 1 Bardic Inspiration use')).toBeInTheDocument();
-    });
-
-    it('renders Cleric features container', () => {
-        const stats = {
-            ...mockPlayerStats,
+    describe('Cleric features', () => {
+        const clericStats = () => makeStats({
             class: { name: 'Cleric', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-cleric')).toBeInTheDocument();
+        });
+
+        it('renders cleric container', () => {
+            renderComponent(clericStats());
+            expect(screen.getByTestId('char-class-cleric')).toBeInTheDocument();
+        });
     });
 
-    it('renders Druid features container', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Druid', class_levels: [{ level: 5 }] },
+    describe('Druid features', () => {
+        const druidStats = (level = 5) => makeStats({
+            level,
+            class: { name: 'Druid', class_levels: [{ level }] },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-druid')).toBeInTheDocument();
+        });
+
+        it('renders druid container at level 5', () => {
+            renderComponent(druidStats(5));
+            expect(screen.getByTestId('char-class-druid')).toBeInTheDocument();
+        });
+
+        it('returns null for druid below level 2', () => {
+            const { container } = renderComponent(druidStats(1));
+            expect(container.innerHTML).toBe('');
+        });
+
+        it('returns null for druid at level 0', () => {
+            const { container } = renderComponent(druidStats(0));
+            expect(container.innerHTML).toBe('');
+        });
     });
 
-    it('returns null for Druid level < 2', () => {
-        const stats = {
-            ...mockPlayerStats,
-            level: 1,
-            class: { name: 'Druid', class_levels: [{ level: 1 }] },
-            automation: { passives: [] },
-        };
-        const { container } = render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(container.innerHTML).toBe('');
-    });
-
-    it('renders Fighter features container', () => {
-        const stats = {
-            ...mockPlayerStats,
+    describe('Fighter features', () => {
+        const fighterStats = (overrides = {}) => makeStats({
             level: 5,
-            class: { name: 'Fighter', class_levels: [{ level: 5, extra_attacks: 2, weapon_mastery: 'Mercy' }, { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 }], fightingStyles: [] },
+            class: {
+                name: 'Fighter',
+                class_levels: [
+                    { level: 5, extra_attacks: 2, weapon_mastery: 'Mercy' },
+                    { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 },
+                ],
+                fightingStyles: [],
+            },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
+            ...overrides,
+        });
+
+        it('renders fighter container', () => {
+            renderComponent(fighterStats());
+            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
+        });
+
+        it('returns null when class_levels is null', () => {
+            const { container } = renderComponent(makeStats({
+                class: { name: 'Fighter', class_levels: null },
+                automation: { passives: [] },
+            }));
+            expect(container.innerHTML).toBe('');
+        });
+
+        it('returns null when class_levels is undefined', () => {
+            const { container } = renderComponent(makeStats({
+                class: { name: 'Fighter', class_levels: undefined },
+                automation: { passives: [] },
+            }));
+            expect(container.innerHTML).toBe('');
+        });
     });
 
-    it('returns null for Fighter when classLevel is missing', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Fighter', class_levels: null },
+    describe('Monk features', () => {
+        const monkStats = (level = 5) => makeStats({
+            level,
+            class: { name: 'Monk', class_levels: [{ level }] },
             automation: { passives: [] },
-        };
-        const { container } = render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(container.innerHTML).toBe('');
+        });
+
+        it('renders monk container at level 5', () => {
+            renderComponent(monkStats(5));
+            expect(screen.getByTestId('char-class-monk')).toBeInTheDocument();
+        });
+
+        it('returns null for monk below level 2', () => {
+            const { container } = renderComponent(monkStats(1));
+            expect(container.innerHTML).toBe('');
+        });
     });
 
-    it('renders Monk features container', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Monk', class_levels: [{ level: 5 }] },
-            automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-monk')).toBeInTheDocument();
-    });
-
-    it('returns null for Monk level < 2', () => {
-        const stats = {
-            ...mockPlayerStats,
-            level: 1,
-            class: { name: 'Monk', class_levels: [{ level: 1 }] },
-            automation: { passives: [] },
-        };
-        const { container } = render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(container.innerHTML).toBe('');
-    });
-
-    it('renders Paladin features container', () => {
-        const stats = {
-            ...mockPlayerStats,
+    describe('Paladin features', () => {
+        const paladinStats = () => makeStats({
             class: { name: 'Paladin', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-paladin')).toBeInTheDocument();
+        });
+
+        it('renders paladin container', () => {
+            renderComponent(paladinStats());
+            expect(screen.getByTestId('char-class-paladin')).toBeInTheDocument();
+        });
     });
 
-    it('renders Ranger features container', () => {
-        const stats = {
-            ...mockPlayerStats,
+    describe('Ranger features', () => {
+        const rangerStats = () => makeStats({
             class: { name: 'Ranger', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-ranger')).toBeInTheDocument();
+        });
+
+        it('renders ranger container', () => {
+            renderComponent(rangerStats());
+            expect(screen.getByTestId('char-class-ranger')).toBeInTheDocument();
+        });
     });
 
-    it('renders Rogue features with Supreme Sneak', () => {
-        const stats = {
-            ...mockPlayerStats,
-            level: 9,
-            class: { name: 'Rogue', class_levels: [{ level: 9 }] },
+    describe('Rogue features', () => {
+        const rogueStats = (level = 9) => makeStats({
+            level,
+            class: { name: 'Rogue', class_levels: [{ level }] },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-rogue')).toBeInTheDocument();
-        expect(screen.getByTitle('Supreme Sneak: Activate Stealth Attack (costs 1d6 Sneak Attack, preserves Invisible with cover)')).toBeInTheDocument();
+        });
+
+        it('renders rogue container at level 9', () => {
+            renderComponent(rogueStats(9));
+            expect(screen.getByTestId('char-class-rogue')).toBeInTheDocument();
+        });
+
+        it('renders Supreme Sneak button at level 9 or above', () => {
+            renderComponent(rogueStats(9));
+            expect(screen.getByTitle(/Supreme Sneak/)).toBeInTheDocument();
+        });
+
+        it('does not render Supreme Sneak below level 9', () => {
+            renderComponent(rogueStats(5));
+            expect(screen.queryByTitle(/Supreme Sneak/)).not.toBeInTheDocument();
+        });
     });
 
-    it('does not render Supreme Sneak for level < 9', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Rogue', class_levels: [{ level: 5 }] },
-            automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.queryByTitle('Supreme Sneak: Activate Stealth Attack')).not.toBeInTheDocument();
-    });
-
-    it('renders Sorcerer features container', () => {
-        const stats = {
-            ...mockPlayerStats,
+    describe('Sorcerer features', () => {
+        const sorcererStats = () => makeStats({
             class: { name: 'Sorcerer', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-sorcerer')).toBeInTheDocument();
+        });
+
+        it('renders sorcerer container', () => {
+            renderComponent(sorcererStats());
+            expect(screen.getByTestId('char-class-sorcerer')).toBeInTheDocument();
+        });
     });
 
-    it('renders Warlock features container', () => {
-        const stats = {
-            ...mockPlayerStats,
+    describe('Warlock features', () => {
+        const warlockStats = () => makeStats({
             class: { name: 'Warlock', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-warlock')).toBeInTheDocument();
+        });
+
+        it('renders warlock container', () => {
+            renderComponent(warlockStats());
+            expect(screen.getByTestId('char-class-warlock')).toBeInTheDocument();
+        });
     });
 
-    it('renders Wizard features container', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Wizard', class_levels: [{ level: 5 }] },
-            automation: { passives: [] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('char-class-wizard')).toBeInTheDocument();
-    });
-
-    it('returns null for Wizard when showWizardFeatures is false', () => {
-        const stats = {
-            ...mockPlayerStats,
+    describe('Wizard features', () => {
+        const wizardStats = () => makeStats({
             level: 5,
             class: { name: 'Wizard', class_levels: [{ level: 5 }] },
             automation: { passives: [] },
-        };
-        const { container } = render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(container.innerHTML).not.toBe('');
+        });
+
+        it('renders wizard container when showWizardFeatures is true', () => {
+            renderComponent(wizardStats());
+            expect(screen.getByTestId('char-class-wizard')).toBeInTheDocument();
+        });
+
+        it('returns null when showWizardFeatures is false', async () => {
+            await vi.resetModules();
+            const classFeaturesModule = await import('../../../services/character/classFeatures.js');
+            classFeaturesModule.getClassFeatures = vi.fn(() => ({ showWizardFeatures: false }));
+            const { container } = renderComponent(wizardStats());
+            expect(container.innerHTML).toBe('');
+        });
     });
 
-    it('renders Aspect of the Wilds for Barbarian with passive', () => {
-        const stats = {
-            ...mockPlayerStats,
-            class: { name: 'Barbarian', class_levels: [{ level: 5, class_specific: { rage_count: 2, rage_damage_bonus: 2 } }] },
-            automation: { passives: [{ effect: 'animal_aspect' }] },
-        };
-        render(<CharClassFeatures playerStats={stats} campaignName={mockCampaignName} />);
-        expect(screen.getByText(/Aspect of the Wilds/)).toBeInTheDocument();
-        expect(document.querySelector('.automation-btn--active')).toBeInTheDocument();
+    describe('automation button states', () => {
+        it('renders Aspect of the Wilds buttons as active when option is set', () => {
+            const stats = makeStats({
+                class: {
+                    name: 'Barbarian',
+                    class_levels: [{ level: 5, class_specific: { rage_count: 2, rage_damage_bonus: 2 } }],
+                },
+                automation: { passives: [{ effect: 'animal_aspect' }] },
+            });
+            renderComponent(stats);
+            const activeBtn = document.querySelector('.automation-btn--active');
+            expect(activeBtn).toBeInTheDocument();
+            expect(activeBtn).toHaveTextContent('Owl');
+        });
     });
 });

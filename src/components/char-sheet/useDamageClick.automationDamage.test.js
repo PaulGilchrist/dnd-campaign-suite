@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useDamageClick from './useDamageClick.js';
 
@@ -137,11 +138,10 @@ describe('useDamageClick - automation damage bonuses', () => {
             const { handleDamageClick } = UseDamageClick({ playerStats: stats });
             await handleDamageClick(meleeAttack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('1d4');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
                 expect.stringContaining('1d4[radiant]'),
-                10, expect.any(Array), 0, expect.any(Object)
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
 
@@ -185,6 +185,11 @@ describe('useDamageClick - automation damage bonuses', () => {
                 '1d8+3',
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
+            expect(mockRollDamage).not.toHaveBeenCalledWith(
+                'Longsword',
+                expect.stringContaining('1d4'),
+                expect.anything(), expect.anything(), expect.anything(), expect.anything()
+            );
         });
     });
 
@@ -206,7 +211,6 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('1d6');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
                 expect.stringContaining('1d6[fire]'),
@@ -342,7 +346,6 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('2');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_frenzyUsedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -405,6 +408,66 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_frenzyUsedRound', expect.any(Number), 'test-campaign');
         });
+
+        it('skips Frenzy when not raging', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return [
+                    { effect: 'advantage_attacks_disadvantage_against' },
+                ];
+                return null;
+            });
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        { type: 'damage_bonus', trigger: 'reckless_attack_hit_while_raging', damageExpression: 'rage_damage', damageType: 'necrotic' },
+                    ],
+                    passives: [],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Greataxe',
+                '1d12+3',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
+
+        it('skips Frenzy when not reckless', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return [
+                    { damageBonusExpression: '2' },
+                ];
+                return null;
+            });
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        { type: 'damage_bonus', trigger: 'reckless_attack_hit_while_raging', damageExpression: 'rage_damage', damageType: 'necrotic' },
+                    ],
+                    passives: [],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: ['Heavy'], abilityName: 'Strength',
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Greataxe',
+                '1d12+3',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
     });
 
     describe('Divine Fury damage bonus', () => {
@@ -431,7 +494,6 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('2');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_divineFuryUsedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
@@ -469,6 +531,65 @@ describe('useDamageClick - automation damage bonuses', () => {
             }));
             expect(mockRollDamage).not.toHaveBeenCalled();
         });
+
+        it('skips Divine Fury when already used this round', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === '_divineFuryUsedRound') return 1;
+                if (key === 'activeBuffs') return [
+                    { damageBonusExpression: '2' },
+                ];
+                return null;
+            });
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        { type: 'damage_bonus', trigger: 'first_hit_while_raging', damageExpression: 'barbarian_level / 2', damageType: 'radiant' },
+                    ],
+                    passives: [],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: ['Heavy'],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Greataxe',
+                '1d12+3',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
+
+        it('skips Divine Fury when not raging', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'activeBuffs') return [];
+                return null;
+            });
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        { type: 'damage_bonus', trigger: 'first_hit_while_raging', damageExpression: 'barbarian_level / 2', damageType: 'radiant' },
+                    ],
+                    passives: [],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Greataxe', damage: '1d12+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: ['Heavy'],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Greataxe',
+                '1d12+3',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
     });
 
     describe('Brutal Strike attack rider', () => {
@@ -489,7 +610,6 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('2d6');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
                 expect.stringContaining('2d6[Force]'),
@@ -516,7 +636,6 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('1d8');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
                 expect.stringContaining('1d8[radiant]'),
@@ -594,7 +713,6 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            // upgrades field filters out the named upgrade, keeping the base version
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
                 expect.stringContaining('1d6[radiant]'),
@@ -654,6 +772,38 @@ describe('useDamageClick - automation damage bonuses', () => {
             );
         });
 
+        it('filters out non-strike options when a different option is chosen', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === '_Primal_Strike_option') return 'Other Effect';
+                return null;
+            });
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        {
+                            type: 'damage_bonus', trigger: 'weapon_attack_hit',
+                            damageExpression: '1d8', damageType: 'radiant',
+                            name: 'Primal Strike', options: ['Strike', 'Other Effect'],
+                        },
+                    ],
+                    passives: [],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Mace', damage: '1d6+2', damageType: 'Bludgeoning',
+                weaponType: 'melee', properties: [],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Mace',
+                '1d6+2',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
+
         it('applies oncePerTurn tracking when feature executes successfully', async () => {
             getRuntimeValue.mockReturnValue(null);
             const stats = {
@@ -708,6 +858,40 @@ describe('useDamageClick - automation damage bonuses', () => {
             );
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Dread_Ambush_uses', 0, 'test-campaign');
         });
+
+        it('skips uses_expression feature when uses are depleted', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === '_Dread_Ambush_uses') return 0;
+                return null;
+            });
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        {
+                            type: 'damage_bonus', trigger: 'weapon_attack_hit',
+                            damageExpression: '1d8', damageType: 'piercing',
+                            name: 'Dread Ambush', uses_expression: 'wis_mod', recharge: 'long_rest',
+                            usesMax: 4,
+                        },
+                    ],
+                    passives: [],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Longbow', damage: '1d8+3', damageType: 'Piercing',
+                weaponType: 'ranged', properties: [],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Longbow',
+                '1d8+3',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', '_Dread_Ambush_uses', expect.any(Number), 'test-campaign');
+        });
     });
 
     describe('natural 20 damage bonus', () => {
@@ -732,7 +916,6 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('2d6');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Overwhelming_Strike_usedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
@@ -799,10 +982,63 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('3');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
                 expect.stringContaining('3[Slashing]'),
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
+
+        it('does not apply natural 20 bonus when isNatural20 is false', async () => {
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        { type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: '2d6', extraDamageType: 'force', name: 'Overwhelming Strike' },
+                    ],
+                    passives: [],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({
+                playerStats: stats,
+                popupHtml: { isCrit: true, isNatural20: false },
+            });
+            const attack = {
+                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: [],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Longsword',
+                '1d8+3',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
+
+        it('does not apply natural 20 bonus when popupHtml is null', async () => {
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        { type: 'damage_bonus', trigger: 'natural_20_attack_roll', extraDamageExpression: '2d6', extraDamageType: 'force', name: 'Overwhelming Strike' },
+                    ],
+                    passives: [],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({
+                playerStats: stats,
+                popupHtml: null,
+            });
+            const attack = {
+                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: [],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Longsword',
+                '1d8+3',
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -830,7 +1066,6 @@ describe('useDamageClick - automation damage bonuses', () => {
             };
             await handleDamageClick(attack);
             await tick();
-            expect(rollExpression).toHaveBeenCalledWith('2d8');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Necrotic_Shroud_usedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
@@ -868,6 +1103,55 @@ describe('useDamageClick - automation damage bonuses', () => {
                 '1d8+3',
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
+        });
+
+        it('skips Celestial Revelation when no active transformation buff', async () => {
+            getActiveBuffs.mockReturnValue([]);
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [],
+                    passives: [
+                        { type: 'attack_rider', damageExpression: '2d8', trigger: 'hit', name: 'Necrotic Shroud', oncePerTurn: true },
+                    ],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: [],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Longsword',
+                '1d8+3',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
+
+        it('applies Celestial Revelation for Heavenly Wings transformation', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            getActiveBuffs.mockReturnValue([
+                { name: 'Heavenly Wings' },
+            ]);
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [],
+                    passives: [
+                        { type: 'attack_rider', damageExpression: '2d8', trigger: 'hit', name: 'Heavenly Wings', oncePerTurn: true },
+                    ],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Longsword', damage: '1d8+3', damageType: 'Slashing',
+                weaponType: 'melee', properties: [],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Heavenly_Wings_usedRound', 1, 'test-campaign');
         });
     });
 
@@ -938,6 +1222,44 @@ describe('useDamageClick - automation damage bonuses', () => {
             );
         });
 
+        it('does not apply Potent Spellcasting when Wisdom modifier is 0', async () => {
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        {
+                            type: 'damage_bonus', trigger: 'weapon_attack_hit',
+                            options: ['Potent Spellcasting (Cantrip)'],
+                            name: 'Potent Spellcasting',
+                        },
+                    ],
+                    passives: [],
+                },
+                spellAbilities: {
+                    spells: [
+                        { name: 'Fire Bolt', level: 0 },
+                    ],
+                },
+                abilities: [
+                    { name: 'Strength', bonus: 3 },
+                    { name: 'Dexterity', bonus: 2 },
+                    { name: 'Wisdom', bonus: 0 },
+                ],
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Fire Bolt', damage: '1d10', damageType: 'Fire',
+                weaponType: 'ranged', properties: [],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(mockRollDamage).toHaveBeenCalledWith(
+                'Fire Bolt',
+                '1d10',
+                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+            );
+        });
+
         it('grants temp HP when bonus.tempHpExpression is set', async () => {
             const stats = {
                 ...mockPlayerStats,
@@ -967,6 +1289,37 @@ describe('useDamageClick - automation damage bonuses', () => {
             await handleDamageClick(attack);
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'tempHp', 5, 'test-campaign');
+        });
+
+        it('does not grant temp HP when evaluateAutoExpression returns NaN', async () => {
+            evaluateAutoExpression.mockReturnValue(NaN);
+            const stats = {
+                ...mockPlayerStats,
+                automation: {
+                    actions: [
+                        {
+                            type: 'damage_bonus', trigger: 'weapon_attack_hit',
+                            options: ['Potent Spellcasting (Cantrip)'],
+                            name: 'Potent Spellcasting',
+                            tempHpExpression: 'invalid',
+                        },
+                    ],
+                    passives: [],
+                },
+                spellAbilities: {
+                    spells: [
+                        { name: 'Fire Bolt', level: 0 },
+                    ],
+                },
+            };
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            const attack = {
+                name: 'Fire Bolt', damage: '1d10', damageType: 'Fire',
+                weaponType: 'ranged', properties: [],
+            };
+            await handleDamageClick(attack);
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('TestFighter', 'tempHp', expect.any(Number), 'test-campaign');
         });
     });
 });

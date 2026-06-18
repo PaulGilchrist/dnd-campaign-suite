@@ -1,6 +1,8 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+// @improved-by-ai
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import FiendishLegacyModal from './FiendishLegacyModal.jsx';
+import { confirmFiendishLegacy } from '../../../services/automation/handlers/class-other/fiendishLegacyHandler.js';
 
 // ── Mocked modules ──
 
@@ -8,26 +10,27 @@ vi.mock('../../../services/automation/handlers/class-other/fiendishLegacyHandler
   confirmFiendishLegacy: vi.fn(),
 }));
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(() => null),
-  setRuntimeValue: vi.fn(() => Promise.resolve()),
-}));
-
-// ── Re-import mocked modules ──
-
-import { confirmFiendishLegacy } from '../../../services/automation/handlers/class-other/fiendishLegacyHandler.js';
-
 // ── Test fixtures ──
 
+const baseAction = { name: 'Fiendish Legacy' };
+
+const basePlayerStats = { name: 'Warlock1', level: 1, hitPoints: 30 };
+
 const baseProps = {
-  action: { name: 'Fiendish Legacy' },
-  playerStats: { name: 'Warlock1', level: 1, hitPoints: 30 },
+  action: baseAction,
+  playerStats: basePlayerStats,
   campaignName: 'test-campaign',
   onClose: vi.fn(),
 };
 
+const LEGACIES = ['Abyssal', 'Chthonic', 'Infernal'];
+
 function makeProps(overrides) {
   return { ...baseProps, ...(overrides || {}) };
+}
+
+function getLegacyLabel(legacyName) {
+  return screen.getByText(legacyName).closest('label');
 }
 
 // ── Tests ──
@@ -35,536 +38,455 @@ function makeProps(overrides) {
 describe('FiendishLegacyModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
-    global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn() });
   });
 
   // ── Initial render / display ──
 
-  it('renders modal overlay and header', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    expect(screen.getByText('Fiendish Legacy')).toBeInTheDocument();
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-  });
-
-  it('renders Font Awesome dragon icon in header', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const icon = document.querySelector('.fa-dragon');
-    expect(icon).toBeInTheDocument();
-  });
-
-  it('displays instruction text', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    expect(screen.getByText(/Choose a fiendish legacy/)).toBeInTheDocument();
-  });
-
-  it('renders all three legacy options', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    expect(screen.getByText('Abyssal')).toBeInTheDocument();
-    expect(screen.getByText('Chthonic')).toBeInTheDocument();
-    expect(screen.getByText('Infernal')).toBeInTheDocument();
-  });
-
-  it('renders Font Awesome icons for each legacy', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    expect(document.querySelector('.fa-dragon')).toBeInTheDocument();
-    expect(document.querySelector('.fa-ghost')).toBeInTheDocument();
-    expect(document.querySelector('.fa-fire')).toBeInTheDocument();
-  });
-
-  it('renders descriptions for each legacy option', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    expect(screen.getByText(/Resistance to Poison damage/)).toBeInTheDocument();
-    expect(screen.getByText(/Resistance to Necrotic damage/)).toBeInTheDocument();
-    expect(screen.getByText(/Resistance to Fire damage/)).toBeInTheDocument();
-  });
-
-  it('renders spellcasting ability text for each legacy', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const spans = screen.getAllByText(/Spellcasting ability: Charisma/);
-    expect(spans).toHaveLength(3);
-  });
-
-  it('renders Select Legacy button disabled by default', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const applyBtn = screen.getByRole('button', { name: /Select Legacy/ });
-    expect(applyBtn).toBeDisabled();
-  });
-
-  it('renders Cancel button', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-  });
-
-  it('renders Font Awesome dragon icon on Select Legacy button', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const icon = screen.getByRole('button', { name: /Select Legacy/ }).querySelector('.fa-dragon');
-    expect(icon).toBeInTheDocument();
-  });
-
-  // ── Overlay click behavior ──
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<FiendishLegacyModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<FiendishLegacyModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-modal'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  // ── Cancel button ──
-
-  it('calls onClose when Cancel button is clicked', () => {
-    const onClose = vi.fn();
-    render(<FiendishLegacyModal {...makeProps({ onClose })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  // ── Selection behavior ──
-
-  it('does not select any legacy by default', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    expect(document.querySelector('input[name="fiendishLegacyOption"]:checked')).not.toBeInTheDocument();
-  });
-
-  it('selects Abyssal legacy when clicked', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const abyssalLabel = screen.getByText('Abyssal').closest('label');
-    fireEvent.click(abyssalLabel);
-    expect(document.querySelector('input[name="fiendishLegacyOption"]:checked')).toBeInTheDocument();
-  });
-
-  it('selects Chthonic legacy when clicked', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const chthonicLabel = screen.getByText('Chthonic').closest('label');
-    fireEvent.click(chthonicLabel);
-    expect(document.querySelector('input[name="fiendishLegacyOption"]:checked')).toBeInTheDocument();
-  });
-
-  it('selects Infernal legacy when clicked', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    fireEvent.click(infernalLabel);
-    expect(document.querySelector('input[name="fiendishLegacyOption"]:checked')).toBeInTheDocument();
-  });
-
-  it('enables Apply button after selection', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    fireEvent.click(infernalLabel);
-    const applyBtn = screen.getByRole('button', { name: /Select Legacy/ });
-    expect(applyBtn).not.toBeDisabled();
-  });
-
-  it('switches selection when clicking a different legacy', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const abyssalLabel = screen.getByText('Abyssal').closest('label');
-    fireEvent.click(abyssalLabel);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    fireEvent.click(infernalLabel);
-    expect(screen.getByText('Infernal').closest('label')).toBeInTheDocument();
-  });
-
-  // ── Apply flow ──
-
-  it('does not call confirmFiendishLegacy when no selection', async () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    expect(confirmFiendishLegacy).not.toHaveBeenCalled();
-  });
-
-  it('calls confirmFiendishLegacy with correct args when Abyssal selected', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    const onClose = vi.fn();
-    render(<FiendishLegacyModal {...makeProps({ onClose })} />);
-    const abyssalLabel = screen.getByText('Abyssal').closest('label');
-    await act(async () => {
-      fireEvent.click(abyssalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    expect(confirmFiendishLegacy).toHaveBeenCalledWith(
-      { name: 'Warlock1', level: 1, hitPoints: 30 },
-      'Abyssal',
-      'test-campaign'
-    );
-  });
-
-  it('calls confirmFiendishLegacy with correct args when Chthonic selected', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Chthonic legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const chthonicLabel = screen.getByText('Chthonic').closest('label');
-    await act(async () => {
-      fireEvent.click(chthonicLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    expect(confirmFiendishLegacy).toHaveBeenCalledWith(
-      { name: 'Warlock1', level: 1, hitPoints: 30 },
-      'Chthonic',
-      'test-campaign'
-    );
-  });
-
-  it('calls confirmFiendishLegacy with correct args when Infernal selected', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Infernal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    await act(async () => {
-      fireEvent.click(infernalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    expect(confirmFiendishLegacy).toHaveBeenCalledWith(
-      { name: 'Warlock1', level: 1, hitPoints: 30 },
-      'Infernal',
-      'test-campaign'
-    );
-  });
-
-  // ── Result state ──
-
-  it('shows result screen after applying a legacy', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const abyssalLabel = screen.getByText('Abyssal').closest('label');
-    await act(async () => {
-      fireEvent.click(abyssalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Fiendish Legacy')).toBeInTheDocument();
-    });
-  });
-
-  it('renders result with done button', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Infernal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    await act(async () => {
-      fireEvent.click(infernalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-    });
-  });
-
-  it('hides selection options after applying', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Chthonic legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const chthonicLabel = screen.getByText('Chthonic').closest('label');
-    await act(async () => {
-      fireEvent.click(chthonicLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      expect(screen.queryByText(/Choose a fiendish legacy/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides Select Legacy and Cancel buttons after applying', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const abyssalLabel = screen.getByText('Abyssal').closest('label');
-    await act(async () => {
-      fireEvent.click(abyssalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /Select Legacy/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-    });
-  });
-
-  it('displays result payload description', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Infernal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    await act(async () => {
-      fireEvent.click(infernalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Selected Infernal legacy. Spellcasting ability: Charisma.')).toBeInTheDocument();
-    });
-  });
-
-  it('calls onClose when Done button is clicked after applying', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    const onClose = vi.fn();
-    render(<FiendishLegacyModal {...makeProps({ onClose })} />);
-    const abyssalLabel = screen.getByText('Abyssal').closest('label');
-    await act(async () => {
-      fireEvent.click(abyssalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onClose when clicking result overlay', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Chthonic legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    const onClose = vi.fn();
-    render(<FiendishLegacyModal {...makeProps({ onClose })} />);
-    const chthonicLabel = screen.getByText('Chthonic').closest('label');
-    await act(async () => {
-      fireEvent.click(chthonicLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      fireEvent.click(document.querySelector('.sp-overlay'));
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close result when clicking inside modal content', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Infernal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    const onClose = vi.fn();
-    render(<FiendishLegacyModal {...makeProps({ onClose })} />);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    await act(async () => {
-      fireEvent.click(infernalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      fireEvent.click(document.querySelector('.sp-modal'));
-    });
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  // ── Result screen with null payload ──
-
-  it('renders result screen with null payload', async () => {
-    confirmFiendishLegacy.mockResolvedValue(null);
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    await act(async () => {
-      fireEvent.click(infernalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
-      expect(screen.getByText('Fiendish Legacy')).toBeInTheDocument();
-    });
-  });
-
-  // ── Modal CSS classes ──
-
-  it('renders modal with proper CSS classes', () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    expect(document.querySelector('.sp-header')).toBeInTheDocument();
-    expect(document.querySelector('.sp-body')).toBeInTheDocument();
-    expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-  });
-
-  it('renders result modal with proper CSS classes', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const abyssalLabel = screen.getByText('Abyssal').closest('label');
-    await act(async () => {
-      fireEvent.click(abyssalLabel);
-    });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
-    });
-    await waitFor(() => {
+  describe('initial render', () => {
+    it('renders modal overlay and structure with all CSS classes', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
       expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
       expect(document.querySelector('.sp-modal')).toBeInTheDocument();
       expect(document.querySelector('.sp-header')).toBeInTheDocument();
       expect(document.querySelector('.sp-body')).toBeInTheDocument();
       expect(document.querySelector('.sp-actions')).toBeInTheDocument();
     });
+
+    it('renders the dragon icon in the header', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      const icon = document.querySelector('.sp-header .fa-solid.fa-dragon');
+      expect(icon).toBeInTheDocument();
+    });
+
+    it('renders the action name in the header', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      expect(screen.getByText('Fiendish Legacy')).toBeInTheDocument();
+    });
+
+    it('renders the selection prompt text', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      expect(screen.getByText(/Choose a fiendish legacy/)).toBeInTheDocument();
+    });
+
+    it('renders all three legacy options with labels', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      LEGACIES.forEach(name => {
+        expect(getLegacyLabel(name)).toBeInTheDocument();
+      });
+    });
+
+    it('renders the correct icon for each legacy', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      expect(document.querySelector('.sp-body .fa-dragon')).toBeInTheDocument();
+      expect(document.querySelector('.sp-body .fa-ghost')).toBeInTheDocument();
+      expect(document.querySelector('.sp-body .fa-fire')).toBeInTheDocument();
+    });
+
+    it('renders descriptions for each legacy option', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      expect(screen.getByText(/Resistance to Poison damage/)).toBeInTheDocument();
+      expect(screen.getByText(/Resistance to Necrotic damage/)).toBeInTheDocument();
+      expect(screen.getByText(/Resistance to Fire damage/)).toBeInTheDocument();
+    });
+
+    it('renders spellcasting ability text for each legacy', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      const spans = screen.getAllByText(/Spellcasting ability: Charisma/);
+      expect(spans).toHaveLength(3);
+    });
+
+    it('disables the apply button when no legacy is selected', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      expect(screen.getByRole('button', { name: /Select Legacy/ })).toBeDisabled();
+    });
+
+    it('renders Cancel button', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
+
+    it('renders the dragon icon inside the apply button', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      const applyBtn = screen.getByRole('button', { name: /Select Legacy/ });
+      expect(applyBtn.querySelector('.fa-solid.fa-dragon')).toBeInTheDocument();
+    });
+
+    it('has no radio button checked on initial render', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      expect(document.querySelector('input[name="fiendishLegacyOption"]:checked')).toBeNull();
+    });
+
+    it('does not show result view elements on initial render', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+    });
   });
 
-  // ── No selection edge case ──
+  // ── Overlay and cancel close behavior ──
 
-  it('does not call confirmFiendishLegacy if apply clicked without selection', async () => {
-    render(<FiendishLegacyModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+  describe('overlay and cancel close behavior', () => {
+    it('calls onClose when clicking the overlay background', () => {
+      const onClose = vi.fn();
+      render(<FiendishLegacyModal {...makeProps({ onClose })} />);
+      fireEvent.click(document.querySelector('.sp-overlay'));
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
-    expect(confirmFiendishLegacy).not.toHaveBeenCalled();
+
+    it('does not close when clicking inside the modal content', () => {
+      const onClose = vi.fn();
+      render(<FiendishLegacyModal {...makeProps({ onClose })} />);
+      fireEvent.click(document.querySelector('.sp-modal'));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('calls onClose when Cancel button is clicked', () => {
+      const onClose = vi.fn();
+      render(<FiendishLegacyModal {...makeProps({ onClose })} />);
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
-  // ── Props passthrough ──
+  // ── Radio selection ──
 
-  it('passes playerStats to confirmFiendishLegacy', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
+  describe('radio selection', () => {
+    LEGACIES.forEach(legacyName => {
+      it(`selects ${legacyName} legacy when clicked`, () => {
+        render(<FiendishLegacyModal {...baseProps} />);
+        fireEvent.click(getLegacyLabel(legacyName));
+        expect(getLegacyLabel(legacyName).querySelector('input')).toBeChecked();
+      });
     });
-    render(<FiendishLegacyModal {...makeProps()} />);
-    const abyssalLabel = screen.getByText('Abyssal').closest('label');
-    await act(async () => {
-      fireEvent.click(abyssalLabel);
+
+    it('deselects previous selection when a different legacy is clicked', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(getLegacyLabel('Infernal'));
+      expect(getLegacyLabel('Abyssal').querySelector('input')).not.toBeChecked();
+      expect(getLegacyLabel('Infernal').querySelector('input')).toBeChecked();
     });
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+
+    it('enables apply button after selecting a legacy', () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      expect(screen.getByRole('button', { name: /Select Legacy/ })).toBeEnabled();
     });
-    expect(confirmFiendishLegacy).toHaveBeenCalledWith(
-      expect.objectContaining({ name: 'Warlock1' }),
-      expect.any(String),
-      'test-campaign'
-    );
   });
 
-  it('passes campaignName to confirmFiendishLegacy', async () => {
-    confirmFiendishLegacy.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Fiendish Legacy',
-        description: 'Selected Infernal legacy. Spellcasting ability: Charisma.',
-        automation: { type: 'fiendish_legacy' },
-      },
-    });
-    render(<FiendishLegacyModal {...makeProps({ campaignName: 'my-campaign' })} />);
-    const infernalLabel = screen.getByText('Infernal').closest('label');
-    await act(async () => {
-      fireEvent.click(infernalLabel);
-    });
-    await act(async () => {
+  // ── Apply flow ──
+
+  describe('apply flow', () => {
+    it('does not call confirmFiendishLegacy when apply is clicked without a selection', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      expect(confirmFiendishLegacy).not.toHaveBeenCalled();
     });
-    expect(confirmFiendishLegacy).toHaveBeenCalledWith(
-      expect.any(Object),
-      expect.any(String),
-      'my-campaign'
-    );
+
+    LEGACIES.forEach(legacyName => {
+      it(`calls confirmFiendishLegacy with correct args when ${legacyName} is selected`, async () => {
+        confirmFiendishLegacy.mockResolvedValue({
+          type: 'popup',
+          payload: {
+            type: 'automation_info',
+            name: 'Fiendish Legacy',
+            description: `Selected ${legacyName} legacy. Spellcasting ability: Charisma.`,
+            automation: { type: 'fiendish_legacy' },
+          },
+        });
+        render(<FiendishLegacyModal {...baseProps} />);
+        fireEvent.click(getLegacyLabel(legacyName));
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+        expect(confirmFiendishLegacy).toHaveBeenCalledWith(
+          basePlayerStats,
+          legacyName,
+          'test-campaign'
+        );
+      });
+    });
+
+    it('calls confirmFiendishLegacy only once on apply', async () => {
+      confirmFiendishLegacy.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Fiendish Legacy',
+          description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
+          automation: { type: 'fiendish_legacy' },
+        },
+      });
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      expect(confirmFiendishLegacy).toHaveBeenCalledTimes(1);
+    });
+
+    it('passes the campaignName prop to confirmFiendishLegacy', async () => {
+      confirmFiendishLegacy.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Fiendish Legacy',
+          description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
+          automation: { type: 'fiendish_legacy' },
+        },
+      });
+      render(<FiendishLegacyModal {...makeProps({ campaignName: 'my-campaign' })} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      expect(confirmFiendishLegacy).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(String),
+        'my-campaign'
+      );
+    });
+
+    it('passes the playerStats prop to confirmFiendishLegacy', async () => {
+      confirmFiendishLegacy.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Fiendish Legacy',
+          description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
+          automation: { type: 'fiendish_legacy' },
+        },
+      });
+      const customStats = { name: 'Warlock2', level: 5, hitPoints: 60 };
+      render(<FiendishLegacyModal {...makeProps({ playerStats: customStats })} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      expect(confirmFiendishLegacy).toHaveBeenCalledWith(
+        customStats,
+        expect.any(String),
+        expect.any(String)
+      );
+    });
+  });
+
+  // ── Result view ──
+
+  describe('result view', () => {
+    beforeEach(() => {
+      confirmFiendishLegacy.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Fiendish Legacy',
+          description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
+          automation: { type: 'fiendish_legacy' },
+        },
+      });
+    });
+
+    it('shows result view after successful apply', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.queryByText(/Choose a fiendish legacy/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders the dragon icon in the result header', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(document.querySelector('.sp-header .fa-solid.fa-dragon')).toBeInTheDocument();
+      });
+    });
+
+    it('renders the action name in the result header', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.getByText('Fiendish Legacy')).toBeInTheDocument();
+      });
+    });
+
+    it('renders result description from payload in the sp-body', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.getByText('Selected Abyssal legacy. Spellcasting ability: Charisma.')).toBeInTheDocument();
+      });
+    });
+
+    it('renders result with proper CSS classes', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
+        expect(document.querySelector('.sp-modal')).toBeInTheDocument();
+        expect(document.querySelector('.sp-header')).toBeInTheDocument();
+        expect(document.querySelector('.sp-body')).toBeInTheDocument();
+        expect(document.querySelector('.sp-actions')).toBeInTheDocument();
+      });
+    });
+
+    it('renders Done button in result view', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+      });
+    });
+
+    it('hides radio buttons after apply', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.queryByText('Abyssal')).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides Cancel button after apply', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides the selection prompt after apply', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.queryByText(/Choose a fiendish legacy/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides the Select Legacy button after apply', async () => {
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: /Select Legacy/ })).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders result with custom action name', async () => {
+      const customAction = { name: 'Custom Legacy' };
+      confirmFiendishLegacy.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Custom Legacy',
+          description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
+          automation: { type: 'fiendish_legacy' },
+        },
+      });
+      render(<FiendishLegacyModal {...makeProps({ action: customAction })} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.getByText('Fiendish Legacy')).toBeInTheDocument();
+      });
+    });
+  });
+
+  // ── Result view close behavior ──
+
+  describe('result view close behavior', () => {
+    beforeEach(() => {
+      confirmFiendishLegacy.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Fiendish Legacy',
+          description: 'Selected Abyssal legacy. Spellcasting ability: Charisma.',
+          automation: { type: 'fiendish_legacy' },
+        },
+      });
+    });
+
+    it('calls onClose when Done button is clicked in result view', async () => {
+      const onClose = vi.fn();
+      render(<FiendishLegacyModal {...makeProps({ onClose })} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when overlay is clicked in result view', async () => {
+      const onClose = vi.fn();
+      render(<FiendishLegacyModal {...makeProps({ onClose })} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        fireEvent.click(document.querySelector('.sp-overlay'));
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not close when clicking modal content in result view', async () => {
+      const onClose = vi.fn();
+      render(<FiendishLegacyModal {...makeProps({ onClose })} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        fireEvent.click(document.querySelector('.sp-modal'));
+      });
+      expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Null/undefined result handling ──
+
+  describe('null/undefined result handling', () => {
+    it('does not show result view when confirmFiendishLegacy returns null', async () => {
+      confirmFiendishLegacy.mockResolvedValue(null);
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /Select Legacy/ })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not show result view when confirmFiendishLegacy returns undefined', async () => {
+      confirmFiendishLegacy.mockResolvedValue(undefined);
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /Select Legacy/ })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  // ── HTML rendering in result view ──
+
+  describe('HTML rendering in result view', () => {
+    it('renders result description as HTML via dangerouslySetInnerHTML', async () => {
+      confirmFiendishLegacy.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Fiendish Legacy',
+          description: '<strong>Fiendish Legacy:</strong> Abyssal selected. <em>Spellcasting ability: Charisma.</em>',
+          automation: { type: 'fiendish_legacy' },
+        },
+      });
+      render(<FiendishLegacyModal {...baseProps} />);
+      fireEvent.click(getLegacyLabel('Abyssal'));
+      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await waitFor(() => {
+        const body = document.querySelector('.sp-body');
+        expect(body.querySelector('strong')).toBeInTheDocument();
+        expect(body.querySelector('em')).toBeInTheDocument();
+      });
+    });
   });
 });

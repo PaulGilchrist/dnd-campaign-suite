@@ -1,42 +1,53 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { clearRuntimeState, setRuntimeValue as setRuntimeProp } from '../../../hooks/runtime/useRuntimeState.js';
 import { toggleBuff, getActiveBuffs, isBuffActive } from './buffToggle.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
-const trackedKeys = new Set();
-function trackKey(k) { if (k) trackedKeys.add(k); }
 
-function resetBetweenTests() {
-    for (const k of [...trackedKeys]) { clearRuntimeState(k); }
-    trackedKeys.clear();
+function resetRuntime() {
+    const keys = [...storeKeys];
+    for (const k of keys) { clearRuntimeState(k); }
+    storeKeys.clear();
     localStorage.clear();
 }
 
-// ── Auto buff fixture ───────────────────────────────────────────
-function makeAuto(options = {}) {
+function trackKey(k) { storeKeys.add(k); }
+
+const storeKeys = new Set();
+
+function makeAuto(overrides = {}) {
     return {
         effect: 'sample_effect',
         duration: '1 minute',
-        enemies_disadvantage_saves: options.enemies_disadvantage_saves || [],
-        distance: options.distance || '',
-        extendedDistance: options.extendedDistance || '',
-        ...options,
+        enemies_disadvantage_saves: overrides.enemies_disadvantage_saves || [],
+        distance: overrides.distance || '',
+        extendedDistance: overrides.extendedDistance || '',
+        blocksSpellcasting: overrides.blocksSpellcasting || false,
+        flySpeed: overrides.flySpeed || null,
+        hover: overrides.hover || false,
+        seeInvisibleRange: overrides.seeInvisibleRange || null,
+        narrowSpace: !!overrides.narrowSpace,
+        casting_time: overrides.casting_time || '',
+        resistanceTypes: overrides.resistanceTypes || [],
+        acBonus: overrides.acBonus || 0,
+        saveBonus: overrides.saveBonus || 0,
+        ...overrides,
     };
 }
 
 // ── Tests ───────────────────────────────────────────────────────
+
 beforeEach(() => {
     vi.restoreAllMocks();
-    resetBetweenTests();
+    resetRuntime();
 });
 
 describe('toggleBuff', () => {
     const campaign = 'TestCampaign';
 
-    describe('activation (buff not yet active)', () => {
-        beforeEach(() => { vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true }); });
-
-        it('adds a new buff when none active', () => {
+    describe('activation', () => {
+        it('returns result with isActive true and wasActive false when buff is not yet active', () => {
             trackKey('fighter');
             const auto = makeAuto({ effect: '+2 AC', duration: 'concentration' });
             const result = toggleBuff('fighter', 'Shield', auto, campaign);
@@ -44,33 +55,30 @@ describe('toggleBuff', () => {
             expect(result.isActive).toBe(true);
             expect(result.wasActive).toBe(false);
             expect(result.targetName).toBe('fighter');
-            expect(result.buffs).toHaveLength(1);
-            expect(result.buffs[0].name).toBe('Shield');
         });
 
-        it('stores buff via runtime state', () => {
+        it('stores the buff in runtime state', () => {
             trackKey('paladin');
             const auto = makeAuto({ effect: '+2 AC' });
             toggleBuff('paladin', 'Divine Shield', auto, campaign);
 
-            // Verify the value was persisted (via useRuntimeState internal store)
-            expect(getActiveBuffs('paladin', campaign)).toHaveLength(1);
-            expect(getActiveBuffs('paladin', campaign)[0].name).toBe('Divine Shield');
+            const buffs = getActiveBuffs('paladin', campaign);
+            expect(buffs).toHaveLength(1);
+            expect(buffs[0].name).toBe('Divine Shield');
         });
 
         it('preserves existing buffs when adding a new one', () => {
             trackKey('wizard');
             const auto1 = makeAuto({ effect: 'invisibility' });
             toggleBuff('wizard', 'Invisibility', auto1, campaign);
-            vi.restoreAllMocks();
-            vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
 
             const auto2 = makeAuto({ effect: 'haste' });
             const result = toggleBuff('wizard', 'Haste', auto2, campaign);
 
             expect(result.buffs).toHaveLength(2);
-            expect(result.buffs.map(b => b.name)).toContain('Invisibility');
-            expect(result.buffs.map(b => b.name)).toContain('Haste');
+            const names = result.buffs.map(b => b.name);
+            expect(names).toContain('Invisibility');
+            expect(names).toContain('Haste');
         });
 
         it('uses targetName when provided instead of playerName', () => {
@@ -80,7 +88,6 @@ describe('toggleBuff', () => {
 
             expect(result.targetName).toBe('ally-char');
             expect(getActiveBuffs('ally-char', campaign)).toHaveLength(1);
-            // The original caster should NOT have the buff
             expect(getActiveBuffs('caster', campaign)).toHaveLength(0);
         });
 
@@ -100,7 +107,46 @@ describe('toggleBuff', () => {
             expect(result.targetName).toBe('bard');
         });
 
-        it('includes sourceCharacter in the stored buff', () => {
+        it('stores all buff fields from the auto object', () => {
+            trackKey('full-buff-char');
+            const auto = makeAuto({
+                effect: '+3 to saves',
+                duration: '1 hour',
+                enemies_disadvantage_saves: ['str', 'dex'],
+                distance: '60 ft.',
+                extendedDistance: '120 ft.',
+                blocksSpellcasting: true,
+                flySpeed: 30,
+                hover: true,
+                seeInvisibleRange: 60,
+                narrowSpace: true,
+                casting_time: '1 action',
+                resistanceTypes: ['fire', 'cold'],
+                acBonus: 3,
+                saveBonus: 2,
+                sourceCharacter: undefined,
+            });
+            toggleBuff('full-buff-char', 'Full Buff', auto, campaign);
+
+            const buff = getActiveBuffs('full-buff-char', campaign)[0];
+            expect(buff.name).toBe('Full Buff');
+            expect(buff.effect).toBe('+3 to saves');
+            expect(buff.duration).toBe('1 hour');
+            expect(buff.enemiesDisadvantageSaves).toEqual(['str', 'dex']);
+            expect(buff.distance).toBe('60 ft.');
+            expect(buff.extendedDistance).toBe('120 ft.');
+            expect(buff.blocksSpellcasting).toBe(true);
+            expect(buff.flySpeed).toBe(30);
+            expect(buff.hover).toBe(true);
+            expect(buff.seeInvisibleRange).toBe(60);
+            expect(buff.narrowSpace).toBe(true);
+            expect(buff.castingTime).toBe('1 action');
+            expect(buff.resistanceTypes).toEqual(['fire', 'cold']);
+            expect(buff.acBonus).toBe(3);
+            expect(buff.saveBonus).toBe(2);
+        });
+
+        it('sets sourceCharacter to the playerName that triggered the toggle', () => {
             trackKey('cleric');
             const auto = makeAuto({ effect: 'heal' });
             toggleBuff('cleric', 'Cure Wounds', auto, campaign);
@@ -108,85 +154,32 @@ describe('toggleBuff', () => {
             expect(getActiveBuffs('cleric', campaign)[0].sourceCharacter).toBe('cleric');
         });
 
-        it('includes effect and duration from the auto object', () => {
-            trackKey('druid');
-            const auto = makeAuto({ effect: '+3 to saves', duration: '1 hour' });
-            toggleBuff('druid', 'Goodberry Aura', auto, campaign);
+        it('defaults missing optional fields to safe values', () => {
+            trackKey('minimal-char');
+            const auto = { effect: 'hex', duration: '1 hour' };
+            toggleBuff('minimal-char', 'Hex', auto, campaign);
 
-            const buff = getActiveBuffs('druid', campaign)[0];
-            expect(buff.effect).toBe('+3 to saves');
-            expect(buff.duration).toBe('1 hour');
-        });
-
-        it('defaults enemiesDisadvantageSaves to empty array when not on auto', () => {
-            trackKey('sorcerer');
-            const auto = makeAuto({}); // no enemies_disadvantage_saves
-            toggleBuff('sorcerer', 'Metamagic Boost', auto, campaign);
-
-            expect(getActiveBuffs('sorcerer', campaign)[0].enemiesDisadvantageSaves).toEqual([]);
-        });
-
-        it('defaults distance to empty string when not on auto', () => {
-            trackKey('warlock');
-            const auto = { effect: 'hex', duration: '1 hour' }; // no distance prop
-            toggleBuff('warlock', 'Hex', auto, campaign);
-
-            expect(getActiveBuffs('warlock', campaign)[0].distance).toBe('');
-        });
-
-        it('defaults extendedDistance to empty string when not on auto', () => {
-            trackKey('ranger');
-            const auto = { effect: 'vantage', duration: '1 hour' }; // no extendedDistance prop
-            toggleBuff('ranger', 'Scouting', auto, campaign);
-
-            expect(getActiveBuffs('ranger', campaign)[0].extendedDistance).toBe('');
-        });
-
-        it('defaults blocksSpellcasting to false when not on auto', () => {
-            trackKey('sorcerer2');
-            const auto = { effect: 'boost', duration: '1 minute' };
-            toggleBuff('sorcerer2', 'Metamagic', auto, campaign);
-
-            expect(getActiveBuffs('sorcerer2', campaign)[0].blocksSpellcasting).toBe(false);
-        });
-
-        it('stores blocksSpellcasting true from auto object', () => {
-            trackKey('druid2');
-            const auto = { effect: 'shape_shift', duration: '1 hour', blocksSpellcasting: true };
-            toggleBuff('druid2', 'Wild Shape', auto, campaign);
-
-            expect(getActiveBuffs('druid2', campaign)[0].blocksSpellcasting).toBe(true);
-        });
-
-        it('carries enemies_disadvantage_saves from auto object', () => {
-            trackKey('caster2');
-            const auto = makeAuto({ enemies_disadvantage_saves: ['str', 'dex'] });
-            toggleBuff('caster2', 'Snares', auto, campaign);
-
-            expect(getActiveBuffs('caster2', campaign)[0].enemiesDisadvantageSaves).toEqual(['str', 'dex']);
-        });
-
-        it('carries distance and extendedDistance from auto object', () => {
-            trackKey('blaster');
-            const auto = makeAuto({ distance: '60 ft.', extendedDistance: '120 ft.' });
-            toggleBuff('blaster', 'Fire Stream', auto, campaign);
-
-            const buff = getActiveBuffs('blaster', campaign)[0];
-            expect(buff.distance).toBe('60 ft.');
-            expect(buff.extendedDistance).toBe('120 ft.');
+            const buff = getActiveBuffs('minimal-char', campaign)[0];
+            expect(buff.enemiesDisadvantageSaves).toEqual([]);
+            expect(buff.distance).toBe('');
+            expect(buff.extendedDistance).toBe('');
+            expect(buff.blocksSpellcasting).toBe(false);
+            expect(buff.flySpeed).toBeNull();
+            expect(buff.hover).toBe(false);
+            expect(buff.seeInvisibleRange).toBeNull();
+            expect(buff.narrowSpace).toBe(false);
+            expect(buff.castingTime).toBe('');
+            expect(buff.resistanceTypes).toEqual([]);
+            expect(buff.acBonus).toBe(0);
+            expect(buff.saveBonus).toBe(0);
         });
     });
 
-    describe('deactivation (buff already active)', () => {
-        beforeEach(() => { vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true }); });
-
-        it('removes buff when toggled a second time', () => {
+    describe('deactivation', () => {
+        it('returns result with isActive false and wasActive true when buff is toggled off', () => {
             trackKey('monk');
             const auto = makeAuto({ effect: 'stunned' });
             toggleBuff('monk', 'Stunning Strike', auto, campaign);
-            vi.restoreAllMocks();
-            vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
-
             const result = toggleBuff('monk', 'Stunning Strike', auto, campaign);
 
             expect(result.isActive).toBe(false);
@@ -199,45 +192,77 @@ describe('toggleBuff', () => {
             const auto1 = makeAuto({ effect: 'a' });
             const auto2 = makeAuto({ effect: 'b' });
             toggleBuff('bard2', 'BuffA', auto1, campaign);
-            vi.restoreAllMocks();
-            vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
             toggleBuff('bard2', 'BuffB', auto2, campaign);
 
-            vi.restoreAllMocks();
-            vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
-
-            const result = toggleBuff('bard2', 'BuffA', auto1, campaign); // remove BuffA
+            const result = toggleBuff('bard2', 'BuffA', auto1, campaign);
 
             expect(result.buffs).toHaveLength(1);
             expect(result.buffs[0].name).toBe('BuffB');
         });
+
+        it('removes only the matching buff name, not similarly named ones', () => {
+            trackKey('similar-names');
+            const auto1 = makeAuto({ effect: 'a' });
+            const auto2 = makeAuto({ effect: 'b' });
+            toggleBuff('similar-names', 'Shield', auto1, campaign);
+            toggleBuff('similar-names', 'Shield of Faith', auto2, campaign);
+
+            const result = toggleBuff('similar-names', 'Shield', auto1, campaign);
+
+            expect(result.buffs).toHaveLength(1);
+            expect(result.buffs[0].name).toBe('Shield of Faith');
+        });
     });
 
     describe('edge cases', () => {
-        beforeEach(() => { vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true }); });
-
-        it('treats non-array stored value as empty array', () => {
-            // Simulate corrupted / non-array state by directly setting a scalar
+        it('treats non-array stored value as empty array and starts fresh', () => {
             trackKey('broken');
             setRuntimeProp('broken', 'activeBuffs', 'not-an-array', campaign);
-            vi.restoreAllMocks();
-            vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
 
             const auto = makeAuto({ effect: 'fix' });
             const result = toggleBuff('broken', 'FixIt', auto, campaign);
 
             expect(result.buffs).toHaveLength(1);
             expect(result.buffs[0].name).toBe('FixIt');
+            expect(result.buffs[0].effect).toBe('fix');
         });
 
-        it('treats null stored value as empty array', () => {
+        it('treats null stored value as empty array and starts fresh', () => {
             trackKey('null-buffs');
             setRuntimeProp('null-buffs', 'activeBuffs', null, campaign);
-            vi.restoreAllMocks();
-            vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
 
             const auto = makeAuto({ effect: 'repair' });
             const result = toggleBuff('null-buffs', 'Repair', auto, campaign);
+
+            expect(result.buffs).toHaveLength(1);
+            expect(result.buffs[0].name).toBe('Repair');
+        });
+
+        it('handles undefined stored value as empty array', () => {
+            // No prior call to setRuntimeProp — the key was never initialized
+            const auto = makeAuto({ effect: 'new' });
+            const result = toggleBuff('never-initialized', 'NewBuff', auto, campaign);
+
+            expect(result.buffs).toHaveLength(1);
+            expect(result.isActive).toBe(true);
+        });
+
+        it('handles empty string stored value as empty array', () => {
+            trackKey('empty-string');
+            setRuntimeProp('empty-string', 'activeBuffs', '', campaign);
+
+            const auto = makeAuto({ effect: 'new' });
+            const result = toggleBuff('empty-string', 'NewBuff', auto, campaign);
+
+            expect(result.buffs).toHaveLength(1);
+        });
+
+        it('handles numeric stored value as empty array', () => {
+            trackKey('numeric');
+            setRuntimeProp('numeric', 'activeBuffs', 42, campaign);
+
+            const auto = makeAuto({ effect: 'new' });
+            const result = toggleBuff('numeric', 'NewBuff', auto, campaign);
 
             expect(result.buffs).toHaveLength(1);
         });
@@ -247,14 +272,13 @@ describe('toggleBuff', () => {
 describe('getActiveBuffs', () => {
     const campaign = 'TestCampaign';
 
-    it('returns empty array when no buffs stored', () => {
+    it('returns empty array when no buffs stored for the character', () => {
         trackKey('empty-char');
         expect(getActiveBuffs('empty-char', campaign)).toEqual([]);
     });
 
     it('returns the stored buffs array', () => {
         trackKey('buffed-char');
-        vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
         setRuntimeProp('buffed-char', 'activeBuffs', [
             { name: 'Bless', effect: '+1 saves' },
             { name: 'Haste', effect: '+speed' },
@@ -266,7 +290,7 @@ describe('getActiveBuffs', () => {
         expect(buffs[1].name).toBe('Haste');
     });
 
-    it('returns empty array when stored value is not an array', () => {
+    it('returns empty array when stored value is not an array (string)', () => {
         trackKey('bad-buffs');
         setRuntimeProp('bad-buffs', 'activeBuffs', 'corrupted', campaign);
         expect(getActiveBuffs('bad-buffs', campaign)).toEqual([]);
@@ -278,25 +302,28 @@ describe('getActiveBuffs', () => {
         expect(getActiveBuffs('obj-buffs', campaign)).toEqual([]);
     });
 
-    it('does not mutate the stored array when returned', () => {
-        trackKey('immutable-char');
-        vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
-        const original = [{ name: 'Shield', effect: '+2 AC' }];
-        setRuntimeProp('immutable-char', 'activeBuffs', original, campaign);
+    it('returns empty array when stored value is null', () => {
+        trackKey('null-buffs');
+        setRuntimeProp('null-buffs', 'activeBuffs', null, campaign);
+        expect(getActiveBuffs('null-buffs', campaign)).toEqual([]);
+    });
 
-        const returned = getActiveBuffs('immutable-char', campaign);
-        // The implementation returns the same reference — but it should still be an array
-        expect(Array.isArray(returned)).toBe(true);
-        expect(returned).toHaveLength(1);
+    it('returns empty array when stored value is undefined (key never set)', () => {
+        expect(getActiveBuffs('never-set', campaign)).toEqual([]);
+    });
+
+    it('returns empty array when stored value is a number', () => {
+        trackKey('num-buffs');
+        setRuntimeProp('num-buffs', 'activeBuffs', 42, campaign);
+        expect(getActiveBuffs('num-buffs', campaign)).toEqual([]);
     });
 });
 
 describe('isBuffActive', () => {
     const campaign = 'TestCampaign';
 
-    it('returns true when buff is in the active buffs list', () => {
+    it('returns true when buff name matches an active buff', () => {
         trackKey('check-char');
-        vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
         setRuntimeProp('check-char', 'activeBuffs', [
             { name: 'Bless', effect: '+1' },
         ], campaign);
@@ -304,9 +331,8 @@ describe('isBuffActive', () => {
         expect(isBuffActive('check-char', 'Bless', campaign)).toBe(true);
     });
 
-    it('returns false when buff is not in the active buffs list', () => {
+    it('returns false when buff name does not match any active buff', () => {
         trackKey('miss-char');
-        vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
         setRuntimeProp('miss-char', 'activeBuffs', [
             { name: 'Haste', effect: '+speed' },
         ], campaign);
@@ -321,7 +347,6 @@ describe('isBuffActive', () => {
 
     it('is case-sensitive for buff name matching', () => {
         trackKey('case-char');
-        vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
         setRuntimeProp('case-char', 'activeBuffs', [
             { name: 'bless', effect: '+1' },
         ], campaign);
@@ -330,9 +355,23 @@ describe('isBuffActive', () => {
         expect(isBuffActive('case-char', 'bless', campaign)).toBe(true);
     });
 
-    it('handles non-array stored value gracefully', () => {
+    it('returns false when stored value is not an array', () => {
         trackKey('corrupted-char');
         setRuntimeProp('corrupted-char', 'activeBuffs', 'not-an-array', campaign);
         expect(isBuffActive('corrupted-char', 'Foo', campaign)).toBe(false);
+    });
+
+    it('handles multiple buffs and finds the correct one', () => {
+        trackKey('multi-char');
+        setRuntimeProp('multi-char', 'activeBuffs', [
+            { name: 'Haste', effect: '+speed' },
+            { name: 'Bless', effect: '+1' },
+            { name: 'Shield', effect: '+2 AC' },
+        ], campaign);
+
+        expect(isBuffActive('multi-char', 'Bless', campaign)).toBe(true);
+        expect(isBuffActive('multi-char', 'Shield', campaign)).toBe(true);
+        expect(isBuffActive('multi-char', 'Haste', campaign)).toBe(true);
+        expect(isBuffActive('multi-char', 'Invisibility', campaign)).toBe(false);
     });
 });

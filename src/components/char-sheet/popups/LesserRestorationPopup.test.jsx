@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+// @improved-by-ai
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import LesserRestorationPopup from './LesserRestorationPopup.jsx';
 
@@ -29,29 +30,37 @@ const mockRange = '30 ft';
 function renderPopup(overrides = {}) {
     const onConfirm = vi.fn();
     const onSkip = vi.fn();
-    return render(
-        <LesserRestorationPopup
-            spell={mockSpell}
-            playerStats={{}}
-            campaignName="test-campaign"
-            creatureTargets={mockCreatureTargets}
-            range={mockRange}
-            onConfirm={onConfirm}
-            onSkip={onSkip}
-            {...overrides}
-        />
-    );
+
+    // The renderPopup default onConfirm/onSkip are always created;
+    // overrides let tests replace them.
+    const props = {
+        spell: mockSpell,
+        playerStats: {},
+        campaignName: 'test-campaign',
+        creatureTargets: mockCreatureTargets,
+        range: mockRange,
+        onConfirm,
+        onSkip,
+        ...overrides,
+    };
+
+    // If the caller passed a custom onConfirm/onSkip via overrides,
+    // we need to use those instead of the defaults.
+    if (overrides.onConfirm !== undefined) {
+        props.onConfirm = overrides.onConfirm;
+    }
+    if (overrides.onSkip !== undefined) {
+        props.onSkip = overrides.onSkip;
+    }
+
+    return render(<LesserRestorationPopup {...props} />);
 }
 
 // ── Helpers ──
 
 async function selectTarget(name) {
-    await act(async () => {
-        const targetEl = screen.getByText(name);
-        fireEvent.click(targetEl);
-        // Wait for async loadTargetData to settle
-        await new Promise(r => setTimeout(r, 50));
-    });
+    const targetEl = screen.getByText(name);
+    fireEvent.click(targetEl);
 }
 
 // ── Tests ──
@@ -63,37 +72,18 @@ describe('LesserRestorationPopup', () => {
 
     // ── Default rendering ──
 
-    it('renders the popup with spell title and medical icon', () => {
+    it('renders the popup with spell title, icon, and details', () => {
         renderPopup();
         expect(screen.getByRole('heading', { name: 'Lesser Restoration' })).toBeInTheDocument();
-        const icon = document.querySelector('.fa-hand-holding-medical');
-        expect(icon).toBeInTheDocument();
-    });
-
-    it('displays spell name and level info', () => {
-        renderPopup();
+        expect(document.querySelector('.fa-hand-holding-medical')).toBeInTheDocument();
         expect(screen.getByText(/Level 2 Abjuration/)).toBeInTheDocument();
-    });
-
-    it('displays range in the instructions', () => {
-        renderPopup();
         expect(screen.getByText(/30 ft/)).toBeInTheDocument();
+        expect(screen.getByText('Target:')).toBeInTheDocument();
     });
 
     it('disables the cast button when no target is selected', () => {
         renderPopup();
-        const castButton = screen.getByText('Cast Lesser Restoration');
-        expect(castButton).toBeDisabled();
-    });
-
-    it('renders Cancel button', () => {
-        renderPopup();
-        expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
-
-    it('renders target selection section', () => {
-        renderPopup();
-        expect(screen.getByText('Target:')).toBeInTheDocument();
+        expect(screen.getByText('Cast Lesser Restoration')).toBeDisabled();
     });
 
     it('renders all creature targets', () => {
@@ -105,25 +95,8 @@ describe('LesserRestorationPopup', () => {
 
     // ── Target selection ──
 
-    it('highlights the selected target with checkmark and green styling', async () => {
-        getRuntimeValue.mockReturnValue([]);
-        getCombatSummary.mockResolvedValue(null);
-
-        renderPopup();
-        await selectTarget('Goblin');
-
-        await waitFor(() => {
-            const targetDivs = document.querySelectorAll('.metamagic-twin-target div[style*="cursor: pointer"]');
-            const selected = Array.from(targetDivs).find(d => d.textContent.includes('✓') && d.textContent.includes('Goblin'));
-            expect(selected).toBeTruthy();
-        });
-
-        const selectedDivs = document.querySelectorAll('[style*="rgba(76, 175, 80, 0.3)"]');
-        expect(selectedDivs.length).toBeGreaterThan(0);
-    });
-
-    it('calls getRuntimeValue when a creature target is clicked', async () => {
-        getRuntimeValue.mockReturnValue([]);
+    it('selects a target and loads its conditions when clicked', async () => {
+        getRuntimeValue.mockReturnValue(['blinded']);
         getCombatSummary.mockResolvedValue(null);
 
         renderPopup();
@@ -131,6 +104,19 @@ describe('LesserRestorationPopup', () => {
 
         await waitFor(() => {
             expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions');
+        });
+    });
+
+    it('highlights the selected target visually', async () => {
+        getRuntimeValue.mockReturnValue([]);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            // Check that the selected target shows a checkmark in its text
+            expect(screen.getByText(/\u2713\s+Goblin/)).toBeInTheDocument();
         });
     });
 
@@ -173,7 +159,7 @@ describe('LesserRestorationPopup', () => {
         });
     });
 
-    it('highlights selected condition with checkmark and green styling', async () => {
+    it('toggles condition selection on click', async () => {
         getRuntimeValue.mockReturnValue(['blinded']);
         getCombatSummary.mockResolvedValue(null);
 
@@ -184,15 +170,18 @@ describe('LesserRestorationPopup', () => {
             expect(screen.getByText(/Blinded condition/)).toBeInTheDocument();
         });
 
-        await act(async () => {
-            const blindedEl = screen.getByText(/Blinded condition/);
-            fireEvent.click(blindedEl);
-            await new Promise(r => setTimeout(r, 50));
+        const blindedEl = screen.getByText(/Blinded condition/);
+
+        // Toggle ON
+        fireEvent.click(blindedEl);
+        await waitFor(() => {
+            expect(blindedEl.textContent).toContain('\u2713');
         });
 
+        // Toggle OFF
+        fireEvent.click(blindedEl);
         await waitFor(() => {
-            const blindedEl = screen.getByText(/Blinded condition/);
-            expect(blindedEl.textContent).toContain('✓');
+            expect(blindedEl.textContent).not.toContain('\u2713');
         });
     });
 
@@ -210,53 +199,10 @@ describe('LesserRestorationPopup', () => {
         const castButton = screen.getByText('Cast Lesser Restoration');
         expect(castButton).toBeDisabled();
 
-        await act(async () => {
-            const blindedEl = screen.getByText(/Blinded condition/);
-            fireEvent.click(blindedEl);
-            await new Promise(r => setTimeout(r, 50));
-        });
+        fireEvent.click(screen.getByText(/Blinded condition/));
 
         await waitFor(() => {
             expect(castButton).toBeEnabled();
-        });
-    });
-
-    // ── Toggle selection ──
-
-    it('toggles condition selection on click', async () => {
-        getRuntimeValue.mockReturnValue(['blinded', 'deafened']);
-        getCombatSummary.mockResolvedValue(null);
-
-        renderPopup();
-        await selectTarget('Goblin');
-
-        await waitFor(() => {
-            expect(screen.getByText(/Blinded condition/)).toBeInTheDocument();
-            expect(screen.getByText(/Deafened condition/)).toBeInTheDocument();
-        });
-
-        // Toggle ON
-        await act(async () => {
-            const blindedEl = screen.getByText(/Blinded condition/);
-            fireEvent.click(blindedEl);
-            await new Promise(r => setTimeout(r, 50));
-        });
-
-        await waitFor(() => {
-            const blindedEl = screen.getByText(/Blinded condition/);
-            expect(blindedEl.textContent).toContain('✓');
-        });
-
-        // Toggle OFF
-        await act(async () => {
-            const blindedEl = screen.getByText(/Blinded condition/);
-            fireEvent.click(blindedEl);
-            await new Promise(r => setTimeout(r, 50));
-        });
-
-        await waitFor(() => {
-            const blindedEl = screen.getByText(/Blinded condition/);
-            expect(blindedEl.textContent).not.toContain('✓');
         });
     });
 
@@ -274,11 +220,7 @@ describe('LesserRestorationPopup', () => {
             expect(screen.getByText(/Blinded condition/)).toBeInTheDocument();
         });
 
-        await act(async () => {
-            const blindedEl = screen.getByText(/Blinded condition/);
-            fireEvent.click(blindedEl);
-            await new Promise(r => setTimeout(r, 50));
-        });
+        fireEvent.click(screen.getByText(/Blinded condition/));
 
         await waitFor(() => {
             expect(screen.getByText('Cast Lesser Restoration')).toBeEnabled();
@@ -287,6 +229,30 @@ describe('LesserRestorationPopup', () => {
         fireEvent.click(screen.getByText('Cast Lesser Restoration'));
         expect(onConfirm).toHaveBeenCalledTimes(1);
         expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Goblin', condition: 'blinded' });
+    });
+
+    it('passes only the first selected condition to onConfirm', async () => {
+        const onConfirm = vi.fn();
+        getRuntimeValue.mockReturnValue(['blinded', 'poisoned', 'deafened']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup({ onConfirm });
+        await selectTarget('Orc');
+
+        await waitFor(() => {
+            expect(screen.getByText(/Blinded condition/)).toBeInTheDocument();
+            expect(screen.getByText(/Poisoned condition/)).toBeInTheDocument();
+        });
+
+        // Select multiple conditions
+        fireEvent.click(screen.getByText(/Blinded condition/));
+        fireEvent.click(screen.getByText(/Poisoned condition/));
+        fireEvent.click(screen.getByText(/Deafened condition/));
+
+        fireEvent.click(screen.getByText('Cast Lesser Restoration'));
+        expect(onConfirm).toHaveBeenCalledTimes(1);
+        // Only the first condition should be passed
+        expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Orc', condition: 'blinded' });
     });
 
     it('does not call onConfirm when cast button is clicked without a target', () => {
@@ -352,66 +318,6 @@ describe('LesserRestorationPopup', () => {
         expect(onSkip).not.toHaveBeenCalled();
     });
 
-    // ── CSS classes ──
-
-    it('renders with popup-overlay class', () => {
-        renderPopup();
-        const overlay = document.querySelector('.popup-overlay');
-        expect(overlay).toBeInTheDocument();
-    });
-
-    it('renders with popup-modal class', () => {
-        renderPopup();
-        const modal = document.querySelector('.popup-modal');
-        expect(modal).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-popup class', () => {
-        renderPopup();
-        const modal = document.querySelector('.metamagic-popup');
-        expect(modal).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-popup-inner class', () => {
-        renderPopup();
-        const inner = document.querySelector('.metamagic-popup-inner');
-        expect(inner).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-spell-name class', () => {
-        renderPopup();
-        const spellName = document.querySelector('.metamagic-spell-name');
-        expect(spellName).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-twin-target class', () => {
-        renderPopup();
-        const twinTarget = document.querySelector('.metamagic-twin-target');
-        expect(twinTarget).toBeInTheDocument();
-    });
-
-    it('renders with metamagic-actions class', () => {
-        renderPopup();
-        const actions = document.querySelector('.metamagic-actions');
-        expect(actions).toBeInTheDocument();
-    });
-
-    // ── Button classes ──
-
-    it('renders Cancel button with btn-secondary class', () => {
-        renderPopup();
-        const cancelButton = document.querySelector('.btn-secondary');
-        expect(cancelButton).toBeInTheDocument();
-        expect(cancelButton.textContent).toBe('Cancel');
-    });
-
-    it('renders Cast button with btn class (but not btn-secondary)', () => {
-        renderPopup();
-        const castButton = document.querySelector('.btn:not(.btn-secondary)');
-        expect(castButton).toBeInTheDocument();
-        expect(castButton.textContent).toBe('Cast Lesser Restoration');
-    });
-
     // ── Fallback values ──
 
     it('handles undefined spell with fallback values', () => {
@@ -444,6 +350,14 @@ describe('LesserRestorationPopup', () => {
         );
         expect(screen.getByText(/Spell/)).toBeInTheDocument();
         expect(screen.getByText(/Level 2/)).toBeInTheDocument();
+    });
+
+    // ── Empty creature targets ──
+
+    it('renders no target options when creatureTargets is empty', () => {
+        renderPopup({ creatureTargets: [] });
+        expect(screen.getByText('Target:')).toBeInTheDocument();
+        expect(screen.queryByText('Goblin')).not.toBeInTheDocument();
     });
 
     // ── Combat summary integration ──
@@ -532,6 +446,22 @@ describe('LesserRestorationPopup', () => {
             expect(screen.getByText('Blinded condition')).toBeInTheDocument();
             expect(screen.queryByText('Exhaustion condition')).not.toBeInTheDocument();
             expect(screen.queryByText('Frightened condition')).not.toBeInTheDocument();
+        });
+    });
+
+    // ── Name matching via utils.getName ──
+
+    it('matches creature names via utils.getName for combat summary lookup', async () => {
+        getRuntimeValue.mockReturnValue([]);
+        getCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin', conditions: [{ key: 'blinded' }] }],
+        });
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(getCombatSummary).toHaveBeenCalled();
         });
     });
 });

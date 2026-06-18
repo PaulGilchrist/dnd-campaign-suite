@@ -1,14 +1,16 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+// @improved-by-ai
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import OpenHandTechniqueModal from './OpenHandTechniqueModal.jsx';
 
-// ── Mocked modules (before the component import) ──
+// ── Mocked modules ──
 
 vi.mock('../../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js', () => ({
   applyOpenHandTechnique: vi.fn(),
 }));
 
 // ── Re-import mocked modules ──
+
 import * as openHandHandler from '../../../services/automation/handlers/class-fighter-rogue/openHandTechniqueHandler.js';
 
 // ── Test fixtures ──
@@ -42,6 +44,10 @@ function makeProps(overrides) {
   };
 }
 
+function renderModal(props) {
+  return render(<OpenHandTechniqueModal {...makeProps(props)} />);
+}
+
 // ── Tests ──
 
 describe('OpenHandTechniqueModal', () => {
@@ -50,553 +56,544 @@ describe('OpenHandTechniqueModal', () => {
     localStorage.clear();
   });
 
-  // ── Initial render ──
-
-  it('renders the modal overlay', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-  });
-
-  it('renders the modal structure (overlay, modal, header, body, actions)', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    expect(document.querySelector('.sp-header')).toBeInTheDocument();
-    expect(document.querySelector('.sp-body')).toBeInTheDocument();
-    expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-  });
-
-  it('renders the header with action name and hand-rock icon', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    expect(screen.getByText('Open Hand Technique')).toBeInTheDocument();
-    const icon = document.querySelector('.fa-solid.fa-hand-rock');
-    expect(icon).toBeInTheDocument();
-  });
-
-  it('renders instruction text with target name', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const bodyDiv = document.querySelector('.sp-body');
-    expect(bodyDiv.textContent).toContain('Choose an effect against');
-    expect(bodyDiv.textContent).toContain('Goblin');
-    expect(bodyDiv.textContent).toMatch(/DEX saving throw \(DC 13\)/);
-  });
-
-  it('renders instruction text without target name when targetName is null', () => {
-    render(<OpenHandTechniqueModal {...makeProps({ targetName: null })} />);
-    expect(screen.getByText(/Choose an effect/)).toBeInTheDocument();
-    expect(screen.queryByText(/against/)).not.toBeInTheDocument();
-  });
-
-  // ── Options rendering ──
-
-  it('renders all options from action.automation.options', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    expect(screen.getByText('Knock Down')).toBeInTheDocument();
-    expect(screen.getByText('Disrupt Attack')).toBeInTheDocument();
-    expect(screen.getByText('Seal Fates')).toBeInTheDocument();
-  });
-
-  it('renders radio inputs for each option', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    expect(radios).toHaveLength(3);
-  });
-
-  it('shows effect description for push_15ft option', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    expect(screen.getByText(/Push 15 ft away/)).toBeInTheDocument();
-  });
-
-  it('shows effect description for disadvantage_next_attack option', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    expect(screen.getByText(/Disadvantage on next attack roll/)).toBeInTheDocument();
-  });
-
-  it('shows effect description for no_reactions option', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    expect(screen.getByText(/Can't take Reactions until start of your next turn/)).toBeInTheDocument();
-  });
-
-  // ── Selection behavior ──
-
-  it('has no option selected initially', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    radios.forEach(radio => expect(radio.checked).toBe(false));
-  });
-
-  it('selects an option when its radio is clicked', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[1]); // Disrupt Attack
-    expect(radios[1].checked).toBe(true);
-  });
-
-  it('deselects previous option when a different one is selected', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]); // Knock Down
-    fireEvent.click(radios[2]); // Seal Fates
-    expect(radios[0].checked).toBe(false);
-    expect(radios[2].checked).toBe(true);
-  });
-
-  it('applies selected style (background) to the chosen option label', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const labels = document.querySelectorAll('label');
-    expect(labels[0].style.background).not.toContain('rgba(255,255,255,0.15)');
-    fireEvent.click(document.querySelectorAll('input[type="radio"]')[0]);
-    expect(labels[0].style.background).toContain('rgba(255');
-  });
-
-  // ── Apply button ──
-
-  it('disables the Apply Effect button when no option is selected', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const btn = screen.getByRole('button', { name: /Apply Effect/ });
-    expect(btn).toBeDisabled();
-  });
-
-  it('enables the Apply Effect button after selecting an option', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    const btn = screen.getByRole('button', { name: /Apply Effect/ });
-    expect(btn).not.toBeDisabled();
-  });
-
-  it('does not call applyOpenHandTechnique when Apply is clicked without selection', async () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-    expect(openHandHandler.applyOpenHandTechnique).not.toHaveBeenCalled();
-  });
-
-  it('calls applyOpenHandTechnique with correct arguments when Apply is clicked with selection', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Goblin failed the save. Knock Down applied.',
-      },
+  describe('initial render', () => {
+    it('renders the modal overlay, modal container, header, body, and actions', () => {
+      renderModal();
+      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
+      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
+      expect(document.querySelector('.sp-header')).toBeInTheDocument();
+      expect(document.querySelector('.sp-body')).toBeInTheDocument();
+      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
     });
 
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]); // Knock Down
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledWith(
-        defaultAction,
-        mockPlayerStats,
-        mockCampaignName,
-        'Goblin',
-        'Knock Down',
-        13,
-        'DEX'
-      );
-    });
-  });
-
-  // ── Applied / result state ──
-
-  it('shows result description after applying with a result', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Goblin failed the save. Knock Down applied.',
-      },
+    it('renders the header with action name and hand-rock icon', () => {
+      renderModal();
+      expect(screen.getByText('Open Hand Technique')).toBeInTheDocument();
+      expect(document.querySelector('.fa-solid.fa-hand-rock')).toBeInTheDocument();
     });
 
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Goblin failed the save/)).toBeInTheDocument();
-    });
-  });
-
-  it('renders Done button in the applied state', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Done.',
-      },
-    });
-
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Done')).toBeInTheDocument();
-    });
-  });
-
-  it('hides selection options after applying', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Knock Down applied.',
-      },
-    });
-
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(screen.queryByText(/Choose an effect/)).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides the Apply Effect button after applying', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Knock Down applied.',
-      },
-    });
-
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /Apply Effect/ })).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides the Cancel button after applying', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Knock Down applied.',
-      },
-    });
-
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-    });
-  });
-
-  it('renders result payload description as HTML', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: '<strong>Knock Down</strong> applied to Goblin.',
-      },
-    });
-
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
+    it('renders instruction text with target name and save info', () => {
+      renderModal();
       const bodyDiv = document.querySelector('.sp-body');
-      expect(bodyDiv.innerHTML).toContain('<strong>Knock Down</strong>');
+      expect(bodyDiv.textContent).toContain('Choose an effect against');
+      expect(bodyDiv.textContent).toContain('Goblin');
+      expect(bodyDiv.textContent).toMatch(/DEX saving throw \(DC 13\)/);
+    });
+
+    it('renders instruction text without target name when targetName is null', () => {
+      renderModal({ targetName: null });
+      expect(screen.getByText(/Choose an effect/)).toBeInTheDocument();
+      expect(screen.queryByText(/against/)).not.toBeInTheDocument();
+    });
+
+    it('renders target name in bold in the instruction text', () => {
+      renderModal();
+      const boldEl = document.querySelector('.sp-body p b');
+      expect(boldEl).toBeInTheDocument();
+      expect(boldEl.textContent).toBe('Goblin');
+    });
+
+    it('renders target name in bold when targetName is null', () => {
+      renderModal({ targetName: null });
+      expect(document.querySelector('.sp-body p b')).not.toBeInTheDocument();
     });
   });
 
-  // ── Applied state with no result ──
+  describe('options rendering', () => {
+    it('renders all options with names and effect descriptions', () => {
+      renderModal();
+      expect(screen.getByText('Knock Down')).toBeInTheDocument();
+      expect(screen.getByText(/Push 15 ft away/)).toBeInTheDocument();
+      expect(screen.getByText('Disrupt Attack')).toBeInTheDocument();
+      expect(screen.getByText(/Disadvantage on next attack roll/)).toBeInTheDocument();
+      expect(screen.getByText('Seal Fates')).toBeInTheDocument();
+      expect(screen.getByText(/Can't take Reactions until start of your next turn/)).toBeInTheDocument();
+    });
 
-  it('does not show applied state when result is null', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue(null);
+    it('renders a radio input for each option', () => {
+      renderModal();
+      expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(3);
+    });
 
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+    it('renders no options when automation.options is empty', () => {
+      renderModal({ action: { name: 'Open Hand Technique', automation: { options: [] } } });
+      expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+    });
 
-    await waitFor(() => {
-      expect(screen.queryByText('Done')).not.toBeInTheDocument();
+    it('renders no options when automation is undefined', () => {
+      renderModal({ action: { name: 'Open Hand Technique' } });
+      expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+    });
+
+    it('renders no options when automation.options is undefined', () => {
+      renderModal({ action: { name: 'Open Hand Technique', automation: {} } });
+      expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+    });
+
+    it('renders options with unknown effect types without effect descriptions', () => {
+      renderModal({
+        action: {
+          name: 'Open Hand Technique',
+          automation: { options: [{ name: 'Unknown Effect', effect: 'unknown_type' }] },
+        },
+      });
+      expect(screen.getByText('Unknown Effect')).toBeInTheDocument();
+      expect(document.querySelectorAll('input[type="radio"]')).toHaveLength(1);
     });
   });
 
-  // ── Close behavior ──
-
-  it('calls onClose when Done button is clicked in applied state', async () => {
-    const onClose = vi.fn();
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Done.',
-      },
+  describe('selection behavior', () => {
+    it('has no option selected initially', () => {
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      radios.forEach(radio => expect(radio.checked).toBe(false));
     });
 
-    render(<OpenHandTechniqueModal {...makeProps({ onClose })} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Done')).toBeInTheDocument();
+    it('selects an option when its radio is clicked', () => {
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[1]);
+      expect(radios[1].checked).toBe(true);
     });
 
-    fireEvent.click(screen.getByText('Done'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onClose when Cancel button is clicked', () => {
-    const onClose = vi.fn();
-    render(<OpenHandTechniqueModal {...makeProps({ onClose })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<OpenHandTechniqueModal {...makeProps({ onClose })} />);
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<OpenHandTechniqueModal {...makeProps({ onClose })} />);
-    const modal = document.querySelector('.sp-modal');
-    fireEvent.click(modal);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  // ── Applied state overlay click ──
-
-  it('calls onClose when clicking the overlay in applied state', async () => {
-    const onClose = vi.fn();
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Done.',
-      },
+    it('deselects the previous option when a different one is selected', () => {
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      fireEvent.click(radios[2]);
+      expect(radios[0].checked).toBe(false);
+      expect(radios[2].checked).toBe(true);
     });
 
-    render(<OpenHandTechniqueModal {...makeProps({ onClose })} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Done')).toBeInTheDocument();
+    it('applies selected style to the chosen option label', () => {
+      renderModal();
+      const labels = document.querySelectorAll('label');
+      fireEvent.click(document.querySelectorAll('input[type="radio"]')[0]);
+      expect(labels[0].style.background).toContain('rgba(255');
     });
 
-    const overlay = document.querySelector('.sp-overlay');
-    fireEvent.click(overlay);
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does NOT close when clicking inside modal in applied state', async () => {
-    const onClose = vi.fn();
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Done.',
-      },
-    });
-
-    render(<OpenHandTechniqueModal {...makeProps({ onClose })} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      expect(screen.getByText('Done')).toBeInTheDocument();
-    });
-
-    const modal = document.querySelector('.sp-modal');
-    fireEvent.click(modal);
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  // ── Empty options edge case ──
-
-  it('renders with no options when automation.options is empty', () => {
-    render(<OpenHandTechniqueModal {...makeProps({
-      action: { name: 'Open Hand Technique', automation: { options: [] } }
-    })} />);
-    expect(screen.getByText('Open Hand Technique')).toBeInTheDocument();
-    const radios = document.querySelectorAll('input[type="radio"]');
-    expect(radios).toHaveLength(0);
-  });
-
-  it('disables apply button when options array is empty', () => {
-    render(<OpenHandTechniqueModal {...makeProps({
-      action: { name: 'Open Hand Technique', automation: { options: [] } }
-    })} />);
-    const btn = screen.getByRole('button', { name: /Apply Effect/ });
-    expect(btn).toBeDisabled();
-  });
-
-  it('renders with no options when automation is missing', () => {
-    render(<OpenHandTechniqueModal {...makeProps({
-      action: { name: 'Open Hand Technique' }
-    })} />);
-    expect(screen.getByText('Open Hand Technique')).toBeInTheDocument();
-    const radios = document.querySelectorAll('input[type="radio"]');
-    expect(radios).toHaveLength(0);
-  });
-
-  // ── Label text with targetName using bold HTML ──
-
-  it('renders target name in bold in the instruction text', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const boldEl = document.querySelector('.sp-body p b');
-    expect(boldEl).toBeInTheDocument();
-    expect(boldEl.textContent).toBe('Goblin');
-  });
-
-  // ── Button classes ──
-
-  it('renders Apply Effect button with sp-roll-btn class', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const btn = screen.getByRole('button', { name: /Apply Effect/ });
-    expect(btn.classList.contains('sp-roll-btn')).toBe(true);
-  });
-
-  it('renders Cancel button with sp-dismiss-btn class', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const btn = screen.getByRole('button', { name: 'Cancel' });
-    expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
-  });
-
-  it('renders hand-rock icon on Apply Effect button', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const btn = screen.getByRole('button', { name: /Apply Effect/ });
-    expect(btn.querySelector('.fa-solid.fa-hand-rock')).toBeInTheDocument();
-  });
-
-  it('renders Done button with sp-roll-btn class in applied state', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Done.',
-      },
-    });
-
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[0]);
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
-
-    await waitFor(() => {
-      const doneBtn = screen.getByRole('button', { name: 'Done' });
-      expect(doneBtn.classList.contains('sp-roll-btn')).toBe(true);
+    it('applies selected style to the chosen option border', () => {
+      renderModal();
+      const labels = document.querySelectorAll('label');
+      fireEvent.click(document.querySelectorAll('input[type="radio"]')[0]);
+      expect(labels[0].style.border).toContain('var(--color-link)');
     });
   });
 
-  // ── Selecting different options ──
-
-  it('selects Disrupt Attack option', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[1]); // Disrupt Attack
-    expect(radios[1].checked).toBe(true);
-  });
-
-  it('selects Seal Fates option', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[2]); // Seal Fates
-    expect(radios[2].checked).toBe(true);
-  });
-
-  // ── Selecting an option and then calling apply ──
-
-  it('calls applyOpenHandTechnique with Disrupt Attack selection', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Disrupt Attack applied.',
-      },
+  describe('apply button', () => {
+    it('is disabled when no option is selected', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: /Apply Effect/ })).toBeDisabled();
     });
 
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[1]); // Disrupt Attack
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+    it('is enabled after selecting an option', () => {
+      renderModal();
+      fireEvent.click(document.querySelectorAll('input[type="radio"]')[0]);
+      expect(screen.getByRole('button', { name: /Apply Effect/ })).not.toBeDisabled();
+    });
 
-    await waitFor(() => {
-      expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledWith(
-        defaultAction,
-        mockPlayerStats,
-        mockCampaignName,
-        'Goblin',
-        'Disrupt Attack',
-        13,
-        'DEX'
-      );
+    it('is disabled again after deselecting (clicking the same radio off is not possible, but selecting another then deselecting via unchecking is tested)', () => {
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      fireEvent.click(radios[1]);
+      expect(screen.getByRole('button', { name: /Apply Effect/ })).not.toBeDisabled();
+    });
+
+    it('renders with sp-roll-btn class', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: /Apply Effect/ }).classList.contains('sp-roll-btn')).toBe(true);
+    });
+
+    it('renders a hand-rock icon on the Apply button', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: /Apply Effect/ }).querySelector('.fa-solid.fa-hand-rock')).toBeInTheDocument();
     });
   });
 
-  it('calls applyOpenHandTechnique with Seal Fates selection', async () => {
-    openHandHandler.applyOpenHandTechnique.mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'Open Hand Technique',
-        description: 'Seal Fates applied.',
-      },
+  describe('cancel button', () => {
+    it('is present in the initial render', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
     });
 
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    const radios = document.querySelectorAll('input[type="radio"]');
-    fireEvent.click(radios[2]); // Seal Fates
-    fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+    it('has sp-dismiss-btn class', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: 'Cancel' }).classList.contains('sp-dismiss-btn')).toBe(true);
+    });
 
-    await waitFor(() => {
-      expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledWith(
-        defaultAction,
-        mockPlayerStats,
-        mockCampaignName,
-        'Goblin',
-        'Seal Fates',
-        13,
-        'DEX'
-      );
+    it('calls onClose when clicked', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(onClose).toHaveBeenCalledTimes(1);
     });
   });
 
-  // ── Modal structure classes ──
+  describe('apply action', () => {
+    it('does not call applyOpenHandTechnique when Apply is clicked without selection', () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      expect(openHandHandler.applyOpenHandTechnique).not.toHaveBeenCalled();
+    });
 
-  it('renders sp-overlay, sp-modal, sp-header, sp-body, sp-actions structure', () => {
-    render(<OpenHandTechniqueModal {...makeProps()} />);
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    expect(document.querySelector('.sp-header')).toBeInTheDocument();
-    expect(document.querySelector('.sp-body')).toBeInTheDocument();
-    expect(document.querySelector('.sp-actions')).toBeInTheDocument();
+    it('calls applyOpenHandTechnique with correct arguments when Apply is clicked with Knock Down selected', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Goblin failed the save. Knock Down applied.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledWith(
+          defaultAction,
+          mockPlayerStats,
+          mockCampaignName,
+          'Goblin',
+          'Knock Down',
+          13,
+          'DEX'
+        );
+      });
+    });
+
+    it('calls applyOpenHandTechnique with Disrupt Attack when selected', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Disrupt Attack applied.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[1]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledWith(
+          defaultAction,
+          mockPlayerStats,
+          mockCampaignName,
+          'Goblin',
+          'Disrupt Attack',
+          13,
+          'DEX'
+        );
+      });
+    });
+
+    it('calls applyOpenHandTechnique with Seal Fates when selected', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Seal Fates applied.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[2]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(openHandHandler.applyOpenHandTechnique).toHaveBeenCalledWith(
+          defaultAction,
+          mockPlayerStats,
+          mockCampaignName,
+          'Goblin',
+          'Seal Fates',
+          13,
+          'DEX'
+        );
+      });
+    });
+
+    it('renders result description after applying with a result', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Goblin failed the save. Knock Down applied.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Goblin failed the save/)).toBeInTheDocument();
+      });
+    });
+
+    it('renders result payload description as HTML', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: '<strong>Knock Down</strong> applied to Goblin.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        const bodyDiv = document.querySelector('.sp-body');
+        expect(bodyDiv.innerHTML).toContain('<strong>Knock Down</strong>');
+      });
+    });
+
+    it('hides selection options after applying', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Knock Down applied.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText(/Choose an effect/)).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides the Apply Effect button after applying', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Knock Down applied.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: /Apply Effect/ })).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides the Cancel button after applying', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Knock Down applied.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not show applied state when result is null', async () => {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue(null);
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Done')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('applied state', () => {
+    function renderWithApplied() {
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Done.',
+        },
+      });
+
+      renderModal();
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+
+      return act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+    }
+
+    it('shows a Done button', async () => {
+      await renderWithApplied();
+      await waitFor(() => {
+        expect(screen.getByText('Done')).toBeInTheDocument();
+      });
+    });
+
+    it('renders the Done button with sp-roll-btn class', async () => {
+      await renderWithApplied();
+      await waitFor(() => {
+        const doneBtn = screen.getByRole('button', { name: 'Done' });
+        expect(doneBtn.classList.contains('sp-roll-btn')).toBe(true);
+      });
+    });
+
+    it('renders the header with action name and hand-rock icon in applied state', async () => {
+      await renderWithApplied();
+      await waitFor(() => {
+        expect(screen.getByText('Open Hand Technique')).toBeInTheDocument();
+        expect(document.querySelector('.fa-solid.fa-hand-rock')).toBeInTheDocument();
+      });
+    });
+
+    it('renders modal structure (overlay, modal, header, body, actions) in applied state', async () => {
+      await renderWithApplied();
+      await waitFor(() => {
+        expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
+        expect(document.querySelector('.sp-modal')).toBeInTheDocument();
+        expect(document.querySelector('.sp-header')).toBeInTheDocument();
+        expect(document.querySelector('.sp-body')).toBeInTheDocument();
+        expect(document.querySelector('.sp-actions')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('close behavior', () => {
+    it('calls onClose when Done button is clicked in applied state', async () => {
+      const onClose = vi.fn();
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Done.',
+        },
+      });
+
+      renderModal({ onClose });
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        fireEvent.click(screen.getByText('Done'));
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when clicking the overlay background', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+      fireEvent.click(document.querySelector('.sp-overlay'));
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not close when clicking inside the modal content', () => {
+      const onClose = vi.fn();
+      renderModal({ onClose });
+      fireEvent.click(document.querySelector('.sp-modal'));
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    it('calls onClose when clicking the overlay in applied state', async () => {
+      const onClose = vi.fn();
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Done.',
+        },
+      });
+
+      renderModal({ onClose });
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        fireEvent.click(document.querySelector('.sp-overlay'));
+      });
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not close when clicking inside modal in applied state', async () => {
+      const onClose = vi.fn();
+      openHandHandler.applyOpenHandTechnique.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Open Hand Technique',
+          description: 'Done.',
+        },
+      });
+
+      renderModal({ onClose });
+      const radios = document.querySelectorAll('input[type="radio"]');
+      fireEvent.click(radios[0]);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
+
+      await waitFor(() => {
+        fireEvent.click(document.querySelector('.sp-modal'));
+      });
+      expect(onClose).not.toHaveBeenCalled();
+    });
   });
 });

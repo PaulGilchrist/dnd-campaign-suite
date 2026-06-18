@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useDamageClick from './useDamageClick.js';
 
@@ -48,11 +49,13 @@ import { getCombatContext, getTargetFromAttacker } from '../../services/rules/co
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
-import { collectWeaponMastery, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
+import { collectWeaponMastery, evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../services/ui/logService.js';
 
-const mockPlayerStats = {
+const defaultRollResult = { total: 5, rolls: [5], modifier: 0 };
+
+const defaultMockPlayerStats = {
     name: 'TestRogue',
     level: 17,
     abilities: [
@@ -66,39 +69,71 @@ const mockPlayerStats = {
 };
 
 const mockCampaignName = 'test-campaign';
-const defaultRollResult = { total: 5, rolls: [5], modifier: 0 };
+
+function createMockPlayerStats(overrides = {}) {
+    return {
+        ...defaultMockPlayerStats,
+        ...overrides,
+        abilities: [...defaultMockPlayerStats.abilities, ...(overrides.abilities || [])],
+        class: {
+            ...defaultMockPlayerStats.class,
+            class_levels: overrides.class?.class_levels || defaultMockPlayerStats.class.class_levels,
+        },
+        automation: {
+            ...defaultMockPlayerStats.automation,
+            ...overrides.automation,
+            actions: overrides.automation?.actions || defaultMockPlayerStats.automation.actions,
+            passives: overrides.automation?.passives || defaultMockPlayerStats.automation.passives,
+        },
+    };
+}
+
+const mockSetPopupHtml = vi.fn();
+const mockRollDamage = vi.fn();
+const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
+const mockBuildCtxSync = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
+const mockSetDamageTypeChoice = vi.fn();
+const mockSetDivineFuryChoice = vi.fn();
+const mockSetWeaponMasteryModal = vi.fn();
+const mockSetAttackRiderModal = vi.fn();
+const mockPendingDamageRef = { current: null };
+
+function UseDamageClick(overrides = {}) {
+    const deps = {
+        playerStats: createMockPlayerStats(overrides.playerStats),
+        campaignName: mockCampaignName,
+        mapName: null,
+        popupHtml: null,
+        setPopupHtml: mockSetPopupHtml,
+        rollDamage: mockRollDamage,
+        buildCtx: mockBuildCtx,
+        buildCtxSync: mockBuildCtxSync,
+        setDamageTypeChoice: mockSetDamageTypeChoice,
+        setDivineFuryChoice: mockSetDivineFuryChoice,
+        setWeaponMasteryModal: mockSetWeaponMasteryModal,
+        setAttackRiderModal: mockSetAttackRiderModal,
+        pendingDamageRef: mockPendingDamageRef,
+        ...overrides,
+    };
+    return useDamageClick(deps);
+}
+
+function makeAttack(overrides = {}) {
+    return {
+        name: 'Rapier',
+        damage: '1d8+5',
+        damageType: 'Piercing',
+        weaponType: 'melee',
+        properties: [],
+        ...overrides,
+    };
+}
+
+function tick() {
+    return new Promise((r) => setTimeout(r, 0));
+}
 
 describe('useDamageClick - class features', () => {
-    const mockSetPopupHtml = vi.fn();
-    const mockRollDamage = vi.fn();
-    const mockBuildCtx = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
-    const mockBuildCtxSync = vi.fn(() => Promise.resolve({ targetName: 'Goblin' }));
-    const mockSetDamageTypeChoice = vi.fn();
-    const mockSetDivineFuryChoice = vi.fn();
-    const mockSetWeaponMasteryModal = vi.fn();
-    const mockSetAttackRiderModal = vi.fn();
-    const mockPendingDamageRef = { current: null };
-
-    function UseDamageClick(overrides = {}) {
-        const deps = {
-            playerStats: mockPlayerStats,
-            campaignName: mockCampaignName,
-            mapName: null,
-            popupHtml: null,
-            setPopupHtml: mockSetPopupHtml,
-            rollDamage: mockRollDamage,
-            buildCtx: mockBuildCtx,
-            buildCtxSync: mockBuildCtxSync,
-            setDamageTypeChoice: mockSetDamageTypeChoice,
-            setDivineFuryChoice: mockSetDivineFuryChoice,
-            setWeaponMasteryModal: mockSetWeaponMasteryModal,
-            setAttackRiderModal: mockSetAttackRiderModal,
-            pendingDamageRef: mockPendingDamageRef,
-            ...overrides,
-        };
-        return useDamageClick(deps);
-    }
-
     beforeEach(() => {
         vi.clearAllMocks();
         rollExpression.mockReturnValue(defaultRollResult);
@@ -108,6 +143,7 @@ describe('useDamageClick - class features', () => {
         getActiveBuffs.mockReturnValue([]);
         hasTwoWeaponFighting.mockReturnValue(false);
         collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
+        evaluateAutoExpression.mockReturnValue(5);
         addEntry.mockResolvedValue(undefined);
         getCombatContext.mockResolvedValue(null);
         getTargetFromAttacker.mockReturnValue(null);
@@ -116,16 +152,27 @@ describe('useDamageClick - class features', () => {
         applyDamageToTarget.mockResolvedValue({ finalDamage: 10, newHp: 50 });
         mockBuildCtx.mockReturnValue(Promise.resolve({ targetName: 'Goblin' }));
         mockBuildCtxSync.mockReturnValue(Promise.resolve({ targetName: 'Goblin' }));
-        mockSetPopupHtml.mockReset();
         mockPendingDamageRef.current = null;
     });
 
-    async function tick() {
-        await new Promise(r => setTimeout(r, 0));
-    }
+    describe('Assassinate (first_round_sneak_attack_hit)', () => {
+        function makeAssassinateStats() {
+            return createMockPlayerStats({
+                automation: {
+                    actions: [
+                        {
+                            type: 'damage_bonus',
+                            trigger: 'first_round_sneak_attack_hit',
+                            damageExpression: '2d6',
+                            damageType: 'Sneak Attack',
+                        },
+                    ],
+                    passives: [],
+                },
+            });
+        }
 
-    describe('Assassinate', () => {
-        it('applies first_round_sneak_attack_hit damage on round 1 before acting', async () => {
+        it('adds Assassinate damage when round 1 and player has not acted', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'TestRogue', hasActed: false, type: 'player' },
@@ -133,92 +180,82 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getCurrentCombatRound.mockReturnValue(1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'first_round_sneak_attack_hit', damageExpression: '2d6', damageType: 'Sneak Attack' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeAssassinateStats() });
+            await handleDamageClick(makeAttack());
             await tick();
+            expect(rollExpression).toHaveBeenCalledWith('2d6');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
                 expect.stringContaining('2d6[Sneak Attack]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+                expect.any(Number),
+                expect.any(Array),
+                expect.any(Number),
+                expect.any(Object),
             );
         });
 
-        it('does not apply Assassinate if already acted this round', async () => {
+        it('skips Assassinate when player has already acted this round', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'TestRogue', hasActed: true, type: 'player' },
                 ],
             });
             getCurrentCombatRound.mockReturnValue(1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'first_round_sneak_attack_hit', damageExpression: '2d6', damageType: 'Sneak Attack' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeAssassinateStats() });
+            await handleDamageClick(makeAttack());
             await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('2d6');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
                 '1d8+5',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+                expect.any(Number),
+                expect.any(Array),
+                expect.any(Number),
+                expect.any(Object),
             );
         });
 
-        it('does not apply Assassinate if not round 1', async () => {
+        it('skips Assassinate when combat is past round 1', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'TestRogue', hasActed: false, type: 'player' },
                 ],
             });
             getCurrentCombatRound.mockReturnValue(2);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'first_round_sneak_attack_hit', damageExpression: '2d6', damageType: 'Sneak Attack' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeAssassinateStats() });
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(mockRollDamage).toHaveBeenCalledWith(
-                'Rapier',
-                '1d8+5',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
-            );
+            expect(rollExpression).not.toHaveBeenCalledWith('2d6');
+        });
+
+        it('skips Assassinate when no combat context exists', async () => {
+            getCombatContext.mockResolvedValue(null);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeAssassinateStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('2d6');
         });
     });
 
-    describe('Stealth Attack cost deduction', () => {
-        it('reduces sneak attack dice by stealthAttackCost', async () => {
+    describe('Stealth Attack (Supreme Sneak cost deduction)', () => {
+        function makeStealthAttackStats() {
+            return createMockPlayerStats({
+                level: 1,
+                automation: {
+                    actions: [
+                        {
+                            type: 'damage_bonus',
+                            trigger: 'first_round_sneak_attack_hit',
+                            damageExpression: '2d6',
+                            damageType: 'Sneak Attack',
+                        },
+                    ],
+                    passives: [],
+                },
+            });
+        }
+
+        it('deducts stealthAttackCost from sneak attack dice and resets cost to 0', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'stealthAttackCost') return 2;
                 return null;
@@ -229,30 +266,82 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getCurrentCombatRound.mockReturnValue(1);
-            const stats = {
-                ...mockPlayerStats,
-                level: 1,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'first_round_sneak_attack_hit', damageExpression: '2d6', damageType: 'Sneak Attack' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeStealthAttackStats() });
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(stats.class.class_levels[0].sneak_attack_num_d6).toBe(7);
             expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', 'stealthAttackCost', 0, 'test-campaign');
+        });
+
+        it('does not deduct when sneak attack dice are 0', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'stealthAttackCost') return 2;
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestRogue', hasActed: false, type: 'player' }],
+            });
+            getCurrentCombatRound.mockReturnValue(1);
+            const stats = createMockPlayerStats({
+                level: 1,
+                class: { name: 'Rogue', class_levels: [{ level: 1, sneak_attack_num_d6: 0 }] },
+                automation: { actions: [], passives: [] },
+            });
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'TestRogue',
+                'stealthAttackCost',
+                0,
+                'test-campaign',
+            );
+        });
+
+        it('does not deduct when cost exceeds available dice', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'stealthAttackCost') return 5;
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestRogue', hasActed: false, type: 'player' }],
+            });
+            getCurrentCombatRound.mockReturnValue(1);
+            const stats = createMockPlayerStats({
+                level: 1,
+                class: { name: 'Rogue', class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
+                automation: { actions: [], passives: [] },
+            });
+            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'TestRogue',
+                'stealthAttackCost',
+                0,
+                'test-campaign',
+            );
         });
     });
 
-    describe('Death Strike', () => {
-        it('applies Death Strike effect on round 1 before acting', async () => {
+    describe('Death Strike (Assassin level 17)', () => {
+        function makeDeathStrikeStats() {
+            return createMockPlayerStats({
+                automation: {
+                    actions: [
+                        {
+                            type: 'attack_rider',
+                            trigger: 'first_round_sneak_attack_hit',
+                            saveType: 'CON',
+                            name: 'Death Strike',
+                            damageDoubled: true,
+                        },
+                    ],
+                    passives: [],
+                },
+            });
+        }
+
+        it('sets target effect with save DC when round 1 and player has not acted', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'TestRogue', hasActed: false, type: 'player' },
@@ -261,36 +350,122 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin King' });
             getCurrentCombatRound.mockReturnValue(1);
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'damage_bonus', trigger: 'first_round_sneak_attack_hit', damageExpression: '2d6', damageType: 'Sneak Attack' },
-                        { type: 'attack_rider', trigger: 'first_round_sneak_attack_hit', saveType: 'CON', name: 'Death Strike', damageDoubled: true },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
-                expect.objectContaining({
-                    effect: 'death_strike',
-                    target: 'Goblin King',
-                    source: 'Death Strike',
-                    saveType: 'CON',
-                }),
-            ]), 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        effect: 'death_strike',
+                        target: 'Goblin King',
+                        source: 'Death Strike',
+                        saveType: 'CON',
+                        saveDc: 19,
+                        saveAbility: 'DEX',
+                        damageDoubled: true,
+                    }),
+                ]),
+                'test-campaign',
+            );
+        });
+
+        it('does not set target effect when player has already acted', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', hasActed: true, type: 'player' },
+                    { name: 'Goblin King', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin King' });
+            getCurrentCombatRound.mockReturnValue(1);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
+        });
+
+        it('does not set target effect when no target found', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', hasActed: false, type: 'player' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue(null);
+            getCurrentCombatRound.mockReturnValue(1);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
+        });
+
+        it('does not set target effect when not round 1', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', hasActed: false, type: 'player' },
+                    { name: 'Goblin King', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin King' });
+            getCurrentCombatRound.mockReturnValue(2);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
+        });
+
+        it('does not set target effect when no combat context', async () => {
+            getCombatContext.mockResolvedValue(null);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeDeathStrikeStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
         });
     });
 
-    describe('Rend Mind', () => {
-        it('applies Rend Mind effect when not already used', async () => {
+    describe('Rend Mind (Soulknife level 17)', () => {
+        function makeRendMindStats(overrides = {}) {
+            return createMockPlayerStats({
+                automation: {
+                    actions: [
+                        {
+                            type: 'attack_rider',
+                            trigger: 'psychic_blade_sneak_attack_hit',
+                            saveType: 'WIS',
+                            name: 'Rend Mind',
+                            condition: 'stunned',
+                            duration: '1_minute',
+                            repeatingSave: true,
+                            ...overrides,
+                        },
+                    ],
+                    passives: [],
+                },
+            });
+        }
+
+        it('applies Rend Mind target effect on first use', async () => {
             getRuntimeValue.mockReturnValue(null);
             getCombatContext.mockResolvedValue({
                 creatures: [
@@ -299,33 +474,32 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Mind Flayer' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'attack_rider', trigger: 'psychic_blade_sneak_attack_hit', saveType: 'WIS', name: 'Rend Mind', condition: 'stunned', duration: '1_minute', repeatingSave: true },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
+            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
-                expect.objectContaining({
-                    target: 'Mind Flayer',
-                    source: 'Rend Mind',
-                    condition: 'stunned',
-                }),
-            ]), 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        target: 'Mind Flayer',
+                        source: 'Rend Mind',
+                        effect: 'stunned',
+                        saveType: 'WIS',
+                        saveDc: 19,
+                        saveAbility: 'DEX',
+                        condition: 'stunned',
+                        duration: '1_minute',
+                        repeatingSave: true,
+                        restoreCost: null,
+                    }),
+                ]),
+                'test-campaign',
+            );
             expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_RendMind_Used', true, 'test-campaign');
         });
 
-        it('resets Rend Mind if last long rest differs from current when already used', async () => {
+        it('resets Rend Mind flag when long rest has changed', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_RendMind_Used') return true;
                 if (key === '_LastLongRest') return 1;
@@ -339,54 +513,66 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Mind Flayer' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'attack_rider', trigger: 'psychic_blade_sneak_attack_hit', saveType: 'WIS', name: 'Rend Mind', condition: 'stunned' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
+            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
             expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_RendMind_Used', false, 'test-campaign');
         });
 
-        it('skips Rend Mind if already used this long rest', async () => {
+        it('skips Rend Mind when already used this long rest', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_RendMind_Used') return true;
                 if (key === '_LastLongRest') return 2;
                 if (key === '_CurrentLongRest') return 2;
                 return null;
             });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        { type: 'attack_rider', trigger: 'psychic_blade_sneak_attack_hit', saveType: 'WIS', name: 'Rend Mind' },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
+            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
             await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
+        });
+
+        it('skips Rend Mind when no combat context', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            getCombatContext.mockResolvedValue(null);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
+            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
+        });
+
+        it('skips Rend Mind when no target found', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', hasActed: false, type: 'player' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue(null);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeRendMindStats() });
+            await handleDamageClick(makeAttack({ name: 'Psychic Blade', damage: '1d6+5', damageType: 'Psychic' }));
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
         });
     });
 
-    describe('Colossus Slayer', () => {
-        it('adds 1d8 extra damage to creature below max HP', async () => {
+    describe("Colossus Slayer (Hunter's Prey)", () => {
+        it('adds 1d8 extra damage when target is below max HP', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
                 return null;
@@ -399,22 +585,26 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Ogre', currentHp: 20, maxHp: 60 });
             const { handleDamageClick } = UseDamageClick();
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            await handleDamageClick(makeAttack());
             await tick();
             expect(rollExpression).toHaveBeenCalledWith('1d8');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_Hunters_Prey_Colossus_UsedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
                 expect.stringContaining('+ 1d8[extra]'),
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+                expect.any(Number),
+                expect.any(Array),
+                expect.any(Number),
+                expect.any(Object),
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestRogue',
+                '_Hunters_Prey_Colossus_UsedRound',
+                1,
+                'test-campaign',
             );
         });
 
-        it('does not add Colossus Slayer if target is at max HP', async () => {
+        it('does not add damage when target is at max HP', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
                 return null;
@@ -427,22 +617,86 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Ogre', currentHp: 60, maxHp: 60 });
             const { handleDamageClick } = UseDamageClick();
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            await handleDamageClick(makeAttack());
             await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('1d8');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
                 '1d8+5',
-                expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
+                expect.any(Number),
+                expect.any(Array),
+                expect.any(Number),
+                expect.any(Object),
             );
+        });
+
+        it('does not add damage when Colossus Slayer is not the chosen Hunter\'s Prey', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === "_Hunter's_Prey_choice") return 'Other';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player' },
+                    { name: 'Ogre', type: 'npc', currentHp: 20, maxHp: 60 },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Ogre', currentHp: 20, maxHp: 60 });
+            const { handleDamageClick } = UseDamageClick();
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('1d8');
+        });
+
+        it('does not add damage when Colossus Slayer already used this round', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === '_Hunters_Prey_Colossus_UsedRound') return 1;
+                if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player' },
+                    { name: 'Ogre', type: 'npc', currentHp: 20, maxHp: 60 },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Ogre', currentHp: 20, maxHp: 60 });
+            const { handleDamageClick } = UseDamageClick();
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('1d8');
+        });
+
+        it('does not add damage when target has no HP data', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player' },
+                    { name: 'Ogre', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Ogre' });
+            const { handleDamageClick } = UseDamageClick();
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('1d8');
         });
     });
 
-    describe('Superior Hunter\'s Prey', () => {
-        it('spreads hunter mark damage to another creature within 30ft', async () => {
+    describe("Superior Hunter's Prey (spread Hunter's Mark damage)", () => {
+        function makeSuperiorHunterStats() {
+            return createMockPlayerStats({
+                automation: {
+                    actions: [],
+                    passives: [{ type: 'superior_hunter_prey' }],
+                },
+            });
+        }
+
+        it('rolls 1d6 Force damage and applies to a different creature within 30ft', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
                 return null;
@@ -456,37 +710,111 @@ describe('useDamageClick - class features', () => {
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
             loadCombatSummary.mockResolvedValue({ some: 'data' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [{ type: 'superior_hunter_prey' }],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeSuperiorHunterStats() });
+            await handleDamageClick(makeAttack());
             await tick();
             expect(rollExpression).toHaveBeenCalledWith('1d6');
             expect(loadCombatSummary).toHaveBeenCalledWith('test-campaign');
             expect(applyDamageToTarget).toHaveBeenCalledWith(
-                { some: 'data' }, 'Orc', 5, ['Force'], 'test-campaign', null, false, 'TestRogue'
+                { some: 'data' },
+                'Orc',
+                5,
+                ['Force'],
+                'test-campaign',
+                null,
+                false,
+                'TestRogue',
             );
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 rollType: 'damage',
                 formula: '1d6[Superior Hunters Prey]',
                 targetName: 'Orc',
             }));
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_Superior_Hunters_Prey_UsedRound', 1, 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestRogue',
+                '_Superior_Hunters_Prey_UsedRound',
+                1,
+                'test-campaign',
+            );
             expect(mockSetPopupHtml).toHaveBeenCalled();
+        });
+
+        it('does not spread damage when Hunter\'s Mark is not active', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player' },
+                    { name: 'Goblin', type: 'npc' },
+                    { name: 'Orc', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeSuperiorHunterStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('1d6');
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+        });
+
+        it('does not spread damage when no other creatures are available', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark" } },
+                    { name: 'Goblin', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeSuperiorHunterStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
+        });
+
+        it('does not spread damage when already used this round', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === '_Superior_Hunters_Prey_UsedRound') return 1;
+                if (key === "_Hunter's_Prey_choice") return 'Colossus Slayer';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player', concentration: { spell: "Hunter's Mark" } },
+                    { name: 'Goblin', type: 'npc' },
+                    { name: 'Orc', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeSuperiorHunterStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(rollExpression).not.toHaveBeenCalledWith('1d6');
+            expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
     });
 
-    describe('Eldritch Strike', () => {
-        it('applies attack_rider effect for weapon_attack_hit without damageExpression', async () => {
+    describe('Eldritch Strike (weapon_attack_hit attack_rider without damageExpression)', () => {
+        function makeEldritchStrikeStats(overrides = {}) {
+            return createMockPlayerStats({
+                automation: {
+                    actions: [
+                        {
+                            type: 'attack_rider',
+                            trigger: 'weapon_attack_hit',
+                            name: 'Eldritch Strike',
+                            oncePerTurn: overrides.oncePerTurn ?? false,
+                            options: [{ name: 'Impose Disadvantage', effect: 'impose_disadvantage' }],
+                        },
+                    ],
+                    passives: [],
+                },
+            });
+        }
+
+        it('applies target effect for weapon_attack_hit without damageExpression', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'TestRogue', type: 'player' },
@@ -494,37 +822,26 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        {
-                            type: 'attack_rider', trigger: 'weapon_attack_hit',
-                            name: 'Eldritch Strike',
-                            options: [{ name: 'Impose Disadvantage', effect: 'impose_disadvantage' }],
-                        },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeEldritchStrikeStats() });
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
-                expect.objectContaining({
-                    target: 'Goblin',
-                    source: 'Eldritch Strike',
-                    option: 'Impose Disadvantage',
-                    effect: 'impose_disadvantage',
-                }),
-            ]), 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        target: 'Goblin',
+                        source: 'Eldritch Strike',
+                        option: 'Impose Disadvantage',
+                        effect: 'impose_disadvantage',
+                        duration: 'until_start_of_next_turn',
+                    }),
+                ]),
+                'test-campaign',
+            );
         });
 
-        it('tracks oncePerTurn for Eldritch Strike when it executes', async () => {
+        it('tracks oncePerTurn usage when rider has oncePerTurn flag', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_Eldritch_Strike_usedRound') return null;
                 return null;
@@ -536,60 +853,94 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [
-                        {
-                            type: 'attack_rider', trigger: 'weapon_attack_hit',
-                            name: 'Eldritch Strike', oncePerTurn: true,
-                            options: [{ name: 'Impose Disadvantage', effect: 'impose_disadvantage' }],
-                        },
-                    ],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeEldritchStrikeStats({ oncePerTurn: true }) });
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', '_Eldritch_Strike_usedRound', 1, 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestRogue',
+                '_Eldritch_Strike_usedRound',
+                1,
+                'test-campaign',
+            );
         });
 
-        it('skips Eldritch Strike when oncePerTurn and already used', async () => {
+        it('skips when oncePerTurn and already used this round', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === '_Eldritch_Strike_usedRound') return 1;
                 return null;
             });
-            const stats = {
-                ...mockPlayerStats,
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeEldritchStrikeStats({ oncePerTurn: true }) });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
+        });
+
+        it('skips when rider has no options', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player' },
+                    { name: 'Goblin', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+            const stats = createMockPlayerStats({
                 automation: {
                     actions: [
                         {
-                            type: 'attack_rider', trigger: 'weapon_attack_hit',
-                            name: 'Eldritch Strike', oncePerTurn: true,
-                            options: [{ name: 'Impose Disadvantage', effect: 'impose_disadvantage' }],
+                            type: 'attack_rider',
+                            trigger: 'weapon_attack_hit',
+                            name: 'Eldritch Strike',
+                            options: [],
                         },
                     ],
                     passives: [],
                 },
-            };
+            });
             const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(setRuntimeValue).not.toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.anything(), 'test-campaign');
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.anything(),
+                'test-campaign',
+            );
         });
     });
 
-    describe("Stalker's Flurry", () => {
-        it('applies saved Stalker Flurry option (sudden_strike)', async () => {
+    describe("Stalker's Flurry (chooseOne attack_rider passive)", () => {
+        function makeStalkersFlurryStats() {
+            return createMockPlayerStats({
+                automation: {
+                    actions: [],
+                    passives: [
+                        {
+                            type: 'attack_rider',
+                            trigger: 'weapon_attack_hit',
+                            name: "Stalker's Flurry",
+                            chooseOne: true,
+                            oncePerTurn: true,
+                            options: [
+                                { name: 'Sudden Strike', effect: 'sudden_strike' },
+                                {
+                                    name: 'Mass Fear',
+                                    effect: 'mass_fear',
+                                    saveType: 'WIS',
+                                    condition: 'frightened',
+                                },
+                            ],
+                        },
+                    ],
+                },
+            });
+        }
+
+        it('applies sudden_strike option when saved', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === "_Stalker's_Flurry_option") return 'Sudden Strike';
                 return null;
@@ -601,34 +952,24 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'weapon_attack_hit',
-                            name: "Stalker's Flurry", chooseOne: true, oncePerTurn: true,
-                            options: [
-                                { name: 'Sudden Strike', effect: 'sudden_strike' },
-                                { name: 'Mass Fear', effect: 'mass_fear', saveType: 'WIS', condition: 'frightened' },
-                            ],
-                        },
-                    ],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', 'pendingSuddenStrike', true, 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', "_Stalker's_Flurry_usedRound", 1, 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestRogue',
+                'pendingSuddenStrike',
+                true,
+                'test-campaign',
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestRogue',
+                "_Stalker's_Flurry_usedRound",
+                1,
+                'test-campaign',
+            );
         });
 
-        it('applies saved Stalker Flurry option (mass_fear)', async () => {
+        it('applies mass_fear option when saved with save parameters', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === "_Stalker's_Flurry_option") return 'Mass Fear';
                 return null;
@@ -640,40 +981,32 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'weapon_attack_hit',
-                            name: "Stalker's Flurry", chooseOne: true, oncePerTurn: true,
-                            options: [
-                                { name: 'Sudden Strike', effect: 'sudden_strike' },
-                                { name: 'Mass Fear', effect: 'mass_fear', saveType: 'WIS', condition: 'frightened' },
-                            ],
-                        },
-                    ],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(setRuntimeValue).toHaveBeenCalledWith('test-campaign', 'targetEffects', expect.arrayContaining([
-                expect.objectContaining({
-                    target: 'Bugbear',
-                    source: "Stalker's Flurry",
-                    effect: 'mass_fear',
-                }),
-            ]), 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestRogue', "_Stalker's_Flurry_usedRound", 1, 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'test-campaign',
+                'targetEffects',
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        target: 'Bugbear',
+                        source: "Stalker's Flurry",
+                        effect: 'mass_fear',
+                        saveType: 'WIS',
+                        condition: 'frightened',
+                    }),
+                ]),
+                'test-campaign',
+            );
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestRogue',
+                "_Stalker's_Flurry_usedRound",
+                1,
+                'test-campaign',
+            );
         });
 
-        it('shows modal when no saved option for Stalker Flurry', async () => {
+        it('shows modal when no saved option', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [
                     { name: 'TestRogue', type: 'player' },
@@ -681,34 +1014,58 @@ describe('useDamageClick - class features', () => {
                 ],
             });
             getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [
-                        {
-                            type: 'attack_rider', trigger: 'weapon_attack_hit',
-                            name: "Stalker's Flurry", chooseOne: true, oncePerTurn: true,
-                            options: [
-                                { name: 'Sudden Strike', effect: 'sudden_strike' },
-                                { name: 'Mass Fear', effect: 'mass_fear' },
-                            ],
-                        },
-                    ],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = {
-                name: 'Rapier', damage: '1d8+5', damageType: 'Piercing',
-                weaponType: 'melee', properties: [],
-            };
-            await handleDamageClick(attack);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
+            await handleDamageClick(makeAttack());
             await tick();
-            expect(mockSetAttackRiderModal).toHaveBeenCalledWith(expect.objectContaining({
-                action: expect.objectContaining({ name: "Stalker's Flurry" }),
-                targetName: 'Bugbear',
-            }));
+            expect(mockSetAttackRiderModal).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    action: expect.objectContaining({ name: "Stalker's Flurry" }),
+                    targetName: 'Bugbear',
+                }),
+            );
             expect(mockRollDamage).not.toHaveBeenCalled();
+        });
+
+        it('skips when already used this round', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === "_Stalker's_Flurry_usedRound") return 1;
+                if (key === "_Stalker's_Flurry_option") return 'Sudden Strike';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player' },
+                    { name: 'Bugbear', type: 'npc' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
+                'TestRogue',
+                'pendingSuddenStrike',
+                true,
+                'test-campaign',
+            );
+        });
+
+        it('skips when no target found', async () => {
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === "_Stalker's_Flurry_option") return 'Sudden Strike';
+                return null;
+            });
+            getCombatContext.mockResolvedValue({
+                creatures: [
+                    { name: 'TestRogue', type: 'player' },
+                ],
+            });
+            getTargetFromAttacker.mockReturnValue(null);
+            const { handleDamageClick } = UseDamageClick({ playerStats: makeStalkersFlurryStats() });
+            await handleDamageClick(makeAttack());
+            await tick();
+            expect(mockSetAttackRiderModal).not.toHaveBeenCalled();
         });
     });
 });

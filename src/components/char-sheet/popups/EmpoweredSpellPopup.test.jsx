@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import EmpoweredSpellPopup from './EmpoweredSpellPopup.jsx';
 
 // ── Test fixtures ──
@@ -26,20 +27,15 @@ function makeState(overrides) {
 // ── Tests ──
 
 describe('EmpoweredSpellPopup', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
     // ── Default / no event ──
 
-    it('renders the popup with spell name and wand icon', () => {
+    it('renders the popup header with wand icon and spell name', () => {
         render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
         expect(screen.getByText('Empowered Spell')).toBeInTheDocument();
-        const icon = document.querySelector('.fa-wand-magic-sparkles');
-        expect(icon).toBeInTheDocument();
+        expect(document.querySelector('.fa-wand-magic-sparkles')).toBeInTheDocument();
     });
 
-    it('displays sorcery points', () => {
+    it('displays sorcery points current and max', () => {
         render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
         expect(screen.getByText(/Sorcery Points:/)).toBeInTheDocument();
         const spDisplay = document.querySelector('.metamagic-sp-display');
@@ -47,15 +43,26 @@ describe('EmpoweredSpellPopup', () => {
         expect(spDisplay.textContent).toContain('10');
     });
 
-    it('shows "no recent damage" message when no lastEvent and no error', () => {
+    it('shows full no-event message when no lastEvent and no error', () => {
         render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
-        expect(screen.getByText(/No recent damage event found/)).toBeInTheDocument();
+        expect(screen.getByText(/No recent damage event found\. Cast a spell/)).toBeInTheDocument();
     });
 
-    it('does not show "no recent damage" message when there is a lastEvent', () => {
+    it('does not show no-event message when there is a lastEvent', () => {
         render(
             <EmpoweredSpellPopup
                 state={makeState({ lastEvent: baseLastEvent })}
+                onReroll={vi.fn()}
+                onClose={vi.fn()}
+            />
+        );
+        expect(screen.queryByText(/No recent damage event found/)).not.toBeInTheDocument();
+    });
+
+    it('does not show no-event message when there is an error', () => {
+        render(
+            <EmpoweredSpellPopup
+                state={makeState({ error: 'Not enough SP' })}
                 onReroll={vi.fn()}
                 onClose={vi.fn()}
             />
@@ -76,7 +83,7 @@ describe('EmpoweredSpellPopup', () => {
         expect(screen.getByText('Not enough SP')).toBeInTheDocument();
     });
 
-    it('does not render error message when state.error is falsy', () => {
+    it('does not render error element when state.error is null', () => {
         render(
             <EmpoweredSpellPopup
                 state={makeState({ error: null })}
@@ -85,6 +92,18 @@ describe('EmpoweredSpellPopup', () => {
             />
         );
         expect(screen.queryByText(/Not enough SP/)).not.toBeInTheDocument();
+    });
+
+    it('does not render error element when state.error is undefined', () => {
+        render(
+            <EmpoweredSpellPopup
+                state={makeState({ error: undefined })}
+                onReroll={vi.fn()}
+                onClose={vi.fn()}
+            />
+        );
+        const errorEl = document.querySelector('.empowered-error');
+        expect(errorEl).not.toBeInTheDocument();
     });
 
     // ── Active event (not completed, has rolls) ──
@@ -103,7 +122,7 @@ describe('EmpoweredSpellPopup', () => {
         expect(screen.getByText('7')).toBeInTheDocument();
     });
 
-    it('shows CHA modifier and reroll capacity', () => {
+    it('shows CHA modifier and reroll capacity from state', () => {
         render(
             <EmpoweredSpellPopup
                 state={makeState({ lastEvent: baseLastEvent, chaMod: 3 })}
@@ -115,7 +134,18 @@ describe('EmpoweredSpellPopup', () => {
         expect(screen.getByText(/can reroll up to 3 dice/)).toBeInTheDocument();
     });
 
-    it('shows Reroll button when lastEvent has rolls and not completed', () => {
+    it('shows zero reroll capacity when chaMod is 0', () => {
+        render(
+            <EmpoweredSpellPopup
+                state={makeState({ lastEvent: baseLastEvent, chaMod: 0 })}
+                onReroll={vi.fn()}
+                onClose={vi.fn()}
+            />
+        );
+        expect(screen.getByText(/can reroll up to 0 dice/)).toBeInTheDocument();
+    });
+
+    it('shows Reroll and Cancel buttons when lastEvent has rolls and not completed', () => {
         render(
             <EmpoweredSpellPopup
                 state={makeState({ lastEvent: baseLastEvent })}
@@ -124,16 +154,6 @@ describe('EmpoweredSpellPopup', () => {
             />
         );
         expect(screen.getByText(/Reroll \(1 SP\)/)).toBeInTheDocument();
-    });
-
-    it('shows Cancel button when lastEvent has rolls and not completed', () => {
-        render(
-            <EmpoweredSpellPopup
-                state={makeState({ lastEvent: baseLastEvent })}
-                onReroll={vi.fn()}
-                onClose={vi.fn()}
-            />
-        );
         expect(screen.getByText('Cancel')).toBeInTheDocument();
     });
 
@@ -190,9 +210,21 @@ describe('EmpoweredSpellPopup', () => {
         expect(screen.queryByText(/Reroll \(1 SP\)/)).not.toBeInTheDocument();
     });
 
+    it('does not show Cancel button when lastEvent has no rolls', () => {
+        const stateWithoutRolls = makeState({ lastEvent: { ...baseLastEvent, rolls: null } });
+        render(
+            <EmpoweredSpellPopup
+                state={stateWithoutRolls}
+                onReroll={vi.fn()}
+                onClose={vi.fn()}
+            />
+        );
+        expect(screen.queryByText('Cancel')).not.toBeInTheDocument();
+    });
+
     // ── Completed state with result message ──
 
-    it('shows completed result with message when state.completed and result.message exist', () => {
+    it('shows completed result message when state.completed and result.message exist', () => {
         const completedState = makeState({
             completed: true,
             result: {
@@ -209,7 +241,7 @@ describe('EmpoweredSpellPopup', () => {
         expect(screen.getByText('Empowered Spell applied!')).toBeInTheDocument();
     });
 
-    it('does not show damage breakdown when result has a message', () => {
+    it('hides damage breakdown when result has a message', () => {
         const completedState = makeState({
             completed: true,
             result: {
@@ -224,6 +256,7 @@ describe('EmpoweredSpellPopup', () => {
             />
         );
         expect(screen.queryByText(/Original Damage/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/New Damage/)).not.toBeInTheDocument();
     });
 
     // ── Completed state with damage breakdown ──
@@ -368,6 +401,29 @@ describe('EmpoweredSpellPopup', () => {
         expect(screen.queryByText(/Target HP:/)).not.toBeInTheDocument();
     });
 
+    it('does not show target HP when result.targetCurrentHp is undefined', () => {
+        const completedState = makeState({
+            completed: true,
+            result: {
+                oldTotal: 7,
+                newTotal: 12,
+                damageDifference: 5,
+                rerollCount: 2,
+                originalDice: [3, 4],
+                newDice: [6, 6],
+                targetCurrentHp: undefined,
+            },
+        });
+        render(
+            <EmpoweredSpellPopup
+                state={completedState}
+                onReroll={vi.fn()}
+                onClose={vi.fn()}
+            />
+        );
+        expect(screen.queryByText(/Target HP:/)).not.toBeInTheDocument();
+    });
+
     it('shows "Spent 1 Sorcery Point" in completed state', () => {
         const completedState = makeState({
             completed: true,
@@ -412,17 +468,12 @@ describe('EmpoweredSpellPopup', () => {
         expect(screen.getByText(/click to dismiss/)).toBeInTheDocument();
     });
 
-    it('shows completed result block when state.completed is true', () => {
+    // ── Completed state edge cases ──
+
+    it('does not show damage breakdown when completed but result is null', () => {
         const completedState = makeState({
             completed: true,
-            result: {
-                oldTotal: 7,
-                newTotal: 12,
-                damageDifference: 5,
-                rerollCount: 2,
-                originalDice: [3, 4],
-                newDice: [6, 6],
-            },
+            result: null,
         });
         render(
             <EmpoweredSpellPopup
@@ -431,8 +482,35 @@ describe('EmpoweredSpellPopup', () => {
                 onClose={vi.fn()}
             />
         );
-        expect(screen.getByText(/New Damage:/)).toBeInTheDocument();
-        expect(screen.getByText(/Spent 1 Sorcery Point/)).toBeInTheDocument();
+        expect(screen.queryByText(/New Damage:/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Spent 1 Sorcery Point/)).not.toBeInTheDocument();
+    });
+
+    it('does not show damage breakdown when completed but result is undefined', () => {
+        const completedState = makeState({
+            completed: true,
+            result: undefined,
+        });
+        render(
+            <EmpoweredSpellPopup
+                state={completedState}
+                onReroll={vi.fn()}
+                onClose={vi.fn()}
+            />
+        );
+        expect(screen.queryByText(/New Damage:/)).not.toBeInTheDocument();
+    });
+
+    it('does not show completed result when state.completed is false', () => {
+        render(
+            <EmpoweredSpellPopup
+                state={makeState({ lastEvent: baseLastEvent, completed: false })}
+                onReroll={vi.fn()}
+                onClose={vi.fn()}
+            />
+        );
+        expect(screen.queryByText(/New Damage:/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Spent 1 Sorcery Point/)).not.toBeInTheDocument();
     });
 
     // ── Zero difference ──
@@ -456,7 +534,6 @@ describe('EmpoweredSpellPopup', () => {
                 onClose={vi.fn()}
             />
         );
-        // Verify the difference line shows 0 (not +0)
         const diffLines = screen.getAllByText(/Difference:/);
         expect(diffLines[0].parentElement.textContent).toContain('0');
         expect(diffLines[0].parentElement.textContent).not.toMatch(/\+0/);
@@ -466,19 +543,16 @@ describe('EmpoweredSpellPopup', () => {
 
     it('renders with dice-roll-result class', () => {
         render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
-        const resultDiv = document.querySelector('.dice-roll-result');
-        expect(resultDiv).toBeInTheDocument();
+        expect(document.querySelector('.dice-roll-result')).toBeInTheDocument();
     });
 
     it('renders with dice-roll-header class', () => {
         render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
-        const headerDiv = document.querySelector('.dice-roll-header');
-        expect(headerDiv).toBeInTheDocument();
+        expect(document.querySelector('.dice-roll-header')).toBeInTheDocument();
     });
 
     it('renders with metamagic-sp-display class', () => {
         render(<EmpoweredSpellPopup state={makeState()} onReroll={vi.fn()} onClose={vi.fn()} />);
-        const spDiv = document.querySelector('.metamagic-sp-display');
-        expect(spDiv).toBeInTheDocument();
+        expect(document.querySelector('.metamagic-sp-display')).toBeInTheDocument();
     });
 });

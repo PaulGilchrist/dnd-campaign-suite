@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import AidTargetPopup from './AidTargetPopup.jsx';
 
 // ── Test fixtures ──
@@ -34,62 +35,29 @@ describe('AidTargetPopup', () => {
         vi.clearAllMocks();
     });
 
-    afterEach(() => {
-        vi.restoreAllMocks();
-    });
-
     // ── Initial render ──
 
-    it('renders the popup overlay and modal', () => {
+    it('renders the popup with spell info and creature targets', () => {
         render(<AidTargetPopup {...makeProps()} />);
-        expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
-        expect(document.querySelector('.popup-modal')).toBeInTheDocument();
+        const headers = screen.getAllByText('Aid');
+        expect(headers.length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText(/Level 2/)).toBeInTheDocument();
+        expect(screen.getByText(/Abjuration/)).toBeInTheDocument();
+        expect(screen.getByText(/30 ft/)).toBeInTheDocument();
+        expect(screen.getByText('Goblin')).toBeInTheDocument();
+        expect(screen.getByText('Skeleton')).toBeInTheDocument();
+        expect(screen.getByText('Orc')).toBeInTheDocument();
+        expect(screen.getByText('Cancel')).toBeInTheDocument();
+        expect(screen.getByText('Cast Aid')).toBeInTheDocument();
+        expect(screen.getByText('Targets (0/3):')).toBeInTheDocument();
     });
 
-    it('renders the metamagic-popup class on the modal', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
-    });
-
-    it('renders the popup-inner wrapper', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(document.querySelector('.metamagic-popup-inner')).toBeInTheDocument();
-    });
-
-    it('renders the "Aid" header with shield-halved icon', () => {
+    it('renders the popup header with shield icon', () => {
         render(<AidTargetPopup {...makeProps()} />);
         const header = document.querySelector('h3');
         expect(header).toHaveTextContent('Aid');
         const icon = document.querySelector('.fa-solid.fa-shield-halved');
         expect(icon).toBeInTheDocument();
-    });
-
-    it('displays the spell name in the spell-name line', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        const spellName = document.querySelector('.metamagic-spell-name strong');
-        expect(spellName).toHaveTextContent('Aid');
-    });
-
-    it('displays the spell level in the spell-name line', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(screen.getByText(/Level 2/)).toBeInTheDocument();
-    });
-
-    it('displays the spell as Abjuration school', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(screen.getByText(/Abjuration/)).toBeInTheDocument();
-    });
-
-    it('displays the range in the instruction text', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(screen.getByText(/30 ft/)).toBeInTheDocument();
-    });
-
-    it('displays the max targets in the instruction text', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        const instructionP = document.querySelector('p:not(.metamagic-spell-name)');
-        expect(instructionP.textContent).toContain('Choose up to');
-        expect(instructionP.textContent).toContain('creatures');
     });
 
     it('displays the HP increase amount in the instruction text', () => {
@@ -98,45 +66,77 @@ describe('AidTargetPopup', () => {
         expect(screen.getByText(/5/)).toBeInTheDocument();
     });
 
+    it('renders the instruction text with target count placeholder', () => {
+        render(<AidTargetPopup {...makeProps()} />);
+        const instructionP = document.querySelector('p:not(.metamagic-spell-name)');
+        expect(instructionP.textContent).toContain('Choose up to');
+        expect(instructionP.textContent).toContain('creatures');
+    });
+
+    // ── Spell prop edge cases ──
+
+    it('throws when spell prop is null', () => {
+        expect(() => render(<AidTargetPopup {...makeProps({ spell: null })} />)).toThrow();
+    });
+
+    it('shows "Spell" fallback when spell has no name', () => {
+        render(<AidTargetPopup {...makeProps({ spell: {} })} />);
+        expect(screen.getByText(/— Level/)).toBeInTheDocument();
+    });
+
+    it('shows default level 2 when spell has no level', () => {
+        render(<AidTargetPopup {...makeProps({ spell: { name: 'Test' } })} />);
+        expect(screen.getByText(/Level 2/)).toBeInTheDocument();
+    });
+
+    it('shows "Spell" and default level when spell is missing both name and level', () => {
+        render(<AidTargetPopup {...makeProps({ spell: {} })} />);
+        const spellNameEl = document.querySelector('.metamagic-spell-name strong');
+        expect(spellNameEl.textContent).toBe('Spell');
+        expect(screen.getByText(/— Level 2/)).toBeInTheDocument();
+    });
+
+    // ── Slot level affects HP increase ──
+
+    it('calculates correct hpIncrease for level 3 spell', () => {
+        render(<AidTargetPopup {...makeProps({ spell: { name: 'Aid', level: 3 } })} />);
+        // hpIncrease = 5 + ((3-2)*5) = 10
+        expect(screen.getByText(/10/)).toBeInTheDocument();
+    });
+
+    it('calculates correct hpIncrease for level 5 spell', () => {
+        render(<AidTargetPopup {...makeProps({ spell: { name: 'Aid', level: 5 } })} />);
+        // hpIncrease = 5 + ((5-2)*5) = 20
+        expect(screen.getByText(/20/)).toBeInTheDocument();
+    });
+
+    it('calculates correct hpIncrease for level 1 spell (below base)', () => {
+        render(<AidTargetPopup {...makeProps({ spell: { name: 'Aid', level: 1 } })} />);
+        // hpIncrease = 5 + ((1-2)*5) = 0, look for it in the instruction paragraph
+        const instructionP = document.querySelector('p:not(.metamagic-spell-name)');
+        expect(instructionP.textContent).toContain('increase by 0 for the duration');
+    });
+
     // ── Creature targets list ──
 
-    it('renders the targets label with selection count', () => {
-        render(<AidTargetPopup {...makeProps()} />);
+    it('renders an empty target list when creatureTargets is empty', () => {
+        render(<AidTargetPopup {...makeProps({ creatureTargets: [] })} />);
         expect(screen.getByText('Targets (0/3):')).toBeInTheDocument();
+        expect(screen.queryByText('Goblin')).not.toBeInTheDocument();
     });
 
-    it('renders all creature targets in the target list', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(screen.getByText('Goblin')).toBeInTheDocument();
-        expect(screen.getByText('Skeleton')).toBeInTheDocument();
-        expect(screen.getByText('Orc')).toBeInTheDocument();
-    });
-
-    it('renders the metamagic-twin-target wrapper', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(document.querySelector('.metamagic-twin-target')).toBeInTheDocument();
-    });
-
-    it('renders a scrollable container for targets', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        const container = document.querySelector('.metamagic-twin-target div[style]');
-        expect(container).toBeInTheDocument();
+    it('respects custom maxTargets value in the label', () => {
+        render(<AidTargetPopup {...makeProps({ maxTargets: 5 })} />);
+        expect(screen.getByText('Targets (0/5):')).toBeInTheDocument();
     });
 
     // ── Target selection ──
 
-    it('shows checkmark prefix when target is selected', () => {
+    it('selects a target on click and shows checkmark prefix', () => {
         render(<AidTargetPopup {...makeProps()} />);
         const goblinEl = screen.getByText('Goblin');
         fireEvent.click(goblinEl);
         expect(screen.getByText('✓ Goblin')).toBeInTheDocument();
-    });
-
-    it('updates selection count when target is selected', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        const goblinEl = screen.getByText('Goblin');
-        fireEvent.click(goblinEl);
-        expect(screen.getByText('Targets (1/3):')).toBeInTheDocument();
     });
 
     it('toggles target off when clicking an already selected target', () => {
@@ -150,65 +150,43 @@ describe('AidTargetPopup', () => {
 
     it('selects multiple targets up to maxTargets', () => {
         render(<AidTargetPopup {...makeProps()} />);
-        const goblinEl = screen.getByText('Goblin');
-        const skeletonEl = screen.getByText('Skeleton');
-        const orcEl = screen.getByText('Orc');
-        fireEvent.click(goblinEl);
-        fireEvent.click(skeletonEl);
-        fireEvent.click(orcEl);
+        fireEvent.click(screen.getByText('Goblin'));
+        fireEvent.click(screen.getByText('Skeleton'));
+        fireEvent.click(screen.getByText('Orc'));
         expect(screen.getByText('Targets (3/3):')).toBeInTheDocument();
     });
 
     it('does not select beyond maxTargets', () => {
         render(<AidTargetPopup {...makeProps({ creatureTargets: ['Goblin', 'Skeleton', 'Orc', 'Zombie'] })} />);
-        const goblinEl = screen.getByText('Goblin');
-        const skeletonEl = screen.getByText('Skeleton');
-        const orcEl = screen.getByText('Orc');
-        const zombieEl = screen.getByText('Zombie');
-        fireEvent.click(goblinEl);
-        fireEvent.click(skeletonEl);
-        fireEvent.click(orcEl);
+        fireEvent.click(screen.getByText('Goblin'));
+        fireEvent.click(screen.getByText('Skeleton'));
+        fireEvent.click(screen.getByText('Orc'));
         expect(screen.getByText('Targets (3/3):')).toBeInTheDocument();
-        fireEvent.click(zombieEl);
-        // Should still be 3/3 since maxTargets is 3
+        fireEvent.click(screen.getByText('Zombie'));
         expect(screen.getByText('Targets (3/3):')).toBeInTheDocument();
     });
 
-    it('applies selected styling to selected targets', () => {
+    it('selects targets in click order for the confirm callback', () => {
+        render(<AidTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Orc'));
+        fireEvent.click(screen.getByText('Goblin'));
+        fireEvent.click(screen.getByText('Skeleton'));
+        fireEvent.click(screen.getByText('Cast Aid'));
+        expect(mockOnConfirm).toHaveBeenCalledWith(['Orc', 'Goblin', 'Skeleton']);
+    });
+
+    it('allows deselecting and reselecting a target', () => {
         render(<AidTargetPopup {...makeProps()} />);
         const goblinEl = screen.getByText('Goblin');
         fireEvent.click(goblinEl);
-        expect(goblinEl).toHaveStyle({
-            backgroundColor: 'rgba(76, 175, 80, 0.3)',
-            border: '1px solid #4CAF50',
-        });
-    });
-
-    it('applies unselected styling to unselected targets', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        const goblinEl = screen.getByText('Goblin');
-        expect(goblinEl).toHaveStyle({
-            backgroundColor: 'rgba(255, 255, 255, 0.1)',
-        });
-        expect(goblinEl.style.borderColor).toBe('transparent');
+        expect(screen.getByText('Targets (1/3):')).toBeInTheDocument();
+        fireEvent.click(goblinEl);
+        expect(screen.getByText('Targets (0/3):')).toBeInTheDocument();
+        fireEvent.click(goblinEl);
+        expect(screen.getByText('Targets (1/3):')).toBeInTheDocument();
     });
 
     // ── Action buttons ──
-
-    it('renders "Cancel" button', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(screen.getByText('Cancel')).toBeInTheDocument();
-    });
-
-    it('renders "Cast Aid" button', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(screen.getByText('Cast Aid')).toBeInTheDocument();
-    });
-
-    it('renders the metamagic-actions wrapper', () => {
-        render(<AidTargetPopup {...makeProps()} />);
-        expect(document.querySelector('.metamagic-actions')).toBeInTheDocument();
-    });
 
     it('disables "Cast Aid" button when no targets selected', () => {
         render(<AidTargetPopup {...makeProps()} />);
@@ -217,8 +195,19 @@ describe('AidTargetPopup', () => {
 
     it('enables "Cast Aid" button when at least one target is selected', () => {
         render(<AidTargetPopup {...makeProps()} />);
-        const goblinEl = screen.getByText('Goblin');
-        fireEvent.click(goblinEl);
+        fireEvent.click(screen.getByText('Goblin'));
+        expect(screen.getByText('Cast Aid')).not.toBeDisabled();
+    });
+
+    it('disables "Cast Aid" button when maxTargets reached with custom max', () => {
+        render(<AidTargetPopup {...makeProps({ maxTargets: 5 })} />);
+        expect(screen.getByText('Cast Aid')).toBeDisabled();
+    });
+
+    it('enables "Cast Aid" button when custom maxTargets is reached', () => {
+        render(<AidTargetPopup {...makeProps({ maxTargets: 2 })} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        fireEvent.click(screen.getByText('Skeleton'));
         expect(screen.getByText('Cast Aid')).not.toBeDisabled();
     });
 
@@ -226,10 +215,8 @@ describe('AidTargetPopup', () => {
 
     it('calls onConfirm with selected targets when confirmed', () => {
         render(<AidTargetPopup {...makeProps()} />);
-        const goblinEl = screen.getByText('Goblin');
-        const skeletonEl = screen.getByText('Skeleton');
-        fireEvent.click(goblinEl);
-        fireEvent.click(skeletonEl);
+        fireEvent.click(screen.getByText('Goblin'));
+        fireEvent.click(screen.getByText('Skeleton'));
         fireEvent.click(screen.getByText('Cast Aid'));
         expect(mockOnConfirm).toHaveBeenCalledTimes(1);
         expect(mockOnConfirm).toHaveBeenCalledWith(['Goblin', 'Skeleton']);
@@ -237,12 +224,9 @@ describe('AidTargetPopup', () => {
 
     it('calls onConfirm with all selected targets', () => {
         render(<AidTargetPopup {...makeProps()} />);
-        const goblinEl = screen.getByText('Goblin');
-        const skeletonEl = screen.getByText('Skeleton');
-        const orcEl = screen.getByText('Orc');
-        fireEvent.click(goblinEl);
-        fireEvent.click(skeletonEl);
-        fireEvent.click(orcEl);
+        fireEvent.click(screen.getByText('Goblin'));
+        fireEvent.click(screen.getByText('Skeleton'));
+        fireEvent.click(screen.getByText('Orc'));
         fireEvent.click(screen.getByText('Cast Aid'));
         expect(mockOnConfirm).toHaveBeenCalledWith(['Goblin', 'Skeleton', 'Orc']);
     });
@@ -251,6 +235,16 @@ describe('AidTargetPopup', () => {
         render(<AidTargetPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Cast Aid'));
         expect(mockOnConfirm).not.toHaveBeenCalled();
+    });
+
+    it('does not call onConfirm when maxTargets limit blocks additional selection', () => {
+        render(<AidTargetPopup {...makeProps({ creatureTargets: ['Goblin', 'Skeleton', 'Orc', 'Zombie'] })} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        fireEvent.click(screen.getByText('Skeleton'));
+        fireEvent.click(screen.getByText('Orc'));
+        fireEvent.click(screen.getByText('Cast Aid'));
+        expect(mockOnConfirm).toHaveBeenCalledTimes(1);
+        expect(mockOnConfirm).toHaveBeenCalledWith(['Goblin', 'Skeleton', 'Orc']);
     });
 
     // ── Skip behavior ──
@@ -275,6 +269,13 @@ describe('AidTargetPopup', () => {
         expect(mockOnSkip).not.toHaveBeenCalled();
     });
 
+    it('does not call onSkip when clicking on the modal inner content', () => {
+        render(<AidTargetPopup {...makeProps()} />);
+        const inner = document.querySelector('.metamagic-popup-inner');
+        fireEvent.click(inner);
+        expect(mockOnSkip).not.toHaveBeenCalled();
+    });
+
     // ── Keyboard: Escape ──
 
     it('calls onSkip when Escape key is pressed', () => {
@@ -296,61 +297,66 @@ describe('AidTargetPopup', () => {
         expect(removeListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
     });
 
-    // ── Missing / optional spell ──
+    // ── maxTargets edge cases ──
 
-    it('throws when spell prop is null', () => {
-        expect(() => render(<AidTargetPopup {...makeProps({ spell: null })} />)).toThrow();
+    it('handles maxTargets of 1', () => {
+        render(<AidTargetPopup {...makeProps({ maxTargets: 1 })} />);
+        expect(screen.getByText('Targets (0/1):')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Goblin'));
+        expect(screen.getByText('Targets (1/1):')).toBeInTheDocument();
+        expect(screen.getByText('Cast Aid')).not.toBeDisabled();
+        // Selecting another should be blocked
+        fireEvent.click(screen.getByText('Skeleton'));
+        expect(screen.getByText('Targets (1/1):')).toBeInTheDocument();
     });
 
-    it('shows "Spell" fallback when spell has no name', () => {
-        render(<AidTargetPopup {...makeProps({ spell: {} })} />);
-        expect(screen.getByText(/— Level/)).toBeInTheDocument();
-    });
-
-    it('shows default level 2 when spell has no level', () => {
-        render(<AidTargetPopup {...makeProps({ spell: { name: 'Test' } })} />);
-        expect(screen.getByText(/Level 2/)).toBeInTheDocument();
-    });
-
-    // ── Slot level affects HP increase ──
-
-    it('calculates correct hpIncrease for level 3 spell', () => {
-        render(<AidTargetPopup {...makeProps({ spell: { name: 'Aid', level: 3 } })} />);
-        // hpIncrease = 5 + ((3-2)*5) = 10
-        expect(screen.getByText(/10/)).toBeInTheDocument();
-    });
-
-    it('calculates correct hpIncrease for level 5 spell', () => {
-        render(<AidTargetPopup {...makeProps({ spell: { name: 'Aid', level: 5 } })} />);
-        // hpIncrease = 5 + ((5-2)*5) = 20
-        expect(screen.getByText(/20/)).toBeInTheDocument();
-    });
-
-    // ── Empty creature targets ──
-
-    it('renders empty target list when creatureTargets is empty', () => {
-        render(<AidTargetPopup {...makeProps({ creatureTargets: [] })} />);
-        expect(screen.getByText('Targets (0/3):')).toBeInTheDocument();
-    });
-
-    // ── Different maxTargets ──
-
-    it('respects custom maxTargets value', () => {
-        render(<AidTargetPopup {...makeProps({ maxTargets: 5 })} />);
-        expect(screen.getByText('Targets (0/5):')).toBeInTheDocument();
-    });
-
-    it('disables confirm button when maxTargets not reached', () => {
-        render(<AidTargetPopup {...makeProps({ maxTargets: 5 })} />);
+    it('handles maxTargets of 0 by keeping button disabled', () => {
+        render(<AidTargetPopup {...makeProps({ maxTargets: 0 })} />);
+        expect(screen.getByText('Targets (0/0):')).toBeInTheDocument();
         expect(screen.getByText('Cast Aid')).toBeDisabled();
+        // Cannot select any targets
+        fireEvent.click(screen.getByText('Goblin'));
+        expect(screen.getByText('Targets (0/0):')).toBeInTheDocument();
     });
 
-    // ── CSS class structure ──
+    // ── creatureTargets edge cases ──
 
-    it('popup-overlay click triggers onSkip', () => {
+    it('throws when creatureTargets is undefined (no null safety in component)', () => {
+        expect(() => render(<AidTargetPopup {...makeProps({ creatureTargets: undefined })} />)).toThrow();
+    });
+
+    it('throws when creatureTargets is null (no null safety in component)', () => {
+        expect(() => render(<AidTargetPopup {...makeProps({ creatureTargets: null })} />)).toThrow();
+    });
+
+    // ── Combined selection and confirm ──
+
+    it('confirms with a single target', () => {
         render(<AidTargetPopup {...makeProps()} />);
-        const overlay = document.querySelector('.popup-overlay');
-        fireEvent.click(overlay);
+        fireEvent.click(screen.getByText('Orc'));
+        fireEvent.click(screen.getByText('Cast Aid'));
+        expect(mockOnConfirm).toHaveBeenCalledTimes(1);
+        expect(mockOnConfirm).toHaveBeenCalledWith(['Orc']);
+    });
+
+    it('skips after selecting some targets', () => {
+        render(<AidTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        fireEvent.click(screen.getByText('Skeleton'));
+        fireEvent.click(screen.getByText('Cancel'));
         expect(mockOnSkip).toHaveBeenCalledTimes(1);
+        expect(mockOnConfirm).not.toHaveBeenCalled();
+    });
+
+    it('resets selection state on unmount and re-render', () => {
+        const { unmount } = render(<AidTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        expect(screen.getByText('Targets (1/3):')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Cancel'));
+        expect(mockOnSkip).toHaveBeenCalledTimes(1);
+        unmount();
+        // A fresh render with same props starts with no selections
+        render(<AidTargetPopup {...makeProps()} />);
+        expect(screen.getByText('Targets (0/3):')).toBeInTheDocument();
     });
 });

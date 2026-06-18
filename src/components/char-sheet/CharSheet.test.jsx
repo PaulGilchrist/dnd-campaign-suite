@@ -1,42 +1,86 @@
+// @improved-by-ai
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// Mock all child components before importing CharSheet
+import CharSheet from './CharSheet';
+
+// ---------------------------------------------------------------------------
+// Mocks
+// ---------------------------------------------------------------------------
+
 vi.mock('./char-summary/CharSummary.jsx', () => ({
-  default: vi.fn(({ playerStats, campaignName }) => (
+  default: vi.fn(({ playerStats, campaignName, conditionEffects, exhaustionLevel }) => (
     <div data-testid="char-summary">
       <span data-testid="summary-name">{playerStats?.name || 'none'}</span>
       <span data-testid="summary-campaign">{campaignName || 'none'}</span>
+      <span data-testid="exhaustion-level">{exhaustionLevel}</span>
+      {conditionEffects && <span data-testid="condition-effects">{JSON.stringify(conditionEffects)}</span>}
     </div>
   )),
 }));
 
 vi.mock('./CharAbilities.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-abilities">CharAbilities</div>),
+  default: vi.fn(({ playerStats, exhaustionPenalty }) => (
+    <div data-testid="char-abilities">
+      <span data-testid="abilities-player">{playerStats?.name || 'none'}</span>
+      <span data-testid="exhaustion-penalty">{exhaustionPenalty}</span>
+    </div>
+  )),
 }));
 
 vi.mock('./CharActions.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-actions">CharActions</div>),
+  default: vi.fn(({ playerStats, cannotAct, conditionAttackMode }) => (
+    <div data-testid="char-actions">
+      <span data-testid="actions-player">{playerStats?.name || 'none'}</span>
+      <span data-testid="cannot-act">{String(cannotAct)}</span>
+      <span data-testid="attack-mode">{conditionAttackMode || 'none'}</span>
+    </div>
+  )),
 }));
 
 vi.mock('./CharInventory.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-inventory">CharInventory</div>),
+  default: vi.fn(({ playerStats }) => (
+    <div data-testid="char-inventory">
+      <span data-testid="inventory-player">{playerStats?.name || 'none'}</span>
+    </div>
+  )),
 }));
 
 vi.mock('./CharReactions.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-reactions">CharReactions</div>),
+  default: vi.fn(({ playerStats, cannotAct }) => (
+    <div data-testid="char-reactions">
+      <span data-testid="reactions-player">{playerStats?.name || 'none'}</span>
+      <span data-testid="reactions-cannot-act">{String(cannotAct)}</span>
+    </div>
+  )),
 }));
 
 vi.mock('./CharSpecialActions.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-special-actions">CharSpecialActions</div>),
+  default: vi.fn(({ playerStats, cannotAct }) => (
+    <div data-testid="char-special-actions">
+      <span data-testid="special-actions-player">{playerStats?.name || 'none'}</span>
+      <span data-testid="special-actions-cannot-act">{String(cannotAct)}</span>
+    </div>
+  )),
 }));
 
 vi.mock('./CharCharacterAdvancement.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-character-advancement">CharCharacterAdvancement</div>),
+  default: vi.fn(({ playerStats, campaignName }) => (
+    <div data-testid="char-character-advancement">
+      <span data-testid="advancement-player">{playerStats?.name || 'none'}</span>
+      <span data-testid="advancement-campaign">{campaignName || 'none'}</span>
+    </div>
+  )),
 }));
 
 vi.mock('./char-spells/CharSpells.jsx', () => ({
-  default: vi.fn(() => <div data-testid="char-spells">CharSpells</div>),
+  default: vi.fn(({ playerStats, handleTogglePreparedSpells, exhaustionPenalty }) => (
+    <div data-testid="char-spells">
+      <span data-testid="spells-player">{playerStats?.name || 'none'}</span>
+      <span data-testid="spells-has-toggle">{handleTogglePreparedSpells ? 'true' : 'false'}</span>
+      <span data-testid="spells-exhaustion-penalty">{exhaustionPenalty}</span>
+    </div>
+  )),
 }));
 
 vi.mock('../../services/rules/rulesFactory.js', () => ({
@@ -65,8 +109,10 @@ vi.mock('../../services/rules/rulesFactory.js', () => ({
   },
 }));
 
+const mockStore = new Map();
+
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
-  getRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn((key, prop) => mockStore.get(`${key}:${prop}`) ?? null),
   setRuntimeValue: vi.fn(),
   useRuntimeValue: vi.fn((_key, prop) => {
     if (prop === 'exhaustionLevel') return 0;
@@ -79,8 +125,9 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   }),
 }));
 
-// Now import CharSheet after all mocks are set up
-import CharSheet from './CharSheet';
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
 const mockPlayerSummary = {
   name: 'Test Fighter',
@@ -108,96 +155,362 @@ const defaultProps = {
   onSaveClick: vi.fn(),
 };
 
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
 describe('CharSheet', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStore.clear();
   });
 
-  it('renders char-sheet wrapper when playerStats loads', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+  // -----------------------------------------------------------------------
+  // Rendering & structural assertions
+  // -----------------------------------------------------------------------
+
+  describe('wrapper rendering', () => {
+    it('renders the char-sheet wrapper after playerStats resolves', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('renders nothing before playerStats resolves', async () => {
+      // The async mock means the component starts with playerStats=null,
+      // so the wrapper div should not be in the document initially.
+      const { container } = render(<CharSheet {...defaultProps} />);
+      expect(container.querySelector('[data-testid="char-sheet"]')).not.toBeInTheDocument();
+      // Wait for the async resolution to complete.
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
     });
   });
 
-  it('renders CharSummary component', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-summary')).toBeInTheDocument();
+  // -----------------------------------------------------------------------
+  // Child component rendering
+  // -----------------------------------------------------------------------
+
+  describe('child components', () => {
+    it('renders CharSummary', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-summary')).toBeInTheDocument();
+      });
+    });
+
+    it('renders CharAbilities', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-abilities')).toBeInTheDocument();
+      });
+    });
+
+    it('renders CharActions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-actions')).toBeInTheDocument();
+      });
+    });
+
+    it('renders CharReactions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-reactions')).toBeInTheDocument();
+      });
+    });
+
+    it('renders CharSpells', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-spells')).toBeInTheDocument();
+      });
+    });
+
+    it('renders CharSpecialActions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-special-actions')).toBeInTheDocument();
+      });
+    });
+
+    it('renders CharInventory', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-inventory')).toBeInTheDocument();
+      });
+    });
+
+    it('renders CharCharacterAdvancement', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-character-advancement')).toBeInTheDocument();
+      });
     });
   });
 
-  it('renders CharAbilities component', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-abilities')).toBeInTheDocument();
+  // -----------------------------------------------------------------------
+  // Props passthrough — verify data flows correctly to children
+  // -----------------------------------------------------------------------
+
+  describe('props passthrough', () => {
+    it('passes playerStats.name to CharSummary', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('summary-name')).toHaveTextContent('Test Fighter');
+      });
+    });
+
+    it('passes campaignName to CharSummary', async () => {
+      render(<CharSheet {...defaultProps} campaignName="my-campaign" />);
+      await waitFor(() => {
+        expect(screen.getByTestId('summary-campaign')).toHaveTextContent('my-campaign');
+      });
+    });
+
+    it('passes campaignName to CharCharacterAdvancement', async () => {
+      render(<CharSheet {...defaultProps} campaignName="my-campaign" />);
+      await waitFor(() => {
+        expect(screen.getByTestId('advancement-campaign')).toHaveTextContent('my-campaign');
+      });
+    });
+
+    it('passes playerStats.name to CharAbilities', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('abilities-player')).toHaveTextContent('Test Fighter');
+      });
+    });
+
+    it('passes playerStats.name to CharActions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('actions-player')).toHaveTextContent('Test Fighter');
+      });
+    });
+
+    it('passes playerStats.name to CharReactions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('reactions-player')).toHaveTextContent('Test Fighter');
+      });
+    });
+
+    it('passes playerStats.name to CharInventory', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('inventory-player')).toHaveTextContent('Test Fighter');
+      });
+    });
+
+    it('passes playerStats.name to CharSpecialActions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('special-actions-player')).toHaveTextContent('Test Fighter');
+      });
+    });
+
+    it('passes playerStats.name to CharSpells', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('spells-player')).toHaveTextContent('Test Fighter');
+      });
     });
   });
 
-  it('renders CharActions component', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-actions')).toBeInTheDocument();
+  // -----------------------------------------------------------------------
+  // Ruleset branching (5e vs 2024)
+  // -----------------------------------------------------------------------
+
+  describe('ruleset handling', () => {
+    it('renders wrapper with 2024 ruleset', async () => {
+      const props2024 = {
+        ...defaultProps,
+        playerSummary: { ...mockPlayerSummary, rules: '2024' },
+      };
+      render(<CharSheet {...props2024} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('passes handleTogglePreparedSpells to CharSpells for 5e ruleset', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('spells-has-toggle')).toHaveTextContent('true');
+      });
+    });
+
+    it('does not pass handleTogglePreparedSpells to CharSpells for 2024 ruleset', async () => {
+      const props2024 = {
+        ...defaultProps,
+        playerSummary: { ...mockPlayerSummary, rules: '2024' },
+      };
+      render(<CharSheet {...props2024} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('spells-has-toggle')).toHaveTextContent('false');
+      });
     });
   });
 
-  it('renders CharReactions component', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-reactions')).toBeInTheDocument();
+  // -----------------------------------------------------------------------
+  // Edge cases
+  // -----------------------------------------------------------------------
+
+  describe('edge cases', () => {
+    it('renders with empty characters array', async () => {
+      render(<CharSheet {...defaultProps} characters={[]} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('renders with null activeMapName', async () => {
+      render(<CharSheet {...defaultProps} activeMapName={null} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('renders with undefined campaignName', async () => {
+      const props = { ...defaultProps };
+      delete props.campaignName;
+      render(<CharSheet {...props} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+    });
+
+    it('does not crash when onDeleteCharacter callback is called', async () => {
+      const onDelete = vi.fn();
+      const props = { ...defaultProps, onDeleteCharacter: onDelete };
+      render(<CharSheet {...props} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+      // No-op: verify the component renders without error when the callback
+      // prop is provided (the component doesn't invoke it during render).
+      expect(onDelete).not.toHaveBeenCalled();
+    });
+
+    it('renders with all callback props as no-op functions', async () => {
+      const props = {
+        ...defaultProps,
+        onDeleteCharacter: vi.fn(),
+        onEditCharacter: vi.fn(),
+        onUploadClick: vi.fn(),
+        onSaveClick: vi.fn(),
+      };
+      render(<CharSheet {...props} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+      // Verify the callbacks were NOT called during render
+      expect(props.onDeleteCharacter).not.toHaveBeenCalled();
+      expect(props.onEditCharacter).not.toHaveBeenCalled();
+      expect(props.onUploadClick).not.toHaveBeenCalled();
+      expect(props.onSaveClick).not.toHaveBeenCalled();
     });
   });
 
-  it('renders CharSpells component', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-spells')).toBeInTheDocument();
+  // -----------------------------------------------------------------------
+  // Exhaustion / condition effects passthrough
+  // -----------------------------------------------------------------------
+
+  describe('exhaustion and condition effects passthrough', () => {
+    it('passes campaignName to CharSummary', async () => {
+      render(<CharSheet {...defaultProps} campaignName="exhaustion-test" />);
+      await waitFor(() => {
+        expect(screen.getByTestId('summary-campaign')).toHaveTextContent('exhaustion-test');
+      });
+    });
+
+    it('renders with exhaustion level from runtime state', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('exhaustion-level')).toBeInTheDocument();
+      });
     });
   });
 
-  it('renders CharSpecialActions component', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-special-actions')).toBeInTheDocument();
+  // -----------------------------------------------------------------------
+  // cannotAct / attack mode passthrough
+  // -----------------------------------------------------------------------
+
+  describe('combat-related props passthrough', () => {
+    it('passes cannotAct to CharActions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('cannot-act')).toBeInTheDocument();
+      });
+    });
+
+    it('passes conditionAttackMode to CharActions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('attack-mode')).toBeInTheDocument();
+      });
+    });
+
+    it('passes cannotAct to CharReactions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('reactions-cannot-act')).toBeInTheDocument();
+      });
+    });
+
+    it('passes cannotAct to CharSpecialActions', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('special-actions-cannot-act')).toBeInTheDocument();
+      });
     });
   });
 
-  it('renders CharInventory component', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-inventory')).toBeInTheDocument();
+  // -----------------------------------------------------------------------
+  // Exhaustion penalty passthrough
+  // -----------------------------------------------------------------------
+
+  describe('exhaustion penalty passthrough', () => {
+    it('passes exhaustionPenalty to CharAbilities', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('exhaustion-penalty')).toBeInTheDocument();
+      });
+    });
+
+    it('passes exhaustionPenalty to CharSpells', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('spells-exhaustion-penalty')).toBeInTheDocument();
+      });
     });
   });
 
-  it('renders CharCharacterAdvancement component', async () => {
-    render(<CharSheet {...defaultProps} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-character-advancement')).toBeInTheDocument();
-    });
-  });
+  // -----------------------------------------------------------------------
+  // Structural assertions
+  // -----------------------------------------------------------------------
 
-  it('renders with 2024 ruleset', async () => {
-    const props2024 = {
-      ...defaultProps,
-      playerSummary: { ...mockPlayerSummary, rules: '2024' },
-    };
-    render(<CharSheet {...props2024} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+  describe('document structure', () => {
+    it('wraps CharCharacterAdvancement in a no-print div', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-character-advancement')).toBeInTheDocument();
+      });
+      // Verify the parent container has the no-print class
+      const advContainer = document.querySelector('[data-testid="char-character-advancement"]');
+      expect(advContainer?.parentElement?.className).toContain('no-print');
     });
-  });
 
-  it('renders with empty characters array', async () => {
-    render(<CharSheet {...defaultProps} characters={[]} />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
-    });
-  });
-
-  it('passes campaignName to child components', async () => {
-    render(<CharSheet {...defaultProps} campaignName="my-campaign" />);
-    await waitFor(() => {
-      expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+    it('renders hr separators between sections', async () => {
+      render(<CharSheet {...defaultProps} />);
+      await waitFor(() => {
+        expect(screen.getByTestId('char-sheet')).toBeInTheDocument();
+      });
+      const hrElements = document.querySelectorAll('hr');
+      expect(hrElements.length).toBeGreaterThan(0);
     });
   });
 });

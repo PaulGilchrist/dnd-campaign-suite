@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import SoulstitchSpellsModal from './SoulstitchSpellsModal.jsx';
@@ -58,80 +59,58 @@ function makeAction(overrides) {
 describe('SoulstitchSpellsModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
   });
 
   // ── Initial render / display ──
 
-  it('renders modal overlay', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('renders modal overlay and modal container', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-  });
-
-  it('renders modal content container', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
     expect(document.querySelector('.sp-modal')).toBeInTheDocument();
   });
 
-  it('renders modal header with feature name', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('renders modal header with feature name and shield icon', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(screen.getByText('Soulstitch Spells')).toBeInTheDocument();
+    expect(document.querySelector('.fa-shield-halved')).toBeInTheDocument();
   });
 
-  it('renders Font Awesome shield icon in header', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    const icon = document.querySelector('.fa-shield-halved');
-    expect(icon).toBeInTheDocument();
-  });
-
-  it('renders description with spell name', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    expect(screen.getByText(/Cast/)).toBeInTheDocument();
+  it('renders description with spell name and selection instructions', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(screen.getByText('Fireball')).toBeInTheDocument();
-  });
-
-  it('displays max selections count in description', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    expect(screen.getByText(/Cast/)).toBeInTheDocument();
     const descriptionP = document.querySelector('.sp-body p');
     expect(descriptionP.textContent).toContain('Choose up to');
     expect(descriptionP.textContent).toContain('2');
     expect(descriptionP.textContent).toContain('creature');
   });
 
-  it('renders creature selection list', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('renders all eligible targets as selectable entries', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(screen.getByText('Orc Warrior')).toBeInTheDocument();
     expect(screen.getByText('Goblin Acolyte')).toBeInTheDocument();
     expect(screen.getByText('Bugbear')).toBeInTheDocument();
   });
 
   it('marks previously chosen creatures with "(previously chosen)" label', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(screen.getByText('(previously chosen)')).toBeInTheDocument();
   });
 
-  it('renders selection counter', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('renders selection counter and action buttons', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
-  });
-
-  it('renders Apply button with correct text', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
     expect(screen.getByRole('button', { name: /Apply Soulstitch \(0 chosen\)/ })).toBeInTheDocument();
-  });
-
-  it('renders Cancel button', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
   });
 
   it('disables Apply button when no creatures selected', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(screen.getByRole('button', { name: /Apply Soulstitch/ })).toBeDisabled();
   });
 
   it('does not show result state on initial render', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
   });
 
@@ -162,20 +141,14 @@ describe('SoulstitchSpellsModal', () => {
 
   // ── Creature selection ──
 
-  it('selects a creature when checkbox is clicked', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('selects a creature and updates the counter when its label is clicked', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Goblin Acolyte'));
     expect(screen.getByText(/Selected: 1 \/ 2/)).toBeInTheDocument();
   });
 
-  it('updates selection counter after selecting a creature', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Goblin Acolyte'));
-    expect(screen.getByText(/Selected: 1 \/ 2/)).toBeInTheDocument();
-  });
-
-  it('deselects a creature when its checkbox is clicked again', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('deselects a creature when its label is clicked again', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Goblin Acolyte'));
     expect(screen.getByText(/Selected: 1 \/ 2/)).toBeInTheDocument();
     fireEvent.click(screen.getByText('Goblin Acolyte'));
@@ -183,32 +156,51 @@ describe('SoulstitchSpellsModal', () => {
   });
 
   it('enables Apply button after selecting at least one creature', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Goblin Acolyte'));
     expect(screen.getByRole('button', { name: /Apply Soulstitch \(1 chosen\)/ })).toBeEnabled();
   });
 
-  it('prevents selecting more than maxSelections', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('prevents selecting more than maxSelections and disables unselected checkboxes', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Goblin Acolyte'));
     fireEvent.click(screen.getByText('Bugbear'));
     expect(screen.getByText(/Selected: 2 \/ 2/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Apply Soulstitch \(2 chosen\)/ })).toBeEnabled();
+    const orcCheckbox = screen.getByText('Orc Warrior').previousElementSibling;
+    expect(orcCheckbox).toHaveAttribute('disabled');
   });
 
   it('selects previously chosen creature when clicked', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    // Orc Warrior is already "previously chosen", so clicking it should select it
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Orc Warrior'));
     expect(screen.getByText(/Selected: 1 \/ 2/)).toBeInTheDocument();
   });
 
   it('toggles previously chosen creature off when clicked again', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Orc Warrior'));
     expect(screen.getByText(/Selected: 1 \/ 2/)).toBeInTheDocument();
     fireEvent.click(screen.getByText('Orc Warrior'));
     expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
+  });
+
+  it('passes selected creatures to applySoulstitchSelection in click order', async () => {
+    applySoulstitchSelection.mockResolvedValue({
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'Soulstitch Spells', description: 'Test result' },
+    });
+    render(<SoulstitchSpellsModal {...baseProps} />);
+    fireEvent.click(screen.getByText('Bugbear'));
+    fireEvent.click(screen.getByText('Goblin Acolyte'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch \(2 chosen\)/ }));
+    });
+    expect(applySoulstitchSelection).toHaveBeenCalledWith(
+      baseAction,
+      basePlayerStats,
+      'test-campaign',
+      ['Bugbear', 'Goblin Acolyte']
+    );
   });
 
   // ── Apply flow ──
@@ -218,7 +210,7 @@ describe('SoulstitchSpellsModal', () => {
       type: 'popup',
       payload: { type: 'automation_info', name: 'Soulstitch Spells', description: 'Test result' },
     });
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Goblin Acolyte'));
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch/ }));
@@ -236,7 +228,7 @@ describe('SoulstitchSpellsModal', () => {
       type: 'popup',
       payload: { type: 'automation_info', name: 'Soulstitch Spells', description: 'Test result' },
     });
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Goblin Acolyte'));
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch/ }));
@@ -246,12 +238,12 @@ describe('SoulstitchSpellsModal', () => {
     });
   });
 
-  it('renders result description from payload', async () => {
+  it('renders result description from payload using dangerouslySetInnerHTML', async () => {
     applySoulstitchSelection.mockResolvedValue({
       type: 'popup',
       payload: { type: 'automation_info', name: 'Soulstitch Spells', description: 'Orc Warrior automatically succeed on saves and take no damage.' },
     });
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Goblin Acolyte'));
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch/ }));
@@ -261,32 +253,18 @@ describe('SoulstitchSpellsModal', () => {
     });
   });
 
-  it('hides selection list after applying', async () => {
+  it('hides selection controls after applying', async () => {
     applySoulstitchSelection.mockResolvedValue({
       type: 'popup',
       payload: { type: 'automation_info', name: 'Soulstitch Spells', description: 'Test result' },
     });
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+    render(<SoulstitchSpellsModal {...baseProps} />);
     fireEvent.click(screen.getByText('Goblin Acolyte'));
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch/ }));
     });
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: /Apply Soulstitch/ })).not.toBeInTheDocument();
-    });
-  });
-
-  it('hides Cancel button after applying', async () => {
-    applySoulstitchSelection.mockResolvedValue({
-      type: 'popup',
-      payload: { type: 'automation_info', name: 'Soulstitch Spells', description: 'Test result' },
-    });
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Goblin Acolyte'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch/ }));
-    });
-    await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
     });
   });
@@ -308,6 +286,21 @@ describe('SoulstitchSpellsModal', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  it('does not crash when result payload description is missing', async () => {
+    applySoulstitchSelection.mockResolvedValue({
+      type: 'popup',
+      payload: { type: 'automation_info', name: 'Soulstitch Spells' },
+    });
+    render(<SoulstitchSpellsModal {...baseProps} />);
+    fireEvent.click(screen.getByText('Goblin Acolyte'));
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch/ }));
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    });
+  });
+
   // ── Default values ──
 
   it('uses default maxSelections of 1 when action has no maxSelections', () => {
@@ -322,7 +315,7 @@ describe('SoulstitchSpellsModal', () => {
   it('uses default spellName when action has no spellName', () => {
     const action = makeAction({ spellName: undefined });
     render(<SoulstitchSpellsModal {...makeProps({ action })} />);
-    expect(screen.getByText(/Unknown/)).toBeInTheDocument();
+    expect(screen.getByText('Unknown')).toBeInTheDocument();
   });
 
   it('uses default featureName when action has no featureName', () => {
@@ -331,59 +324,29 @@ describe('SoulstitchSpellsModal', () => {
     expect(screen.getByText('Soulstitch Spells')).toBeInTheDocument();
   });
 
-  it('uses empty eligibleTargets when action has none', () => {
+  it('renders no creature entries when eligibleTargets is empty', () => {
     const action = makeAction({ eligibleTargets: [] });
     render(<SoulstitchSpellsModal {...makeProps({ action })} />);
     expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
+    expect(document.querySelectorAll('input[type="checkbox"]').length).toBe(0);
   });
 
-  it('uses empty chosenCreatures when action has none', () => {
+  it('does not show "(previously chosen)" when chosenCreatures is empty', () => {
     const action = makeAction({ chosenCreatures: [] });
     render(<SoulstitchSpellsModal {...makeProps({ action })} />);
     expect(screen.queryByText('(previously chosen)')).not.toBeInTheDocument();
   });
 
-  // ── Multiple selections ──
-
-  it('allows selecting up to maxSelections creatures', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Goblin Acolyte'));
-    expect(screen.getByText(/Selected: 1 \/ 2/)).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Bugbear'));
-    expect(screen.getByText(/Selected: 2 \/ 2/)).toBeInTheDocument();
+  it('uses all eligible checkboxes when maxSelections is larger than target count', () => {
+    const action = makeAction({ maxSelections: 5 });
+    render(<SoulstitchSpellsModal {...makeProps({ action })} />);
+    expect(document.querySelectorAll('input[type="checkbox"]').length).toBe(3);
   });
 
-  it('updates Apply button text with correct count', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Goblin Acolyte'));
-    expect(screen.getByRole('button', { name: /Apply Soulstitch \(1 chosen\)/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByText('Bugbear'));
-    expect(screen.getByRole('button', { name: /Apply Soulstitch \(2 chosen\)/ })).toBeInTheDocument();
-  });
+  // ── CSS structure ──
 
-  it('passes all selected creatures to applySoulstitchSelection', async () => {
-    applySoulstitchSelection.mockResolvedValue({
-      type: 'popup',
-      payload: { type: 'automation_info', name: 'Soulstitch Spells', description: 'Test result' },
-    });
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Goblin Acolyte'));
-    fireEvent.click(screen.getByText('Bugbear'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch \(2 chosen\)/ }));
-    });
-    expect(applySoulstitchSelection).toHaveBeenCalledWith(
-      baseAction,
-      basePlayerStats,
-      'test-campaign',
-      ['Goblin Acolyte', 'Bugbear']
-    );
-  });
-
-  // ── Modal CSS structure ──
-
-  it('renders modal with proper CSS classes', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('renders modal with all expected CSS class containers', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
     expect(document.querySelector('.sp-modal')).toBeInTheDocument();
     expect(document.querySelector('.sp-header')).toBeInTheDocument();
@@ -391,32 +354,9 @@ describe('SoulstitchSpellsModal', () => {
     expect(document.querySelector('.sp-actions')).toBeInTheDocument();
   });
 
-  it('renders checkboxes for each eligible target', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
+  it('renders a checkbox for each eligible target', () => {
+    render(<SoulstitchSpellsModal {...baseProps} />);
     const checkboxes = document.querySelectorAll('input[type="checkbox"]');
     expect(checkboxes.length).toBe(3);
-  });
-
-  it('renders selection list container with scroll', () => {
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    const listContainer = document.querySelector('[style*="maxHeight"]') || document.querySelector('.sp-body > div');
-    expect(listContainer).toBeInTheDocument();
-  });
-
-  // ── Result state with no payload ──
-
-  it('does not crash when result payload description is missing', async () => {
-    applySoulstitchSelection.mockResolvedValue({
-      type: 'popup',
-      payload: { type: 'automation_info', name: 'Soulstitch Spells' },
-    });
-    render(<SoulstitchSpellsModal {...makeProps()} />);
-    fireEvent.click(screen.getByText('Goblin Acolyte'));
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Apply Soulstitch/ }));
-    });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
-    });
   });
 });

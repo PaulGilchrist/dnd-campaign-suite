@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpells from './CharSpells.jsx';
@@ -17,6 +18,7 @@ vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
     setPopupHtml: vi.fn(),
     rollAttack: vi.fn(),
     rollDamage: vi.fn(),
+    quickRollPlayerSave: vi.fn(),
   })),
 }));
 
@@ -57,7 +59,7 @@ vi.mock('../../../services/ui/sanitize.js', () => ({
 vi.mock('./CharSpellSlots.jsx', () => ({
   default: function MockCharSpellSlots() {
     return <div data-testid="char-spell-slots">Spell Slots</div>;
-    },
+  },
 }));
 
 vi.mock('lodash', () => ({
@@ -70,12 +72,36 @@ vi.mock('../../../hooks/combat/useSpellMetamagicFlow.js', () => ({
     gateMetamagic: vi.fn(),
     handleConfirm: vi.fn(),
     handleSkip: vi.fn(),
+    pendingMultiTarget: null,
+    handleMultiTargetConfirm: vi.fn(),
+    handleMultiTargetSkip: vi.fn(),
     pendingAid: null,
-    pendingGreaterRestoration: null,
     handleAidConfirm: vi.fn(),
     handleAidSkip: vi.fn(),
+    pendingHeroesFeast: null,
+    handleHeroesFeastConfirm: vi.fn(),
+    handleHeroesFeastSkip: vi.fn(),
+    pendingGreaterRestoration: null,
     handleGreaterRestorationConfirm: vi.fn(),
     handleGreaterRestorationSkip: vi.fn(),
+    pendingLesserRestoration: null,
+    handleLesserRestorationConfirm: vi.fn(),
+    handleLesserRestorationSkip: vi.fn(),
+    pendingMageArmor: null,
+    handleMageArmorConfirm: vi.fn(),
+    handleMageArmorSkip: vi.fn(),
+    pendingShieldOfFaith: null,
+    handleShieldOfFaithConfirm: vi.fn(),
+    handleShieldOfFaithSkip: vi.fn(),
+    pendingProtectionFromEnergy: null,
+    handleProtectionFromEnergyConfirm: vi.fn(),
+    handleProtectionFromEnergySkip: vi.fn(),
+    pendingResistance: null,
+    handleResistanceConfirm: vi.fn(),
+    handleResistanceSkip: vi.fn(),
+    pendingRemoveCurse: null,
+    handleRemoveCurseConfirm: vi.fn(),
+    handleRemoveCurseSkip: vi.fn(),
   })),
 }));
 
@@ -129,119 +155,261 @@ describe('CharSpells', () => {
   });
 
   describe('Exhaustion and conditions', () => {
-    it('should apply disabled-attack class when cannotAct is true', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          cannotAct
-        />
-      );
+    const baseProps = {
+      playerStats: mockPlayerStats,
+      handleTogglePreparedSpells: mockHandleTogglePreparedSpells,
+    };
 
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      expect(attackLabel).toHaveClass('disabled-attack');
+    function getSpellAbilitiesSection() {
+      return screen.getByRole('heading', { name: 'Spells', level: 4 }).closest('.spell-abilities');
+    }
+
+    function getToHitSpan() {
+      const section = getSpellAbilitiesSection();
+      const spans = section.querySelectorAll('span');
+      // First span after the attack label is the to-hit value
+      return spans[0];
+    }
+
+    function getModifierSpan() {
+      const section = getSpellAbilitiesSection();
+      const spans = section.querySelectorAll('span');
+      // Second span is the modifier value
+      return spans[1];
+    }
+
+    function getAttackLabel() {
+      return screen.getByText(/Attack \(to hit\):/);
+    }
+
+    describe('cannotAct condition', () => {
+      it('should apply disabled-attack class to the attack label when cannotAct is true', () => {
+        render(<CharSpells {...baseProps} cannotAct />);
+
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).toHaveClass('disabled-attack');
+      });
+
+      it('should apply stat--penalized class to the attack label when cannotAct is true', () => {
+        render(<CharSpells {...baseProps} cannotAct />);
+
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).toHaveClass('stat--penalized');
+      });
+
+      it('should apply stat--penalized class to the to-hit value span when cannotAct is true', () => {
+        render(<CharSpells {...baseProps} cannotAct />);
+
+        const toHitSpan = getToHitSpan();
+        expect(toHitSpan).toHaveClass('stat--penalized');
+      });
+
+      it('should not call rollAttack when clicking the attack label with cannotAct true', () => {
+        const mockRollAttack = vi.fn();
+        useLoggedDiceRoll.mockImplementation(() => ({
+          popupHtml: null,
+          setPopupHtml: vi.fn(),
+          rollAttack: mockRollAttack,
+          rollDamage: vi.fn(),
+          quickRollPlayerSave: vi.fn(),
+        }));
+
+        render(<CharSpells {...baseProps} cannotAct />);
+
+        const attackLabel = getAttackLabel();
+        fireEvent.click(attackLabel);
+
+        expect(mockRollAttack).not.toHaveBeenCalled();
+      });
+
+      it('should call rollAttack when clicking the attack label without cannotAct', () => {
+        const mockRollAttack = vi.fn();
+        useLoggedDiceRoll.mockImplementation(() => ({
+          popupHtml: null,
+          setPopupHtml: vi.fn(),
+          rollAttack: mockRollAttack,
+          rollDamage: vi.fn(),
+          quickRollPlayerSave: vi.fn(),
+        }));
+
+        render(<CharSpells {...baseProps} />);
+
+        const attackLabel = getAttackLabel();
+        fireEvent.click(attackLabel);
+
+        expect(mockRollAttack).toHaveBeenCalled();
+      });
     });
 
-    it('should apply stat--penalized class when exhaustionPenalty > 0', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          exhaustionPenalty={2}
-        />
-      );
+    describe('exhaustionPenalty', () => {
+      it('should apply stat--penalized class to the attack label when exhaustionPenalty > 0', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
 
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      expect(attackLabel).toHaveClass('stat--penalized');
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).toHaveClass('stat--penalized');
+      });
+
+      it('should apply stat--penalized class to the to-hit span when exhaustionPenalty > 0', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
+
+        const toHitSpan = getToHitSpan();
+        expect(toHitSpan).toHaveClass('stat--penalized');
+      });
+
+      it('should apply stat--penalized class to the modifier span when exhaustionPenalty > 0', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
+
+        const modifierSpan = getModifierSpan();
+        expect(modifierSpan).toHaveClass('stat--penalized');
+      });
+
+      it('should not apply stat--penalized class when exhaustionPenalty is 0', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={0} />);
+
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).not.toHaveClass('stat--penalized');
+
+        const toHitSpan = getToHitSpan();
+        expect(toHitSpan).not.toHaveClass('stat--penalized');
+
+        const modifierSpan = getModifierSpan();
+        expect(modifierSpan).not.toHaveClass('stat--penalized');
+      });
+
+      it('should subtract exhaustionPenalty from the to-hit display value', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
+
+        // playerStats.spellAbilities.toHit is 5, penalty is 2 => +3
+        expect(getToHitSpan().textContent).toBe('+3');
+      });
+
+      it('should subtract exhaustionPenalty from the modifier display value', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={2} />);
+
+        // playerStats.spellAbilities.modifier is 3, penalty is 2 => +1
+        expect(getModifierSpan().textContent).toBe('+1');
+      });
+
+      it('should display correct to-hit and modifier with exhaustionPenalty of 1', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={1} />);
+
+        // toHit 5 - 1 = +4, modifier 3 - 1 = +2
+        expect(getToHitSpan().textContent).toBe('+4');
+        expect(getModifierSpan().textContent).toBe('+2');
+      });
+
+      it('should display correct to-hit and modifier with exhaustionPenalty of 3', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={3} />);
+
+        // toHit 5 - 3 = +2, modifier 3 - 3 = +0
+        expect(getToHitSpan().textContent).toBe('+2');
+        expect(getModifierSpan().textContent).toBe('+0');
+      });
+
+      it('should display correct to-hit and modifier with exhaustionPenalty of 5 (full subtraction)', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={5} />);
+
+        // toHit 5 - 5 = +0, modifier 3 - 5 = +-2
+        expect(getToHitSpan().textContent).toBe('+0');
+        expect(getModifierSpan().textContent).toBe('+-2');
+      });
+
+      it('should apply stat--penalized when exhaustionPenalty is greater than toHit value', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={6} />);
+
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).toHaveClass('stat--penalized');
+
+        const toHitSpan = getToHitSpan();
+        expect(toHitSpan).toHaveClass('stat--penalized');
+        expect(toHitSpan.textContent).toBe('+-1');
+      });
     });
 
-    it('should apply stat--penalized class when conditionAttackMode is disadvantage', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          conditionAttackMode='disadvantage'
-        />
-      );
+    describe('conditionAttackMode', () => {
+      it('should apply stat--penalized class when conditionAttackMode is disadvantage', () => {
+        render(<CharSpells {...baseProps} conditionAttackMode="disadvantage" />);
 
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      expect(attackLabel).toHaveClass('stat--penalized');
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).toHaveClass('stat--penalized');
+      });
+
+      it('should not apply stat--penalized class when conditionAttackMode is normal', () => {
+        render(<CharSpells {...baseProps} conditionAttackMode="normal" />);
+
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).not.toHaveClass('stat--penalized');
+      });
+
+      it('should not apply stat--penalized class when conditionAttackMode is undefined', () => {
+        render(<CharSpells {...baseProps} />);
+
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).not.toHaveClass('stat--penalized');
+      });
     });
 
-    it('should apply stat--penalized to the to-hit value span when exhaustionPenalty > 0', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          exhaustionPenalty={2}
-        />
-      );
+    describe('combined conditions', () => {
+      it('should apply both disabled-attack and stat--penalized when cannotAct and exhaustionPenalty are set', () => {
+        render(<CharSpells {...baseProps} cannotAct exhaustionPenalty={2} />);
 
-      const toHitSpan = screen.getByText('+3');
-      expect(toHitSpan).toHaveClass('stat--penalized');
-    });
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).toHaveClass('disabled-attack');
+        expect(attackLabel).toHaveClass('stat--penalized');
+      });
 
-    it('should apply stat--penalized to the modifier span when exhaustionPenalty > 0', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          exhaustionPenalty={2}
-        />
-      );
+      it('should apply stat--penalized when cannotAct and conditionAttackMode are both set', () => {
+        render(<CharSpells {...baseProps} cannotAct conditionAttackMode="disadvantage" />);
 
-      const modifierSpan = screen.getByText('+1');
-      expect(modifierSpan).toHaveClass('stat--penalized');
-    });
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).toHaveClass('disabled-attack');
+        expect(attackLabel).toHaveClass('stat--penalized');
+      });
 
-    it('should subtract exhaustionPenalty from toHit display', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          exhaustionPenalty={2}
-        />
-      );
+      it('should apply stat--penalized when exhaustionPenalty and conditionAttackMode are both set', () => {
+        render(<CharSpells {...baseProps} exhaustionPenalty={2} conditionAttackMode="disadvantage" />);
 
-      // toHit is 5, penalty is 2 => +3
-      expect(screen.getByText('+3')).toBeInTheDocument();
-    });
+        const attackLabel = getAttackLabel();
+        expect(attackLabel).toHaveClass('stat--penalized');
 
-    it('should subtract exhaustionPenalty from modifier display', () => {
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          exhaustionPenalty={2}
-        />
-      );
+        const toHitSpan = getToHitSpan();
+        expect(toHitSpan).toHaveClass('stat--penalized');
+      });
 
-      // modifier is 3, penalty is 2 => +1
-      expect(screen.getByText('+1')).toBeInTheDocument();
-    });
+      it('should not call rollAttack when cannotAct is true regardless of exhaustionPenalty', () => {
+        const mockRollAttack = vi.fn();
+        useLoggedDiceRoll.mockImplementation(() => ({
+          popupHtml: null,
+          setPopupHtml: vi.fn(),
+          rollAttack: mockRollAttack,
+          rollDamage: vi.fn(),
+          quickRollPlayerSave: vi.fn(),
+        }));
 
-    it('should not allow spell attack click when cannotAct is true', () => {
-      const mockRollAttack = vi.fn();
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: null,
-        setPopupHtml: vi.fn(),
-        rollAttack: mockRollAttack,
-        rollDamage: vi.fn(),
-      }));
+        render(<CharSpells {...baseProps} cannotAct exhaustionPenalty={2} />);
 
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-          cannotAct
-        />
-      );
+        const attackLabel = getAttackLabel();
+        fireEvent.click(attackLabel);
 
-      const attackLabel = screen.getByText(/Attack \(to hit\):/);
-      fireEvent.click(attackLabel);
+        expect(mockRollAttack).not.toHaveBeenCalled();
+      });
 
-      // rollAttack should NOT be called when cannotAct is true
-      expect(mockRollAttack).not.toHaveBeenCalled();
+      it('should subtract exhaustionPenalty from to-hit display when cannotAct is also true', () => {
+        render(<CharSpells {...baseProps} cannotAct exhaustionPenalty={2} />);
+
+        // toHit 5 - 2 = +3
+        expect(getToHitSpan().textContent).toBe('+3');
+      });
+
+      it('should apply stat--penalized to both spans when cannotAct and exhaustionPenalty are set', () => {
+        render(<CharSpells {...baseProps} cannotAct exhaustionPenalty={2} />);
+
+        const toHitSpan = getToHitSpan();
+        expect(toHitSpan).toHaveClass('stat--penalized');
+
+        const modifierSpan = getModifierSpan();
+        expect(modifierSpan).toHaveClass('stat--penalized');
+      });
     });
   });
 });

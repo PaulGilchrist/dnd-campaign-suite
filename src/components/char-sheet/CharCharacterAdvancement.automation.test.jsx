@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
@@ -24,8 +25,11 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 vi.mock('../common/Popup.jsx', () => ({
   default: function Popup({ html, onClickOrKeyDown }) {
     return (
-      <div data-testid="popup" onClick={onClickOrKeyDown}>
-        <div dangerouslySetInnerHTML={{ __html: html }} />
+      <div data-testid="popup-overlay" onClick={onClickOrKeyDown}>
+        <div className="popup-modal" onClick={(e) => e.stopPropagation()}>
+          <div dangerouslySetInnerHTML={{ __html: html }} />
+          <span className="dice-roll-hint">click to dismiss</span>
+        </div>
       </div>
     );
   },
@@ -36,24 +40,28 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 }));
 
 vi.mock('./modals/arcane/SpellMasteryModal.jsx', () => ({
-  default: function SpellMasteryModal({ _payload, onConfirm, onClose }) {
+  default: function SpellMasteryModal({ payload, onConfirm, onClose }) {
     return (
-      <div data-testid="spell-mastery-modal">
-        <span>Spell Mastery Modal</span>
-        <button data-testid="confirm-spell-mastery" onClick={() => onConfirm('level1', 'level2')}>Confirm</button>
-        <button data-testid="close-spell-mastery" onClick={onClose}>Close</button>
+      <div data-testid="spell-mastery-modal" role="dialog" onClick={onClose}>
+        <div className="popup-modal" onClick={(e) => e.stopPropagation()}>
+          <span>Spell Mastery Modal</span>
+          <button data-testid="confirm-spell-mastery" onClick={() => onConfirm(payload?.level1Options?.[0] || 'level1', payload?.level2Options?.[0] || 'level2')}>Confirm</button>
+          <button data-testid="close-spell-mastery" onClick={onClose}>Close</button>
+        </div>
       </div>
     );
   },
 }));
 
 vi.mock('./modals/arcane/SignatureSpellsModal.jsx', () => ({
-  default: function SignatureSpellsModal({ _payload, onConfirm, onClose }) {
+  default: function SignatureSpellsModal({ payload, onConfirm, onClose }) {
     return (
-      <div data-testid="signature-spells-modal">
-        <span>Signature Spells Modal</span>
-        <button data-testid="confirm-signature-spells" onClick={() => onConfirm('spell1', 'spell2')}>Confirm</button>
-        <button data-testid="close-signature-spells" onClick={onClose}>Close</button>
+      <div data-testid="signature-spells-modal" role="dialog" onClick={onClose}>
+        <div className="popup-modal" onClick={(e) => e.stopPropagation()}>
+          <span>Signature Spells Modal</span>
+          <button data-testid="confirm-signature-spells" onClick={() => onConfirm(payload?.level3Options?.[0] || 'spell1', payload?.level3Options?.[1] || 'spell2')}>Confirm</button>
+          <button data-testid="close-signature-spells" onClick={onClose}>Close</button>
+        </div>
       </div>
     );
   },
@@ -68,9 +76,6 @@ vi.mock('../../services/automation/handlers/class-wizard/signatureSpellsHandler.
   onSignatureSpellsSelected: mockOnSignatureSpellsSelected,
   handle: vi.fn().mockResolvedValue(null),
 }));
-
-// useActionPopup is NOT mocked — the real implementation uses React.useState
-// so setPopupHtml properly triggers re-renders
 
 describe('CharCharacterAdvancement - Automation', () => {
   beforeEach(() => {
@@ -93,412 +98,514 @@ describe('CharCharacterAdvancement - Automation', () => {
     campaignName: 'test-campaign',
   };
 
-  it('renders clickable feature when it has automation', () => {
-    render(<CharCharacterAdvancement {...baseProps} />);
-    const feature = screen.getByText('Auto Feature:');
-    expect(feature).toHaveClass('clickable');
-  });
-
-  it('calls executeHandler when clicking feature with automation', async () => {
-    mockExecuteHandler.mockResolvedValue(null);
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(mockExecuteHandler).toHaveBeenCalledWith(
-        basePlayerStats.characterAdvancement[0],
-        basePlayerStats,
-        'test-campaign'
-      );
+  describe('feature click behavior', () => {
+    it('renders clickable feature when it has automation', () => {
+      render(<CharCharacterAdvancement {...baseProps} />);
+      const feature = screen.getByText('Auto Feature:');
+      expect(feature).toHaveClass('clickable');
     });
-  });
 
-  it('shows no popup when executeHandler returns null', async () => {
-    mockExecuteHandler.mockResolvedValue(null);
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+    it('calls executeHandler with correct arguments when clicking automated feature', async () => {
+      mockExecuteHandler.mockResolvedValue(null);
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(mockExecuteHandler).toHaveBeenCalledWith(
+          basePlayerStats.characterAdvancement[0],
+          basePlayerStats,
+          'test-campaign'
+        );
+      });
     });
   });
 
-  it('shows no popup when executeHandler returns undefined', async () => {
-    mockExecuteHandler.mockResolvedValue(undefined);
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+  describe('executeHandler null/undefined results', () => {
+    it('does not render popup when executeHandler returns null', async () => {
+      mockExecuteHandler.mockResolvedValue(null);
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not render popup when executeHandler returns undefined', async () => {
+      mockExecuteHandler.mockResolvedValue(undefined);
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not render popup when executeHandler returns a non-popup/non-modal result', async () => {
+      mockExecuteHandler.mockResolvedValue({ type: 'other', payload: 'ignored' });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
     });
   });
 
-  it('shows popup with string payload from executeHandler', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'popup',
-      payload: 'Simple popup message',
+  describe('executeHandler popup results', () => {
+    it('renders popup with string payload from executeHandler', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'popup',
+        payload: 'Simple popup message',
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        const popup = screen.getByTestId('popup-overlay');
+        expect(popup).toHaveTextContent('Simple popup message');
+      });
     });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      const popup = screen.getByTestId('popup');
-      expect(popup).toBeInTheDocument();
-      expect(popup).toHaveTextContent('Simple popup message');
+
+    it('renders popup with object payload containing name and description from executeHandler', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'popup',
+        payload: { name: 'Test Popup', description: 'Popup description' },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByText('Test Popup')).toBeInTheDocument();
+        expect(screen.getByText('Popup description')).toBeInTheDocument();
+      });
+    });
+
+    it('renders feature name as popup title fallback when payload has no name', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'popup',
+        payload: { description: 'Missing name payload' },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByText('Auto Feature')).toBeInTheDocument();
+        expect(screen.getByText('Missing name payload')).toBeInTheDocument();
+      });
+    });
+
+    it('renders popup with object payload containing name only (no description)', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'popup',
+        payload: { name: 'NameOnly' },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByText('NameOnly')).toBeInTheDocument();
+      });
+    });
+
+    it('renders click-to-dismiss hint in popup', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'popup',
+        payload: 'Dismiss me',
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('popup-overlay')).toHaveTextContent('click to dismiss');
+      });
+    });
+
+    it('dismisses popup when clicking the overlay', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'popup',
+        payload: 'Dismiss me',
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('popup-overlay'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not dismiss popup when clicking the modal content area', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'popup',
+        payload: 'Modal content',
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('popup-overlay').querySelector('.popup-modal'));
+      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
     });
   });
 
-  it('dismisses popup when clicking on it', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'popup',
-      payload: 'Dismiss me',
+  describe('executeHandler modal results', () => {
+    it('renders spellMastery modal when executeHandler returns modal result', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'spellMastery',
+        payload: { payload: { action: 'learn', spells: ['fireball'] } },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        const modal = screen.getByTestId('spell-mastery-modal');
+        expect(modal).toBeInTheDocument();
+        expect(modal).toHaveAttribute('role', 'dialog');
+      });
     });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('popup')).toBeInTheDocument();
+
+    it('renders signatureSpells modal when executeHandler returns modal result', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'signatureSpells',
+        payload: { payload: { action: 'choose', spells: ['shield'] } },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        const modal = screen.getByTestId('signature-spells-modal');
+        expect(modal).toBeInTheDocument();
+        expect(modal).toHaveAttribute('role', 'dialog');
+      });
     });
-    fireEvent.click(screen.getByTestId('popup'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+
+    it('does not render any modal for unknown modalName from executeHandler', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'unknown_modal',
+        payload: { some: 'data' },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
+      });
     });
   });
 
-  it('shows popup with object payload from executeHandler', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'popup',
-      payload: { name: 'Test Popup', description: 'Popup description' },
+  describe('spellMastery modal interactions', () => {
+    it('calls onSpellMasterySelected with correct arguments on confirm', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'spellMastery',
+        payload: { payload: { action: 'learn', spells: ['fireball'] } },
+      });
+      mockOnSpellMasterySelected.mockResolvedValue(null);
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
+      await waitFor(() => {
+        expect(mockOnSpellMasterySelected).toHaveBeenCalledWith(
+          'learn',
+          basePlayerStats,
+          'test-campaign',
+          'level1',
+          'level2'
+        );
+      });
     });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByText('Test Popup')).toBeInTheDocument();
-      expect(screen.getByText('Popup description')).toBeInTheDocument();
+
+    it('hides modal and shows string popup when onSpellMasterySelected returns popup', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'spellMastery',
+        payload: { payload: { action: 'learn', spells: ['fireball'] } },
+      });
+      mockOnSpellMasterySelected.mockResolvedValue({
+        type: 'popup',
+        payload: 'Mastery learned!',
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
+        const popup = screen.getByTestId('popup-overlay');
+        expect(popup).toHaveTextContent('Mastery learned!');
+      });
+    });
+
+    it('hides modal and shows object popup when onSpellMasterySelected returns popup with name and description', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'spellMastery',
+        payload: { payload: { action: 'learn', spells: ['fireball'] } },
+      });
+      mockOnSpellMasterySelected.mockResolvedValue({
+        type: 'popup',
+        payload: { name: 'Mastery', description: 'You mastered a spell!' },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
+        expect(screen.getByText('Mastery')).toBeInTheDocument();
+        expect(screen.getByText('You mastered a spell!')).toBeInTheDocument();
+      });
+    });
+
+    it('uses "Spell Mastery" as fallback title when popup payload has no name', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'spellMastery',
+        payload: { payload: { action: 'learn', spells: ['fireball'] } },
+      });
+      mockOnSpellMasterySelected.mockResolvedValue({
+        type: 'popup',
+        payload: { description: 'No name here' },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
+        expect(screen.getByText('Spell Mastery')).toBeInTheDocument();
+        expect(screen.getByText('No name here')).toBeInTheDocument();
+      });
+    });
+
+    it('hides modal without showing popup when onSpellMasterySelected returns null', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'spellMastery',
+        payload: { payload: { action: 'learn', spells: ['fireball'] } },
+      });
+      mockOnSpellMasterySelected.mockResolvedValue(null);
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides modal without calling handler when closed via close button', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'spellMastery',
+        payload: { payload: { action: 'learn', spells: ['fireball'] } },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('close-spell-mastery'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
+        expect(mockOnSpellMasterySelected).not.toHaveBeenCalled();
+      });
+    });
+
+    it('hides modal without calling handler when clicking overlay', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'spellMastery',
+        payload: { payload: { action: 'learn', spells: ['fireball'] } },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('spell-mastery-modal'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
+        expect(mockOnSpellMasterySelected).not.toHaveBeenCalled();
+      });
     });
   });
 
-  it('shows popup with object payload using feature name as fallback', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'popup',
-      payload: { description: 'No name in payload' },
+  describe('signatureSpells modal interactions', () => {
+    it('calls onSignatureSpellsSelected with correct arguments on confirm', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'signatureSpells',
+        payload: { payload: { action: 'choose', spells: ['shield'] } },
+      });
+      mockOnSignatureSpellsSelected.mockResolvedValue(null);
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-signature-spells'));
+      await waitFor(() => {
+        expect(mockOnSignatureSpellsSelected).toHaveBeenCalledWith(
+          'choose',
+          basePlayerStats,
+          'test-campaign',
+          'spell1',
+          'spell2'
+        );
+      });
     });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByText('Auto Feature')).toBeInTheDocument();
+
+    it('hides modal and shows string popup when onSignatureSpellsSelected returns popup', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'signatureSpells',
+        payload: { payload: { action: 'choose', spells: ['shield'] } },
+      });
+      mockOnSignatureSpellsSelected.mockResolvedValue({
+        type: 'popup',
+        payload: 'Signature string message',
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-signature-spells'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
+        const popup = screen.getByTestId('popup-overlay');
+        expect(popup).toHaveTextContent('Signature string message');
+      });
+    });
+
+    it('hides modal and shows object popup when onSignatureSpellsSelected returns popup with name and description', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'signatureSpells',
+        payload: { payload: { action: 'choose', spells: ['shield'] } },
+      });
+      mockOnSignatureSpellsSelected.mockResolvedValue({
+        type: 'popup',
+        payload: { name: 'Signature', description: 'Signature spells set!' },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-signature-spells'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
+        expect(screen.getByText('Signature')).toBeInTheDocument();
+        expect(screen.getByText('Signature spells set!')).toBeInTheDocument();
+      });
+    });
+
+    it('uses "Signature Spells" as fallback title when popup payload has no name', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'signatureSpells',
+        payload: { payload: { action: 'choose', spells: ['shield'] } },
+      });
+      mockOnSignatureSpellsSelected.mockResolvedValue({
+        type: 'popup',
+        payload: { description: 'No name sig' },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-signature-spells'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
+        expect(screen.getByText('Signature Spells')).toBeInTheDocument();
+        expect(screen.getByText('No name sig')).toBeInTheDocument();
+      });
+    });
+
+    it('hides modal without showing popup when onSignatureSpellsSelected returns null', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'signatureSpells',
+        payload: { payload: { action: 'choose', spells: ['shield'] } },
+      });
+      mockOnSignatureSpellsSelected.mockResolvedValue(null);
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('confirm-signature-spells'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
+    });
+
+    it('hides modal without calling handler when closed via close button', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'signatureSpells',
+        payload: { payload: { action: 'choose', spells: ['shield'] } },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('close-signature-spells'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
+        expect(mockOnSignatureSpellsSelected).not.toHaveBeenCalled();
+      });
+    });
+
+    it('hides modal without calling handler when clicking overlay', async () => {
+      mockExecuteHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'signatureSpells',
+        payload: { payload: { action: 'choose', spells: ['shield'] } },
+      });
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('signature-spells-modal'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
+        expect(mockOnSignatureSpellsSelected).not.toHaveBeenCalled();
+      });
     });
   });
 
-  it('shows spellMastery modal when executeHandler returns modal result', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'spellMastery',
-      payload: { payload: { action: 'learn', spells: ['fireball'] } },
+  describe('executeHandler error handling', () => {
+    it('does not render popup when executeHandler throws', async () => {
+      mockExecuteHandler.mockRejectedValue(new Error('Handler failed'));
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
     });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-    });
-  });
 
-  it('shows signatureSpells modal when executeHandler returns modal result', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'signatureSpells',
-      payload: { payload: { action: 'choose', spells: ['shield'] } },
+    it('does not render popup when executeHandler rejects with undefined', async () => {
+      mockExecuteHandler.mockRejectedValue(undefined);
+      render(<CharCharacterAdvancement {...baseProps} />);
+      fireEvent.click(screen.getByText('Auto Feature:'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+      });
     });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-    });
-  });
-
-  it('dismisses spellMastery modal when onSpellMasterySelected returns null', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'spellMastery',
-      payload: { payload: { action: 'learn', spells: ['fireball'] } },
-    });
-    mockOnSpellMasterySelected.mockResolvedValue(null);
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows popup when spellMastery confirm returns popup with string payload', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'spellMastery',
-      payload: { payload: { action: 'learn', spells: ['fireball'] } },
-    });
-    mockOnSpellMasterySelected.mockResolvedValue({
-      type: 'popup',
-      payload: 'Mastery learned!',
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-      const popup = screen.getByTestId('popup');
-      expect(popup).toHaveTextContent('Mastery learned!');
-    });
-  });
-
-  it('shows popup when spellMastery confirm returns popup with object payload', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'spellMastery',
-      payload: { payload: { action: 'learn', spells: ['fireball'] } },
-    });
-    mockOnSpellMasterySelected.mockResolvedValue({
-      type: 'popup',
-      payload: { name: 'Mastery', description: 'You mastered a spell!' },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-      expect(screen.getByText('Mastery')).toBeInTheDocument();
-      expect(screen.getByText('You mastered a spell!')).toBeInTheDocument();
-    });
-  });
-
-  it('shows popup when signatureSpells confirm returns popup with object payload', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'signatureSpells',
-      payload: { payload: { action: 'choose', spells: ['shield'] } },
-    });
-    mockOnSignatureSpellsSelected.mockResolvedValue({
-      type: 'popup',
-      payload: { name: 'Signature', description: 'Signature spells set!' },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-signature-spells'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
-      expect(screen.getByText('Signature')).toBeInTheDocument();
-      expect(screen.getByText('Signature spells set!')).toBeInTheDocument();
-    });
-  });
-
-  it('closes spellMastery modal without confirming', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'spellMastery',
-      payload: { payload: { action: 'learn', spells: ['fireball'] } },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('close-spell-mastery'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-    });
-  });
-
-  it('closes signatureSpells modal without confirming', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'signatureSpells',
-      payload: { payload: { action: 'choose', spells: ['shield'] } },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('close-signature-spells'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
-    });
-  });
-
-  it('ignores unknown result type from executeHandler', async () => {
-    mockExecuteHandler.mockResolvedValue({ type: 'other', payload: 'test' });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
-    });
-  });
-
-  it('ignores unknown modal type from executeHandler', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'unknown_modal',
-      payload: { some: 'data' },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
-    });
-  });
-
-  it('shows popup when spellMastery confirm returns object payload without name', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'spellMastery',
-      payload: { payload: { action: 'learn', spells: ['fireball'] } },
-    });
-    mockOnSpellMasterySelected.mockResolvedValue({
-      type: 'popup',
-      payload: { description: 'No name here' },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-      expect(screen.getByText('Spell Mastery')).toBeInTheDocument();
-      expect(screen.getByText('No name here')).toBeInTheDocument();
-    });
-  });
-
-  it('shows popup when spellMastery confirm returns object payload without description', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'spellMastery',
-      payload: { payload: { action: 'learn', spells: ['fireball'] } },
-    });
-    mockOnSpellMasterySelected.mockResolvedValue({
-      type: 'popup',
-      payload: { name: 'NoDescMastery' },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-spell-mastery'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-      expect(screen.getByText('NoDescMastery')).toBeInTheDocument();
-    });
-  });
-
-  it('shows popup when signatureSpells confirm returns object payload without description', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'signatureSpells',
-      payload: { payload: { action: 'choose', spells: ['shield'] } },
-    });
-    mockOnSignatureSpellsSelected.mockResolvedValue({
-      type: 'popup',
-      payload: { name: 'NoDescSig' },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-signature-spells'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
-      expect(screen.getByText('NoDescSig')).toBeInTheDocument();
-    });
-  });
-
-  it('shows popup when signatureSpells confirm returns object payload without name', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'signatureSpells',
-      payload: { payload: { action: 'choose', spells: ['shield'] } },
-    });
-    mockOnSignatureSpellsSelected.mockResolvedValue({
-      type: 'popup',
-      payload: { description: 'No name sig' },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-signature-spells'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
-      expect(screen.getByText('Signature Spells')).toBeInTheDocument();
-      expect(screen.getByText('No name sig')).toBeInTheDocument();
-    });
-  });
-
-  it('shows popup when signatureSpells confirm returns popup with string payload', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'signatureSpells',
-      payload: { payload: { action: 'choose', spells: ['shield'] } },
-    });
-    mockOnSignatureSpellsSelected.mockResolvedValue({
-      type: 'popup',
-      payload: 'Signature string message',
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('confirm-signature-spells'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
-      const popup = screen.getByTestId('popup');
-      expect(popup).toHaveTextContent('Signature string message');
-    });
-  });
-
-  it('shows popup from executeHandler with object payload name only (no description)', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'popup',
-      payload: { name: 'NameOnly' },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByText('NameOnly')).toBeInTheDocument();
-    });
-  });
-
-  it('does not call onSpellMasterySelected when modal is closed without confirming', async () => {
-    mockExecuteHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'spellMastery',
-      payload: { payload: { action: 'learn', spells: ['fireball'] } },
-    });
-    render(<CharCharacterAdvancement {...baseProps} />);
-    fireEvent.click(screen.getByText('Auto Feature:'));
-    await waitFor(() => {
-      expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-    });
-    fireEvent.click(screen.getByTestId('close-spell-mastery'));
-    await waitFor(() => {
-      expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-    });
-    expect(mockOnSpellMasterySelected).not.toHaveBeenCalled();
   });
 });

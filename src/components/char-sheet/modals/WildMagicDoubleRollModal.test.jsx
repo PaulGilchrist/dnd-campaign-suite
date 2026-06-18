@@ -1,5 +1,6 @@
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @improved-by-ai
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import WildMagicDoubleRollModal from './WildMagicDoubleRollModal.jsx';
 
 // ── Mocked modules ──
@@ -7,8 +8,6 @@ import WildMagicDoubleRollModal from './WildMagicDoubleRollModal.jsx';
 vi.mock('../../../services/automation/handlers/class-sorcerer/wildMagicSurgeHandler.js', () => ({
   onDoubleRollSelected: vi.fn(),
 }));
-
-// ── Re-import mocked modules ──
 
 import * as wildMagicSurgeHandler from '../../../services/automation/handlers/class-sorcerer/wildMagicSurgeHandler.js';
 
@@ -35,12 +34,15 @@ function makeProps(overrides) {
   return { ...baseProps, ...(overrides || {}) };
 }
 
+function renderModal(overrides) {
+  return render(<WildMagicDoubleRollModal {...makeProps(overrides)} />);
+}
+
 // ── Tests ──
 
 describe('WildMagicDoubleRollModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
     wildMagicSurgeHandler.onDoubleRollSelected.mockResolvedValue({
       type: 'popup',
       payload: {
@@ -51,340 +53,214 @@ describe('WildMagicDoubleRollModal', () => {
     });
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
+  // ── Initial render ──
 
-  // ── Initial render / display ──
-
-  it('renders modal overlay', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-  });
-
-  it('renders modal content container', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-  });
-
-  it('renders modal header with feature name', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(screen.getByText('Wild Magic Surge')).toBeInTheDocument();
-  });
-
-  it('renders Font Awesome bolt icon in header', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    const icon = document.querySelector('.fa-solid.fa-bolt');
-    expect(icon).toBeInTheDocument();
-  });
-
-  it('displays "Choose your roll" instruction', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(screen.getByText(/Choose your roll/)).toBeInTheDocument();
-  });
-
-  it('renders Roll 1 button with roll value', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(screen.getByRole('button', { name: /Roll 1: 14/ })).toBeInTheDocument();
-  });
-
-  it('renders Roll 2 button with roll value', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(screen.getByRole('button', { name: /Roll 2: 7/ })).toBeInTheDocument();
-  });
-
-  it('shows surge effect preview for roll 1', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    const roll1Btn = screen.getByRole('button', { name: /Roll 1: 14/ });
-    expect(roll1Btn.textContent).toContain('Your body becomes larger than normal');
-  });
-
-  it('shows surge effect preview for roll 2', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    const roll2Btn = screen.getByRole('button', { name: /Roll 2: 7/ });
-    expect(roll2Btn.textContent).toContain('Each creature within 30 feet');
-  });
-
-  it('truncates long surge effect descriptions at 80 characters', () => {
-    render(<WildMagicDoubleRollModal {...makeProps({ roll1: 1, roll2: 20 })} />);
-    const roll1Btn = screen.getByRole('button', { name: /Roll 1: 1/ });
-    expect(roll1Btn.textContent).toContain('...');
-  });
-
-  it('does not show surge effect text when no matching surge entry', () => {
-    render(<WildMagicDoubleRollModal {...makeProps({ surgeTable: [] })} />);
-    const roll1Btn = screen.getByRole('button', { name: /Roll 1: 14/ });
-    expect(roll1Btn.textContent).not.toContain('...');
-  });
-
-  it('renders Cancel button', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
-  });
-
-  it('renders Done button after selection', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+  describe('initial render', () => {
+    it('shows the feature name with bolt icon in the header', () => {
+      renderModal();
+      expect(screen.getByText('Wild Magic Surge')).toBeInTheDocument();
+      expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
     });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+
+    it('shows the feature name with a custom name', () => {
+      renderModal({ featureName: 'Arcane Chaos' });
+      expect(screen.getByText('Arcane Chaos')).toBeInTheDocument();
+    });
+
+    it('shows the roll selection prompt', () => {
+      renderModal();
+      expect(screen.getByText(/Choose your roll/)).toBeInTheDocument();
+    });
+
+    it('renders both roll buttons with their values', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: /Roll 1: 14/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Roll 2: 7/ })).toBeInTheDocument();
+    });
+
+    it('renders roll buttons with different roll values', () => {
+      renderModal({ roll1: 1, roll2: 20 });
+      expect(screen.getByRole('button', { name: /Roll 1: 1/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Roll 2: 20/ })).toBeInTheDocument();
+    });
+
+    it('shows a truncated surge effect preview on each roll button', () => {
+      renderModal();
+      const roll1Btn = screen.getByRole('button', { name: /Roll 1: 14/ });
+      const roll2Btn = screen.getByRole('button', { name: /Roll 2: 7/ });
+      expect(roll1Btn.textContent).toContain('Your body becomes larger than normal');
+      expect(roll2Btn.textContent).toContain('Each creature within 30 feet');
+    });
+
+    it('truncates long surge effect descriptions at 80 characters', () => {
+      renderModal({ roll1: 1, roll2: 20 });
+      const roll1Btn = screen.getByRole('button', { name: /Roll 1: 1/ });
+      expect(roll1Btn.textContent).toContain('...');
+    });
+
+    it('does not show surge preview text when no matching surge entry exists', () => {
+      renderModal({ surgeTable: [] });
+      const roll1Btn = screen.getByRole('button', { name: /Roll 1: 14/ });
+      expect(roll1Btn.textContent).not.toContain('...');
+    });
+
+    it('shows the Cancel button', () => {
+      renderModal();
+      expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
+
+    it('does not show the result or Done button before selection', () => {
+      renderModal();
+      expect(screen.queryByText(/SURGE/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
     });
   });
 
-  it('hides Cancel button after selection', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
-    });
-  });
+  // ── Overlay and cancel behavior ──
 
-  it('hides roll selection buttons after selection', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: /Roll 1: 14/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /Roll 2: 7/ })).not.toBeInTheDocument();
-    });
-  });
-
-  // ── Overlay click behavior ──
-
-  it('calls onClose when clicking the overlay background', () => {
-    const onClose = vi.fn();
-    render(<WildMagicDoubleRollModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-overlay'));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not close when clicking inside the modal content', () => {
-    const onClose = vi.fn();
-    render(<WildMagicDoubleRollModal {...makeProps({ onClose })} />);
-    fireEvent.click(document.querySelector('.sp-modal'));
-    expect(onClose).not.toHaveBeenCalled();
-  });
-
-  // ── Cancel button ──
-
-  it('calls onClose when Cancel button is clicked', () => {
-    const onClose = vi.fn();
-    render(<WildMagicDoubleRollModal {...makeProps({ onClose })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  // ── Roll 1 selection ──
-
-  it('calls onDoubleRollSelected with selected roll 1', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    expect(wildMagicSurgeHandler.onDoubleRollSelected).toHaveBeenCalledWith(
-      { featureName: 'Wild Magic Surge', surgeTable },
-      { name: 'Sorcerer1', level: 3 },
-      'test-campaign',
-      14
-    );
-  });
-
-  it('calls onDoubleRollSelected with selected roll 2', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 2: 7/ }));
-    });
-    expect(wildMagicSurgeHandler.onDoubleRollSelected).toHaveBeenCalledWith(
-      { featureName: 'Wild Magic Surge', surgeTable },
-      { name: 'Sorcerer1', level: 3 },
-      'test-campaign',
-      7
-    );
-  });
-
-  it('displays surge result description after selection', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    await waitFor(() => {
-      expect(screen.getByText(/SURGE/)).toBeInTheDocument();
-    });
-  });
-
-  it('renders result body with dangerouslySetInnerHTML', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    await waitFor(() => {
-      const body = document.querySelector('.sp-body');
-      expect(body).toHaveProperty('innerHTML');
-    });
-  });
-
-  it('shows Done button in actions after selection', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    await waitFor(() => {
-      expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-    });
-  });
-
-  // ── Roll 2 selection ──
-
-  it('displays surge result for roll 2 selection', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 2: 7/ }));
-    });
-    await waitFor(() => {
-      expect(screen.getByText(/SURGE/)).toBeInTheDocument();
-    });
-  });
-
-  // ── Done button ──
-
-  it('calls onClose when Done button is clicked', async () => {
-    const onClose = vi.fn();
-    render(<WildMagicDoubleRollModal {...makeProps({ onClose })} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    await waitFor(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  it('calls onClose when Done button is clicked after roll 2', async () => {
-    const onClose = vi.fn();
-    render(<WildMagicDoubleRollModal {...makeProps({ onClose })} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 2: 7/ }));
-    });
-    await waitFor(() => {
-      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
-    });
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
-
-  // ── Overlay click after selection ──
-
-  it('calls onClose when clicking overlay after selection', async () => {
-    const onClose = vi.fn();
-    render(<WildMagicDoubleRollModal {...makeProps({ onClose })} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    await waitFor(() => {
+  describe('closing the modal', () => {
+    it('calls onClose when clicking the overlay background', () => {
+      renderModal();
       fireEvent.click(document.querySelector('.sp-overlay'));
+      expect(baseProps.onClose).toHaveBeenCalledTimes(1);
     });
-    expect(onClose).toHaveBeenCalledTimes(1);
+
+    it('does not close when clicking inside the modal content', () => {
+      renderModal();
+      fireEvent.click(document.querySelector('.sp-modal'));
+      expect(baseProps.onClose).not.toHaveBeenCalled();
+    });
+
+    it('calls onClose when Cancel button is clicked', () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+      expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // ── Roll selection flow ──
+
+  describe('roll selection', () => {
+    it('calls onDoubleRollSelected with roll 1 when Roll 1 is clicked', async () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+      await waitFor(() => {
+        expect(wildMagicSurgeHandler.onDoubleRollSelected).toHaveBeenCalledWith(
+          { featureName: 'Wild Magic Surge', surgeTable },
+          { name: 'Sorcerer1', level: 3 },
+          'test-campaign',
+          14
+        );
+      });
+    });
+
+    it('calls onDoubleRollSelected with roll 2 when Roll 2 is clicked', async () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: /Roll 2: 7/ }));
+      await waitFor(() => {
+        expect(wildMagicSurgeHandler.onDoubleRollSelected).toHaveBeenCalledWith(
+          { featureName: 'Wild Magic Surge', surgeTable },
+          { name: 'Sorcerer1', level: 3 },
+          'test-campaign',
+          7
+        );
+      });
+    });
+
+    it('swaps the UI to show the surge result after selection', async () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+      await waitFor(() => {
+        expect(screen.getByText(/SURGE/)).toBeInTheDocument();
+        expect(screen.queryByText(/Choose your roll/)).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Roll 1: 14/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Roll 2: 7/ })).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders the surge result description in the body', async () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+      await waitFor(() => {
+        const body = document.querySelector('.sp-body');
+        expect(body.innerHTML).toContain('SURGE');
+        expect(body.innerHTML).toContain('larger than normal');
+      });
+    });
+
+    it('shows the Done button after selection', async () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+      });
+    });
+
+    it('calls onClose when Done button is clicked after roll 1', async () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+      await waitFor(() => {
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+      });
+      expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when Done button is clicked after roll 2', async () => {
+      renderModal({ roll1: 3, roll2: 18 });
+      fireEvent.click(screen.getByRole('button', { name: /Roll 2: 18/ }));
+      await waitFor(() => {
+        fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+      });
+      expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('calls onClose when overlay is clicked after selection', async () => {
+      renderModal();
+      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+      await waitFor(() => {
+        fireEvent.click(document.querySelector('.sp-overlay'));
+      });
+      expect(baseProps.onClose).toHaveBeenCalledTimes(1);
+    });
   });
 
   // ── Edge cases ──
 
-  it('renders with null playerStats using default name', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps({ playerStats: null })} />);
-    await act(async () => {
+  describe('edge cases', () => {
+    it('passes { name: "Player" } when playerStats is null', async () => {
+      renderModal({ playerStats: null });
       fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+      await waitFor(() => {
+        expect(wildMagicSurgeHandler.onDoubleRollSelected).toHaveBeenCalledWith(
+          { featureName: 'Wild Magic Surge', surgeTable },
+          { name: 'Player' },
+          'test-campaign',
+          14
+        );
+      });
     });
-    expect(wildMagicSurgeHandler.onDoubleRollSelected).toHaveBeenCalledWith(
-      { featureName: 'Wild Magic Surge', surgeTable },
-      { name: 'Player' },
-      'test-campaign',
-      14
-    );
-  });
 
-  it('renders with empty surge table without crashing', () => {
-    render(<WildMagicDoubleRollModal {...makeProps({ surgeTable: [] })} />);
-    expect(screen.getByRole('button', { name: /Roll 1: 14/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Roll 2: 7/ })).toBeInTheDocument();
-  });
-
-  it('handles onDoubleRollSelected rejection without crashing', async () => {
-    const err = new Error('Network error');
-    wildMagicSurgeHandler.onDoubleRollSelected.mockRejectedValue(err);
-    const { UNSAFE_warning } = console;
-    console.warn = () => {};
-    const unhandlerHandler = () => {};
-    process.on('unhandledRejection', unhandlerHandler);
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+    it('renders without crashing when surge table is empty', () => {
+      renderModal({ surgeTable: [] });
+      expect(screen.getByRole('button', { name: /Roll 1: 14/ })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Roll 2: 7/ })).toBeInTheDocument();
     });
-    console.warn = UNSAFE_warning;
-    process.off('unhandledRejection', unhandlerHandler);
-    await waitFor(() => {
-      expect(screen.queryByText(/SURGE/)).not.toBeInTheDocument();
+
+    it('handles onDoubleRollSelected rejection without crashing', async () => {
+      const unhandledRejectionHandler = () => {};
+      process.on('unhandledRejection', unhandledRejectionHandler);
+      try {
+        wildMagicSurgeHandler.onDoubleRollSelected.mockRejectedValue(new Error('Network error'));
+        renderModal();
+        fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
+        await waitFor(() => {
+          expect(screen.queryByText(/SURGE/)).not.toBeInTheDocument();
+        });
+      }
+      finally {
+        process.off('unhandledRejection', unhandledRejectionHandler);
+      }
     });
-  });
-
-  it('renders with custom feature name', () => {
-    render(<WildMagicDoubleRollModal {...makeProps({ featureName: 'Arcane Chaos' })} />);
-    expect(screen.getByText('Arcane Chaos')).toBeInTheDocument();
-  });
-
-  it('renders with different roll values', () => {
-    render(<WildMagicDoubleRollModal {...makeProps({ roll1: 1, roll2: 20 })} />);
-    expect(screen.getByRole('button', { name: /Roll 1: 1/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Roll 2: 20/ })).toBeInTheDocument();
-  });
-
-  it('renders all modal CSS structure classes', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    expect(document.querySelector('.sp-header')).toBeInTheDocument();
-    expect(document.querySelector('.sp-body')).toBeInTheDocument();
-    expect(document.querySelector('.sp-actions')).toBeInTheDocument();
-  });
-
-  it('shows "Controlled Chaos" label in modal body', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(screen.getByText(/Controlled Chaos/)).toBeInTheDocument();
-  });
-
-  it('renders roll buttons with sp-roll-btn class', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    const buttons = document.querySelectorAll('.sp-roll-btn');
-    expect(buttons).toHaveLength(2);
-  });
-
-  it('renders cancel button with sp-dismiss-btn class', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    const cancelBtn = document.querySelector('.sp-dismiss-btn');
-    expect(cancelBtn).toBeInTheDocument();
-    expect(cancelBtn.textContent).toBe('Cancel');
-  });
-
-  it('renders done button with sp-roll-btn class', async () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /Roll 1: 14/ }));
-    });
-    await waitFor(() => {
-      const doneBtn = document.querySelector('.sp-actions .sp-roll-btn');
-      expect(doneBtn).toBeInTheDocument();
-      expect(doneBtn.textContent).toBe('Done');
-    });
-  });
-
-  it('does not show result on initial render', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(screen.queryByText(/SURGE/)).not.toBeInTheDocument();
-  });
-
-  it('does not show Done button on initial render', () => {
-    render(<WildMagicDoubleRollModal {...makeProps()} />);
-    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
   });
 });

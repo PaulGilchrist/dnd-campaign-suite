@@ -1,8 +1,9 @@
+// @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import SetConditionModal from './SetConditionModal.jsx';
 
-// ── Mocked modules (before the component import) ──
+// ── Mocked modules ──
 
 vi.mock('../../../../services/rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
@@ -31,12 +32,16 @@ vi.mock('../../../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(),
 }));
 
+vi.mock('../../../../services/combat/automation/automationService.js', () => ({
+  playerIsImmuneToCondition: vi.fn().mockReturnValue(false),
+}));
+
 vi.mock('../../../../services/ui/utils.js', () => {
   let counter = 0;
   const utilsMock = {
     guid: vi.fn(() => `guid-${++counter}`),
     getAbilityLongName: vi.fn((s) => s),
-   };
+  };
   return { default: utilsMock };
 });
 
@@ -50,6 +55,8 @@ import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as expirations from '../../../../services/rules/effects/expirations.js';
 import * as logService from '../../../../services/ui/logService.js';
 import * as diceRoller from '../../../../services/dice/diceRoller.js';
+import * as automationService from '../../../../services/combat/automation/automationService.js';
+import * as rangeValidation from '../../../../services/rules/combat/rangeValidation.js';
 
 // ── Test fixtures ──
 
@@ -60,11 +67,6 @@ const mockCombatSummary = {
     { name: 'Goblin B', type: 'npc', conditions: [], saveBonuses: { wis: 2 } },
     { name: 'Player Ally', type: 'player' },
   ],
-};
-
-const mockMapData = {
-  players: [{ name: 'Attacker', gridX: 0, gridY: 0 }],
-  placedItems: [],
 };
 
 const mockAttackerPos = { gridX: 0, gridY: 0 };
@@ -87,7 +89,6 @@ function makeProps(overrides) {
 describe('SetConditionModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
     global.fetch = vi.fn().mockResolvedValue({ ok: true, json: vi.fn() });
   });
 
@@ -97,9 +98,14 @@ describe('SetConditionModal', () => {
 
   // ── Render / initial state ──
 
-  it('renders the modal overlay and header', () => {
+  it('renders the modal overlay and header with default feature name', () => {
     render(<SetConditionModal {...makeProps()} />);
     expect(screen.getByText('Abjure Foes')).toBeInTheDocument();
+  });
+
+  it('renders the modal overlay and header with custom feature name', () => {
+    render(<SetConditionModal {...makeProps({ featureName: 'Turn Undead' })} />);
+    expect(screen.getByText('Turn Undead')).toBeInTheDocument();
   });
 
   it('shows instructions with WIS save reference and DC info by default', () => {
@@ -109,7 +115,7 @@ describe('SetConditionModal', () => {
     expect(bodyDiv.textContent).toMatch(/DC 14/);
   });
 
-  it('shows custom save type and condition via props', () => {
+  it('shows custom save type, condition, and range via props', () => {
     render(<SetConditionModal {...makeProps({ featureName: 'Nature\'s Wrath', conditionName: 'restrained', saveType: 'STR', rangeFeet: 15 })} />);
     expect(screen.getByText("Nature's Wrath")).toBeInTheDocument();
     const bodyDiv = document.querySelector('.sp-body');
@@ -163,6 +169,44 @@ describe('SetConditionModal', () => {
     expect(screen.getByText(/No valid targets in range/)).toBeInTheDocument();
   });
 
+  it('excludes targets beyond range when mapData is provided', () => {
+    const farAwaySummary = {
+      creatures: [
+        { name: 'Attacker', type: 'player' },
+        { name: 'Distant Goblin', type: 'npc', conditions: [] },
+      ],
+    };
+    const farAwayPos = { gridX: 20, gridY: 20 };
+    rangeValidation.getDistanceFeet.mockReturnValue(141);
+    const props = makeProps({
+      combatSummary: farAwaySummary,
+      mapData: { players: [{ name: 'Attacker', gridX: 0, gridY: 0 }, { name: 'Distant Goblin', gridX: 20, gridY: 20 }], placedItems: [] },
+      attackerPos: farAwayPos,
+      rangeFeet: 30,
+    });
+    render(<SetConditionModal {...props} />);
+    expect(screen.getByText(/No valid targets in range/)).toBeInTheDocument();
+  });
+
+  it('includes targets within range when mapData is provided', () => {
+    const nearbySummary = {
+      creatures: [
+        { name: 'Attacker', type: 'player' },
+        { name: 'Near Goblin', type: 'npc', conditions: [] },
+      ],
+    };
+    const nearbyPos = { gridX: 1, gridY: 1 };
+    rangeValidation.getDistanceFeet.mockReturnValue(5);
+    const props = makeProps({
+      combatSummary: nearbySummary,
+      mapData: { players: [{ name: 'Attacker', gridX: 0, gridY: 0 }, { name: 'Near Goblin', gridX: 1, gridY: 1 }], placedItems: [] },
+      attackerPos: nearbyPos,
+      rangeFeet: 30,
+    });
+    render(<SetConditionModal {...props} />);
+    expect(screen.getByText(/Near Goblin/)).toBeInTheDocument();
+  });
+
   // ── Checkbox interactions ──
 
   it('toggles target selection on checkbox click', () => {
@@ -181,7 +225,7 @@ describe('SetConditionModal', () => {
     expect(checkbox.checked).toBe(false);
   });
 
-  it('allows selecting all targets (no max cap)', () => {
+  it('allows selecting all targets', () => {
     render(<SetConditionModal {...makeProps()} />);
     const checkboxes = screen.getAllByRole('checkbox');
     checkboxes.forEach(cb => fireEvent.click(cb));
@@ -192,6 +236,15 @@ describe('SetConditionModal', () => {
     render(<SetConditionModal {...makeProps()} />);
     fireEvent.click(screen.getAllByRole('checkbox')[0]);
     expect(screen.getByText(/Targets selected: 1\/3/)).toBeInTheDocument();
+  });
+
+  it('updates target counter after deselecting a target', () => {
+    render(<SetConditionModal {...makeProps()} />);
+    const checkboxes = screen.getAllByRole('checkbox');
+    checkboxes.forEach(cb => fireEvent.click(cb));
+    expect(screen.getByText(/Targets selected: 3\/3/)).toBeInTheDocument();
+    checkboxes[0].click();
+    expect(screen.getByText(/Targets selected: 2\/3/)).toBeInTheDocument();
   });
 
   // ── Apply button behavior ──
@@ -221,6 +274,14 @@ describe('SetConditionModal', () => {
     fireEvent.click(boxes[0]);
     fireEvent.click(boxes[1]);
     expect(screen.getByRole('button', { name: /Abjure Foes \(2 targets\)/ })).toBeInTheDocument();
+  });
+
+  it('disables apply button when all targets are filtered out by range', () => {
+    const noTargetsSummary = { creatures: [{ name: 'Attacker', type: 'player' }] };
+    const props = makeProps({ combatSummary: noTargetsSummary });
+    render(<SetConditionModal {...props} />);
+    const btn = screen.getByRole('button', { name: /Abjure Foes \(0 targets\)/ });
+    expect(btn.disabled).toBe(true);
   });
 
   // ── Cancel and close ──
@@ -337,6 +398,31 @@ describe('SetConditionModal', () => {
     );
   });
 
+  it('does not show roll result when bonus is 0', () => {
+    diceRoller.rollD20.mockReturnValue(10);
+
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
+
+    // Goblin A has no saveBonuses, so the roll display should not include "+0"
+    const bodyDiv = document.querySelector('.sp-body');
+    expect(bodyDiv.textContent).not.toMatch(/\+0/);
+  });
+
+  it('rolls all selected NPCs independently', () => {
+    diceRoller.rollD20.mockReturnValueOnce(5).mockReturnValueOnce(20);
+
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
+    fireEvent.click(screen.getAllByRole('checkbox')[1]); // Goblin B
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(2 targets\)/ }));
+
+    expect(diceRoller.rollD20).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/Failed — Frightened!/)).toBeInTheDocument();
+    expect(screen.getByText(/Saved — unaffected/)).toBeInTheDocument();
+  });
+
   // ── Nature's Wrath: STR saves, Restrained ──
 
   it('uses STR save bonuses for Nature\'s Wrath', () => {
@@ -381,10 +467,19 @@ describe('SetConditionModal', () => {
     diceRoller.rollD20.mockReturnValue(15);
 
     render(<SetConditionModal {...makeProps()} />);
-    fireEvent.click(screen.getAllByRole('checkbox')[2]);
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
     expect(savePromptService.sendSavePrompt).toHaveBeenCalled();
+  });
+
+  it('does not roll dice for player targets', () => {
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally only
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
+
+    expect(diceRoller.rollD20).not.toHaveBeenCalled();
+    expect(screen.getByText(/Waiting for save roll/)).toBeInTheDocument();
   });
 
   // ── Confirm flow — mixed NPC and Player selection ──
@@ -438,6 +533,45 @@ describe('SetConditionModal', () => {
 
     await waitFor(() => {
       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
+    });
+  });
+
+  it('does not apply condition when player save succeeds via event', async () => {
+    diceRoller.rollD20.mockReturnValue(15);
+
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
+
+    const sentPrompt = savePromptService.sendSavePrompt.mock.calls[0][1];
+    window.dispatchEvent(
+      new CustomEvent('save-result', {
+        detail: { promptId: sentPrompt.promptId, targetName: 'Player Ally', success: true, total: 20, roll: 16, saveBonus: 4 },
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Waiting for save roll/)).not.toBeInTheDocument();
+    });
+    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('ignores save-result event with unknown promptId', async () => {
+    diceRoller.rollD20.mockReturnValue(5);
+
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]); // NPC
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
+
+    window.dispatchEvent(
+      new CustomEvent('save-result', {
+        detail: { promptId: 'nonexistent-id', targetName: 'Unknown', success: false },
+      })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Failed — Frightened!/)).toBeInTheDocument();
+      expect(screen.queryByText(/Unknown/)).not.toBeInTheDocument();
     });
   });
 
@@ -511,12 +645,42 @@ describe('SetConditionModal', () => {
     expect(screen.queryByText('Done')).not.toBeInTheDocument();
   });
 
-  // ── Range filtering with mapData ──
+  // ── Additional condition support ──
 
-  it('renders correctly when mapData is provided', () => {
-    const props = makeProps({ mapData: mockMapData, attackerPos: mockAttackerPos });
-    render(<SetConditionModal {...props} />);
-    expect(screen.getByText(/Goblin A/)).toBeInTheDocument();
+  it('shows both conditions when additionalCondition is provided', () => {
+    render(<SetConditionModal {...makeProps({ conditionName: 'frightened', additionalCondition: 'blinded' })} />);
+    const bodyDiv = document.querySelector('.sp-body');
+    expect(bodyDiv.textContent).toMatch(/Frightened/);
+    expect(bodyDiv.textContent).toMatch(/Blinded/);
+  });
+
+  it('shows both conditions on NPC failure when additionalCondition is provided', () => {
+    diceRoller.rollD20.mockReturnValue(5);
+
+    render(<SetConditionModal {...makeProps({ conditionName: 'frightened', additionalCondition: 'blinded' })} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
+
+    expect(screen.getByText(/Failed — Frightened & Blinded!/)).toBeInTheDocument();
+  });
+
+  it('calls addExpiration with both conditions on NPC failure', () => {
+    diceRoller.rollD20.mockReturnValue(5);
+
+    render(<SetConditionModal {...makeProps({ conditionName: 'frightened', additionalCondition: 'blinded' })} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[0]);
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
+
+    expect(expirations.addExpiration).toHaveBeenCalledWith(
+      'Attacker',
+      'Goblin A',
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'frightened' }),
+        expect.objectContaining({ type: 'blinded' }),
+      ]),
+      'test-campaign',
+      undefined
+    );
   });
 
   // ── Custom range in instruction text ──
@@ -583,6 +747,8 @@ describe('SetConditionModal', () => {
     fireEvent.click(btn);
 
     expect(diceRoller.rollD20).not.toHaveBeenCalled();
+    expect(savePromptService.sendSaveResult).not.toHaveBeenCalled();
+    expect(savePromptService.sendSavePrompt).not.toHaveBeenCalled();
     expect(screen.queryByText(/Resolving WIS/)).not.toBeInTheDocument();
   });
 
@@ -623,5 +789,26 @@ describe('SetConditionModal', () => {
 
     const playerLabels = screen.getAllByText(/player/);
     expect(playerLabels.length).toBeGreaterThanOrEqual(1);
+  });
+
+  // ── Immunity handling ──
+
+  it('skips immune player targets and does not apply condition', async () => {
+    automationService.playerIsImmuneToCondition.mockReturnValue(true);
+    diceRoller.rollD20.mockReturnValue(15);
+
+    render(<SetConditionModal {...makeProps()} />);
+    fireEvent.click(screen.getAllByRole('checkbox')[2]); // Player Ally
+    fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
+
+    expect(savePromptService.sendSavePrompt).toHaveBeenCalled();
+  });
+
+  // ── Duration rounds display ──
+
+  it('shows duration in instruction text when durationRounds is provided', () => {
+    render(<SetConditionModal {...makeProps({ durationRounds: 3 })} />);
+    const bodyDiv = document.querySelector('.sp-body');
+    expect(bodyDiv.textContent).toMatch(/for 1 minute/);
   });
 });

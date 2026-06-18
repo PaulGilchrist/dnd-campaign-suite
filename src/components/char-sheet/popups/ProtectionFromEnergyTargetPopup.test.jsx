@@ -1,28 +1,28 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ProtectionFromEnergyTargetPopup from './ProtectionFromEnergyTargetPopup.jsx';
 
 // ── Test fixtures ──
 
-const baseSpell = {
-    name: 'Protection from Energy',
-    level: 3,
-};
+const mockSpell = { name: 'Protection from Energy', level: 3 };
+const mockRange = 30;
+const mockCreatureTargets = ['Ally 1', 'Ally 2', 'Ally 3'];
+const mockDamageTypes = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
+const mockOnConfirm = vi.fn();
+const mockOnSkip = vi.fn();
 
-const creatureTargets = ['Ally 1', 'Ally 2', 'Ally 3'];
-const damageTypes = ['Acid', 'Cold', 'Fire', 'Lightning', 'Thunder'];
-
-function makeProps(overrides = {}) {
+function makeProps(overrides) {
     return {
-        spell: baseSpell,
+        spell: mockSpell,
         _playerStats: {},
         _campaignName: 'test-campaign',
-        range: 30,
-        creatureTargets,
-        damageTypes,
-        onConfirm: vi.fn(),
-        onSkip: vi.fn(),
-        ...overrides,
+        range: mockRange,
+        creatureTargets: mockCreatureTargets,
+        damageTypes: mockDamageTypes,
+        onConfirm: mockOnConfirm,
+        onSkip: mockOnSkip,
+        ...(overrides || {}),
     };
 }
 
@@ -33,7 +33,7 @@ describe('ProtectionFromEnergyTargetPopup', () => {
         vi.clearAllMocks();
     });
 
-    // ── Default rendering ──
+    // ── Initial render ──
 
     it('renders the popup with shield icon and title', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
@@ -42,30 +42,39 @@ describe('ProtectionFromEnergyTargetPopup', () => {
         expect(document.querySelector('h3')).toHaveTextContent('Protection from Energy');
     });
 
-    it('displays spell name and level in spell name section', () => {
+    it('renders spell name and level in the spell name section', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
-        expect(document.querySelector('.metamagic-spell-name strong')).toHaveTextContent('Protection from Energy');
-        expect(screen.getByText(/Level 3/)).toBeInTheDocument();
-        expect(document.querySelector('.metamagic-spell-name')).toHaveTextContent(/Abjuration/);
+        const spellNameEl = document.querySelector('.metamagic-spell-name');
+        expect(spellNameEl).toHaveTextContent('Protection from Energy');
+        expect(spellNameEl).toHaveTextContent(/Level 3/);
+        expect(spellNameEl).toHaveTextContent(/Abjuration/);
     });
 
-    it('displays range in the description', () => {
-        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
-        expect(screen.getByText(/30/)).toBeInTheDocument();
+    it('renders description paragraph with range value', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps({ range: 60 })} />);
+        expect(screen.getByText(/60/)).toBeInTheDocument();
     });
 
-    it('renders creature target list', () => {
+    it('renders Target label', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
         expect(screen.getByText('Target:')).toBeInTheDocument();
-        creatureTargets.forEach(target => {
+    });
+
+    it('renders all creature targets', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        mockCreatureTargets.forEach(target => {
             expect(screen.getByText(target)).toBeInTheDocument();
         });
     });
 
-    it('renders damage type list', () => {
+    it('renders Damage Type label', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
         expect(screen.getByText('Damage Type:')).toBeInTheDocument();
-        damageTypes.forEach(type => {
+    });
+
+    it('renders all damage types', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        mockDamageTypes.forEach(type => {
             expect(screen.getByText(type)).toBeInTheDocument();
         });
     });
@@ -76,19 +85,54 @@ describe('ProtectionFromEnergyTargetPopup', () => {
         expect(screen.getByText('Cast Protection from Energy')).toBeInTheDocument();
     });
 
+    // ── CSS classes ──
+
     it('renders with popup-overlay class', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
-        const overlay = document.querySelector('.popup-overlay');
-        expect(overlay).toBeInTheDocument();
+        expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
+    });
+
+    it('renders with popup-modal class', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        expect(document.querySelector('.popup-modal')).toBeInTheDocument();
     });
 
     it('renders with metamagic-popup class', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
-        const modal = document.querySelector('.metamagic-popup');
-        expect(modal).toBeInTheDocument();
+        expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
     });
 
-    // ── Null/undefined spell handling ──
+    it('renders with metamagic-popup-inner class', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        expect(document.querySelector('.metamagic-popup-inner')).toBeInTheDocument();
+    });
+
+    it('renders with metamagic-spell-name class', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        expect(document.querySelector('.metamagic-spell-name')).toBeInTheDocument();
+    });
+
+    it('renders with metamagic-twin-target class', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        expect(document.querySelector('.metamagic-twin-target')).toBeInTheDocument();
+    });
+
+    it('renders with metamagic-actions class', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        expect(document.querySelector('.metamagic-actions')).toBeInTheDocument();
+    });
+
+    it('renders btn-secondary class on Cancel button', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        expect(screen.getByText('Cancel')).toHaveClass('btn-secondary');
+    });
+
+    it('renders btn class on Cast button', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        expect(screen.getByText('Cast Protection from Energy')).toHaveClass('btn');
+    });
+
+    // ── Spell prop edge cases ──
 
     it('shows fallback text when spell is null', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps({ spell: null })} />);
@@ -96,28 +140,106 @@ describe('ProtectionFromEnergyTargetPopup', () => {
         expect(screen.getByText(/Level 3/)).toBeInTheDocument();
     });
 
-    it('shows fallback text when spell name is undefined', () => {
+    it('shows fallback text when spell has no name', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps({ spell: {} })} />);
         expect(screen.getByText(/Spell/)).toBeInTheDocument();
         expect(screen.getByText(/Level 3/)).toBeInTheDocument();
     });
 
+    it('shows spell name with default level when spell has no level', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps({ spell: { name: 'Test' } })} />);
+        expect(screen.getByText('Test')).toBeInTheDocument();
+        expect(screen.getByText(/Level 3/)).toBeInTheDocument();
+    });
+
     // ── Target selection ──
 
-    it('does not show checkmark next to targets before selection', () => {
+    it('does not show checkmark next to targets before any selection', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
-        creatureTargets.forEach(target => {
-            expect(screen.getByText(target)).toBeInTheDocument();
-        });
-        // The checkmark character is '\u2713' which appears before the name
-        // Since no target is selected, no item should start with the checkmark
-        const allItems = Array.from(document.querySelectorAll('.metamagic-twin-target div div'));
-        allItems.forEach(item => {
+        const targetItems = Array.from(document.querySelectorAll('.metamagic-twin-target div div'));
+        targetItems.forEach(item => {
             expect(item.textContent).not.toMatch(/^\u2713/);
         });
     });
 
-    it('calls onConfirm with selected target and damage type when both are selected', () => {
+    it('shows checkmark prefix when a target is selected', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Ally 1'));
+        expect(screen.getByText('✓ Ally 1')).toBeInTheDocument();
+    });
+
+    it('hides checkmark for unselected targets after selecting another', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Ally 1'));
+        expect(screen.queryByText('✓ Ally 2')).not.toBeInTheDocument();
+        expect(screen.queryByText('✓ Ally 3')).not.toBeInTheDocument();
+    });
+
+    it('updates selected target when clicking a different creature', () => {
+        const onConfirm = vi.fn();
+        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onConfirm })} />);
+
+        fireEvent.click(screen.getByText('Ally 1'));
+        fireEvent.click(screen.getByText('Ally 2'));
+        fireEvent.click(screen.getByText('Acid'));
+        fireEvent.click(screen.getByText('Cast Protection from Energy'));
+
+        expect(onConfirm).toHaveBeenCalledWith({
+            targetName: 'Ally 2',
+            damageType: 'Acid',
+        });
+    });
+
+    it('shows checkmark prefix when a damage type is selected', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Acid'));
+        expect(screen.getByText('✓ Acid')).toBeInTheDocument();
+    });
+
+    it('updates selected damage type when clicking a different type', () => {
+        const onConfirm = vi.fn();
+        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onConfirm })} />);
+
+        fireEvent.click(screen.getByText('Ally 1'));
+        fireEvent.click(screen.getByText('Cold'));
+        fireEvent.click(screen.getByText('Fire'));
+        fireEvent.click(screen.getByText('Cast Protection from Energy'));
+
+        expect(onConfirm).toHaveBeenCalledWith({
+            targetName: 'Ally 1',
+            damageType: 'Fire',
+        });
+    });
+
+    // ── Button disabled state ──
+
+    it('disables Cast button when no selections made', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        expect(screen.getByText('Cast Protection from Energy')).toBeDisabled();
+    });
+
+    it('disables Cast button when only target is selected', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Ally 1'));
+        expect(screen.getByText('Cast Protection from Energy')).toBeDisabled();
+    });
+
+    it('disables Cast button when only damage type is selected', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Acid'));
+        expect(screen.getByText('Cast Protection from Energy')).toBeDisabled();
+    });
+
+    it('enables Cast button when both target and damage type are selected', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Ally 1'));
+        fireEvent.click(screen.getByText('Acid'));
+        expect(screen.getByText('Cast Protection from Energy')).toBeEnabled();
+    });
+
+    // ── Confirm behavior ──
+
+    it('calls onConfirm with selected target and damage type when Cast is clicked', () => {
         const onConfirm = vi.fn();
         render(<ProtectionFromEnergyTargetPopup {...makeProps({ onConfirm })} />);
 
@@ -152,110 +274,67 @@ describe('ProtectionFromEnergyTargetPopup', () => {
         expect(onConfirm).not.toHaveBeenCalled();
     });
 
-    it('updates selected target when clicking a different creature', () => {
-        const onConfirm = vi.fn();
-        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onConfirm })} />);
-
-        fireEvent.click(screen.getByText('Ally 1'));
-        fireEvent.click(screen.getByText('Ally 2'));
-        fireEvent.click(screen.getByText('Acid'));
-        fireEvent.click(screen.getByText('Cast Protection from Energy'));
-
-        expect(onConfirm).toHaveBeenCalledWith({
-            targetName: 'Ally 2',
-            damageType: 'Acid',
-        });
-    });
-
-    it('updates selected damage type when clicking a different type', () => {
-        const onConfirm = vi.fn();
-        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onConfirm })} />);
-
-        fireEvent.click(screen.getByText('Ally 1'));
-        fireEvent.click(screen.getByText('Cold'));
-        fireEvent.click(screen.getByText('Fire'));
-        fireEvent.click(screen.getByText('Cast Protection from Energy'));
-
-        expect(onConfirm).toHaveBeenCalledWith({
-            targetName: 'Ally 1',
-            damageType: 'Fire',
-        });
-    });
-
-    // ── Cancel / skip ──
+    // ── Skip behavior ──
 
     it('calls onSkip when Cancel button is clicked', () => {
-        const onSkip = vi.fn();
-        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onSkip })} />);
-
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Cancel'));
-        expect(onSkip).toHaveBeenCalledTimes(1);
+        expect(mockOnSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('calls onSkip when overlay is clicked', () => {
-        const onSkip = vi.fn();
-        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onSkip })} />);
-
+    it('calls onSkip when clicking the overlay background', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
         const overlay = document.querySelector('.popup-overlay');
         fireEvent.click(overlay);
-        expect(onSkip).toHaveBeenCalledTimes(1);
+        expect(mockOnSkip).toHaveBeenCalledTimes(1);
     });
 
     it('does not call onSkip when modal content is clicked', () => {
-        const onSkip = vi.fn();
-        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onSkip })} />);
-
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
         const modal = document.querySelector('.metamagic-popup');
         fireEvent.click(modal);
-        expect(onSkip).not.toHaveBeenCalled();
+        expect(mockOnSkip).not.toHaveBeenCalled();
     });
 
-    // ── Keyboard interactions ──
+    it('does not call onSkip when modal inner content is clicked', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        const inner = document.querySelector('.metamagic-popup-inner');
+        fireEvent.click(inner);
+        expect(mockOnSkip).not.toHaveBeenCalled();
+    });
+
+    it('does not call onSkip when Escape key is not pressed', () => {
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        fireEvent.keyDown(document, { key: 'Enter' });
+        expect(mockOnSkip).not.toHaveBeenCalled();
+    });
 
     it('calls onSkip when Escape key is pressed', () => {
-        const onSkip = vi.fn();
-        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onSkip })} />);
-
+        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
         fireEvent.keyDown(document, { key: 'Escape' });
-        expect(onSkip).toHaveBeenCalledTimes(1);
+        expect(mockOnSkip).toHaveBeenCalledTimes(1);
     });
 
-    it('does not call onSkip for other keys', () => {
+    it('calls onSkip without calling onConfirm when skipped after selections', () => {
+        const onConfirm = vi.fn();
         const onSkip = vi.fn();
-        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onSkip })} />);
+        render(<ProtectionFromEnergyTargetPopup {...makeProps({ onConfirm, onSkip })} />);
 
-        fireEvent.keyDown(document, { key: 'Enter' });
-        expect(onSkip).not.toHaveBeenCalled();
-    });
-
-    // ── Button disabled state ──
-
-    it('has disabled Cast button when no selections made', () => {
-        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
-        const castButton = screen.getByText('Cast Protection from Energy');
-        expect(castButton).toBeDisabled();
-    });
-
-    it('has disabled Cast button when only target selected', () => {
-        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
-        fireEvent.click(screen.getByText('Ally 1'));
-        const castButton = screen.getByText('Cast Protection from Energy');
-        expect(castButton).toBeDisabled();
-    });
-
-    it('has disabled Cast button when only damage type selected', () => {
-        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
-        fireEvent.click(screen.getByText('Acid'));
-        const castButton = screen.getByText('Cast Protection from Energy');
-        expect(castButton).toBeDisabled();
-    });
-
-    it('has enabled Cast button when both target and damage type selected', () => {
-        render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Ally 1'));
         fireEvent.click(screen.getByText('Acid'));
-        const castButton = screen.getByText('Cast Protection from Energy');
-        expect(castButton).toBeEnabled();
+        fireEvent.click(screen.getByText('Cancel'));
+
+        expect(onSkip).toHaveBeenCalledTimes(1);
+        expect(onConfirm).not.toHaveBeenCalled();
+    });
+
+    // ── Keyboard listener cleanup ──
+
+    it('removes keydown listener on unmount', () => {
+        const removeListenerSpy = vi.spyOn(document, 'removeEventListener');
+        const { unmount } = render(<ProtectionFromEnergyTargetPopup {...makeProps()} />);
+        unmount();
+        expect(removeListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
     });
 
     // ── Empty lists ──
@@ -263,10 +342,12 @@ describe('ProtectionFromEnergyTargetPopup', () => {
     it('renders with empty creature targets list', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps({ creatureTargets: [] })} />);
         expect(screen.getByText('Target:')).toBeInTheDocument();
+        expect(screen.queryByText('Ally 1')).not.toBeInTheDocument();
     });
 
     it('renders with empty damage types list', () => {
         render(<ProtectionFromEnergyTargetPopup {...makeProps({ damageTypes: [] })} />);
         expect(screen.getByText('Damage Type:')).toBeInTheDocument();
+        expect(screen.queryByText('Acid')).not.toBeInTheDocument();
     });
 });

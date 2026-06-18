@@ -1,9 +1,9 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharSpells from './CharSpells.jsx';
 import * as helpers from './CharSpells.test.helpers.js';
 
-// Heavy mocks for all the complex dependencies
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   useRuntimeValue: vi.fn(() => []),
   getRuntimeValue: vi.fn(() => null),
@@ -221,366 +221,363 @@ vi.mock('../common/Popup.jsx', () => ({
   },
 }));
 
-// Mock common components that would cause issues
-vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
-  default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
-}));
-
-vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn(() => ({
-    popupHtml: null,
-    setPopupHtml: vi.fn(),
-    rollAttack: vi.fn(),
-    rollDamage: vi.fn(),
-    quickRollPlayerSave: vi.fn(),
-  })),
-}));
-
 const basePlayerStats = helpers.mockPlayerStats;
+
+function getTableHeaders(table) {
+  const headers = table.querySelectorAll('th');
+  return Array.from(headers).map(h => h.textContent);
+}
 
 describe('CharSpells', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('renders spell abilities section', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByText('Spells')).toBeInTheDocument();
+  describe('spell abilities header', () => {
+    it('renders the spells section header', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      expect(screen.getByText('Spells')).toBeInTheDocument();
+    });
+
+    it('renders the attack to hit display with correct value', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      expect(screen.getByText('+5')).toBeInTheDocument();
+    });
+
+    it('renders the save DC display with correct value', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      expect(screen.getByText('13')).toBeInTheDocument();
+    });
+
+    it('renders cantrips known count', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const abilitiesDiv = document.querySelector('.spell-abilities');
+      expect(abilitiesDiv.textContent).toContain('Cantrips Known:');
+      expect(abilitiesDiv.textContent).toContain('3');
+    });
+
+    it('renders prepared spells count', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const abilitiesDiv = document.querySelector('.spell-abilities');
+      expect(abilitiesDiv.textContent).toContain('Prepared Spells:');
+      expect(abilitiesDiv.textContent).toContain('5');
+    });
+
+    it('renders the spell slots component', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      expect(screen.getByTestId('char-spell-slots')).toBeInTheDocument();
+    });
+
+    it('applies exhaustion penalty to attack to hit display', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" exhaustionPenalty={2} />);
+      expect(screen.getByText('+3')).toBeInTheDocument();
+    });
+
+    it('applies exhaustion penalty to modifier display', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" exhaustionPenalty={1} />);
+      expect(screen.getByText('+2')).toBeInTheDocument();
+    });
+
+    it('renders attack as disabled when cannotAct is true', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" cannotAct={true} />);
+      const attackText = screen.getByText(/attack.*to hit/i);
+      expect(attackText).toHaveClass('disabled-attack');
+    });
+
+    it('renders attack as clickable when cannotAct is false', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" cannotAct={false} />);
+      const attackText = screen.getByText(/attack.*to hit/i);
+      expect(attackText).toHaveClass('clickable');
+    });
+
+    it('renders attack as clickable by default (cannotAct undefined)', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const attackText = screen.getByText(/attack.*to hit/i);
+      expect(attackText).toHaveClass('clickable');
+    });
   });
 
-  it('renders spell attack to hit display', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByText(/attack.*to hit/i)).toBeInTheDocument();
+  describe('spell table rendering', () => {
+    it('renders all spells from player stats', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      expect(screen.getByText('Fireball')).toBeInTheDocument();
+      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+      expect(screen.getByText('Light')).toBeInTheDocument();
+    });
+
+    it('renders spell levels correctly', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const table = screen.getByRole('table');
+      expect(table.textContent).toContain('3');
+      expect(table.textContent).toContain('1');
+      expect(table.textContent).toContain('Cantrip');
+    });
+
+    it('renders casting time with abbreviations', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const table = screen.getByRole('table');
+      expect(table.textContent).toContain(' A');
+    });
+
+    it('renders duration with abbreviated text', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const table = screen.getByRole('table');
+      expect(table.textContent).toContain('Instant');
+    });
+
+    it('renders spell range values', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      expect(screen.getByText('150 feet')).toBeInTheDocument();
+      expect(screen.getByText('120 feet')).toBeInTheDocument();
+    });
+
+    it('renders damage dice for spells with damage', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      expect(screen.getByText(/8d6/)).toBeInTheDocument();
+    });
+
+    it('renders damage type for spells', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const table = screen.getByRole('table');
+      expect(table.textContent).toContain('Fire');
+      expect(table.textContent).toContain('Force');
+    });
+
+    it('renders spell components as notes', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const table = screen.getByRole('table');
+      expect(table.textContent).toContain('V');
+    });
+
+    it('renders concentration abbreviation in notes', () => {
+      const spellWithConc = {
+        ...basePlayerStats.spellAbilities.spells[0],
+        concentration: true,
+        ritual: true,
+      };
+      const stats = {
+        ...basePlayerStats,
+        spellAbilities: {
+          ...basePlayerStats.spellAbilities,
+          spells: [spellWithConc],
+        },
+      };
+      render(<CharSpells playerStats={stats} campaignName="test" />);
+      expect(screen.getByText(/Con/)).toBeInTheDocument();
+    });
+
+    it('renders spell name cells as clickable', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const spellName = screen.getByText('Fireball');
+      expect(spellName).toHaveClass('clickable');
+    });
+
+    it('renders sort headers as clickable', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const spellHeader = screen.getByText('Spell');
+      expect(spellHeader).toHaveClass('clickable');
+      const levelHeader = screen.getByText('Level');
+      expect(levelHeader).toHaveClass('clickable');
+    });
   });
 
-  it('renders save DC display', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByText(/save dc/i)).toBeInTheDocument();
+  describe('spell detail popup', () => {
+    it('opens the spell detail popup when clicking a spell name', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const spellName = screen.getByText('Fireball');
+      fireEvent.click(spellName);
+      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('spell-detail-popup')).toHaveTextContent('Fireball');
+    });
+
+    it('closes the spell detail popup when clicking close', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const spellName = screen.getByText('Fireball');
+      fireEvent.click(spellName);
+      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+    });
   });
 
-  it('renders cantrips known count', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByText(/cantrips known/i)).toBeInTheDocument();
+  describe('5e ruleset behavior', () => {
+    it('renders the prepared column header for 5e ruleset', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const table = screen.getByRole('table');
+      const headers = getTableHeaders(table);
+      expect(headers).toContain('Prepared');
+    });
+
+    it('renders checkboxes for spells with Prepared status', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const checkboxes = screen.getAllByRole('checkbox');
+      expect(checkboxes.length).toBeGreaterThan(0);
+    });
   });
 
-  it('renders prepared spells count', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByText(/prepared spells/i)).toBeInTheDocument();
+  describe('2024 ruleset behavior', () => {
+    it('does not render the prepared column for 2024 ruleset', () => {
+      render(<CharSpells playerStats={helpers.mockPlayerStats2024} campaignName="test" />);
+      const table = screen.getByRole('table');
+      const headers = getTableHeaders(table);
+      expect(headers).not.toContain('Prepared');
+    });
   });
 
-  it('renders spell slots component', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByTestId('char-spell-slots')).toBeInTheDocument();
+  describe('sorting', () => {
+    it('sorts spells by name when spell header is clicked', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const spellHeader = screen.getByText('Spell');
+      fireEvent.click(spellHeader);
+      expect(screen.getByText('Fireball')).toBeInTheDocument();
+      expect(screen.getByText('Magic Missile')).toBeInTheDocument();
+      expect(screen.getByText('Light')).toBeInTheDocument();
+    });
+
+    it('keeps spells visible after sorting by level', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const levelHeader = screen.getByText('Level');
+      fireEvent.click(levelHeader);
+      expect(screen.getByText('Light')).toBeInTheDocument();
+    });
   });
 
-  it('renders spell table with spells', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByText('Fireball')).toBeInTheDocument();
-    expect(screen.getByText('Magic Missile')).toBeInTheDocument();
-    expect(screen.getByText('Light')).toBeInTheDocument();
+  describe('filtering', () => {
+    it('toggles prepared filter when prepared header is clicked', () => {
+      render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
+      const preparedHeader = screen.getByText('Prepared');
+      fireEvent.click(preparedHeader);
+      expect(screen.getByText('Fireball')).toBeInTheDocument();
+    });
   });
 
-  it('renders spell levels correctly', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const table = screen.getByRole('table');
-    const tableText = table.textContent;
-    expect(tableText).toContain('3');
-    expect(tableText).toContain('1');
-    expect(tableText).toContain('Cantrip');
-  });
+  describe('edge cases', () => {
+    it('does not render a table when spells array is empty', () => {
+      const emptyStats = {
+        ...basePlayerStats,
+        spellAbilities: {
+          toHit: 5,
+          modifier: 3,
+          saveDc: 13,
+          cantrips_known: 0,
+          spells: [],
+        },
+      };
+      render(<CharSpells playerStats={emptyStats} campaignName="test" />);
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    });
 
-  it('renders casting time with abbreviations', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const table = screen.getByRole('table');
-    expect(table.textContent).toContain(' A');
-  });
+    it('does not render a table when spellAbilities is undefined', () => {
+      const noSpellsStats = {
+        ...basePlayerStats,
+        spellAbilities: undefined,
+      };
+      render(<CharSpells playerStats={noSpellsStats} campaignName="test" />);
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    });
 
-  it('renders spell duration with abbreviations', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const table = screen.getByRole('table');
-    expect(table.textContent).toContain('Instant');
-  });
+    it('does not render a table when spellAbilities is null', () => {
+      const noSpellsStats = {
+        ...basePlayerStats,
+        spellAbilities: null,
+      };
+      render(<CharSpells playerStats={noSpellsStats} campaignName="test" />);
+      expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    });
 
-  it('renders notes column with concentration', () => {
-    const spellWithConc = {
-      ...basePlayerStats.spellAbilities.spells[0],
-      concentration: true,
-      ritual: true,
-    };
-    const stats = {
-      ...basePlayerStats,
-      spellAbilities: {
-        ...basePlayerStats.spellAbilities,
-        spells: [spellWithConc],
-      },
-    };
-    render(<CharSpells playerStats={stats} campaignName="test" />);
-    expect(screen.getByText(/con/i)).toBeInTheDocument();
-  });
+    it('renders cantrips without damage as utility', () => {
+      const spellNoDmg = {
+        ...basePlayerStats.spellAbilities.spells[2],
+        damage: null,
+      };
+      const stats = {
+        ...basePlayerStats,
+        spellAbilities: {
+          ...basePlayerStats.spellAbilities,
+          spells: [spellNoDmg],
+        },
+      };
+      render(<CharSpells playerStats={stats} campaignName="test" />);
+      expect(screen.getByText('Light')).toBeInTheDocument();
+    });
 
-  it('renders damage display for spells with damage', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByText(/8d6/i)).toBeInTheDocument();
-  });
+    it('renders utility label for cantrips without damage', () => {
+      const spellNoDmg = {
+        name: 'Prestidigitation',
+        level: 0,
+        damage: null,
+        prepared: 'Always',
+      };
+      const stats = {
+        ...basePlayerStats,
+        spellAbilities: {
+          ...basePlayerStats.spellAbilities,
+          spells: [spellNoDmg],
+        },
+      };
+      render(<CharSpells playerStats={stats} campaignName="test" />);
+      expect(screen.getByText('Utility')).toBeInTheDocument();
+    });
 
-  it('renders spell name as clickable', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const spellName = screen.getByText('Fireball');
-    expect(spellName).toHaveClass('clickable');
-  });
-
-  it('opens spell detail popup when clicking spell name', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const spellName = screen.getByText('Fireball');
-    fireEvent.click(spellName);
-    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-  });
-
-  it('closes spell detail popup when clicking close', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const spellName = screen.getByText('Fireball');
-    fireEvent.click(spellName);
-    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-  });
-
-  it('renders prepared checkbox for prepared spells in 5e', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const checkboxes = screen.getAllByRole('checkbox');
-    expect(checkboxes.length).toBeGreaterThan(0);
-  });
-
-  it('does not render prepared column for 2024 rules', () => {
-    render(<CharSpells playerStats={helpers.mockPlayerStats2024} campaignName="test" />);
-    const headers = screen.getByRole('table').querySelectorAll('th');
-    const headerTexts = Array.from(headers).map(h => h.textContent);
-    expect(headerTexts).not.toContain('Prepared');
-  });
-
-  it('renders 5e prepared column by default', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const headers = screen.getByRole('table').querySelectorAll('th');
-    const headerTexts = Array.from(headers).map(h => h.textContent);
-    expect(headerTexts).toContain('Prepared');
-  });
-
-  it('renders spell sort headers as clickable', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const spellHeader = screen.getByText('Spell');
-    expect(spellHeader).toHaveClass('clickable');
-  });
-
-  it('renders level sort header as clickable', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const levelHeader = screen.getByText('Level');
-    expect(levelHeader).toHaveClass('clickable');
-  });
-
-  it('renders spell notes with components', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const table = screen.getByRole('table');
-    expect(table.textContent).toContain('V');
-  });
-
-  it('renders spell range', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    expect(screen.getByText('150 feet')).toBeInTheDocument();
-    expect(screen.getByText('120 feet')).toBeInTheDocument();
-  });
-
-  it('handles empty spells array', () => {
-    const emptyStats = {
-      ...basePlayerStats,
-      spellAbilities: {
-        toHit: 5,
-        modifier: 3,
-        saveDc: 13,
-        cantrips_known: 0,
-        spells: [],
-      },
-    };
-    render(<CharSpells playerStats={emptyStats} campaignName="test" />);
-    // Component renders outer div but no spell table when no spells
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
-  });
-
-  it('handles undefined spellAbilities', () => {
-    const noSpellsStats = {
-      ...basePlayerStats,
-      spellAbilities: undefined,
-    };
-    render(<CharSpells playerStats={noSpellsStats} campaignName="test" />);
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
-  });
-
-  it('handles null spellAbilities', () => {
-    const noSpellsStats = {
-      ...basePlayerStats,
-      spellAbilities: null,
-    };
-    render(<CharSpells playerStats={noSpellsStats} campaignName="test" />);
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
-  });
-
-  it('renders spell attack as clickable when not cannotAct', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" cannotAct={false} />);
-    const attackText = screen.getByText(/attack.*to hit/i);
-    expect(attackText).toHaveClass('clickable');
-  });
-
-  it('renders spell attack as disabled when cannotAct', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" cannotAct={true} />);
-    const attackText = screen.getByText(/attack.*to hit/i);
-    expect(attackText).toHaveClass('disabled-attack');
-  });
-
-  it('applies exhaustion penalty to to hit display', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" exhaustionPenalty={2} />);
-    expect(screen.getByText('+3')).toBeInTheDocument(); // 5 - 2 = 3
-  });
-
-  it('applies exhaustion penalty to modifier display', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" exhaustionPenalty={1} />);
-    // modifier is 3, penalty is 1, so 2
-    expect(screen.getByText('+2')).toBeInTheDocument();
-  });
-
-  it('applies innate sorcery bonus to save DC', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    // saveDc is 13, innate sorcery is false, so 13
-    const abilitiesDiv = document.querySelector('.spell-abilities');
-    expect(abilitiesDiv.textContent).toContain('13');
-  });
-
-  it('sorts spells by level when level header clicked', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const levelHeader = screen.getByText('Level');
-    fireEvent.click(levelHeader);
-    // After sorting, cantrip should still be there
-    expect(screen.getByText('Light')).toBeInTheDocument();
-  });
-
-  it('sorts spells by name when spell header clicked', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const spellHeader = screen.getByText('Spell');
-    fireEvent.click(spellHeader);
-    expect(screen.getByText('Fireball')).toBeInTheDocument();
-  });
-
-  it('toggles prepared filter', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const preparedHeader = screen.getByText('Prepared');
-    fireEvent.click(preparedHeader);
-    // After toggling, should still render
-    expect(screen.getByText('Fireball')).toBeInTheDocument();
-  });
-
-  it('renders damage type for spells', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const table = screen.getByRole('table');
-    expect(table.textContent).toContain('Fire');
-  });
-
-  it('renders effect text for spells with save DC', () => {
-    render(<CharSpells playerStats={basePlayerStats} campaignName="test" />);
-    const table = screen.getByRole('table');
-    expect(table.textContent).toContain('Fire');
-  });
-
-  it('handles spell with no damage', () => {
-    const spellNoDmg = {
-      ...basePlayerStats.spellAbilities.spells[2],
-      damage: null,
-    };
-    const stats = {
-      ...basePlayerStats,
-      spellAbilities: {
-        ...basePlayerStats.spellAbilities,
-        spells: [spellNoDmg],
-      },
-    };
-    render(<CharSpells playerStats={stats} campaignName="test" />);
-    expect(screen.getByText('Light')).toBeInTheDocument();
-  });
-
-  it('renders utility effect for cantrips without damage', () => {
-    const spellNoDmg = {
-      name: 'Prestidigitation',
-      level: 0,
-      damage: null,
-      prepared: 'Always',
-    };
-    const stats = {
-      ...basePlayerStats,
-      spellAbilities: {
-        ...basePlayerStats.spellAbilities,
-        spells: [spellNoDmg],
-      },
-    };
-    render(<CharSpells playerStats={stats} campaignName="test" />);
-    expect(screen.getByText('Utility')).toBeInTheDocument();
-  });
-
-  it('handles Hunter Mark Ranger level 20 damage upgrade', () => {
-    const hunterMark = {
-      name: "Hunter's Mark",
-      level: 1,
-      damage: {
-        damage_at_slot_level: { '1': '1d6' },
-        damage_type: 'Radiant',
-      },
-      prepared: 'Always',
-    };
-    const stats = {
-      ...basePlayerStats,
-      class: { name: 'Ranger' },
-      level: 20,
-      spellAbilities: {
-        ...basePlayerStats.spellAbilities,
-        spells: [hunterMark],
-      },
-    };
-    render(<CharSpells playerStats={stats} campaignName="test" />);
-    const table = screen.getByRole('table');
-    expect(table.textContent).toContain('1d10');
+    it('upgrades Hunter Mark damage to 1d10 at ranger level 20', () => {
+      const hunterMark = {
+        name: "Hunter's Mark",
+        level: 1,
+        damage: {
+          damage_at_slot_level: { '1': '1d6' },
+          damage_type: 'Radiant',
+        },
+        prepared: 'Always',
+      };
+      const stats = {
+        ...basePlayerStats,
+        class: { name: 'Ranger' },
+        level: 20,
+        spellAbilities: {
+          ...basePlayerStats.spellAbilities,
+          spells: [hunterMark],
+        },
+      };
+      render(<CharSpells playerStats={stats} campaignName="test" />);
+      const table = screen.getByRole('table');
+      expect(table.textContent).toContain('1d10');
+    });
   });
 });
 
 describe('CharSpells.test.helpers', () => {
-  it('exports mockPlayerStats', () => {
+  it('exports mockPlayerStats with correct structure', () => {
     expect(helpers.mockPlayerStats).toBeDefined();
     expect(helpers.mockPlayerStats.name).toBe('Test Character');
     expect(helpers.mockPlayerStats.spellAbilities.spells).toHaveLength(3);
   });
 
-  it('exports mockPlayerStats2024', () => {
+  it('exports mockPlayerStats2024 with 2024 rules', () => {
     expect(helpers.mockPlayerStats2024).toBeDefined();
     expect(helpers.mockPlayerStats2024.rules).toBe('2024');
   });
 
-  it('exports mockHandleTogglePreparedSpells', () => {
+  it('exports mockHandleTogglePreparedSpells as a function', () => {
     expect(helpers.mockHandleTogglePreparedSpells).toBeDefined();
     expect(typeof helpers.mockHandleTogglePreparedSpells).toBe('function');
   });
 
-  it('exports mockGateMetamagic', () => {
+  it('exports mockGateMetamagic as a function', () => {
     expect(helpers.mockGateMetamagic).toBeDefined();
     expect(typeof helpers.mockGateMetamagic).toBe('function');
   });
 
-  it('exports mockGateUpcast', () => {
+  it('exports mockGateUpcast as a function that returns false', () => {
     expect(helpers.mockGateUpcast).toBeDefined();
     expect(typeof helpers.mockGateUpcast).toBe('function');
     expect(helpers.mockGateUpcast()).toBe(false);
   });
 
-  it('exports mockGetCantripAutoLevel', () => {
+  it('exports mockGetCantripAutoLevel as a function that returns null', () => {
     expect(helpers.mockGetCantripAutoLevel).toBeDefined();
     expect(typeof helpers.mockGetCantripAutoLevel).toBe('function');
     expect(helpers.mockGetCantripAutoLevel()).toBeNull();
   });
 
-  it('mockPlayerStats has correct spell count', () => {
-    expect(helpers.mockPlayerStats.spellAbilities.spells).toHaveLength(3);
+  it('mockPlayerStats contains expected spell names', () => {
     const names = helpers.mockPlayerStats.spellAbilities.spells.map(s => s.name);
     expect(names).toContain('Fireball');
     expect(names).toContain('Magic Missile');
@@ -597,11 +594,11 @@ describe('CharSpells.test.helpers', () => {
     expect(light.level).toBe(0);
   });
 
-  it('mockPlayerStats has cantrips_known', () => {
+  it('mockPlayerStats has cantrips_known of 3', () => {
     expect(helpers.mockPlayerStats.spellAbilities.cantrips_known).toBe(3);
   });
 
-  it('mockPlayerStats2024 has same spell structure', () => {
+  it('mockPlayerStats2024 has same spell structure as 5e', () => {
     expect(helpers.mockPlayerStats2024.spellAbilities.spells).toHaveLength(3);
     expect(helpers.mockPlayerStats2024.rules).toBe('2024');
   });
