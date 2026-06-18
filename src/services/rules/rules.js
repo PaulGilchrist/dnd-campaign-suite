@@ -694,7 +694,7 @@ const rules = {
              languagesAllowed += playerStats.race.subrace.language_options.choose || 0;
           }
 
-         let classLanguages = playerStats.class?.languages;
+         let classLanguages = playerStats.class?.languages || [];
          if (!Array.isArray(classLanguages)) {
              console.error('rules: expected class.languages to be an array for', playerStats.name);
              throw new Error('Missing array: class.languages for ' + playerStats.name);
