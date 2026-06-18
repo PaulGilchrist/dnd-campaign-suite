@@ -59,11 +59,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             const { baseName: offBaseName, magicBonus: offMagicBonus } = parseMagicItemName(offHandName);
             const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
             if (offHandWeapon) {
-                const passives = playerStats.automation?.passives;
-                if (passives == null) {
-                    console.error('[attackCalc2024] Missing array:', passives);
-                    throw new Error('Expected array, got ' + passives);
-                }
+                const passives = playerStats.automation?.passives ?? [];
                 const hasCrossbowExpertDualWielding = passives.some(
                     p => p.effect === 'two_weapon_fighting' && p.name === 'Dual Wielding'
                 );
@@ -81,11 +77,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 }));
 
                 // Dual Wielder feat: extra bonus action attack beyond standard off-hand
-            const bonusActions = playerStats.automation?.bonusActions;
-            if (bonusActions == null) {
-                console.error('[attackCalc2024] Missing array:', bonusActions);
-                throw new Error('Expected array, got ' + bonusActions);
-            }
+            const bonusActions = playerStats.automation?.bonusActions ?? [];
             const hasDualWielder = bonusActions.some(
                 a => a.type === 'bonus_attacks' && a.trigger === 'attack_action_with_light_weapon'
             );
@@ -122,11 +114,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
 
     // Tavern Brawler: Add unarmed strike attacks for non-monk characters
     // Damage: 1d4 + Strength modifier (Bludgeoning)
-    const passives2 = playerStats.automation?.passives;
-    if (passives2 == null) {
-        console.error('[attackCalc2024] Missing array:', passives2);
-        throw new Error('Expected array, got ' + passives2);
-    }
+    const passives2 = playerStats.automation?.passives ?? [];
     const hasTavernBrawler = passives2.some(
         p => p.effect === 'tavern_brawler_push' || p.effect === 'tavern_brawler_reroll_ones'
     );
@@ -149,12 +137,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
 
     // College of Dance: Dazzling Footwork unarmed strikes (DEX-based, BI die damage)
     if (playerStats.class?.name === 'Bard' && playerStats.class?.subclass?.name === 'College of Dance' && playerStats.level >= 3) {
-        const classLevels = playerStats.class?.class_levels;
-        if (classLevels == null) {
-            console.error('[attackCalc2024] Missing array:', classLevels);
-            throw new Error('Expected array, got ' + classLevels);
-        }
-        const classLevel = classLevels.find(cl => cl.level === playerStats.level);
+        const classLevel = (playerStats.class?.class_levels ?? []).find(cl => cl.level === playerStats.level);
         const bardicDie = classLevel?.bardic_die || 6;
         const diceStr = `1d${bardicDie}`;
         attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }).map(a => ({
@@ -254,16 +237,8 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         const dexMod = dex?.bonus || 0;
         const prof = proficiency;
         const toHit = dexMod + prof;
-        const equippedWeapons = playerStats.inventory?.equipped;
-        if (equippedWeapons == null) {
-            console.error('[attackCalc2024] Missing array:', equippedWeapons);
-            throw new Error('Expected array, got ' + equippedWeapons);
-        }
-        const allEquip = allEquipment;
-        if (allEquip == null) {
-            console.error('[attackCalc2024] Missing array:', allEquip);
-            throw new Error('Expected array, got ' + allEquip);
-        }
+        const equippedWeapons = playerStats.inventory?.equipped ?? [];
+        const allEquip = allEquipment ?? [];
         let bowWeapon = null;
         for (const equippedName of equippedWeapons) {
             let baseName = equippedName;
@@ -272,11 +247,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             }
             const weapon = allEquip.find(w => w.name === baseName);
             if (!weapon) continue;
-            const props = weapon.properties;
-            if (props == null) {
-                console.error('[attackCalc2024] Missing array:', props);
-                throw new Error('Expected array, got ' + props);
-            }
+            const props = weapon?.properties ?? [];
             const isBow = weapon.weapon_category === 'Ranged' && (props.includes('Ammunition') || props.includes('Heavy') || props.includes('Light'));
             const isBoltWeapon = ['Longbow', 'Light Crossbow', 'Hand Crossbow', 'Crossbow, Heavy', 'Crossbow, Light'].includes(weapon.name);
             if (isBow || isBoltWeapon) {
@@ -311,11 +282,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
     }
 
     // Starry Form: Archer constellation - ranged spell attack
-    const activeBuffs = playerStats.activeBuffs;
-    if (activeBuffs == null) {
-        console.error('[attackCalc2024] Missing array:', activeBuffs);
-        throw new Error('Expected array, got ' + activeBuffs);
-    }
+    const activeBuffs = playerStats.activeBuffs ?? [];
     const starryFormBuff = activeBuffs.find(b => b.name === 'Starry Form' && b.constellation === 'Archer');
     if (starryFormBuff) {
         const wis = playerStats.abilities.find(a => a.name === 'Wisdom');
