@@ -119,7 +119,11 @@ const rulesFactory = {
         const { raceRules: rr } = rulesFactory.getRules(playerSummary);
         const senses = rr.getSenses(playerStats);
         // Apply Truesight from passive_buff automation (e.g., Boon of Truesight)
-        const passives = playerStats.automation?.passives || [];
+        const passives = playerStats.automation?.passives;
+        if (!Array.isArray(passives)) {
+            console.error('rulesFactory.getSenses: expected passives array');
+            throw new Error('Expected passives to be an array');
+        }
         const truesightPassive = passives.find(p => p.type === 'passive_buff' && p.effect === 'truesight');
         if (truesightPassive && !senses.some(s => s.name === 'Truesight')) {
             const rangeMatch = String(truesightPassive.range || '').match(/(\d+)\s*ft/i);
@@ -149,39 +153,74 @@ const rulesFactory = {
         playerStats.immunities = rr.getImmunities(playerStats);
         playerStats.resistances = rr.getResistances(playerStats);
 
-        const autoResistances = (playerStats.automation?.passives || [])
+        const passives = playerStats.automation?.passives;
+        if (!Array.isArray(passives)) {
+            console.error('rulesFactory.getPlayerStats: expected passives array');
+            throw new Error('Expected passives to be an array');
+        }
+        const autoResistances = passives
             .filter(p => p.type === 'resistance')
-            .flatMap(p => p.damageTypes || []);
+            .flatMap(p => {
+                const damageTypes = p.damageTypes;
+                if (!Array.isArray(damageTypes)) {
+                    console.error('rulesFactory.getPlayerStats: expected damageTypes array');
+                    throw new Error('Expected damageTypes to be an array');
+                }
+                return damageTypes;
+            });
         if (autoResistances.length) {
+            const resistances = playerStats.resistances;
+            if (!Array.isArray(resistances)) {
+                console.error('rulesFactory.getPlayerStats: expected resistances array');
+                throw new Error('Expected resistances to be an array');
+            }
             playerStats.resistances = [...new Set([
-                ...(playerStats.resistances || []),
+                ...resistances,
                 ...autoResistances
             ])];
         }
 
         // Resolve passive_immunity damageResistance (e.g., Psychic Defenses)
-        const passiveImmunityResistances = (playerStats.automation?.passives || [])
+        const passiveImmunityResistances = passives
             .filter(p => p.type === 'passive_immunity' && Array.isArray(p.damageResistance))
             .flatMap(p => p.damageResistance);
         if (passiveImmunityResistances.length) {
+            const resistances = playerStats.resistances;
+            if (!Array.isArray(resistances)) {
+                console.error('rulesFactory.getPlayerStats: expected resistances array');
+                throw new Error('Expected resistances to be an array');
+            }
             playerStats.resistances = [...new Set([
-                ...(playerStats.resistances || []),
+                ...resistances,
                 ...passiveImmunityResistances
             ])];
         }
 
         // Resolve land_resistance automation (Circle of the Land Nature's Ward)
-        const landResistances = (playerStats.automation?.passives || [])
+        const landResistances = passives
             .filter(p => p.type === 'land_resistance')
             .flatMap(p => {
-                const mappings = p.landMappings || {};
-                const classData = playerStats.class || {};
+                const mappings = p.landMappings;
+                if (mappings == null || typeof mappings !== 'object') {
+                    console.error('rulesFactory.getPlayerStats: expected landMappings object');
+                    throw new Error('Expected landMappings to be an object');
+                }
+                const classData = playerStats.class;
+                if (classData == null || typeof classData !== 'object') {
+                    console.error('rulesFactory.getPlayerStats: expected class object');
+                    throw new Error('Expected class to be an object');
+                }
                 const landType = (classData.major?.type || classData.subclass?.type || '').toLowerCase().trim();
                 return mappings[landType] ? [mappings[landType]] : [];
             });
         if (landResistances.length) {
+            const resistances = playerStats.resistances;
+            if (!Array.isArray(resistances)) {
+                console.error('rulesFactory.getPlayerStats: expected resistances array');
+                throw new Error('Expected resistances to be an array');
+            }
             playerStats.resistances = [...new Set([
-                ...(playerStats.resistances || []),
+                ...resistances,
                 ...landResistances
             ])];
         }
@@ -189,8 +228,13 @@ const rulesFactory = {
         // Resolve Elemental Affinity damage type resistance (2024 Draconic Sorcery)
         const elementalAffinityType = getChosenRuntimeValue(playerStats, 'Elemental Affinity', 'chosenType');
         if (elementalAffinityType) {
+            const resistances = playerStats.resistances;
+            if (!Array.isArray(resistances)) {
+                console.error('rulesFactory.getPlayerStats: expected resistances array');
+                throw new Error('Expected resistances to be an array');
+            }
             playerStats.resistances = [...new Set([
-                ...(playerStats.resistances || []),
+                ...resistances,
                 elementalAffinityType
             ])];
         }
@@ -198,8 +242,13 @@ const rulesFactory = {
         // Resolve Fiendish Resilience damage type resistance (2024 Warlock Fiend Patron)
         const fiendishResilienceType = getChosenRuntimeValue(playerStats, 'Fiendish Resilience', 'chosenType');
         if (fiendishResilienceType) {
+            const resistances = playerStats.resistances;
+            if (!Array.isArray(resistances)) {
+                console.error('rulesFactory.getPlayerStats: expected resistances array');
+                throw new Error('Expected resistances to be an array');
+            }
             playerStats.resistances = [...new Set([
-                ...(playerStats.resistances || []),
+                ...resistances,
                 fiendishResilienceType
             ])];
         }
@@ -207,8 +256,13 @@ const rulesFactory = {
         // Resolve Boon Of Energy Resistance damage type resistances (2024 Epic Boon)
         const boonEnergyResistances = getChosenRuntimeValue(playerStats, 'Boon Of Energy Resistance', 'chosenTypes');
         if (Array.isArray(boonEnergyResistances) && boonEnergyResistances.length > 0) {
+            const resistances = playerStats.resistances;
+            if (!Array.isArray(resistances)) {
+                console.error('rulesFactory.getPlayerStats: expected resistances array');
+                throw new Error('Expected resistances to be an array');
+            }
             playerStats.resistances = [...new Set([
-                ...(playerStats.resistances || []),
+                ...resistances,
                 ...boonEnergyResistances
             ])];
         }

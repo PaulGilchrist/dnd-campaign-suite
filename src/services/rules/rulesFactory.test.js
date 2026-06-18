@@ -205,7 +205,7 @@ describe('rulesFactory', () => {
     })
 
     it('getSenses returns senses array', () => {
-      const result = rulesFactory.getSenses({}, { rules: '5e' })
+      const result = rulesFactory.getSenses({ automation: { passives: [] } }, { rules: '5e' })
       expect(Array.isArray(result)).toBe(true)
     })
 
