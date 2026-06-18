@@ -1,21 +1,14 @@
 import { getCombatContext } from '../rules/combat/damageUtils.js'
 
-const CS_KEY = 'combatSummary'
-const ACTIVE_KEY = 'activeCreatureName'
+// Global in-memory store for combat data (synced via SSE events)
+let cachedCombatSummary = null
 
-function readLocal(key) {
-  try {
-    const raw = localStorage.getItem(key)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function writeLocal(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch { /* ignore */ }
+/**
+ * Call this when combat summary is updated on the server.
+ * Used by initiative.jsx to seed the cache from its SSE handler.
+ */
+export function setCombatSummaryCache(summary) {
+  cachedCombatSummary = summary
 }
 
 export async function loadCombatSummary(campaignName) {
@@ -23,17 +16,17 @@ export async function loadCombatSummary(campaignName) {
     try {
       const fromApi = await getCombatContext(campaignName)
       if (fromApi) {
-        writeLocal(CS_KEY, fromApi)
+        setCombatSummaryCache(fromApi)
         return fromApi
       }
     } catch { /* fall through */ }
     return null
   }
-  return readLocal(CS_KEY)
+  return null
 }
 
 export function getCombatSummary() {
-  return readLocal(CS_KEY)
+  return cachedCombatSummary
 }
 
 export async function loadActiveCreatureName(campaignName) {
@@ -41,16 +34,15 @@ export async function loadActiveCreatureName(campaignName) {
     try {
       const fromApi = await getCombatContext(campaignName)
       if (fromApi?.activeCreatureName) {
-        writeLocal(ACTIVE_KEY, fromApi.activeCreatureName)
         return fromApi.activeCreatureName
       }
     } catch { /* fall through */ }
   }
-  return readLocal(ACTIVE_KEY)
+  return null
 }
 
 export function getActiveCreatureName() {
-  return readLocal(ACTIVE_KEY)
+  return cachedCombatSummary?.activeCreatureName ?? null
 }
 
 export async function loadCurrentCombatRound(campaignName) {
@@ -58,7 +50,6 @@ export async function loadCurrentCombatRound(campaignName) {
   return cs?.round ?? 1
 }
 
-export function getCurrentCombatRound(campaignName) {
-  const cs = getCombatSummary(campaignName)
-  return cs?.round ?? 1
+export function getCurrentCombatRound() {
+  return cachedCombatSummary?.round ?? 1
 }

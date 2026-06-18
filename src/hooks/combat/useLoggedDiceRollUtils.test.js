@@ -46,39 +46,9 @@ describe('useLoggedDiceRollUtils', () => {
     });
 
     describe('readAoeContext', () => {
-        it('returns parsed context from localStorage', () => {
-            const mockContext = { overlay: { label: 'Fireball' }, players: [], npcs: [] };
-            localStorage.__store = { 'aoeContext-test-campaign': JSON.stringify(mockContext) };
-            const originalGetItem = localStorage.getItem;
-            localStorage.getItem = vi.fn((key) => {
-                if (key === 'aoeContext-test-campaign') return JSON.stringify(mockContext);
-                return originalGetItem.call(localStorage, key);
-            });
-
+        it('returns null — AOE context is now managed via server/SSE only', () => {
             const result = readAoeContext('test-campaign');
-
-            expect(result).toEqual(mockContext);
-            localStorage.getItem = originalGetItem;
-        });
-
-        it('returns null when no context stored', () => {
-            const originalGetItem = localStorage.getItem;
-            localStorage.getItem = vi.fn(() => null);
-
-            const result = readAoeContext('test-campaign');
-
             expect(result).toBeNull();
-            localStorage.getItem = originalGetItem;
-        });
-
-        it('returns null on parse error', () => {
-            const originalGetItem = localStorage.getItem;
-            localStorage.getItem = vi.fn(() => '{ invalid json');
-
-            const result = readAoeContext('test-campaign');
-
-            expect(result).toBeNull();
-            localStorage.getItem = originalGetItem;
         });
     });
 

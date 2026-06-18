@@ -12,13 +12,10 @@ export function dispatchUnbreakableMajestySave(campaignName, defenderName, attac
     });
 }
 
-export function readAoeContext(campaignName) {
-  try {
-    const stored = localStorage.getItem(`aoeContext-${campaignName}`);
-    return stored ? JSON.parse(stored) : null;
-  } catch {
-    return null;
-  }
+export function readAoeContext(_campaignName) {
+  // AOE context is now managed via server/SSE only — returns null
+  // Callers should get AOE data from the initiative component state
+  return null;
 }
 
 export function hasPotentCantrip(playerStats) {

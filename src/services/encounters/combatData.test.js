@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import * as damageUtils from '../rules/combat/damageUtils.js';
+import * as combatDataModule from './combatData.js';
 
 describe('combatData', () => {
   let getCombatContextSpy;
@@ -7,6 +8,8 @@ describe('combatData', () => {
   beforeEach(() => {
     localStorage.clear();
     getCombatContextSpy = vi.spyOn(damageUtils, 'getCombatContext');
+    // Clear the combat summary cache
+    combatDataModule.setCombatSummaryCache(null);
   });
 
   afterEach(() => {
@@ -14,41 +17,40 @@ describe('combatData', () => {
   });
 
   describe('loadCombatSummary', () => {
-    it('reads from localStorage when no campaignName', async () => {
+    it('returns null when no campaignName', async () => {
       getCombatContextSpy.mockResolvedValue(null);
-      localStorage.setItem('combatSummary', JSON.stringify({ round: 3 }));
       const { loadCombatSummary } = await import('./combatData.js');
       const result = await loadCombatSummary(null);
-      expect(result).toEqual({ round: 3 });
+      expect(result).toBeNull();
     });
 
-    it('returns null from API when campaignName but API returns null (no localStorage fallback)', async () => {
+    it('returns null from API when campaignName but API returns null', async () => {
       getCombatContextSpy.mockResolvedValue(null);
-      localStorage.setItem('combatSummary', JSON.stringify({ round: 2 }));
       const { loadCombatSummary } = await import('./combatData.js');
       const result = await loadCombatSummary('testCampaign');
       expect(result).toBeNull();
     });
 
-    it('writes to localStorage when API returns data', async () => {
+    it('returns data from API and updates cache when campaignName provided', async () => {
       getCombatContextSpy.mockResolvedValue({ round: 5, creatures: [] });
-      const { loadCombatSummary } = await import('./combatData.js');
+      const { loadCombatSummary, setCombatSummaryCache, getCombatSummary } = await import('./combatData.js');
       const result = await loadCombatSummary('testCampaign');
       expect(result).toEqual({ round: 5, creatures: [] });
-      expect(localStorage.getItem('combatSummary')).toBe(JSON.stringify({ round: 5, creatures: [] }));
+      // Verify cache was updated
+      expect(getCombatSummary()).toEqual({ round: 5, creatures: [] });
+      // Verify NO localStorage write
+      expect(localStorage.getItem('combatSummary')).toBeNull();
     });
 
     it('returns null when API call fails', async () => {
       getCombatContextSpy.mockRejectedValue(new Error('network error'));
-      localStorage.removeItem('combatSummary');
       const { loadCombatSummary } = await import('./combatData.js');
       const result = await loadCombatSummary('testCampaign');
       expect(result).toBeNull();
     });
 
-    it('returns null when localStorage has no data and no campaignName', async () => {
+    it('returns null when no campaignName provided', async () => {
       getCombatContextSpy.mockResolvedValue(null);
-      localStorage.removeItem('combatSummary');
       const { loadCombatSummary } = await import('./combatData.js');
       const result = await loadCombatSummary(null);
       expect(result).toBeNull();
@@ -56,34 +58,34 @@ describe('combatData', () => {
   });
 
   describe('getCombatSummary', () => {
-    it('reads from localStorage', () => {
-      localStorage.setItem('combatSummary', JSON.stringify({ round: 4 }));
-      const { getCombatSummary } = require('./combatData.js');
+    it('returns cached value when set via loadCombatSummary', async () => {
+      getCombatContextSpy.mockResolvedValue({ round: 4 });
+      const { loadCombatSummary, getCombatSummary } = await import('./combatData.js');
+      await loadCombatSummary('testCampaign');
       expect(getCombatSummary()).toEqual({ round: 4 });
     });
 
-    it('returns null when no data in localStorage', () => {
-      localStorage.removeItem('combatSummary');
+    it('returns null when no cache set', () => {
       const { getCombatSummary } = require('./combatData.js');
       expect(getCombatSummary()).toBeNull();
     });
   });
 
   describe('loadActiveCreatureName', () => {
-    it('reads from localStorage when no campaignName', async () => {
+    it('returns null when no campaignName', async () => {
       getCombatContextSpy.mockResolvedValue(null);
-      localStorage.setItem('activeCreatureName', JSON.stringify('Goblin'));
       const { loadActiveCreatureName } = await import('./combatData.js');
       const result = await loadActiveCreatureName(null);
-      expect(result).toBe('Goblin');
+      expect(result).toBeNull();
     });
 
-    it('reads from API and writes to localStorage', async () => {
+    it('reads from API when campaignName provided', async () => {
       getCombatContextSpy.mockResolvedValue({ round: 1, activeCreatureName: 'Orc' });
       const { loadActiveCreatureName } = await import('./combatData.js');
       const result = await loadActiveCreatureName('testCampaign');
       expect(result).toBe('Orc');
-      expect(localStorage.getItem('activeCreatureName')).toBe('"Orc"');
+      // Verify NO localStorage write
+      expect(localStorage.getItem('activeCreatureName')).toBeNull();
     });
 
     it('returns null when API returns no activeCreatureName', async () => {
@@ -93,24 +95,23 @@ describe('combatData', () => {
       expect(result).toBeNull();
     });
 
-    it('falls through to localStorage when API fails', async () => {
+    it('returns null when API fails', async () => {
       getCombatContextSpy.mockRejectedValue(new Error('network error'));
-      localStorage.setItem('activeCreatureName', JSON.stringify('Goblin'));
       const { loadActiveCreatureName } = await import('./combatData.js');
       const result = await loadActiveCreatureName('testCampaign');
-      expect(result).toBe('Goblin');
+      expect(result).toBeNull();
     });
   });
 
   describe('getActiveCreatureName', () => {
-    it('reads from localStorage', () => {
-      localStorage.setItem('activeCreatureName', JSON.stringify('Goblin'));
-      const { getActiveCreatureName } = require('./combatData.js');
+    it('returns cached active creature name', async () => {
+      getCombatContextSpy.mockResolvedValue({ round: 1, activeCreatureName: 'Goblin' });
+      const { loadCombatSummary, getActiveCreatureName } = await import('./combatData.js');
+      await loadCombatSummary('testCampaign');
       expect(getActiveCreatureName()).toBe('Goblin');
     });
 
-    it('returns null when no data in localStorage', () => {
-      localStorage.removeItem('activeCreatureName');
+    it('returns null when no cache set', () => {
       const { getActiveCreatureName } = require('./combatData.js');
       expect(getActiveCreatureName()).toBeNull();
     });
@@ -140,21 +141,22 @@ describe('combatData', () => {
   });
 
   describe('getCurrentCombatRound', () => {
-    it('returns round from localStorage', () => {
-      localStorage.setItem('combatSummary', JSON.stringify({ round: 3 }));
-      const { getCurrentCombatRound } = require('./combatData.js');
+    it('returns round from cache', async () => {
+      getCombatContextSpy.mockResolvedValue({ round: 3 });
+      const { loadCombatSummary, getCurrentCombatRound } = await import('./combatData.js');
+      await loadCombatSummary('testCampaign');
       expect(getCurrentCombatRound()).toBe(3);
     });
 
-    it('returns 1 when no data in localStorage', () => {
-      localStorage.removeItem('combatSummary');
+    it('returns 1 when no cache set', () => {
       const { getCurrentCombatRound } = require('./combatData.js');
       expect(getCurrentCombatRound()).toBe(1);
     });
 
-    it('returns 1 when combatSummary has no round', () => {
-      localStorage.setItem('combatSummary', JSON.stringify({ creatures: [] }));
-      const { getCurrentCombatRound } = require('./combatData.js');
+    it('returns 1 when combatSummary has no round', async () => {
+      getCombatContextSpy.mockResolvedValue({ creatures: [] });
+      const { loadCombatSummary, getCurrentCombatRound } = await import('./combatData.js');
+      await loadCombatSummary('testCampaign');
       expect(getCurrentCombatRound()).toBe(1);
     });
   });

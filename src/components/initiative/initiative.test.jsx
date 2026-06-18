@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import Initiative from './initiative.jsx';
 import { loadCombatSummary, getActiveCreatureName } from '../../services/encounters/combatData.js';
 import { loadNPCs } from '../../services/npcs/npcsService.js';
-import { loadMapData } from '../../services/maps/mapsService.js';
 import { npcToMonsterFormat } from '../../services/encounters/npcStatBlockUtils.js';
 import { isPreviousDisabled, clearCombat } from '../../services/encounters/initiativeService.js';
 
@@ -40,9 +39,8 @@ vi.mock('../../services/combat/conditions/conditionUtils.js', () => ({
 }));
 vi.mock('../../services/npcs/npcsService.js', () => ({ loadNPCs: vi.fn(() => Promise.resolve({ npcs: [] })) }));
 vi.mock('../../services/encounters/npcStatBlockUtils.js', () => ({ npcToMonsterFormat: vi.fn(() => null), npcHasStatBlock: vi.fn(() => true) }));
-vi.mock('../../services/maps/mapsService.js', () => ({ loadMapData: vi.fn(() => Promise.resolve(null)) }));
 vi.mock('../../services/rules/effects/expirations.js', () => ({ expireStaleEffects: vi.fn(), applyTurnStartEffects: vi.fn() }));
-vi.mock('../../services/encounters/combatData.js', () => ({ loadCombatSummary: vi.fn(() => Promise.resolve(null)), getCombatSummary: vi.fn(() => null), getActiveCreatureName: vi.fn(() => null) }));
+vi.mock('../../services/encounters/combatData.js', () => ({ loadCombatSummary: vi.fn(() => Promise.resolve(null)), getCombatSummary: vi.fn(() => null), getActiveCreatureName: vi.fn(() => null), setCombatSummaryCache: vi.fn() }));
 vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({ clearPerRoundMajestyTrackers: vi.fn() }));
 vi.mock('../../services/encounters/initiativeService.js', () => ({
     setupCreatures: vi.fn((characters) => characters.map((ch) => ({ name: ch.name, type: 'player', initiative: '', targetName: null, concentration: null }))),
@@ -292,20 +290,6 @@ describe('Initiative', () => {
         });
     });
 
-    describe('map data loading', () => {
-        it('should load map data when combatSummary and mapName are available', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(mockLoadMapDataCalled()).toBe(true); });
-        });
-
-        it('should not load map data when combatSummary is null', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue(null);
-            render(<Initiative {...props} />);
-            expect(mockLoadMapDataCalled()).toBe(false);
-        });
-    });
-
     describe('callbacks', () => {
         it('should call onNpcsChange with NPC list when combatSummary changes', async () => {
             vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }, { name: 'Goblin', type: 'npc' }] });
@@ -424,8 +408,4 @@ describe('Initiative', () => {
 
 function mockLoadNPCsCalled() {
     return vi.mocked(loadNPCs).mock.calls.length > 0;
-}
-
-function mockLoadMapDataCalled() {
-    return vi.mocked(loadMapData).mock.calls.length > 0;
 }

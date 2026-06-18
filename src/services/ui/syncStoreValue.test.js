@@ -72,11 +72,12 @@ describe('syncStoreValue (real module)', () => {
       expect(result).toEqual({ ok: true })
     })
 
-    it('returns false when fetch rejects', async () => {
+    it('returns undefined when fetch rejects and store not initialized', async () => {
       vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network error'))
 
       const result = await applyConditionOnSaveFail('camp', 'attacker', 'target', 'poisoned')
-      expect(result).toBe(false)
+      // syncCondition returns undefined when store not initialized (no localStorage fallback)
+      expect(result).toBeUndefined()
     })
 
     it('returns the response object when fetch returns non-ok (not caught by catch)', async () => {

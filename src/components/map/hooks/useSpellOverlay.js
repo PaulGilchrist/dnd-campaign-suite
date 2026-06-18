@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import useSSEEqualityGuard from '../../../hooks/runtime/useSSEEqualityGuard.js';
 
 /**
@@ -9,38 +9,14 @@ import useSSEEqualityGuard from '../../../hooks/runtime/useSSEEqualityGuard.js';
 const SSE_EVENT_KEY_PREFIX = 'spell-overlay-';
 const UPDATE_DEBOUNCE_MS = 150;
 
-function getStorageKey(campaignName, mapName) {
-  return `spellOverlays-${campaignName}-${mapName}`;
-}
-
-function loadOverlays(campaignName, mapName) {
-  try {
-    const stored = localStorage.getItem(getStorageKey(campaignName, mapName));
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveOverlays(campaignName, mapName, overlays) {
-  try {
-    localStorage.setItem(getStorageKey(campaignName, mapName), JSON.stringify(overlays));
-  } catch { /* ignore quota errors */ }
-}
-
-function useSpellOverlay(campaignName, mapName) {
-    const [overlays, setOverlays] = useState(() => loadOverlays(campaignName, mapName));
+function useSpellOverlay(campaignName, _mapName) {
+    const [overlays, setOverlays] = useState([]);
     const setOverlaysG = useSSEEqualityGuard(setOverlays);
     const [pendingOverlay, setPendingOverlay] = useState(null);
     const debounceTimerRef = useRef(null);
     const pendingRef = useRef(null);
     const campaignRef = useRef(campaignName);
     campaignRef.current = campaignName;
-
-    // Persist overlays to localStorage whenever they change
-    useEffect(() => {
-      if (mapName) saveOverlays(campaignName, mapName, overlays);
-    }, [campaignName, mapName, overlays]);
 
     const sendAction = useCallback(async (action, data = {}) => {
         try {
@@ -103,7 +79,7 @@ function useSpellOverlay(campaignName, mapName) {
                         const unique = newOverlays.filter(n => !existingIds.has(n.id));
                         return unique.length ? [...prev, ...unique] : prev;
                      });
-                  }
+                   }
                 break;
             case 'update':
                 if (newOverlays?.length) {
@@ -111,7 +87,7 @@ function useSpellOverlay(campaignName, mapName) {
                         const replacement = newOverlays.find(n => n.id === o.id);
                         return replacement || o;
                      }));
-                  }
+                   }
                 break;
             case 'remove':
                 if (overlayId) {

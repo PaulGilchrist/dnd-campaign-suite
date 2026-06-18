@@ -1,28 +1,27 @@
 import utils from './utils.js'
 const storage = {
     get: async (key, campaignName) => {
-        if (campaignName) {
-            try {
-                const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (data.value != null) {
-                        localStorage.setItem(key, JSON.stringify(data.value));
-                        return data.value;
-                    }
-                }
-            } catch { /* fall through to localStorage */ }
+        if (!campaignName) {
+            return null;
         }
-        const json = localStorage.getItem(key);
-        if (json) {
-            const parsed = JSON.parse(json);
-            return parsed;
+        try {
+            const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`);
+            if (response.ok) {
+                const data = await response.json();
+                if (data.value != null) {
+                    return data.value;
+                }
+            }
+        } catch (err) {
+            console.error(`storage.get failed for key "${key}" in campaign "${campaignName}"`, err);
         }
         return null;
     },
     set: (key, value, campaignName) => {
-        const json = JSON.stringify(value);
-        localStorage.setItem(key, json);
+        if (!campaignName) {
+            console.error('storage.set called with undefined campaignName', { key, value, stack: new Error().stack });
+            return Promise.resolve();
+        }
         const fullUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(key)}`;
         return fetch(fullUrl, {
             method: 'POST',
@@ -41,7 +40,7 @@ const storage = {
       },
     setProperty: async (name, propertyName, value, campaignName) => {
         const firstName = utils.getName(name);
-        let obj = await storage.get(firstName);
+        let obj = await storage.get(firstName, campaignName);
         if(!obj) {
             obj = {};
           }

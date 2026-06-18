@@ -2,7 +2,7 @@ import { seedTrackedResources, addStorageChangeListener, getRuntimeValue, setRun
 
 const usedKeys = new Set();
 function trackKey(k) { if (k) usedKeys.add(k); }
-function resetModule() { for (const k of [...usedKeys]) { clearRuntimeState(k); } usedKeys.clear(); localStorage.clear(); }
+function resetModule() { for (const k of [...usedKeys]) { clearRuntimeState(k); } usedKeys.clear(); }
 beforeEach(() => { vi.restoreAllMocks(); resetModule(); });
 afterEach(() => { vi.restoreAllMocks(); resetModule(); });
 
@@ -33,9 +33,9 @@ describe('valuesEqual (indirect)', () => {
   });
   it('stored string vs number line10 no-op', () => {
     trackKey('v4');
-    localStorage.setItem('v4', JSON.stringify({ hp: '42' }));
-    clearRuntimeState('v4'); // force reload from store
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: false });
+    // No longer reads from localStorage — seed via setRuntimeValue instead
+    setRuntimeValue('v4', 'hp', '42', 'cam'); // stores string
+    vi.spyOn(globalThis, 'fetch').mockClear();
     setRuntimeValue('v4', 'hp', 42, 'cam'); // Number('42')===42 -> no fetch
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -74,14 +74,14 @@ describe('valuesEqual (indirect)', () => {
 });
 describe('getStore (indirect)', () => {
   it('null for new key lines21-24', () => { trackKey('g1'); expect(getRuntimeValue('g1','hp')).toBeNull(); });
-  it('reads from localStorage line23-24', () => { trackKey('g2'); localStorage.setItem('g2',JSON.stringify({hp:50})); expect(getRuntimeValue('g2','hp')).toBe(50); });
-  it('empty store for bad JSON line26', () => { trackKey('g3'); localStorage.setItem('g3','{bad}'); expect(getRuntimeValue('g3','hp')).toBeNull(); });
-  it('cached bypasses localStorage line29', () => { trackKey('g4'); localStorage.setItem('g4',JSON.stringify({hp:50})); getRuntimeValue('g4','hp'); localStorage.clear(); expect(getRuntimeValue('g4','hp')).toBe(50); });
+  it('returns null for key not yet seeded (no localStorage fallback)', () => { trackKey('g2'); expect(getRuntimeValue('g2','hp')).toBeNull(); });
+  it('empty store for corrupt data', () => { trackKey('g3'); expect(getRuntimeValue('g3','hp')).toBeNull(); });
+  it('cached in-memory store persists after localStorage cleared', () => { trackKey('g4'); setRuntimeValue('g4','hp',50,'cam'); localStorage.clear(); expect(getRuntimeValue('g4','hp')).toBe(50); });
 });
 describe('getRuntimeValue exported', () => {
-  it('returns stored value lines65-66', () => { trackKey('r1'); localStorage.setItem('r1',JSON.stringify({str:8})); expect(getRuntimeValue('r1','str')).toBe(8); });
-  it('returns null for missing prop line65', () => { trackKey('r2'); localStorage.setItem('r2',JSON.stringify({str:8})); expect(getRuntimeValue('r2','missing')).toBeNull(); });
-  it('uses cached store after load', () => { trackKey('r3'); localStorage.setItem('r3',JSON.stringify({con:14})); const v=getRuntimeValue('r3','con'); expect(v).toBe(14); v.toString(); });
+  it('returns stored value after setRuntimeValue', () => { trackKey('r1'); setRuntimeValue('r1','str',8,'cam'); expect(getRuntimeValue('r1','str')).toBe(8); });
+  it('returns null for missing prop line65', () => { trackKey('r2'); setRuntimeValue('r2','str',8,'cam'); expect(getRuntimeValue('r2','missing')).toBeNull(); });
+  it('uses cached store after load', () => { trackKey('r3'); setRuntimeValue('r3','con',14,'cam'); const v=getRuntimeValue('r3','con'); expect(v).toBe(14); v.toString(); });
 });
 describe('seedTrackedResources', () => {
   it('sets runtime values from tracked entries', () => {

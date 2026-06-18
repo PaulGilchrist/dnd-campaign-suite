@@ -32,7 +32,11 @@ export function clearStore(key) {
 }
 
 function syncCondition(name, key, condition) {
-  const current = readStore(name) || {}
+  const current = readStore(name)
+  if (!current) {
+    console.error('syncCondition: store not initialized for', name)
+    return Promise.resolve()
+  }
   const conditions = Array.isArray(current[key]) ? current[key] : []
   if (conditions.includes(condition)) {
     return Promise.resolve()
@@ -81,12 +85,6 @@ async function fetchAndSeedStores(campaignName) {
         }
       }
       if (!data) {
-        const stored = localStorage.getItem(key)
-        if (stored) data = JSON.parse(stored)
-      }
-      if (data) {
-        setStore(key, new Map(Object.entries(data)))
-      } else {
         setStore(key, new Map())
       }
     } catch {

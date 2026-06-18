@@ -19,12 +19,7 @@ function valuesEqual(a, b) {
 
 function getStore(characterKey) {
   if (!stores.has(characterKey)) {
-    try {
-      const stored = localStorage.getItem(characterKey);
-      stores.set(characterKey, stored ? new Map(Object.entries(JSON.parse(stored))) : new Map());
-    } catch {
-      stores.set(characterKey, new Map());
-    }
+    stores.set(characterKey, new Map());
   }
   return stores.get(characterKey);
 }
@@ -40,7 +35,6 @@ export function seedTrackedResources(characterKey, trackedEntries) {
     }
   }
   if (changed) {
-    try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
     notify(characterKey);
   }
 }
@@ -72,7 +66,6 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
   // console.log(`[SSE] setRuntimeValue ${characterKey}.${propertyName}:`, existing, '->', value);
 
   const obj = Object.fromEntries(store);
-  try { localStorage.setItem(characterKey, JSON.stringify(obj)); } catch { /* ignore */ }
 
   if (!campaignName) {
     console.error('setRuntimeValue called with undefined campaignName', { characterKey, propertyName, value, stack: new Error().stack });
@@ -102,7 +95,6 @@ export function setRuntimeObject(characterKey, fullObject, campaignName, skipSyn
   }
   if (changed) {
     // console.log(`[SSE] setRuntimeObject ${characterKey}: keys [${changedKeys.join(', ')}] changed`);
-    try { localStorage.setItem(characterKey, JSON.stringify(Object.fromEntries(store))); } catch { /* ignore */ }
 
     if (campaignName && !skipSync) {
       fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
@@ -161,7 +153,6 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
   if (!changed) return;
 
   const obj = Object.fromEntries(store);
-  try { localStorage.setItem(characterKey, JSON.stringify(obj)); } catch { /* ignore */ }
 
   if (!campaignName) {
     console.error('setRuntimeBatch called with undefined campaignName', { characterKey, properties, stack: new Error().stack });

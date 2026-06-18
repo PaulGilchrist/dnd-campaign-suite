@@ -411,18 +411,14 @@ function validateCunningStrikeOption(option, targetName, playerStats) {
 
 /**
  * Synchronous helper to get target info from combat context.
- * Uses the same logic as getTargetFromAttacker but synchronously.
+ * Removed localStorage dependency — now returns null so size validations
+ * pass through (default assumption: target is valid size).
  */
-function getCombatContextSync(targetName) {
-    try {
-        const stored = localStorage.getItem(`combatContext`);
-        if (!stored) return null;
-        const cs = JSON.parse(stored);
-        if (!cs?.creatures) return null;
-        return cs.creatures.find(c => c.name === targetName) || null;
-    } catch {
-        return null;
-    }
+function getCombatContextSync(_targetName) {
+    // Combat context is now managed via server/SSE only.
+    // Size validations that need this data should use the combatSummary
+    // from the initiative component state.
+    return null;
 }
 
 /**

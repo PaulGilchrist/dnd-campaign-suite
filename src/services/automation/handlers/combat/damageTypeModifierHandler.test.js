@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import * as combatData from '../../../../services/encounters/combatData.js';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
 
@@ -44,6 +45,7 @@ function makeAction(automation = {}) {
 describe('damageTypeModifierHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    combatData.setCombatSummaryCache(null);
   });
 
   it('returns modal when options are present', async () => {
@@ -115,6 +117,7 @@ describe('damageTypeModifierHandler.handle', () => {
 describe('damageTypeModifierHandler.applyDamageTypeChoice', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    combatData.setCombatSummaryCache(null);
   });
 
   it('returns null when chosen option not found', async () => {
@@ -198,11 +201,12 @@ describe('damageTypeModifierHandler.applyDamageTypeChoice', () => {
     expect(result).not.toBeNull();
   });
 
-  it('uses current combat round from localStorage', async () => {
+  it('uses current combat round from cache', async () => {
     const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
     const ps = makePlayerStats();
 
-    localStorage.setItem('combatSummary', JSON.stringify({ round: 5 }));
+    // Set the combat summary cache to round 5
+    combatData.setCombatSummaryCache({ round: 5 });
 
     await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
 
@@ -212,11 +216,12 @@ describe('damageTypeModifierHandler.applyDamageTypeChoice', () => {
     expect(roundCall[2]).toBe(5);
   });
 
-  it('defaults to round 1 when no combat summary', async () => {
+  it('defaults to round 1 when no combat summary in cache', async () => {
     const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
     const ps = makePlayerStats();
 
-    localStorage.removeItem('combatSummary');
+    // Clear the cache
+    combatData.setCombatSummaryCache(null);
 
     await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
 

@@ -10,9 +10,8 @@ import { getMonsterImageUrl, getMonsterData } from '../../services/npcs/monsterU
 import { getAbilityLabel, CONDITIONS } from '../../services/combat/conditions/conditionUtils.js'
 import { loadNPCs } from '../../services/npcs/npcsService.js'
 import { npcToMonsterFormat, npcHasStatBlock } from '../../services/encounters/npcStatBlockUtils.js'
-import * as mapsService from '../../services/maps/mapsService.js'
 import { expireStaleEffects, applyTurnStartEffects } from '../../services/rules/effects/expirations.js'
-import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/encounters/combatData.js'
+import { loadCombatSummary, getCombatSummary, getActiveCreatureName, setCombatSummaryCache } from '../../services/encounters/combatData.js'
 import { clearPerRoundMajestyTrackers } from '../../services/combat/auras/unbreakableMajesty.js'
 import {
     setupCreatures,
@@ -58,19 +57,6 @@ import ConditionPicker from './ConditionPicker.jsx'
 import ConcentrationPicker from './ConcentrationPicker.jsx'
 import './initiative.css'
 
-function getOverlayStorageKey(campaignName, mapName) {
-    return `spellOverlays-${campaignName}-${mapName}`
-}
-
-function loadOverlays(campaignName, mapName) {
-    try {
-        const stored = localStorage.getItem(getOverlayStorageKey(campaignName, mapName))
-        return stored ? JSON.parse(stored) : []
-    } catch {
-        return []
-    }
-}
-
 function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapName }) {
     const [combatSummary, setCombatSummary] = React.useState(null)
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
@@ -84,6 +70,10 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const combatSummaryRef = React.useRef(null)
     combatSummaryRef.current = combatSummary
 
+    React.useEffect(() => {
+        setCombatSummaryCache(combatSummary)
+    }, [combatSummary])
+
     const [conditionPickerTarget, setConditionPickerTarget] = React.useState(null)
     const [conditionPopup, setConditionPopup] = React.useState(null)
     const [conditionPickerDc, setConditionPickerDc] = React.useState(10)
@@ -96,7 +86,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
 
     const [campaignNpcs, setCampaignNpcs] = React.useState([])
 
-    const [mapData, setMapData] = React.useState(null)
     const [overlays, setOverlays] = React.useState([])
 
     const displayCreatures = React.useMemo(() => {
@@ -127,20 +116,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             }
         })
     }, [combatSummary, characters])
-
-    React.useEffect(() => {
-        if (!combatSummary || !mapName) {
-            setMapData(null)
-            setOverlays([])
-            return
-        }
-        setOverlays(loadOverlays(campaignName, mapName))
-        mapsService.loadMapData(campaignName, mapName).then(data => {
-            setMapData(data)
-        }).catch(() => {
-            setMapData(null)
-        })
-    }, [combatSummary, campaignName, mapName])
 
     React.useEffect(() => {
         if (!campaignName) return
@@ -503,15 +478,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
             const overlay = overlays.find(o => o.id === overlayId)
             if (overlay) {
                 setTarget(combatSummary, creatureName, targetName)
-                const players = mapData?.players || []
-                const npcs = (mapData?.placedItems || []).filter(i => i.type === 'npc')
-                try {
-                    localStorage.setItem(`aoeContext-${campaignName}`, JSON.stringify({
-                        overlay,
-                        players,
-                        npcs,
-                    }))
-                } catch { /* ignore */ }
+                // AOE context is now managed via server/SSE only
             }
         } else {
             setTarget(combatSummary, creatureName, targetName)

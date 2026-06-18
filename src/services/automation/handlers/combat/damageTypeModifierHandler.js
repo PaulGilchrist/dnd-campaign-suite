@@ -1,5 +1,6 @@
 import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getCurrentCombatRound as getCombatRoundFromCache } from '../../../../services/encounters/combatData.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -47,7 +48,7 @@ export async function applyDamageTypeChoice(action, playerStats, campaignName, c
 
     // Store the chosen damage type for the current round
     setRuntimeValue(playerStats.name, 'empoweredStrikesDamageType', chosen.damageType, campaignName);
-    setRuntimeValue(playerStats.name, usedKey, getCurrentCombatRound(), campaignName);
+    setRuntimeValue(playerStats.name, usedKey, getCombatRoundFromCache(), campaignName);
 
     addEntry(campaignName, {
         type: 'ability_use',
@@ -66,15 +67,4 @@ export async function applyDamageTypeChoice(action, playerStats, campaignName, c
             automation: auto,
         },
     };
-}
-
-function getCurrentCombatRound() {
-    try {
-        const cs = localStorage.getItem('combatSummary');
-        if (cs) {
-            const parsed = JSON.parse(cs);
-            return parsed?.round || 1;
-        }
-    } catch (e) { /* ignore */ }
-    return 1;
 }

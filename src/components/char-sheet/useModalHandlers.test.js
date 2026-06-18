@@ -10,6 +10,11 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
+const mockGetCurrentCombatRound = vi.fn();
+vi.mock('../../services/encounters/combatData.js', () => ({
+    getCurrentCombatRound: () => mockGetCurrentCombatRound(),
+}));
+
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
     getDistanceFeet: vi.fn(),
 }));
@@ -78,7 +83,7 @@ describe('useModalHandlers', () => {
         vi.clearAllMocks();
         getRuntimeValue.mockReturnValue(null);
         setRuntimeValue.mockReturnValue(undefined);
-        getCurrentCombatRound.mockReturnValue(1);
+        mockGetCurrentCombatRound.mockReturnValue(1);
         rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
         getCombatContext.mockResolvedValue(null);
         getDistanceFeet.mockReturnValue(5);
