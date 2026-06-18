@@ -80,8 +80,7 @@ describe('attackCalc', () => {
     });
 
     it('should handle null/undefined equipped', () => {
-      const result = findEquippedWeapons(allEquipment, null, 'Melee');
-      expect(result).toEqual([]);
+      expect(() => findEquippedWeapons(allEquipment, null, 'Melee')).toThrow('Expected array, got null');
     });
   });
 
@@ -356,6 +355,7 @@ describe('attackCalc', () => {
         equipped: overrides.equipped || [],
       },
       spellAbilities: overrides.spellAbilities || null,
+      activeBuffs: overrides.activeBuffs || [],
     });
 
     it('should build melee weapon attack', () => {

@@ -390,22 +390,23 @@ describe('rules', () => {
       const allSpells = [];
       const playerSummary = {
         level: 1,
-        class: { languages: [] },
-        languages: [],
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-        ],
-        inventory: { equipped: [], magicItems: [] },
-        skillProficiencies: [],
-        actions: [],
-        bonusActions: [],
-        reactions: [],
-        specialActions: []
+         class: { languages: [], fightingStyles: [] },
+         languages: [],
+         abilities: [
+           { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
+         ],
+         inventory: { equipped: [], magicItems: [] },
+         skillProficiencies: [],
+         actions: [],
+         bonusActions: [],
+         reactions: [],
+         specialActions: [],
+         activeBuffs: []
       };
 
       const result = await rules.getPlayerStats(allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary);
@@ -432,25 +433,26 @@ describe('rules', () => {
       const allMagicItems = [];
       const allRaces = [{ name: 'Human' }];
       const allSpells = [];
-      const playerSummary = {
-        level: 1,
-        class: { languages: [] },
-        languages: [],
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-        ],
-        inventory: { equipped: [], magicItems: [] },
-        skillProficiencies: [],
-        actions: [],
-        bonusActions: [],
-        reactions: [],
-        specialActions: []
-      };
+       const playerSummary = {
+         level: 1,
+         class: { languages: [], fightingStyles: [] },
+         languages: [],
+         abilities: [
+           { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+           { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
+         ],
+         inventory: { equipped: [], magicItems: [] },
+         skillProficiencies: [],
+         actions: [],
+         bonusActions: [],
+         reactions: [],
+         specialActions: [],
+         activeBuffs: []
+       };
 
       await rules.getPlayerStats(allClasses, allEquipment, allMagicItems, allRaces, allSpells, playerSummary);
 
@@ -671,10 +673,11 @@ describe('rules', () => {
         const playerStats = {
           rules: '5e',
           level: 5,
-          class: { name: 'Fighter' },
+          class: { name: 'Fighter', fightingStyles: [] },
           abilities: [{ name: 'Strength', bonus: 3 }],
           inventory: { equipped: [] },
-          spellAbilities: null
+          spellAbilities: null,
+          activeBuffs: []
         };
         const result = rules.getAttacks([], [], playerStats);
         expect(Array.isArray(result)).toBe(true);

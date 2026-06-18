@@ -22,7 +22,8 @@ export function parseMagicItemName(itemName) {
  * @returns {string[]}
  */
 export function findEquippedWeapons(allEquipment, equipped, weaponRange) {
-    return (equipped || []).filter(itemName => {
+    if (equipped == null) { console.error('[attackCalc] Missing array:', equipped); throw new Error('Expected array, got ' + equipped); }
+    return equipped.filter(itemName => {
         if (!itemName || typeof itemName !== 'string') return false;
         const { baseName } = parseMagicItemName(itemName);
         const item = allEquipment.find(item => item.name === baseName);
@@ -146,7 +147,8 @@ export function buildMonkAttacks(opts) {
 export function buildSpellAttacks(playerSpells, allSpells, spellAbilities, playerLevel = 1) {
     const attacks = [];
 
-    const spells = (playerSpells || []).map(spell => {
+    if (playerSpells == null) { console.error('[attackCalc] Missing array:', playerSpells); throw new Error('Expected array, got ' + playerSpells); }
+    const spells = playerSpells.map(spell => {
         const spellDetail = allSpells.find(d => d.name === spell.name);
         if (spellDetail) return { ...spellDetail, prepared: spell.prepared };
         return { ...spell };
@@ -209,7 +211,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
     const dexterity = playerStats.abilities.find(a => a.name === 'Dexterity');
     const proficiency = Math.floor((playerStats.level - 1) / 4 + 2);
     const attacks = [];
-    const fightingStyles = playerStats.class?.fightingStyles || [];
+    const fightingStyles = playerStats.class?.fightingStyles != null ? playerStats.class.fightingStyles : [];
 
      // Ranged weapon
     const rangedWeapons = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Ranged');
@@ -294,7 +296,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
       }
 
      // Starry Form: Archer constellation - ranged spell attack
-     const starryFormBuff = (playerStats.activeBuffs || []).find(b => b.name === 'Starry Form' && b.constellation === 'Archer');
+      const starryFormBuff = playerStats.activeBuffs != null ? playerStats.activeBuffs.find(b => b.name === 'Starry Form' && b.constellation === 'Archer') : undefined;
      if (starryFormBuff) {
          const wis = playerStats.abilities.find(a => a.name === 'Wisdom');
          const wisMod = wis?.bonus || 0;
