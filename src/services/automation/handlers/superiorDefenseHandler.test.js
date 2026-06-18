@@ -812,6 +812,7 @@ describe('superiorDefenseHandler', () => {
         });
 
         await expect(activateAtTurnStart(ps, campaignName)).rejects.toThrow('Network error');
+      });
 
       it('should use maxFocus as fallback when focusPoints not in runtime state', async () => {
         runtimeState.getRuntimeValue.mockImplementation((name, key) => {
