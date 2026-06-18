@@ -25,7 +25,7 @@ function WizardStepAbilities({
   onFeatAbilityChoiceChange,
 }) {
   const [pointBuyCosts, setPointBuyCosts] = useState({});
-  const [pointsAllowed, setPointsAllowed] = useState(24);
+  const [pointsAllowed, setPointsAllowed] = useState(27);
   const [abilityNames, setAbilityNames] = useState(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
   const [bgAbilityChoices, setBgAbilityChoices] = useState([]);
   const [bgAbilityAssignments, setBgAbilityAssignments] = useState({});
