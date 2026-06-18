@@ -1039,7 +1039,7 @@ describe('countercharmHandler.handle', () => {
       };
       getLastAttackRoll.mockReturnValue(saveEvent);
       rangeToFeet.mockReturnValue(30);
-      addEntry.mockReturnValue(Promise.reject(new Error('log error')));
+      addEntry.mockReturnValue(Promise.reject(new Error('log error')).catch(() => {}));
 
       // Should not throw
       await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();

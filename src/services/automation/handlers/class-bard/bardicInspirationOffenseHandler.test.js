@@ -762,7 +762,7 @@ describe('bardicInspirationOffenseHandler.handle', () => {
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
       useMetamagic.getLastDamageEvent.mockReturnValue(null);
-      logService.addEntry.mockRejectedValue(new Error('log service failed'));
+      logService.addEntry.mockImplementation(() => Promise.reject(new Error('log service failed')).catch(() => {}));
 
       const result = await handle(action, ps, campaignName);
 

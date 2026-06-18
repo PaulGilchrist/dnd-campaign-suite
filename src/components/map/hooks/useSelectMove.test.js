@@ -3,6 +3,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useSelectMove from './useSelectMove.js';
 import { TOOL_SELECT } from '../../../config/mapConfig.js';
 
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
+  setRuntimeObject: vi.fn(),
+}));
+
 describe('useSelectMove', () => {
   const mockSvgRef = { current: null };
   const mockGetGridFromEvent = vi.fn();

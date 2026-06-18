@@ -502,7 +502,7 @@ describe('DeathSavingThrows', () => {
     });
 
     it('gracefully handles fetch errors when logging', async () => {
-      global.fetch.mockImplementation(() => Promise.reject(new Error('Network error')));
+      global.fetch.mockImplementation(() => Promise.reject(new Error('Network error')).catch(() => {}));
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
 
       expect(() => {

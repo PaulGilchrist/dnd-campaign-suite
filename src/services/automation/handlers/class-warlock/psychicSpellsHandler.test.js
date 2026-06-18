@@ -2,6 +2,11 @@ import { isPsychicSpellsActive, getPsychicSpellsConfig, handle } from './psychic
 import { collectAutomationFromFeatures } from '../../../combat/automation/automationCollector.js';
 import { psionicHandlers } from '../../../combat/automation/automationInfoBuilder/psionic.js';
 
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
+}));
+
 describe('psychicSpellsHandler', () => {
     describe('isPsychicSpellsActive', () => {
         it('should return true when psychic_spells passive exists', () => {

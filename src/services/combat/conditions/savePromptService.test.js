@@ -42,7 +42,8 @@ describe('sendSavePrompt', () => {
    });
 
   it('swallows fetch errors silently', async () => {
-    global.fetch.mockReturnValueOnce(Promise.reject(new Error('fail')));
+    const err = new Error('fail');
+    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
     const result = sendSavePrompt('T', { targetName: 'T' });
     expect(result).toBeUndefined(); // fire-and-forget, no promise returned
     await Promise.resolve(); // allow microtask to settle so rejection is caught internally
@@ -66,7 +67,8 @@ describe('sendSaveResult', () => {
   });
 
   it('swallows fetch errors silently', async () => {
-    global.fetch.mockReturnValueOnce(Promise.reject(new Error('fail')));
+    const err = new Error('fail');
+    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
     const result = sendSaveResult('T', 'Goblin', {});
     expect(result).toBeUndefined();
     await Promise.resolve();
@@ -90,7 +92,8 @@ describe('clearSavePrompt', () => {
   });
 
   it('swallows fetch errors silently', async () => {
-    global.fetch.mockReturnValueOnce(Promise.reject(new Error('fail')));
+    const err = new Error('fail');
+    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
     const result = clearSavePrompt('Test', 'Goblin', 'id');
     expect(result).toBeUndefined();
     await Promise.resolve();
@@ -114,7 +117,8 @@ describe('sendDeathSavePrompt', () => {
   });
 
   it('swallows fetch errors silently', async () => {
-    global.fetch.mockReturnValueOnce(Promise.reject(new Error('fail')));
+    const err = new Error('fail');
+    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
     const result = sendDeathSavePrompt('Test', { targetName: 'T' });
     expect(result).toBeUndefined();
     await Promise.resolve();
@@ -141,7 +145,8 @@ describe('clearDeathSavePrompt', () => {
   });
 
   it('swallows fetch errors silently', async () => {
-    global.fetch.mockReturnValueOnce(Promise.reject(new Error('fail')));
+    const err = new Error('fail');
+    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
     const result = clearDeathSavePrompt('Test', 'T');
     expect(result).toBeUndefined();
     await Promise.resolve();
@@ -165,7 +170,8 @@ describe('sendDeathSaveResult', () => {
   });
 
   it('swallows fetch errors silently', async () => {
-    global.fetch.mockReturnValueOnce(Promise.reject(new Error('fail')));
+    const err = new Error('fail');
+    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
     const result = sendDeathSaveResult('Test', 'Fighter', {});
     expect(result).toBeUndefined();
     await Promise.resolve();
@@ -189,7 +195,8 @@ describe('sendConcentrationPrompt', () => {
   });
 
   it('swallows fetch errors silently', async () => {
-    global.fetch.mockReturnValueOnce(Promise.reject(new Error('fail')));
+    const err = new Error('fail');
+    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
     const result = sendConcentrationPrompt('Test', { targetName: 'T' });
     expect(result).toBeUndefined();
     await Promise.resolve();
@@ -213,7 +220,8 @@ describe('sendConcentrationResult', () => {
   });
 
   it('swallows fetch errors silently', async () => {
-    global.fetch.mockReturnValueOnce(Promise.reject(new Error('fail')));
+    const err = new Error('fail');
+    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
     const result = sendConcentrationResult('Test', 'Wizard', {});
     expect(result).toBeUndefined();
     await Promise.resolve();

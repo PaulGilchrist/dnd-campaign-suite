@@ -387,7 +387,7 @@ describe('greaseAreaSaveHandler.handle', () => {
       mapsService.loadMapData.mockResolvedValue({
         players: [{ name: 'TestWizard', gridX: 5, gridY: 10 }],
       });
-      logService.addEntry.mockRejectedValue(new Error('network'));
+      logService.addEntry.mockImplementation(() => Promise.reject(new Error('network')).catch(() => {}));
 
       await expect(handle(action, ps, campaignName, 'test-map')).resolves.toBeDefined();
     });

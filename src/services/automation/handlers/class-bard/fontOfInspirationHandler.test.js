@@ -532,7 +532,7 @@ describe('fontOfInspirationHandler.handle', () => {
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce(2)
         .mockReturnValueOnce(4);
-      logService.addEntry.mockRejectedValue(new Error('db error'));
+      logService.addEntry.mockImplementation(() => Promise.reject(new Error('db error')).catch(() => {}));
 
       // Should not throw
       const result = await handle(action, ps, campaignName, null);

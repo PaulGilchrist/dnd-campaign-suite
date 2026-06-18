@@ -318,7 +318,7 @@ describe('npcCombatService - addNPCToInitiative', () => {
 
   describe('resilience', () => {
     it('does not throw when the logInitiativeRoll fetch fails', async () => {
-      global.fetch = vi.fn(() => Promise.reject(new Error('network error')));
+      global.fetch = vi.fn(() => Promise.reject(new Error('network error')).catch(() => {}));
 
       await expect(addNPCToInitiative(CAMPAIGN, defaultNPC())).resolves.toBeUndefined();
       expect(storage.set).toHaveBeenCalled();

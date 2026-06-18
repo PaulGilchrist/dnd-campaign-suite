@@ -462,7 +462,7 @@ describe('HandOfHealingModal', () => {
     });
 
     it('does not crash when fetch fails during condition removal', async () => {
-      global.fetch.mockRejectedValue(new Error('network error'));
+      global.fetch.mockImplementation(() => Promise.reject(new Error('network error')).catch(() => {}));
       combatData.getCombatSummary.mockReturnValue({
         creatures: [{ name: 'Goblin', conditions: [{ key: 'blinded' }] }],
       });

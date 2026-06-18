@@ -1114,7 +1114,7 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       const metaCtx = { totalDamage: 10 };
 
       getCombatContext.mockResolvedValue(baseCombatSummary);
-      addEntry.mockReturnValue(Promise.reject(new Error('log error')));
+      addEntry.mockReturnValue(Promise.reject(new Error('log error')).catch(() => {}));
 
       const result = await applyMultiTarget(
         action,

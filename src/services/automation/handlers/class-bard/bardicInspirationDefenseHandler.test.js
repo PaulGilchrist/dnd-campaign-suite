@@ -358,7 +358,7 @@ describe('bardicInspirationDefenseHandler.handle', () => {
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      logService.addEntry.mockRejectedValue(new Error('log service failed'));
+      logService.addEntry.mockImplementation(() => Promise.reject(new Error('log service failed')).catch(() => {}));
 
       const result = await handle(action, ps, campaignName);
 

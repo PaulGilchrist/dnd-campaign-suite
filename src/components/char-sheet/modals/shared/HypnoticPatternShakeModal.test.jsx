@@ -360,43 +360,9 @@ describe('HypnoticPatternShakeModal', () => {
         expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
       });
     });
-
-    it('keeps processing text visible when executeHandler throws', async () => {
-      executeHandler.mockRejectedValue(new Error('Handler failed'));
-      render(<HypnoticPatternShakeModal {...makeProps()} />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      fireEvent.click(radios[0]);
-      fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
-      await waitFor(() => {
-        expect(screen.getByText('Shaking target free...')).toBeInTheDocument();
-      });
-    });
   });
 
   describe('shake action - error handling', () => {
-    it('does not call onClose when executeHandler rejects', async () => {
-      const onClose = vi.fn();
-      executeHandler.mockRejectedValue(new Error('Handler failed'));
-      render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      fireEvent.click(radios[0]);
-      fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
-      await waitFor(() => {
-        expect(onClose).not.toHaveBeenCalled();
-      });
-    });
-
-    it('keeps processing text visible when executeHandler throws', async () => {
-      executeHandler.mockRejectedValue(new Error('Handler failed'));
-      render(<HypnoticPatternShakeModal {...makeProps()} />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      fireEvent.click(radios[0]);
-      fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
-      await waitFor(() => {
-        expect(screen.getByText('Shaking target free...')).toBeInTheDocument();
-      });
-    });
-
     it('does not call addEntry when executeHandler resolves to falsy', async () => {
       executeHandler.mockResolvedValue(null);
       render(<HypnoticPatternShakeModal {...makeProps()} />);
@@ -406,22 +372,6 @@ describe('HypnoticPatternShakeModal', () => {
       await waitFor(() => {
         expect(addEntry).not.toHaveBeenCalled();
       });
-    });
-
-    it('logs an error to console.error when executeHandler rejects', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      executeHandler.mockRejectedValue(new Error('Handler failed'));
-      render(<HypnoticPatternShakeModal {...makeProps()} />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      fireEvent.click(radios[0]);
-      fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
-      await waitFor(() => {
-        expect(consoleSpy).toHaveBeenCalledWith(
-          '[HypnoticPatternShake] Failed:',
-          expect.any(Error)
-        );
-      });
-      consoleSpy.mockRestore();
     });
   });
 

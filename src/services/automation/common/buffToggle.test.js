@@ -41,6 +41,11 @@ function makeAuto(overrides = {}) {
 beforeEach(() => {
     vi.restoreAllMocks();
     resetRuntime();
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({}),
+    });
 });
 
 describe('toggleBuff', () => {

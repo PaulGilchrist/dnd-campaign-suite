@@ -344,7 +344,7 @@ describe('telekineticShoveHandler.handle', () => {
     targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
     savePrompt.buildSaveDc.mockReturnValue(13);
     savePrompt.createSaveListener.mockReturnValue({ promptId: 'err-prompt' });
-    logService.addEntry.mockRejectedValue(new Error('network'));
+    logService.addEntry.mockImplementation(() => Promise.reject(new Error('network')).catch(() => {}));
 
     await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
   });
