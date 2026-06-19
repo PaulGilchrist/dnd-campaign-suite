@@ -73,11 +73,15 @@ function createMinimalCharacter(name) {
 function stubPlayerRuntime(currentHp, conditions = []) {
   getRuntimeValue.mockReset();
   getRuntimeValue
-    .mockReturnValueOnce([])                        // activeBuffs
-    .mockReturnValueOnce(undefined)                 // arcaneWardActive
-    .mockReturnValueOnce(currentHp)                 // currentHitPoints
-    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check
-    .mockReturnValueOnce(conditions);               // activeConditions
+    .mockImplementation((key, subKey) => {
+      if (subKey === 'activeBuffs') return [];
+      if (subKey === 'arcaneWardActive') return undefined;
+      if (subKey === 'arcaneWardHp') return 0;
+      if (subKey === 'lastMetamagicDamage') return undefined;
+      if (subKey === 'currentHitPoints') return currentHp;
+      if (subKey === 'activeConditions') return conditions;
+      return undefined;
+    });
 }
 
 describe('Dark One\'s Blessing', () => {

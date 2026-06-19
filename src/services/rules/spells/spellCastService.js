@@ -530,8 +530,22 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 }
             }
 
+        // Generic automation routing — any spell with automation.type that hasn't been handled by a specific case above
+        // This ensures all automated spells (shield, blade_ward, buff_ally, temp_buff, etc.) work when cast
+        if (spell.automation?.type) {
+            const target = await getTargetInfo();
+            if (target) {
+                const action = {
+                    name: spell.name,
+                    spell: spell,
+                    automation: spell.automation,
+                };
+                await executeHandler(action, playerStats, campaignName, mapName);
+            }
+        }
+
            return;
-   }
+    }
 
    const rollContext = { ...metaCtx, damageType };
 

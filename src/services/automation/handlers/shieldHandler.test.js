@@ -39,7 +39,8 @@ describe('shieldHandler', () => {
             'TestCharacter',
             'TestCharacter',
             [{ type: 'remove_active_buff', buffName: 'Shield' }],
-            mockCampaignName
+            mockCampaignName,
+            1
         );
 
         expect(result).toEqual({

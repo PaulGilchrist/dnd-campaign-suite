@@ -1556,8 +1556,11 @@
       "Cleric"
     ],
     "subclasses": [
-      "Devotion"
-    ]
+      "Lore"
+    ],
+    "automation": {
+      "type": "shield"
+    }
   },
   {
     "index": "commune-with-nature",
@@ -8433,7 +8436,10 @@
     ],
     "subclasses": [
       "Lore"
-    ]
+    ],
+    "automation": {
+      "type": "shield"
+    }
   },
   {
     "index": "shield-of-faith",

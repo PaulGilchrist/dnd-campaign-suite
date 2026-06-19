@@ -133,21 +133,29 @@ function createMinimalCharacter(name) {
 function stubPlayerRuntime(currentHp, conditions = []) {
   getRuntimeValue.mockReset();
   getRuntimeValue
-    .mockReturnValueOnce([])                        // activeBuffs (line 110)
-    .mockReturnValueOnce(undefined)                 // arcaneWardActive (line 162)
-    .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 186)
-    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond check (line 223)
-    .mockReturnValueOnce(conditions);               // activeConditions (line 277)
+    .mockImplementation((key, subKey) => {
+      if (subKey === 'activeBuffs') return [];
+      if (subKey === 'arcaneWardActive') return undefined;
+      if (subKey === 'arcaneWardHp') return 0;
+      if (subKey === 'lastMetamagicDamage') return undefined;
+      if (subKey === 'currentHitPoints') return currentHp;
+      if (subKey === 'activeConditions') return conditions;
+      return undefined;
+    });
 }
 
 function stubNpcRuntime(currentHp, conditions = []) {
   getRuntimeValue.mockReset();
   getRuntimeValue
-    .mockReturnValueOnce([])                        // activeBuffs (line 113)
-    .mockReturnValueOnce(undefined)                 // arcaneWardActive (line 170)
-    .mockReturnValueOnce(currentHp)                 // currentHitPoints (line 194)
-    .mockReturnValueOnce([])                        // activeBuffs for Warding Bond (line 235)
-    .mockReturnValueOnce(conditions);               // activeConditions (line 289)
+    .mockImplementation((key, subKey) => {
+      if (subKey === 'activeBuffs') return [];
+      if (subKey === 'arcaneWardActive') return undefined;
+      if (subKey === 'arcaneWardHp') return 0;
+      if (subKey === 'lastMetamagicDamage') return undefined;
+      if (subKey === 'currentHitPoints') return currentHp;
+      if (subKey === 'activeConditions') return conditions;
+      return undefined;
+    });
 }
 
 // ── Tests ───────────────────────────────────────────────────────

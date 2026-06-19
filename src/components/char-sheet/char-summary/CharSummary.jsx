@@ -181,6 +181,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let flySpeed = null;
     let swimSpeed = null;
     let hasteAcBonus = 0;
+    let shieldAcBonus = 0;
     let mageArmorActive = false;
     let iceWalkActive = false;
     let acrobaticMovementActive = false;
@@ -196,6 +197,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
         if (buff.effect === 'speed_boost' && buff.speedBonus) buffSpeedBonus += buff.speedBonus;
         if (buff.effect === 'large_form') buffSpeedBonus += 10;
         if (buff.effect === 'mage_armor') mageArmorActive = true;
+        if (buff.effect === 'shield') shieldAcBonus = 5;
         if (buff.effect === 'ice_walk') iceWalkActive = true;
         if (buff.effect === 'glistening_flight') { flySpeed = speed; glisteningFlightHover = true; }
         if (buff.effect === 'dragon_wings') { flySpeed = buff.flySpeed || 60; dragonWingsHover = true; }
@@ -285,7 +287,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
             </div>
             <div className='summaryGrid'>
                 <div>
-                    <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? (playerStats.armorClass + hasteAcBonus + (conditionEffects?.wardingBondAcBonus || 0) - (conditionEffects?.acPenalty || 0))}{(hasteAcBonus > 0 || mageArmorActive) && <span className="aura-source" title={mageArmorActive ? "From Mage Armor" : undefined}>{hasteAcBonus > 0 && ` (+${hasteAcBonus} from Haste)`}{mageArmorActive && ' (+3 from Mage Armor)'}</span>}{(conditionEffects?.wardingBondAcBonus || 0) > 0 && <span className="aura-source" title="From Warding Bond"> (+{conditionEffects.wardingBondAcBonus} from Warding Bond)</span>}{(conditionEffects?.acPenalty || 0) > 0 && <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{conditionEffects.acPenalty} from Slow)</span>}</div>
+                    <div className='clickable' onClick={showArmorClassFormulaPopup}><b>Armor Class: </b>{circleFormsACOverride ?? (playerStats.armorClass + hasteAcBonus + shieldAcBonus + (conditionEffects?.wardingBondAcBonus || 0) - (conditionEffects?.acPenalty || 0))}{(hasteAcBonus > 0 || mageArmorActive || shieldAcBonus > 0) && <span className="aura-source" title={mageArmorActive ? "From Mage Armor" : undefined}>{hasteAcBonus > 0 && ` (+${hasteAcBonus} from Haste)`}{mageArmorActive && ' (+3 from Mage Armor)'}</span>}{shieldAcBonus > 0 && <span className="aura-source" title="From Shield"> (+5 from Shield)</span>}{(conditionEffects?.wardingBondAcBonus || 0) > 0 && <span className="aura-source" title="From Warding Bond"> (+{conditionEffects.wardingBondAcBonus} from Warding Bond)</span>}{(conditionEffects?.acPenalty || 0) > 0 && <span className="stat--penalized" title="Slow spell penalty"> ({'−'}{conditionEffects.acPenalty} from Slow)</span>}</div>
                     <CharHitPoints playerStats={playerStats} campaignName={campaignName}></CharHitPoints>
                       <b>Speed: </b><span className={exhaustionLevel > 0 || conditionEffects?.speedZero ? 'stat--penalized' : ''}>{totalSpeedWithBuff}{playerStats.climbSpeed ? `, climb ${playerStats.climbSpeed}` : ''}{playerStats.swimSpeed ? `, swim ${playerStats.swimSpeed}` : ''}{swimSpeed !== null ? `, swim ${swimSpeed}` : ''}{flySpeed !== null ? `, fly ${flySpeed + auraSpeedBonus}${(glisteningFlightHover || dragonWingsHover) ? ' (hover)' : ''}` : ''}{iceWalkActive ? ', ice walk' : ''}{acrobaticMovementActive ? ', acrobatic movement' : ''}</span> ft.{auraSpeedBonus > 0 && auraSpeedSource && <span className="aura-source" title={`From ${auraSpeedSource}'s Aura of Alacrity`}> (+{auraSpeedBonus})</span>}<br />
                     <CharGold playerStats={playerStats} campaignName={campaignName}></CharGold>

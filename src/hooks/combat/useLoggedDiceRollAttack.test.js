@@ -298,7 +298,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             getShieldAcBonus.mockReturnValue(5);
             const fn = createFn();
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-            expect(getShieldAcBonus).toHaveBeenCalledWith('TestFighter', 'test-campaign');
+            expect(getShieldAcBonus).toHaveBeenCalledWith('Goblin', 'test-campaign');
         });
 
         it('adds shield of faith AC bonus when active', async () => {
@@ -306,7 +306,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             getShieldOfFaithAcBonus.mockReturnValue(2);
             const fn = createFn();
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-            expect(getShieldOfFaithAcBonus).toHaveBeenCalledWith('TestFighter', 'test-campaign');
+            expect(getShieldOfFaithAcBonus).toHaveBeenCalledWith('Goblin', 'test-campaign');
         });
     });
 

@@ -15,16 +15,24 @@ import { getDistanceFeet } from './rangeValidation.js';
  * Save the last damage event under the target's key so reaction features
  * (e.g., Superior Hunter's Defense) can find the most recent damage the
  * target received via getLastDamageEvent(targetName).
+ *
+ * Accumulates primary and secondary damage from a single NPC action into
+ * a single event with combined rawDamage and all damageTypes.
  */
 function saveDamageEventForTarget(targetName, rawDamage, damageTypes, campaignName) {
     if (!targetName || !campaignName) return;
-    const damageType = damageTypes && damageTypes.length > 0 ? damageTypes[0] : 'untyped';
+    const existing = getRuntimeValue(targetName, 'lastMetamagicDamage', campaignName);
+    let combinedDamage = rawDamage;
+    let combinedTypes = [...damageTypes];
+    if (existing && existing.rawDamage) {
+        combinedDamage += existing.rawDamage;
+        combinedTypes = [...(existing.damageTypes || []), ...damageTypes];
+    }
     setRuntimeValue(targetName, 'lastMetamagicDamage', {
         targetName,
-        rawDamage,
-        damageType,
-        damageTypes,
-        timestamp: Date.now(),
+        rawDamage: combinedDamage,
+        damageType: combinedTypes[0],
+        damageTypes: combinedTypes,
     }, campaignName);
 }
 
