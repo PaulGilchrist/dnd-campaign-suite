@@ -99,6 +99,22 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
             }
 
+            // Apply Roving / Climb Speed passive: climb speed equal to walking speed
+            if (!stats.climbSpeed) {
+                const climbSpeedPassives = (stats.automation?.passives || []).filter(p => p.effect === 'climb_speed');
+                if (climbSpeedPassives.length > 0) {
+                    stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
+                }
+            }
+
+            // Apply Roving / Swim Speed passive: swim speed equal to walking speed
+            if (!stats.swimSpeed) {
+                const swimSpeedPassives = (stats.automation?.passives || []).filter(p => p.effect === 'swim_speed');
+                if (swimSpeedPassives.length > 0) {
+                    stats.swimSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
+                }
+            }
+
             // Expose Athlete Hop Up flag: stand from prone with only 5 ft of movement
             const athleteHopUpPassive = (stats.automation?.passives || []).find(p => p.effect === 'stand_from_prone');
             if (athleteHopUpPassive) {

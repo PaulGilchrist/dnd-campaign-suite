@@ -7,52 +7,54 @@
       "name": "Strength",
       "baseScore": 8,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Dexterity",
       "baseScore": 13,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Constitution",
-      "baseScore": 14,
+      "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Intelligence",
       "baseScore": 10,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 0,
+      "miscIncrease": 0
     },
     {
       "name": "Wisdom",
       "baseScore": 15,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 12,
+      "baseScore": 11,
       "featIncrease": 0,
-      "miscIncrease": 0,
-      "backgroundIncrease": 0
+      "backgroundIncrease": 1,
+      "miscIncrease": 0
     }
   ],
-  "background": "",
+  "background": "Hermit",
   "class": {
     "name": "Druid",
     "subclass": {
-      "name": "Land",
-      "type": "Forest"
-    }
+      "name": "Circle of the Moon",
+      "type": ""
+    },
+    "divineOrder": "",
+    "primalOrder": "Magician"
   },
   "expertSkills": [],
   "feats": [],

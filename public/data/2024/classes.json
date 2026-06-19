@@ -7436,7 +7436,28 @@
             "name": "Roving",
             "description": "Your Speed increases by 10 feet while you aren't wearing Heavy armor. You also have a Climb Speed and a Swim Speed equal to your Speed.",
             "level": 6,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": [
+              {
+                "type": "passive_buff",
+                "effect": "speed_bonus",
+                "bonusExpression": "10",
+                "condition": "no_heavy_armor",
+                "casting_time": "passive"
+              },
+              {
+                "type": "passive_buff",
+                "effect": "climb_speed",
+                "bonusExpression": "speed",
+                "casting_time": "passive"
+              },
+              {
+                "type": "passive_buff",
+                "effect": "swim_speed",
+                "bonusExpression": "speed",
+                "casting_time": "passive"
+              }
+            ]
           }
         ],
         "spellcasting": {
