@@ -513,7 +513,8 @@ describe('silenceService', () => {
         it('returns null when activeBuffs is null', () => {
             getRuntimeValue.mockReturnValue(null);
 
-            expect(() => getSilenceSource('Target', 'TestCampaign')).toThrow('Expected array, got null');
+            const result = getSilenceSource('Target', 'TestCampaign');
+            expect(result).toBeNull();
         });
 
         it('returns null when silence buff has no sourceCharacter', () => {
@@ -1026,7 +1027,8 @@ describe('silenceService', () => {
         it('returns empty array when activeBuffs is null', () => {
             getRuntimeValue.mockReturnValue(null);
 
-            expect(() => getSilenceDeafenedSources('Target', 'TestCampaign')).toThrow('Expected array, got null');
+            const result = getSilenceDeafenedSources('Target', 'TestCampaign');
+            expect(result).toEqual([]);
         });
 
         it('returns empty array when activeBuffs is empty', () => {
