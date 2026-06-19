@@ -31,7 +31,7 @@ import { executeSpellCast } from '../../../services/rules/spells/spellCastServic
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rules/combat/rangeValidation.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffs/buffService.js';
-import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
@@ -106,19 +106,6 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                         note: 'Overchannel self-damage (ignores resistance/immunity)',
                     }).catch((e) => { console.error("[CharSpells] Error:", e); throw e; });
                 }
-                const usesKey = '_Overchannel_useCount';
-                const restKey = '_Overchannel_restTimestamp';
-                const now = Date.now();
-                const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
-                let currentUses;
-                if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-                    currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-                } else if (!lastRestTimestamp) {
-                    currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-                } else {
-                    currentUses = 0;
-                }
-                setRuntimeValue(playerStats.name, usesKey, currentUses + 1, campaignName);
             }
             }
             // Remarkable Athlete: after critical hit, enable movement without opportunity attacks

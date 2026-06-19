@@ -53,7 +53,9 @@ export function addStorageChangeListener(characterKey, listener) {
 
 export function getRuntimeValue(characterKey, propertyName) {
   const store = getStore(characterKey);
-  return store.has(propertyName) ? store.get(propertyName) : null;
+  const hasKey = store.has(propertyName);
+  const value = hasKey ? store.get(propertyName) : null;
+  return value;
 }
 
 export function setRuntimeValue(characterKey, propertyName, value, campaignName) {

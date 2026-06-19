@@ -1,6 +1,6 @@
 import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
-const OVERCHANNEL_KEY = '_Overchannel_useCount';
+const OVERCHANNEL_KEY = 'Overchannel_useCount';
 
 export async function handle(action, playerStats, _campaignName, _mapName) {
     const usesKey = OVERCHANNEL_KEY;
@@ -8,22 +8,24 @@ export async function handle(action, playerStats, _campaignName, _mapName) {
     const currentUseCount = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
 
     const nextUseCount = currentUseCount + 1;
+    const useLabel = nextUseCount === 1 ? 'First use' : `Use #${nextUseCount}`;
+    const damageNote = nextUseCount === 1 ? 'no adverse effect' : `take ${nextUseCount * 2}d12 necrotic damage`;
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `${action.name}: You can deal maximum damage with a Wizard spell (slot levels 1-5) on the turn you cast it. First use: no adverse effect. Subsequent uses before Long Rest: take necrotic damage. Current use: ${nextUseCount}.`,
+            description: `${action.name}: You can deal maximum damage with a Wizard spell (slot levels 1-5) on the turn you cast it. ${useLabel}: ${damageNote}.`,
             automation: action.automation,
         },
     };
 }
 
-export function getOverchannelUses(playerStats, _campaignName) {
+export function getOverchannelUses(playerStats, campaignName) {
     const usesKey = OVERCHANNEL_KEY;
-
-    return Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
+    const value = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
+    return value;
 }
 
 export function hasOverchannelRemaining(_playerStats, _campaignName) {
@@ -32,9 +34,7 @@ export function hasOverchannelRemaining(_playerStats, _campaignName) {
 
 export async function consumeOverchannelUse(playerStats, campaignName) {
     const usesKey = OVERCHANNEL_KEY;
-
     const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
-
     await setRuntimeValue(playerStats.name, usesKey, currentUses + 1, campaignName);
     return true;
 }

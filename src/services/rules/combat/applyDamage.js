@@ -598,7 +598,9 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
 
 function checkUndyingSentinel(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
-    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) { console.error('[applyDamage] allFeatures is not an array'); throw new Error('allFeatures must be an array'); }
+    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
+        return { intercepted: false };
+    }
     const allFeatures = rawAllFeatures;
     let hasUndyingSentinel = false;
 
@@ -676,7 +678,9 @@ function checkUndyingSentinel(creature, playerComputed, campaignName) {
 
 function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
-    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) { console.error('[applyDamage] allFeatures is not an array'); throw new Error('allFeatures must be an array'); }
+    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
+        return { intercepted: false };
+    }
     const allFeatures = rawAllFeatures;
     let hasBoonOfRecovery = false;
 
@@ -744,7 +748,9 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
 
 function checkRelentlessEndurance(creature, playerComputed, campaignName) {
     const rawAllFeatures = playerComputed?.allFeatures;
-    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) { console.error('[applyDamage] allFeatures is not an array'); throw new Error('allFeatures must be an array'); }
+    if (rawAllFeatures == null || !Array.isArray(rawAllFeatures)) {
+        return { intercepted: false };
+    }
     const allFeatures = rawAllFeatures;
     let hasRelentlessEndurance = false;
 

@@ -147,19 +147,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             note: 'Overchannel self-damage (ignores resistance/immunity)',
                         }).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
                     }
-                    const usesKey = '_Overchannel_useCount';
-                    const restKey = '_Overchannel_restTimestamp';
-                    const now = Date.now();
-                    const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
-                    let currentUses;
-                    if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-                        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-                    } else if (!lastRestTimestamp) {
-                        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
-                    } else {
-                        currentUses = 0;
-                    }
-                    await setRuntimeValue(playerStats.name, usesKey, currentUses + 1, campaignName);
                 }
             }
             // Remarkable Athlete: after critical hit, enable movement without opportunity attacks

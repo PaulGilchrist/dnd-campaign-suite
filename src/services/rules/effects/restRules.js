@@ -443,6 +443,9 @@ export async function applyLongRest(playerStats, campaignName) {
     setRuntimeValue(name, 'adrenalineRushUses', null, campaignName, true)
     setRuntimeValue(name, 'adrenalineRushRestTimestamp', null, campaignName, true)
 
+    // Reset Overchannel use count on long rest
+    setRuntimeValue(name, 'Overchannel_useCount', 0, campaignName, true)
+
     // Chef: Bolstering Treats crafted on Long Rest
     const hasBolsteringTreats = (playerStats.automation?.passives ?? []).some(
         p => p.type === 'temp_hp_buff' && p.name === 'Bolstering Treats'

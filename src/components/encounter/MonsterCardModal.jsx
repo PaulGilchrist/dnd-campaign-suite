@@ -64,7 +64,6 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     campaignName,
     {
       autoDamageRoll: (autoDamage, isCrit) => {
-        console.log('[MonsterCardModal] autoDamageRoll called:', { autoDamage, isCrit, formula: autoDamage?.formula, name: autoDamage?.name });
         const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
         if (result) {
           const context = {

@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js'
-import { getOverchannelUses, getOverchannelNecroticDamage } from '../../../services/automation/handlers/class-wizard/overchannelHandler.js'
+import { getOverchannelNecroticDamage } from '../../../services/automation/handlers/class-wizard/overchannelHandler.js'
 
 function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
   const raw = getRuntimeValue(playerName, '_War_God_s_Blessing_freeCast');
@@ -115,17 +115,20 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     return firstAvailable ? String(firstAvailable.level) : String(upcastLevels[0]?.level || spell.level);
   });
 
-  const hasOverchannelPassive = playerStats?.automation?.passives?.some(p => p.type === 'overchannel');
-  const isOverchannelApplicable = hasOverchannelPassive && hasDamage && spell.level >= 1 && spell.level <= 5;
-  const [useOverchannel, setUseOverchannel] = useState(false);
-  const overchannelUseCount = useMemo(() => {
-    if (!isOverchannelApplicable) return 0;
-    return getOverchannelUses(playerStats.name, campaignName);
-  }, [isOverchannelApplicable, playerStats.name, campaignName]);
+   const hasOverchannelPassive = playerStats?.automation?.passives?.some(p => p.type === 'overchannel');
+   const isOverchannelApplicable = hasOverchannelPassive && hasDamage && spell.level >= 1 && spell.level <= 5;
+   const [useOverchannel, setUseOverchannel] = useState(false);
+    const overchannelUseTrigger = useRuntimeValue(playerStats.name, 'Overchannel_useCount', campaignName);
+    const overchannelUseCount = useMemo(() => {
+      if (!isOverchannelApplicable) return 0;
+      const value = overchannelUseTrigger ?? 0;
+      return value;
+   }, [isOverchannelApplicable, playerStats.name, campaignName, overchannelUseTrigger]); // eslint-disable-line react-hooks/exhaustive-deps
   const nextOverchannelUse = overchannelUseCount + 1;
   const overchannelDamage = useMemo(() => {
     if (!isOverchannelApplicable || !useOverchannel) return null;
-    return getOverchannelNecroticDamage(spell.level, nextOverchannelUse);
+    const damage = getOverchannelNecroticDamage(spell.level, nextOverchannelUse);
+    return damage;
   }, [isOverchannelApplicable, useOverchannel, spell.level, nextOverchannelUse]);
 
   const cantripAutoLevel = useMemo(() => {
@@ -332,7 +335,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
               />
               <span>Overchannel (Maximize Damage)&nbsp;</span>
             </label>
-            {overchannelDamage && overchannelDamage > 0 && (
+            {overchannelDamage && overchannelDamage.expression && (
               <div className="spell-detail-overchannel-warning">
                 <i className="fa-solid fa-skull"></i> Warning: Using Overchannel this time (use #{nextOverchannelUse}) will deal <strong>{overchannelDamage.expression}</strong> Necrotic damage to you (ignores resistance/immunity). First use deals no damage.
               </div>

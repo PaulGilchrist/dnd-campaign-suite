@@ -8,6 +8,7 @@ import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(),
+  useRuntimeValue: vi.fn(() => null),
 }));
 
 vi.mock('../../../services/combat/buffs/buffService.js', () => ({

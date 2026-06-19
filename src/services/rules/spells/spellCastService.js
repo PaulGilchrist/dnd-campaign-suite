@@ -610,12 +610,13 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         const spellLevel = metaCtx?.slotLevel || spell.level;
         const hasDamage = !!spell.damage;
         const isSlotLevelValid = spellLevel >= 1 && spellLevel <= 5;
-        const usesKey = '_Overchannel_useCount';
+        const usesKey = 'Overchannel_useCount';
         const currentUseCount = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
         if (hasDamage && isSlotLevelValid && metaCtx?.overchannel) {
             overchannelActive = true;
             overchannelUseCount = currentUseCount + 1;
             overchannelFormula = `${empEvocFormula}[Overchannel Maximize]`;
+            setRuntimeValue(playerStats.name, usesKey, overchannelUseCount, campaignName);
         }
     }
 

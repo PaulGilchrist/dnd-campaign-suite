@@ -21,34 +21,31 @@ import {
 } from './useLoggedDiceRollUtils.js';
 
 function handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters) {
-    if (context?.overchannelActive && context?.overchannelUseCount > 1) {
-        const overchannelSpellLevel = context?.overchannelSpellLevel || 1;
-        const dicePerLevel = 2 + (context.overchannelUseCount - 1);
-        const totalDice = dicePerLevel * overchannelSpellLevel;
-        const necroticFormula = `${totalDice}d12`;
-        const necroticResult = rollExpression(necroticFormula);
-        if (necroticResult) {
-            const casterCombatSummary = getCombatSummary(campaignName);
-            const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, characters, true, characterName);
-            logEntry({
-                type: 'roll',
-                characterName,
-                rollType: 'overchannel-damage',
-                name: 'Overchannel',
-                formula: necroticFormula,
-                rolls: necroticResult.rolls,
-                total: necroticResult.total,
-                modifier: necroticResult.modifier,
-                damageType: 'Necrotic',
-                targetName: characterName,
-                finalDamage: casterApplyResult?.finalDamage,
-                note: 'Overchannel self-damage (ignores resistance/immunity)',
-            });
-        }
-        const usesKey = '_Overchannel_useCount';
-        const currentUses = Number(getRuntimeValue(characterName, usesKey) ?? 0);
-        if (currentUses >= 0) {
-            setRuntimeValue(characterName, usesKey, currentUses + 1, campaignName);
+    if (context?.overchannelActive) {
+        if (context?.overchannelUseCount > 1) {
+            const overchannelSpellLevel = context?.overchannelSpellLevel || 1;
+            const dicePerLevel = 2 + (context.overchannelUseCount - 1);
+            const totalDice = dicePerLevel * overchannelSpellLevel;
+            const necroticFormula = `${totalDice}d12`;
+            const necroticResult = rollExpression(necroticFormula);
+            if (necroticResult) {
+                const casterCombatSummary = getCombatSummary(campaignName);
+                const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, characters, true, characterName);
+                logEntry({
+                    type: 'roll',
+                    characterName,
+                    rollType: 'overchannel-damage',
+                    name: 'Overchannel',
+                    formula: necroticFormula,
+                    rolls: necroticResult.rolls,
+                    total: necroticResult.total,
+                    modifier: necroticResult.modifier,
+                    damageType: 'Necrotic',
+                    targetName: characterName,
+                    finalDamage: casterApplyResult?.finalDamage ?? necroticResult.total,
+                    note: 'Overchannel self-damage (ignores resistance/immunity)',
+                });
+            }
         }
     }
 }
