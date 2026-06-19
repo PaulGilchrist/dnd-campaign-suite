@@ -45,6 +45,7 @@ html {
     --color-body: #eee;
     --color-header: #48A948;
     --color-header-inner: #fff;
+    --color-section-heading: #6fd66f;
     --color-text: #eee;
     --color-text-secondary: #aaa;
     --color-text-muted: #666;
@@ -207,6 +208,16 @@ input[type="checkbox"] {
     color: var(--color-header);
     font-size: 1.05em;
     font-weight: 800;
+}
+
+.sectionHeader {
+    color: var(--color-section-heading);
+}
+
+@media (prefers-color-scheme: light) {
+    .sectionHeader {
+        color: var(--color-section-heading-light);
+    }
 }
 
 .text-muted {
@@ -393,6 +404,7 @@ th {
         --color-body: #000;
         --color-header: #070;
         --color-header-inner: #070;
+        --color-section-heading: #040;
         --color-text: #222;
         --color-text-secondary: #444;
         --color-text-muted: #555;
