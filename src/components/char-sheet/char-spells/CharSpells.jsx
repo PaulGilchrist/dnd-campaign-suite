@@ -137,8 +137,6 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const [selectedSpell, setSelectedSpell] = React.useState(null);
     const isSorcerer = playerStats.class?.name === 'Sorcerer';
     const [pendingSimpleMetamagic, setPendingSimpleMetamagic] = React.useState(null);
-    const [pendingMagicMissile, setPendingMagicMissile] = React.useState(null);
-    const [pendingMagicMissileMeta, setPendingMagicMissileMeta] = React.useState(null);
 
     const handleSimpleConfirm = React.useCallback((result) => {
       const pending = pendingSimpleMetamagic;
@@ -190,64 +188,14 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         return getTargetFromAttacker(cs, playerStats.name);
     }, [playerStats.name, campaignName]);
 
-    const handleMagicMissileConfirm = React.useCallback((result) => {
-      const pending = pendingMagicMissile;
-      const meta = pendingMagicMissileMeta;
-      setPendingMagicMissile(null);
-      setPendingMagicMissileMeta(null);
-      if (!pending || !meta) return;
-
-      const { spell } = pending;
-      const distribution = result.distribution;
-
-      const hasAnyTargets = Object.values(distribution).some(v => v > 0);
-      if (!hasAnyTargets) return;
-
-      if (meta.metaCtx) {
-        const { metaCtx, attackerPos, targetPos } = meta;
-        const finalMetaCtx = { ...metaCtx, magicMissileDistribution: distribution };
-        executeSpellCast(spell, finalMetaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos, targetPos, campaignName, mapName, characters });
-      } else {
-        const slotLevel = spell.level || 1;
-        const finalMetaCtx = { magicMissileDistribution: distribution, slotLevel };
-        executeSpellCast(spell, finalMetaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters });
-      }
-    }, [pendingMagicMissile, pendingMagicMissileMeta, rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters]);
-
-    const handleMagicMissileSkip = React.useCallback(() => {
-      setPendingMagicMissile(null);
-      setPendingMagicMissileMeta(null);
-    }, []);
-
     const cachedCastPosRef = React.useRef(null);
 
     const castAction = React.useCallback((spell, metaCtx) => {
-      const isMM = spell.name && spell.name.toLowerCase() === 'magic missile';
-      if (isMM) {
-        const cs = getCombatSummary(campaignName);
-        const slotLevel = metaCtx?.slotLevel || spell.level;
-        const numMissiles = 3 + (slotLevel - 1);
-        const creatureTargets = cs?.creatures
-          ?.filter(c => c.name !== playerStats.name)
-          .map(c => c.name) || [];
-        if (creatureTargets.length === 0) {
-          return;
-        }
-        setPendingMagicMissile({
-          spell,
-          totalMissiles: numMissiles,
-          missileDamage: '1d4 + 1',
-          creatureTargets,
-        });
-        setPendingMagicMissileMeta({ spell, metaCtx, attackerPos: cachedCastPosRef.current?.attackerPos, targetPos: cachedCastPosRef.current?.targetPos });
-        cachedCastPosRef.current = null;
-        return;
-      }
       const pos = cachedCastPosRef.current;
       executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, campaignName, mapName, characters });
       cachedCastPosRef.current = null;
       }, [rollAttack, rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters]);
-    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingShieldOfFaith, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
+    const { pendingMetamagic, pendingMultiTarget, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, pendingAid, handleAidConfirm, handleAidSkip, pendingHeroesFeast, handleHeroesFeastConfirm, handleHeroesFeastSkip, pendingGreaterRestoration, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, pendingLesserRestoration, handleLesserRestorationConfirm, handleLesserRestorationSkip, pendingMageArmor, handleMageArmorConfirm, handleMageArmorSkip, pendingShieldOfFaith, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, pendingProtectionFromEnergy, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, pendingResistance, handleResistanceConfirm, handleResistanceSkip, pendingRemoveCurse, handleRemoveCurseConfirm, handleRemoveCurseSkip, pendingMagicMissile, handleMagicMissileConfirm, handleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, castAction);
     const { pendingUpcast, buildUpcastLevels, gateUpcast, handleUpcastConfirm, handleUpcastCancel, getCantripAutoLevel } = useSpellUpcastFlow(playerStats, campaignName);
 
     const resolveSpellPositions = React.useCallback(async () => {
@@ -286,30 +234,8 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 
       await resolveSpellPositions();
 
-      const isMM = spell?.name && spell.name.toLowerCase() === 'magic missile';
-      if (isMM) {
-        const freshCombat = await getCombatContext(campaignName);
-        const creatureTargets = freshCombat?.creatures
-          ?.filter(c => c.name !== playerStats.name)
-          .map(c => c.name) || [];
-        if (creatureTargets.length === 0) {
-          return;
-        }
-        const slotLevel = spell.level || 1;
-        const numMissiles = 3 + (slotLevel - 1);
-        setPendingMagicMissile({
-          spell,
-          totalMissiles: numMissiles,
-          missileDamage: '1d4 + 1',
-          creatureTargets,
-        });
-        setPendingMagicMissileMeta({ spell, metaCtx: {}, attackerPos: cachedCastPosRef.current?.attackerPos, targetPos: cachedCastPosRef.current?.targetPos });
-        cachedCastPosRef.current = null;
-        return;
-      }
-
       gateMetamagic(spell);
-    }, [gateMetamagic, resolveSpellPositions, campaignName, playerStats.name]);
+    }, [gateMetamagic, resolveSpellPositions]);
 
     const executeDamageRoll = (formula, spellName, spell) => {
         const wasCrit = dicePopupHtml?.isCrit;
@@ -381,30 +307,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         finalFormula = finalFormula.replace('1d6', '1d10');
       }
 
-      const isMM = spellName && spellName.toLowerCase() === 'magic missile';
-
-      if (isMM) {
+      if (spellName && spellName.toLowerCase() === 'magic missile') {
         const mmAfterUpcast = (modifiedSpell) => {
-          const slotLevel = modifiedSpell.level || spell.level;
-          const numMissiles = 3 + (slotLevel - 1);
-          const cs = getCombatSummary(campaignName);
-          const creatureTargets = cs?.creatures
-            ?.filter(c => c.name !== playerStats.name)
-            .map(c => c.name) || [];
-          if (creatureTargets.length === 0) {
-            return;
-          }
-          setPendingMagicMissile({
-            spell: modifiedSpell,
-            totalMissiles: numMissiles,
-            missileDamage: '1d4 + 1',
-            creatureTargets,
-          });
-          setPendingMagicMissileMeta({
-            spell: modifiedSpell,
-            formula,
-            getTargetInfo,
-          });
+          gateMetamagic(modifiedSpell);
         };
 
         if (gateUpcast(spell, mmAfterUpcast, false)) {

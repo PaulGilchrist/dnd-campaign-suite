@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
 import utils from '../../ui/utils.js';
 import storage from '../../ui/storage.js';
@@ -660,16 +660,12 @@ export function clearAllExpirationEffects(characterName, campaignName) {
     setRuntimeValue(characterName, KEY, [], campaignName);
 
      // --- Scan all runtime stores for "to me" entries ---
-    const allKeys = Object.keys(localStorage);
+    const allKeys = getAllStoreKeys();
     for (const key of allKeys) {
-        if (!key || key === 'combatSummary' || key === 'activeCreatureName') continue;
         if (key.toLowerCase() === charLower) continue;
 
         const list = getRuntimeValue(key, KEY);
-        if (!Array.isArray(list)) {
-            console.error('expirations: expected pendingExpirations to be an array for', key);
-            throw new Error('Missing array: pendingExpirations for ' + key);
-        }
+        if (!Array.isArray(list)) continue;
         if (!list.length) continue;
 
         let kept = [];

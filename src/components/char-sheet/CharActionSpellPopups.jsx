@@ -3,7 +3,10 @@ import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import AidTargetPopup from './popups/AidTargetPopup.jsx'
 import GreaterRestorationPopup from './popups/GreaterRestorationPopup.jsx'
 import RemoveCursePopup from './popups/RemoveCursePopup.jsx'
+import MagicMissileTargetPopup from './popups/MagicMissileTargetPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
+import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
+import { getCombatSummary } from '../../services/encounters/combatData.js'
 
 export default function CharActionSpellPopups({
     playerStats,
@@ -24,6 +27,9 @@ export default function CharActionSpellPopups({
     actionPendingRemoveCurse,
     actionHandleRemoveCurseConfirm,
     actionHandleRemoveCurseSkip,
+    actionPendingMagicMissile,
+    actionHandleMagicMissileConfirm,
+    actionHandleMagicMissileSkip,
     pendingActionMetamagic,
     handleActionMetamagicConfirm,
     handleActionMetamagicSkip,
@@ -88,6 +94,23 @@ export default function CharActionSpellPopups({
                     onSkip={actionHandleRemoveCurseSkip}
                 />
             )}
+            {actionPendingMagicMissile && (() => {
+              const { spell, totalMissiles, missileDamage, creatureTargets } = actionPendingMagicMissile;
+              const currentTargetName = getTargetFromAttacker(getCombatSummary(campaignName), playerStats.name)?.name;
+              return (
+                <MagicMissileTargetPopup
+                  spell={{ name: spell.name, level: spell.level || 0 }}
+                  playerStats={playerStats}
+                  campaignName={campaignName}
+                  totalMissiles={totalMissiles}
+                  missileDamage={missileDamage}
+                  creatureTargets={creatureTargets}
+                  currentTargetName={currentTargetName}
+                  onConfirm={actionHandleMagicMissileConfirm}
+                  onSkip={actionHandleMagicMissileSkip}
+                />
+              );
+            })()}
             {pendingActionMetamagic && (
                 <MetamagicPopup
                     spell={{ name: pendingActionMetamagic.spellName, level: pendingActionMetamagic.spellLevel || 0 }}

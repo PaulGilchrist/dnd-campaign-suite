@@ -36,6 +36,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingProtectionFromEnergy, setPendingProtectionFromEnergy] = React.useState(null);
   const [pendingResistance, setPendingResistance] = React.useState(null);
   const [pendingRemoveCurse, setPendingRemoveCurse] = React.useState(null);
+  const [pendingMagicMissile, setPendingMagicMissile] = React.useState(null);
 
   const gateMetamagic = React.useCallback((spell) => {
     const isGreaterRestoration = (spell.name || '').toLowerCase() === 'greater restoration';
@@ -209,6 +210,25 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
           range: spell.range || 'Touch',
           creatureTargets,
           damageTypes: ['Acid', 'Bludgeoning', 'Cold', 'Fire', 'Lightning', 'Necrotic', 'Piercing', 'Poison', 'Radiant', 'Slashing', 'Thunder'],
+        });
+        return;
+      }
+    }
+
+    const isMagicMissile = (spell.name || '').toLowerCase() === 'magic missile';
+    if (isMagicMissile) {
+      const cs = getCombatSummary(campaignName);
+      const creatureTargets = cs?.creatures
+        ?.filter(c => c.name !== playerStats?.name)
+        .map(c => c.name) || [];
+      if (creatureTargets.length > 0) {
+        const slotLevel = spell.level || 1;
+        const totalMissiles = 3 + (slotLevel - 1);
+        setPendingMagicMissile({
+          spell,
+          totalMissiles,
+          missileDamage: '1d4 + 1',
+          creatureTargets,
         });
         return;
       }
@@ -795,5 +815,25 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
   }, [pendingShieldOfFaith, playerStats.name, campaignName]);
 
-  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, pendingShieldOfFaith, pendingProtectionFromEnergy, pendingResistance, pendingRemoveCurse, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, handleResistanceConfirm, handleResistanceSkip, handleRemoveCurseConfirm, handleRemoveCurseSkip };
+  const handleMagicMissileConfirm = React.useCallback((result) => {
+    const pending = pendingMagicMissile;
+    setPendingMagicMissile(null);
+    if (!pending) return;
+
+    const { spell } = pending;
+    const distribution = result.distribution;
+
+    const hasAnyTargets = Object.values(distribution).some(v => v > 0);
+    if (!hasAnyTargets) return;
+
+    const slotLevel = spell.level || 1;
+    const finalMetaCtx = { magicMissileDistribution: distribution, slotLevel };
+    onExecute(spell, finalMetaCtx);
+  }, [pendingMagicMissile, onExecute]);
+
+  const handleMagicMissileSkip = React.useCallback(() => {
+    setPendingMagicMissile(null);
+  }, []);
+
+  return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, pendingShieldOfFaith, pendingProtectionFromEnergy, pendingResistance, pendingRemoveCurse, pendingMagicMissile, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, handleResistanceConfirm, handleResistanceSkip, handleRemoveCurseConfirm, handleRemoveCurseSkip, handleMagicMissileConfirm, handleMagicMissileSkip };
 }

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../ui/utils.js', () => ({
@@ -24,7 +25,7 @@ vi.mock('../../encounters/combatData.js', () => ({
 }));
 
 import { clearAllExpirationEffects } from './expirations.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, getAllStoreKeys } from '../../../hooks/runtime/useRuntimeState.js';
 import utils from '../../ui/utils.js';
 
 const KEY = 'pendingExpirations';
@@ -41,7 +42,8 @@ function stubUtilsNameIdentity() {
 
 function setupLocalStorageScan(keysMap, myPendingList) {
   const lowerChar = Object.keys(keysMap);
-  for (const key of Object.keys(keysMap)) {
+  getAllStoreKeys.mockReturnValue(lowerChar);
+  for (const key of lowerChar) {
      Object.defineProperty(localStorage, key, { value: JSON.stringify({}), enumerable: true, writable: true, configurable: true });
    }
 
@@ -133,23 +135,8 @@ describe('clearAllExpirationEffects', () => {
     expect(keepCall).toBeTruthy();
    });
 
-  it('skips combatSummary and activeCreatureName keys in localStorage scan', () => {
-    localStorage.setItem('combatSummary', JSON.stringify({}));
-    localStorage.setItem('activeCreatureName', JSON.stringify({}));
-
-    getRuntimeValue.mockReturnValue([]);
-
-    clearAllExpirationEffects('Goblin', 'MyCampaign');
-
-    const allCalls = getRuntimeValue.mock.calls.filter((c) => c[1] === KEY);
-    const skippedNames = ['combatSummary', 'activeCreatureName'];
-    for (const name of skippedNames) {
-      expect(allCalls.find((c) => c[0] === name)).toBeUndefined();
-     }
-   });
-
-  it('skips own character key in localStorage scan', () => {
-    localStorage.setItem('goblin', JSON.stringify({}));
+  it('skips own character key in store scan', () => {
+    getAllStoreKeys.mockReturnValue(['goblin']);
 
     getRuntimeValue.mockReturnValue([]);
 
@@ -159,7 +146,7 @@ describe('clearAllExpirationEffects', () => {
     expect(allCalls.find((c) => c[0] === 'goblin')).toBeUndefined();
    });
 
-  it('skips empty runtime list in localStorage entries', () => {
+  it('skips empty runtime list in store entries', () => {
     setupLocalStorageScan({ orc: [] }, []);
 
     clearAllExpirationEffects('Goblin', 'MyCampaign');

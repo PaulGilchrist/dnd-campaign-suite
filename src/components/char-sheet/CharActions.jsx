@@ -677,7 +677,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         executeSpellCast(spell, metaCtx, { rollAttack, rollDamage, playerStats, getTargetInfo, attackerPos: pos?.attackerPos, targetPos: pos?.targetPos, featEffects: featRangeEffects, campaignName, mapName, characters });
         cachedActionCastPosRef.current = null;
     }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName, characters]);
-    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
+    const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
     const handleActionSpellCast = React.useCallback(async (spell) => {
         setSelectedActionSpell(null);
         if (mapName) {
@@ -917,6 +917,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     actionPendingRemoveCurse={actionPendingRemoveCurse}
                     actionHandleRemoveCurseConfirm={actionHandleRemoveCurseConfirm}
                     actionHandleRemoveCurseSkip={actionHandleRemoveCurseSkip}
+                    actionPendingMagicMissile={actionPendingMagicMissile}
+                    actionHandleMagicMissileConfirm={actionHandleMagicMissileConfirm}
+                    actionHandleMagicMissileSkip={actionHandleMagicMissileSkip}
                     pendingActionMetamagic={pendingActionMetamagic}
                     handleActionMetamagicConfirm={handleActionMetamagicConfirm}
                     handleActionMetamagicSkip={handleActionMetamagicSkip}

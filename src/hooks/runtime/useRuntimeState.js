@@ -171,3 +171,7 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
 export function clearRuntimeState(characterKey) {
   stores.delete(characterKey);
 }
+
+export function getAllStoreKeys() {
+  return Array.from(stores.keys());
+}
