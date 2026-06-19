@@ -55,11 +55,9 @@ function makeAction(overrides = {}) {
 
 describe('spellThiefHandler', () => {
     describe('uses remaining', () => {
-        it('returns popup when no uses remaining after long rest', async () => {
-            const recentRest = Date.now() - 3600000; // 1 hour ago
+        it('returns popup when no uses remaining', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'spellthiefUses') return 0;
-                if (key === 'spellthiefRestTimestamp') return recentRest;
                 return null;
             });
 
@@ -69,7 +67,7 @@ describe('spellThiefHandler', () => {
             expect(result.payload.description).toContain('no uses remaining');
         });
 
-        it('allows use when no rest timestamp exists (first use)', async () => {
+        it('allows use when has 1 use remaining', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'spellthiefUses') return 1;
                 return null;
@@ -83,27 +81,9 @@ describe('spellThiefHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('allows use when long rest has passed (> 24 hours)', async () => {
-            const oldRest = Date.now() - 172800000; // 2 days ago
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'spellthiefUses') return 0;
-                if (key === 'spellthiefRestTimestamp') return oldRest;
-                return null;
-            });
-
-            buildSaveDc.mockReturnValue(13);
-            createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-        });
-
-        it('reads stored uses when within long rest window', async () => {
-            const recentRest = Date.now() - 3600000; // 1 hour ago
+        it('reads stored uses', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'spellthiefUses') return 2;
-                if (key === 'spellthiefRestTimestamp') return recentRest;
                 return null;
             });
 
@@ -112,14 +92,16 @@ describe('spellThiefHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(getRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'spellthiefRestTimestamp', 'test-campaign');
-            expect(getRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'spellthiefUses', 'test-campaign');
+            expect(getRuntimeValue).toHaveBeenCalledWith('FighterRogue', 'spellthiefUses');
         });
     });
 
     describe('save listener setup', () => {
         it('creates save listener with INT save type', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -133,7 +115,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('uses custom saveType from automation', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(15);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -146,7 +131,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('uses action targetName when provided', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -159,7 +147,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('falls back to playerName when no targetName', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -174,7 +165,10 @@ describe('spellThiefHandler', () => {
 
     describe('popup result', () => {
         it('returns popup with save DC info', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -189,7 +183,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('includes casterName and spellName in popup', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -200,7 +197,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('logs ability use', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -216,7 +216,10 @@ describe('spellThiefHandler', () => {
 
     describe('save result handling (simulated via event dispatch)', () => {
         it('decrements uses after save result event', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -234,7 +237,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('sets blocked and stolen keys on save failure', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -251,7 +257,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('adds expirations for stolen spell on failure', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -280,7 +289,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('logs save result on failure', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -299,7 +311,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('logs save result on success', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 
@@ -318,7 +333,10 @@ describe('spellThiefHandler', () => {
         });
 
         it('dispatches combat-summary-updated on failure', async () => {
-            getRuntimeValue.mockReturnValue(null);
+            getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'spellthiefUses') return 1;
+                return null;
+            });
             buildSaveDc.mockReturnValue(13);
             createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
 

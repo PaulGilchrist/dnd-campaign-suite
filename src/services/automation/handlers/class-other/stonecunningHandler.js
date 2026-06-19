@@ -3,7 +3,6 @@ import { toggleBuff } from '../../common/buffToggle.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const STONECANNING_USES_KEY = 'stonecunningUses';
-const STONECANNING_REST_KEY = 'stonecunningRestTimestamp';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -11,10 +10,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Stonecunning';
 
     const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${STONECANNING_USES_KEY}`;
-    const restKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${STONECANNING_REST_KEY}`;
-
-    const now = Date.now();
-    const lastRest = getRuntimeValue(playerName, restKey, campaignName);
 
     let usesMax;
     if (auto.uses === 'proficiency_bonus') {
@@ -27,14 +22,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     let usesRemaining, canUse;
 
-    if (lastRest && (now - lastRest) < 86400000) {
-        const stored = getRuntimeValue(playerName, usesKey, campaignName);
-        usesRemaining = stored != null ? Number(stored) : usesMax;
-        canUse = usesRemaining > 0;
-    } else {
-        usesRemaining = usesMax;
-        canUse = true;
-    }
+    const stored = getRuntimeValue(playerName, usesKey, campaignName);
+    usesRemaining = stored != null ? Number(stored) : usesMax;
+    canUse = usesRemaining > 0;
 
     if (!canUse) {
         return {
@@ -57,7 +47,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             characterName: playerName,
             abilityName: featureName,
             description: `${featureName} deactivated.`,
-            timestamp: now,
         }).catch((e) => { console.error("[stonecunning] Error:", e); throw e; });
 
         return {
@@ -80,7 +69,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${featureName} activated. Tremorsense 60 ft. (${newUses} use${newUses !== 1 ? 's' : ''} remaining).`,
-        timestamp: now,
     }).catch((e) => { console.error("[stonecunning] Error:", e); throw e; });
 
     return {
@@ -97,8 +85,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
 export function restoreUses(playerName, campaignName) {
     const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${STONECANNING_USES_KEY}`;
-    const restKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${STONECANNING_REST_KEY}`;
 
-    setRuntimeValue(playerName, restKey, Date.now(), campaignName);
     setRuntimeValue(playerName, usesKey, null, campaignName);
 }

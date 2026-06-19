@@ -38,7 +38,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const [pendingRemoveCurse, setPendingRemoveCurse] = React.useState(null);
   const [pendingMagicMissile, setPendingMagicMissile] = React.useState(null);
 
-  const gateMetamagic = React.useCallback((spell) => {
+  const gateMetamagic = React.useCallback((spell, metaCtx = {}) => {
     const isGreaterRestoration = (spell.name || '').toLowerCase() === 'greater restoration';
     const isLesserRestoration = (spell.name || '').toLowerCase() === 'lesser restoration';
     const isRemoveCurse = (spell.name || '').toLowerCase() === 'remove curse';
@@ -262,7 +262,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         spCost: 0,
         timestamp: Date.now(),
       });
-      onExecute(spell, {});
+      onExecute(spell, metaCtx);
       return;
     }
 
@@ -279,6 +279,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       _currentSP: currentSP,
       isPsionic: isPsionic && hasPsionic,
       psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
+      _metaCtx: metaCtx,
     });
     }, [isSorcerer, playerStats, campaignName, onExecute]);
 
@@ -315,7 +316,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       timestamp: Date.now(),
     });
 
-    const metaCtx = {};
+    const metaCtx = { ...pending._metaCtx };
     if (result?.options) {
       if (result.options.includes('Heightened Spell')) metaCtx.metamagicHeighten = true;
       if (result.options.includes('Careful Spell')) metaCtx.metamagicCareful = true;

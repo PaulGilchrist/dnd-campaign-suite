@@ -693,10 +693,7 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
 
     // Check if Last Stand has already been used this long rest
     const lastStandUsed = getRuntimeValue(creature.name, 'boonOfRecoveryLastStandUsed', campaignName);
-    const lastRestTimestamp = getRuntimeValue(creature.name, 'boonOfRecoveryLastStandRestTimestamp', campaignName);
-    const now = Date.now();
-
-    if (lastStandUsed && (!lastRestTimestamp || now - lastRestTimestamp < 86400000)) {
+    if (lastStandUsed) {
         return { intercepted: false };
     }
 
@@ -711,7 +708,6 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
 
     setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
     setRuntimeValue(creature.name, 'boonOfRecoveryLastStandUsed', true, campaignName);
-    setRuntimeValue(creature.name, 'boonOfRecoveryLastStandRestTimestamp', now, campaignName);
 
     setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
     setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);

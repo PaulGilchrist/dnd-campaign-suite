@@ -190,11 +190,11 @@ const reactionCastAction = React.useCallback((spell, metaCtx) => {
         } catch { /* positions unavailable */ }
       }, [mapName, campaignName, playerStats.name]);
 
-      const handleReactionSpellCast = React.useCallback(async (spell) => {
+      const handleReactionSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedSpell(null);
 
         await resolveReactionSpellPositions();
-        gateMetamagic(spell);
+        gateMetamagic(spell, metaCtx);
       }, [gateMetamagic, resolveReactionSpellPositions]);
 
     return (

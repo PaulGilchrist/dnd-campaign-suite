@@ -8,7 +8,6 @@ import { evaluateAutoExpression } from '../../../combat/automation/automationSer
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';
-const ADRENALINE_RUSH_REST_KEY = 'adrenalineRushRestTimestamp';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -60,24 +59,19 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     // Check long rest recharge for traits with no explicit uses field
     if (auto?.recharge === 'long_rest' && !auto?.uses) {
-        const restKey = playerStats.name.toLowerCase().replace(/\s+/g, '') + '_buffRestTimestamp';
-        const lastRest = getRuntimeValue(playerStats.name, restKey, campaignName);
-        const now = Date.now();
-        if (lastRest && (now - lastRest) < 86400000) {
-            const stored = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
-            const activeBuffs = Array.isArray(stored) ? stored : [];
-            const isActive = activeBuffs.some(b => b.name === action.name);
-            if (!isActive) {
-                return {
-                    type: 'popup',
-                    payload: {
-                        type: 'automation_info',
-                        name: action.name,
-                        description: `${action.name} has been used and cannot be used again until a Long Rest.`,
-                        automation: auto,
-                    },
-                };
-            }
+        const stored = getRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
+        const activeBuffs = Array.isArray(stored) ? stored : [];
+        const isActive = activeBuffs.some(b => b.name === action.name);
+        if (!isActive) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: action.name,
+                    description: `${action.name} has been used and cannot be used again until a Long Rest.`,
+                    automation: auto,
+                },
+            };
         }
     }
 
@@ -139,8 +133,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     if (auto?.effect === 'fly_speed_equals_walk_speed' && wasActive) {
-        const restKey = playerStats.name.toLowerCase().replace(/\s+/g, '') + '_buffRestTimestamp';
-        await setRuntimeValue(playerStats.name, restKey, Date.now(), campaignName);
+        // No longer tracking rest timestamps
     }
 
     if (auto?.effect === 'haste') {
@@ -191,10 +184,6 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
     const featureName = action.name || 'Adrenaline Rush';
 
     const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_USES_KEY}`;
-    const restKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_REST_KEY}`;
-
-    const now = Date.now();
-    const lastRest = getRuntimeValue(playerName, restKey, campaignName);
 
     let usesMax;
     if (auto.uses === 'proficiency_bonus') {
@@ -205,16 +194,9 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
         usesMax = auto.usesMax != null ? auto.usesMax : 1;
     }
 
-    let usesRemaining, canUse;
-
-    if (lastRest && (now - lastRest) < 43200000) {
-        const stored = getRuntimeValue(playerName, usesKey, campaignName);
-        usesRemaining = stored != null ? Number(stored) : usesMax;
-        canUse = usesRemaining > 0;
-    } else {
-        usesRemaining = usesMax;
-        canUse = true;
-    }
+    const stored = getRuntimeValue(playerName, usesKey, campaignName);
+    const usesRemaining = stored != null ? Number(stored) : usesMax;
+    const canUse = usesRemaining > 0;
 
     if (!canUse) {
         return {
@@ -257,8 +239,6 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
 
 export function restoreAdrenalineRushUses(playerName, campaignName) {
     const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_USES_KEY}`;
-    const restKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_REST_KEY}`;
 
-    setRuntimeValue(playerName, restKey, Date.now(), campaignName);
     setRuntimeValue(playerName, usesKey, null, campaignName);
 }

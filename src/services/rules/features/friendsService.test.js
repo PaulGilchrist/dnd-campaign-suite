@@ -405,7 +405,7 @@ describe('friendsService', () => {
 
         it('returns cooldown popup when cast within 24 hours', async () => {
             getCombatContext.mockResolvedValue(null);
-            getRuntimeValue.mockReturnValue(String(Date.now() - 3600000)); // 1 hour ago
+            getRuntimeValue.mockReturnValue(true);
 
             const result = await triggerFriends(
                 { name: 'Friends', level: 0 },
@@ -428,7 +428,7 @@ describe('friendsService', () => {
 
         it('allows cast when cooldown has expired (more than 24 hours ago)', async () => {
             getCombatContext.mockResolvedValue(null);
-            getRuntimeValue.mockReturnValue(String(Date.now() - 90000000)); // ~25 hours ago
+            getRuntimeValue.mockReturnValue(false);
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             const result = await triggerFriends(
@@ -460,7 +460,7 @@ describe('friendsService', () => {
             expect(result).toEqual({ type: 'popup' });
         });
 
-        it('records the cast timestamp on success', async () => {
+        it('records the cast on success', async () => {
             getCombatContext.mockResolvedValue(null);
             getRuntimeValue.mockReturnValue(null);
             executeHandler.mockResolvedValue({ type: 'popup' });
@@ -476,7 +476,7 @@ describe('friendsService', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Wizard',
                 '_friends_24h_Wizard_Goblin',
-                expect.any(String),
+                true,
                 campaignName,
             );
         });

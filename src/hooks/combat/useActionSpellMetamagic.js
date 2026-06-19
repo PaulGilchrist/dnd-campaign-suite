@@ -54,7 +54,7 @@ export function useActionSpellMetamagic({
         if (intMod <= 0) return { formula, total, rolls, modifier };
 
         return {
-            formula: `${formula} + ${intMod}[Empowered Evocation]`,
+            formula: `${formula} + ${intMod} [Empowered Evocation]`,
             total: total + intMod,
             rolls: [...rolls],
             modifier,

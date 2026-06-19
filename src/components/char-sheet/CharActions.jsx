@@ -95,7 +95,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             const isEvocation = spellSchool === 'evocation';
             const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
             if (shouldApplyEmpoweredEvoc) {
-                autoFormula = `${autoFormula} + ${empEvocIntMod}[Empowered Evocation]`;
+                autoFormula = `${autoFormula} + ${empEvocIntMod} [Empowered Evocation]`;
             }
             const isOverchannel = autoDamage.overchannelActive;
             const overchannelUseCount = autoDamage.overchannelUseCount || 0;
@@ -147,21 +147,19 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             note: 'Overchannel self-damage (ignores resistance/immunity)',
                         }).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
                     }
-                    const usesKey = '_Overchannel_uses';
+                    const usesKey = '_Overchannel_useCount';
                     const restKey = '_Overchannel_restTimestamp';
                     const now = Date.now();
                     const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
                     let currentUses;
                     if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-                        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+                        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
                     } else if (!lastRestTimestamp) {
-                        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+                        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
                     } else {
-                        currentUses = 1;
+                        currentUses = 0;
                     }
-                    if (currentUses > 0) {
-                        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
-                    }
+                    await setRuntimeValue(playerStats.name, usesKey, currentUses + 1, campaignName);
                 }
             }
             // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
@@ -679,7 +677,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         cachedActionCastPosRef.current = null;
     }, [rollAttack, rollDamage, playerStats, getTargetInfo, featRangeEffects, campaignName, mapName, characters]);
     const { pendingMetamagic: actionPendingMetamagic, gateMetamagic: actionGateMetamagic, handleConfirm: actionHandleConfirm, handleSkip: actionHandleSkip, pendingAid: actionPendingAid, handleAidConfirm: actionHandleAidConfirm, handleAidSkip: actionHandleAidSkip, pendingGreaterRestoration: actionPendingGreaterRestoration, handleGreaterRestorationConfirm: actionHandleGreaterRestorationConfirm, handleGreaterRestorationSkip: actionHandleGreaterRestorationSkip, pendingRemoveCurse: actionPendingRemoveCurse, handleRemoveCurseConfirm: actionHandleRemoveCurseConfirm, handleRemoveCurseSkip: actionHandleRemoveCurseSkip, pendingMagicMissile: actionPendingMagicMissile, handleMagicMissileConfirm: actionHandleMagicMissileConfirm, handleMagicMissileSkip: actionHandleMagicMissileSkip } = useSpellMetamagicFlow(playerStats, campaignName, actionCastAction);
-    const handleActionSpellCast = React.useCallback(async (spell) => {
+    const handleActionSpellCast = React.useCallback(async (spell, metaCtx) => {
         setSelectedActionSpell(null);
         if (mapName) {
             try {
@@ -710,7 +708,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
             } catch { /* positions unavailable */ }
         }
-        actionGateMetamagic(spell);
+        actionGateMetamagic(spell, metaCtx);
     }, [actionGateMetamagic, mapName, campaignName, playerStats.name]);
 
     const is2024Rules = playerStats.rules === '2024';

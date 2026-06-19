@@ -2,7 +2,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { createSaveListener, buildSaveDc } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-
 const SPELL_THIEF_BLOCK_KEY = 'spellThiefBlocked';
 const SPELL_THIEF_STOLEN_KEY = 'spellThiefStolen';
 
@@ -10,9 +9,7 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
-function getRuntimeRestTimestampKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'RestTimestamp';
-}
+
 
 function getBlockedSpellKey(casterName, spellName) {
     return `${SPELL_THIEF_BLOCK_KEY}_${casterName}_${spellName}`;
@@ -28,16 +25,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Spell Thief';
 
     const usesKey = getRuntimeUsesKey(featureName);
-    const restTimestampKey = getRuntimeRestTimestampKey(featureName);
-    const lastRestTimestamp = getRuntimeValue(playerName, restTimestampKey, campaignName);
-    const now = Date.now();
-
-    let currentUses = 1;
-    if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-        currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 1);
-    } else if (!lastRestTimestamp) {
-        currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 1);
-    }
+    const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? 0);
 
     if (currentUses <= 0) {
         return {

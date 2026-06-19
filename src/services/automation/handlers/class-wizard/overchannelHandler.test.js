@@ -47,12 +47,12 @@ describe('overchannelHandler', () => {
             expect(result.payload.name).toBe('Overchannel');
         });
 
-        it('includes description with uses remaining Yes when max uses available', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
+        it('includes description with current use count', async () => {
+            getRuntimeValue.mockReturnValue(0);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.payload.description).toContain('Uses remaining: Yes');
+            expect(result.payload.description).toContain('Current use: 1');
         });
 
         it('includes description with correct action name', async () => {
@@ -70,72 +70,79 @@ describe('overchannelHandler', () => {
     });
 
     describe('getOverchannelUses', () => {
-        it('returns MAX_USES (1) when no stored values exist', () => {
+        it('returns 0 when no stored values exist', () => {
             getRuntimeValue.mockReturnValue(undefined);
 
             const result = getOverchannelUses(makePlayerStats(), 'test-campaign');
 
-            expect(result).toBe(1);
+            expect(result).toBe(0);
         });
 
-        it('returns stored uses when rest timestamp exists and is within 24 hours', () => {
+        it('returns stored use count when rest timestamp exists and is within 24 hours', () => {
             const now = Date.now();
             const recentRest = now - 3600000;
             getRuntimeValue.mockImplementation((_playerName, key) => {
                 if (key === '_Overchannel_restTimestamp') return recentRest;
-                if (key === '_Overchannel_uses') return 0;
+                if (key === '_Overchannel_useCount') return 3;
                 return undefined;
             });
 
             const result = getOverchannelUses(makePlayerStats(), 'test-campaign');
 
-            expect(result).toBe(0);
+            expect(result).toBe(3);
         });
 
-        it('returns stored uses when no rest timestamp exists', () => {
+        it('returns stored use count when no rest timestamp exists', () => {
             getRuntimeValue.mockImplementation((_playerName, key) => {
                 if (key === '_Overchannel_restTimestamp') return undefined;
-                if (key === '_Overchannel_uses') return 0;
+                if (key === '_Overchannel_useCount') return 2;
                 return undefined;
             });
 
             const result = getOverchannelUses(makePlayerStats(), 'test-campaign');
 
-            expect(result).toBe(0);
+            expect(result).toBe(2);
         });
 
-        it('returns MAX_USES when rest timestamp is older than 24 hours', () => {
+        it('returns stored use count even when rest timestamp is older than 24 hours', () => {
             const now = Date.now();
             const oldRest = now - 172800000;
             getRuntimeValue.mockImplementation((_playerName, key) => {
                 if (key === '_Overchannel_restTimestamp') return oldRest;
+                if (key === '_Overchannel_useCount') return 5;
                 return undefined;
             });
 
             const result = getOverchannelUses(makePlayerStats(), 'test-campaign');
 
-            expect(result).toBe(1);
+            expect(result).toBe(5);
         });
     });
 
     describe('hasOverchannelRemaining', () => {
-        it('returns true when uses > 0', () => {
-            getRuntimeValue.mockReturnValue(1);
-
+        it('returns true (unlimited uses with damage)', () => {
             expect(hasOverchannelRemaining(makePlayerStats(), 'test-campaign')).toBe(true);
-        });
-
-        it('returns false when uses <= 0', () => {
-            getRuntimeValue.mockReturnValue(0);
-
-            expect(hasOverchannelRemaining(makePlayerStats(), 'test-campaign')).toBe(false);
         });
     });
 
     describe('consumeOverchannelUse', () => {
-        it('returns true and decrements when uses available', async () => {
+        it('returns true and increments when no stored values exist', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+
+            const result = await consumeOverchannelUse(makePlayerStats(), 'test-campaign');
+
+            expect(result).toBe(true);
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'WizardBoy',
+                '_Overchannel_useCount',
+                1,
+                'test-campaign'
+            );
+        });
+
+        it('returns true and increments from stored value', async () => {
             getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === '_Overchannel_uses') return 1;
+                if (key === '_Overchannel_useCount') return 2;
                 return undefined;
             });
 
@@ -144,30 +151,18 @@ describe('overchannelHandler', () => {
             expect(result).toBe(true);
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'WizardBoy',
-                '_Overchannel_uses',
-                0,
+                '_Overchannel_useCount',
+                3,
                 'test-campaign'
             );
         });
 
-        it('returns false when no uses remaining', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === '_Overchannel_uses') return 0;
-                return undefined;
-            });
-
-            const result = await consumeOverchannelUse(makePlayerStats(), 'test-campaign');
-
-            expect(result).toBe(false);
-            expect(setRuntimeValue).not.toHaveBeenCalled();
-        });
-
-        it('returns true and decrements when rest timestamp exists within 24 hours', async () => {
+        it('increments when rest timestamp exists within 24 hours', async () => {
             const now = Date.now();
             const recentRest = now - 3600000;
             getRuntimeValue.mockImplementation((_playerName, key) => {
                 if (key === '_Overchannel_restTimestamp') return recentRest;
-                if (key === '_Overchannel_uses') return 1;
+                if (key === '_Overchannel_useCount') return 1;
                 return undefined;
             });
 
@@ -176,17 +171,18 @@ describe('overchannelHandler', () => {
             expect(result).toBe(true);
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'WizardBoy',
-                '_Overchannel_uses',
-                0,
+                '_Overchannel_useCount',
+                2,
                 'test-campaign'
             );
         });
 
-        it('resets to MAX_USES when rest timestamp is older than 24 hours', async () => {
+        it('increments even when rest timestamp is older than 24 hours', async () => {
             const now = Date.now();
             const oldRest = now - 172800000;
             getRuntimeValue.mockImplementation((_playerName, key) => {
                 if (key === '_Overchannel_restTimestamp') return oldRest;
+                if (key === '_Overchannel_useCount') return 1;
                 return undefined;
             });
 
@@ -195,27 +191,21 @@ describe('overchannelHandler', () => {
             expect(result).toBe(true);
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'WizardBoy',
-                '_Overchannel_uses',
-                0,
+                '_Overchannel_useCount',
+                2,
                 'test-campaign'
             );
         });
     });
 
     describe('restoreOverchannelOnLongRest', () => {
-        it('sets rest timestamp and resets uses to MAX_USES', async () => {
+        it('resets use count to 0', async () => {
             await restoreOverchannelOnLongRest(makePlayerStats(), 'test-campaign');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'WizardBoy',
-                '_Overchannel_restTimestamp',
-                expect.any(Number),
-                'test-campaign'
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WizardBoy',
-                '_Overchannel_uses',
-                1,
+                '_Overchannel_useCount',
+                0,
                 'test-campaign'
             );
         });

@@ -237,16 +237,7 @@ export async function triggerSpellThief(spell, metaCtx, playerStats, campaignNam
     for (const thief of spellThiefFeatures) {
         const featureName = thief.name;
         const usesKey = featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
-        const restTimestampKey = featureName.toLowerCase().replace(/\s+/g, '') + 'RestTimestamp';
-        const lastRestTimestamp = getRuntimeValue(playerStats.name, restTimestampKey, campaignName);
-        const now = Date.now();
-
-        let currentUses = 1;
-        if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-            currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
-        } else if (!lastRestTimestamp) {
-            currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
-        }
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
 
         if (currentUses <= 0) {
             continue;

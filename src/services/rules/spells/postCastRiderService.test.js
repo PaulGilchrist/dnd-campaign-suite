@@ -329,10 +329,8 @@ describe('postCastRiderService', () => {
     it('calls executeHandler for each thief feature', async () => {
       const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
       executeHandler.mockResolvedValue({ success: true })
-      // Return false for restTimestamp (triggers else-if branch), then 1 for uses
-      vi.mocked(getRuntimeValue)
-        .mockReturnValueOnce(false)
-        .mockReturnValueOnce(1)
+      // Return 1 for uses (the handler calls getRuntimeValue(playerStats.name, usesKey) with no campaignName)
+      vi.mocked(getRuntimeValue).mockReturnValue(1)
       const stats = {
         name: 'Player',
         automation: { passives: [{ type: 'spell_thief', name: 'Thief', saveType: 'INT' }] },

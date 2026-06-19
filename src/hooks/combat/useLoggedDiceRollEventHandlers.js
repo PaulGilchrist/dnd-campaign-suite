@@ -119,21 +119,6 @@ export function setupEventListeners(deps) {
                         note: 'Overchannel self-damage (ignores resistance/immunity)',
                     });
                 }
-                const usesKey = '_Overchannel_uses';
-                const restKey = '_Overchannel_restTimestamp';
-                const now = Date.now();
-                const lastRestTimestamp = getRuntimeValue(characterName, restKey, campaignName);
-                let currentUses;
-                if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-                    currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
-                } else if (!lastRestTimestamp) {
-                    currentUses = Number(getRuntimeValue(characterName, usesKey, campaignName) ?? 1);
-                } else {
-                    currentUses = 1;
-                }
-                if (currentUses > 0) {
-                    setRuntimeValue(characterName, usesKey, currentUses - 1, campaignName);
-                }
             }
 
             delete window.__pendingSaves[e.detail.promptId];

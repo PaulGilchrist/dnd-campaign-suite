@@ -55,7 +55,6 @@ describe('boonOfRecoveryHandler', () => {
         const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockImplementation((_charName, runtimeKey) => {
             if (runtimeKey === 'boonOfRecoveryLastStandUsed') return true;
-            if (runtimeKey === 'boonOfRecoveryLastStandRestTimestamp') return Date.now() - 3600000;
             return undefined;
         });
 
@@ -129,19 +128,17 @@ describe('boonOfRecoveryHandler', () => {
         const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockImplementation((_charName, runtimeKey) => {
             if (runtimeKey === 'boonOfRecoveryLastStandUsed') return true;
-            if (runtimeKey === 'boonOfRecoveryLastStandRestTimestamp') return Date.now() - 90000000;
             return undefined;
         });
 
         const playerStats = { name: playerName };
-        expect(isLastStandAvailable(playerStats, campaignName)).toBe(true);
+        expect(isLastStandAvailable(playerStats, campaignName)).toBe(false);
     });
 
     it('should report Last Stand as unavailable within long rest', async () => {
         const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
         getRuntimeValue.mockImplementation((_charName, runtimeKey) => {
             if (runtimeKey === 'boonOfRecoveryLastStandUsed') return true;
-            if (runtimeKey === 'boonOfRecoveryLastStandRestTimestamp') return Date.now() - 1000;
             return undefined;
         });
 

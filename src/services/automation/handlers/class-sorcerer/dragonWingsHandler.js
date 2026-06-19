@@ -5,7 +5,6 @@ import { addEntry } from '../../../ui/logService.js';
 
 const DRAGON_WINGS_KEY = 'dragonWingsActive';
 const DRAGON_WINGS_USES_KEY = 'dragonWingsUses';
-const DRAGON_WINGS_REST_KEY = 'dragonWingsRestTimestamp';
 
 function getRuntimeKey(playerName, key) {
     return playerName.toLowerCase().replace(/\s+/g, '') + '_' + key;
@@ -20,24 +19,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const currentSP = playerStats.resources?.sorcery_points?.current ?? maxSP;
 
     const usesKey = getRuntimeKey(playerName, DRAGON_WINGS_USES_KEY);
-    const restKey = getRuntimeKey(playerName, DRAGON_WINGS_REST_KEY);
-
-    const lastRest = getRuntimeValue(playerName, restKey, campaignName);
-    const now = Date.now();
-    let active;
     const usesMax = auto.uses ?? 1;
 
-    if (lastRest && (now - lastRest) < 86400000) {
-        const stored = getRuntimeValue(playerName, usesKey, campaignName);
-        active = (stored != null ? Number(stored) : usesMax) > 0;
-    } else {
-        active = true;
-    }
+    const storedUses = getRuntimeValue(playerName, usesKey, campaignName);
+    const active = (storedUses != null ? Number(storedUses) : usesMax) > 0;
 
     if (!active) {
         if (currentSP >= (auto.restoreCost || 3)) {
             spendSorceryPoints(playerName, auto.restoreCost || 3, campaignName);
-            await setRuntimeValue(playerName, restKey, now, campaignName);
             await setRuntimeValue(playerName, usesKey, usesMax, campaignName);
 
             await addEntry(campaignName, {
@@ -45,7 +34,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 characterName: playerName,
                 abilityName: featureName,
                 description: `${playerName} restored Dragon Wings by spending ${auto.restoreCost || 3} Sorcery Points.`,
-                timestamp: now,
             }).catch((e) => { console.error("[dragonWings] Error:", e); throw e; });
 
             return {
@@ -71,8 +59,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     // Toggle off if already active
-    const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);
-    const activeBuffs = Array.isArray(stored) ? stored : [];
+    const activeBuffsRaw = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    const activeBuffs = Array.isArray(activeBuffsRaw) ? activeBuffsRaw : [];
     const wasActive = activeBuffs.some(b => b.name === featureName);
 
     if (wasActive) {
@@ -84,7 +72,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             characterName: playerName,
             abilityName: featureName,
             description: `${featureName} deactivated.`,
-            timestamp: now,
         }).catch((e) => { console.error("[dragonWings] Error:", e); throw e; });
 
         return {
@@ -115,7 +102,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${featureName} activated (Bonus Action, ${auto.duration || '1 hour'}). Fly Speed 60 feet (hover).`,
-        timestamp: now,
     }).catch((e) => { console.error("[dragonWings] Error:", e); throw e; });
 
     return {

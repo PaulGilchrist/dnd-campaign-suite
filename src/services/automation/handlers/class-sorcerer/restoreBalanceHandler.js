@@ -15,10 +15,6 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
-function getRuntimeRestTimestampKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'RestTimestamp';
-}
-
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -63,16 +59,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const usesMax = Math.max(1, chaMod);
 
     const usesKey = getRuntimeUsesKey(featureName);
-    const restTimestampKey = getRuntimeRestTimestampKey(featureName);
-    const lastRestTimestamp = getRuntimeValue(playerName, restTimestampKey, campaignName);
-    const now = Date.now();
 
-    let currentUses = 0;
-    if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-        currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
-    } else if (!lastRestTimestamp) {
-        currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? usesMax);
-    }
+    const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? usesMax);
 
     if (currentUses <= 0) {
         return {

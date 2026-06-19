@@ -507,7 +507,7 @@ describe('wildMagicSurgeService', () => {
             );
         });
 
-        it('sets last rest timestamp when feats of chaos uses reach 0', async () => {
+        it('does not set last rest timestamp when feats of chaos uses reach 0', async () => {
             const playerStats = {
                 ...basePlayerStats,
                 automation: {
@@ -536,7 +536,7 @@ describe('wildMagicSurgeService', () => {
                 mapName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).not.toHaveBeenCalledWith(
                 playerStats.name,
                 'featsOfChaosLastRest',
                 expect.any(Number),
@@ -871,7 +871,7 @@ describe('wildMagicSurgeService', () => {
             );
         });
 
-        it('handles tamed surge with null stored uses defaulting to 1', async () => {
+        it('handles tamed surge with null stored uses defaulting to 0', async () => {
             const playerStats = {
                 ...basePlayerStats,
                 automation: {
@@ -897,16 +897,10 @@ describe('wildMagicSurgeService', () => {
                 mapName,
             );
 
-            expect(result).toEqual({
-                type: 'modal',
-                modalName: 'wildMagicTamed',
-                payload: expect.objectContaining({
-                    featureName: 'Tamed Surge',
-                }),
-            });
+            expect(result).toBeNull();
         });
 
-        it('handles tamed surge with undefined stored uses defaulting to 1', async () => {
+        it('handles tamed surge with undefined stored uses defaulting to 0', async () => {
             const playerStats = {
                 ...basePlayerStats,
                 automation: {
@@ -928,13 +922,7 @@ describe('wildMagicSurgeService', () => {
                 mapName,
             );
 
-            expect(result).toEqual({
-                type: 'modal',
-                modalName: 'wildMagicTamed',
-                payload: expect.objectContaining({
-                    featureName: 'Tamed Surge',
-                }),
-            });
+            expect(result).toBeNull();
         });
 
         it('does not set runtime value when executeHandler returns falsy', async () => {

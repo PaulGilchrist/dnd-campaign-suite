@@ -52,7 +52,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
           const isEvocation = spellSchool === 'evocation';
           const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
           if (shouldApplyEmpoweredEvoc) {
-            autoFormula = `${autoFormula} + ${empEvocIntMod}[Empowered Evocation]`;
+            autoFormula = `${autoFormula} + ${empEvocIntMod} [Empowered Evocation]`;
           }
           const isOverchannel = autoDamage.overchannelActive;
           const overchannelUseCount = autoDamage.overchannelUseCount || 0;
@@ -106,21 +106,19 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                         note: 'Overchannel self-damage (ignores resistance/immunity)',
                     }).catch((e) => { console.error("[CharSpells] Error:", e); throw e; });
                 }
-                const usesKey = '_Overchannel_uses';
+                const usesKey = '_Overchannel_useCount';
                 const restKey = '_Overchannel_restTimestamp';
                 const now = Date.now();
                 const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
                 let currentUses;
                 if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-                    currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+                    currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
                 } else if (!lastRestTimestamp) {
-                    currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
+                    currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 0);
                 } else {
-                    currentUses = 1;
+                    currentUses = 0;
                 }
-                if (currentUses > 0) {
-                    setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
-                }
+                setRuntimeValue(playerStats.name, usesKey, currentUses + 1, campaignName);
             }
             }
             // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
@@ -229,12 +227,12 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
       } catch { /* positions unavailable */ }
     }, [mapName, campaignName, playerStats.name]);
 
-    const handleSpellCast = React.useCallback(async (spell) => {
-      setSelectedSpell(null);
+    const handleSpellCast = React.useCallback(async (spell, metaCtx) => {
+        setSelectedSpell(null);
 
-      await resolveSpellPositions();
+        await resolveSpellPositions();
 
-      gateMetamagic(spell);
+        gateMetamagic(spell, metaCtx);
     }, [gateMetamagic, resolveSpellPositions]);
 
     const executeDamageRoll = (formula, spellName, spell) => {
@@ -247,7 +245,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
         let empEvocFormula = formula;
         if (shouldApplyEmpoweredEvoc) {
-            empEvocFormula = `${formula} + ${empEvocIntMod}[Empowered Evocation]`;
+            empEvocFormula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
         }
         const result = wasCrit ? rollExpressionDoubled(empEvocFormula) : rollExpression(empEvocFormula);
         if (result) {

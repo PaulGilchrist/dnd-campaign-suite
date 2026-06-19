@@ -354,23 +354,34 @@ describe('executeSpellCast', () => {
   })
 
   describe('Overchannel', () => {
-    it('calls rollExpressionMaximized for spells level 1-5', async () => {
+    it('calls rollExpressionMaximized when overchannel is enabled', async () => {
+      const dice = await import('../../dice/diceRoller.js')
+      const services = makeServices()
+      const stats = makePlayerStats({
+        automation: { passives: [{ type: 'overchannel' }] },
+      })
+      await executeSpellCast(makeSpell(), makeMetaCtx({ slotLevel: 3, overchannel: true }), { ...services, playerStats: stats })
+      expect(dice.rollExpressionMaximized).toHaveBeenCalled()
+    })
+
+    it('calls normal rollExpression when overchannel is not enabled', async () => {
       const dice = await import('../../dice/diceRoller.js')
       const services = makeServices()
       const stats = makePlayerStats({
         automation: { passives: [{ type: 'overchannel' }] },
       })
       await executeSpellCast(makeSpell(), makeMetaCtx({ slotLevel: 3 }), { ...services, playerStats: stats })
-      expect(dice.rollExpressionMaximized).toHaveBeenCalled()
+      expect(dice.rollExpression).toHaveBeenCalled()
+      expect(dice.rollExpressionMaximized).not.toHaveBeenCalled()
     })
 
-    it('calls normal rollExpression for level 6+ spells', async () => {
+    it('calls normal rollExpression for level 6+ spells even with overchannel', async () => {
       const dice = await import('../../dice/diceRoller.js')
       const services = makeServices()
       const stats = makePlayerStats({
         automation: { passives: [{ type: 'overchannel' }] },
       })
-      await executeSpellCast(makeSpell(), makeMetaCtx({ slotLevel: 6 }), { ...services, playerStats: stats })
+      await executeSpellCast(makeSpell(), makeMetaCtx({ slotLevel: 6, overchannel: true }), { ...services, playerStats: stats })
       expect(dice.rollExpression).toHaveBeenCalled()
       expect(dice.rollExpressionMaximized).not.toHaveBeenCalled()
     })

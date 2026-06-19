@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js'
+import { getOverchannelUses, getOverchannelNecroticDamage } from '../../../services/automation/handlers/class-wizard/overchannelHandler.js'
 
 function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, campaignName) {
   const raw = getRuntimeValue(playerName, '_War_God_s_Blessing_freeCast');
@@ -114,6 +115,19 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     return firstAvailable ? String(firstAvailable.level) : String(upcastLevels[0]?.level || spell.level);
   });
 
+  const hasOverchannelPassive = playerStats?.automation?.passives?.some(p => p.type === 'overchannel');
+  const isOverchannelApplicable = hasOverchannelPassive && hasDamage && spell.level >= 1 && spell.level <= 5;
+  const [useOverchannel, setUseOverchannel] = useState(false);
+  const overchannelUseCount = useMemo(() => {
+    if (!isOverchannelApplicable) return 0;
+    return getOverchannelUses(playerStats.name, campaignName);
+  }, [isOverchannelApplicable, playerStats.name, campaignName]);
+  const nextOverchannelUse = overchannelUseCount + 1;
+  const overchannelDamage = useMemo(() => {
+    if (!isOverchannelApplicable || !useOverchannel) return null;
+    return getOverchannelNecroticDamage(spell.level, nextOverchannelUse);
+  }, [isOverchannelApplicable, useOverchannel, spell.level, nextOverchannelUse]);
+
   const cantripAutoLevel = useMemo(() => {
     if (!isCantrip) return null;
     const dmgObj = (charDmg && Object.keys(charDmg).length) ? charDmg : (slotDmg && Object.keys(slotDmg).length ? slotDmg : null);
@@ -125,9 +139,10 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
 
   const handleCast = () => {
     if (!canCast) return;
+    const metaCtx = { overchannel: useOverchannel };
     if (isCantrip) {
       const modifiedSpell = cantripAutoLevel ? { ...spell, level: cantripAutoLevel } : spell;
-      onCast(modifiedSpell);
+      onCast(modifiedSpell, metaCtx);
       return;
     }
     const isUpcast = isUpcastable && Number(selectedUpcastLvl) !== spell.level;
@@ -141,7 +156,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         setRuntimeValue(playerStats.name, slotKey, availableSlots - 1, campaignName);
       }
       const modifiedSpell = { ...spell, level: upcastLevel };
-      onCast(modifiedSpell);
+      onCast(modifiedSpell, metaCtx);
       return;
     }
     if (freeCastAuthorized) {
@@ -237,7 +252,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
       }
       return s;
     })();
-    onCast(modifiedSpell);
+    onCast(modifiedSpell, metaCtx);
   };
 
   const isRaging = getActiveBuffs(playerStats.name, campaignName).some(b => b.name === 'Rage');
@@ -305,6 +320,28 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
               />
               <span>Change damage type to Psychic</span>
             </label>
+          </div>
+        )}
+        {isOverchannelApplicable && (
+          <div className="spell-detail-upcast">
+            <label>
+              <input
+                type="checkbox"
+                checked={useOverchannel}
+                onChange={() => setUseOverchannel(!useOverchannel)}
+              />
+              <span>Overchannel (Maximize Damage)&nbsp;</span>
+            </label>
+            {overchannelDamage && overchannelDamage > 0 && (
+              <div className="spell-detail-overchannel-warning">
+                <i className="fa-solid fa-skull"></i> Warning: Using Overchannel this time (use #{nextOverchannelUse}) will deal <strong>{overchannelDamage.expression}</strong> Necrotic damage to you (ignores resistance/immunity). First use deals no damage.
+              </div>
+            )}
+            {overchannelDamage === 0 && useOverchannel && (
+              <div className="spell-detail-overchannel-info">
+                <i className="fa-solid fa-shield-halved"></i> First use: no necrotic damage
+              </div>
+            )}
           </div>
         )}
         {noVSComponents && (

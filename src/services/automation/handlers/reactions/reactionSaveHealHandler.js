@@ -7,10 +7,6 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
-function getRuntimeRestTimestampKey(featureName) {
-    return featureName.toLowerCase().replace(/\s+/g, '') + 'RestTimestamp';
-}
-
 function evaluateHealExpression(expression, playerStats) {
     if (typeof expression === 'number') return expression;
     if (!expression) return playerStats.barbarianLevel || playerStats.level || 1;
@@ -91,17 +87,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     const usesKey = getRuntimeUsesKey(featureName);
-    const restTimestampKey = getRuntimeRestTimestampKey(featureName);
-    const lastRestTimestamp = getRuntimeValue(playerName, restTimestampKey, campaignName);
-    const now = Date.now();
-
-    let currentUses = 0;
-    if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-        currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 0);
-    }
-    else if (!lastRestTimestamp) {
-        currentUses = Number(getRuntimeValue(playerName, usesKey, campaignName) ?? 0);
-    }
+    const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? 0);
 
     const recharge = auto.recharge || 'short_or_long_rest';
     const maxUses = recharge === 'short_or_long_rest' ? 1 : 1;

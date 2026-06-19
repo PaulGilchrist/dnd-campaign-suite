@@ -16,36 +16,24 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const currentSP = playerStats.resources?.sorcery_points?.current ?? maxSP;
 
     const usesKey = getRuntimeKey(playerName, 'clockworkCavalcadeUses');
-    const restKey = getRuntimeKey(playerName, 'clockworkCavalcadeRestTimestamp');
 
-    const lastRest = getRuntimeValue(playerName, restKey, campaignName);
-    const now = Date.now();
-    let usesMax = 1;
-    let active;
     let usesRemaining;
 
-    if (lastRest && (now - lastRest) < 86400000) {
-        const stored = getRuntimeValue(playerName, usesKey, campaignName);
-        usesRemaining = stored != null ? Number(stored) : usesMax;
-        active = usesRemaining > 0;
-    } else {
-        usesRemaining = usesMax;
-        active = true;
-    }
+    const stored = getRuntimeValue(playerName, usesKey, campaignName);
+    usesRemaining = stored != null ? Number(stored) : 1;
+    const active = usesRemaining > 0;
 
     if (!active) {
         if (currentSP >= 7) {
             spendSorceryPoints(playerName, 7, campaignName);
-            await setRuntimeValue(playerName, restKey, now, campaignName);
-            await setRuntimeValue(playerName, usesKey, usesMax, campaignName);
-            usesRemaining = usesMax;
+            await setRuntimeValue(playerName, usesKey, 1, campaignName);
+            usesRemaining = 1;
 
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,
                 abilityName: featureName,
                 description: `${playerName} restored Clockwork Cavalcade by spending 7 Sorcery Points.`,
-                timestamp: now,
             }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); throw e; });
         } else {
             return {
@@ -60,9 +48,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         }
     }
 
-    if (usesMax > 0) {
-        await setRuntimeValue(playerName, usesKey, usesRemaining - 1, campaignName);
-    }
+    await setRuntimeValue(playerName, usesKey, usesRemaining - 1, campaignName);
 
     const description = `<b>${featureName}</b><br/>Action — 30-foot Cube<br/>`
         + `• Heal: Up to 100 HP divided among creatures in range<br/>`
@@ -75,7 +61,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} used ${featureName}.`,
-        timestamp: now,
     }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); throw e; });
 
     return {

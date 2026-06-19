@@ -1,84 +1,46 @@
 import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
-const OVERCHANNEL_KEY = '_Overchannel_uses';
-const OVERCHANNEL_REST_KEY = '_Overchannel_restTimestamp';
-const MAX_USES = 1;
+const OVERCHANNEL_KEY = '_Overchannel_useCount';
 
-export async function handle(action, playerStats, campaignName, _mapName) {
+export async function handle(action, playerStats, _campaignName, _mapName) {
     const usesKey = OVERCHANNEL_KEY;
-    const restKey = OVERCHANNEL_REST_KEY;
-    const now = Date.now();
 
-    const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
-    let currentMaxUses = MAX_USES;
+    const currentUseCount = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
 
-    if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-        currentMaxUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? MAX_USES);
-    } else if (!lastRestTimestamp) {
-        currentMaxUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? MAX_USES);
-    }
-
-    const hasRemainingUses = currentMaxUses > 0;
+    const nextUseCount = currentUseCount + 1;
 
     return {
         type: 'popup',
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `${action.name}: You can deal maximum damage with a Wizard spell (slot levels 1-5) on the turn you cast it. First use: no adverse effect. Subsequent uses before Long Rest: take necrotic damage. Uses remaining: ${hasRemainingUses ? 'Yes' : 'No'}.`,
+            description: `${action.name}: You can deal maximum damage with a Wizard spell (slot levels 1-5) on the turn you cast it. First use: no adverse effect. Subsequent uses before Long Rest: take necrotic damage. Current use: ${nextUseCount}.`,
             automation: action.automation,
         },
     };
 }
 
-export function getOverchannelUses(playerStats, campaignName) {
+export function getOverchannelUses(playerStats, _campaignName) {
     const usesKey = OVERCHANNEL_KEY;
-    const restKey = OVERCHANNEL_REST_KEY;
-    const now = Date.now();
 
-    const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
-    let currentMaxUses = MAX_USES;
-
-    if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-        currentMaxUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? MAX_USES);
-    } else if (!lastRestTimestamp) {
-        currentMaxUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? MAX_USES);
-    }
-
-    return currentMaxUses;
+    return Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
 }
 
-export function hasOverchannelRemaining(playerStats, campaignName) {
-    return getOverchannelUses(playerStats, campaignName) > 0;
+export function hasOverchannelRemaining(_playerStats, _campaignName) {
+    return true;
 }
 
 export async function consumeOverchannelUse(playerStats, campaignName) {
     const usesKey = OVERCHANNEL_KEY;
-    const restKey = OVERCHANNEL_REST_KEY;
-    const now = Date.now();
 
-    const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
-    let currentUses;
+    const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
 
-    if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? MAX_USES);
-    } else if (!lastRestTimestamp) {
-        currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? MAX_USES);
-    } else {
-        currentUses = MAX_USES;
-    }
-
-    if (currentUses <= 0) {
-        return false;
-    }
-
-    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+    await setRuntimeValue(playerStats.name, usesKey, currentUses + 1, campaignName);
     return true;
 }
 
 export async function restoreOverchannelOnLongRest(playerStats, campaignName) {
-    await setRuntimeValue(playerStats.name, OVERCHANNEL_REST_KEY, Date.now(), campaignName);
-    await setRuntimeValue(playerStats.name, OVERCHANNEL_KEY, MAX_USES, campaignName);
+    await setRuntimeValue(playerStats.name, OVERCHANNEL_KEY, 0, campaignName);
 }
 
 export function getOverchannelNecroticDamage(spellLevel, useCount) {

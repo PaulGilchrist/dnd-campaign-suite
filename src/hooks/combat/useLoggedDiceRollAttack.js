@@ -377,7 +377,7 @@ export function createLogAndShow(deps) {
                 const isEvocation = spellSchool === 'evocation';
                 const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
                 if (shouldApplyEmpoweredEvoc) {
-                    potentFormula = `${potentFormula} + ${empEvocIntMod}[Empowered Evocation]`;
+                    potentFormula = `${potentFormula} + ${empEvocIntMod} [Empowered Evocation]`;
                 }
                 const damageResult = rollExpression(potentFormula);
                 if (damageResult) {

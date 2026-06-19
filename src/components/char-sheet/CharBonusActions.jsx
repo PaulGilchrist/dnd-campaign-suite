@@ -106,11 +106,11 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
       } catch { /* positions unavailable */ }
     }, [mapName, campaignName, playerStats.name]);
 
-    const handleBonusSpellCast = React.useCallback(async (spell) => {
+    const handleBonusSpellCast = React.useCallback(async (spell, metaCtx) => {
       setSelectedBonusSpell(null);
 
       await resolveBonusSpellPositions();
-      gateMetamagic(spell);
+      gateMetamagic(spell, metaCtx);
     }, [gateMetamagic, resolveBonusSpellPositions]);
 
     const bonusActionAttacks = playerStats.attacks.filter((attack) => {

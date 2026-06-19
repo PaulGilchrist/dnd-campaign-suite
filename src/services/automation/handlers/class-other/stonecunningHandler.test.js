@@ -87,12 +87,8 @@ describe('stonecunningHandler', () => {
     });
 
     describe('long rest tracking', () => {
-        it('allows use when no rest timestamp (first use)', async () => {
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return undefined;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return null;
-                return null;
-            });
+        it('allows use when no stored value (defaults to usesMax)', async () => {
+            getRuntimeValue.mockReturnValue(null);
             toggleBuff.mockReturnValue({ wasActive: false });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -100,28 +96,11 @@ describe('stonecunningHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('allows use when long rest has passed (> 24 hours)', async () => {
-            const oldRest = Date.now() - 172800000; // 2 days ago
-            getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'dwarfboy_stonecunningUses') return 0;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return oldRest;
-                return null;
-            });
-            toggleBuff.mockReturnValue({ wasActive: false });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-        });
-
-        it('checks stored uses when within long rest window', async () => {
-            const recentRest = Date.now() - 3600000; // 1 hour ago
+        it('allows use when has stored uses', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 2;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
-
             toggleBuff.mockReturnValue({ wasActive: false });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -129,11 +108,9 @@ describe('stonecunningHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('blocks use when no uses remaining within long rest window', async () => {
-            const recentRest = Date.now() - 3600000; // 1 hour ago
+        it('blocks use when no uses remaining', async () => {
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 0;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
 
@@ -146,10 +123,8 @@ describe('stonecunningHandler', () => {
 
     describe('toggle behavior', () => {
         it('deactivates when already active', async () => {
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 1;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: true });
@@ -161,10 +136,8 @@ describe('stonecunningHandler', () => {
         });
 
         it('activates when not active', async () => {
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 1;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -176,10 +149,8 @@ describe('stonecunningHandler', () => {
         });
 
         it('decrements uses on activation', async () => {
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 2;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -207,10 +178,8 @@ describe('stonecunningHandler', () => {
         });
 
         it('logs ability use on activation', async () => {
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 1;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -225,10 +194,8 @@ describe('stonecunningHandler', () => {
         });
 
         it('logs ability use on deactivation', async () => {
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 1;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: true });
@@ -245,10 +212,8 @@ describe('stonecunningHandler', () => {
 
     describe('popup description', () => {
         it('includes duration in activation description', async () => {
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 1;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -259,10 +224,8 @@ describe('stonecunningHandler', () => {
         });
 
         it('includes remaining uses in activation description', async () => {
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 3;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -273,10 +236,8 @@ describe('stonecunningHandler', () => {
         });
 
         it('uses singular "use" when 1 remaining', async () => {
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 1;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -289,10 +250,8 @@ describe('stonecunningHandler', () => {
 
         it('uses default duration when not provided', async () => {
             const action = makeAction({ automation: {} });
-            const recentRest = Date.now() - 3600000;
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'dwarfboy_stonecunningUses') return 1;
-                if (key === 'dwarfboy_stonecunningRestTimestamp') return recentRest;
                 return null;
             });
             toggleBuff.mockReturnValue({ wasActive: false });
@@ -304,18 +263,6 @@ describe('stonecunningHandler', () => {
     });
 
     describe('restoreUses', () => {
-        it('sets rest timestamp to now', async () => {
-            const now = Date.now();
-            vi.useFakeTimers();
-            vi.setSystemTime(now);
-
-            restoreUses('DwarfBoy', 'test-campaign');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('DwarfBoy', 'dwarfboy_stonecunningRestTimestamp', now, 'test-campaign');
-
-            vi.useRealTimers();
-        });
-
         it('clears uses key', async () => {
             restoreUses('DwarfBoy', 'test-campaign');
 

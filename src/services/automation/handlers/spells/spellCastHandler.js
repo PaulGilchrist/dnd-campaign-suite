@@ -145,7 +145,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             const isEvocation = spellSchool === 'evocation';
             const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
             if (shouldApplyEmpoweredEvoc) {
-                formula = `${formula} + ${empEvocIntMod}[Empowered Evocation]`;
+                formula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
             }
             const result = rollExpression(formula);
             if (result) {

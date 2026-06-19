@@ -74,17 +74,7 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
     const tamedSurge = getTamedSurgeFeature(playerStats);
     if (tamedSurge) {
         const usesKey = 'tamedSurgeUses';
-        const restKey = 'tamedSurgeLastRest';
-        const storedUses = getRuntimeValue(playerStats.name, usesKey, campaignName);
-        const restTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
-        const now = Date.now();
-
-        let currentUses = 1;
-        if (restTimestamp && now - restTimestamp < 86400000) {
-            currentUses = Number(storedUses ?? 1);
-        } else if (!restTimestamp) {
-            currentUses = Number(storedUses ?? 1);
-        }
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
 
         if (currentUses > 0) {
             const surgeTable = playerStats.wildMagicSurgeTable;
@@ -113,34 +103,11 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
 
     if (featsOfChaos) {
         const usesKey = 'featsOfChaosUses';
-        const restKey = 'featsOfChaosLastRest';
-        const storedUses = getRuntimeValue(playerStats.name, usesKey, campaignName);
-        const restTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
-        const now = Date.now();
-
-        let currentUses = 1;
-        if (restTimestamp && now - restTimestamp < 86400000) {
-            currentUses = Number(storedUses ?? 1);
-        } else if (!restTimestamp) {
-            currentUses = Number(storedUses ?? 1);
-        }
-
-        if (currentUses <= 0) {
-            const lastRest = restTimestamp || 0;
-            const timeSinceRest = now - lastRest;
-            if (timeSinceRest >= 86400000) {
-                currentUses = 1;
-            } else {
-                currentUses = 0;
-            }
-        }
+        const currentUses = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
 
         if (currentUses > 0) {
             const newUses = currentUses - 1;
             await setRuntimeValue(playerStats.name, usesKey, newUses, campaignName, true);
-            if (newUses <= 0) {
-                await setRuntimeValue(playerStats.name, restKey, now, campaignName, true);
-            }
 
             if (featsOfChaosActive) {
                 await setRuntimeValue(playerStats.name, 'featsOfChaosActive', false, campaignName, true);

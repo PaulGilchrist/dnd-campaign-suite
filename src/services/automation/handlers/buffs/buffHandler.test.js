@@ -288,92 +288,90 @@ describe('buffHandler.handle', () => {
     });
   });
 
-  describe('bonus_action_dash (Adrenaline Rush)', () => {
-    it('should grant temp HP equal to proficiency bonus and decrement uses', async () => {
-      const ps = makePlayerStats({ proficiency: 4 });
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      automationService.evaluateAutoExpression.mockReturnValue(4);
+    describe('bonus_action_dash (Adrenaline Rush)', () => {
+        it('should grant temp HP equal to proficiency bonus and decrement uses', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValue(null);
+            automationService.evaluateAutoExpression.mockReturnValue(4);
 
-      const action = {
-        name: 'Adrenaline Rush',
-        automation: {
-          type: 'temp_buff',
-          effect: 'bonus_action_dash',
-          bonusEffect: 'temp_hp',
-          bonusExpression: 'proficiency_bonus',
-          uses: 'proficiency_bonus',
-          recharge: 'short_rest',
-          casting_time: '1 bonus action',
-        },
-      };
+            const action = {
+                name: 'Adrenaline Rush',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    bonusEffect: 'temp_hp',
+                    bonusExpression: 'proficiency_bonus',
+                    uses: 'proficiency_bonus',
+                    recharge: 'short_rest',
+                    casting_time: '1 bonus action',
+                },
+            };
 
-      const result = await handle(action, ps, campaignName, null);
+            const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Dash action as a Bonus Action');
-      expect(result.payload.description).toContain('4 temporary hit points');
-      expect(result.payload.description).toContain('3 uses remaining');
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'tempHp', 4, campaignName);
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'testhero_adrenalineRushUses',
-        3,
-        campaignName
-      );
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Dash action as a Bonus Action');
+            expect(result.payload.description).toContain('4 temporary hit points');
+            expect(result.payload.description).toContain('3 uses remaining');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'tempHp', 4, campaignName);
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                ps.name,
+                'testhero_adrenalineRushUses',
+                3,
+                campaignName
+            );
+        });
+
+        it('should return no uses remaining when all uses exhausted', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValueOnce(0);
+
+            const action = {
+                name: 'Adrenaline Rush',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    bonusEffect: 'temp_hp',
+                    bonusExpression: 'proficiency_bonus',
+                    uses: 'proficiency_bonus',
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain('Short or Long Rest');
+        });
+
+        it('should reset uses when no rest timestamp exists', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValue(null);
+            automationService.evaluateAutoExpression.mockReturnValue(4);
+
+            const action = {
+                name: 'Adrenaline Rush',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    bonusEffect: 'temp_hp',
+                    bonusExpression: 'proficiency_bonus',
+                    uses: 'proficiency_bonus',
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('3 uses remaining');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                ps.name,
+                'testhero_adrenalineRushUses',
+                3,
+                campaignName
+            );
+        });
     });
-
-    it('should return no uses remaining when all uses exhausted', async () => {
-      const ps = makePlayerStats({ proficiency: 4 });
-      runtimeState.getRuntimeValue
-        .mockReturnValueOnce(Date.now())
-        .mockReturnValueOnce(0);
-
-      const action = {
-        name: 'Adrenaline Rush',
-        automation: {
-          type: 'temp_buff',
-          effect: 'bonus_action_dash',
-          bonusEffect: 'temp_hp',
-          bonusExpression: 'proficiency_bonus',
-          uses: 'proficiency_bonus',
-          recharge: 'short_rest',
-        },
-      };
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('no uses remaining');
-      expect(result.payload.description).toContain('Short or Long Rest');
-    });
-
-    it('should reset uses when no rest timestamp exists', async () => {
-      const ps = makePlayerStats({ proficiency: 4 });
-      runtimeState.getRuntimeValue.mockReturnValue(null);
-      automationService.evaluateAutoExpression.mockReturnValue(4);
-
-      const action = {
-        name: 'Adrenaline Rush',
-        automation: {
-          type: 'temp_buff',
-          effect: 'bonus_action_dash',
-          bonusEffect: 'temp_hp',
-          bonusExpression: 'proficiency_bonus',
-          uses: 'proficiency_bonus',
-          recharge: 'short_rest',
-        },
-      };
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('3 uses remaining');
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        ps.name,
-        'testhero_adrenalineRushUses',
-        3,
-        campaignName
-      );
-    });
-  });
 });

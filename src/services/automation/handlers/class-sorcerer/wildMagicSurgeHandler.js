@@ -115,17 +115,7 @@ export async function handleTamedSurge(action, playerStats, campaignName, _mapNa
     const playerName = playerStats.name;
 
     const usesKey = 'tamedSurgeUses';
-    const restKey = 'tamedSurgeLastRest';
-    const storedUses = getRuntimeValue(playerName, usesKey, campaignName);
-    const restTimestamp = getRuntimeValue(playerName, restKey, campaignName);
-    const now = Date.now();
-
-    let currentUses = 1;
-    if (restTimestamp && now - restTimestamp < 86400000) {
-        currentUses = Number(storedUses ?? 1);
-    } else if (!restTimestamp) {
-        currentUses = Number(storedUses ?? 1);
-    }
+    const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? 0);
 
     if (currentUses <= 0) {
         return {
@@ -171,26 +161,12 @@ export async function onTamedSurgeSelected(action, playerStats, campaignName, se
     const auto = action.automation;
 
     const usesKey = 'tamedSurgeUses';
-    const restKey = 'tamedSurgeLastRest';
-    const storedUses = getRuntimeValue(playerName, usesKey, campaignName);
-    const restTimestamp = getRuntimeValue(playerName, restKey, campaignName);
-    const now = Date.now();
-
-    let currentUses = 1;
-    if (restTimestamp && now - restTimestamp < 86400000) {
-        currentUses = Number(storedUses ?? 1);
-    } else if (!restTimestamp) {
-        currentUses = Number(storedUses ?? 1);
-    }
+    const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? 0);
 
     if (currentUses <= 0) return null;
 
     const newUses = currentUses - 1;
     await setRuntimeValue(playerName, usesKey, newUses, campaignName, true);
-
-    if (newUses <= 0) {
-        await setRuntimeValue(playerName, restKey, now, campaignName, true);
-    }
 
     await addEntry(campaignName, {
         type: 'ability_use',
@@ -211,22 +187,12 @@ export async function onTamedSurgeSelected(action, playerStats, campaignName, se
     };
 }
 
-export async function handleFeatsOfChaos(action, playerStats, campaignName, _mapName) {
+export async function handleFeatsOfChaos(action, playerStats, _campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
     const usesKey = 'featsOfChaosUses';
-    const restKey = 'featsOfChaosLastRest';
-    const storedUses = getRuntimeValue(playerName, usesKey, campaignName);
-    const restTimestamp = getRuntimeValue(playerName, restKey, campaignName);
-    const now = Date.now();
-
-    let currentUses = 1;
-    if (restTimestamp && now - restTimestamp < 86400000) {
-        currentUses = Number(storedUses ?? 1);
-    } else if (!restTimestamp) {
-        currentUses = Number(storedUses ?? 1);
-    }
+    const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? 0);
 
     if (currentUses <= 0) {
         return {
@@ -316,24 +282,11 @@ export async function onFeatsOfChaosActivate(action, playerStats, campaignName) 
 export async function onFeatsOfChaosConsume(action, playerStats, campaignName) {
     const playerName = playerStats.name;
     const usesKey = 'featsOfChaosUses';
-    const restKey = 'featsOfChaosLastRest';
-    const storedUses = getRuntimeValue(playerName, usesKey, campaignName);
-    const restTimestamp = getRuntimeValue(playerName, restKey, campaignName);
-    const now = Date.now();
-
-    let currentUses = 1;
-    if (restTimestamp && now - restTimestamp < 86400000) {
-        currentUses = Number(storedUses ?? 1);
-    } else if (!restTimestamp) {
-        currentUses = Number(storedUses ?? 1);
-    }
+    const currentUses = Number(getRuntimeValue(playerName, usesKey) ?? 0);
 
     if (currentUses > 0) {
         const newUses = currentUses - 1;
         await setRuntimeValue(playerName, usesKey, newUses, campaignName, true);
-        if (newUses <= 0) {
-            await setRuntimeValue(playerName, restKey, now, campaignName, true);
-        }
     }
 
     await setRuntimeValue(playerName, 'featsOfChaosActive', false, campaignName, true);

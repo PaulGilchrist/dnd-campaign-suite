@@ -4,8 +4,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import { getMonsterData } from '../../npcs/monsterUtils.js';
 import { addEntry } from '../../ui/logService.js';
 
-const FRIENDS_COOLDOWN_MS = 86400000; // 24 hours
-
 /**
  * Check whether a creature (by name) is a Humanoid.
  * Players are always Humanoid. NPCs are checked against monster data.
@@ -55,15 +53,12 @@ async function isFighting(casterName, targetName, campaignName) {
 }
 
 /**
- * Check whether the caster has cast Friends on this target within the past 24 hours.
+ * Check whether the caster has cast Friends on this target.
  */
 function hasRecentFriendsCast(casterName, targetName, campaignName) {
     const key = `_friends_24h_${casterName}_${targetName}`;
     const lastCast = getRuntimeValue(casterName, key, campaignName);
-    if (!lastCast) return false;
-
-    const elapsed = Date.now() - Number(lastCast);
-    return elapsed < FRIENDS_COOLDOWN_MS;
+    return !!lastCast;
 }
 
 /**
@@ -71,7 +66,7 @@ function hasRecentFriendsCast(casterName, targetName, campaignName) {
  */
 function recordFriendsCast(casterName, targetName, campaignName) {
     const key = `_friends_24h_${casterName}_${targetName}`;
-    setRuntimeValue(casterName, key, String(Date.now()), campaignName);
+    setRuntimeValue(casterName, key, true, campaignName);
 }
 
 export async function triggerFriends(spell, metaCtx, playerStats, campaignName, mapName) {

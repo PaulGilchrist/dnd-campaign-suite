@@ -591,7 +591,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
 
     let empEvocFormula = formula;
     if (shouldApplyEmpoweredEvoc) {
-        empEvocFormula = `${formula} + ${empEvocIntMod}[Empowered Evocation]`;
+        empEvocFormula = `${formula} + ${empEvocIntMod} [Empowered Evocation]`;
     }
 
     // Overchannel: maximize damage for Wizard spells (slot levels 1-5) that deal damage
@@ -610,19 +610,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         const spellLevel = metaCtx?.slotLevel || spell.level;
         const hasDamage = !!spell.damage;
         const isSlotLevelValid = spellLevel >= 1 && spellLevel <= 5;
-        const usesKey = '_Overchannel_uses';
-        const restKey = '_Overchannel_restTimestamp';
-        const now = Date.now();
-        const lastRestTimestamp = getRuntimeValue(playerStats.name, restKey, campaignName);
-        let currentMaxUses = 1;
-        if (lastRestTimestamp && now - lastRestTimestamp < 86400000) {
-            currentMaxUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
-        } else if (!lastRestTimestamp) {
-            currentMaxUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? 1);
-        }
-        if (hasDamage && isSlotLevelValid && currentMaxUses > 0) {
+        const usesKey = '_Overchannel_useCount';
+        const currentUseCount = Number(getRuntimeValue(playerStats.name, usesKey) ?? 0);
+        if (hasDamage && isSlotLevelValid && metaCtx?.overchannel) {
             overchannelActive = true;
-            overchannelUseCount = currentMaxUses;
+            overchannelUseCount = currentUseCount + 1;
             overchannelFormula = `${empEvocFormula}[Overchannel Maximize]`;
         }
     }
@@ -632,12 +624,15 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         const context = {
           targetName: target?.name,
           attackerName: playerStats.name,
-           ...rollContext,
-           saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
-          saveType: spell.dc.dc_type,
-          dcSuccess: spell.dc.dc_success,
-          metamagicHeighten: hasInvisible,
-          isCantrip: spell.level === 0,
+            ...rollContext,
+            saveDc: spellSaveDc + (innateSorceryActive ? 1 : 0),
+            saveType: spell.dc.dc_type,
+            dcSuccess: spell.dc.dc_success,
+            metamagicHeighten: hasInvisible,
+            isCantrip: spell.level === 0,
+            overchannelActive,
+            overchannelUseCount,
+            overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
         };
         if (spell.status_effects && spell.status_effects.length > 0) {
           context.statusEffects = spell.status_effects;

@@ -162,7 +162,6 @@ describe('wildMagicSurgeHandler', () => {
         it('should return info popup when no uses remaining', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'tamedSurgeUses') return 0;
-                if (key === 'tamedSurgeLastRest') return Date.now();
                 return null;
             });
 
@@ -175,7 +174,6 @@ describe('wildMagicSurgeHandler', () => {
         it('should return info popup when no surge table', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'tamedSurgeUses') return 1;
-                if (key === 'tamedSurgeLastRest') return null;
                 return null;
             });
 
@@ -188,7 +186,6 @@ describe('wildMagicSurgeHandler', () => {
         it('should return modal with available surges', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'tamedSurgeUses') return 1;
-                if (key === 'tamedSurgeLastRest') return null;
                 return null;
             });
 
@@ -211,7 +208,6 @@ describe('wildMagicSurgeHandler', () => {
             };
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'tamedSurgeUses') return 1;
-                if (key === 'tamedSurgeLastRest') return null;
                 return null;
             });
 
@@ -221,12 +217,12 @@ describe('wildMagicSurgeHandler', () => {
             expect(result.payload.availableSurges[0].max).toBe(5);
         });
 
-        it('should default to 1 use when no stored value', async () => {
+        it('should default to 0 uses when no stored value', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
             const result = await handleTamedSurge(makeAction(), makePlayerStats(), 'campaign', 'map');
 
-            expect(result.type).toBe('modal');
+            expect(result.type).toBe('popup');
         });
     });
 
@@ -234,7 +230,6 @@ describe('wildMagicSurgeHandler', () => {
         it('should return null when no uses remaining', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'tamedSurgeUses') return 0;
-                if (key === 'tamedSurgeLastRest') return Date.now();
                 return null;
             });
 
@@ -246,7 +241,6 @@ describe('wildMagicSurgeHandler', () => {
         it('should decrement uses and return popup', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'tamedSurgeUses') return 1;
-                if (key === 'tamedSurgeLastRest') return null;
                 return null;
             });
 
@@ -263,28 +257,9 @@ describe('wildMagicSurgeHandler', () => {
             );
         });
 
-        it('should set rest timestamp when uses reach 0', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'tamedSurgeUses') return 1;
-                if (key === 'tamedSurgeLastRest') return null;
-                return null;
-            });
-
-            await onTamedSurgeSelected(makeAction(), makePlayerStats(), 'campaign', { effect: 'Test effect' });
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'tamedSurgeLastRest',
-                expect.any(Number),
-                'campaign',
-                true
-            );
-        });
-
         it('should add campaign log entry', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'tamedSurgeUses') return 1;
-                if (key === 'tamedSurgeLastRest') return null;
                 return null;
             });
 
@@ -302,7 +277,6 @@ describe('wildMagicSurgeHandler', () => {
         it('should return info popup when no uses remaining', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'featsOfChaosUses') return 0;
-                if (key === 'featsOfChaosLastRest') return Date.now();
                 return null;
             });
 
@@ -313,7 +287,10 @@ describe('wildMagicSurgeHandler', () => {
         });
 
         it('should return popup with advantage description', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(null);
+            runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+                if (key === 'featsOfChaosUses') return 1;
+                return null;
+            });
 
             const result = await handleFeatsOfChaos(makeAction(), makePlayerStats(), 'campaign', 'map');
 
@@ -322,13 +299,13 @@ describe('wildMagicSurgeHandler', () => {
             expect(result.payload.description).toContain('Wild Magic Surge');
         });
 
-        it('should default to 1 use when no stored value', async () => {
+        it('should default to 0 uses when no stored value', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(null);
 
             const result = await handleFeatsOfChaos(makeAction(), makePlayerStats(), 'campaign', 'map');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Advantage');
+            expect(result.payload.description).toContain('no uses remaining');
         });
     });
 
@@ -412,7 +389,6 @@ describe('wildMagicSurgeHandler', () => {
         it('should consume a use and deactivate', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'featsOfChaosUses') return 1;
-                if (key === 'featsOfChaosLastRest') return null;
                 return null;
             });
 
@@ -438,7 +414,6 @@ describe('wildMagicSurgeHandler', () => {
         it('should not consume when no uses remaining', async () => {
             runtimeState.getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'featsOfChaosUses') return 0;
-                if (key === 'featsOfChaosLastRest') return Date.now();
                 return null;
             });
 
@@ -449,24 +424,6 @@ describe('wildMagicSurgeHandler', () => {
                 'TestSorcerer',
                 'featsOfChaosActive',
                 false,
-                'campaign',
-                true
-            );
-        });
-
-        it('should set rest timestamp when uses reach 0', async () => {
-            runtimeState.getRuntimeValue.mockImplementation((name, key) => {
-                if (key === 'featsOfChaosUses') return 1;
-                if (key === 'featsOfChaosLastRest') return null;
-                return null;
-            });
-
-            await onFeatsOfChaosConsume(makeAction(), makePlayerStats(), 'campaign');
-
-            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'featsOfChaosLastRest',
-                expect.any(Number),
                 'campaign',
                 true
             );

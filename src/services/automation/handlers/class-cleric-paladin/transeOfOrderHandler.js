@@ -16,24 +16,14 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const currentSP = playerStats.resources?.sorcery_points?.current ?? maxSP;
 
     const usesKey = getRuntimeKey(playerName, 'transeOfOrderUses');
-    const restKey = getRuntimeKey(playerName, 'transeOfOrderRestTimestamp');
+    const usesMax = 1;
 
-    const lastRest = getRuntimeValue(playerName, restKey, campaignName);
-    const now = Date.now();
-    let usesMax = 1;
-    let active;
-
-    if (lastRest && (now - lastRest) < 86400000) {
-        const stored = getRuntimeValue(playerName, usesKey, campaignName);
-        active = (stored != null ? Number(stored) : usesMax) > 0;
-    } else {
-        active = true;
-    }
+    const stored = getRuntimeValue(playerName, usesKey, campaignName);
+    const active = (stored != null ? Number(stored) : usesMax) > 0;
 
     if (!active) {
         if (currentSP >= 5) {
             spendSorceryPoints(playerName, 5, campaignName);
-            await setRuntimeValue(playerName, restKey, now, campaignName);
             await setRuntimeValue(playerName, usesKey, usesMax, campaignName);
 
             addEntry(campaignName, {
@@ -41,7 +31,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 characterName: playerName,
                 abilityName: featureName,
                 description: `${playerName} restored Transe of Order by spending 5 Sorcery Points.`,
-                timestamp: now,
             }).catch((e) => { console.error("[transeOfOrder] Error:", e); throw e; });
 
             return {
@@ -74,7 +63,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} activated ${featureName} (Bonus Action, 1 minute). Attack rolls against you can't benefit from Advantage. D20 tests treat 9 or lower as 10.`,
-        timestamp: now,
     }).catch((e) => { console.error("[transeOfOrder] Error:", e); throw e; });
 
     return {

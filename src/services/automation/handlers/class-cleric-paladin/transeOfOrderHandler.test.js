@@ -49,7 +49,6 @@ function getRuntimeKey(playerName, key) {
 describe('Transe of Order Handler', () => {
     const activeKey = getRuntimeKey('Test Character', 'transeOfOrderActive');
     const usesKey = getRuntimeKey('Test Character', 'transeOfOrderUses');
-    const restKey = getRuntimeKey('Test Character', 'transeOfOrderRestTimestamp');
 
     beforeEach(() => {
         vi.clearAllMocks();
@@ -79,11 +78,9 @@ describe('Transe of Order Handler', () => {
     });
 
     it('returns error when no uses remaining and insufficient SP', async () => {
-        const recentRest = Date.now() - 3600000; // 1 hour ago
         runtimeState.getRuntimeValue.mockImplementation((name, key) => {
             if (key === activeKey) return false;
             if (key === usesKey) return 0;
-            if (key === getRuntimeKey('Test Character', 'transeOfOrderRestTimestamp')) return recentRest;
             return null;
         });
 
@@ -98,11 +95,9 @@ describe('Transe of Order Handler', () => {
     });
 
     it('restores transe of order by spending 5 SP when no uses remaining', async () => {
-        const recentRest = Date.now() - 3600000; // 1 hour ago
         runtimeState.getRuntimeValue.mockImplementation((name, key) => {
             if (key === activeKey) return false;
             if (key === usesKey) return 0;
-            if (key === getRuntimeKey('Test Character', 'transeOfOrderRestTimestamp')) return recentRest;
             return null;
         });
 
@@ -116,12 +111,6 @@ describe('Transe of Order Handler', () => {
         expect(metamagic.spendSorceryPoints).toHaveBeenCalledWith(
             'Test Character',
             5,
-            'test-campaign'
-        );
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-            'Test Character',
-            restKey,
-            expect.any(Number),
             'test-campaign'
         );
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
