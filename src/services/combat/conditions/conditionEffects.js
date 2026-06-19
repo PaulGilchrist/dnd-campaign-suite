@@ -63,7 +63,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     if (!within5ft) return false;
     return true;
   }
-  if (modifier.target !== 'saving_throw' && modifier.target !== 'save' && modifier.target !== 'attack_roll' && modifier.target !== 'attack_rolls' && modifier.target !== 'attack_rolls_vs_unmounted_near_mount') return false;
+  if (modifier.target !== 'saving_throw' && modifier.target !== 'save' && modifier.target !== 'attack_roll' && modifier.target !== 'attack_rolls' && modifier.target !== 'attack_rolls_vs_unmounted_near_mount' && modifier.target !== 'concentration_saving_throws' && modifier.target !== 'death_saving_throws') return false;
   if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'shape_shift') return shapeShiftActive;
   if (modifier.condition === 'peerless_athlete') return isPeerlessAthlete;
@@ -142,7 +142,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       if (mod.effect === 'disadvantage') {
         effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
       }
-    } else if (mod.target !== 'saving_throw' && mod.target !== 'save') {
+    } else if (mod.target !== 'saving_throw' && mod.target !== 'save' && mod.target !== 'concentration_saving_throws' && mod.target !== 'death_saving_throws') {
       continue;
     }
     if (mod.effect === 'advantage') {
@@ -341,7 +341,7 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
   const conditionSet = new Set(conditions)
 
   for (const mod of saveModifiers) {
-    if (mod.target !== 'saving_throw' && mod.target !== 'save') continue;
+    if (mod.target !== 'saving_throw' && mod.target !== 'save' && mod.target !== 'concentration_saving_throws' && mod.target !== 'death_saving_throws') continue;
     if (mod.condition === 'charmed' && conditionSet.has('charmed')) {
       if (mod.effect === 'advantage') effects.saveAdvantage.push('charmed');
       if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('charmed');

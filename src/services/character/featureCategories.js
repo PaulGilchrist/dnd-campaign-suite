@@ -141,6 +141,7 @@ const categories2024 = {
         "Barbarian Subclass",
         "Bard Subclass",
         "Bardic Inspiration",
+        "Body and Mind",
         "Channel Divinity",
         "Cleric Subclass",
         "Celestial Resistance",

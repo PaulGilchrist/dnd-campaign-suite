@@ -678,7 +678,7 @@
                     "target": "d20",
                     "condition": "roll_equals_1",
                     "effect": "reroll",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             },
             {
@@ -687,7 +687,7 @@
                 "automation": {
                     "type": "passive_rule",
                     "effect": "naturally_stealthy",
-                    "casting_time": "passive"
+                    "casting_time": "1 action"
                 }
             }
         ],

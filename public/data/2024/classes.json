@@ -228,7 +228,7 @@
               "effect": "rage_bonus_movement",
               "distanceExpression": "speed / 2",
               "triggerOnRage": true,
-              "casting_time": "passive"
+              "casting_time": "1 bonus action"
             }
           }
         ]

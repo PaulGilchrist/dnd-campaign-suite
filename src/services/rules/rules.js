@@ -1045,6 +1045,7 @@ const rules = {
             });
             // Re-process automation with feat features included
             playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+            playerStats.saveModifiers = collectSaveModifiers(allFeatures);
         }
 
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);

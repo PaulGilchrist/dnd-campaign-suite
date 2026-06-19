@@ -53,7 +53,13 @@ function ConcentrationPromptModal({ campaignName, characters, activeMapName }) {
     const aura = await computeAuraBonus({ targetName: current.targetName, characters, campaignName, activeMapName });
     const auraBonus = aura.bonus;
 
-    const hasAdvantage = hasSaveModifier(saveModifiers, 'concentration_saving_throws', 'CON');
+    const hasAdvantage = hasSaveModifier(saveModifiers, 'concentration_saving_throws', 'CON') ||
+      (saveModifiers && saveModifiers.some(mod =>
+        mod.target === 'saving_throw' &&
+        mod.condition === 'concentration_spell_damage' &&
+        mod.effect === 'advantage' &&
+        mod.abilities && mod.abilities.includes('Constitution')
+      ));
     const starryFormBuff = (saveModifiers || []).length > 0 && (() => {
       const character = (characters || []).find(c => {
         const name = typeof c === 'string' ? c : c.name;
