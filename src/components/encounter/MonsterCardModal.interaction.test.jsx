@@ -1,5 +1,5 @@
 /* @improved-by-ai */
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import MonsterCardModal from './MonsterCardModal.jsx';
 import { makeMonster, makeProps, defaultConditionEffects } from './MonsterCardModal.test-utils.js';
@@ -112,8 +112,6 @@ const rollAbilityCheck = useLoggedDiceRoll._rollAbilityCheck;
 const rollSavingThrow = useLoggedDiceRoll._rollSavingThrow;
 const rollSkillCheck = useLoggedDiceRoll._rollSkillCheck;
 const rollInitiative = useLoggedDiceRoll._rollInitiative;
-const quickRollPlayerSave = useLoggedDiceRoll._quickRollPlayerSave;
-const setPopupHtml = useLoggedDiceRoll._setPopupHtml;
 
 // ── Tests ----
 

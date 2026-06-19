@@ -3,8 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import WarningList from './WarningList.jsx';
 
-const warningIcon = '\u26A0\uFE0F';
-const infoIcon = '\u2139\uFE0F';
+
 
 describe('WarningList', () => {
     describe('empty/null/undefined handling', () => {
