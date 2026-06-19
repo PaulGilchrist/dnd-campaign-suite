@@ -371,7 +371,15 @@
             },
             {
                 "name": "Keen Senses",
-                "description": "You have proficiency in the Insight, Perception, or Survival skill."
+                "description": "You have proficiency in the Insight, Perception, or Survival skill.",
+                "proficiency_choices": {
+                    "choose": 1,
+                    "from": [
+                        "Skill: Insight",
+                        "Skill: Perception",
+                        "Skill: Survival"
+                    ]
+                }
             },
             {
                 "name": "Trance",

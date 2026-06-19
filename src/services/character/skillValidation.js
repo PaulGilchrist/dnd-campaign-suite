@@ -20,9 +20,17 @@ function parseSkillProficiencies(data, ruleset = '5e') {
   // 2024: Check trait descriptions for skill proficiency grants
   if (ruleset === '2024' && data.traits) {
     const skills = [];
+    let choiceCount = 0;
     data.traits.forEach(trait => {
+      if (trait.proficiency_choices) {
+        const pc = trait.proficiency_choices;
+        if (pc.from && pc.from.length > 0 && pc.from[0].startsWith('Skill: ')) {
+          choiceCount += pc.choose || 0;
+        }
+        return;
+      }
       if (trait.description) {
-        const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
+        const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z,\s]+?)\s*skill/i);
         if (match) {
           const skillsStr = match[1]
             .replace(/\s+and\s+/g, ',')
@@ -39,7 +47,7 @@ function parseSkillProficiencies(data, ruleset = '5e') {
         }
       }
     });
-    return { count: skills.length, skills, isChoice: false };
+    return { count: skills.length + choiceCount, skills, isChoice: choiceCount > 0 };
   }
 
   const skillField = data.skill_proficiencies || data.skill_proficiency_choices;

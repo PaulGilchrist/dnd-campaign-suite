@@ -275,30 +275,34 @@ const rules = {
                         throw new Error('Missing array: race.traits for ' + playerStats.name);
                     }
                     traits.forEach(trait => {
-                       // Parse specific skill names from description text
-                       if (trait.description) {
-                           const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z\s]+?)\s*skill/i);
-                           if (match) {
-                               const skillsStr = match[1]
-                                   .replace(/\s+and\s+/g, ',')
-                                   .replace(/\s+or\s+/g, ',')
-                                   .replace(/,\s*,/g, ',')
-                                   .split(',')
-                                   .map(s => s.trim())
-                                   .filter(s => s.length > 0);
-                               skillsStr.forEach(sName => {
-                                   extra.push(`Skill: ${sName}`);
-                               });
-                           }
-                       }
-                       // Merge skill proficiency_choices from traits (e.g., Human's Skillful)
-                       if (trait.proficiency_choices) {
-                           const pc = trait.proficiency_choices;
-                           if (pc.from && pc.from.length > 0) {
-                               extra.push(...pc.from);
-                           }
-                       }
-                   });
+                        // Skip traits with proficiency_choices (handled separately below)
+                        if (trait.proficiency_choices) {
+                            return;
+                        }
+                        // Parse specific skill names from description text
+                        if (trait.description) {
+                            const match = trait.description.match(/proficiency in the ([A-Z][a-z]+(?:,|[,\s]and[,\s]|[,\s]or[,\s]|,?)[A-Za-z,\s]+?)\s*skill/i);
+                            if (match) {
+                                const skillsStr = match[1]
+                                    .replace(/\s+and\s+/g, ',')
+                                    .replace(/\s+or\s+/g, ',')
+                                    .replace(/,\s*,/g, ',')
+                                    .split(',')
+                                    .map(s => s.trim())
+                                    .filter(s => s.length > 0);
+                                skillsStr.forEach(sName => {
+                                    extra.push(`Skill: ${sName}`);
+                                });
+                            }
+                        }
+                        // Merge skill proficiency_choices from traits (e.g., Human's Skillful)
+                        if (trait.proficiency_choices) {
+                            const pc = trait.proficiency_choices;
+                            if (pc.from && pc.from.length > 0) {
+                                extra.push(...pc.from);
+                            }
+                        }
+                    });
                    return extra;
                };
 
