@@ -417,12 +417,12 @@ describe('CharBonusActions', () => {
       const onAutomationAction = vi.fn();
       const rageAction = {
         ...automatedBonusAction,
-        name: 'Rage',
+        name: 'Berserker Rage',
         description: 'You enter a rage.',
         automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' },
       };
       render(<CharBonusActions playerStats={createStats({ bonusActions: [rageAction] })} onAutomationAction={onAutomationAction} />);
-      const actionName = screen.getByText(/Rage:/);
+      const actionName = screen.getByText(/Berserker Rage:/);
       fireEvent.click(actionName);
       expect(onAutomationAction).not.toHaveBeenCalled();
     });
@@ -448,7 +448,7 @@ describe('CharBonusActions', () => {
 
   describe('rage expendable features', () => {
     const rageBonusAction = {
-      name: 'Rage',
+      name: 'Berserker Rage',
       description: 'You enter a rage.',
       automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage', resourceKey: 'ragePoints' },
     };
@@ -464,7 +464,7 @@ describe('CharBonusActions', () => {
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
       const nonRage = {
-        name: 'Channel Divinity',
+        name: 'Divine Channel',
         description: 'You channel divine energy.',
         automation: { type: 'auto_effect', recharge: 'long_rest' },
       };

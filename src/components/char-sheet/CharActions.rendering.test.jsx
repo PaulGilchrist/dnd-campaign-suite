@@ -456,7 +456,7 @@ describe('CharActions rendering', () => {
       const { hasAutomation } = await import('../../services/combat/automation/automationService.js');
       hasAutomation.mockReturnValue(true);
       const stats = createStats({
-        actions: [{ name: 'Rage', description: 'Enter a rage.', automation: { type: 'combat_stance' } }],
+        actions: [{ name: 'Berserker Rage', description: 'Enter a rage.', automation: { type: 'combat_stance' } }],
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.getByText(/Rage:/)).toHaveClass('clickable');
@@ -535,7 +535,7 @@ describe('CharActions rendering', () => {
 
     it('does not rename non-Metamagic actions', () => {
       const stats = createStats({
-        actions: [{ name: 'Rage', description: 'Enter a rage.', automation: { type: 'combat_stance' } }],
+        actions: [{ name: 'Berserker Rage', description: 'Enter a rage.', automation: { type: 'combat_stance' } }],
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.getByText(/Rage:/)).toBeInTheDocument();
@@ -550,7 +550,7 @@ describe('CharActions rendering', () => {
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(true);
       const stats = createStats({
-        actions: [{ name: 'Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
+        actions: [{ name: 'Berserker Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.getByText(/Restore with Rage/)).toBeInTheDocument();
@@ -574,7 +574,7 @@ describe('CharActions rendering', () => {
       hasAutomation.mockReturnValue(true);
       isExhausted.mockReturnValue(false);
       const stats = createStats({
-        actions: [{ name: 'Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
+        actions: [{ name: 'Berserker Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
       });
       render(<CharActions playerStats={stats} />);
       expect(screen.queryByText(/Restore with Rage/)).not.toBeInTheDocument();

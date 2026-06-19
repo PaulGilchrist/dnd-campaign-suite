@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import EmpoweredSpellPopup from './popups/EmpoweredSpellPopup.jsx'
+import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
@@ -714,6 +715,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const is2024Rules = playerStats.rules === '2024';
 
+    const categories = getCategories(playerStats.rules || '5e');
+
     return (
         <div className="char-actions">
             <div>
@@ -924,7 +927,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleActionMetamagicConfirm={handleActionMetamagicConfirm}
                     handleActionMetamagicSkip={handleActionMetamagicSkip}
                 />
-                {playerStats.actions.map((action) => {
+                {(playerStats.actions || []).filter(a => !categories.featuresToIgnore.includes(a.name)).map((action) => {
                     const auto = action.automation;
                     const isMetamagic = action.name === 'Metamagic' && auto?.type === 'spell_modifier';
                     const isClickable = action.details || hasAutomation(action);

@@ -3,6 +3,7 @@
     import DiceRollResult from './DiceRollResult.jsx'
     import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
     import MetamagicPopup from './popups/MetamagicPopup.jsx'
+      import { getCategories } from '../../services/character/featureCategories.js'
       import { sanitizeHtml } from '../../services/ui/sanitize.js';
        import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
        import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
@@ -245,7 +246,7 @@ const reactionCastAction = React.useCallback((spell, metaCtx) => {
                      <DiceRollResult {...popupHtml} />}
                 </Popup>
             )}
-              {reactions.map((reaction) => {
+              {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {
                 const isClickable = reaction.details || reaction.name === OPPORTUNITY_ATTACK.name || hasAutomation(reaction);
                 return <div key={reaction.name}>
                      <b className={isClickable ? "clickable" : ""} onClick={() => handleReactionClick(reaction)}>{reaction.name}:</b> <span dangerouslySetInnerHTML={{ __html: sanitizeHtml(reaction.description) }}></span>

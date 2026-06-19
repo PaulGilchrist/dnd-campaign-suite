@@ -240,11 +240,11 @@ describe('CharSpecialActions', () => {
     it('shows a popup when a non-clickable special action is clicked', () => {
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Rage', description: 'Enter a berserker rage.' },
+          { name: 'Berserker Rage', description: 'Enter a berserker rage.' },
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Rage/));
+      fireEvent.click(screen.getByText(/Berserker Rage/));
       expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
       const elements = screen.getAllByText(/Enter a berserker rage/);
       expect(elements.length).toBeGreaterThanOrEqual(1);
@@ -253,11 +253,11 @@ describe('CharSpecialActions', () => {
     it('dismisses the popup when the overlay is clicked', async () => {
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Rage', description: 'Enter a berserker rage.' },
+          { name: 'Berserker Rage', description: 'Enter a berserker rage.' },
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Rage/));
+      fireEvent.click(screen.getByText(/Berserker Rage/));
       await waitFor(() => {
         expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
       });

@@ -3,6 +3,7 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
+import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
@@ -259,8 +260,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                   </div>
               )}
              {(popupHtml && hasBonusActions) && <br />}
-             {hasBonusActions && <div>
-             {playerStats.bonusActions.map((bonusAction) => {
+              {hasBonusActions && <div>
+              {((playerStats.bonusActions || []).filter(a => getCategories(playerStats.rules || '5e').featuresToIgnore.includes(a.name) === false)).map((bonusAction) => {
                      const isBonusClickable = bonusAction.details || hasAutomation(bonusAction);
                      const bonusAuto = bonusAction.automation;
                      const isRageExpendable = bonusAuto?.recharge === 'long_rest_or_expend_rage';

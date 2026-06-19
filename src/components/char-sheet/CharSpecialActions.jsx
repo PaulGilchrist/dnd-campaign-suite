@@ -1,6 +1,7 @@
  
 import { useState, useCallback } from 'react';
 import Popup from '../common/Popup.jsx'
+import { getCategories } from '../../services/character/featureCategories.js'
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
 import { getFightingStyle } from '../../services/character/fightingStyles.js'
 import { executeHandler } from '../../services/automation/index.js';
@@ -52,12 +53,15 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const reactionNames = new Set(playerStats.reactions?.map(action => action.name) || []);
     const characterAdvancementNames = new Set(playerStats.characterAdvancement?.map(feature => feature.name) || []);
     
-      // Filter out features that are in actions, bonusActions, reactions, or characterAdvancement
+      const categories = getCategories(playerStats.rules || '5e');
+    
+    // Filter out features that are in actions, bonusActions, reactions, or characterAdvancement, or featuresToIgnore
     const filteredActions = specialActions.filter(action => 
           !actionNames.has(action.name) && 
           !bonusActionNames.has(action.name) && 
           !reactionNames.has(action.name) &&
-          !characterAdvancementNames.has(action.name)
+          !characterAdvancementNames.has(action.name) &&
+          !categories.featuresToIgnore.includes(action.name)
       );
     
     const uniqueActions = Array.from(new Map(filteredActions.map(action => [action.name, action])).values());

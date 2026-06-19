@@ -1,6 +1,7 @@
 
 import useActionPopup from '../../hooks/combat/useActionPopup.js'
 import Popup from '../common/Popup.jsx'
+import { getCategories } from '../../services/character/featureCategories.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { executeHandler } from '../../services/automation/index.js'
@@ -13,7 +14,8 @@ import { useState, useCallback } from 'react';
 
 function CharCharacterAdvancement({ playerStats, campaignName }) {
     const { showPopup, popupHtml, setPopupHtml } = useActionPopup('feature');
-    const features = playerStats.characterAdvancement || [];
+    const categories = getCategories(playerStats.rules || '5e');
+    const features = (playerStats.characterAdvancement || []).filter(f => !categories.featuresToIgnore.includes(f.name));
     const [spellMasteryModal, setSpellMasteryModal] = useState(null);
     const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
 

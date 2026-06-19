@@ -223,7 +223,7 @@ describe('CharActions click handlers', () => {
 
       const stats = createStats({
         actions: [{
-          name: 'Rage',
+          name: 'Berserker Rage',
           description: 'You enter a rage.',
           automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' },
         }],
@@ -250,7 +250,7 @@ describe('CharActions click handlers', () => {
 
       const stats = createStats({
         actions: [{
-          name: 'Rage',
+          name: 'Berserker Rage',
           description: 'You enter a rage.',
           automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' },
         }],
@@ -269,7 +269,7 @@ describe('CharActions click handlers', () => {
 
       const stats = createStats({
         actions: [{
-          name: 'Rage',
+          name: 'Berserker Rage',
           description: 'You enter a rage.',
           automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' },
         }],
@@ -505,7 +505,7 @@ describe('CharActions click handlers', () => {
       isExhausted.mockReturnValue(true);
 
       const stats = createStats({
-        actions: [{ name: 'Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
+        actions: [{ name: 'Berserker Rage', description: 'You enter a rage.', automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' } }],
       });
 
       await renderWithFetch(<CharActions playerStats={stats} />);
