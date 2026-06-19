@@ -651,17 +651,18 @@ export function clearAllExpirationEffects(characterName, campaignName) {
      // --- "From me": clear all effects I have on other targets ---
     const myList = getRuntimeValue(characterName, KEY);
     if (!Array.isArray(myList)) {
-        console.error('expirations: expected pendingExpirations to be an array for', characterName);
-        throw new Error('Missing array: pendingExpirations for ' + characterName);
-    }
-    for (const entry of myList) {
-        clearExpirationEffects(entry.effects, entry.target, characterName, campaignName);
+        setRuntimeValue(characterName, KEY, [], campaignName);
+    } else {
+        for (const entry of myList) {
+            clearExpirationEffects(entry.effects, entry.target, characterName, campaignName);
+          }
+        setRuntimeValue(characterName, KEY, [], campaignName);
       }
-    setRuntimeValue(characterName, KEY, [], campaignName);
 
      // --- Scan all runtime stores for "to me" entries ---
     const allKeys = getAllStoreKeys();
     for (const key of allKeys) {
+        if (typeof key !== 'string') continue;
         if (key.toLowerCase() === charLower) continue;
 
         const list = getRuntimeValue(key, KEY);
