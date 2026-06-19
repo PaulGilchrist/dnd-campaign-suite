@@ -95,7 +95,6 @@ export function setRuntimeObject(characterKey, fullObject, campaignName, skipSyn
   }
   if (changed) {
     // console.log(`[SSE] setRuntimeObject ${characterKey}: keys [${changedKeys.join(', ')}] changed`);
-
     if (campaignName && !skipSync) {
       fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
         method: 'POST',
@@ -153,7 +152,6 @@ export function setRuntimeBatch(characterKey, properties, campaignName) {
   if (!changed) return;
 
   const obj = Object.fromEntries(store);
-
   if (!campaignName) {
     console.error('setRuntimeBatch called with undefined campaignName', { characterKey, properties, stack: new Error().stack });
   }

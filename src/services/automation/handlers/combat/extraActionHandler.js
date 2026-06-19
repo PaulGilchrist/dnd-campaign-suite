@@ -5,7 +5,7 @@ import { getCurrentCombatRound, loadCombatSummary } from '../../../../services/e
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const usesMax = auto.uses || 1;
-    const resourceKey = auto.resourceKey || 'actionsurgeUses';
+    const resourceKey = auto.resourceKey || 'actionSurgeUses';
 
     // Check oncePerCombat flag
     if (auto.oncePerCombat) {
@@ -55,7 +55,7 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     if (auto.oncePerTurn) {
-        const usedThisTurn = getRuntimeValue(playerStats.name, 'actionsurgeUsedThisTurn', campaignName);
+        const usedThisTurn = getRuntimeValue(playerStats.name, 'actionSurgeUsedThisTurn', campaignName);
         if (usedThisTurn) {
             return {
                 type: 'popup',
@@ -67,7 +67,7 @@ export async function handle(action, playerStats, campaignName) {
                 },
             };
         }
-        await setRuntimeValue(playerStats.name, 'actionsurgeUsedThisTurn', true, campaignName, true);
+        await setRuntimeValue(playerStats.name, 'actionSurgeUsedThisTurn', true, campaignName, true);
     }
 
     if (usesMax > 0) {

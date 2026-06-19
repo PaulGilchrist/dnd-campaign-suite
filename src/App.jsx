@@ -346,7 +346,6 @@ function App() {
     const prefix = `change-${campaignName}-`;
     if (!event.key.startsWith(prefix)) return;
     const characterKey = event.key.slice(prefix.length);
-    // console.log(`[SSE] inbound change-${characterKey} from server:`, event.data);
     setRuntimeObject(characterKey, event.data, campaignName, true);
   }, [campaignName, setCharacters]);
 

@@ -162,7 +162,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
         SHORT_REST_RESOURCES.forEach((key) => {
             setRuntimeValue(playerStats.name, key, null, campaignName);
-           });
+            });
 
         if (sorcRestoration && restorationAvailable && restorationRequested) {
             let curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');

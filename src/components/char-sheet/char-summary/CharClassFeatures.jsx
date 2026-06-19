@@ -217,7 +217,7 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName }) 
               <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
               <div><b>Weapon Mastery: </b>{classLevel.weapon_mastery}</div>
               <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-              <TrackedResourceInput label="Action Surge Uses" resourceKey="actionsurgeUses" playerName={playerStats.name} getMax={() => actionsurgeMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              <TrackedResourceInput label="Action Surge Uses" resourceKey="actionSurgeUses" playerName={playerStats.name} getMax={() => actionsurgeMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               {hasEnergy && (
                   <div>
                       <div><b>Psionic Energy (Psi Warrior):</b></div>

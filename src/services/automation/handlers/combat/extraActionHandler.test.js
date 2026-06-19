@@ -97,7 +97,7 @@ describe('extraActionHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 1, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 1, campaignName, true);
     });
 
     it('should use custom resourceKey from automation', async () => {
@@ -121,7 +121,7 @@ describe('extraActionHandler.handle', () => {
       const result = await handle(action, ps, campaignName);
 
       expect(result.type).toBe('popup');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 1, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 1, campaignName, true);
     });
 
     it('should use default uses of 1 when auto.uses is missing', async () => {
@@ -133,7 +133,7 @@ describe('extraActionHandler.handle', () => {
       const result = await handle(action, ps, campaignName);
 
       expect(result.type).toBe('popup');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 0, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 0, campaignName, true);
     });
 
     it('should not decrement when usesUsed is already 0 after re-check', async () => {
@@ -159,7 +159,7 @@ describe('extraActionHandler.handle', () => {
 
       getRuntimeValue
         .mockReturnValueOnce(undefined)  // First call: usesUsed (undefined -> usesMax=2, passes check)
-        .mockReturnValue(true);          // Second call: actionsurgeUsedThisTurn
+        .mockReturnValue(true);          // Second call: actionSurgeUsedThisTurn
 
       const result = await handle(action, ps, campaignName);
 
@@ -174,13 +174,13 @@ describe('extraActionHandler.handle', () => {
 
       getRuntimeValue
         .mockReturnValueOnce(2)   // First call: usesUsed
-        .mockReturnValue(undefined); // Second call: actionsurgeUsedThisTurn (falsy)
+        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisTurn (falsy)
 
       const result = await handle(action, ps, campaignName);
 
       expect(result.type).toBe('popup');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUsedThisTurn', true, campaignName, true);
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 1, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisTurn', true, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 1, campaignName, true);
     });
 
     it('should skip oncePerTurn check when oncePerTurn is not set', async () => {
@@ -192,7 +192,7 @@ describe('extraActionHandler.handle', () => {
       const result = await handle(action, ps, campaignName);
 
       expect(result.type).toBe('popup');
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'actionsurgeUsedThisTurn', true, campaignName, true);
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisTurn', true, campaignName, true);
     });
 
     it('should still decrement uses when oncePerTurn is true and first use', async () => {
@@ -201,12 +201,12 @@ describe('extraActionHandler.handle', () => {
 
       getRuntimeValue
         .mockReturnValueOnce(3)   // First call: usesUsed
-        .mockReturnValue(undefined); // Second call: actionsurgeUsedThisTurn (falsy)
+        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisTurn (falsy)
 
       await handle(action, ps, campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUsedThisTurn', true, campaignName, true);
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 2, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisTurn', true, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 2, campaignName, true);
     });
   });
 
@@ -221,7 +221,7 @@ describe('extraActionHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 0, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 0, campaignName, true);
     });
 
     it('should succeed without checking runtime state when uses is 0', async () => {
@@ -266,7 +266,7 @@ describe('extraActionHandler.handle', () => {
   });
 
   describe('default resource key', () => {
-    it('should use actionsurgeUses as default resourceKey', async () => {
+    it('should use actionSurgeUses as default resourceKey', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 2 });
 
@@ -274,20 +274,20 @@ describe('extraActionHandler.handle', () => {
 
       await handle(action, ps, campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 1, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 1, campaignName, true);
     });
 
-    it('should use actionsurgeUses as default for oncePerTurn flag', async () => {
+    it('should use actionSurgeUses as default for oncePerTurn flag', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ oncePerTurn: true, uses: 2 });
 
       getRuntimeValue
         .mockReturnValueOnce(2)   // First call: usesUsed
-        .mockReturnValue(undefined); // Second call: actionsurgeUsedThisTurn (falsy)
+        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisTurn (falsy)
 
       await handle(action, ps, campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUsedThisTurn', true, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisTurn', true, campaignName, true);
     });
   });
 
@@ -330,7 +330,7 @@ describe('extraActionHandler.handle', () => {
 
       await handle(action, ps, campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionsurgeUses', 0, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 0, campaignName, true);
     });
   });
 
