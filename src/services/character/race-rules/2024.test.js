@@ -584,6 +584,35 @@ describe('raceRules 2024 (direct module)', () => {
       const result = raceRules.getSenses(playerStats);
       expect(result).toEqual([]);
     });
+
+    it('should add Blindsight 30 ft. when Feral Senses class feature exists', () => {
+      const playerStats = {
+        senses: [],
+        race: { traits: [] },
+        class: {
+          class_levels: [
+            { level: 1, features: [{ name: 'Spellcasting', level: 1 }] },
+            { level: 18, features: [{ name: 'Feral Senses', description: 'Your connection to the forces of nature grants you Blindsight with a range of 30 feet.', level: 18 }] }
+          ]
+        }
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result).toContainEqual({ name: 'Blindsight', value: '30 ft.' });
+    });
+
+    it('should not duplicate Blindsight if already present', () => {
+      const playerStats = {
+        senses: [{ name: 'Blindsight', value: '10 ft.' }],
+        race: { traits: [] },
+        class: {
+          class_levels: [
+            { level: 18, features: [{ name: 'Feral Senses', level: 18 }] }
+          ]
+        }
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result.filter((s) => s.name === 'Blindsight').length).toBe(1);
+    });
   });
 
   describe('getRace', () => {

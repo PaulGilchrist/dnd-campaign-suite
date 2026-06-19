@@ -135,8 +135,14 @@ const raceRules = {
         return resistances.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           },
     getSenses: (playerStats) => {
-            // 2024 Rules: Extract senses from racial traits
+            // 2024 Rules: Extract senses from racial traits and class features
          const passiveSenses = computePassiveSkills(playerStats);
+
+         // Check for Feral Senses class feature (Ranger level 18 - grants Blindsight 30 ft.)
+         const feralSensesExists = hasFeralSenses2024(playerStats);
+         if (feralSensesExists && !passiveSenses.some((sense) => sense.name === 'Blindsight')) {
+             passiveSenses.push({ name: 'Blindsight', value: '30 ft.' });
+         }
 
          if (playerStats.race && playerStats.race.traits) {
              playerStats.race.traits.forEach(trait => {
@@ -239,6 +245,17 @@ function extractDarkvisionFeet(value) {
     if (!value) return 0;
     const match = String(value).match(/(\d+)\s*ft/i);
     return match ? parseInt(match[1], 10) : 0;
+}
+
+function hasFeralSenses2024(playerStats) {
+    const classLevels = playerStats.class?.class_levels || [];
+    for (const classLevel of classLevels) {
+        const features = classLevel?.features || [];
+        if (features.some((f) => f.name === 'Feral Senses')) {
+            return true;
+        }
+    }
+    return false;
 }
 
 export default raceRules;

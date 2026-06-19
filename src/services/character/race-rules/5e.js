@@ -95,12 +95,16 @@ const raceRules = {
         return resistances.sort();
         },
     getSenses: (playerStats) => {
-            // Dependencies: Race
+            // Dependencies: Race, Class
          const passiveSenses = computePassiveSkills(playerStats);
          const darkvisionInSenses = passiveSenses.some((sense) => sense.name === 'Darkvision');
          const darkvisionRace = playerStats.race.traits.some((trait) => trait.name === 'Darkvision');
          if (darkvisionRace && !darkvisionInSenses) {
              passiveSenses.push({ name: 'Darkvision', value: '60 ft.' });
+            }
+         const feralSensesExists = hasFeralSenses(playerStats);
+         if (feralSensesExists && !passiveSenses.some((sense) => sense.name === 'Feral Senses')) {
+             passiveSenses.push({ name: 'Feral Senses', value: '' });
             }
          return passiveSenses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           },
@@ -117,5 +121,16 @@ const raceRules = {
         return traits;
         }
 };
+
+function hasFeralSenses(playerStats) {
+    const classLevels = playerStats.class?.class_levels || [];
+    for (const classLevel of classLevels) {
+        const features = classLevel?.features || [];
+        if (features.some((f) => f.name === 'Feral Senses')) {
+            return true;
+        }
+    }
+    return false;
+}
 
 export default raceRules;
