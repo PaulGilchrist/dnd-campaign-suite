@@ -579,7 +579,7 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
     targetName: creature.name,
     delta,
     currentHp: newHp,
-    maxHp: creature.maxHp,
+    maxHp,
     isHealing: false,
     isUnconscious: isDead,
    };
