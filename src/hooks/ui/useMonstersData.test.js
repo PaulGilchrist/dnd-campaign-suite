@@ -1,10 +1,10 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 
 describe('useMonstersData', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Clear the module-level cache by resetting modules
     vi.resetModules();
   });
 

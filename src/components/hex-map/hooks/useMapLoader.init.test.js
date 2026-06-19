@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
@@ -31,6 +32,7 @@ import { hexKey } from '../../../services/maps/hexMapUtils.js';
 describe('useMapLoader - initial state', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mapsService.loadMapData.mockResolvedValue(null);
         hexKey.mockImplementation((q, r) => `${q},${r}`);
     });
 
@@ -40,86 +42,31 @@ describe('useMapLoader - initial state', () => {
     ];
 
     it('returns loading as true initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
         const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
         expect(result.current.loading).toBe(true);
     });
 
     it('returns mapData as null initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
         const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
         expect(result.current.mapData).toBeNull();
     });
 
-    it('returns gridSize as 10 initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
+    it.each([
+        ['gridSize', 10],
+        ['terrain', {}],
+        ['rivers', []],
+        ['roads', []],
+        ['pois', []],
+        ['marchingOrder', []],
+        ['partyPosition', null],
+        ['weather', null],
+        ['travelInit', null],
+        ['travelSaveVersion', 0],
+        ['zoom', 2],
+        ['panX', 0],
+        ['panY', 0],
+    ])('returns %s as %o initially', (field, expectedValue) => {
         const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.gridSize).toBe(10);
-    });
-
-    it('returns terrain as empty object initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.terrain).toEqual({});
-    });
-
-    it('returns rivers as empty array initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.rivers).toEqual([]);
-    });
-
-    it('returns roads as empty array initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.roads).toEqual([]);
-    });
-
-    it('returns pois as empty array initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.pois).toEqual([]);
-    });
-
-    it('returns marchingOrder as empty array initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.marchingOrder).toEqual([]);
-    });
-
-    it('returns partyPosition as null initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.partyPosition).toBeNull();
-    });
-
-    it('returns weather as null initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.weather).toBeNull();
-    });
-
-    it('returns travelInit as null initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.travelInit).toBeNull();
-    });
-
-    it('returns zoom as 2 initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.zoom).toBe(2);
-    });
-
-    it('returns panX as 0 initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.panX).toBe(0);
-    });
-
-    it('returns panY as 0 initially', () => {
-        mapsService.loadMapData.mockResolvedValue(null);
-        const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-        expect(result.current.panY).toBe(0);
+        expect(result.current[field]).toEqual(expectedValue);
     });
 });

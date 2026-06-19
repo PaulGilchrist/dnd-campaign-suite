@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useHexHover from './useHexHover.js';
@@ -29,27 +30,13 @@ describe('useHexHover', () => {
     };
 
     describe('initial state', () => {
-        it('returns hoveredHex as null initially', () => {
+        it('returns the correct shape with null hoveredHex and three functions', () => {
             const svgRef = createSvgRef();
             const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
+
             expect(result.current.hoveredHex).toBeNull();
-        });
-
-        it('returns setHoveredHex as a function', () => {
-            const svgRef = createSvgRef();
-            const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
             expect(typeof result.current.setHoveredHex).toBe('function');
-        });
-
-        it('returns getHexFromEvent as a function', () => {
-            const svgRef = createSvgRef();
-            const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
             expect(typeof result.current.getHexFromEvent).toBe('function');
-        });
-
-        it('returns handleHexHover as a function', () => {
-            const svgRef = createSvgRef();
-            const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
             expect(typeof result.current.handleHexHover).toBe('function');
         });
     });
@@ -92,7 +79,7 @@ describe('useHexHover', () => {
             expect(hex).toBeNull();
         });
 
-        it('returns a hex object when svgRef exists', () => {
+        it('returns a hex object with q and r when svgRef exists', () => {
             const svgRef = createSvgRef();
             const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
 
@@ -103,15 +90,14 @@ describe('useHexHover', () => {
             expect(hex).toHaveProperty('r');
         });
 
-        it('uses clientX and clientY from the event', () => {
+        it('returns { q: 0, r: 0 } when event maps to origin in SVG coordinates', () => {
             const svgRef = createSvgRef();
             const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
 
             const mockEvent = { clientX: 150, clientY: 90 };
             const hex = result.current.getHexFromEvent(mockEvent);
 
-            expect(hex).toHaveProperty('q');
-            expect(hex).toHaveProperty('r');
+            expect(hex).toEqual({ q: 0, r: 0 });
         });
     });
 
@@ -148,7 +134,6 @@ describe('useHexHover', () => {
             const svgRef = createSvgRef();
             const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
 
-            // Move mouse to outside the grid (negative coordinates after viewBox conversion)
             const mockEvent = { clientX: -100, clientY: -100 };
             act(() => {
                 result.current.handleHexHover(mockEvent);
@@ -157,41 +142,16 @@ describe('useHexHover', () => {
             expect(result.current.hoveredHex).toBeNull();
         });
 
-        it('sets hoveredHex to null when q is negative', () => {
-            const svgRef = createSvgRef({
-                viewBox: { baseVal: { x: 0, y: 0, width: 600, height: 300 } },
-                getBoundingClientRect: () => ({ left: 0, top: 0, width: 600, height: 300 }),
-            });
-            const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
-
-            // Use a mockEvent that would produce a negative q after pixelToHexSnapped
-            const mockEvent = { clientX: -500, clientY: 100 };
-            act(() => {
-                result.current.handleHexHover(mockEvent);
-            });
-
-            // Should be null because q < 0
-            expect(result.current.hoveredHex).toBeNull();
-        });
-
-        it('sets hoveredHex to null when q exceeds grid width', () => {
+        it.each`
+            description              | clientX  | clientY
+            ${'negative q'}          | ${-500}  | ${100}
+            ${'q exceeds grid width'}| ${10000} | ${100}
+            ${'r exceeds grid height'}| ${100}  | ${10000}
+        `('sets hoveredHex to null when $description', ({ clientX, clientY }) => {
             const svgRef = createSvgRef();
             const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
 
-            // Position far to the right, beyond grid width
-            const mockEvent = { clientX: 10000, clientY: 100 };
-            act(() => {
-                result.current.handleHexHover(mockEvent);
-            });
-
-            expect(result.current.hoveredHex).toBeNull();
-        });
-
-        it('sets hoveredHex to null when r exceeds grid height', () => {
-            const svgRef = createSvgRef();
-            const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
-
-            const mockEvent = { clientX: 100, clientY: 10000 };
+            const mockEvent = { clientX, clientY };
             act(() => {
                 result.current.handleHexHover(mockEvent);
             });
@@ -208,10 +168,14 @@ describe('useHexHover', () => {
                 (...args) => useHexHover(args[0], args[1], args[2]),
                 { initialProps: hookArgs }
             );
+
             const getHexFromEvent = result.current.getHexFromEvent;
             const handleHexHover = result.current.handleHexHover;
-            expect(typeof getHexFromEvent).toBe('function');
-            expect(typeof handleHexHover).toBe('function');
+
+            expect(getHexFromEvent).toBeInstanceOf(Function);
+            expect(handleHexHover).toBeInstanceOf(Function);
+            expect(result.current.getHexFromEvent).toBe(getHexFromEvent);
+            expect(result.current.handleHexHover).toBe(handleHexHover);
         });
     });
 
@@ -230,7 +194,6 @@ describe('useHexHover', () => {
 
             rerender({ svgRef, hexCols: 20, hexRows: 10 });
 
-            // After changing hexCols to 20, the same event should still be within bounds
             expect(result.current.hoveredHex).not.toBeNull();
         });
 
@@ -253,11 +216,12 @@ describe('useHexHover', () => {
     });
 
     describe('returned object shape', () => {
-        it('returns exactly hoveredHex, setHoveredHex, getHexFromEvent, handleHexHover', () => {
+        it('returns exactly 4 keys: hoveredHex, setHoveredHex, getHexFromEvent, handleHexHover', () => {
             const svgRef = createSvgRef();
             const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
 
             const keys = Object.keys(result.current);
+            expect(keys).toHaveLength(4);
             expect(keys).toContain('hoveredHex');
             expect(keys).toContain('setHoveredHex');
             expect(keys).toContain('getHexFromEvent');

@@ -1,145 +1,134 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect } from 'vitest';
 import * as constants from './constants.js';
-import { loadAbilityScores } from '../services/ui/dataLoader.js';
-
-// Mock dataLoader
-vi.mock('../services/ui/dataLoader.js', () => ({
-  loadAbilityScores: vi.fn(),
-  loadSkills: vi.fn(),
-  loadPassiveSkills: vi.fn()
-}));
 
 describe('constants', () => {
   describe('REQUIRED_FIELDS', () => {
-    it('should export an array of required field names', () => {
+    it('should export an array containing exactly 9 required field names', () => {
       expect(constants.REQUIRED_FIELDS).toBeInstanceOf(Array);
-      expect(constants.REQUIRED_FIELDS).toContain('name');
-      expect(constants.REQUIRED_FIELDS).toContain('level');
-      expect(constants.REQUIRED_FIELDS).toContain('alignment');
-      expect(constants.REQUIRED_FIELDS).toContain('race');
-      expect(constants.REQUIRED_FIELDS).toContain('class');
-      expect(constants.REQUIRED_FIELDS).toContain('abilities');
-      expect(constants.REQUIRED_FIELDS).toContain('inventory');
-      expect(constants.REQUIRED_FIELDS).toContain('skillProficiencies');
-      expect(constants.REQUIRED_FIELDS).toContain('expertSkills');
+      expect(constants.REQUIRED_FIELDS).toHaveLength(9);
     });
 
-    it('should have 9 required fields', () => {
-      expect(constants.REQUIRED_FIELDS.length).toBe(9);
+    it('should contain all expected character sheet field keys', () => {
+      const expected = [
+        'name',
+        'level',
+        'alignment',
+        'race',
+        'class',
+        'abilities',
+        'inventory',
+        'skillProficiencies',
+        'expertSkills',
+      ];
+      for (const field of expected) {
+        expect(constants.REQUIRED_FIELDS).toContain(field);
+      }
     });
   });
 
-   describe('loadAbilityScores', () => {
-      beforeEach(() => {
-        vi.clearAllMocks();
-      });
-
-      it('should return ability scores from data-loader', async () => {
-        const mockScores = [
-           { full_name: 'Strength' },
-           { full_name: 'Dexterity' },
-           { full_name: 'Constitution' },
-           { full_name: 'Intelligence' },
-           { full_name: 'Wisdom' },
-            { full_name: 'Charisma' }
-          ];
-        vi.mocked(loadAbilityScores).mockResolvedValue(mockScores);
-
-        const result = await loadAbilityScores();
-        expect(result).toEqual(mockScores);
-        expect(result.map(a => a.full_name)).toEqual([
-            'Strength',
-            'Dexterity',
-            'Constitution',
-            'Intelligence',
-            'Wisdom',
-            'Charisma'
-          ]);
-      });
-
-      it('should return ability names when mapped', async () => {
-        const mockScores = [
-            { full_name: 'Strength' },
-            { full_name: 'Dexterity' },
-            { full_name: 'Constitution' },
-            { full_name: 'Intelligence' },
-            { full_name: 'Wisdom' },
-            { full_name: 'Charisma' }
-          ];
-        vi.mocked(loadAbilityScores).mockResolvedValue(mockScores);
-
-        const scores = await loadAbilityScores();
-        const names = scores.map(a => a.full_name);
-        expect(names).toEqual([
-            'Strength',
-            'Dexterity',
-            'Constitution',
-            'Intelligence',
-            'Wisdom',
-            'Charisma'
-          ]);
-      });
-
-    it('should handle errors gracefully', async () => {
-        vi.mocked(loadAbilityScores).mockRejectedValue(new Error('Network error'));
-
-        await expect(loadAbilityScores()).rejects.toThrow('Network error');
-        });
-       });
-
   describe('DEFAULT_FORM_DATA', () => {
-    it('should export a default form data object', () => {
-      expect(constants.DEFAULT_FORM_DATA).toBeDefined();
+    it('should be a plain object with all expected top-level keys', () => {
+      const expectedKeys = [
+        'name',
+        'level',
+        'alignment',
+        'abilities',
+        'background',
+        'class',
+        'expertSkills',
+        'feats',
+        'fightingStyles',
+        'race',
+        'immunities',
+        'inventory',
+        'languages',
+        'resistances',
+        'skillProficiencies',
+        'specialActions',
+        'spells',
+        'rules',
+        'xp',
+        'xpMode',
+      ];
+      for (const key of expectedKeys) {
+        expect(constants.DEFAULT_FORM_DATA).toHaveProperty(key);
+      }
+      const actualKeys = Object.keys(constants.DEFAULT_FORM_DATA);
+      expect(actualKeys).toHaveLength(expectedKeys.length);
+    });
+
+    it('should have correct primitive defaults', () => {
       expect(constants.DEFAULT_FORM_DATA.name).toBe('');
       expect(constants.DEFAULT_FORM_DATA.level).toBe(1);
       expect(constants.DEFAULT_FORM_DATA.alignment).toBe('True Neutral');
+      expect(constants.DEFAULT_FORM_DATA.background).toBe('');
+      expect(constants.DEFAULT_FORM_DATA.rules).toBe('5e');
+      expect(constants.DEFAULT_FORM_DATA.xp).toBe(0);
+      expect(constants.DEFAULT_FORM_DATA.xpMode).toBe('milestone');
     });
 
-    it('should have abilities array with 6 abilities', () => {
-      expect(constants.DEFAULT_FORM_DATA.abilities).toBeInstanceOf(Array);
-      expect(constants.DEFAULT_FORM_DATA.abilities.length).toBe(6);
-    });
+    it('should have an abilities array with 6 entries, each with correct structure', () => {
+      const abilities = constants.DEFAULT_FORM_DATA.abilities;
+      expect(abilities).toBeInstanceOf(Array);
+      expect(abilities).toHaveLength(6);
 
-    it('should have abilities with default baseScore of 8', () => {
-      constants.DEFAULT_FORM_DATA.abilities.forEach(ability => {
+      const expectedNames = [
+        'Strength',
+        'Dexterity',
+        'Constitution',
+        'Intelligence',
+        'Wisdom',
+        'Charisma',
+      ];
+      abilities.forEach((ability, index) => {
+        expect(ability.name).toBe(expectedNames[index]);
         expect(ability.baseScore).toBe(8);
         expect(ability.featIncrease).toBe(0);
+        expect(ability.backgroundIncrease).toBe(0);
         expect(ability.miscIncrease).toBe(0);
       });
     });
 
-    it('should have default class as Fighter', () => {
-      expect(constants.DEFAULT_FORM_DATA.class.name).toBe('Fighter');
-      expect(constants.DEFAULT_FORM_DATA.class.subclass.name).toBe('');
+    it('should have default class with nested subclass and order fields', () => {
+      const cls = constants.DEFAULT_FORM_DATA.class;
+      expect(cls.name).toBe('Fighter');
+      expect(cls.subclass).toEqual({ name: '' });
+      expect(cls.divineOrder).toBe('');
+      expect(cls.primalOrder).toBe('');
     });
 
-    it('should have default race as Human', () => {
-      expect(constants.DEFAULT_FORM_DATA.race.name).toBe('Human');
-      expect(constants.DEFAULT_FORM_DATA.race.subrace.name).toBe('');
+    it('should have default race with nested subrace', () => {
+      const race = constants.DEFAULT_FORM_DATA.race;
+      expect(race.name).toBe('Human');
+      expect(race.subrace).toEqual({ name: '' });
     });
 
-    it('should have default inventory with gold of 10', () => {
-      expect(constants.DEFAULT_FORM_DATA.inventory).toBeDefined();
-      expect(constants.DEFAULT_FORM_DATA.inventory.backpack).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.inventory.equipped).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.inventory.gold).toBe(10);
-      expect(constants.DEFAULT_FORM_DATA.inventory.magicItems).toEqual([]);
+    it('should have default inventory with correct structure', () => {
+      const inventory = constants.DEFAULT_FORM_DATA.inventory;
+      expect(inventory).toEqual({
+        backpack: [],
+        equipped: [],
+        gold: 10,
+        magicItems: [],
+      });
     });
 
-    it('should have empty arrays for optional fields', () => {
-      expect(constants.DEFAULT_FORM_DATA.expertSkills).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.feats).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.fightingStyles).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.immunities).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.languages).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.resistances).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.skillProficiencies).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.specialActions).toEqual([]);
-      expect(constants.DEFAULT_FORM_DATA.spells).toEqual([]);
-    });
-
-    it('should have default rules set to 5e', () => {
-      expect(constants.DEFAULT_FORM_DATA.rules).toBe('5e');
+    it('should have empty arrays for list-based optional fields', () => {
+      const listFields = [
+        'expertSkills',
+        'feats',
+        'fightingStyles',
+        'immunities',
+        'languages',
+        'resistances',
+        'skillProficiencies',
+        'specialActions',
+        'spells',
+      ];
+      for (const field of listFields) {
+        expect(constants.DEFAULT_FORM_DATA[field]).toEqual([]);
+      }
     });
   });
 });

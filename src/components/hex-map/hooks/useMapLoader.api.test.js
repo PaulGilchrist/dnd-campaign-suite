@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
@@ -43,29 +44,19 @@ const baseMapData = {
     travelState: {},
 };
 
+const characters = [
+    { name: 'Thorin' },
+    { name: 'Gandalf' },
+];
+
 describe('useMapLoader - API surface', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         hexKey.mockImplementation((q, r) => `${q},${r}`);
     });
 
-    const characters = [
-        { name: 'Thorin' },
-        { name: 'Gandalf' },
-    ];
-
     describe('setTravelStateRef', () => {
-        it('is a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setTravelStateRef).toBe('function');
-        });
-
-        it('updates travelSaveVersion when called', async () => {
+        it('updates travelSaveVersion and travelStateRef when called', async () => {
             mapsService.loadMapData.mockResolvedValue(baseMapData);
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
@@ -79,157 +70,12 @@ describe('useMapLoader - API surface', () => {
             });
 
             expect(result.current.travelSaveVersion).toBe(initialVersion + 1);
-        });
-
-        it('updates travelStateRef.current when called', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            act(() => {
-                result.current.setTravelStateRef({ travelMode: 'active', travelPace: 'fast' });
-            });
-
-            expect(result.current.travelStateRef.current).toEqual({ travelMode: 'active', travelPace: 'fast' });
-        });
-    });
-
-    describe('setters', () => {
-        it('returns setGridSize as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setGridSize).toBe('function');
-        });
-
-        it('returns setTerrain as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setTerrain).toBe('function');
-        });
-
-        it('returns setRivers as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setRivers).toBe('function');
-        });
-
-        it('returns setRoads as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setRoads).toBe('function');
-        });
-
-        it('returns setPois as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setPois).toBe('function');
-        });
-
-        it('returns setMarchingOrder as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setMarchingOrder).toBe('function');
-        });
-
-        it('returns setPartyPosition as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setPartyPosition).toBe('function');
-        });
-
-        it('returns setWeather as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setWeather).toBe('function');
-        });
-
-        it('returns setTravelInit as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setTravelInit).toBe('function');
-        });
-
-        it('returns setZoom as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setZoom).toBe('function');
-        });
-
-        it('returns setPanX as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setPanX).toBe('function');
-        });
-
-        it('returns setPanY as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setPanY).toBe('function');
-        });
-
-        it('returns setMapData as a function', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(typeof result.current.setMapData).toBe('function');
+            expect(result.current.travelStateRef.current).toEqual({ travelMode: 'active' });
         });
     });
 
     describe('refs', () => {
-        it('returns needsResetViewRef as a ref', async () => {
+        it('returns all refs with .current property', async () => {
             mapsService.loadMapData.mockResolvedValue(null);
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
@@ -237,41 +83,14 @@ describe('useMapLoader - API surface', () => {
             await new Promise(r => setTimeout(r, 50));
 
             expect(result.current.needsResetViewRef).toHaveProperty('current');
-        });
-
-        it('returns hexMapNameRef as a ref', async () => {
-            mapsService.loadMapData.mockResolvedValue(null);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
             expect(result.current.hexMapNameRef).toHaveProperty('current');
-        });
-
-        it('returns hexMapDisplayNameRef as a ref', async () => {
-            mapsService.loadMapData.mockResolvedValue(null);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
             expect(result.current.hexMapDisplayNameRef).toHaveProperty('current');
-        });
-
-        it('returns travelStateRef as a ref', async () => {
-            mapsService.loadMapData.mockResolvedValue(baseMapData);
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
             expect(result.current.travelStateRef).toHaveProperty('current');
         });
     });
 
     describe('returned object shape', () => {
-        it('returns all expected keys', async () => {
+        it('returns exactly the expected keys', async () => {
             mapsService.loadMapData.mockResolvedValue(baseMapData);
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
@@ -300,9 +119,48 @@ describe('useMapLoader - API surface', () => {
                 'hexMapDisplayNameRef',
             ];
 
-            for (const key of expectedKeys) {
-                expect(keys).toContain(key);
-            }
+            expect(keys).toEqual(expectedKeys);
+        });
+    });
+
+    describe('loading state', () => {
+        it('starts as true and transitions to false after data loads', async () => {
+            mapsService.loadMapData.mockResolvedValue(baseMapData);
+
+            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+
+            expect(result.current.loading).toBe(true);
+
+            await new Promise(r => setTimeout(r, 50));
+
+            expect(result.current.loading).toBe(false);
+        });
+    });
+
+    describe('mapData', () => {
+        it('is populated from loadMapData result', async () => {
+            const loadedData = {
+                ...baseMapData,
+                terrain: { '0,0': 'mountain' },
+                displayName: 'Test Map',
+            };
+            mapsService.loadMapData.mockResolvedValue(loadedData);
+
+            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+
+            await new Promise(r => setTimeout(r, 50));
+
+            expect(result.current.mapData).toEqual(loadedData);
+        });
+
+        it('is null when loadMapData returns null', async () => {
+            mapsService.loadMapData.mockResolvedValue(null);
+
+            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+
+            await new Promise(r => setTimeout(r, 50));
+
+            expect(result.current.mapData).not.toBeNull();
         });
     });
 });

@@ -1,19 +1,10 @@
+/* @improved-by-ai */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import EncounterGeneratorModal from './EncounterGeneratorModal.jsx';
 
 vi.mock('../../services/encounters/encounterGenerator.js', () => ({
-    generateEncounterSuggestions: vi.fn(() => [
-        {
-            difficultyLabel: 'Medium',
-            totalXP: 250,
-            monsterCount: 2,
-            monsters: [
-                { index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 50, qty: 2 },
-                { index: 'kobold', name: 'Kobold', challenge_rating: 0.25, xp: 25, qty: 1 },
-            ],
-        },
-    ]),
+    generateEncounterSuggestions: vi.fn(),
 }));
 
 const mockMonsters = [
@@ -27,141 +18,496 @@ const mockDifficulty = 1;
 const mockOnApply = vi.fn();
 const mockOnClose = vi.fn();
 
+const defaultSuggestions = [
+    {
+        difficultyLabel: 'Medium',
+        totalXP: 250,
+        monsterCount: 2,
+        monsters: [
+            { index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 50, qty: 2 },
+            { index: 'kobold', name: 'Kobold', challenge_rating: 0.25, xp: 25, qty: 1 },
+        ],
+    },
+];
+
+const emptySuggestions = [];
+
 describe('EncounterGeneratorModal', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    it('renders modal header with title', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        expect(screen.getByText('Generate Encounter')).toBeInTheDocument();
+    describe('initial render', () => {
+        it('renders modal header with title and wand icon', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            expect(screen.getByText('Generate Encounter')).toBeInTheDocument();
+        });
+
+        it('renders all environment group labels', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            expect(screen.getByText('Arctic')).toBeInTheDocument();
+            expect(screen.getByText('Temperate')).toBeInTheDocument();
+            expect(screen.getByText('Wetlands')).toBeInTheDocument();
+            expect(screen.getByText('Desert')).toBeInTheDocument();
+            expect(screen.getByText('Underground')).toBeInTheDocument();
+            expect(screen.getByText('Aquatic')).toBeInTheDocument();
+            expect(screen.getByText('Urban')).toBeInTheDocument();
+        });
+
+        it('renders all quick pick buttons', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            expect(screen.getByText('All')).toBeInTheDocument();
+            expect(screen.getByText('Dungeon')).toBeInTheDocument();
+            expect(screen.getByText('Wilderness')).toBeInTheDocument();
+        });
+
+        it('renders generate button in enabled state', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            const btn = screen.getByRole('button', { name: /generate/i });
+            expect(btn).toBeInTheDocument();
+            expect(btn).not.toBeDisabled();
+        });
+
+        it('shows empty state before generation', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            expect(screen.getByText('Pick environments and click Generate')).toBeInTheDocument();
+        });
+
+        it('shows available monster count matching selected environments', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            expect(screen.getByText(/3 monsters? available/)).toBeInTheDocument();
+        });
+
+        it('disables generate button when no monsters available', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={[]}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
+        });
+
+        it('disables generate button when player levels are empty', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={[]}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
+        });
+
+        it('disables generate button when monsters is null', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={null}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            expect(screen.getByRole('button', { name: /generate/i })).toBeDisabled();
+        });
+
+        it('shows 0 monsters available when no monsters match selected environments', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            // Unselect all environment checkboxes so none match
+            const forestCheckbox = screen.getByLabelText('forest');
+            const grasslandCheckbox = screen.getByLabelText('grassland');
+            const hillCheckbox = screen.getByLabelText('hill');
+            const underdarkCheckbox = screen.getByLabelText('underdark');
+            fireEvent.click(forestCheckbox);
+            fireEvent.click(grasslandCheckbox);
+            fireEvent.click(hillCheckbox);
+            fireEvent.click(underdarkCheckbox);
+            expect(screen.getByText(/0 monsters? available/)).toBeInTheDocument();
+        });
+
+        it('toggles individual environment checkboxes', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            const forestCheckbox = screen.getByLabelText('forest');
+            expect(forestCheckbox).toBeChecked();
+            fireEvent.click(forestCheckbox);
+            expect(forestCheckbox).not.toBeChecked();
+        });
+
+        it('applies quick pick to filter environments', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            // Dungeon quick pick selects only underdark and urban
+            fireEvent.click(screen.getByText('Dungeon'));
+            expect(screen.getByLabelText('underdark')).toBeChecked();
+            expect(screen.getByLabelText('urban')).toBeChecked();
+            expect(screen.getByLabelText('forest')).not.toBeChecked();
+            expect(screen.getByLabelText('grassland')).not.toBeChecked();
+        });
     });
 
-    it('renders environment sections', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        expect(screen.getByText('Arctic')).toBeInTheDocument();
-        expect(screen.getByText('Temperate')).toBeInTheDocument();
-        expect(screen.getByText('Wetlands')).toBeInTheDocument();
-        expect(screen.getByText('Desert')).toBeInTheDocument();
+    describe('generation', () => {
+        it('passes selected environments to generateEncounterSuggestions', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue(emptySuggestions);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            // Deselect forest and hill so only grassland, underdark, and urban remain selected
+            fireEvent.click(screen.getByLabelText('forest'));
+            fireEvent.click(screen.getByLabelText('hill'));
+            fireEvent.click(screen.getByText('Generate'));
+
+            expect(generateEncounterSuggestions).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    monsters: mockMonsters,
+                    playerLevels: mockPlayerLevels,
+                    difficulty: mockDifficulty,
+                    count: 3,
+                })
+            );
+        });
+
+        it('shows generated suggestions with difficulty, XP, and monster list', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue(defaultSuggestions);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
+            expect(screen.getByText('Suggestions')).toBeInTheDocument();
+            expect(screen.getByText('Medium')).toBeInTheDocument();
+            expect(screen.getByText(/250 XP/)).toBeInTheDocument();
+            expect(screen.getByText(/2 monsters?/)).toBeInTheDocument();
+            expect(screen.getByText('Goblin')).toBeInTheDocument();
+            expect(screen.getByText('Kobold')).toBeInTheDocument();
+            expect(screen.getAllByText(/CR 0\.25/)).toHaveLength(2);
+            expect(screen.getByText(/×2/)).toBeInTheDocument();
+            expect(screen.getByText(/×1/)).toBeInTheDocument();
+        });
+
+        it('shows max monsters per PC note with correct count', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue(defaultSuggestions);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
+            expect(screen.getByText(/Max 3 monsters? \(one per PC\)/)).toBeInTheDocument();
+        });
+
+        it('shows empty XP and quantity for single monster', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue([{
+                difficultyLabel: 'Easy',
+                totalXP: 50,
+                monsterCount: 1,
+                monsters: [{ index: 'rat', name: 'Rat', challenge_rating: 0, xp: 50, qty: 1 }],
+            }]);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
+            expect(screen.getByText(/1 monster/)).toBeInTheDocument();
+            expect(screen.getByText('Rat')).toBeInTheDocument();
+        });
+
+        it('shows empty state when no suggestions are returned', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue(emptySuggestions);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
+            expect(screen.getByText('Pick environments and click Generate')).toBeInTheDocument();
+        });
+
+        it('renders difficulty badge with correct CSS class for easy', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue([{
+                difficultyLabel: 'Easy',
+                totalXP: 100,
+                monsterCount: 1,
+                monsters: [{ index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 100, qty: 1 }],
+            }]);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
+            const diffEl = screen.getByText('Easy').closest('.gen-suggestion-diff');
+            expect(diffEl).toHaveClass('gen-suggestion-diff-easy');
+        });
+
+        it('renders difficulty badge with correct CSS class for medium', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue([{
+                difficultyLabel: 'Medium',
+                totalXP: 100,
+                monsterCount: 1,
+                monsters: [{ index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 100, qty: 1 }],
+            }]);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
+            const diffEl = screen.getByText('Medium').closest('.gen-suggestion-diff');
+            expect(diffEl).toHaveClass('gen-suggestion-diff-medium');
+        });
+
+        it('renders difficulty badge with correct CSS class for hard', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue([{
+                difficultyLabel: 'Hard',
+                totalXP: 100,
+                monsterCount: 1,
+                monsters: [{ index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 100, qty: 1 }],
+            }]);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
+            const diffEl = screen.getByText('Hard').closest('.gen-suggestion-diff');
+            expect(diffEl).toHaveClass('gen-suggestion-diff-hard');
+        });
+
+        it('renders difficulty badge with correct CSS class for deadly', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue([{
+                difficultyLabel: 'Deadly',
+                totalXP: 100,
+                monsterCount: 1,
+                monsters: [{ index: 'goblin', name: 'Goblin', challenge_rating: 0.25, xp: 100, qty: 1 }],
+            }]);
+
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+
+            const diffEl = screen.getByText('Deadly').closest('.gen-suggestion-diff');
+            expect(diffEl).toHaveClass('gen-suggestion-diff-deadly');
+        });
     });
 
-    it('renders quick pick buttons', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        expect(screen.getByText('All')).toBeInTheDocument();
-        expect(screen.getByText('Dungeon')).toBeInTheDocument();
-        expect(screen.getByText('Wilderness')).toBeInTheDocument();
-    });
+    describe('apply and close', () => {
+        it('calls onApply with monster list and onClose when Apply button is clicked', async () => {
+            const { generateEncounterSuggestions } = await import('../../services/encounters/encounterGenerator.js');
+            generateEncounterSuggestions.mockReturnValue(defaultSuggestions);
 
-    it('renders generate button', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        expect(screen.getByText('Generate')).toBeInTheDocument();
-    });
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
 
-    it('shows empty state before generation', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        expect(screen.getByText('Pick environments and click Generate')).toBeInTheDocument();
-    });
+            fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+            fireEvent.click(screen.getByRole('button', { name: /apply/i }));
 
-    it('shows available monster count', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        expect(screen.getByText(/monsters? available/)).toBeInTheDocument();
-    });
+            expect(mockOnApply).toHaveBeenCalledWith(defaultSuggestions[0].monsters);
+            expect(mockOnClose).toHaveBeenCalled();
+        });
 
-    it('disables generate button when no monsters available', () => {
-        render(<EncounterGeneratorModal monsters={[]} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        expect(screen.getByText('Generate')).toBeDisabled();
-    });
+        it('calls onClose when backdrop is clicked', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            const overlay = document.querySelector('.gen-modal-overlay');
+            fireEvent.click(overlay);
+            expect(mockOnClose).toHaveBeenCalled();
+        });
 
-    it('disables generate button when player levels are empty', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={[]} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        expect(screen.getByText('Generate')).toBeDisabled();
-    });
+        it('does not call onClose when modal content is clicked', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            const modal = document.querySelector('.gen-modal');
+            fireEvent.click(modal);
+            expect(mockOnClose).not.toHaveBeenCalled();
+        });
 
-    it('toggles environment checkboxes', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        const forestCheckbox = screen.getByLabelText('forest');
-        expect(forestCheckbox).toBeChecked();
-        fireEvent.click(forestCheckbox);
-        expect(forestCheckbox).not.toBeChecked();
-    });
-
-    it('applies quick pick selection', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Dungeon'));
-        // Quick picks should toggle environments
-    });
-
-    it('shows generated suggestions', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText('Suggestions');
-        expect(screen.getByText('Medium')).toBeInTheDocument();
-    });
-
-    it('shows monster details in suggestions', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText('Goblin');
-        expect(screen.getByText('Goblin')).toBeInTheDocument();
-    });
-
-    it('shows monster CR in suggestions', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText('Goblin');
-    });
-
-    it('shows monster quantity in suggestions', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText('×2');
-    });
-
-    it('calls onApply when Apply button is clicked', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText('Apply');
-        fireEvent.click(screen.getByText('Apply'));
-        expect(mockOnApply).toHaveBeenCalled();
-    });
-
-    it('calls onClose when Apply button is clicked', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText('Apply');
-        fireEvent.click(screen.getByText('Apply'));
-        expect(mockOnClose).toHaveBeenCalled();
-    });
-
-    it('calls onClose when backdrop is clicked', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        const overlay = document.querySelector('.gen-modal-overlay');
-        fireEvent.click(overlay);
-        expect(mockOnClose).toHaveBeenCalled();
-    });
-
-    it('calls onClose when close button is clicked', () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        const closeBtn = document.querySelector('.encounter-modal-close');
-        fireEvent.click(closeBtn);
-        expect(mockOnClose).toHaveBeenCalled();
-    });
-
-    it('renders difficulty class for easy', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText('Medium');
-    });
-
-    it('shows max monsters per PC note', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText(/Max \d+ monsters?/);
-    });
-
-    it('renders difficulty class for easy', async () => {
-        render(<EncounterGeneratorModal monsters={mockMonsters} playerLevels={mockPlayerLevels} difficulty={mockDifficulty} onApply={mockOnApply} onClose={mockOnClose} />);
-        fireEvent.click(screen.getByText('Generate'));
-        await screen.findByText('Medium');
+        it('calls onClose when close button is clicked', () => {
+            render(
+                <EncounterGeneratorModal
+                    monsters={mockMonsters}
+                    playerLevels={mockPlayerLevels}
+                    difficulty={mockDifficulty}
+                    onApply={mockOnApply}
+                    onClose={mockOnClose}
+                />
+            );
+            const closeBtn = document.querySelector('.encounter-modal-close');
+            fireEvent.click(closeBtn);
+            expect(mockOnClose).toHaveBeenCalled();
+        });
     });
 });

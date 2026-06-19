@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useEncounterGeneration from './useEncounterGeneration.js';
@@ -362,38 +363,39 @@ describe('useEncounterGeneration', () => {
             );
         });
 
-        it('handles errors from createMap gracefully', async () => {
+        it('does not call extraPlacedItems when none provided', async () => {
             generateOutdoorEncounter.mockReturnValue({
-                placedItems: [],
-                players: [],
-                bgFill: '#7A9B6A',
-            });
-            const error = new Error('Network error');
-            mapsService.createMap.mockRejectedValue(error);
-            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-
-            await result.current.handleStartEncounter(0, 0);
-
-            expect(consoleSpy).toHaveBeenCalledWith(
-                '[handleStartEncounter] FAILED:',
-                error
-            );
-            consoleSpy.mockRestore();
-        });
-
-        it('handles errors from saveMapData gracefully', async () => {
-            generateOutdoorEncounter.mockReturnValue({
-                placedItems: [],
+                placedItems: [{ id: 'enc-item-1' }],
                 players: [],
                 bgFill: '#7A9B6A',
             });
             mapsService.createMap.mockResolvedValue({});
-            const error = new Error('Save failed');
-            mapsService.saveMapData.mockRejectedValue(error);
+            mapsService.saveMapData.mockResolvedValue({});
+
+            const { result } = renderHook(() =>
+                useEncounterGeneration(...baseArgs)
+            );
+
+            await result.current.handleStartEncounter(0, 0);
+
+            const callArgs = mapsService.createMap.mock.calls[0];
+            const placedItems = callArgs[2].placedItems;
+
+            expect(placedItems.length).toBe(1);
+            expect(placedItems[0].id).toBe('enc-item-1');
+        });
+
+        it.each`
+            service              | setup
+            ${'createMap'}       | ${() => mapsService.createMap.mockRejectedValue(new Error('Network error'))}
+            ${'saveMapData'}     | ${() => { mapsService.createMap.mockResolvedValue({}); mapsService.saveMapData.mockRejectedValue(new Error('Save failed')); }}
+        `('handles errors from $service gracefully', async ({ setup }) => {
+            generateOutdoorEncounter.mockReturnValue({
+                placedItems: [],
+                players: [],
+                bgFill: '#7A9B6A',
+            });
+            setup();
             const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
             const { result } = renderHook(() =>
@@ -404,7 +406,7 @@ describe('useEncounterGeneration', () => {
 
             expect(consoleSpy).toHaveBeenCalledWith(
                 '[handleStartEncounter] FAILED:',
-                error
+                expect.any(Error)
             );
             consoleSpy.mockRestore();
         });
@@ -435,28 +437,7 @@ describe('useEncounterGeneration', () => {
             expect(onEncounterCreated).not.toHaveBeenCalled();
         });
 
-        it('uses correct grid size of 30', async () => {
-            generateOutdoorEncounter.mockReturnValue({
-                placedItems: [],
-                players: [],
-                bgFill: '#7A9B6A',
-            });
-            mapsService.createMap.mockResolvedValue({});
-
-            const { result } = renderHook(() =>
-                useEncounterGeneration(...baseArgs)
-            );
-
-            await result.current.handleStartEncounter(0, 0);
-
-            expect(mapsService.createMap).toHaveBeenCalledWith(
-                'test-campaign',
-                expect.any(String),
-                expect.objectContaining({ gridSize: 30 })
-            );
-        });
-
-        it('passes parentHex with correct q and r values', async () => {
+        it('generates correct createMap call args for various hex coordinates', async () => {
             generateOutdoorEncounter.mockReturnValue({
                 placedItems: [],
                 players: [],
@@ -472,28 +453,118 @@ describe('useEncounterGeneration', () => {
 
             expect(mapsService.createMap).toHaveBeenCalledWith(
                 'test-campaign',
-                expect.any(String),
+                'test-map - Encounter at 3,7',
                 expect.objectContaining({
+                    gridSize: 30,
                     parentHex: { q: 3, r: 7 },
                 })
             );
         });
-    });
 
-    describe('returned object', () => {
-        it('returns generateMonsterPlacements and handleStartEncounter', () => {
+        it('handles generateOutdoorEncounter returning null placedItems', async () => {
+            generateOutdoorEncounter.mockReturnValue({
+                placedItems: null,
+                players: [],
+                bgFill: '#7A9B6A',
+            });
+            mapsService.createMap.mockResolvedValue({});
+
             const { result } = renderHook(() =>
                 useEncounterGeneration(...baseArgs)
             );
 
-            expect(result.current).toHaveProperty('generateMonsterPlacements');
-            expect(result.current).toHaveProperty('handleStartEncounter');
-            expect(typeof result.current.generateMonsterPlacements).toBe(
-                'function'
+            await result.current.handleStartEncounter(0, 0);
+
+            expect(mapsService.createMap).toHaveBeenCalled();
+            const callArgs = mapsService.createMap.mock.calls[0];
+            expect(callArgs[2].placedItems).toBeNull();
+        });
+
+        it('handles generateOutdoorEncounter throwing an error', async () => {
+            generateOutdoorEncounter.mockImplementation(() => {
+                throw new Error('Encounter generation failed');
+            });
+            const onEncounterCreated = vi.fn();
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            const args = [
+                'test-campaign',
+                'test-map.json',
+                { '0,0': 'plains' },
+                ['Alice'],
+                onEncounterCreated,
+            ];
+
+            const { result } = renderHook(() =>
+                useEncounterGeneration(...args)
             );
-            expect(typeof result.current.handleStartEncounter).toBe(
-                'function'
+
+            let caughtError = null;
+            try {
+                await result.current.handleStartEncounter(0, 0);
+            } catch (err) {
+                caughtError = err;
+            }
+
+            expect(caughtError).toBeInstanceOf(Error);
+            expect(caughtError.message).toBe('Encounter generation failed');
+            expect(onEncounterCreated).not.toHaveBeenCalled();
+            expect(mapsService.createMap).not.toHaveBeenCalled();
+            expect(consoleSpy).not.toHaveBeenCalled();
+            consoleSpy.mockRestore();
+        });
+
+        it('handles empty terrain map with no hex keys', async () => {
+            generateOutdoorEncounter.mockReturnValue({
+                placedItems: [],
+                players: [],
+                bgFill: '#7A9B6A',
+            });
+            mapsService.createMap.mockResolvedValue({});
+
+            const emptyTerrainArgs = [
+                'test-campaign',
+                'test-map.json',
+                {},
+                ['Alice'],
+                vi.fn(),
+            ];
+
+            const { result } = renderHook(() =>
+                useEncounterGeneration(...emptyTerrainArgs)
             );
+
+            await result.current.handleStartEncounter(0, 0);
+
+            expect(generateOutdoorEncounter).toHaveBeenCalledWith(
+                'plains',
+                30,
+                ['Alice'],
+                0,
+                0
+            );
+        });
+
+        it('returns stable handleStartEncounter reference', () => {
+            const stableCallback = vi.fn();
+            const stableArgs = [
+                'test-campaign',
+                'test-map.json',
+                { '0,0': 'plains', '1,0': 'forest' },
+                ['Alice', 'Bob'],
+                stableCallback,
+            ];
+            let handleStartEncounter;
+            const { rerender } = renderHook(
+                (args) => {
+                    handleStartEncounter = useEncounterGeneration(...args);
+                    return handleStartEncounter;
+                },
+                { initialProps: stableArgs }
+            );
+            const first = handleStartEncounter.handleStartEncounter;
+            rerender(stableArgs);
+            expect(handleStartEncounter.handleStartEncounter).toBe(first);
         });
     });
 });

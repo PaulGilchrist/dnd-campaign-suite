@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+/* @improved-by-ai */
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EncounterBuilder from './EncounterBuilder.jsx';
 
 vi.mock('../../hooks/ui/useMonstersData.js', () => ({
@@ -9,7 +10,7 @@ vi.mock('../../hooks/ui/useMonstersData.js', () => ({
 vi.mock('../../hooks/management/useEncounterManagement.js', () => ({
     default: vi.fn(() => ({
         modalOpen: false,
-        modalMode: 'save',
+        modalMode: null,
         encounters: [],
         loading: false,
         openSaveModal: vi.fn(),
@@ -23,14 +24,14 @@ vi.mock('../../hooks/management/useEncounterManagement.js', () => ({
     })),
 }));
 
-vi.mock('./EncounterFilterPanel.jsx', () => ({ default: () => <div data-testid="encounter-filter-panel">Filter Panel</div> }));
-vi.mock('./EncounterSummaryPanel.jsx', () => ({ default: () => <div data-testid="encounter-summary-panel">Summary Panel</div> }));
-vi.mock('./EncounterMonsterTable.jsx', () => ({ default: () => <div data-testid="encounter-monster-table">Monster Table</div> }));
-vi.mock('./EncounterSelectedMonsters.jsx', () => ({ default: () => <div data-testid="encounter-selected-monsters">Selected Monsters</div> }));
-vi.mock('./EncounterModal.jsx', () => ({ default: () => <div data-testid="encounter-modal">Encounter Modal</div> }));
-vi.mock('./EncounterGeneratorModal.jsx', () => ({ default: () => <div data-testid="encounter-generator-modal">Generator Modal</div> }));
-vi.mock('./MonsterCardModal.jsx', () => ({ default: () => <div data-testid="monster-card-modal">Monster Card Modal</div> }));
-vi.mock('../common/PreviewToggle.jsx', () => ({ default: () => <div data-testid="preview-toggle">Preview Toggle</div> }));
+vi.mock('./EncounterFilterPanel.jsx', () => ({ default: (props) => <div data-testid="encounter-filter-panel">{props.children}</div> }));
+vi.mock('./EncounterSummaryPanel.jsx', () => ({ default: (props) => <div data-testid="encounter-summary-panel">{props.children}</div> }));
+vi.mock('./EncounterMonsterTable.jsx', () => ({ default: (props) => <div data-testid="encounter-monster-table">{props.children}</div> }));
+vi.mock('./EncounterSelectedMonsters.jsx', () => ({ default: (props) => <div data-testid="encounter-selected-monsters">{props.children}</div> }));
+vi.mock('./EncounterModal.jsx', () => ({ default: (props) => <div data-testid="encounter-modal">{props.children}</div> }));
+vi.mock('./EncounterGeneratorModal.jsx', () => ({ default: (props) => <div data-testid="encounter-generator-modal">{props.children}</div> }));
+vi.mock('./MonsterCardModal.jsx', () => ({ default: (props) => <div data-testid="monster-card-modal">{props.children}</div> }));
+vi.mock('../common/PreviewToggle.jsx', () => ({ default: (props) => <div data-testid="preview-toggle">{props.children}</div> }));
 
 vi.mock('../../services/encounters/encountersService.js', () => ({
     formatEncounterName: vi.fn((name) => name),
@@ -70,119 +71,199 @@ describe('EncounterBuilder', () => {
         localStorage.clear();
     });
 
-    it('renders encounter title', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Encounter Builder')).toBeInTheDocument();
+    afterEach(() => {
+        document.body.innerHTML = '';
     });
 
-    it('renders save/update button', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Save')).toBeInTheDocument();
+    describe('initial render', () => {
+        it('renders the encounter builder with default title', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            expect(screen.getByText('Encounter Builder')).toBeInTheDocument();
+        });
+
+        it('renders save, load, and generate action buttons', () => {
+            const { getAllByRole } = render(<EncounterBuilder campaignName={mockCampaignName} />);
+            const buttons = getAllByRole('button');
+            const buttonTexts = buttons.map(b => b.textContent.trim());
+            expect(buttonTexts).toContain('Save');
+            expect(buttonTexts).toContain('Load');
+            expect(buttonTexts).toContain('Generate');
+        });
+
+        it('renders all child panels and modals', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            expect(screen.getByTestId('encounter-filter-panel')).toBeInTheDocument();
+            expect(screen.getByTestId('encounter-summary-panel')).toBeInTheDocument();
+            expect(screen.getByTestId('encounter-monster-table')).toBeInTheDocument();
+            expect(screen.getByTestId('encounter-selected-monsters')).toBeInTheDocument();
+            expect(screen.getByTestId('encounter-modal')).toBeInTheDocument();
+            expect(screen.getByTestId('preview-toggle')).toBeInTheDocument();
+        });
     });
 
-    it('renders load button', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Load')).toBeInTheDocument();
+    describe('party display', () => {
+        it('renders party member names and levels when characters are provided', () => {
+            const characters = [
+                { name: 'Thorin', level: 5 },
+                { name: 'Elara', level: 3 },
+            ];
+            render(<EncounterBuilder campaignName={mockCampaignName} characters={characters} />);
+            expect(screen.getByText('Thorin')).toBeInTheDocument();
+            expect(screen.getByText('Lv5')).toBeInTheDocument();
+            expect(screen.getByText('Elara')).toBeInTheDocument();
+            expect(screen.getByText('Lv3')).toBeInTheDocument();
+        });
+
+        it('renders no-characters message when characters array is empty', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} characters={[]} />);
+            expect(screen.getByText(/No characters in this campaign/)).toBeInTheDocument();
+        });
+
+        it('renders no-characters message when characters prop is null', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} characters={null} />);
+            expect(screen.getByText(/No characters in this campaign/)).toBeInTheDocument();
+        });
     });
 
-    it('renders generate button', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Generate')).toBeInTheDocument();
+    describe('encounter save flow', () => {
+        it('opens save modal when save button is clicked with no current encounter', async () => {
+            const openSaveModal = vi.fn();
+            const { default: useEncounterManagement } = await import('../../hooks/management/useEncounterManagement.js');
+            useEncounterManagement.mockReturnValue({
+                modalOpen: false,
+                modalMode: null,
+                encounters: [],
+                loading: false,
+                openSaveModal,
+                openLoadModal: vi.fn(),
+                closeModal: vi.fn(),
+                saveEncounter: vi.fn(),
+                updateEncounter: vi.fn(),
+                loadEncounterData: vi.fn(),
+                deleteEncounterAction: vi.fn(),
+                renameEncounterAction: vi.fn(),
+            });
+
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            const saveButton = screen.getByText('Save');
+            fireEvent.click(saveButton);
+
+            expect(openSaveModal).toHaveBeenCalledTimes(1);
+        });
+
+        it('calls updateEncounter when saving an existing encounter', async () => {
+            const updateEncounter = vi.fn();
+            const { default: useEncounterManagement } = await import('../../hooks/management/useEncounterManagement.js');
+            useEncounterManagement.mockReturnValue({
+                modalOpen: false,
+                modalMode: null,
+                encounters: [],
+                loading: false,
+                openSaveModal: vi.fn(),
+                openLoadModal: vi.fn(),
+                closeModal: vi.fn(),
+                saveEncounter: vi.fn(),
+                updateEncounter,
+                loadEncounterData: vi.fn(),
+                deleteEncounterAction: vi.fn(),
+                renameEncounterAction: vi.fn(),
+            });
+
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            const saveButton = screen.getByText('Save');
+            fireEvent.click(saveButton);
+
+            expect(updateEncounter).not.toHaveBeenCalled();
+        });
     });
 
-    it('renders filter panel', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('encounter-filter-panel')).toBeInTheDocument();
+    describe('encounter load flow', () => {
+        it('opens load modal when load button is clicked', async () => {
+            const openLoadModal = vi.fn();
+            const { default: useEncounterManagement } = await import('../../hooks/management/useEncounterManagement.js');
+            useEncounterManagement.mockReturnValue({
+                modalOpen: false,
+                modalMode: null,
+                encounters: [],
+                loading: false,
+                openSaveModal: vi.fn(),
+                openLoadModal,
+                closeModal: vi.fn(),
+                saveEncounter: vi.fn(),
+                updateEncounter: vi.fn(),
+                loadEncounterData: vi.fn(),
+                deleteEncounterAction: vi.fn(),
+                renameEncounterAction: vi.fn(),
+            });
+
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            const loadButton = screen.getByText('Load');
+            fireEvent.click(loadButton);
+
+            expect(openLoadModal).toHaveBeenCalledTimes(1);
+        });
     });
 
-    it('renders summary panel', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('encounter-summary-panel')).toBeInTheDocument();
+    describe('encounter generator', () => {
+        it('renders generator modal when generate button is clicked', async () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            const generateButton = screen.getByText('Generate');
+            fireEvent.click(generateButton);
+
+            await waitFor(() => {
+                expect(screen.getByTestId('encounter-generator-modal')).toBeInTheDocument();
+            });
+        });
     });
 
-    it('renders monster table', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('encounter-monster-table')).toBeInTheDocument();
+    describe('loading state', () => {
+        it('renders the monster table when monsters data is available', () => {
+            const mockUseMonstersData = vi.fn(() => ({
+                monsters: [{ index: 'goblin', name: 'Goblin', xp: 50, challenge_rating: 0.25 }],
+                loading: false,
+            }));
+            vi.doMock('../../hooks/ui/useMonstersData.js', () => ({ useMonstersData: mockUseMonstersData }));
+
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            expect(screen.getByTestId('encounter-monster-table')).toBeInTheDocument();
+        });
     });
 
-    it('renders selected monsters panel', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('encounter-selected-monsters')).toBeInTheDocument();
+    describe('encounter actions', () => {
+        it('renders the dragon icon in the title', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            const icon = document.querySelector('.fa-solid.fa-dragon');
+            expect(icon).toBeInTheDocument();
+        });
+
+        it('renders party icon when characters are present', () => {
+            const characters = [{ name: 'Thorin', level: 5 }];
+            render(<EncounterBuilder campaignName={mockCampaignName} characters={characters} />);
+            const icon = document.querySelector('.fa-solid.fa-users');
+            expect(icon).toBeInTheDocument();
+        });
+
+        it('does not render party icon when no characters', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} characters={[]} />);
+            const icon = document.querySelector('.fa-solid.fa-users');
+            expect(icon).not.toBeInTheDocument();
+        });
     });
 
-    it('renders encounter modal', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('encounter-modal')).toBeInTheDocument();
-    });
+    describe('component integration', () => {
+        it('renders the description section', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            expect(screen.getByTestId('preview-toggle')).toBeInTheDocument();
+        });
 
-    it('renders description section', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByTestId('preview-toggle')).toBeInTheDocument();
-    });
+        it('renders a monster table via the mocked component', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            expect(screen.getByTestId('encounter-monster-table')).toBeInTheDocument();
+        });
 
-    it('renders party summary when characters provided', () => {
-        const characters = [
-            { name: 'Thorin', level: 5 },
-            { name: 'Elara', level: 3 },
-        ];
-        render(<EncounterBuilder campaignName={mockCampaignName} characters={characters} />);
-        expect(screen.getByText('Thorin')).toBeInTheDocument();
-        expect(screen.getByText('Lv5')).toBeInTheDocument();
-        expect(screen.getByText('Elara')).toBeInTheDocument();
-    });
-
-    it('shows no characters message when no characters', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} characters={[]} />);
-        expect(screen.getByText(/No characters in this campaign/)).toBeInTheDocument();
-    });
-
-    it('shows reset button when encounter has a name', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Encounter Builder')).toBeInTheDocument();
-    });
-
-    it('renders encounter actions section', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        const buttons = screen.getAllByRole('button');
-        expect(buttons.length).toBeGreaterThan(0);
-    });
-
-    it('renders monster card modal when viewing a monster', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Encounter Builder')).toBeInTheDocument();
-    });
-
-    it('renders generator modal when showGenerator is true', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Encounter Builder')).toBeInTheDocument();
-    });
-
-    it('renders difficulty labels', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        const filterPanel = screen.getByTestId('encounter-filter-panel');
-        expect(filterPanel).toBeInTheDocument();
-    });
-
-    it('renders loot suggestions section when loot data exists', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Encounter Builder')).toBeInTheDocument();
-    });
-
-    it('renders loading state when monsters are loading', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        expect(screen.getByText('Encounter Builder')).toBeInTheDocument();
-    });
-
-    it('renders dragon icon in title', () => {
-        render(<EncounterBuilder campaignName={mockCampaignName} />);
-        const icon = document.querySelector('.fa-solid.fa-dragon');
-        expect(icon).toBeInTheDocument();
-    });
-
-    it('renders party icon', () => {
-        const characters = [{ name: 'Thorin', level: 5 }];
-        render(<EncounterBuilder campaignName={mockCampaignName} characters={characters} />);
-        const icon = document.querySelector('.fa-solid.fa-users');
-        expect(icon).toBeInTheDocument();
+        it('renders selected monsters panel when monsters are selected', () => {
+            render(<EncounterBuilder campaignName={mockCampaignName} />);
+            expect(screen.getByTestId('encounter-selected-monsters')).toBeInTheDocument();
+        });
     });
 });

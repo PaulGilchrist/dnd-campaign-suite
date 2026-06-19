@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useHexMapSSESync from './useHexMapSSESync.js';
@@ -26,14 +27,6 @@ describe('useHexMapSSESync', () => {
     };
 
     const createSseEvent = (key, data) => ({ key, data });
-
-    describe('initial return shape', () => {
-        it('returns an object with handleSSEEvent', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            expect(result.current).toHaveProperty('handleSSEEvent');
-            expect(typeof result.current.handleSSEEvent).toBe('function');
-        });
-    });
 
     describe('handleSSEEvent - event filtering', () => {
         it('does nothing when event is null', () => {
@@ -81,115 +74,48 @@ describe('useHexMapSSESync', () => {
             expect(baseArgs.setMapData).not.toHaveBeenCalled();
             expect(baseArgs.onTravelStateChange).not.toHaveBeenCalled();
         });
+
+        it('does nothing when event key has extra segments', () => {
+            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
+            const extraKeyEvent = createSseEvent('map-data-test-campaign-test-map-extra', { gridSize: 20 });
+            act(() => {
+                result.current.handleSSEEvent(extraKeyEvent);
+            });
+            expect(baseArgs.setGridSize).not.toHaveBeenCalled();
+        });
+
+        it('does nothing when data is a string instead of an object', () => {
+            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
+            const stringDataEvent = { key: 'map-data-test-campaign-test-map', data: 'not-an-object' };
+            act(() => {
+                result.current.handleSSEEvent(stringDataEvent);
+            });
+            expect(baseArgs.setGridSize).not.toHaveBeenCalled();
+        });
     });
 
     describe('handleSSEEvent - data fields', () => {
-        it('calls setGridSize when data.gridSize is present', () => {
+        it.each`
+            field               | setter                | value
+            ${'gridSize'}       | ${'setGridSize'}      | ${30}
+            ${'terrain'}        | ${'setTerrain'}       | ${'forest'}
+            ${'rivers'}         | ${'setRivers'}        | ${['river1']}
+            ${'roads'}          | ${'setRoads'}         | ${['road1']}
+            ${'pois'}           | ${'setPois'}          | ${{ x: 1, y: 2 }}
+            ${'zoom'}           | ${'setZoom'}          | ${2.5}
+            ${'panX'}           | ${'setPanX'}          | ${100}
+            ${'panY'}           | ${'setPanY'}          | ${200}
+            ${'marchingOrder'}  | ${'setMarchingOrder'} | ${['unit1']}
+            ${'partyPosition'}  | ${'setPartyPosition'} | ${{ q: 5, r: 10 }}
+            ${'weather'}        | ${'setWeather'}       | ${'rainy'}
+            ${'travelState'}    | ${'onTravelStateChange'} | ${'marching'}
+        `('calls $setter when data.$field is present', ({ field, setter, value }) => {
             const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { gridSize: 30 });
+            const event = createSseEvent('map-data-test-campaign-test-map', { [field]: value });
             act(() => {
                 result.current.handleSSEEvent(event);
             });
-            expect(baseArgs.setGridSize).toHaveBeenCalledWith(30);
-        });
-
-        it('calls setTerrain when data.terrain is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { terrain: 'forest' });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setTerrain).toHaveBeenCalledWith('forest');
-        });
-
-        it('calls setRivers when data.rivers is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { rivers: ['river1'] });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setRivers).toHaveBeenCalledWith(['river1']);
-        });
-
-        it('calls setRoads when data.roads is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { roads: ['road1'] });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setRoads).toHaveBeenCalledWith(['road1']);
-        });
-
-        it('calls setPois when data.pois is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { pois: [{ x: 1, y: 2 }] });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setPois).toHaveBeenCalledWith([{ x: 1, y: 2 }]);
-        });
-
-        it('calls setZoom when data.zoom is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { zoom: 2.5 });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setZoom).toHaveBeenCalledWith(2.5);
-        });
-
-        it('calls setPanX when data.panX is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { panX: 100 });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setPanX).toHaveBeenCalledWith(100);
-        });
-
-        it('calls setPanY when data.panY is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { panY: 200 });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setPanY).toHaveBeenCalledWith(200);
-        });
-
-        it('calls setMarchingOrder when data.marchingOrder is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { marchingOrder: ['unit1'] });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setMarchingOrder).toHaveBeenCalledWith(['unit1']);
-        });
-
-        it('calls setPartyPosition when data.partyPosition is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { partyPosition: { q: 5, r: 10 } });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setPartyPosition).toHaveBeenCalledWith({ q: 5, r: 10 });
-        });
-
-        it('calls setWeather when data.weather is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { weather: 'rainy' });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setWeather).toHaveBeenCalledWith('rainy');
-        });
-
-        it('calls onTravelStateChange when data.travelState is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { travelState: 'marching' });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.onTravelStateChange).toHaveBeenCalledWith('marching');
+            expect(baseArgs[setter]).toHaveBeenCalledWith(value);
         });
 
         it('does not call onTravelStateChange when it is not provided', () => {
@@ -199,48 +125,8 @@ describe('useHexMapSSESync', () => {
             act(() => {
                 result.current.handleSSEEvent(event);
             });
-            // Should not throw even though onTravelStateChange is undefined
-        });
-    });
-
-    describe('handleSSEEvent - mapData merge', () => {
-        it('calls setMapData with merged data when data.type is present', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { type: 'map', gridSize: 20, terrain: 'desert' });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setMapData).toHaveBeenCalled();
-            const callArg = baseArgs.setMapData.mock.calls[0][0];
-            expect(typeof callArg).toBe('function');
-            // Call the function with null to see the result
-            const resultData = callArg(null);
-            expect(resultData).toEqual({ type: 'map', gridSize: 20, terrain: 'desert' });
         });
 
-        it('does not call setMapData when data.type is absent', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const event = createSseEvent('map-data-test-campaign-test-map', { gridSize: 20 });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(baseArgs.setMapData).not.toHaveBeenCalled();
-        });
-
-        it('merges data into existing mapData via functional update', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
-            const existingData = { type: 'map', gridSize: 10 };
-            const event = createSseEvent('map-data-test-campaign-test-map', { type: 'map', terrain: 'forest' });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            const callArg = baseArgs.setMapData.mock.calls[0][0];
-            const resultData = callArg(existingData);
-            expect(resultData).toEqual({ type: 'map', gridSize: 10, terrain: 'forest' });
-        });
-    });
-
-    describe('handleSSEEvent - multiple fields', () => {
         it('calls all relevant setters when multiple fields are present', () => {
             const { result } = renderHook(() => useHexMapSSESync(baseArgs));
             const event = createSseEvent('map-data-test-campaign-test-map', {
@@ -262,7 +148,7 @@ describe('useHexMapSSESync', () => {
             expect(baseArgs.setWeather).toHaveBeenCalledWith('clear');
         });
 
-        it('calls all setters when all fields are present', () => {
+        it('calls each setter exactly once when all fields are present', () => {
             const { result } = renderHook(() => useHexMapSSESync(baseArgs));
             const event = createSseEvent('map-data-test-campaign-test-map', {
                 gridSize: 25,
@@ -295,6 +181,56 @@ describe('useHexMapSSESync', () => {
             expect(baseArgs.setWeather).toHaveBeenCalledTimes(1);
             expect(baseArgs.onTravelStateChange).toHaveBeenCalledTimes(1);
             expect(baseArgs.setMapData).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('handleSSEEvent - mapData merge', () => {
+        it('calls setMapData with merged data when data.type is present', () => {
+            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
+            const event = createSseEvent('map-data-test-campaign-test-map', { type: 'map', gridSize: 20, terrain: 'desert' });
+            act(() => {
+                result.current.handleSSEEvent(event);
+            });
+            expect(baseArgs.setMapData).toHaveBeenCalled();
+            const callArg = baseArgs.setMapData.mock.calls[0][0];
+            expect(typeof callArg).toBe('function');
+            const resultData = callArg(null);
+            expect(resultData).toEqual({ type: 'map', gridSize: 20, terrain: 'desert' });
+        });
+
+        it('does not call setMapData when data.type is absent', () => {
+            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
+            const event = createSseEvent('map-data-test-campaign-test-map', { gridSize: 20 });
+            act(() => {
+                result.current.handleSSEEvent(event);
+            });
+            expect(baseArgs.setMapData).not.toHaveBeenCalled();
+        });
+
+        it('merges data into existing mapData via functional update', () => {
+            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
+            const existingData = { type: 'map', gridSize: 10 };
+            const event = createSseEvent('map-data-test-campaign-test-map', { type: 'map', terrain: 'forest' });
+            act(() => {
+                result.current.handleSSEEvent(event);
+            });
+            const callArg = baseArgs.setMapData.mock.calls[0][0];
+            const resultData = callArg(existingData);
+            expect(resultData).toEqual({ type: 'map', gridSize: 10, terrain: 'forest' });
+        });
+
+        it('calls setMapData with functional update merging multiple fields', () => {
+            const args = { ...baseArgs, setMapData: vi.fn() };
+            const { result } = renderHook(() => useHexMapSSESync(args));
+            const existingData = { type: 'map', gridSize: 10, terrain: 'desert', zoom: 1.0 };
+            const event = createSseEvent('map-data-test-campaign-test-map', { type: 'map', gridSize: 30, zoom: 2.0, weather: 'clear' });
+            act(() => {
+                result.current.handleSSEEvent(event);
+            });
+            expect(args.setMapData).toHaveBeenCalledTimes(1);
+            const callArg = args.setMapData.mock.calls[0][0];
+            const merged = callArg(existingData);
+            expect(merged).toEqual({ type: 'map', gridSize: 30, terrain: 'desert', zoom: 2.0, weather: 'clear' });
         });
     });
 
@@ -333,49 +269,23 @@ describe('useHexMapSSESync', () => {
     });
 
     describe('SSE equality guard behavior', () => {
-        it('does not call setter when value is identical to previous (primitive)', () => {
-            const args = { ...baseArgs, setGridSize: vi.fn() };
+        it.each`
+            field               | setter                | value
+            ${'gridSize'}       | ${'setGridSize'}      | ${20}
+            ${'rivers'}         | ${'setRivers'}        | ${['a', 'b']}
+            ${'partyPosition'}  | ${'setPartyPosition'} | ${{ q: 3, r: 4 }}
+        `('does not call setter when value is identical to previous ($field)', ({ field, setter, value }) => {
+            const args = { ...baseArgs, [setter]: vi.fn() };
             const { result } = renderHook(() => useHexMapSSESync(args));
-            const event = createSseEvent('map-data-test-campaign-test-map', { gridSize: 20 });
-            // First call should invoke the setter
+            const event = createSseEvent('map-data-test-campaign-test-map', { [field]: value });
             act(() => {
                 result.current.handleSSEEvent(event);
             });
-            expect(args.setGridSize).toHaveBeenCalledTimes(1);
-            // Second call with same value should be guarded
+            expect(args[setter]).toHaveBeenCalledTimes(1);
             act(() => {
                 result.current.handleSSEEvent(event);
             });
-            // The guard should prevent the second call
-            expect(args.setGridSize).toHaveBeenCalledTimes(1);
-        });
-
-        it('does not call setter when value is identical (array)', () => {
-            const args = { ...baseArgs, setRivers: vi.fn() };
-            const { result } = renderHook(() => useHexMapSSESync(args));
-            const event = createSseEvent('map-data-test-campaign-test-map', { rivers: ['a', 'b'] });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(args.setRivers).toHaveBeenCalledTimes(1);
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(args.setRivers).toHaveBeenCalledTimes(1);
-        });
-
-        it('does not call setter when value is identical (object)', () => {
-            const args = { ...baseArgs, setPartyPosition: vi.fn() };
-            const { result } = renderHook(() => useHexMapSSESync(args));
-            const event = createSseEvent('map-data-test-campaign-test-map', { partyPosition: { q: 3, r: 4 } });
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(args.setPartyPosition).toHaveBeenCalledTimes(1);
-            act(() => {
-                result.current.handleSSEEvent(event);
-            });
-            expect(args.setPartyPosition).toHaveBeenCalledTimes(1);
+            expect(args[setter]).toHaveBeenCalledTimes(1);
         });
 
         it('calls setter when value changes', () => {
@@ -397,7 +307,6 @@ describe('useHexMapSSESync', () => {
         it('handles functional update in setMapData with equality guard', () => {
             const args = { ...baseArgs, setMapData: vi.fn() };
             const { result } = renderHook(() => useHexMapSSESync(args));
-            // First call with identical merge result
             const event = createSseEvent('map-data-test-campaign-test-map', { type: 'map' });
             act(() => {
                 result.current.handleSSEEvent(event);
@@ -415,11 +324,23 @@ describe('useHexMapSSESync', () => {
     });
 
     describe('function stability', () => {
-        it('handleSSEEvent is a stable reference (useCallback)', () => {
-            const { result } = renderHook(() => useHexMapSSESync(baseArgs));
+        it('handleSSEEvent is stable across rerenders when deps have not changed', () => {
+            const { result, rerender } = renderHook(() => useHexMapSSESync(baseArgs));
             const handler1 = result.current.handleSSEEvent;
+            rerender();
             const handler2 = result.current.handleSSEEvent;
             expect(handler1).toBe(handler2);
+        });
+
+        it('handleSSEEvent changes when campaignName changes', () => {
+            const { result, rerender } = renderHook(
+                ({ campaignName }) => useHexMapSSESync({ ...baseArgs, campaignName }),
+                { initialProps: { campaignName: 'test-campaign' } }
+            );
+            const handler1 = result.current.handleSSEEvent;
+            rerender({ campaignName: 'new-campaign' });
+            const handler2 = result.current.handleSSEEvent;
+            expect(handler1).not.toBe(handler2);
         });
     });
 });

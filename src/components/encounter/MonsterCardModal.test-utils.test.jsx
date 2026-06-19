@@ -1,62 +1,41 @@
+/* @improved-by-ai */
 import { describe, it, expect, vi } from 'vitest';
 import * as utils from './MonsterCardModal.test-utils.js';
 
 describe('MonsterCardModal.test-utils', () => {
   describe('defaultConditionEffects', () => {
-    it('exports defaultConditionEffects object', () => {
-      expect(utils.defaultConditionEffects).toBeDefined();
-      expect(typeof utils.defaultConditionEffects).toBe('object');
-    });
-
-    it('has all expected numeric count properties', () => {
-      const { defaultConditionEffects } = utils;
-      expect(defaultConditionEffects.attackAdvantageCount).toBe(0);
-      expect(defaultConditionEffects.attackDisadvantageCount).toBe(0);
-      expect(defaultConditionEffects.targetAdvantageCount).toBe(0);
-      expect(defaultConditionEffects.targetDisadvantageCount).toBe(0);
-      expect(defaultConditionEffects.saveAdvantageCount).toBe(0);
-      expect(defaultConditionEffects.saveDisadvantageCount).toBe(0);
-    });
-
-    it('has all expected boolean properties', () => {
-      const { defaultConditionEffects } = utils;
-      expect(defaultConditionEffects.abilityCheckDisadvantage).toBe(false);
-      expect(defaultConditionEffects.cannotAct).toBe(false);
-      expect(defaultConditionEffects.speedZero).toBe(false);
-      expect(defaultConditionEffects.concentrationBroken).toBe(false);
-      expect(defaultConditionEffects.targetAdvantageIfWithin5ft).toBe(false);
-      expect(defaultConditionEffects.targetDisadvantageIfBeyond5ft).toBe(false);
-      expect(defaultConditionEffects.autoCritWithin5ft).toBe(false);
-      expect(defaultConditionEffects.resistantToAll).toBe(false);
-      expect(defaultConditionEffects.poisonImmune).toBe(false);
-      expect(defaultConditionEffects.autoReroll).toBe(false);
-      expect(defaultConditionEffects.strSaveReplace).toBe(false);
-      expect(defaultConditionEffects.strCheckReplace).toBe(false);
-      expect(defaultConditionEffects.reliableTalent).toBe(false);
-      expect(defaultConditionEffects.tacticalMind).toBe(false);
-    });
-
-    it('has all expected array properties', () => {
-      const { defaultConditionEffects } = utils;
-      expect(Array.isArray(defaultConditionEffects.autoFailSaves)).toBe(true);
-      expect(Array.isArray(defaultConditionEffects.saveDisadvantage)).toBe(true);
-      expect(Array.isArray(defaultConditionEffects.saveAdvantage)).toBe(true);
-    });
-
-    it('has all expected nullable properties', () => {
-      const { defaultConditionEffects } = utils;
-      expect(defaultConditionEffects.autoRerollCondition).toBeNull();
-      expect(defaultConditionEffects.autoRerollBonus).toBeNull();
-      expect(defaultConditionEffects.tacticalMindBonus).toBeNull();
+    it('has correct default values for all properties', () => {
+      const d = utils.defaultConditionEffects;
+      expect(d.attackAdvantageCount).toBe(0);
+      expect(d.attackDisadvantageCount).toBe(0);
+      expect(d.targetAdvantageCount).toBe(0);
+      expect(d.targetDisadvantageCount).toBe(0);
+      expect(d.saveAdvantageCount).toBe(0);
+      expect(d.saveDisadvantageCount).toBe(0);
+      expect(d.abilityCheckDisadvantage).toBe(false);
+      expect(d.cannotAct).toBe(false);
+      expect(d.speedZero).toBe(false);
+      expect(d.concentrationBroken).toBe(false);
+      expect(d.targetAdvantageIfWithin5ft).toBe(false);
+      expect(d.targetDisadvantageIfBeyond5ft).toBe(false);
+      expect(d.autoCritWithin5ft).toBe(false);
+      expect(d.resistantToAll).toBe(false);
+      expect(d.poisonImmune).toBe(false);
+      expect(d.autoReroll).toBe(false);
+      expect(d.strSaveReplace).toBe(false);
+      expect(d.strCheckReplace).toBe(false);
+      expect(d.reliableTalent).toBe(false);
+      expect(d.tacticalMind).toBe(false);
+      expect(d.autoRerollCondition).toBeNull();
+      expect(d.autoRerollBonus).toBeNull();
+      expect(d.tacticalMindBonus).toBeNull();
+      expect(Array.isArray(d.autoFailSaves)).toBe(true);
+      expect(Array.isArray(d.saveDisadvantage)).toBe(true);
+      expect(Array.isArray(d.saveAdvantage)).toBe(true);
     });
   });
 
   describe('makeMonster', () => {
-    it('exports makeMonster function', () => {
-      expect(utils.makeMonster).toBeDefined();
-      expect(typeof utils.makeMonster).toBe('function');
-    });
-
     it('returns a monster object with default values', () => {
       const monster = utils.makeMonster();
       expect(monster.name).toBe('Goblin');
@@ -71,24 +50,10 @@ describe('MonsterCardModal.test-utils', () => {
       expect(monster.languages).toBe('Common');
     });
 
-    it('returns a monster with ability scores', () => {
+    it('returns a monster with ability scores and modifiers', () => {
       const monster = utils.makeMonster();
-      expect(monster.ability_scores.str).toBe(8);
-      expect(monster.ability_scores.dex).toBe(14);
-      expect(monster.ability_scores.con).toBe(10);
-      expect(monster.ability_scores.int).toBe(10);
-      expect(monster.ability_scores.wis).toBe(8);
-      expect(monster.ability_scores.cha).toBe(10);
-    });
-
-    it('returns a monster with ability score modifiers', () => {
-      const monster = utils.makeMonster();
-      expect(monster.ability_score_modifiers.str).toBe(-1);
-      expect(monster.ability_score_modifiers.dex).toBe(2);
-      expect(monster.ability_score_modifiers.con).toBe(0);
-      expect(monster.ability_score_modifiers.int).toBe(0);
-      expect(monster.ability_score_modifiers.wis).toBe(-1);
-      expect(monster.ability_score_modifiers.cha).toBe(0);
+      expect(monster.ability_scores).toEqual({ str: 8, dex: 14, con: 10, int: 10, wis: 8, cha: 10 });
+      expect(monster.ability_score_modifiers).toEqual({ str: -1, dex: 2, con: 0, int: 0, wis: -1, cha: 0 });
     });
 
     it('returns a monster with speed object', () => {
@@ -122,13 +87,13 @@ describe('MonsterCardModal.test-utils', () => {
       expect(monster.desc).toBeNull();
       expect(monster.book).toBeNull();
       expect(monster.page).toBeNull();
+      expect(monster.subtype).toBe('');
     });
 
     it('merges overrides into default monster', () => {
       const monster = utils.makeMonster({ name: 'Ogre', hit_points: 59 });
       expect(monster.name).toBe('Ogre');
       expect(monster.hit_points).toBe(59);
-      // Default values should still be present
       expect(monster.size).toBe('Small');
       expect(monster.armor_class).toBe(15);
     });
@@ -147,14 +112,16 @@ describe('MonsterCardModal.test-utils', () => {
       expect(monster.challenge_rating).toBe('30');
       expect(monster.xp).toBe(33000);
     });
+
+    it('does not mutate the original default when overrides are applied', () => {
+      const defaultMonster = utils.makeMonster();
+      const overrideMonster = utils.makeMonster({ name: 'Ogre' });
+      expect(overrideMonster.name).toBe('Ogre');
+      expect(defaultMonster.name).toBe('Goblin');
+    });
   });
 
   describe('makeProps', () => {
-    it('exports makeProps function', () => {
-      expect(utils.makeProps).toBeDefined();
-      expect(typeof utils.makeProps).toBe('function');
-    });
-
     it('returns props with monster and defaults', () => {
       const monster = utils.makeMonster();
       const props = utils.makeProps(monster);
@@ -164,6 +131,7 @@ describe('MonsterCardModal.test-utils', () => {
       expect(props.creatureName).toBe('');
       expect(props.mapName).toBeNull();
       expect(props.characters).toEqual([]);
+      expect(typeof props.onClose).toBe('function');
     });
 
     it('merges overrides into props', () => {
@@ -171,6 +139,12 @@ describe('MonsterCardModal.test-utils', () => {
       const props = utils.makeProps(monster, { campaignName: 'my-campaign', creatureName: 'Goblin' });
       expect(props.campaignName).toBe('my-campaign');
       expect(props.creatureName).toBe('Goblin');
+      expect(props.monster).toBe(monster);
+    });
+
+    it('preserves the monster reference (not cloned)', () => {
+      const monster = utils.makeMonster();
+      const props = utils.makeProps(monster);
       expect(props.monster).toBe(monster);
     });
 
@@ -182,67 +156,31 @@ describe('MonsterCardModal.test-utils', () => {
   });
 
   describe('hasEntries', () => {
-    it('exports hasEntries function', () => {
-      expect(utils.hasEntries).toBeDefined();
-      expect(typeof utils.hasEntries).toBe('function');
-    });
-
-    it('returns falsy for null', () => {
+    it('returns falsy for null, undefined, and empty object', () => {
       expect(utils.hasEntries(null)).toBeFalsy();
-    });
-
-    it('returns falsy for undefined', () => {
       expect(utils.hasEntries(undefined)).toBeFalsy();
-    });
-
-    it('returns false for empty object', () => {
-      expect(utils.hasEntries({})).toBe(false);
+      expect(utils.hasEntries({})).toBeFalsy();
     });
 
     it('returns true for non-empty object', () => {
       expect(utils.hasEntries({ key: 'value' })).toBe(true);
-    });
-
-    it('returns true for object with one entry', () => {
       expect(utils.hasEntries({ a: 1 })).toBe(true);
     });
   });
 
   describe('hasSenseEntries', () => {
-    it('exports hasSenseEntries function', () => {
-      expect(utils.hasSenseEntries).toBeDefined();
-      expect(typeof utils.hasSenseEntries).toBe('function');
-    });
-
-    it('returns false for null', () => {
-      expect(utils.hasSenseEntries(null)).toBe(false);
-    });
-
-    it('returns false for undefined', () => {
+    it('returns falsy for null, undefined, empty object, and object without sense keys', () => {
+      expect(utils.hasSenseEntries(null)).toBeFalsy();
       expect(utils.hasSenseEntries(undefined)).toBeFalsy();
-    });
-
-    it('returns falsy for empty object', () => {
       expect(utils.hasSenseEntries({})).toBeFalsy();
+      expect(utils.hasSenseEntries({ ac: 20 })).toBeFalsy();
     });
 
-    it('returns truthy when blindsight is set', () => {
+    it('returns truthy for each individual sense type', () => {
       expect(!!utils.hasSenseEntries({ blindsight: 60 })).toBe(true);
-    });
-
-    it('returns truthy when darkvision is set', () => {
       expect(!!utils.hasSenseEntries({ darkvision: 60 })).toBe(true);
-    });
-
-    it('returns truthy when truesight is set', () => {
       expect(!!utils.hasSenseEntries({ truesight: 120 })).toBe(true);
-    });
-
-    it('returns truthy when tremorsense is set', () => {
       expect(!!utils.hasSenseEntries({ tremorsense: 60 })).toBe(true);
-    });
-
-    it('returns truthy when passive_perception is set', () => {
       expect(!!utils.hasSenseEntries({ passive_perception: 15 })).toBe(true);
     });
 
@@ -256,50 +194,31 @@ describe('MonsterCardModal.test-utils', () => {
   });
 
   describe('saveAbilityAbbr', () => {
-    it('exports saveAbilityAbbr function', () => {
-      expect(utils.saveAbilityAbbr).toBeDefined();
-      expect(typeof utils.saveAbilityAbbr).toBe('function');
-    });
-
-    it('converts Strength to STR', () => {
-      expect(utils.saveAbilityAbbr('Strength')).toBe('STR');
-    });
-
-    it('converts Dexterity to DEX', () => {
-      expect(utils.saveAbilityAbbr('Dexterity')).toBe('DEX');
-    });
-
-    it('converts Constitution to CON', () => {
-      expect(utils.saveAbilityAbbr('Constitution')).toBe('CON');
-    });
-
-    it('converts Intelligence to INT', () => {
-      expect(utils.saveAbilityAbbr('Intelligence')).toBe('INT');
-    });
-
-    it('converts Wisdom to WIS', () => {
-      expect(utils.saveAbilityAbbr('Wisdom')).toBe('WIS');
-    });
-
-    it('converts Charisma to CHA', () => {
-      expect(utils.saveAbilityAbbr('Charisma')).toBe('CHA');
+    it.each([
+      ['Strength', 'STR'],
+      ['Dexterity', 'DEX'],
+      ['Constitution', 'CON'],
+      ['Intelligence', 'INT'],
+      ['Wisdom', 'WIS'],
+      ['Charisma', 'CHA'],
+    ])('converts %s to %s', (input, expected) => {
+      expect(utils.saveAbilityAbbr(input)).toBe(expected);
     });
 
     it('returns uppercase first 3 chars for unknown ability', () => {
       expect(utils.saveAbilityAbbr('Foo')).toBe('FOO');
     });
 
-    it('returns uppercase first 3 chars for null', () => {
+    it('handles lowercase input', () => {
+      expect(utils.saveAbilityAbbr('strength')).toBe('STR');
+    });
+
+    it('returns undefined for null', () => {
       expect(utils.saveAbilityAbbr(null)).toBe(undefined);
     });
   });
 
   describe('abilityNameMap', () => {
-    it('exports abilityNameMap', () => {
-      expect(utils.abilityNameMap).toBeDefined();
-      expect(typeof utils.abilityNameMap).toBe('object');
-    });
-
     it('maps lowercase keys to full names', () => {
       expect(utils.abilityNameMap.str).toBe('Strength');
       expect(utils.abilityNameMap.dex).toBe('Dexterity');
@@ -308,40 +227,35 @@ describe('MonsterCardModal.test-utils', () => {
       expect(utils.abilityNameMap.wis).toBe('Wisdom');
       expect(utils.abilityNameMap.cha).toBe('Charisma');
     });
+
+    it('has all six ability keys', () => {
+      expect(Object.keys(utils.abilityNameMap).length).toBe(6);
+      expect(Object.keys(utils.abilityNameMap)).toEqual(['str', 'dex', 'con', 'int', 'wis', 'cha']);
+    });
   });
 
   describe('parseInitiativeBonus', () => {
-    it('exports parseInitiativeBonus function', () => {
-      expect(utils.parseInitiativeBonus).toBeDefined();
-      expect(typeof utils.parseInitiativeBonus).toBe('function');
+    it.each([
+      [null, null],
+      [undefined, null],
+      ['', null],
+    ])('returns null for %s input', (input, expected) => {
+      expect(utils.parseInitiativeBonus(input)).toBe(expected);
     });
 
-    it('returns null for null input', () => {
-      expect(utils.parseInitiativeBonus(null)).toBeNull();
+    it.each([
+      ['+2', 2],
+      ['-1', -1],
+      ['+5', 5],
+      ['-4', -4],
+      ['+10', 10],
+      ['-10', -10],
+    ])('parses "%s" to %d', (input, expected) => {
+      expect(utils.parseInitiativeBonus(input)).toBe(expected);
     });
 
-    it('returns null for undefined input', () => {
-      expect(utils.parseInitiativeBonus(undefined)).toBeNull();
-    });
-
-    it('returns null for empty string', () => {
-      expect(utils.parseInitiativeBonus('')).toBeNull();
-    });
-
-    it('parses positive bonus', () => {
-      expect(utils.parseInitiativeBonus('+2')).toBe(2);
-    });
-
-    it('parses negative bonus', () => {
-      expect(utils.parseInitiativeBonus('-1')).toBe(-1);
-    });
-
-    it('parses larger positive bonus', () => {
-      expect(utils.parseInitiativeBonus('+5')).toBe(5);
-    });
-
-    it('parses larger negative bonus', () => {
-      expect(utils.parseInitiativeBonus('-4')).toBe(-4);
+    it('handles plain number without sign', () => {
+      expect(utils.parseInitiativeBonus('3')).toBeNull();
     });
 
     it('returns null when no match', () => {
@@ -350,17 +264,11 @@ describe('MonsterCardModal.test-utils', () => {
   });
 
   describe('parseExtraDamageDice', () => {
-    it('exports parseExtraDamageDice function', () => {
-      expect(utils.parseExtraDamageDice).toBeDefined();
-      expect(typeof utils.parseExtraDamageDice).toBe('function');
-    });
-
-    it('returns empty array for null', () => {
-      expect(utils.parseExtraDamageDice(null)).toEqual([]);
-    });
-
-    it('returns empty array for undefined', () => {
-      expect(utils.parseExtraDamageDice(undefined)).toEqual([]);
+    it.each([
+      [null, []],
+      [undefined, []],
+    ])('returns empty array for %s input', (input, expected) => {
+      expect(utils.parseExtraDamageDice(input)).toEqual(expected);
     });
 
     it('parses single damage die', () => {
@@ -379,44 +287,27 @@ describe('MonsterCardModal.test-utils', () => {
       expect(utils.parseExtraDamageDice('2d6 + 4 1d8', '2d6+4')).toEqual(['1d8']);
     });
 
-    it('returns all dice when no exclusion', () => {
+    it('returns all dice when exclusion is empty', () => {
       const result = utils.parseExtraDamageDice('1d6 1d8', '');
       expect(result).toContain('1d6');
       expect(result).toContain('1d8');
     });
+
+    it('excludes formula matching entire string', () => {
+      expect(utils.parseExtraDamageDice('1d8', '1d8')).toEqual([]);
+    });
   });
 
   describe('formatSenses', () => {
-    it('exports formatSenses function', () => {
-      expect(utils.formatSenses).toBeDefined();
-      expect(typeof utils.formatSenses).toBe('function');
-    });
-
-    it('throws when passed null', () => {
-      expect(() => utils.formatSenses(null)).toThrow();
-    });
-
     it('returns empty string for empty object', () => {
       expect(utils.formatSenses({})).toBe('');
     });
 
-    it('formats blindsight', () => {
+    it('formats each sense type individually', () => {
       expect(utils.formatSenses({ blindsight: 60 })).toBe('blindsight 60');
-    });
-
-    it('formats darkvision', () => {
       expect(utils.formatSenses({ darkvision: 60 })).toBe('darkvision 60');
-    });
-
-    it('formats truesight', () => {
       expect(utils.formatSenses({ truesight: 120 })).toBe('truesight 120');
-    });
-
-    it('formats tremorsense', () => {
       expect(utils.formatSenses({ tremorsense: 60 })).toBe('tremorsense 60');
-    });
-
-    it('formats passive perception', () => {
       expect(utils.formatSenses({ passive_perception: 15 })).toBe('passive Perception 15');
     });
 
@@ -427,6 +318,14 @@ describe('MonsterCardModal.test-utils', () => {
         passive_perception: 15,
       });
       expect(result).toBe('blindsight 60, darkvision 120, passive Perception 15');
+    });
+
+    it('returns empty string when all sense values are null/undefined', () => {
+      expect(utils.formatSenses({ blindsight: null, darkvision: undefined })).toBe('');
+    });
+
+    it('throws when passed null', () => {
+      expect(() => utils.formatSenses(null)).toThrow(TypeError);
     });
   });
 });

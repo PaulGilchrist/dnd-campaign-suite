@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect } from 'vitest';
 import { WIZARD_STEPS, getTotalSteps, getStepConfig } from './steps-config.js';
 
 describe('steps-config', () => {
@@ -13,7 +14,7 @@ describe('steps-config', () => {
       expect(uniqueSteps).toHaveLength(stepNumbers.length);
     });
 
-    it('should have all required properties', () => {
+    it('should have all required properties on every step', () => {
       WIZARD_STEPS.forEach(step => {
         expect(step.step).toBeDefined();
         expect(step.title).toBeDefined();
@@ -27,18 +28,33 @@ describe('steps-config', () => {
       expect(WIZARD_STEPS[0].title).toBe('Ruleset');
       expect(WIZARD_STEPS[1].title).toBe('Basic Information');
       expect(WIZARD_STEPS[2].title).toBe('Race & Class');
+      expect(WIZARD_STEPS[3].title).toBe('Feats');
+      expect(WIZARD_STEPS[4].title).toBe('Ability Scores');
+      expect(WIZARD_STEPS[5].title).toBe('Skill Proficiencies');
+      expect(WIZARD_STEPS[6].title).toBe('Languages & Fighting Styles');
+      expect(WIZARD_STEPS[7].title).toBe('Resistances & Immunities');
+      expect(WIZARD_STEPS[8].title).toBe('Spells');
+      expect(WIZARD_STEPS[9].title).toBe('Magic Items');
+      expect(WIZARD_STEPS[10].title).toBe('Inventory');
+      expect(WIZARD_STEPS[11].title).toBe('Special Actions');
     });
 
-    it('should have correct step order', () => {
+    it('should have sequential step numbers starting at 1', () => {
       WIZARD_STEPS.forEach((step, index) => {
         expect(step.step).toBe(index + 1);
       });
     });
+
+    it('should export distinct component references for each step', () => {
+      const components = WIZARD_STEPS.map(s => s.component);
+      const uniqueComponents = [...new Set(components)];
+      expect(uniqueComponents).toHaveLength(12);
+    });
   });
 
   describe('getTotalSteps', () => {
-    it('should return 12', () => {
-      expect(getTotalSteps()).toBe(12);
+    it('should return the length of WIZARD_STEPS', () => {
+      expect(getTotalSteps()).toBe(WIZARD_STEPS.length);
     });
   });
 
@@ -58,183 +74,236 @@ describe('steps-config', () => {
     });
 
     it('should return undefined for invalid step', () => {
-      const config = getStepConfig(999);
-      expect(config).toBeUndefined();
+      expect(getStepConfig(999)).toBeUndefined();
     });
 
     it('should return undefined for 0', () => {
-      const config = getStepConfig(0);
-      expect(config).toBeUndefined();
+      expect(getStepConfig(0)).toBeUndefined();
     });
 
     it('should return undefined for negative step', () => {
-      const config = getStepConfig(-1);
-      expect(config).toBeUndefined();
+      expect(getStepConfig(-1)).toBeUndefined();
     });
 
-    it('should return correct component for each step', () => {
-      const step1 = getStepConfig(1);
-      expect(step1.component).toBeDefined();
+    it('should return undefined for non-numeric inputs', () => {
+      expect(getStepConfig('1')).toBeUndefined();
+      expect(getStepConfig(null)).toBeUndefined();
+      expect(getStepConfig(undefined)).toBeUndefined();
+    });
+
+    it('should return undefined for float values', () => {
+      expect(getStepConfig(1.5)).toBeUndefined();
+    });
+
+    it('should return the same object reference when called multiple times for the same step', () => {
+      const config1 = getStepConfig(5);
+      const config2 = getStepConfig(5);
+      expect(config1).toBe(config2);
+    });
+
+    it('should return distinct configs for distinct steps', () => {
+      const config1 = getStepConfig(1);
+      const config2 = getStepConfig(2);
+      expect(config1).not.toBe(config2);
+      expect(config1.step).not.toBe(config2.step);
     });
   });
 
   describe('getProps functions', () => {
-    it('should call getProps with correct arguments for step 1', () => {
+    it('should pass through all input props for step 1 (Ruleset)', () => {
       const config = getStepConfig(1);
-      const mockProps = {
+      const input = {
         ruleset: '5e',
-        errors: {},
-        onRulesetChange: vi.fn(),
+        errors: { step1: true },
+        onRulesetChange: () => {},
       };
-      const props = config.getProps(mockProps);
-      expect(props.ruleset).toBe('5e');
-      expect(props.errors).toBeDefined();
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
     });
 
-    it('should call getProps with correct arguments for step 2', () => {
+    it('should pass through all input props for step 2 (Basic Information)', () => {
       const config = getStepConfig(2);
-      const mockProps = {
+      const input = {
         formData: { name: 'Test' },
         errors: {},
-        backgrounds: [],
+        backgrounds: ['Soldier'],
         ruleset: '5e',
-        onInputChange: vi.fn(),
+        onInputChange: () => {},
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
-      expect(props.backgrounds).toEqual([]);
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
     });
 
-    it('should call getProps for step 3 (Race & Class)', () => {
+    it('should pass through all input props for step 3 (Race & Class)', () => {
       const config = getStepConfig(3);
-      const mockProps = {
+      const input = {
         formData: {},
         errors: {},
-        racesData: [],
-        classSubtypes: [],
+        racesData: [{ name: 'Human' }],
+        classSubtypes: [{ name: 'Fighter' }],
         ruleset: '5e',
-        onInputChange: vi.fn(),
+        onInputChange: () => {},
+        allClasses: [{ name: 'Wizard' }],
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
-      expect(props.racesData).toEqual([]);
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
     });
 
-    it('should call getProps for step 4 (Feats)', () => {
+    it('should pass through all input props for step 4 (Feats)', () => {
       const config = getStepConfig(4);
-      const mockProps = {
-        formData: { feats: [] },
-        allFeats: [],
-        onArrayFieldChange: vi.fn(),
+      const input = {
+        formData: { feats: ['Great Weapon Master'] },
+        allFeats: [{ name: 'Great Weapon Master' }],
+        onArrayFieldChange: () => {},
         preSelectedFeats: [],
+        computedBuffs: [],
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
-      expect(props.allFeats).toEqual([]);
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
     });
 
-    it('should call getProps for step 5 (Ability Scores)', () => {
+    it('should map prop names correctly for step 5 (Ability Scores)', () => {
       const config = getStepConfig(5);
-      const mockProps = {
+      const input = {
         formData: { abilities: [] },
         errors: {},
-        onAbilityBaseScoreChange: vi.fn(),
-        onAbilityMiscIncreaseChange: vi.fn(),
+        onAbilityBaseScoreChange: () => {},
+        onAbilityMiscIncreaseChange: () => {},
+        updateBackgroundIncrease: () => {},
+        backgroundAbilityNames: ['Strength'],
+        backgroundAbilityAssignments: {},
+        backgroundValidationWarnings: [],
+        allFeats: [],
+        featAbilityChoices: {},
+        featAbilityAssignments: {},
+        handleFeatAbilityChoice: () => {},
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
+      const props = config.getProps(input);
+      expect(props.formData).toBe(input.formData);
+      expect(props.errors).toBe(input.errors);
+      expect(props.onAbilityBaseScoreChange).toBe(input.onAbilityBaseScoreChange);
+      expect(props.onAbilityMiscIncreaseChange).toBe(input.onAbilityMiscIncreaseChange);
+      expect(props.onBackgroundIncreaseChange).toBe(input.updateBackgroundIncrease);
+      expect(props.backgroundAbilityChoices).toBe(input.backgroundAbilityNames);
+      expect(props.backgroundAbilityAssignments).toBe(input.backgroundAbilityAssignments);
+      expect(props.backgroundValidationWarnings).toBe(input.backgroundValidationWarnings);
+      expect(props.allFeats).toBe(input.allFeats);
+      expect(props.featAbilityChoices).toBe(input.featAbilityChoices);
+      expect(props.featAbilityAssignments).toBe(input.featAbilityAssignments);
+      expect(props.onFeatAbilityChoiceChange).toBe(input.handleFeatAbilityChoice);
     });
 
-    it('should call getProps for step 6 (Skills)', () => {
+    it('should pass through all input props for step 6 (Skill Proficiencies)', () => {
       const config = getStepConfig(6);
-      const mockProps = {
+      const input = {
         formData: { skillProficiencies: [] },
         errors: {},
-        onSkillToggle: vi.fn(),
-        onSkillExpertiseToggle: vi.fn(),
+        onSkillToggle: () => {},
+        onSkillExpertiseToggle: () => {},
         skillLimits: null,
         expertiseLimits: null,
         warnings: [],
         preSelectedSkills: [],
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
     });
 
-    it('should call getProps for step 7 (Languages)', () => {
+    it('should map prop names correctly for step 7 (Languages & Fighting Styles)', () => {
       const config = getStepConfig(7);
-      const mockProps = {
+      const input = {
         formData: { languages: [] },
         errors: {},
-        onLanguageToggle: vi.fn(),
-        onFightingStyleToggle: vi.fn(),
+        onLanguageToggle: () => {},
+        onFightingStyleToggle: () => {},
         languageLimits: null,
         fightingStyleLimits: null,
-        warnings: [],
+        languageWarnings: ['Too many languages'],
         preSelectedLanguages: [],
         preSelectedFightingStyles: [],
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
+      const props = config.getProps(input);
+      expect(props.formData).toBe(input.formData);
+      expect(props.errors).toBe(input.errors);
+      expect(props.onLanguageToggle).toBe(input.onLanguageToggle);
+      expect(props.onFightingStyleToggle).toBe(input.onFightingStyleToggle);
+      expect(props.languageLimits).toBe(input.languageLimits);
+      expect(props.fightingStyleLimits).toBe(input.fightingStyleLimits);
+      expect(props.warnings).toBe(input.languageWarnings);
+      expect(props.preSelectedLanguages).toBe(input.preSelectedLanguages);
+      expect(props.preSelectedFightingStyles).toBe(input.preSelectedFightingStyles);
     });
 
-    it('should call getProps for step 8 (Resistances)', () => {
+    it('should map prop names correctly for step 8 (Resistances & Immunities)', () => {
       const config = getStepConfig(8);
-      const mockProps = {
+      const input = {
         formData: { resistances: [], immunities: [] },
-        onResistanceToggle: vi.fn(),
-        onImmunityToggle: vi.fn(),
-        warnings: { resistances: [], immunities: [] },
+        onResistanceToggle: () => {},
+        onImmunityToggle: () => {},
+        resistanceWarnings: { resistances: ['Duplicate'], immunities: [] },
         preSelectedResistances: { resistances: [], immunities: [] },
         preSelectedImmunities: { resistances: [], immunities: [] },
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
+      const props = config.getProps(input);
+      expect(props.formData).toBe(input.formData);
+      expect(props.onResistanceToggle).toBe(input.onResistanceToggle);
+      expect(props.onImmunityToggle).toBe(input.onImmunityToggle);
+      expect(props.warnings).toBe(input.resistanceWarnings);
+      expect(props.preSelectedResistances).toBe(input.preSelectedResistances);
+      expect(props.preSelectedImmunities).toBe(input.preSelectedImmunities);
     });
 
-    it('should call getProps for step 9 (Spells)', () => {
+    it('should pass through all input props for step 9 (Spells)', () => {
       const config = getStepConfig(9);
-      const mockProps = {
+      const input = {
         formData: { spells: [] },
         allSpells: [],
-        onArrayFieldChange: vi.fn(),
+        onArrayFieldChange: () => {},
+        preSelectedSpells: [],
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
     });
 
-    it('should call getProps for step 10 (Magic Items)', () => {
+    it('should pass through all input props for step 10 (Magic Items)', () => {
       const config = getStepConfig(10);
-      const mockProps = {
+      const input = {
         formData: { inventory: { magicItems: [] } },
         allMagicItems: [],
         ruleset: '5e',
-        onArrayFieldChange: vi.fn(),
+        onArrayFieldChange: () => {},
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
     });
 
-    it('should call getProps for step 11 (Inventory)', () => {
+    it('should pass through all input props for step 11 (Inventory)', () => {
       const config = getStepConfig(11);
-      const mockProps = {
+      const input = {
         formData: { inventory: {} },
         tempInventory: { backpack: [], equipped: [] },
-        onInventoryChange: vi.fn(),
-        onTempInventoryChange: vi.fn(),
+        onInventoryChange: () => {},
+        onTempInventoryChange: () => {},
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
     });
 
-    it('should call getProps for step 12 (Special Actions)', () => {
+    it('should pass through all input props for step 12 (Special Actions)', () => {
       const config = getStepConfig(12);
-      const mockProps = {
+      const input = {
         formData: { actions: [], bonusActions: [], reactions: [], specialActions: [] },
-        onArrayFieldChange: vi.fn(),
+        onArrayFieldChange: () => {},
       };
-      const props = config.getProps(mockProps);
-      expect(props.formData).toBeDefined();
+      const props = config.getProps(input);
+      expect(props).toEqual(input);
+    });
+
+    it('should return a new object from getProps (not the input reference)', () => {
+      const config = getStepConfig(1);
+      const input = { ruleset: '5e', errors: {}, onRulesetChange: () => {} };
+      const props = config.getProps(input);
+      expect(props).not.toBe(input);
     });
   });
 });

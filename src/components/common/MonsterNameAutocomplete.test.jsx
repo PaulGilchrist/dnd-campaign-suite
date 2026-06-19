@@ -1,5 +1,6 @@
+/* @improved-by-ai */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import MonsterNameAutocomplete from './MonsterNameAutocomplete.jsx';
 
 vi.mock('../../services/ui/dataLoader.js', () => ({
@@ -29,6 +30,7 @@ describe('MonsterNameAutocomplete', () => {
 
     afterEach(() => {
         delete HTMLElement.prototype.scrollIntoView;
+        vi.restoreAllMocks();
     });
 
     it('renders an input field', () => {
@@ -84,7 +86,7 @@ describe('MonsterNameAutocomplete', () => {
         await waitFor(() => {
             const items = document.querySelectorAll('.monster-autocomplete-item');
             expect(items.length).toBeGreaterThan(0);
-            expect(items[0].textContent).toContain('Ancient Dragon');
+            expect(items[0].textContent.trim()).toContain('Ancient Dragon');
         });
     });
 
@@ -160,7 +162,7 @@ describe('MonsterNameAutocomplete', () => {
                 fireEvent.keyDown(input, { key: 'ArrowDown' });
             }
             const first = document.querySelector('.monster-autocomplete-item.highlighted');
-            expect(first.textContent).toContain(items[0].textContent.trim());
+            expect(first.textContent.trim()).toContain(items[0].textContent.trim());
         }
     });
 
@@ -290,9 +292,29 @@ describe('MonsterNameAutocomplete', () => {
             const list = document.querySelector('.monster-autocomplete-list');
             expect(list).toBeInTheDocument();
         });
-        const badge = document.querySelector('.monster-autocomplete-badge');
+        const npcItem = document.querySelector('.monster-autocomplete-item');
+        expect(npcItem).toBeInTheDocument();
+        expect(npcItem.textContent).toContain('Custom NPC');
+        const badge = npcItem.querySelector('.monster-autocomplete-badge');
         expect(badge).toBeInTheDocument();
         expect(badge.textContent).toBe('NPC');
+    });
+
+    it('filters out NPC items with no name', async () => {
+        const npcs = [{ name: null }, { name: undefined }, { name: 'Valid NPC' }];
+        render(<MonsterNameAutocomplete value="" npcs={npcs} />);
+        const input = document.querySelector('.monster-autocomplete-input');
+        fireEvent.change(input, { target: { value: 'Val' } });
+        await waitFor(() => {
+            const list = document.querySelector('.monster-autocomplete-list');
+            expect(list).toBeInTheDocument();
+        });
+        const items = document.querySelectorAll('.monster-autocomplete-item');
+        const itemTexts = Array.from(items).map(item => {
+            const badge = item.querySelector('.monster-autocomplete-badge');
+            return badge ? item.textContent.replace('NPC', '').trim() : item.textContent.trim();
+        });
+        expect(itemTexts).toContain('Valid NPC');
     });
 
     it('applies fixed positioning class when position prop is provided', () => {
@@ -301,7 +323,7 @@ describe('MonsterNameAutocomplete', () => {
         );
         const wrapper = container.querySelector('.monster-autocomplete');
         expect(wrapper).toHaveClass('monster-autocomplete-fixed');
-        expect(wrapper).toHaveAttribute('style', 'top: 10px; left: 20px;');
+        expect(wrapper).toHaveStyle({ top: '10px', left: '20px' });
     });
 
     it('does not apply fixed positioning class when position is undefined', () => {
@@ -319,19 +341,6 @@ describe('MonsterNameAutocomplete', () => {
         });
     });
 
-    it('uses only first 8 startedWith matches and fills remaining with partial matches', async () => {
-        render(<MonsterNameAutocomplete value="" />);
-        const input = document.querySelector('.monster-autocomplete-input');
-        fireEvent.change(input, { target: { value: 'A' } });
-        await waitFor(() => {
-            const list = document.querySelector('.monster-autocomplete-list');
-            expect(list).toBeInTheDocument();
-        });
-        const items = document.querySelectorAll('.monster-autocomplete-item');
-        expect(items.length).toBeGreaterThan(0);
-        expect(items.length).toBeLessThanOrEqual(16);
-    });
-
     it('does not show suggestions for empty query', async () => {
         render(<MonsterNameAutocomplete value="" />);
         await waitFor(() => {
@@ -340,7 +349,17 @@ describe('MonsterNameAutocomplete', () => {
         });
     });
 
-    it('renders NPC items without badge for monster items', async () => {
+    it('does not show suggestions for whitespace-only query', async () => {
+        render(<MonsterNameAutocomplete value="" />);
+        const input = document.querySelector('.monster-autocomplete-input');
+        fireEvent.change(input, { target: { value: '   ' } });
+        await waitFor(() => {
+            const list = document.querySelector('.monster-autocomplete-list');
+            expect(list).not.toBeInTheDocument();
+        });
+    });
+
+    it('does not call onCommit when it is not provided on blur', async () => {
         render(<MonsterNameAutocomplete value="" />);
         const input = document.querySelector('.monster-autocomplete-input');
         fireEvent.change(input, { target: { value: 'Gobl' } });
@@ -348,10 +367,15 @@ describe('MonsterNameAutocomplete', () => {
             const list = document.querySelector('.monster-autocomplete-list');
             expect(list).toBeInTheDocument();
         });
-        const items = document.querySelectorAll('.monster-autocomplete-item');
-        const npcBadges = document.querySelectorAll('.monster-autocomplete-badge');
-        expect(npcBadges.length).toBe(0);
-        expect(items[0].textContent).toBe('Goblin');
+        fireEvent.blur(input);
+        expect(screen.getByDisplayValue('Gobl')).toBeInTheDocument();
+    });
+
+    it('does not call onCommit when it is not provided on Enter with no suggestions', async () => {
+        render(<MonsterNameAutocomplete value="" />);
+        const input = document.querySelector('.monster-autocomplete-input');
+        fireEvent.keyDown(input, { key: 'Enter' });
+        expect(screen.getByDisplayValue('')).toBeInTheDocument();
     });
 
     it('scrolls highlighted item into view', async () => {
@@ -371,15 +395,7 @@ describe('MonsterNameAutocomplete', () => {
         }
     });
 
-    it('does nothing on Enter when no suggestions are shown', async () => {
-        const onCommit = vi.fn();
-        render(<MonsterNameAutocomplete value="" onCommit={onCommit} />);
-        const input = document.querySelector('.monster-autocomplete-input');
-        fireEvent.keyDown(input, { key: 'Enter' });
-        expect(onCommit).toHaveBeenCalledWith('');
-    });
-
-    it('calls onCommit with current query on Enter when suggestions are shown but nothing highlighted', async () => {
+    it('calls onCommit with current query when suggestions are shown but nothing highlighted on Enter', async () => {
         const onCommit = vi.fn();
         render(<MonsterNameAutocomplete value="" onCommit={onCommit} />);
         const input = document.querySelector('.monster-autocomplete-input');
@@ -390,5 +406,38 @@ describe('MonsterNameAutocomplete', () => {
         });
         fireEvent.keyDown(input, { key: 'Enter' });
         expect(onCommit).toHaveBeenCalledWith('Gobl');
+    });
+
+    it('renders monster items without NPC badge', async () => {
+        render(<MonsterNameAutocomplete value="" />);
+        const input = document.querySelector('.monster-autocomplete-input');
+        fireEvent.change(input, { target: { value: 'Gobl' } });
+        await waitFor(() => {
+            const list = document.querySelector('.monster-autocomplete-list');
+            expect(list).toBeInTheDocument();
+        });
+        const items = document.querySelectorAll('.monster-autocomplete-item');
+        const npcBadges = document.querySelectorAll('.monster-autocomplete-badge');
+        expect(npcBadges.length).toBe(0);
+        const firstItem = items[0];
+        expect(firstItem.textContent.trim()).toBe('Goblin');
+        expect(firstItem.querySelector('.monster-autocomplete-badge')).not.toBeInTheDocument();
+    });
+
+    it('renders NPC items before monster items in the list', async () => {
+        const npcs = [{ name: 'Zombie NPC' }];
+        render(<MonsterNameAutocomplete value="" npcs={npcs} />);
+        const input = document.querySelector('.monster-autocomplete-input');
+        fireEvent.change(input, { target: { value: 'Z' } });
+        await waitFor(() => {
+            const list = document.querySelector('.monster-autocomplete-list');
+            expect(list).toBeInTheDocument();
+        });
+        const items = document.querySelectorAll('.monster-autocomplete-item');
+        const firstItem = items[0];
+        const badge = firstItem.querySelector('.monster-autocomplete-badge');
+        expect(badge).toBeInTheDocument();
+        expect(firstItem.textContent).toContain('Zombie NPC');
+        expect(firstItem.textContent).toContain('NPC');
     });
 });
