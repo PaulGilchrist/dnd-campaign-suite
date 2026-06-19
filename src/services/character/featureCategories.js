@@ -182,7 +182,6 @@ const categories2024 = {
         "Sneak Attack",
         "Spell Mastery",
         "Studied Attacks",
-        "Supreme Sneak",
         "Tactical Master",
         "Tireless",
         "War Magic",
@@ -199,9 +198,7 @@ const categories2024 = {
         "Fighting Style Bonus",
         "Instinctive Pounce",
         "Large Form",
-        "Nature's Veil",
-        "Steady Aim",
-        "Tactical Shift"
+        "Nature's Veil"
     ],
 
     reactions: [
@@ -214,7 +211,6 @@ const categories2024 = {
         "Opportunity Attack",
         "Riposte",
         "Shield Block",
-        "Soul of Vengeance",
         "Uncanny Dodge"
     ],
 
@@ -248,11 +244,9 @@ const categories2024 = {
         "Slippery Mind",
         "Skillful",
         "Student of War",
-        "Versatile",
         "Abjuration Savant",
         "Divination Savant",
-        "Evocation Savant",
-        "Spell Breaker"
+        "Evocation Savant"
     ]
 };
 

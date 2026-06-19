@@ -2,7 +2,7 @@
   {
     "index": "barbarian",
     "name": "Barbarian",
-    "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion—and not limited to anger—this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
+    "class_description": "<p><b>A fierce warrior of primal rage.</b></p><p>Barbarians are mighty warriors who are powered by primal forces of the multiverse that manifest as a Rage. More than a mere emotion\u2014and not limited to anger\u2014this Rage is an incarnation of a predator's ferocity, a storm's fury, and a sea's turmoil. Some Barbarians personify their Rage as a fierce spirit or revered forebear. Others see it as a connection to the pain and anguish of the world, as an impersonal tangle of wild magic, or as an expression of their own deepest self. For every Barbarian, their Rage is a power that fuels not just battle prowess, but also uncanny reflexes and heightened senses. Barbarians often serve as protectors and leaders in their communities. They charge headlong into danger so those under their protection don't have to. Their courage in the face of danger makes Barbarians perfectly suited for adventure.</p>",
     "primary_ability": "Strength",
     "hit_point_die": "12",
     "weapon_proficiencies": "Simple and Martial weapons",
@@ -4039,7 +4039,7 @@
   {
     "index": "fighter",
     "name": "Fighter",
-    "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries—as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
+    "class_description": "<p><b>Fighters rule the battlefields.</b></p><p>Questing knights, loyal champions, elite soldiers, and hardened mercenaries\u2014as Fighters, they all share an unparalleled prowess with weapons and armor. And they are well acquainted with death, both meeting it out and defying it. Fighters master various weapon techniques, and a well-equipped Fighter always has the right tool at hand for any combat situation. Likewise, a Fighter is adept with every form of armor. Beyond that basic degree of familiarity, each Fighter specializes in certain styles of combat. Some concentrate on archery, some on fighting with two weapons at once, and some on augmenting their martial skills with magic. This combination of broad ability and extensive specialization makes Fighters superior combatants.</p>",
     "primary_ability": "Strength or Dexterity",
     "hit_point_die": "10",
     "skill_proficiencies": "Choose 2: Acrobatics, Animal Handling, Athletics, History, Insight, Intimidation, Persuasion, Perception, or Survival",
@@ -4208,7 +4208,8 @@
             "type": "class_feature",
             "automation": {
               "type": "passive_rule",
-              "effect": "tactical_shift_no_oa"
+              "effect": "tactical_shift_no_oa",
+              "casting_time": "1 bonus action"
             }
           }
         ],
@@ -5986,7 +5987,8 @@
             "automation": {
               "type": "cloak_of_shadows",
               "action": "action",
-              "duration": "1_minute"
+              "duration": "1_minute",
+              "casting_time": "1 action"
             }
           }
         ],
@@ -7178,7 +7180,8 @@
             "level": 15,
             "automation": {
               "type": "soul_of_vengeance",
-              "trigger": "after_vow_of_enmity_target_attacks"
+              "trigger": "after_vow_of_enmity_target_attacks",
+              "casting_time": "1 reaction"
             }
           },
           {
@@ -7194,7 +7197,8 @@
               "hover": true,
               "auraRange": "aura_of_protection",
               "saveType": "WIS",
-              "saveDc": "ability"
+              "saveDc": "ability",
+              "casting_time": "1 bonus action"
             }
           }
         ],
@@ -8395,7 +8399,8 @@
             "type": "class_feature",
             "automation": {
               "type": "steady_aim",
-              "duration": "until_end_of_turn"
+              "duration": "until_end_of_turn",
+              "casting_time": "1 bonus action"
             }
           }
         ],
@@ -9142,7 +9147,8 @@
             "level": 13,
             "automation": {
               "type": "passive_rule",
-              "effect": "versatile_trickster"
+              "effect": "versatile_trickster",
+              "casting_time": "1 bonus action"
             }
           },
           {
@@ -9361,7 +9367,7 @@
               "options": [
                 {
                   "name": "Sleight of Hand",
-                  "description": "Make a Dexterity (Sleight of Hand) check — pick pocket, palming, hiding small objects, etc."
+                  "description": "Make a Dexterity (Sleight of Hand) check \u2014 pick pocket, palming, hiding small objects, etc."
                 },
                 {
                   "name": "Thieves' Tools",
@@ -9369,7 +9375,7 @@
                 },
                 {
                   "name": "Use an Object",
-                  "description": "Use an object — Utilize action for magic items, or Action for normal objects"
+                  "description": "Use an object \u2014 Utilize action for magic items, or Action for normal objects"
                 }
               ],
               "casting_time": "1 bonus action",
@@ -9397,11 +9403,13 @@
                 "effect": "advantage",
                 "abilities": [
                   "DEX"
-                ]
+                ],
+                "casting_time": "1 action"
               },
               {
                 "type": "passive_rule",
-                "effect": "supreme_sneak"
+                "effect": "supreme_sneak",
+                "casting_time": "1 action"
               }
             ]
           },
@@ -10256,7 +10264,7 @@
       {
         "name": "Clockwork Sorcery",
         "subtitle": "Channel Cosmic Forces of Order",
-        "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it—a plane of existence shaped entirely by clockwork efficiency.",
+        "description": "The cosmic force of order has suffused you with magic. That power arises from Mechanus or a realm like it\u2014a plane of existence shaped entirely by clockwork efficiency.",
         "features": [
           {
             "name": "Clockwork Spells",
@@ -11653,7 +11661,7 @@
       {
         "name": "Great Old One Patron",
         "subtitle": "Unearth Forbidden Lore of Ineffable Being",
-        "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god—a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
+        "description": "Your pact binds you to an unspeakable being from the Far Realm or an elder god\u2014a being such as Tharizdun, the Chained God; Zargon, the Returner; Hadar, the Dark Hunger; or Great Cthulhu. Or you might involve several entities without yoking yourself to one. The motives of these beings are incomprehensible, and the Great Old One might be indifferent to your existence.",
         "features": [
           {
             "name": "Awakened Mind",
@@ -12340,7 +12348,10 @@
             "type": "class_feature",
             "automation": {
               "type": "free_spell",
-              "spell": ["Spell Mastery 1", "Spell Mastery 2"],
+              "spell": [
+                "Spell Mastery 1",
+                "Spell Mastery 2"
+              ],
               "perSpellTracking": true,
               "casting_time": "passive",
               "action": "action"
@@ -12433,7 +12444,7 @@
       {
         "name": "Abjurer",
         "subtitle": "Shield Companions and Banish Foes",
-        "description": "Your study of magic is focused on spells that block, banish, or protect—ending harmful effects, banishing evil influences, and protecting the weak.",
+        "description": "Your study of magic is focused on spells that block, banish, or protect\u2014ending harmful effects, banishing evil influences, and protecting the weak.",
         "features": [
           {
             "name": "Abjuration Savant",
@@ -12468,7 +12479,8 @@
               "effect": "projected_ward",
               "wardTrigger": "ally_damage_taken",
               "range": 30,
-              "reaction": true
+              "reaction": true,
+              "casting_time": "1 reaction"
             }
           },
           {
@@ -12478,10 +12490,19 @@
             "automation": {
               "type": "passive_rule",
               "effect": "spell_breaker",
-              "alwaysPreparedSpells": ["Counterspell", "Dispel Magic"],
-              "bonusActionSpells": ["Dispel Magic"],
+              "alwaysPreparedSpells": [
+                "Counterspell",
+                "Dispel Magic"
+              ],
+              "bonusActionSpells": [
+                "Dispel Magic"
+              ],
               "dispelAbilityCheckBonus": "proficiency_bonus",
-              "slotRetentionSpells": ["Counterspell", "Dispel Magic"]
+              "slotRetentionSpells": [
+                "Counterspell",
+                "Dispel Magic"
+              ],
+              "casting_time": "passive"
             }
           },
           {
@@ -12650,8 +12671,14 @@
             "automation": {
               "type": "phantasmal_creatures",
               "casting_time": "passive",
-              "alwaysPreparedSpells": ["Summon Beast", "Summon Fey"],
-              "freeCastSpells": ["Summon Beast", "Summon Fey"],
+              "alwaysPreparedSpells": [
+                "Summon Beast",
+                "Summon Fey"
+              ],
+              "freeCastSpells": [
+                "Summon Beast",
+                "Summon Fey"
+              ],
               "usesMax": 1,
               "recharge": "long_rest",
               "halvesHp": true

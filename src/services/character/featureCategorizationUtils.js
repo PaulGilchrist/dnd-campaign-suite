@@ -20,7 +20,6 @@ export const categorizeFeatures = (items, categories, options = {}) => {
   } = options;
 
   const {
-    featuresToIgnore,
     actions,
     bonusActions,
     reactions,
@@ -52,11 +51,6 @@ export const categorizeFeatures = (items, categories, options = {}) => {
       details: item.details,
       automation: item.automation
     };
-
-    // Skip ignored features
-    if (featuresToIgnore.includes(item.name)) {
-      return;
-    }
 
     // Categorize by casting_time for features that have automations with casting_time
     let castingTime = item.automation?.casting_time;

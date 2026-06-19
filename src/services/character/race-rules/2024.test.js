@@ -836,13 +836,14 @@ describe('raceRules 2024 (direct module)', () => {
       expect(result).toBeDefined();
     });
 
-    it('should skip features in featuresToIgnore list', () => {
+    it('should categorize features in featuresToIgnore (no longer skipped)', () => {
       const traits = [
         { name: 'Darkvision', description: 'Can see in the dark' },
         { name: 'Spellcasting', description: 'You can cast spells' }
       ];
       const result = raceRules.addTraits(traits);
-      expect(result.specialActions.find((t) => t.name === 'Spellcasting')).toBeUndefined();
+      expect(result.specialActions.find((t) => t.name === 'Darkvision')).toBeDefined();
+      expect(result.specialActions.find((t) => t.name === 'Spellcasting')).toBeDefined();
     });
 
     it('should include traits not in any category in specialActions', () => {

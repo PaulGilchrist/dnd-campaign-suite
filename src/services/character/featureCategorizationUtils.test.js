@@ -72,7 +72,7 @@ describe('featureCategorizationUtils', () => {
       expect(result.specialActions[0].name).toBe('Unarmored Defense');
          });
 
-    it('should ignore features in featuresToIgnore', () => {
+    it('should categorize features in featuresToIgnore (no longer skipped)', () => {
       const items = [
             { name: 'Proficiency', description: 'Increase proficiency' },
             { name: 'Action Surge', description: 'Take an additional action' }
@@ -82,8 +82,9 @@ describe('featureCategorizationUtils', () => {
 
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Action Surge');
-      expect(result.specialActions).toHaveLength(0);
-         });
+      expect(result.specialActions).toHaveLength(1);
+      expect(result.specialActions[0].name).toBe('Proficiency');
+          });
 
     it('should deduplicate features by name', () => {
       const items = [
@@ -378,7 +379,7 @@ describe('featureCategorizationUtils', () => {
       expect(result.bonusActions).toHaveLength(1);
       expect(result.reactions).toHaveLength(1);
       expect(result.characterAdvancement).toHaveLength(1);
-      expect(result.specialActions).toHaveLength(1);
+      expect(result.specialActions).toHaveLength(2);
          });
        });
 
