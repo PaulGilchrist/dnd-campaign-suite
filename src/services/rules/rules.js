@@ -990,6 +990,8 @@ const rules = {
                     automation: featFeature.automation,
                 };
 
+                const featureCategories = getCategories(playerStats.rules || '5e');
+
                 // Categorize by automation.casting_time
                 let castingTime = featFeature.automation?.casting_time;
                 if (castingTime) {
@@ -1000,14 +1002,13 @@ const rules = {
                         playerStats.bonusActions = [...playerStats.bonusActions, featEntry];
                     } else if (ct === '1 reaction' && !playerStats.reactions.some(f => f.name === featFeature.name)) {
                         playerStats.reactions = [...playerStats.reactions, featEntry];
-                    } else if (ct === 'passive' && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
+                    } else if (ct === 'passive' && featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
                         playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
                     } else {
                         playerStats.specialActions = [...playerStats.specialActions, featEntry];
                     }
                 } else {
                     // No automation.casting_time — go to specialActions unless name matches a category
-                    const featureCategories = getCategories(playerStats.rules || '5e');
                     if (featureCategories.characterAdvancement.includes(featFeature.name) && !playerStats.characterAdvancement.some(f => f.name === featFeature.name)) {
                         playerStats.characterAdvancement = [...playerStats.characterAdvancement, featEntry];
                     } else if (featureCategories.actions.includes(featFeature.name) && !playerStats.actions.some(f => f.name === featFeature.name)) {

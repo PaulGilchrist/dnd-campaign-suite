@@ -244,6 +244,7 @@ const categories2024 = {
         // "Primal Order",
         // "Slippery Mind",
         // "Skillful",
+        "Somatic Components",
         // "Student of War",
         // "Abjuration Savant",
         // "Divination Savant",

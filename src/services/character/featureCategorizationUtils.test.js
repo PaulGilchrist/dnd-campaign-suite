@@ -294,18 +294,18 @@ describe('featureCategorizationUtils', () => {
       expect(result.specialActions[0].name).toBe('Mystery Feature');
          });
 
-    it('should categorize features with casting_time "passive" as characterAdvancement', () => {
+    it('should categorize features with casting_time "passive" as specialActions unless in characterAdvancement category', () => {
       const items = [
         { name: 'Racial Trait', description: 'Passive ability', automation: { casting_time: 'passive', type: 'racial' } }
             ];
 
       const result = categorizeFeatures(items, mockCategories);
 
-      expect(result.characterAdvancement).toHaveLength(1);
-      expect(result.characterAdvancement[0].name).toBe('Racial Trait');
+      expect(result.specialActions).toHaveLength(1);
+      expect(result.specialActions[0].name).toBe('Racial Trait');
          });
 
-    it('should deduplicate characterAdvancement by name when casting_time is passive', () => {
+    it('should deduplicate specialActions by name when casting_time is passive', () => {
       const items = [
         { name: 'Racial Trait', description: 'First level', automation: { casting_time: 'passive' } },
         { name: 'Racial Trait', description: 'Higher level', automation: { casting_time: 'passive' } },
@@ -313,8 +313,8 @@ describe('featureCategorizationUtils', () => {
 
       const result = categorizeFeatures(items, mockCategories);
 
-      expect(result.characterAdvancement).toHaveLength(1);
-      expect(result.characterAdvancement[0].description).toBe('First level');
+      expect(result.specialActions).toHaveLength(1);
+      expect(result.specialActions[0].description).toBe('First level');
          });
 
     it('should prefer casting_time categorization over name-based for characterAdvancement', () => {
