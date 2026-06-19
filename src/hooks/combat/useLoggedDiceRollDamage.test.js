@@ -174,7 +174,7 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
                 metamagicCareful: true,
             });
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                note: 'Careful Spell: ally automatically succeeds save',
+                note: 'careful_spell_damage_roll_before_apply',
             }));
         });
 
@@ -191,7 +191,7 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
                 playerStats,
             });
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                note: 'Contact Patron: automatically succeed on saving throw',
+                note: 'contact_patron_damage_roll_before_apply',
             }));
         });
     });

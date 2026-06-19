@@ -202,10 +202,10 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       newHp = Math.max(0, oldHp - wardDamage);
       setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
    } else {
-     oldHp = creature.currentHp;
-     newHp = Math.max(0, oldHp - wardDamage);
-     creature.currentHp = newHp;
-    }
+      oldHp = creature.currentHp;
+      newHp = Math.max(0, oldHp - wardDamage);
+      creature.currentHp = newHp;
+     }
 
     // Tasha's Hideous Laughter: damage-triggered repeat WIS save with Advantage
     if (wardDamage > 0 && !isPlayer) {
@@ -591,7 +591,7 @@ function logDamageApplication(creature, damage, oldHp, newHp, campaignName) {
       setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName);
       setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
        }
-     }
+      }
 
   postLogEntry(campaignName, entry);
 }

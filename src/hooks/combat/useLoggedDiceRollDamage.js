@@ -220,6 +220,30 @@ export function createLogDamageAndShow(deps) {
             finalDamage = Math.floor(adjustedTotal / 2);
         }
         const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+        logEntry({
+            type: 'roll',
+            characterName,
+            rollType: 'save-damage',
+            name,
+            formula,
+            rolls,
+            total,
+            modifier,
+            damageType,
+            targetName: target.name,
+            saveType,
+            saveDc,
+            saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (saveResult.success ? 'success' : 'failure'),
+            saveRoll: saveResult.roll,
+            saveBonus: saveResult.bonus,
+            saveRawRolls: saveResult.rawRolls,
+            mode: disadvantage ? 'disadvantage' : 'normal',
+            finalDamage: null,
+            note: 'save_damage_roll_before_apply',
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, ignoreResistance, characterName);
 
         if (applyResult && applyResult.finalDamage > 0) {
@@ -258,29 +282,6 @@ export function createLogDamageAndShow(deps) {
                 }
             }
         }
-
-        logEntry({
-            type: 'roll',
-            characterName,
-            rollType: 'save-damage',
-            name,
-            formula,
-            rolls,
-            total,
-            modifier,
-            damageType,
-            targetName: target.name,
-            saveType,
-            saveDc,
-            saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (saveResult.success ? 'success' : 'failure'),
-            saveRoll: saveResult.roll,
-            saveBonus: saveResult.bonus,
-            saveRawRolls: saveResult.rawRolls,
-            mode: disadvantage ? 'disadvantage' : 'normal',
-            finalDamage: applyResult?.finalDamage ?? total,
-            soulstitchProtected: isSoulstitchProtected,
-            resistanceDetails: applyResult?.resistanceDetails || [],
-        });
 
         setPopupHtml({
             type: 'save-damage',
@@ -345,10 +346,7 @@ export function createLogDamageAndShow(deps) {
                     twinFinalDamage = Math.floor(total / 2);
                 }
                 const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
-                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, ignoreResistance, characterName);
-                if (twinApplyResult && twinApplyResult.finalDamage > 0) {
-                    endInvisibilityOnHostileAction(characterName, campaignName);
-                }
+
                 logEntry({
                     type: 'roll',
                     characterName,
@@ -367,8 +365,17 @@ export function createLogDamageAndShow(deps) {
                     saveBonus: twinSaveResult.bonus,
                     saveRawRolls: twinSaveResult.rawRolls,
                     mode: twinDisadvantage ? 'disadvantage' : 'normal',
-                    finalDamage: twinApplyResult?.finalDamage ?? total,
+                    finalDamage: null,
+                    note: 'twin_save_damage_roll_before_apply',
                 });
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, twinFinalDamage, [damageType], campaignName, null, ignoreResistance, characterName);
+
+                if (twinApplyResult && twinApplyResult.finalDamage > 0) {
+                    endInvisibilityOnHostileAction(characterName, campaignName);
+                }
                 setPopupHtml(prev => ({
                     ...prev,
                     twinTargetName: twinTarget.name,
@@ -390,7 +397,6 @@ export function createLogDamageAndShow(deps) {
                     if (hasPotentFlag && isCantripFlag && multiSaveResult.success && dcSuccess === 'none') {
                         multiFinalDamage = Math.floor(total / 2);
                     }
-                    const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, multiFinalDamage, [damageType], campaignName, null);
                     logEntry({
                         type: 'roll',
                         characterName,
@@ -409,8 +415,14 @@ export function createLogDamageAndShow(deps) {
                         saveBonus: multiSaveResult.bonus,
                         saveRawRolls: multiSaveResult.rawRolls,
                         mode: 'normal',
-                        finalDamage: multiApplyResult?.finalDamage ?? total,
+                        finalDamage: null,
+                        note: 'multi_save_damage_roll_before_apply',
                     });
+
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, multiFinalDamage, [damageType], campaignName, null);
+
                     setPopupHtml(prev => ({
                         ...prev,
                         twinTargetName: multiTarget.name,
@@ -422,10 +434,7 @@ export function createLogDamageAndShow(deps) {
                     }));
                 } else {
                     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
-                    const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, ignoreResistance, characterName);
-                    if (multiApplyResult && multiApplyResult.finalDamage > 0) {
-                        endInvisibilityOnHostileAction(characterName, campaignName);
-                    }
+
                     logEntry({
                         type: 'roll',
                         characterName,
@@ -437,8 +446,17 @@ export function createLogDamageAndShow(deps) {
                         modifier,
                         damageType,
                         targetName: multiTarget.name,
-                        finalDamage: multiApplyResult?.finalDamage ?? total,
+                        finalDamage: null,
+                        note: 'multi_plain_damage_roll_before_apply',
                     });
+
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, ignoreResistance, characterName);
+
+                    if (multiApplyResult && multiApplyResult.finalDamage > 0) {
+                        endInvisibilityOnHostileAction(characterName, campaignName);
+                    }
                 }
             }
         }
@@ -454,10 +472,7 @@ export function createLogDamageAndShow(deps) {
         if (isCarefulAlly) {
             const carefulDamage = computeDamageAfterSave(adjustedTotal, true, dcSuccess);
             const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
-            const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null, ignoreResistance, characterName);
-            if (applyResult && applyResult.finalDamage > 0) {
-                endInvisibilityOnHostileAction(characterName, campaignName);
-            }
+
             logEntry({
                 type: 'roll',
                 characterName,
@@ -474,9 +489,17 @@ export function createLogDamageAndShow(deps) {
                 saveResult: 'success',
                 saveRoll: 20,
                 saveBonus: 0,
-                finalDamage: carefulDamage,
-                note: 'Careful Spell: ally automatically succeeds save',
+                finalDamage: null,
+                note: 'careful_spell_damage_roll_before_apply',
             });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const applyResult = applyDamageToTarget(combatSummary, target.name, carefulDamage, [damageType], campaignName, null, ignoreResistance, characterName);
+
+            if (applyResult && applyResult.finalDamage > 0) {
+                endInvisibilityOnHostileAction(characterName, campaignName);
+            }
             saveLastDamageEvent(characterName, {
                 targetName: target.name,
                 spellName: name,
@@ -521,10 +544,7 @@ export function createLogDamageAndShow(deps) {
         if (hasContactPatron && name === 'Contact Other Plane' && target.name === characterName) {
             const successfulSave = computeDamageAfterSave(adjustedTotal, true, dcSuccess);
             const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
-            const applyResult = applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, ignoreResistance, characterName);
-            if (applyResult && applyResult.finalDamage > 0) {
-                endInvisibilityOnHostileAction(characterName, campaignName);
-            }
+
             logEntry({
                 type: 'roll',
                 characterName,
@@ -541,9 +561,17 @@ export function createLogDamageAndShow(deps) {
                 saveResult: 'success',
                 saveRoll: 20,
                 saveBonus: 0,
-                finalDamage: successfulSave,
-                note: 'Contact Patron: automatically succeed on saving throw',
+                finalDamage: null,
+                note: 'contact_patron_damage_roll_before_apply',
             });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            const applyResult = applyDamageToTarget(combatSummary, target.name, successfulSave, [damageType], campaignName, null, ignoreResistance, characterName);
+
+            if (applyResult && applyResult.finalDamage > 0) {
+                endInvisibilityOnHostileAction(characterName, campaignName);
+            }
             setPopupHtml({
                 type: 'save-damage',
                 name,
@@ -674,6 +702,24 @@ export function createLogDamageAndShow(deps) {
             }
             const reducedTotal = Math.max(0, adjustedTotal - rayReduction);
             const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
+
+            logEntry({
+                type: 'roll',
+                characterName,
+                rollType: 'damage',
+                name,
+                formula,
+                rolls,
+                total,
+                modifier,
+                damageType,
+                targetName: target?.name,
+                finalDamage: null,
+                note: 'plain_damage_roll_before_apply',
+            });
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             applyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName);
             if (rayReduction > 0) {
                 applyResult = { ...applyResult, rayOfEnfeebleReduction: rayReduction };
@@ -694,7 +740,7 @@ export function createLogDamageAndShow(deps) {
                 if (!dsSaveResult.success) {
                     const doubledTotal = adjustedTotal * 2;
                     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
-                    const dsApplyResult = applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, null, ignoreResistance || false, characterName);
+
                     logEntry({
                         type: 'roll',
                         characterName,
@@ -712,9 +758,14 @@ export function createLogDamageAndShow(deps) {
                         saveRoll: dsSaveResult.roll,
                         saveBonus: dsSaveResult.bonus,
                         saveRawRolls: dsSaveResult.rawRolls,
-                        finalDamage: dsApplyResult?.finalDamage ?? doubledTotal,
-                        note: 'Death Strike: CON save failed, damage doubled',
+                        finalDamage: null,
+                        note: 'death_strike_damage_roll_before_apply',
                     });
+
+                    await new Promise(resolve => setTimeout(resolve, 500));
+
+                    const dsApplyResult = applyDamageToTarget(combatSummary, target.name, doubledTotal, [damageType], campaignName, null, ignoreResistance || false, characterName);
+
                     if (!applyResult) {
                         applyResult = dsApplyResult;
                     }
@@ -776,21 +827,6 @@ export function createLogDamageAndShow(deps) {
             }
         }
 
-        logEntry({
-            type: 'roll',
-            characterName,
-            rollType: 'damage',
-            name,
-            formula,
-            rolls,
-            total,
-            modifier,
-            damageType,
-            targetName: target?.name,
-            finalDamage: applyResult?.finalDamage,
-            resistanceDetails: applyResult?.resistanceDetails || [],
-        });
-
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 
         const popupData = {
@@ -837,10 +873,6 @@ export function createLogDamageAndShow(deps) {
         if (context?.metamagicTwinTarget && target) {
             const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
             if (twinTarget && twinTarget.name !== target.name) {
-                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, null, false, characterName);
-                if (twinApplyResult && twinApplyResult.finalDamage > 0) {
-                    endInvisibilityOnHostileAction(characterName, campaignName);
-                }
                 logEntry({
                     type: 'roll',
                     characterName,
@@ -852,8 +884,17 @@ export function createLogDamageAndShow(deps) {
                     modifier,
                     damageType,
                     targetName: twinTarget.name,
-                    finalDamage: twinApplyResult?.finalDamage,
+                    finalDamage: null,
+                    note: 'twin_damage_roll_before_apply',
                 });
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                const twinApplyResult = applyDamageToTarget(combatSummary, twinTarget.name, adjustedTotal, [damageType], campaignName, null, false, characterName);
+
+                if (twinApplyResult && twinApplyResult.finalDamage > 0) {
+                    endInvisibilityOnHostileAction(characterName, campaignName);
+                }
                 setPopupHtml(prev => ({
                     ...prev,
                     twinTargetName: twinTarget.name,
@@ -869,7 +910,6 @@ export function createLogDamageAndShow(deps) {
         if (context?.multiTarget && target) {
             const multiTarget = combatSummary?.creatures?.find(c => c.name === context.multiTarget);
             if (multiTarget && multiTarget.name !== target.name) {
-                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, false, characterName);
                 logEntry({
                     type: 'roll',
                     characterName,
@@ -881,8 +921,14 @@ export function createLogDamageAndShow(deps) {
                     modifier,
                     damageType,
                     targetName: multiTarget.name,
-                    finalDamage: multiApplyResult?.finalDamage,
+                    finalDamage: null,
+                    note: 'multi_damage_roll_before_apply',
                 });
+
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                const multiApplyResult = applyDamageToTarget(combatSummary, multiTarget.name, total, [damageType], campaignName, null, false, characterName);
+
                 setPopupHtml(prev => ({
                     ...prev,
                     twinTargetName: multiTarget.name,

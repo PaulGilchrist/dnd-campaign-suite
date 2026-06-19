@@ -54,7 +54,7 @@ function addEntry(campaign, entry) {
     id: guid.create().toString(),
     timestamp: Date.now(),
      ...entry
-   };
+    };
   log.push(newEntry);
   logCache.set(campaign, log);
   saveLogFile();
