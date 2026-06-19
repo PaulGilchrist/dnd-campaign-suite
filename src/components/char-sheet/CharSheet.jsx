@@ -99,20 +99,14 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
             }
 
-            // Apply Roving / Climb Speed passive: climb speed equal to walking speed
-            if (!stats.climbSpeed) {
-                const climbSpeedPassives = (stats.automation?.passives || []).filter(p => p.effect === 'climb_speed');
-                if (climbSpeedPassives.length > 0) {
-                    stats.climbSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
-                }
+            // Apply Roving (Ranger level 6): climb speed and swim speed equal to walking speed
+            // Roving increases speed by 10 without heavy armor, then sets climb/swim to that speed
+            const rovingPassive = (stats.automation?.passives || []).find(p => p.name === 'Roving');
+            if (rovingPassive && !stats.climbSpeed) {
+                stats.climbSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
             }
-
-            // Apply Roving / Swim Speed passive: swim speed equal to walking speed
-            if (!stats.swimSpeed) {
-                const swimSpeedPassives = (stats.automation?.passives || []).filter(p => p.effect === 'swim_speed');
-                if (swimSpeedPassives.length > 0) {
-                    stats.swimSpeed = stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30;
-                }
+            if (rovingPassive && !stats.swimSpeed) {
+                stats.swimSpeed = (stats.speed || stats.race?.subrace?.speed || stats.race?.speed || 30) + 10;
             }
 
             // Expose Athlete Hop Up flag: stand from prone with only 5 ft of movement
