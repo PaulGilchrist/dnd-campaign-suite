@@ -80,7 +80,7 @@ describe('CharInventory', () => {
   describe('rendering', () => {
     it('should render magic items section header', () => {
       renderComponent();
-      expect(screen.getByText('Magic Items')).toBeInTheDocument();
+      expect(screen.getByText(/Magic Items:/)).toBeInTheDocument();
     });
 
     it('should render magic item details', () => {
@@ -162,7 +162,7 @@ describe('CharInventory', () => {
     it('should render magic items section header when magicItems is missing', () => {
       const stats = { inventory: {} };
       renderComponent(stats);
-      expect(screen.queryByText('Magic Items')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Magic Items:/)).not.toBeInTheDocument();
     });
 
     it('should render equipped items section with comma separation', () => {

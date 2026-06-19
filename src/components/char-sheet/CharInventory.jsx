@@ -118,20 +118,19 @@ function CharInventory({ playerStats }) {
     return (
         <div>
              {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml(null)} />}
-            {playerStats.inventory.magicItems && <div>
-                <div className='sectionHeader'>Magic Items</div>
+            <div className='sectionHeader'>Inventory</div>
+            {playerStats.inventory.magicItems && playerStats.inventory.magicItems.length > 0 && <div>
+                <b>Magic Items:</b>
                 {playerStats.inventory.magicItems.map((magicItem, index) => {
                     return <div key={`magic-item-${index}`}>
-                        <b>
-                            {magicItem.name} {magicItem.quantity ? `(qty ${magicItem.quantity}) ` : '' } -&nbsp;
-                            <i>
-                                {magicItem.type}
-                                {magicItem.subtype && <span>&nbsp;({magicItem.subtype})</span>}, {magicItem.rarity}
-                                {magicItem.requiresAttunement && !magicItem.attunementRequirements && <span> (requires attunement)</span>}
-                                {magicItem.requiresAttunement && magicItem.attunementRequirements && <span> ({magicItem.attunementRequirements})</span>}
-                            </i>
-                            :&nbsp;
-                        </b>
+                        {magicItem.name} {magicItem.quantity ? `(qty ${magicItem.quantity}) ` : '' } -&nbsp;
+                        <i>
+                            {magicItem.type}
+                            {magicItem.subtype && <span>&nbsp;({magicItem.subtype})</span>}, {magicItem.rarity}
+                            {magicItem.requiresAttunement && !magicItem.attunementRequirements && <span> (requires attunement)</span>}
+                            {magicItem.requiresAttunement && magicItem.attunementRequirements && <span> ({magicItem.attunementRequirements})</span>}
+                        </i>
+                        :&nbsp;
                         <span className="magic-item-description" dangerouslySetInnerHTML={{ __html: sanitizeHtml(magicItem.description) }}></span>
                     </div>}
                 )}
