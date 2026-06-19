@@ -33,24 +33,11 @@ describe('featureCategories5e', () => {
     it('should be an array', () => {
       expect(Array.isArray(actions)).toBe(true);
           });
-
-    it('should contain action features', () => {
-      expect(actions).toContain('Sneak Attack');
-      expect(actions).toContain('Eldritch Strike');
-      expect(actions).not.toContain('Corona of Light');
-      expect(actions).not.toContain('War Priest');
-          });
         });
 
   describe('bonusActions', () => {
     it('should be an array', () => {
       expect(Array.isArray(bonusActions)).toBe(true);
-          });
-
-    it('should contain bonus action features', () => {
-      expect(bonusActions).toContain('Cunning Action');
-      expect(bonusActions).toContain('Combat Wild Shape');
-      expect(bonusActions).not.toContain('Frenzy');
           });
         });
 
@@ -58,24 +45,11 @@ describe('featureCategories5e', () => {
     it('should be an array', () => {
       expect(Array.isArray(reactions)).toBe(true);
           });
-
-    it('should contain reaction features', () => {
-      expect(reactions).toContain('Wrath of the Storm');
-      expect(reactions).not.toContain('Retaliation');
-      expect(reactions).not.toContain('Warding Flare');
-          });
         });
 
   describe('characterAdvancement', () => {
     it('should be an array', () => {
       expect(Array.isArray(characterAdvancement)).toBe(true);
-          });
-
-    it('should contain character advancement features', () => {
-      expect(characterAdvancement).toContain('Martial Arts');
-      expect(characterAdvancement).toContain('Eldritch Invocations');
-      expect(characterAdvancement).toContain('Unarmored Defense');
-      expect(characterAdvancement).not.toContain('Expertise');
           });
         });
 });

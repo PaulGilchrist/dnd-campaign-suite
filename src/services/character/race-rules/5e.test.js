@@ -696,7 +696,7 @@ describe('raceRules 5e (direct module)', () => {
         { name: 'Spellcasting', description: 'You can cast spells' }
       ];
       const result = raceRules.addTraits(traits);
-      expect(result.characterAdvancement.find((t) => t.name === 'Darkvision')).toBeDefined();
+      expect(result.specialActions.find((t) => t.name === 'Darkvision')).toBeDefined();
       expect(result.specialActions.find((t) => t.name === 'Spellcasting')).toBeDefined();
     });
 
@@ -804,7 +804,7 @@ describe('raceRules 5e (direct module)', () => {
         }
       };
       const result = raceRules.getTraits(playerStats);
-      expect(result.characterAdvancement.filter((t) => t.name === 'Darkvision').length).toBe(1);
+      expect(result.specialActions.filter((t) => t.name === 'Darkvision').length).toBe(1);
     });
   });
 });
