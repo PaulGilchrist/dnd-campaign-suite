@@ -278,6 +278,8 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
           <span><b>Casting Time:</b> {spell.casting_time || '—'}</span>
           <span><b>Range:</b> {spell.range || '—'}</span>
           <span><b>Duration:</b> {spell.duration || '—'}</span>
+          {spell.school && <span><b>School:</b> {spell.school}</span>}
+          {spell.area_of_effect && <span><b>Area:</b> {spell.area_of_effect.type || spell.area_of_effect.shape}{spell.area_of_effect.size ? ` - ${spell.area_of_effect.size}` : ''}</span>}
           {!isCantrip && !showUpcastSelector && (
             <span><b>Slots Remaining:</b> {(() => {
               const baseKey = `spell_slots_level_${spell.level}`;
