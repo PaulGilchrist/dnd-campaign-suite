@@ -542,9 +542,8 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 };
                 await executeHandler(action, playerStats, campaignName, mapName);
             }
+            return;
         }
-
-           return;
     }
 
    const rollContext = { ...metaCtx, damageType };

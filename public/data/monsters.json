@@ -70,13 +70,17 @@
         "name": "Talon",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) slashing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -639,7 +643,9 @@
         "name": "Club",
         "description": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4",
+        "damage_type_primary": "bludgeoning"
       }
     ],
     "traits": [
@@ -894,19 +900,25 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +13 to hit, reach 10 ft., one target. Hit: 18 (2d10 + 7) piercing damage plus 5 (1dlO) lightning damage.",
         "attack_bonus": 13,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d10 + 7",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claw",
         "description": "Melee Weapon Attack:+13 to hit, reach 5 ft., one target. Hit: 14 (2d6 + 7) slashing damage.",
         "attack_bonus": 13,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 7",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Tail",
         "description": "Melee Weapon Attack: +13 to hit, reach 15 ft., one target. Hit: 16 (2d8 + 7) bludgeoning damage.",
         "attack_bonus": 13,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "2d8 + 7",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Frightful Presence",
@@ -3792,7 +3804,9 @@
         "name": "Claw",
         "description": "Melee Weapon Attack: +12 to hit, reach 5 ft., one target. Hit: 17 (2d10 + 6) slashing damage.",
         "attack_bonus": 12,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d10 + 6",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Roar",
@@ -4524,7 +4538,9 @@
         "name": "Dagger",
         "description": "Melee or Ranged Weapon Attack: +2 to hit , reach 5 ft. or range 20/60 ft., one target. Hit: 2 (1d4) piercing damage.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -5413,7 +5429,11 @@
         "name": "Warhammer",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) bludgeoning damage, or 8 (1d10 + 3) bludgeoning damage if used with two hands to make a melee attack, plus 3 (1d6) fire damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 3",
+        "damage_type_primary": "bludgeoning",
+        "damage_dice_secondary": "1d6",
+        "damage_type_secondary": "fire"
       }
     ],
     "traits": [
@@ -8813,13 +8833,17 @@
         "name": "Morningstar",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 11 (2d8 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 9 (2d6 + 2) piercing damage in melee or 5 (1d6 + 2) piercing damage at range.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -8924,13 +8948,17 @@
         "name": "Morningstar",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 12 (2d8 + 3) piercing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 3",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 10 (2d6 + 3) piercing damage in melee or 6 (1d6 + 3) piercing damage at range.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 3",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -9427,13 +9455,17 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) bludgeoning damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Spear",
         "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d6 + 1) piercing damage, or 5 (1d8 + 1) piercing damage ifused with two hands to make a meele attack.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -10120,18 +10152,24 @@
         "name": "Pike",
         "description": "Melee Weapon Attack: +6 to hit, reach 10 ft., one target. Hit: 9 (1d10 + 4) piercing damage.",
         "attack_bonus": 6,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "1d10 + 4",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Hooves",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 11 (2d6 + 4) bludgeoning damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 4",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Longbow",
         "description": "Ranged Weapon Attack: +4 to hit, range 150/600 ft., one target. Hit: 6 (1d8 + 2) piercing damage.",
-        "attack_bonus": 4
+        "attack_bonus": 4,
+        "damage_dice_primary": "1d8 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -12199,7 +12237,9 @@
         "name": "Dagger",
         "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 20/60 ft., one creature. Hit: 4 (1d4 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -12598,7 +12638,9 @@
         "name": "Greatclub",
         "description": "Melee Weapon Attack: +9 to hit, reach 10 ft., one target. Hit: 19 (3d8 + 6) bludgeoning damage.",
         "attack_bonus": 9,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "3d8 + 6",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Rock",
@@ -13848,13 +13890,17 @@
         "name": "War Pick",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 6 (1d8 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Poisoned Dart",
         "description": "Ranged Weapon Attack: +4 to hit, range 30/120 ft., one creature. Hit: 4 (1d4 + 2) piercing damage, and the target must succeed on a DC 12 Constitution saving throw or be poisoned for 1 minute. The target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success",
         "attack_bonus": 4,
-        "save_dc": 12
+        "save_dc": 12,
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -15060,20 +15106,26 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +13 to hit, reach 15 ft., one target. Hit: 26 (3d12 + 7) piercing damage.",
         "attack_bonus": 13,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "3d12 + 7",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claw",
         "description": "Melee Weapon Attack: +13 to hit, reach 10 ft., one target. Hit: 16 (2d8 + 7) slashing damage.",
         "attack_bonus": 13,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d8 + 7",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Tail",
         "description": "Melee Weapon Attack: +13 to hit, reach 15 ft., one target. Hit: 26 (3d12 + 7) bludgeoning damage. If the target is a creature, it must succeed on a DC 20 Strength saving throw or be pushed up to 10 feet away from the dragon turtle and knocked prone.",
         "attack_bonus": 13,
         "reach": "15 ft.",
-        "save_dc": 20
+        "save_dc": 20,
+        "damage_dice_primary": "3d12 + 7",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Steam Breath",
@@ -15182,13 +15234,17 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 3 (1d6) piercing damage.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claws",
         "description": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 5 (2d4) slashing damage.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d4",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Fetid Cloud",
@@ -15286,18 +15342,28 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one creature. Hit: 2 (1d4) piercing damage plus 9 (2d8) poison damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "2d8",
+        "damage_type_secondary": "poison"
       },
       {
         "name": "Longsword",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) slashing damage, or 8 (1d10 + 3) slashing damage if used with two hands.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 3",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Longbow",
         "description": "Ranged Weapon Attack: +6 to hit, range 150/600 ft., one target. Hit: 7 (1d8 + 3) piercing damage plus 4 (1d8) poison damage.",
-        "attack_bonus": 6
+        "attack_bonus": 6,
+        "damage_dice_primary": "1d8 + 3",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "1d8",
+        "damage_type_secondary": "poison"
       }
     ],
     "traits": [
@@ -15412,13 +15478,17 @@
         "name": "Shortsword",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Hand Crossbow",
         "description": "Ranged Weapon Attack: +4 to hit, range 30/120 ft., one target. Hit: 5 (1d6 + 2) piercing damage, and the target must succeed on a DC 13 Constitution saving throw or be poisoned for 1 hour. If the saving throw fails by 5 or more, the target is also unconscious while poisoned in this way. The target wakes up if it takes damage or if another creature takes an action to shake it awake.",
         "attack_bonus": 4,
-        "save_dc": 13
+        "save_dc": 13,
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -15539,13 +15609,19 @@
         "name": "Shortsword",
         "description": "Melee Weapon Attack: +7 to hit, reach 5 ft., one target. Hit: 7 (1d6 + 4) piercing damage plus 10 (3d6) poison damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 4",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "3d6",
+        "damage_type_secondary": "poison"
       },
       {
         "name": "Hand Crossbow",
         "description": "Ranged Weapon Attack: +7 to hit, range 30/120 ft., one target. Hit: 7 (1d6 + 4) piercing damage, and the target must succeed on a DC 13 Constitution saving throw or be poisoned for 1 hour. If the saving throw fails by 5 or more, the target is also unconscious while poisoned in this way. The target wakes up if it takes damage or if another creature takes an action to shake it awake.",
         "attack_bonus": 7,
-        "save_dc": 13
+        "save_dc": 13,
+        "damage_dice_primary": "1d6 + 4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -15671,12 +15747,18 @@
         "name": "Shortsword",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 7 (1d6 + 4) piercing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 4",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Poisonous Pistol",
         "description": "Ranged Weapon Attack: +6 to hit, range 30/90 ft., one target. Hit: 9 (1d10 + 4) piercing damage plus 11 (2d10) poison damage.",
-        "attack_bonus": 6
+        "attack_bonus": 6,
+        "damage_dice_primary": "1d10 + 4",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "2d10",
+        "damage_type_secondary": "poison"
       }
     ],
     "traits": [
@@ -15792,7 +15874,11 @@
       {
         "name": "Staff",
         "description": "Melee Weapon Attack: + 2 to hit, reach 5 ft., one target. Hit: 2 (1d6 - 1) bludgeoning damage, or 3 (1d8 - 1) bludgeoning damage if used with two hands, plus 3 (1d6) poison damage.",
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 - 1",
+        "damage_type_primary": "bludgeoning",
+        "damage_dice_secondary": "1d6",
+        "damage_type_secondary": "poison"
       },
       {
         "name": "Summon Demon",
@@ -15931,7 +16017,11 @@
         "name": "Scourge",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage plus 17 (5d6) poison damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "5d6",
+        "damage_type_secondary": "poison"
       },
       {
         "name": "Summon Demon",
@@ -16050,7 +16140,9 @@
         "name": "Quarterstaff",
         "description": "Melee Weapon Attack: +2 to hit (+4 to hit with shillelagh), reach 5 ft., one target. Hit: 3 (1d6) bludgeoning damage, or 6 (1d8 + 2) bludgeoning damage with shillelagh or if wielded with two hands.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6",
+        "damage_type_primary": "bludgeoning"
       }
     ],
     "traits": [
@@ -16256,13 +16348,17 @@
         "name": "War Pick",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 6 (1d8 + 2) piercing damage, or 11 (2d8 + 2) piercing damage while enlarged.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 9 (2d6 + 2) piercing damage while enlarged.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Invisibility",
@@ -16365,13 +16461,17 @@
         "name": "Fist",
         "description": "Melee Weapon Attack: +2 to hit, reach 5 ft., one target. Hit: 2 (1d4) bludgeoning damage.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 4 (1d6 + 1) piercing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -16470,7 +16570,9 @@
         "name": "Claws",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one creature. Hit: 4 (1d4 + 2) slashing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Blinding Breath (Recharge 6)",
@@ -16572,7 +16674,9 @@
         "name": "Talons",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) slashing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "slashing"
       }
     ],
     "traits": [
@@ -16671,7 +16775,9 @@
         "name": "Slam",
         "description": "Melee Weapon Attack: +8 to hit, reach 10 ft., one target. Hit: 14 (2d8 + 5) bludgeoning damage.",
         "attack_bonus": 8,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d8 + 5",
+        "damage_type_primary": "bludgeoning"
       }
     ],
     "traits": [
@@ -16775,12 +16881,18 @@
         "name": "Scimitar",
         "description": "Melee Weapon Attack: +10 to hit, reach 5 ft., one target. Hit: 13 (2d6 + 6) slashing damage plus 7 (2d6) fire damage.",
         "attack_bonus": 10,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 6",
+        "damage_type_primary": "slashing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "fire"
       },
       {
         "name": "Hurl Flame",
         "description": "Ranged Spell Attack: +7 to hit, range 120 ft., one target. Hit: 17 (5d6) fire damage.",
-        "attack_bonus": 7
+        "attack_bonus": 7,
+        "damage_dice_primary": "5d6",
+        "damage_type_primary": "fire"
       }
     ],
     "traits": [
@@ -16899,7 +17011,8 @@
         "attack_bonus": 15,
         "reach": "30 ft.",
         "range": "150 ft.",
-        "damage_type_primary": "Acid"
+        "damage_type_primary": "Acid",
+        "damage_dice_primary": "5d6 + 8"
       },
       {
         "name": "Cataclysmic Event",
@@ -17011,7 +17124,8 @@
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 25 (6d6 + 4) damage of a type chosen by the cultist: Acid, Cold, Fire, Lightning, or Thunder.",
         "attack_bonus": 7,
         "reach": "5 ft.",
-        "damage_type_primary": "Acid"
+        "damage_type_primary": "Acid",
+        "damage_dice_primary": "6d6 + 4"
       },
       {
         "name": "Elemental Claw",
@@ -17019,7 +17133,8 @@
         "attack_bonus": 7,
         "range": "120 ft.",
         "save_effect": "If the target is a Medium or smaller creature, the cultist moves the target up to 10 feet straight toward or away from itself.",
-        "damage_type_primary": "Acid"
+        "damage_type_primary": "Acid",
+        "damage_dice_primary": "4d10"
       },
       {
         "name": "Spellcasting",
@@ -17116,13 +17231,17 @@
         "name": "Gore",
         "description": "Melee Weapon Attack: +8 to hit, reach 5 ft., one target. Hit: 19 (3d8 + 6) piercing damage.",
         "attack_bonus": 8,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "3d8 + 6",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Stomp",
         "description": "Melee Weapon Attack: +8 to hit, reach 5 ft., one prone creature. Hit: 22 (3d10 + 6) bludgeoning damage.",
         "attack_bonus": 8,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "3d10 + 6",
+        "damage_type_primary": "bludgeoning"
       }
     ],
     "traits": [
@@ -17205,13 +17324,17 @@
         "name": "Ram",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) bludgeoning damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Hooves",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one prone creature. Hit: 8 (2d4 + 3) bludgeoning damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d4 + 3",
+        "damage_type_primary": "bludgeoning"
       }
     ],
     "traits": [
@@ -17319,7 +17442,8 @@
         "description": "Ranged Attack Roll: +15, range 600 ft. Hit: 35 (6d8 + 8) Necrotic or Radiant damage (empyrean's choice).",
         "attack_bonus": 15,
         "range": "600 ft.",
-        "damage_type_primary": "Necrotic"
+        "damage_type_primary": "Necrotic or Radiant",
+        "damage_dice_primary": "6d8 + 8"
       },
       {
         "name": "Spellcasting",
@@ -17448,7 +17572,8 @@
         "attack_bonus": 5,
         "reach": "5 ft.",
         "range": "30 ft.",
-        "damage_type_primary": "Necrotic"
+        "damage_type_primary": "Necrotic or Radiant",
+        "damage_dice_primary": "1d8 + 3"
       },
       {
         "name": "Spellcasting",
@@ -18567,13 +18692,21 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) piercing damage plus 3 (1d6) fire damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "1d6",
+        "damage_type_secondary": "fire"
       },
       {
         "name": "Tail",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) bludgeoning damage plus 3 (1d6) fire damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "bludgeoning",
+        "damage_dice_secondary": "1d6",
+        "damage_type_secondary": "fire"
       }
     ],
     "traits": [
@@ -19202,7 +19335,9 @@
         "name": "Longsword",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) slashing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 1",
+        "damage_type_primary": "slashing"
       }
     ],
     "traits": [
@@ -19684,7 +19819,9 @@
         "name": "Slam",
         "description": "Melee Weapon Attack: +8 to hit, reach 5 ft., one target. Hit: 12 (2d6 + 5) bludgeoning damage.",
         "attack_bonus": 8,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 5",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Animate Boulders",
@@ -22264,7 +22401,9 @@
         "description": "Melee Weapon Attack: +6 to hit, reach 10 ft., one target. Hit: 6 (1d4 + 4) piercing damage, and the target must make a DC 11 Constitution saving throw, taking 10 (3d6) poison damage on a failed save, or half as much damage on a successful one.",
         "attack_bonus": 6,
         "reach": "10 ft.",
-        "save_dc": 11
+        "save_dc": 11,
+        "damage_dice_primary": "1d4 + 4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [],
@@ -22510,7 +22649,9 @@
         "name": "Ram",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 4 (1d6 + 1) bludgeoning damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "bludgeoning"
       }
     ],
     "traits": [
@@ -24434,18 +24575,24 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one creature. Hit: 4 (1d4 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Spear",
         "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 6 (1d8 + 2) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Longbow",
         "description": "Ranged Weapon Attack: +3 to hit, range 150/600 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
-        "attack_bonus": 3
+        "attack_bonus": 3,
+        "damage_dice_primary": "1d8 + 1",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -25024,12 +25171,16 @@
         "name": "Scimitar",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) slashing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Shortbow",
         "description": "Ranged Weapon Attack: +4 to hit, range 80/320 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
-        "attack_bonus": 4
+        "attack_bonus": 4,
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -26236,7 +26387,11 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 7 (1d10 + 2) piercing damage plus 3 (1d6) poison damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d10 + 2",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "1d6",
+        "damage_type_secondary": "poison"
       },
       {
         "name": "Poison Breath",
@@ -26346,7 +26501,9 @@
         "name": "Claws",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 13 (2d8 + 4) slashing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 4",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Illusory Appearance",
@@ -26465,24 +26622,32 @@
         "name": "Bite (Slaad Form Only).",
         "description": "Melee Weapon Attack: +7 to hit, reach 5 ft., one target. Hit: 11 (2d6 + 4) piercing damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 4",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claw (Slaad Form Only)",
         "description": "Melee Weapon Attack: +7 to hit, reach 5 ft., one target. Hit: 7 (1d6 + 4) slashing damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 4",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Staff",
         "description": "Melee Weapon Attack: +7 to hit, reach 5 ft., one target. Hit: 11 (2d6 + 4) bludgeoning damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 4",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Hurl Flame",
         "description": "Ranged Spell Attack: +4 to hit, range 60 ft., one target. Hit: 10 (3d6) fire damage. The fire ignites flammable objects that aren't being worn or carried.",
-        "attack_bonus": 4
+        "attack_bonus": 4,
+        "damage_dice_primary": "3d6",
+        "damage_type_primary": "fire"
       }
     ],
     "traits": [
@@ -26781,19 +26946,25 @@
         "name": "Tail",
         "description": "Melee Weapon Attack: +7 to hit, reach 10 ft., one target. Hit: 11 (2d6 + 4) bludgeoning damage.",
         "attack_bonus": 7,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d6 + 4",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Tentacles",
         "description": "Melee Weapon Attack: +7 to hit, reach 10 ft., one target. Hit: 22 (4d8 + 4) slashing damage.",
         "attack_bonus": 7,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "4d8 + 4",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Beak",
         "description": "Melee Weapon Attack: +7 to hit, reach 10 ft., one target. Hit: 13 (2d8 + 4) piercing damage.",
         "attack_bonus": 7,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d8 + 4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -27613,7 +27784,9 @@
         "name": "Claw",
         "description": "Melee Weapon Attack: +9 to hit, reach 5 ft., one target. Hit: 13 (2d8 + 4) slashing damage.",
         "attack_bonus": 9,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 4",
+        "damage_type_primary": "slashing"
       }
     ],
     "traits": [
@@ -27724,13 +27897,17 @@
         "name": "Battleaxe",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 12 (2d8 + 3) slashing damage, or 14 (2dl0 + 3) slashing damage if used with two hands.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 3",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 10 (2d6 + 3) piercing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 3",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [],
@@ -27928,18 +28105,24 @@
         "name": "Longsword",
         "description": "Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) slashing damage, or 8 (1d10 + 3) slashing damage if used with two hands.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 3",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Shortsword",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Heavy Crossbow",
         "description": "Ranged Weapon Attack: +3 to hit, range 100/400 ft., one target. Hit: 6 (1d10 + 1) piercing damage.",
-        "attack_bonus": 3
+        "attack_bonus": 3,
+        "damage_dice_primary": "1d10 + 1",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Fire Breath",
@@ -28924,12 +29107,16 @@
         "name": "Longsword",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 5 (1d8 + 1) slashing damage, or 6 (1d10 + 1) slashing damage if used with two hands.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 1",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Longbow",
         "description": "Ranged Weapon Attack: +3 to hit, range 150/600 ft., one target. Hit: 5 (1d8 + 1) piercing damage.",
-        "attack_bonus": 3
+        "attack_bonus": 3,
+        "damage_dice_primary": "1d8 + 1",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -31581,12 +31768,16 @@
         "name": "Dagger",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Sling",
         "description": "Ranged Weapon Attack: +4 to hit, range 30/120 ft., one target. Hit: 4 (1d4 + 2) bludgeoning damage.",
-        "attack_bonus": 4
+        "attack_bonus": 4,
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "bludgeoning"
       }
     ],
     "traits": [
@@ -31970,13 +32161,17 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) piercing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Spear",
         "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d6 + 1) piercing damage, or 5 (1d8 + 1) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Net",
@@ -32230,13 +32425,19 @@
         "name": "Scepter",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) bludgeoning damage plus 14 (4d6) lightning damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "bludgeoning",
+        "damage_dice_secondary": "4d6",
+        "damage_type_secondary": "lightning"
       },
       {
         "name": "Unarmed Strike",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 5 (1d4 + 3) bludgeoning damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 3",
+        "damage_type_primary": "bludgeoning"
       }
     ],
     "traits": [
@@ -32591,14 +32792,18 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Pincer Staff",
         "description": "Melee Weapon Attack: +4 to hit, reach 10 ft., one target. Hit: 5 (1d6 + 2) piercing damage. If the target is a Medium or smaller creature, it is grappled (escape DC 14). Until this grapple ends, the kuo-toa can't use its pincer staff on another target.",
         "attack_bonus": 4,
         "reach": "10 ft.",
-        "save_dc": 14
+        "save_dc": 14,
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -33581,19 +33786,25 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claws",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 5 (1d4 + 3) slashing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 3",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Trident",
         "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 6 (1d6 + 3) piercing damage, or 7 (1d8 + 3) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -33700,25 +33911,33 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Heavy Club",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) bludgeoning damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +4 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Spiked Shield",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -33961,13 +34180,17 @@
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) piercing damage, or 7 (1dlO + 2) piercing damage in crocodile form. Ifthe lizardfolk is in crocodile form and the target is a Large or smaller creature, the target is grappled (escape DC 12). Until this grapple ends, the target is restrained, and the lizardfolk can't bite another target. If the lizardfolk reverts to its true form, the grapple ends.",
         "attack_bonus": 4,
         "reach": "5 ft.",
-        "save_dc": 12
+        "save_dc": 12,
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claws (Lizardfolk Form Only)",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 4 (1d4 + 2) slashing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Change Shape (Recharges after a Short or Long Rest)",
@@ -35630,7 +35853,9 @@
         "name": "Spear",
         "description": "Melee or Ranged Weapon Attack: +2 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 3 (1d6) piercing damage, or 4 (1d8) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -36220,7 +36445,9 @@
         "reach": "5 ft.",
         "recharge": "",
         "damage_dice_primary": "1d8 + 3",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "1d8",
+        "damage_type_secondary": "Acid"
       },
       {
         "name": "Pseudopod",
@@ -36652,13 +36879,17 @@
         "name": "Greataxe",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 17 (2d12 + 4) slashing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d12 + 4",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Gore",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 13 (2d8 + 4) piercing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -37532,13 +37763,17 @@
         "name": "Dagger",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) piercing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +2 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 3 (1d6) piercing damage.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -39146,13 +39381,17 @@
         "name": "Rapier",
         "description": "Melee Weapon Attack: +6 to hiti reach 5 ft., one target. Hit: 8 (1d8 + 4) piercing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 4",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Dagger",
         "description": "Melee or Ranged Weapon Attack~+6 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 6 (1d4 + 4) piercing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -40474,13 +40713,17 @@
         "name": "Greataxe",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 9 (1d12 + 3) slashing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d12 + 3",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +5 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -40832,13 +41075,17 @@
         "name": "Greataxe",
         "description": "Melee Weapon Attack: +6 to hit, reach 5 ft., one target. Hit: 10 (1d12 + 4) slashing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d12 + 4",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +6 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 7 (1d6 + 4) piercing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -41447,7 +41694,9 @@
         "name": "Arm",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one target. Hit: 5 (1d6 + 2) bludgeoning damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Paralysis Gas",
@@ -44751,12 +45000,16 @@
         "name": "Fist",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) bludgeoning damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Shortbow",
         "description": "Ranged Weapon Attack: +4 to hit, range 80/320 ft., one target. Hit: 5 (1d6 + 2) piercing damage.",
-        "attack_bonus": 4
+        "attack_bonus": 4,
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -47148,19 +47401,25 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) piercing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claws",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) slashing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Spear",
         "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d6 + 1) piercing damage, or 5 (1d8 + 1) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -47533,13 +47792,17 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) piercing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claws",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) slashing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "slashing"
       }
     ],
     "traits": [
@@ -49960,7 +50223,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 9 (1d10 + 4) Piercing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d10 + 4",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Cold Breath",
@@ -50047,13 +50312,17 @@
         "name": "Shortsword",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Shortbow",
         "description": "Ranged Attack Roll: +5, range 80/320 ft. Hit: 6 (1d6 + 3) Piercing damage.",
         "attack_bonus": 5,
-        "range": "80/320 ft."
+        "range": "80/320 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -50138,7 +50407,9 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -50228,7 +50499,9 @@
         "name": "Claw",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Cinder Breath",
@@ -50466,7 +50739,9 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Eye Rays",
@@ -50574,7 +50849,9 @@
         "name": "Life Drain",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 7 (2d6) Necrotic damage. If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "Necrotic"
       }
     ],
     "bonus_actions": [],
@@ -50696,7 +50973,9 @@
         "name": "Claw",
         "description": "Melee Attack Roll: +8, reach 5 ft. Hit: 14 (3d6 + 4) Slashing damage.",
         "attack_bonus": 8,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "3d6 + 4",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Mind-Rending Roar",
@@ -50945,7 +51224,9 @@
         "name": "Claw",
         "description": "Melee Attack Roll: +12, reach 5 ft. Hit: 20 (4d6 + 6) Slashing damage.",
         "attack_bonus": 12,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "4d6 + 6",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Roar",
@@ -51384,7 +51665,9 @@
         "name": "Necrotic Ray",
         "description": "Ranged Attack Roll: +6, range 60 ft. Hit: 21 (6d6) Necrotic damage.",
         "attack_bonus": 6,
-        "range": "60 ft."
+        "range": "60 ft.",
+        "damage_dice_primary": "6d6",
+        "damage_type_primary": "Necrotic"
       },
       {
         "name": "Spellcasting",
@@ -51477,7 +51760,9 @@
         "name": "Needle Sword",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 6 (1d4 + 4) Piercing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 4",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Enchanting Bow",
@@ -51926,7 +52211,9 @@
         "name": "Proboscis",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage, and the stirge attaches to the target. While attached, the stirge can't make Proboscis attacks, and the target takes 5 (2d4) Necrotic damage at the start of each of the stirge's turns. The stirge can detach itself by spending 5 feet of its movement. The target or a creature within 5 feet of it can detach the stirge as an action.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -52014,13 +52301,17 @@
         "name": "Stone Club",
         "description": "Melee Attack Roll: +9, reach 15 ft. Hit: 22 (3d10 + 6) Bludgeoning damage.",
         "attack_bonus": 9,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "3d10 + 6",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Boulder",
         "description": "Ranged Attack Roll: +9, range 60/240 ft. Hit: 15 (2d8 + 6) Bludgeoning damage. If the target is a Large or smaller creature, it has the Prone condition.",
         "attack_bonus": 9,
-        "range": "60/240 ft."
+        "range": "60/240 ft.",
+        "damage_dice_primary": "2d8 + 6",
+        "damage_type_primary": "Bludgeoning"
       }
     ],
     "bonus_actions": [],
@@ -52111,7 +52402,9 @@
         "name": "Force Bolt",
         "description": "Ranged Attack Roll: +9, range 120 ft. Hit: 22 (4d10) Force damage.",
         "attack_bonus": 9,
-        "range": "120 ft."
+        "range": "120 ft.",
+        "damage_dice_primary": "4d10",
+        "damage_type_primary": "Force"
       }
     ],
     "bonus_actions": [
@@ -52239,7 +52532,9 @@
         "name": "Thunderbolt",
         "description": "Ranged Attack Roll: +14, range 500 ft. Hit: 22 (2d12 + 9) Lightning damage, and the target has the Blinded and Deafened conditions until the start of the giant's next turn.",
         "attack_bonus": 14,
-        "range": "500 ft."
+        "range": "500 ft.",
+        "damage_dice_primary": "2d12 + 9",
+        "damage_type_primary": "Lightning"
       },
       {
         "name": "Lightning Storm",
@@ -52357,7 +52652,9 @@
         "name": "Fiendish Touch",
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 16 (2d10 + 5) Psychic damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d10 + 5",
+        "damage_type_primary": "Psychic"
       },
       {
         "name": "Charm",
@@ -52498,7 +52795,9 @@
         "name": "Claw (Fiend Form Only)",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) slashing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Charm",
@@ -52705,7 +53004,9 @@
         "name": "Bites",
         "description": "Melee Weapon Attack: +3 to hit, reach 0 ft., one target in the swarm's space. Hit: 10 (4d4) piercing damage, or 5 (2d4) piercing damage if the swarm has half of its hit points or fewer.",
         "attack_bonus": 3,
-        "reach": "0 ft."
+        "reach": "0 ft.",
+        "damage_dice_primary": "4d4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -52803,7 +53104,9 @@
         "name": "Bites",
         "description": "Melee Weapon Attack: +3 to hit, reach 0 ft., one target in the swarm's space. Hit: 10 (4d4) piercing damage, or 5 (2d4) piercing damage if the swarm has half of its hit points or fewer.\nA creature reduced to 0 hit points by a swarm of centipedes is stable but poisoned for 1 hour, even after regaining hit points, and paralyzed while poisoned in this way.",
         "attack_bonus": 3,
-        "reach": "0 ft."
+        "reach": "0 ft.",
+        "damage_dice_primary": "4d4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -53474,7 +53777,9 @@
         "description": "Melee Weapon Attack: +6 to hit, reach 0 ft., one creature in the swarm's space. Hit: 7 (2d6) piercing damage, or 3 (1d6) piercing damage if the swarm has half of its hit points or fewer. The target must make a DC 10 Constitution saving throw, taking 14 (4d6) poison damage on a failed save, or half as much damage on a successful one.",
         "attack_bonus": 6,
         "reach": "0 ft.",
-        "save_dc": 10
+        "save_dc": 10,
+        "damage_dice_primary": "2d6",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -53566,7 +53871,9 @@
         "name": "Bites",
         "description": "Melee Weapon Attack: +5 to hit, reach 0 ft., one creature in the swarm's space. Hit: 14 (4d6) piercing damage, or 7 (2d6) piercing damage if the swarm has half of its hit points or fewer.",
         "attack_bonus": 5,
-        "reach": "0 ft."
+        "reach": "0 ft.",
+        "damage_dice_primary": "4d6",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -53866,7 +54173,9 @@
         "name": "Bites",
         "description": "Melee Weapon Attack: +3 to hit, reach 0 ft., one target in the swarm's space. Hit: 10 (4d4) piercing damage, or 5 (2d4) piercing damage if the swarm has half of its hit points or fewer.",
         "attack_bonus": 3,
-        "reach": "0 ft."
+        "reach": "0 ft.",
+        "damage_dice_primary": "4d4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -54036,7 +54345,9 @@
         "attack_bonus": 6,
         "reach": "5 ft.",
         "damage_dice_primary": "1d8 + 4",
-        "damage_type_primary": "Piercing"
+        "damage_type_primary": "Piercing",
+        "damage_dice_secondary": "3d6",
+        "damage_type_secondary": "Poison"
       }
     ],
     "bonus_actions": [],
@@ -54154,7 +54465,9 @@
         "name": "Bites",
         "description": "Melee Weapon Attack: +3 to hit, reach 0 ft., one target in the swarm's space. Hit: 10 (4d4) piercing damage, or 5 (2d4) piercing damage if the swarm has half of its hit points or fewer.",
         "attack_bonus": 3,
-        "reach": "0 ft."
+        "reach": "0 ft.",
+        "damage_dice_primary": "4d4",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -54230,19 +54543,25 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +19, reach 15 ft. Hit: 36 (4d12 + 10) Piercing damage, and the target has the Grappled condition (escape DC 20). Until the grapple ends, the target has the Restrained condition and can't teleport.",
         "attack_bonus": 19,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "4d12 + 10",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Claw",
         "description": "Melee Attack Roll: +19, reach 15 ft. Hit: 28 (4d8 + 10) Slashing damage.",
         "attack_bonus": 19,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "4d8 + 10",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Tail",
         "description": "Melee Attack Roll: +19, reach 30 ft. Hit: 23 (3d8 + 10) Bludgeoning damage. If the target is a Huge or smaller creature, it has the Prone condition.",
         "attack_bonus": 19,
-        "reach": "30 ft."
+        "reach": "30 ft.",
+        "damage_dice_primary": "3d8 + 10",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Thunderous Bellow",
@@ -54414,20 +54733,26 @@
         "name": "Claw",
         "description": "Melee Weapon Attack: +19 to hit, reach 15 ft., one target. Hit: 28 (4d8 + 10) slashing damage.",
         "attack_bonus": 19,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "4d8 + 10",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Horns",
         "description": "Melee Weapon Attack: +19 to hit, reach 10 ft., one target. Hit: 32 (4d10 + 10) piercing damage.",
         "attack_bonus": 19,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "4d10 + 10",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Tail",
         "description": "Melee Weapon Attack: +19 to hit, reach 20 ft., one target. Hit: 24 (4d6 + 10) bludgeoning damage. If the target is a creature, it must succeed on a DC 20 Strength saving throw or be knocked prone.",
         "attack_bonus": 19,
         "reach": "20 ft.",
-        "save_dc": 20
+        "save_dc": 20,
+        "damage_dice_primary": "4d6 + 10",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Frightful Presence",
@@ -54564,13 +54889,17 @@
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one creature. Hit: 4 (1d6 + 1) piercing damage, and the target must succeed on a DC 1 1 Constitution saving throw or be poisoned for 1 minute. If the saving throw fails by 5 or more, the target is also paralyzed while poisoned in this way. The poisoned target can repeat the saving throw at the end of each of its turns, ending the effect on itself on a success.",
         "attack_bonus": 3,
         "reach": "5 ft.",
-        "save_dc": 1
+        "save_dc": 1,
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Claws",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 6 (2d4 + 1) slashing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d4 + 1",
+        "damage_type_primary": "slashing"
       }
     ],
     "traits": [
@@ -54666,7 +54995,9 @@
         "name": "Chatkcha",
         "description": "Ranged Attack Roll: +4, range 30/120 ft. Hit: 5 (1d6 + 2) Slashing damage.",
         "attack_bonus": 4,
-        "range": "30/120 ft."
+        "range": "30/120 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [
@@ -54756,7 +55087,9 @@
         "description": "Melee or Ranged Attack Roll: +7, reach 10 ft. or range 120 ft. Hit: 18 (4d6 + 4) Psychic damage.",
         "attack_bonus": 7,
         "reach": "10 ft.",
-        "range": "120 ft."
+        "range": "120 ft.",
+        "damage_dice_primary": "4d6 + 4",
+        "damage_type_primary": "Psychic"
       },
       {
         "name": "Spellcasting",
@@ -54867,12 +55200,16 @@
         "name": "Mace",
         "description": "Melee Weapon Attack: +4 to hit, reach 5 ft., one creature. Hit: 5 (1d6 + 2) bludgeoning damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Heavy Crossbow",
         "description": "Ranged Weapon Attack: +2 to hit, range 100/400 ft., one target. Hit: 5 (1d10) piercing damage.",
-        "attack_bonus": 2
+        "attack_bonus": 2,
+        "damage_dice_primary": "1d10",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -54946,7 +55283,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage. If the target is a Large or smaller creature, it has the Prone condition.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 3",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [
@@ -55019,13 +55358,17 @@
         "name": "Mace",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Bludgeoning damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Heavy Crossbow",
         "description": "Ranged Attack Roll: +3, range 100/400 ft. Hit: 6 (1d10 + 1) Piercing damage.",
         "attack_bonus": 3,
-        "range": "100/400 ft."
+        "range": "100/400 ft.",
+        "damage_dice_primary": "1d10 + 1",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -55107,13 +55450,17 @@
         "name": "Warhammer",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 12 (2d8 + 3) Bludgeoning damage. If the target is a Large or smaller creature, the tough pushes the target up to 10 feet straight away from itself.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 3",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Heavy Crossbow",
         "description": "Ranged Attack Roll: +4, range 100/400 ft. Hit: 13 (2d10 + 2) Piercing damage.",
         "attack_bonus": 4,
-        "range": "100/400 ft."
+        "range": "100/400 ft.",
+        "damage_dice_primary": "2d10 + 2",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -55194,13 +55541,17 @@
         "name": "Slam",
         "description": "Melee Attack Roll: +10, reach 5 ft. Hit: 16 (3d6 + 6) Bludgeoning damage.",
         "attack_bonus": 10,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "3d6 + 6",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Hail of Bark",
         "description": "Ranged Attack Roll: +10, range 180 ft. Hit: 28 (4d10 + 6) Piercing damage.",
         "attack_bonus": 10,
-        "range": "180 ft."
+        "range": "180 ft.",
+        "damage_dice_primary": "4d10 + 6",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Animate Trees",
@@ -55289,7 +55640,9 @@
         "name": "Branch",
         "description": "Melee Attack Roll: +9, reach 15 ft. Hit: 16 (3d6 + 6) Bludgeoning damage.",
         "attack_bonus": 9,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "3d6 + 6",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Grasping Root",
@@ -55399,7 +55752,9 @@
         "name": "Spear",
         "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 20/60 ft., one target. Hit: 4 (1d6 + 1) piercing damage, or 5 (1d8 + 1) piercing damage if used with two hands to make a melee attack.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -55563,13 +55918,17 @@
         "name": "Fist",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 3 (1d4 + 1) bludgeoning damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 1",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Weapon Attack: +3 to hit, reach 5 ft. or range 30/120 ft., one target. Hit: 4 (1d6 + 1) piercing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [
@@ -55644,7 +56003,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [],
@@ -55732,7 +56093,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 11 (2d6 + 4) Slashing damage.",
         "attack_bonus": 7,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d6 + 4",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [
@@ -55817,7 +56180,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 9 (2d4 + 4) Slashing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d4 + 4",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [],
@@ -55906,7 +56271,9 @@
         "name": "Claw",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Slashing damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 2",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [],
@@ -55994,13 +56361,17 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 33 (4d12 + 7) Piercing damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 17). While Grappled, the target has the Restrained condition and can't be targeted by the tyrannosaurus's Tail.",
         "attack_bonus": 10,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "4d12 + 7",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Tail",
         "description": "Melee Attack Roll: +10, reach 15 ft. Hit: 25 (4d8 + 7) Bludgeoning damage. If the target is a Huge or smaller creature, it has the Prone condition.",
         "attack_bonus": 10,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "4d8 + 7",
+        "damage_type_primary": "Bludgeoning"
       }
     ],
     "bonus_actions": [],
@@ -56088,7 +56459,9 @@
         "name": "Mercurial Whip",
         "description": "Melee Attack Roll: +9, reach 15 ft. Hit: 25 (6d6 + 4) Force damage, and the ultroloth can teleport the target up to 10 feet to an unoccupied space the ultroloth can see that isn't in the air.",
         "attack_bonus": 9,
-        "reach": "15 ft."
+        "reach": "15 ft.",
+        "damage_dice_primary": "6d6 + 4",
+        "damage_type_primary": "Force"
       },
       {
         "name": "Hypnotic Gaze",
@@ -56201,7 +56574,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 12 (2d6 + 5) Slashing damage.",
         "attack_bonus": 8,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d6 + 5",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [
@@ -56288,13 +56663,17 @@
         "name": "Hooves",
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 11 (2d6 + 4) Bludgeoning damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 4",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Radiant Horn",
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 9 (1d10 + 4) Radiant damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d10 + 4",
+        "damage_type_primary": "Radiant"
       },
       {
         "name": "Spellcasting",
@@ -56801,7 +57180,9 @@
         "name": "Claw",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (2d4 + 3) Slashing damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13) from one of two claws.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d4 + 3",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Bite",
@@ -56926,7 +57307,9 @@
         "name": "Sickening Ray",
         "description": "Ranged Attack Roll: +10, range 120 ft. Hit: 16 (2d10 + 5) Necrotic damage, and the target has the Poisoned condition until the start of the vampire's next turn.",
         "attack_bonus": 10,
-        "range": "120 ft."
+        "range": "120 ft.",
+        "damage_dice_primary": "2d10 + 5",
+        "damage_type_primary": "Necrotic"
       },
       {
         "name": "Hunger of Hadar",
@@ -57166,18 +57549,24 @@
         "name": "Longsword",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 7 (1d8 + 3) slashing damage, or 8 (1d10 + 3) slashing damage if used with two hands.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 3",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Shortsword",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) piercing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "piercing"
       },
       {
         "name": "Heavy Crossbow",
         "description": "Ranged Weapon Attack: +3 to hit, range 100/400 ft., one target. Hit: 6 (1d10 + 1) piercing damage.",
-        "attack_bonus": 3
+        "attack_bonus": 3,
+        "damage_dice_primary": "1d10 + 1",
+        "damage_type_primary": "piercing"
       }
     ],
     "traits": [],
@@ -57242,7 +57631,9 @@
         "name": "Constricting Vine",
         "description": "Melee Attack Roll: +4, reach 10 ft. Hit: 6 (1d8 + 2) Bludgeoning damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC 12). Until the grapple ends, the target takes 4 (1d8) Bludgeoning damage at the start of each of its turns, and the blight can't make Constricting Vine attacks.",
         "attack_bonus": 4,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "1d8 + 2",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Entangling Plants",
@@ -57323,7 +57714,9 @@
         "name": "Rotting Touch",
         "description": "Melee Attack Roll: +2, reach 10 ft. Hit: 4 (1d8) Necrotic damage.",
         "attack_bonus": 2,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "1d8",
+        "damage_type_primary": "Necrotic"
       }
     ],
     "bonus_actions": [],
@@ -57614,7 +58007,9 @@
         "name": "Beak",
         "description": "Melee Attack Roll: +2, reach 5 ft. Hit: 2 (1d4) Piercing damage.",
         "attack_bonus": 2,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -57758,7 +58153,9 @@
         "name": "Hooves",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 7 (1d6 + 4) Bludgeoning damage. If the target is a Large or smaller creature and the skeleton moved 20+ feet straight toward it immediately before the hit, the target has the Prone condition.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 4",
+        "damage_type_primary": "Bludgeoning"
       }
     ],
     "bonus_actions": [],
@@ -57853,13 +58250,17 @@
         "name": "Greatsword",
         "description": "Melee Attack Roll: +9, reach 5 ft. Hit: 19 (4d6 + 5) Slashing damage. The warrior also creates one of the following effects: Sap. The target has Disadvantage on its next attack roll before the start of the warrior's next turn. Maneuver. One ally who can see or hear the warrior can take a Reaction to move up to half the ally's Speed without provoking Opportunity Attacks.",
         "attack_bonus": 9,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "4d6 + 5",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Longbow",
         "description": "Ranged Attack Roll: +9, range 150/600 ft. Hit: 18 (3d8 + 5) Piercing damage, and the target's Speed decreases by 10 feet until the end of the target's next turn.",
         "attack_bonus": 9,
-        "range": "150/600 ft."
+        "range": "150/600 ft.",
+        "damage_dice_primary": "3d8 + 5",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [
@@ -57944,7 +58345,9 @@
         "description": "Melee or Ranged Attack Roll: +3, reach 5 ft. or range 20/60 ft. Hit: 4 (1d6 + 1) Piercing damage.",
         "attack_bonus": 3,
         "reach": "5 ft.",
-        "range": "20/60 ft."
+        "range": "20/60 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -58034,13 +58437,17 @@
         "name": "Greatsword",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 3",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Heavy Crossbow",
         "description": "Ranged Attack Roll: +3, range 100/400 ft. Hit: 12 (2d10 + 1) Piercing damage.",
         "attack_bonus": 3,
-        "range": "100/400 ft."
+        "range": "100/400 ft.",
+        "damage_dice_primary": "2d10 + 1",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -58125,7 +58532,9 @@
         "name": "Slam",
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Prone condition.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 4",
+        "damage_type_primary": "Bludgeoning"
       },
       {
         "name": "Whelm",
@@ -58225,7 +58634,9 @@
         "name": "Surge",
         "description": "Melee Attack Roll: +5, reach 10 ft. Hit: 13 (3d6 + 3) Cold damage. If the target is a Medium or smaller creature, it has the Grappled condition (escape DC 13), and it has the Restrained condition until the grapple ends.",
         "attack_bonus": 5,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "3d6 + 3",
+        "damage_type_primary": "Cold"
       }
     ],
     "bonus_actions": [],
@@ -58411,20 +58822,26 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 17 (2d12 + 4) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 14. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Werebear under the DM's control and has 10 Hit Points. Success: The target is immune to this werebear's curse for 24 hours.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d12 + 4",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Handaxe",
         "description": "Melee or Ranged Attack Roll: +7, reach 5 ft or range 20/60 ft. Hit: 14 (3d6 + 4) Slashing damage.",
         "attack_bonus": 7,
         "reach": "5 ft.",
-        "range": "20/60 ft."
+        "range": "20/60 ft.",
+        "damage_dice_primary": "3d6 + 4",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Rend",
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Slashing damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 4",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [
@@ -58509,14 +58926,18 @@
         "name": "Gore",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Wereboar under the DM's control and has 10 Hit Points. Success: The target is immune to this wereboar's curse for 24 hours.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 3",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Javelin",
         "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 30/120 ft. Hit: 13 (3d6 + 3) Piercing damage.",
         "attack_bonus": 5,
         "reach": "5 ft.",
-        "range": "30/120 ft."
+        "range": "30/120 ft.",
+        "damage_dice_primary": "3d6 + 3",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Tusk",
@@ -58616,19 +59037,25 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 8 (2d4 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 11. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Wererat under the DM's control and has 10 Hit Points. Success: The target is immune to this wererat's curse for 24 hours.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d4 + 3",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Scratch",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Slashing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Hand Crossbow",
         "description": "Ranged Attack Roll: +5, range 30/120 ft. Hit: 6 (1d6 + 3) Piercing damage.",
         "attack_bonus": 5,
-        "range": "30/120 ft."
+        "range": "30/120 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [
@@ -58718,19 +59145,25 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 13. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Weretiger under the DM's control and has 10 Hit Points. Success: The target is immune to this weretiger's curse for 24 hours.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 3",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Scratch",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 3",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Longbow",
         "description": "Ranged Attack Roll: +4, range 150/600 ft. Hit: 11 (2d8 + 2) Piercing damage.",
         "attack_bonus": 4,
-        "range": "150/600 ft."
+        "range": "150/600 ft.",
+        "damage_dice_primary": "2d8 + 2",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [
@@ -58824,19 +59257,25 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 12 (2d8 + 3) Piercing damage. If the target is a Humanoid, it is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target is cursed. If the cursed target drops to 0 Hit Points, it instead becomes a Werewolf under the DM's control and has 10 Hit Points. Success: The target is immune to this werewolf's curse for 24 hours.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 3",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Scratch",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 3",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Longbow",
         "description": "Ranged Attack Roll: +4, range 150/600 ft. Hit: 11 (2d8 + 2) Piercing damage.",
         "attack_bonus": 4,
-        "range": "150/600 ft."
+        "range": "150/600 ft.",
+        "damage_dice_primary": "2d8 + 2",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [
@@ -59184,7 +59623,9 @@
         "name": "Shock",
         "description": "Melee Spell Attack: +4 to hit, reach 5 ft., one creature. Hit: 9 (2d8) lightning damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8",
+        "damage_type_primary": "lightning"
       },
       {
         "name": "Invisibility",
@@ -59266,13 +59707,16 @@
         "name": "Dragon-Tooth Blade",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Chromatic Spitfire",
         "description": "Ranged Attack Roll: +5, range 30 ft. Hit: 6 (1d6 + 3) damage of a type chosen by the kobold: Acid, Cold, Fire, Lightning, or Poison.",
         "attack_bonus": 5,
-        "range": "30 ft."
+        "range": "30 ft.",
+        "damage_dice_primary": "1d6 + 3"
       }
     ],
     "bonus_actions": [],
@@ -59359,7 +59803,9 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 11 (2d6 + 4) Piercing damage. If the target is a Large or smaller creature, it has the Prone condition.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 4",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Cold Breath",
@@ -59474,7 +59920,9 @@
         "name": "Shock",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 11 (2d8 + 2) Lightning damage.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 2",
+        "damage_type_primary": "Lightning"
       }
     ],
     "bonus_actions": [
@@ -59551,7 +59999,9 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage. If the target is a Medium or smaller creature, it has the Prone condition.",
         "attack_bonus": 4,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 2",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -59630,7 +60080,9 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage, and the next attack roll made against the target before the start of the worg's next turn has Advantage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 3",
+        "damage_type_primary": "Piercing"
       }
     ],
     "bonus_actions": [],
@@ -59701,7 +60153,9 @@
         "name": "Life Drain",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 21 (4d8 + 3) Necrotic damage. If the target is a creature, its Hit Point maximum decreases by an amount equal to the damage taken.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "4d8 + 3",
+        "damage_type_primary": "Necrotic"
       },
       {
         "name": "Create Specter",
@@ -59813,7 +60267,9 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Piercing damage.",
         "attack_bonus": 7,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d8 + 4",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Sting",
@@ -59908,13 +60364,17 @@
         "name": "Bite",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 17 (4d6 + 3) Piercing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "4d6 + 3",
+        "damage_type_primary": "Piercing"
       },
       {
         "name": "Claw",
         "description": "Melee Attack Roll: +6, reach 5 ft. Hit: 8 (1d10 + 3) Slashing damage.",
         "attack_bonus": 6,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d10 + 3",
+        "damage_type_primary": "Slashing"
       }
     ],
     "bonus_actions": [
@@ -60130,7 +60590,9 @@
         "description": "Melee or Ranged Attack Roll: +8, reach 10 ft. or range 120 ft. Hit: 25 (6d6 + 4) Acid damage.",
         "attack_bonus": 8,
         "reach": "10 ft.",
-        "range": "120 ft."
+        "range": "120 ft.",
+        "damage_dice_primary": "6d6 + 4",
+        "damage_type_primary": "Acid"
       },
       {
         "name": "Spellcasting",
@@ -60486,7 +60948,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 15 (2d10 + 4) Slashing damage.",
         "attack_bonus": 7,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d10 + 4",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Fire Breath",
@@ -60603,7 +61067,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +8, reach 10 ft. Hit: 16 (2d10 + 5) Slashing damage.",
         "attack_bonus": 8,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d10 + 5",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Lightning Breath",
@@ -60725,7 +61191,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +7, reach 10 ft. Hit: 15 (2d10 + 4) Slashing damage.",
         "attack_bonus": 7,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d10 + 4",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Acid Breath",
@@ -60846,7 +61314,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 17 (2d10 + 6) Slashing damage.",
         "attack_bonus": 10,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d10 + 6",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Fire Breath",
@@ -61229,13 +61699,19 @@
         "name": "Bite",
         "description": "Melee Weapon Attack: +10 to hit, reach 10 ft., one target. Hit: 17 (2d10 + 6) piercing damage plus 3 (1d6) necrotic damage.",
         "attack_bonus": 10,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d10 + 6",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "1d6",
+        "damage_type_secondary": "necrotic"
       },
       {
         "name": "Claw",
         "description": "Melee Weapon Attack: +10 to hit, reach 5 ft., one target. Hit: 13 (2d6 + 6) slashing damage.",
         "attack_bonus": 10,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "2d6 + 6",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Shadow Breath",
@@ -61421,7 +61897,9 @@
         "name": "Rend",
         "description": "Melee Attack Roll: +10, reach 10 ft. Hit: 15 (2d8 + 6) Slashing damage.",
         "attack_bonus": 10,
-        "reach": "10 ft."
+        "reach": "10 ft.",
+        "damage_dice_primary": "2d8 + 6",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Cold Breath",
@@ -61772,13 +62250,17 @@
         "name": "Scimitar",
         "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 4 (1d6 + 1) Slashing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "Slashing"
       },
       {
         "name": "Poison Ray",
         "description": "Ranged Attack Roll: +4, range 120 ft. Hit: 9 (2d6 + 2) Poison damage.",
         "attack_bonus": 4,
-        "range": "120 ft."
+        "range": "120 ft.",
+        "damage_dice_primary": "2d6 + 2",
+        "damage_type_primary": "Poison"
       },
       {
         "name": "Spellcasting",
@@ -61896,25 +62378,37 @@
         "name": "Bite (requires snake head or snakes for arms)",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one creature. Hit: 5 (1d4 + 3) piercing damage plus 7 (2d6) poison damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d4 + 3",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "poison"
       },
       {
         "name": "Constrict (requires serpentine lower body)",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 10 (2d6 + 3) bludgeoning damage, and the target is grappled (escape DC 13). Until this grapple ends, the target is restrained, and the yuan-ti can't constrict another target.",
         "attack_bonus": 5,
         "reach": "5 ft.",
-        "save_dc": 13
+        "save_dc": 13,
+        "damage_dice_primary": "2d6 + 3",
+        "damage_type_primary": "bludgeoning"
       },
       {
         "name": "Scimitar (requires human arms)",
         "description": "Melee Weapon Attack: +5 to hit, reach 5 ft., one target. Hit: 6 (1d6 + 3) slashing damage.",
         "attack_bonus": 5,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 3",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Longbow (requires human arms)",
         "description": "Ranged Weapon Attack: +4 to hit, range 150/600 ft., one target. Hit: 6 (1d8 + 2) piercing damage plus 7 (2d6) poison damage.",
-        "attack_bonus": 4
+        "attack_bonus": 4,
+        "damage_dice_primary": "1d8 + 2",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "poison"
       }
     ],
     "traits": [
@@ -62011,7 +62505,9 @@
         "name": "Poison Ray",
         "description": "Ranged Attack Roll: +5, range 120 ft. Hit: 12 (2d8 + 3) Poison damage.",
         "attack_bonus": 5,
-        "range": "120 ft."
+        "range": "120 ft.",
+        "damage_dice_primary": "2d8 + 3",
+        "damage_type_primary": "Poison"
       },
       {
         "name": "Spellcasting",
@@ -62220,7 +62716,9 @@
         "description": "Melee or Ranged Attack Roll: +5, reach 5 ft. or range 120 ft. Hit: 12 (2d8 + 3) Poison damage.",
         "attack_bonus": 5,
         "reach": "5 ft.",
-        "range": "120 ft."
+        "range": "120 ft.",
+        "damage_dice_primary": "2d8 + 3",
+        "damage_type_primary": "Poison"
       },
       {
         "name": "Constrict",
@@ -62356,12 +62854,18 @@
         "name": "Scimitar",
         "description": "Melee Weapon Attack: +3 to hit, reach 5 ft., one target. Hit: 4 (1d6 + 1) slashing damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "slashing"
       },
       {
         "name": "Shortbow",
         "description": "Ranged Weapon Attack: +3 to hit, range 80/320 ft., one target. Hit: 4 (1d6 + 1) piercing damage plus 7 (2d6) poison damage.",
-        "attack_bonus": 3
+        "attack_bonus": 3,
+        "damage_dice_primary": "1d6 + 1",
+        "damage_type_primary": "piercing",
+        "damage_dice_secondary": "2d6",
+        "damage_type_secondary": "poison"
       }
     ],
     "traits": [
@@ -62430,7 +62934,9 @@
         "name": "Slam",
         "description": "Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d8 + 1) Bludgeoning damage.",
         "attack_bonus": 3,
-        "reach": "5 ft."
+        "reach": "5 ft.",
+        "damage_dice_primary": "1d8 + 1",
+        "damage_type_primary": "Bludgeoning"
       }
     ],
     "bonus_actions": [],

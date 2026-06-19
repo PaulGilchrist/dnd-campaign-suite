@@ -29,7 +29,9 @@ function rollDisadvantage() {
 
 function parseExpression(formula) {
   if (!formula) return null;
-  const cleaned = formula.replace(/\s/g, '');
+  const stripped = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
+  if (!stripped) return null;
+  const cleaned = stripped.replace(/\s/g, '');
   const match = cleaned.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
   if (match) {
     return {
@@ -38,8 +40,8 @@ function parseExpression(formula) {
       modifier: match[3] ? parseInt(match[3], 10) : 0
     };
   }
-  if (formula.toLowerCase().includes(' or ')) {
-    const parts = formula.split(/\s+or\s+/i);
+  if (stripped.toLowerCase().includes(' or ')) {
+    const parts = stripped.split(/\s+or\s+/i);
     for (const part of parts) {
       const result = parseExpression(part);
       if (result) return result;
@@ -50,15 +52,17 @@ function parseExpression(formula) {
 
 function rollExpression(formula, options = {}) {
   if (!formula) return null;
-  if (formula.includes(' or ')) {
-    const parts = formula.split(/\s+or\s+/i);
+  const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
+  if (!baseFormula) return null;
+  if (baseFormula.includes(' or ')) {
+    const parts = baseFormula.split(/\s+or\s+/i);
     for (const part of parts) {
       const result = rollExpression(part, options);
       if (result) return result;
     }
   }
-  if (formula.includes(' plus ')) {
-    const parts = formula.split(/\s+plus\s+/);
+  if (baseFormula.includes(' plus ')) {
+    const parts = baseFormula.split(/\s+plus\s+/);
     let total = 0;
     let rolls = [];
     let modifier = 0;
@@ -85,15 +89,17 @@ function rollExpression(formula, options = {}) {
 
 function rollExpressionDoubled(formula) {
   if (!formula) return null;
-  if (formula.includes(' or ')) {
-    const parts = formula.split(/\s+or\s+/i);
+  const baseFormula = formula.replace(/\s*\[.*?\]\s*/g, '').trim();
+  if (!baseFormula) return null;
+  if (baseFormula.includes(' or ')) {
+    const parts = baseFormula.split(/\s+or\s+/i);
     for (const part of parts) {
       const result = rollExpressionDoubled(part);
       if (result) return result;
     }
   }
-  if (formula.includes(' plus ')) {
-    const parts = formula.split(/\s+plus\s+/);
+  if (baseFormula.includes(' plus ')) {
+    const parts = baseFormula.split(/\s+plus\s+/);
     let total = 0;
     let rolls = [];
     let modifier = 0;

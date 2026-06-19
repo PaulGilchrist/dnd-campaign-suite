@@ -20,6 +20,13 @@ function toAbbr(name) {
   return ABBR_MAP[name] || name?.substring(0, 3).toLowerCase();
 }
 
+function extractDamageDiceFromDescription(description, existingDamageDice) {
+  if (existingDamageDice) return existingDamageDice;
+  if (!description) return null;
+  const hitMatch = description.match(/Hit:\s*\d+\s*\((\d+d\d+(?:\s*[+-]\s*\d+)?)\)/i);
+  return hitMatch ? hitMatch[1].replace(/\s+/g, ' ').trim() : null;
+}
+
 function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureName, mapName, characters }) {
   const monsterName = creatureName || monster?.name || 'Monster';
   const fallbackCsRef = useRef(null);
@@ -57,6 +64,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     campaignName,
     {
       autoDamageRoll: (autoDamage, isCrit) => {
+        console.log('[MonsterCardModal] autoDamageRoll called:', { autoDamage, isCrit, formula: autoDamage?.formula, name: autoDamage?.name });
         const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
         if (result) {
           const context = {
@@ -195,9 +203,9 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
       isAutoCrit,
       isAutoMiss,
       rangeReason,
-      autoDamageFormula: action?.damage_dice_primary || null,
+      autoDamageFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary) || null,
       autoDamageName: name,
-      autoDamageSecondaryFormula: action?.damage_dice_secondary || null,
+      autoDamageSecondaryFormula: extractDamageDiceFromDescription(action?.description, action?.damage_dice_secondary) || null,
       autoDamageSecondaryName: name,
       autoDamageSecondaryDamageType: action?.damage_type_secondary ? formatDamageTypes([action.damage_type_secondary]) : null,
       targetName: target?.name,
@@ -241,7 +249,8 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
 
   const renderAction = (action, i) => {
     const damageTypes = getDamageTypesForAction(action);
-    const damageOptions = action.damage_dice_primary ? action.damage_dice_primary.split(/\s+or\s+/) : null;
+    const effectiveDamageDice = extractDamageDiceFromDescription(action?.description, action?.damage_dice_primary);
+    const damageOptions = effectiveDamageDice ? effectiveDamageDice.split(/\s+or\s+/) : null;
     const hasDamageOptions = damageOptions && damageOptions.length > 1;
 
     const renderDamageDice = (formula, type) => {
@@ -268,7 +277,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
           </span>
         ))
       ) : null}
-      {action.damage_dice_primary && !hasDamageOptions ? renderDamageDice(action.damage_dice_primary, formatDamageTypes([action.damage_type_primary || ''])) : null}
+      {effectiveDamageDice && !hasDamageOptions ? renderDamageDice(effectiveDamageDice, formatDamageTypes([action.damage_type_primary || ''])) : null}
       {action.damage_dice_secondary ? renderDamageDice(action.damage_dice_secondary, formatDamageTypes([action.damage_type_secondary || ''])) : null}
       {action.save_dc != null && (
         <span className={`mc-dice-link ${!action.attack_bonus && !attackerCannotAct ? 'mc-dice-link-save mc-dice-link-save-clickable' : 'mc-dice-link-save'}`} onClick={!action.attack_bonus && !attackerCannotAct ? () => {
