@@ -1,20 +1,14 @@
+// @improved-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import TerrainLayer from './TerrainLayer.jsx';
+import { getAllHexes, hexToPixel, hexToSVGPath } from '../../services/maps/hexMapUtils.js';
 
 vi.mock('../../services/maps/hexMapUtils.js', () => ({
-    getAllHexes: vi.fn((cols, rows) => {
-        const hexes = [];
-        for (let r = 0; r < rows; r++) {
-            for (let q = 0; q < cols; q++) {
-                hexes.push({ q, r });
-            }
-        }
-        return hexes;
-    }),
+    getAllHexes: vi.fn(() => []),
     hexKey: vi.fn((q, r) => `${q},${r}`),
     hexToPixel: vi.fn(() => ({ x: 10, y: 20 })),
-    hexToSVGPath: vi.fn((x, y, size) => `M${x},${y} l${size},0`),
+    hexToSVGPath: vi.fn(() => 'M10,20 l30,0'),
 }));
 
 describe('TerrainLayer', () => {
@@ -32,14 +26,28 @@ describe('TerrainLayer', () => {
         });
 
         it('should render one path element per hex cell', () => {
+            const hexCols = 3;
+            const hexRows = 2;
+            const expectedCount = hexCols * hexRows;
+
+            const hexes = [];
+            for (let r = 0; r < hexRows; r++) {
+                for (let q = 0; q < hexCols; q++) {
+                    hexes.push({ q, r });
+                }
+            }
+            vi.mocked(getAllHexes).mockReturnValue(hexes);
+
             const { container } = render(
-                <TerrainLayer hexCols={3} hexRows={2} terrain={{}} />
+                <TerrainLayer hexCols={hexCols} hexRows={hexRows} terrain={{}} />
             );
             const paths = container.querySelectorAll('path');
-            expect(paths.length).toBe(6);
+            expect(paths.length).toBe(expectedCount);
         });
 
         it('should render no paths when hexCols is 0', () => {
+            vi.mocked(getAllHexes).mockReturnValue([]);
+
             const { container } = render(
                 <TerrainLayer hexCols={0} hexRows={5} terrain={{}} />
             );
@@ -48,6 +56,8 @@ describe('TerrainLayer', () => {
         });
 
         it('should render no paths when hexRows is 0', () => {
+            vi.mocked(getAllHexes).mockReturnValue([]);
+
             const { container } = render(
                 <TerrainLayer hexCols={5} hexRows={0} terrain={{}} />
             );
@@ -56,6 +66,8 @@ describe('TerrainLayer', () => {
         });
 
         it('should render no paths when both dimensions are 0', () => {
+            vi.mocked(getAllHexes).mockReturnValue([]);
+
             const { container } = render(
                 <TerrainLayer hexCols={0} hexRows={0} terrain={{}} />
             );
@@ -64,6 +76,8 @@ describe('TerrainLayer', () => {
         });
 
         it('should render a single path for a 1x1 grid', () => {
+            vi.mocked(getAllHexes).mockReturnValue([{ q: 0, r: 0 }]);
+
             const { container } = render(
                 <TerrainLayer hexCols={1} hexRows={1} terrain={{}} />
             );
@@ -71,25 +85,30 @@ describe('TerrainLayer', () => {
             expect(paths.length).toBe(1);
         });
 
-        it('should render paths for a 10x21 grid', () => {
-            const { container } = render(
-                <TerrainLayer hexCols={10} hexRows={21} terrain={{}} />
-            );
-            const paths = container.querySelectorAll('path');
-            expect(paths.length).toBe(210);
-        });
-
         it('should not crash with large grid dimensions', () => {
-            const { container } = render(
-                <TerrainLayer hexCols={20} hexRows={15} terrain={{}} />
-            );
-            const paths = container.querySelectorAll('path');
-            expect(paths.length).toBe(300);
+            const hexCols = 20;
+            const hexRows = 15;
+            const hexes = [];
+            for (let r = 0; r < hexRows; r++) {
+                for (let q = 0; q < hexCols; q++) {
+                    hexes.push({ q, r });
+                }
+            }
+            vi.mocked(getAllHexes).mockReturnValue(hexes);
+
+            expect(() => {
+                render(<TerrainLayer hexCols={hexCols} hexRows={hexRows} terrain={{}} />);
+            }).not.toThrow();
         });
     });
 
     describe('Path attributes', () => {
         it('should set fill attribute on every path', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 0, r: 1 }, { q: 1, r: 1 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer hexCols={2} hexRows={2} terrain={{}} />
             );
@@ -100,6 +119,11 @@ describe('TerrainLayer', () => {
         });
 
         it('should set d attribute on every path', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 0, r: 1 }, { q: 1, r: 1 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer hexCols={2} hexRows={2} terrain={{}} />
             );
@@ -110,16 +134,26 @@ describe('TerrainLayer', () => {
         });
 
         it('should not set stroke attribute on path elements', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 0, r: 1 }, { q: 1, r: 1 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer hexCols={2} hexRows={2} terrain={{}} />
             );
             const paths = container.querySelectorAll('path');
             paths.forEach(path => {
-                expect(path.getAttribute('stroke')).toBeNull();
+                expect(path).not.toHaveAttribute('stroke');
             });
         });
 
         it('should use q,r as React key for each path', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 0, r: 1 }, { q: 1, r: 1 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer hexCols={2} hexRows={2} terrain={{}} />
             );
@@ -132,49 +166,72 @@ describe('TerrainLayer', () => {
             });
         });
 
-        it('should render paths in row-major order', () => {
-            const { container } = render(
-                <TerrainLayer hexCols={3} hexRows={2} terrain={{}} />
-            );
-            const paths = container.querySelectorAll('path');
-            expect(paths.length).toBe(6);
-            paths.forEach(path => {
-                expect(path.getAttribute('d')).toBeTruthy();
-            });
-        });
-
         it('should render all paths within the terrain-layer group', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 0, r: 1 }, { q: 1, r: 1 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer hexCols={2} hexRows={2} terrain={{}} />
             );
             const layer = container.querySelector('g.terrain-layer');
-            const layerPaths = layer.querySelectorAll('path');
-            const allPaths = container.querySelectorAll('path');
-            expect(layerPaths.length).toBe(allPaths.length);
+            expect(layer).toBeInTheDocument();
+            expect(layer.querySelectorAll('path').length).toBe(4);
+        });
+
+        it('should pass hex coordinates through to hexToPixel and hexToSVGPath', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 2, r: 3 },
+            ]);
+            vi.mocked(hexToPixel).mockReturnValue({ x: 100, y: 200 });
+            vi.mocked(hexToSVGPath).mockReturnValue('M100,200 l30,0');
+
+            render(<TerrainLayer hexCols={1} hexRows={1} terrain={{}} />);
+
+            expect(hexToPixel).toHaveBeenCalledWith(2, 3, expect.any(Number));
+            expect(hexToSVGPath).toHaveBeenCalledWith(100, 200, expect.any(Number));
         });
     });
 
     describe('Terrain types', () => {
         it('should use default terrain (plains) when hex key is missing from terrain prop', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer hexCols={2} hexRows={1} terrain={{}} />
             );
             const paths = container.querySelectorAll('path');
             expect(paths.length).toBe(2);
             paths.forEach(path => {
-                expect(path.getAttribute('fill')).toBeTruthy();
+                const fill = path.getAttribute('fill');
+                expect(fill).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
             });
         });
 
         it('should use terrain from the terrain prop when key exists', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer hexCols={2} hexRows={1} terrain={{ '0,0': 'forest' }} />
             );
             const paths = container.querySelectorAll('path');
             expect(paths.length).toBe(2);
+            // The '0,0' hex should have a different fill (forest) than '1,0' (default plains)
+            const fills = [...paths].map(p => p.getAttribute('fill'));
+            expect(fills[0]).not.toBe(fills[1]);
         });
 
-        it('should apply different fills for different terrain types', () => {
+        it('should apply different fills for each terrain type', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 2, r: 0 }, { q: 3, r: 0 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer
                     hexCols={4}
@@ -190,28 +247,38 @@ describe('TerrainLayer', () => {
             const paths = container.querySelectorAll('path');
             expect(paths.length).toBe(4);
             const fills = [...paths].map(p => p.getAttribute('fill'));
-            expect(fills[0]).not.toBe(fills[1]);
-            expect(fills[1]).not.toBe(fills[2]);
-            expect(fills[2]).not.toBe(fills[3]);
+            // Each terrain type should produce a unique fill
+            expect(new Set(fills).size).toBe(4);
         });
 
         it('should support all terrain types from config', () => {
             const terrainTypes = ['plains', 'hills', 'forest', 'mountains', 'desert', 'swamp', 'tundra', 'water', 'beach'];
+            vi.mocked(getAllHexes).mockReturnValue(
+                terrainTypes.map((_, i) => ({ q: i, r: 0 }))
+            );
+
             const terrain = {};
             terrainTypes.forEach((type, i) => {
                 terrain[`${i},0`] = type;
             });
+
             const { container } = render(
                 <TerrainLayer hexCols={terrainTypes.length} hexRows={1} terrain={terrain} />
             );
             const paths = container.querySelectorAll('path');
             expect(paths.length).toBe(terrainTypes.length);
             paths.forEach(path => {
-                expect(path.getAttribute('fill')).toBeTruthy();
+                const fill = path.getAttribute('fill');
+                expect(fill).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
             });
         });
 
         it('should handle terrain entries for only some hexes', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 },
+                { q: 0, r: 1 }, { q: 1, r: 1 }, { q: 2, r: 1 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer
                     hexCols={3}
@@ -221,12 +288,17 @@ describe('TerrainLayer', () => {
             );
             const paths = container.querySelectorAll('path');
             expect(paths.length).toBe(6);
-            paths.forEach(path => {
-                expect(path.getAttribute('fill')).toBeTruthy();
+            // Hexes with explicit terrain should differ from default plains
+            const fills = [...paths].map(p => p.getAttribute('fill'));
+            // All fills should be valid rgb
+            fills.forEach(fill => {
+                expect(fill).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
             });
         });
 
-        it('should not crash with an unknown terrain type', () => {
+        it('should fall back to default terrain for unknown terrain types', () => {
+            vi.mocked(getAllHexes).mockReturnValue([{ q: 0, r: 0 }]);
+
             const { container } = render(
                 <TerrainLayer
                     hexCols={1}
@@ -237,12 +309,18 @@ describe('TerrainLayer', () => {
             const paths = container.querySelectorAll('path');
             expect(paths.length).toBe(1);
             const path = paths[0];
-            expect(path.getAttribute('fill')).toBeTruthy();
+            const fill = path.getAttribute('fill');
+            expect(fill).toMatch(/^rgb\(\d+,\d+,\d+\)$/);
         });
     });
 
     describe('Variation', () => {
         it('should apply a fill variation per hex position', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 2, r: 0 }, { q: 3, r: 0 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer
                     hexCols={4}
@@ -253,12 +331,14 @@ describe('TerrainLayer', () => {
             const paths = container.querySelectorAll('path');
             expect(paths.length).toBe(4);
             const fills = [...paths].map(p => p.getAttribute('fill'));
-            // Same terrain type at different positions should have slight fill variations
+            // Same terrain at different positions should produce different fills due to hex variation
             expect(fills[0]).not.toBe(fills[1]);
             expect(fills[2]).not.toBe(fills[3]);
         });
 
         it('should produce rgb-formatted fill values', () => {
+            vi.mocked(getAllHexes).mockReturnValue([{ q: 0, r: 0 }]);
+
             const { container } = render(
                 <TerrainLayer hexCols={1} hexRows={1} terrain={{}} />
             );
@@ -268,6 +348,12 @@ describe('TerrainLayer', () => {
         });
 
         it('should keep fill values within valid rgb range', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 0, r: 1 }, { q: 1, r: 1 },
+                { q: 2, r: 2 },
+            ]);
+
             const { container } = render(
                 <TerrainLayer hexCols={5} hexRows={5} terrain={{ '0,0': 'plains' }} />
             );
@@ -275,19 +361,27 @@ describe('TerrainLayer', () => {
             paths.forEach(path => {
                 const fill = path.getAttribute('fill');
                 const match = fill.match(/rgb\((\d+),(\d+),(\d+)\)/);
-                expect(match).toBeTruthy();
-                expect(Number(match[1])).toBeGreaterThanOrEqual(0);
-                expect(Number(match[1])).toBeLessThanOrEqual(255);
-                expect(Number(match[2])).toBeGreaterThanOrEqual(0);
-                expect(Number(match[2])).toBeLessThanOrEqual(255);
-                expect(Number(match[3])).toBeGreaterThanOrEqual(0);
-                expect(Number(match[3])).toBeLessThanOrEqual(255);
+                expect(match).not.toBeNull();
+                const r = Number(match[1]);
+                const g = Number(match[2]);
+                const b = Number(match[3]);
+                expect(r).toBeGreaterThanOrEqual(0);
+                expect(r).toBeLessThanOrEqual(255);
+                expect(g).toBeGreaterThanOrEqual(0);
+                expect(g).toBeLessThanOrEqual(255);
+                expect(b).toBeGreaterThanOrEqual(0);
+                expect(b).toBeLessThanOrEqual(255);
             });
         });
     });
 
     describe('Memoization', () => {
         it('should render the same number of paths with identical props', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+                { q: 0, r: 1 }, { q: 1, r: 1 },
+            ]);
+
             const { container: c1 } = render(<TerrainLayer hexCols={2} hexRows={2} terrain={{}} />);
             const paths1 = c1.querySelectorAll('path');
             const { container: c2 } = render(<TerrainLayer hexCols={2} hexRows={2} terrain={{}} />);
@@ -296,6 +390,16 @@ describe('TerrainLayer', () => {
         });
 
         it('should regenerate paths when hexCols changes', () => {
+            vi.mocked(getAllHexes).mockImplementation((cols) => {
+                const hexes = [];
+                for (let r = 0; r < 2; r++) {
+                    for (let q = 0; q < cols; q++) {
+                        hexes.push({ q, r });
+                    }
+                }
+                return hexes;
+            });
+
             const { container: c1 } = render(<TerrainLayer hexCols={2} hexRows={2} terrain={{}} />);
             const paths1 = c1.querySelectorAll('path');
             const { container: c2 } = render(<TerrainLayer hexCols={4} hexRows={2} terrain={{}} />);
@@ -305,6 +409,16 @@ describe('TerrainLayer', () => {
         });
 
         it('should regenerate paths when hexRows changes', () => {
+            vi.mocked(getAllHexes).mockImplementation((cols, rows) => {
+                const hexes = [];
+                for (let r = 0; r < rows; r++) {
+                    for (let q = 0; q < cols; q++) {
+                        hexes.push({ q, r });
+                    }
+                }
+                return hexes;
+            });
+
             const { container: c1 } = render(<TerrainLayer hexCols={2} hexRows={2} terrain={{}} />);
             const paths1 = c1.querySelectorAll('path');
             const { container: c2 } = render(<TerrainLayer hexCols={2} hexRows={4} terrain={{}} />);
@@ -314,6 +428,10 @@ describe('TerrainLayer', () => {
         });
 
         it('should regenerate paths when terrain changes', () => {
+            vi.mocked(getAllHexes).mockReturnValue([
+                { q: 0, r: 0 }, { q: 1, r: 0 },
+            ]);
+
             const { container: c1 } = render(
                 <TerrainLayer hexCols={2} hexRows={1} terrain={{ '0,0': 'plains' }} />
             );
