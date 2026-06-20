@@ -3,16 +3,12 @@ import { applySoulstitchSelection } from '../../../../services/automation/handle
 import { confirmSoulstitchSelection } from '../../../../services/rules/spells/postCastRiderService.js';
 import '../../CharSheet.css';
 
-function SoulstitchSpellsModal({ action, playerStats, campaignName, onClose }) {
+function SoulstitchSpellsModal({ action, playerStats, campaignName, maxSelections = 1, eligibleTargets = [], spellName = 'Unknown', featureName = 'Soulstitch Spells', chosenCreatures = [], onClose }) {
     const [selected, setSelected] = useState([]);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
 
-    const maxSelections = action?.maxSelections || 1;
-    const eligibleTargets = action?.eligibleTargets || [];
-    const spellName = action?.spellName || 'Unknown';
-    const featureName = action?.featureName || 'Soulstitch Spells';
-    const existingChosen = action?.chosenCreatures || [];
+    const existingChosen = chosenCreatures;
 
     const handleToggle = (name) => {
         if (selected.includes(name)) {

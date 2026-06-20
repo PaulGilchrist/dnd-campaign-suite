@@ -141,7 +141,7 @@ export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, cam
     return results.length > 0 ? results : null;
 }
 
-const EVOCATION_SCHOOL = 'Evocation';
+const EVOCATION_SCHOOL = 'evocation';
 
 export function getSoulstitchFeatures(playerStats) {
     const rawPassives = playerStats.automation?.passives;

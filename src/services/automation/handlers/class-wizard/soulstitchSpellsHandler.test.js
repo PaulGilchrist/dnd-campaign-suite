@@ -13,12 +13,33 @@ vi.mock('../../../../services/ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../../../services/campaign/campaignService.js', () => ({
+  getCharacterFiles: vi.fn(),
+  loadCharacters: vi.fn(),
+  getCharacterFolders: vi.fn(),
+}));
+
 import { handle, applySoulstitchSelection } from './soulstitchSpellsHandler.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageUtils from '../../../../services/rules/combat/damageUtils.js';
 import * as logService from '../../../../services/ui/logService.js';
 
 const campaignName = 'TestCampaign';
+
+function mockFetchResponses(responses) {
+  global.fetch = vi.fn((url) => {
+    const urlStr = url.toString();
+    for (const [pattern, response] of Object.entries(responses)) {
+      if (urlStr.includes(pattern)) {
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve(response),
+        });
+      }
+    }
+    return Promise.resolve({ ok: false, json: () => Promise.resolve({}) });
+  });
+}
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -41,6 +62,9 @@ function makeAction(automation = {}, spell = {}) {
 describe('soulstitchSpellsHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFetchResponses({
+      'TestCampaign': { files: [] },
+    });
   });
 
   it('should return null for non-Evocation spell', async () => {
@@ -59,25 +83,29 @@ describe('soulstitchSpellsHandler.handle', () => {
     expect(result).toBeNull();
   });
 
-  it('should return null when no combat context', async () => {
+  it('should return modal with character names when no combat context', async () => {
     const action = makeAction({}, { school: 'Evocation', dc: 15 });
     damageUtils.getCombatContext.mockResolvedValue(null);
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.type).toBe('modal');
+    expect(result.payload.eligibleTargets).toEqual([]);
   });
 
-  it('should return null when combat context has no creatures', async () => {
+  it('should return modal with character names when combat context has no creatures', async () => {
     const action = makeAction({}, { school: 'Evocation', dc: 15 });
     damageUtils.getCombatContext.mockResolvedValue({});
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.type).toBe('modal');
+    expect(result.payload.eligibleTargets).toEqual([]);
   });
 
-  it('should return null when spell school comparison fails (case mismatch)', async () => {
+  it('should accept capitalized Evocation school (case-insensitive)', async () => {
     const action = makeAction({}, { school: 'Evocation', dc: 15, name: 'Fireball' });
     damageUtils.getCombatContext.mockResolvedValue({
       creatures: [{ name: 'Goblin1' }],
@@ -85,7 +113,9 @@ describe('soulstitchSpellsHandler.handle', () => {
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.type).toBe('modal');
+    expect(result.payload.spellName).toBe('Fireball');
   });
 
   it('should get spell slot level from action.spellSlotLevel when set', async () => {
@@ -97,7 +127,8 @@ describe('soulstitchSpellsHandler.handle', () => {
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.payload.maxSelections).toBe(4);
   });
 
   it('should get spell slot level from spell.level when action.spellSlotLevel is not set', async () => {
@@ -108,7 +139,8 @@ describe('soulstitchSpellsHandler.handle', () => {
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.payload.maxSelections).toBe(3);
   });
 
   it('should exclude self from eligible targets', async () => {
@@ -123,7 +155,9 @@ describe('soulstitchSpellsHandler.handle', () => {
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.payload.eligibleTargets).toEqual(expect.not.arrayContaining(['TestWizard']));
+    expect(result.payload.eligibleTargets).toEqual(expect.arrayContaining(['Ally1', 'Enemy1']));
   });
 
   it('should get previously chosen creatures from runtime', async () => {
@@ -135,7 +169,8 @@ describe('soulstitchSpellsHandler.handle', () => {
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.payload.chosenCreatures).toEqual(['Goblin1']);
   });
 
   it('should default featureName to Soulstitch Spells when action.name is missing', async () => {
@@ -149,7 +184,8 @@ describe('soulstitchSpellsHandler.handle', () => {
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.payload.featureName).toBe('Soulstitch Spells');
   });
 
   it('should get spell from action.payload.spell when action.spell is not set', async () => {
@@ -164,7 +200,8 @@ describe('soulstitchSpellsHandler.handle', () => {
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.payload.spellName).toBe('Lightning Bolt');
   });
 
   it('should default spellName to Unknown when spell name is missing', async () => {
@@ -176,7 +213,8 @@ describe('soulstitchSpellsHandler.handle', () => {
 
     const result = await handle(action, makePlayerStats(), campaignName, null);
 
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result.payload.spellName).toBe('Unknown');
   });
 });
 

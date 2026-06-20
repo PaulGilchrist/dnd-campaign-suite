@@ -248,12 +248,12 @@ describe('postCastRiderService', () => {
       expect(result).toBeNull()
     })
 
-    it('returns null for lowercase evocation school (case-sensitive check)', async () => {
+    it('should accept evocation school regardless of case', async () => {
       executeHandler.mockResolvedValue({ success: true })
       const stats = { automation: { passives: [{ type: 'soulstitch_spells', name: 'Soulstitch' }] } }
       const lowercaseSpell = { name: 'Fireball', school: 'evocation', dc: { dc_type: 'CON' } }
       const result = await triggerSoulstitchSpells(lowercaseSpell, {}, stats, 'camp', 'map')
-      expect(result).toBeNull()
+      expect(result).not.toBeNull()
     })
   })
 

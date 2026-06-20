@@ -2,7 +2,32 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 
-const EVOCATION_SCHOOL = 'Evocation';
+const EVOCATION_SCHOOL = 'evocation';
+
+export async function getCharacterNames(campaignName) {
+    try {
+        const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}`);
+        if (!response.ok) return [];
+        const data = await response.json();
+        const files = data.files || [];
+        const characterPromises = files
+            .filter(f => f.endsWith('.json'))
+            .map(async (file) => {
+                try {
+                    const charRes = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(file)}`);
+                    if (!charRes.ok) return null;
+                    const charData = await charRes.json();
+                    return charData?.name || null;
+                } catch {
+                    return null;
+                }
+            });
+        const names = await Promise.all(characterPromises);
+        return names.filter(Boolean);
+    } catch {
+        return [];
+    }
+}
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
@@ -30,18 +55,18 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
     // Get combat context for creature targets
     const combatSummary = await getCombatContext(campaignName);
-    if (!combatSummary?.creatures) {
-        return null;
-    }
+    const combatCreatureNames = combatSummary?.creatures?.map(c => c.name) || [];
 
     // Get previously chosen creatures for this spell cast
     const castKey = `_${featureName.replace(/\s+/g, '_')}_cast_${Date.now()}`;
     const chosenCreatures = getRuntimeValue(playerName, castKey, campaignName) || [];
 
-    // Get all creatures the caster can see (all creatures except self in combat)
-    const eligibleTargets = combatSummary.creatures
-        .filter(c => c.name !== playerName)
-        .map(c => c.name);
+    // Get all character names from the campaign
+    const characterNames = await getCharacterNames(campaignName);
+
+    // Combine combat creatures and character names, excluding self
+    const allNames = new Set([...combatCreatureNames, ...characterNames]);
+    const eligibleTargets = [...allNames].filter(name => name !== playerName);
 
     return {
         type: 'modal',

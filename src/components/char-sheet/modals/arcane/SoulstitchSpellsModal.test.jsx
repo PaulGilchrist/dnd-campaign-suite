@@ -34,11 +34,7 @@ import { applySoulstitchSelection } from '../../../../services/automation/handle
 
 const baseAction = {
   name: 'Soulstitch Spells',
-  maxSelections: 2,
-  eligibleTargets: ['Orc Warrior', 'Goblin Acolyte', 'Bugbear'],
-  spellName: 'Fireball',
-  featureName: 'Soulstitch Spells',
-  chosenCreatures: ['Orc Warrior'],
+  automation: { type: 'soulstitch_spells' },
 };
 
 const basePlayerStats = { name: 'Wizard1', level: 5, hitPoints: 30 };
@@ -47,15 +43,16 @@ const baseProps = {
   action: baseAction,
   playerStats: basePlayerStats,
   campaignName: 'test-campaign',
+  maxSelections: 2,
+  eligibleTargets: ['Orc Warrior', 'Goblin Acolyte', 'Bugbear'],
+  spellName: 'Fireball',
+  featureName: 'Soulstitch Spells',
+  chosenCreatures: ['Orc Warrior'],
   onClose: vi.fn(),
 };
 
 function makeProps(overrides) {
   return { ...baseProps, ...(overrides || {}) };
-}
-
-function makeAction(overrides) {
-  return { ...baseAction, ...(overrides || {}) };
 }
 
 // ── Tests ──
@@ -307,43 +304,37 @@ describe('SoulstitchSpellsModal', () => {
 
   // ── Default values ──
 
-  it('uses default maxSelections of 1 when action has no maxSelections', () => {
-    const action = makeAction({ maxSelections: undefined });
-    render(<SoulstitchSpellsModal {...makeProps({ action })} />);
+  it('uses default maxSelections of 1 when maxSelections is not provided', () => {
+    render(<SoulstitchSpellsModal {...makeProps({ maxSelections: undefined })} />);
     const descriptionP = document.querySelector('.sp-body p');
     expect(descriptionP.textContent).toContain('Choose up to');
     expect(descriptionP.textContent).toContain('1');
     expect(descriptionP.textContent).toContain('creature');
   });
 
-  it('uses default spellName when action has no spellName', () => {
-    const action = makeAction({ spellName: undefined });
-    render(<SoulstitchSpellsModal {...makeProps({ action })} />);
+  it('uses default spellName when spellName is not provided', () => {
+    render(<SoulstitchSpellsModal {...makeProps({ spellName: undefined })} />);
     expect(screen.getByText('Unknown')).toBeInTheDocument();
   });
 
-  it('uses default featureName when action has no featureName', () => {
-    const action = makeAction({ featureName: undefined });
-    render(<SoulstitchSpellsModal {...makeProps({ action })} />);
+  it('uses default featureName when featureName is not provided', () => {
+    render(<SoulstitchSpellsModal {...makeProps({ featureName: undefined })} />);
     expect(screen.getByText('Soulstitch Spells')).toBeInTheDocument();
   });
 
   it('renders no creature entries when eligibleTargets is empty', () => {
-    const action = makeAction({ eligibleTargets: [] });
-    render(<SoulstitchSpellsModal {...makeProps({ action })} />);
+    render(<SoulstitchSpellsModal {...makeProps({ eligibleTargets: [] })} />);
     expect(screen.getByText(/Selected: 0 \/ 2/)).toBeInTheDocument();
     expect(document.querySelectorAll('input[type="checkbox"]').length).toBe(0);
   });
 
   it('does not show "(previously chosen)" when chosenCreatures is empty', () => {
-    const action = makeAction({ chosenCreatures: [] });
-    render(<SoulstitchSpellsModal {...makeProps({ action })} />);
+    render(<SoulstitchSpellsModal {...makeProps({ chosenCreatures: [] })} />);
     expect(screen.queryByText('(previously chosen)')).not.toBeInTheDocument();
   });
 
   it('uses all eligible checkboxes when maxSelections is larger than target count', () => {
-    const action = makeAction({ maxSelections: 5 });
-    render(<SoulstitchSpellsModal {...makeProps({ action })} />);
+    render(<SoulstitchSpellsModal {...makeProps({ maxSelections: 5 })} />);
     expect(document.querySelectorAll('input[type="checkbox"]').length).toBe(3);
   });
 
