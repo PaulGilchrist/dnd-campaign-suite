@@ -2,11 +2,16 @@ import { useState } from 'react';
 
 function SpellMasteryModal({ payload, onConfirm, onClose }) {
     const { level1Options, level2Options, currentLevel1, currentLevel2 } = payload;
+    const hasSelection = currentLevel1 && currentLevel2;
     const [selectedLevel1, setSelectedLevel1] = useState(currentLevel1 || '');
     const [selectedLevel2, setSelectedLevel2] = useState(currentLevel2 || '');
 
     const handleConfirm = () => {
-        onConfirm(selectedLevel1, selectedLevel2);
+        if (!selectedLevel1 && !selectedLevel2) {
+            onConfirm(null, null);
+        } else {
+            onConfirm(selectedLevel1, selectedLevel2);
+        }
     };
 
     return (
@@ -15,7 +20,7 @@ function SpellMasteryModal({ payload, onConfirm, onClose }) {
                 <div style={{ padding: '16px' }}>
                     <h3 style={{ marginTop: 0 }}>Spell Mastery</h3>
                     <p>Choose a level 1 and a level 2 spell from your spellbook with casting time of an action. You can cast them at will at their lowest level without expending a spell slot.</p>
-                    {currentLevel1 && <p style={{ opacity: 0.7 }}>Current: Level 1 - <b>{currentLevel1}</b>, Level 2 - <b>{currentLevel2}</b></p>}
+                    {hasSelection && <p style={{ opacity: 0.7 }}>Current: Level 1 - <b>{currentLevel1}</b>, Level 2 - <b>{currentLevel2}</b></p>}
                     <div style={{ marginBottom: '12px' }}>
                         <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>Level 1 spell:</label>
                         <select
@@ -47,11 +52,25 @@ function SpellMasteryModal({ payload, onConfirm, onClose }) {
                     <button
                         className="char-btn"
                         onClick={handleConfirm}
-                        disabled={!selectedLevel1 || !selectedLevel2}
-                        style={{ width: '100%' }}
+                        disabled={
+                            (!selectedLevel1 && !selectedLevel2) ||
+                            !selectedLevel1 ||
+                            !selectedLevel2 ||
+                            selectedLevel1 === selectedLevel2
+                        }
+                        style={{ width: '100%', marginBottom: '8px' }}
                     >
                         Confirm Selection
                     </button>
+                    {hasSelection && (
+                        <button
+                            className="char-btn"
+                            onClick={() => onConfirm(null, null)}
+                            style={{ width: '100%', opacity: 0.7 }}
+                        >
+                            Clear Selection
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

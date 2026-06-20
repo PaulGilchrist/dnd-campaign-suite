@@ -185,6 +185,15 @@ describe('SpellMasteryModal', () => {
       render(<SpellMasteryModal {...makeProps({ payload: { level1Options: [], level2Options: [], currentLevel1: '', currentLevel2: '' } })} />);
       expect(screen.getByRole('button', { name: 'Confirm Selection' })).toBeDisabled();
     });
+
+    it('is disabled when the same spell is selected for both levels', () => {
+      render(<SpellMasteryModal {...makeProps({ payload: { level1Options: ['Magic Missile', 'Shield'], level2Options: ['Magic Missile', 'Shield'], currentLevel1: '', currentLevel2: '' } })} />);
+      const selects = screen.getAllByRole('combobox');
+      const btn = screen.getByRole('button', { name: 'Confirm Selection' });
+      fireEvent.change(selects[0], { target: { value: 'Magic Missile' } });
+      fireEvent.change(selects[1], { target: { value: 'Magic Missile' } });
+      expect(btn).toBeDisabled();
+    });
   });
 
   // ── Confirm button enabled state ──
@@ -363,6 +372,37 @@ describe('SpellMasteryModal', () => {
       render(<SpellMasteryModal {...makeProps({ onClose })} />);
       fireEvent.click(document.querySelector('.popup-modal'));
       expect(onClose).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── Clear Selection ──
+
+  describe('clear selection', () => {
+    it('does not show Clear Selection button when no selection exists', () => {
+      render(<SpellMasteryModal {...makeProps()} />);
+      expect(screen.queryByText('Clear Selection')).not.toBeInTheDocument();
+    });
+
+    it('shows Clear Selection button when both spells are pre-selected', () => {
+      render(<SpellMasteryModal {...makeProps({ payload: { level1Options, level2Options, currentLevel1: 'Fireball', currentLevel2: 'Misty Step' } })} />);
+      expect(screen.getByText('Clear Selection')).toBeInTheDocument();
+    });
+
+    it('does not show Clear Selection button when only level 1 is pre-selected', () => {
+      render(<SpellMasteryModal {...makeProps({ payload: { level1Options, level2Options, currentLevel1: 'Fireball', currentLevel2: '' } })} />);
+      expect(screen.queryByText('Clear Selection')).not.toBeInTheDocument();
+    });
+
+    it('does not show Clear Selection button when only level 2 is pre-selected', () => {
+      render(<SpellMasteryModal {...makeProps({ payload: { level1Options, level2Options, currentLevel1: '', currentLevel2: 'Misty Step' } })} />);
+      expect(screen.queryByText('Clear Selection')).not.toBeInTheDocument();
+    });
+
+    it('calls onConfirm with null, null when Clear Selection is clicked', () => {
+      const onConfirm = vi.fn();
+      render(<SpellMasteryModal {...makeProps({ payload: { level1Options, level2Options, currentLevel1: 'Fireball', currentLevel2: 'Misty Step' }, onConfirm })} />);
+      fireEvent.click(screen.getByText('Clear Selection'));
+      expect(onConfirm).toHaveBeenCalledWith(null, null);
     });
   });
 });

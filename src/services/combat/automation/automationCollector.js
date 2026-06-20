@@ -765,6 +765,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'signature_spells':
                 result.specialActions.push(info);
                 break;
+            case 'spell_mastery':
+                result.specialActions.push(info);
+                break;
             case 'abjuration_savant':
                 result.passives.push(info);
                 break;

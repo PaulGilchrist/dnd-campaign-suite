@@ -8,12 +8,15 @@ import { executeHandler } from '../../services/automation/index.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import TeleportModal from './modals/TeleportModal.jsx';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
+import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
+import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const [popupHtml, setPopupHtml] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
     const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
+    const [spellMasteryModal, setSpellMasteryModal] = useState(null);
 
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
@@ -26,6 +29,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 setTeleportModal(result.payload);
             } else if (result.modalName === 'signatureSpells') {
                 setSignatureSpellsModal(result.payload);
+            } else if (result.modalName === 'spellMastery') {
+                setSpellMasteryModal(result.payload);
             }
         }
     }, [playerStats, campaignName, cannotAct]);
@@ -42,6 +47,19 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
             setPopupHtml(html);
         }
     }, [signatureSpellsModal, playerStats, campaignName]);
+
+    const handleSpellMasteryConfirm = useCallback(async (spell1, spell2) => {
+        if (!spellMasteryModal) return;
+        const result = await onSpellMasterySelected(spellMasteryModal.action, playerStats, campaignName, spell1, spell2);
+        setSpellMasteryModal(null);
+        if (result?.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || 'Spell Mastery'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [spellMasteryModal, playerStats, campaignName]);
 
     function formatPopupPayload(payload) {
         if (!payload) return null;
@@ -101,6 +119,13 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                     payload={signatureSpellsModal}
                     onConfirm={handleSignatureSpellsConfirm}
                     onClose={() => setSignatureSpellsModal(null)}
+                />
+            )}
+            {spellMasteryModal && (
+                <SpellMasteryModal
+                    payload={spellMasteryModal}
+                    onConfirm={handleSpellMasteryConfirm}
+                    onClose={() => setSpellMasteryModal(null)}
                 />
             )}
             {uniqueActions.map((specialAction, index) => {

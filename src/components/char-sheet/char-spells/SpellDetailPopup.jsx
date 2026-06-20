@@ -15,8 +15,8 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
   if (bewitchingFreeCast && spellName === 'Misty Step') return true;
 
   // Spell Mastery: check runtime state for player-chosen mastery spells
-  const masteryLevel1 = getRuntimeValue(playerName, '_Spell_Mastery_level1', campaignName);
-  const masteryLevel2 = getRuntimeValue(playerName, '_Spell_Mastery_level2', campaignName);
+  const masteryLevel1 = getRuntimeValue(playerName, 'SpellMastery_level1', campaignName);
+  const masteryLevel2 = getRuntimeValue(playerName, 'SpellMastery_level2', campaignName);
   if (spellName === masteryLevel1 && spellLevel === 1) return true;
   if (spellName === masteryLevel2 && spellLevel === 2) return true;
 
@@ -164,8 +164,8 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
     }
     if (freeCastAuthorized) {
       // Spell Mastery: mark as used (at-will, so no tracking needed beyond the cast)
-      const masteryLevel1 = getRuntimeValue(playerStats.name, '_Spell_Mastery_level1', campaignName);
-      const masteryLevel2 = getRuntimeValue(playerStats.name, '_Spell_Mastery_level2', campaignName);
+      const masteryLevel1 = getRuntimeValue(playerStats.name, 'SpellMastery_level1', campaignName);
+      const masteryLevel2 = getRuntimeValue(playerStats.name, 'SpellMastery_level2', campaignName);
       if (spell.name === masteryLevel1 || spell.name === masteryLevel2) {
         // At-will casting, no tracking needed
       } else {

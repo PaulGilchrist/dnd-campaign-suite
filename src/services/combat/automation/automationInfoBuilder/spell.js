@@ -181,6 +181,17 @@ export const spellHandlers = {
         }
     },
 
+    'spell_mastery': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'spell_mastery',
+            name: feature.name,
+            action: auto.action || 'action',
+            casting_time: auto.casting_time || 'passive',
+            hasAutomation: true
+        }
+    },
+
     'overchannel': (feature, _playerStats) => {
         const auto = feature.automation
         return {

@@ -12354,12 +12354,7 @@
             "level": 18,
             "type": "class_feature",
             "automation": {
-              "type": "free_spell",
-              "spell": [
-                "Spell Mastery 1",
-                "Spell Mastery 2"
-              ],
-              "perSpellTracking": true,
+              "type": "spell_mastery",
               "casting_time": "passive",
               "action": "action"
             }

@@ -268,8 +268,8 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
 
             // Spell Mastery: read runtime state for player-chosen spells
             const campaignName = playerSummary?.campaignName;
-            const level1Spell = getRuntimeValue(playerStats.name, '_Spell_Mastery_level1', campaignName);
-            const level2Spell = getRuntimeValue(playerStats.name, '_Spell_Mastery_level2', campaignName);
+            const level1Spell = getRuntimeValue(playerStats.name, 'SpellMastery_level1', campaignName);
+            const level2Spell = getRuntimeValue(playerStats.name, 'SpellMastery_level2', campaignName);
             if (level1Spell && !spellAbilities.spells.find(s => s.name === level1Spell)) {
                 spellAbilities.spells.push({ name: level1Spell, prepared: 'Always' });
             }
