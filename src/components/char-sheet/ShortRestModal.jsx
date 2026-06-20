@@ -193,6 +193,20 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             setRuntimeValue(playerStats.name, 'arcaneRecoveryLevels', null, campaignName);
             }
 
+        // Signature Spells: Reset per-spell used flags on short rest
+        const hasSignatureSpells = (playerStats.automation?.specialActions ?? []).some(
+            a => a.type === 'signature_spells'
+        )
+        if (hasSignatureSpells) {
+            const selection = getRuntimeValue(playerStats.name, 'SignatureSpells_selection', campaignName)
+            if (selection && Array.isArray(selection)) {
+                for (const spell of selection) {
+                    const usedKey = `SignatureSpells_${spell.replace(/\s+/g, '_')}_used`
+                    setRuntimeValue(playerStats.name, usedKey, null, campaignName)
+                }
+            }
+        }
+
         clearAllExpirationEffects(playerStats.name, campaignName);
 
         onComplete && onComplete();
