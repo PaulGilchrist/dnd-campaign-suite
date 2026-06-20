@@ -21,7 +21,7 @@ import ResistanceTargetPopup from '../popups/ResistanceTargetPopup.jsx'
 import MagicMissileTargetPopup from '../popups/MagicMissileTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
+import { getCombatContext, getTargetFromAttacker, getAttackerTargetName } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/combat/useMetamagic.js'
 import { useSpellMetamagicFlow } from '../../../hooks/combat/useSpellMetamagicFlow.js'
@@ -170,7 +170,11 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const getTargetInfo = React.useCallback(async () => {
         const cs = await getCombatContext(campaignName);
         if (!cs) return null;
-        return getTargetFromAttacker(cs, playerStats.name);
+        const target = getTargetFromAttacker(cs, playerStats.name);
+        if (target) return target;
+        const overlayTargetName = getAttackerTargetName(cs, playerStats.name);
+        if (overlayTargetName) return { name: overlayTargetName };
+        return null;
     }, [playerStats.name, campaignName]);
 
     const cachedCastPosRef = React.useRef(null);
@@ -237,7 +241,9 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         const result = wasCrit ? rollExpressionDoubled(empEvocFormula) : rollExpression(empEvocFormula);
         if (result) {
             const doDamage = async (metaCtx) => {
-                const target = await getTargetInfo();
+                const cs = await getCombatContext(campaignName);
+                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerStats.name) : undefined);
                 const isWarlock = playerStats.class?.name === 'Warlock';
                 const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
                 const isEnchantmentOrIllusion = () => {
@@ -247,7 +253,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                 const componentReduction = isWarlock && hasPsychicSpells && isEnchantmentOrIllusion();
                 const psychicOverride = spell._psychicSpellsOverride && isWarlock && hasPsychicSpells && !!spell.damage;
                 const context = {
-                    targetName: target?.name,
+                    targetName,
                     attackerName: playerStats.name,
                     damageType: spell.damage?.damage_type || '',
                     psychicSpellsOverride: psychicOverride,

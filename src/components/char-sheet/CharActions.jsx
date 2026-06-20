@@ -23,7 +23,7 @@ import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
-import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
+import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
@@ -167,8 +167,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         const cs = await getCombatContext(campaignName);
         if (!cs) return null;
         const target = getTargetFromAttacker(cs, playerStats.name);
-        if (!target) return null;
-        return target;
+        if (target) return target;
+        const overlayTargetName = getAttackerTargetName(cs, playerStats.name);
+        if (overlayTargetName) return { name: overlayTargetName };
+        return null;
     }, [playerStats.name, campaignName]);
 
     const buildCtxSync = React.useCallback(async (attack) => {

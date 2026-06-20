@@ -62,7 +62,7 @@ export function setupEventListeners(deps) {
             }
             const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
             const applyResult = applyDamageToTarget(
-                combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, null, ignoreResistance, pending.attackerName || characterName
+                combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, pending.attackerName || characterName
             );
 
             if (applyResult && applyResult.finalDamage > 0) {
@@ -103,7 +103,7 @@ export function setupEventListeners(deps) {
                 const necroticResult = rollExpression(necroticFormula);
                 if (necroticResult) {
                     const casterCombatSummary = getCombatSummary(campaignName);
-                    const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, null, true, characterName);
+                    const casterApplyResult = applyDamageToTarget(casterCombatSummary, characterName, necroticResult.total, ['Necrotic'], campaignName, charactersRef.current, true, characterName);
                     logEntry({
                         type: 'roll',
                         characterName,

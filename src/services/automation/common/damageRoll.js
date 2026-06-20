@@ -30,11 +30,8 @@ export function rollDamageForAction(auto, options = {}) {
 
 export async function buildBaseAttackContext(playerName, campaignName, damageType) {
     const cs = await getCombatContext(campaignName);
-    console.log('[buildBaseAttackContext] cs:', cs ? 'found' : 'null', 'creatures:', cs?.creatures?.length, 'creature names:', cs?.creatures?.map(c => c.name));
     const target = cs ? getTargetFromAttacker(cs, playerName) : null;
-    console.log('[buildBaseAttackContext] target from getTargetFromAttacker:', target?.name || 'null');
     const targetName = target?.name || (cs ? getAttackerTargetName(cs, playerName) : undefined);
-    console.log('[buildBaseAttackContext] targetName:', targetName, 'playerName:', playerName);
     const resistanceNotice = target ? getResistanceNotice([damageType], target.resistances, target.immunities, target.name) : null;
     return { target, targetName, resistanceNotice };
 }

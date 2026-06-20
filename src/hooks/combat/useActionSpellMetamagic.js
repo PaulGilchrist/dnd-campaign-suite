@@ -125,7 +125,7 @@ export function useActionSpellMetamagic({
         pending.action({});
     }, [pendingActionMetamagic, playerStats.name, campaignName]);
 
-    const handleActionSpellDamageClick = (attack) => {
+    const handleActionSpellDamageClick = async (attack) => {
         if (!isBonusSorcerer) {
             addEntry(campaignName, {
                 type: 'spell',
@@ -146,12 +146,10 @@ export function useActionSpellMetamagic({
             const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, affResult.formula, affResult.total, affResult.rolls, affResult.modifier);
 
             if (!mapName) {
-                console.log('[handleActionSpellDamageClick] no mapName, using buildCtxSync');
-                rollDamage(attack.name, formula, total, rolls, modifier, buildCtxSync(attack));
+                const ctx = await buildCtxSync(attack);
+                rollDamage(attack.name, formula, total, rolls, modifier, ctx);
             } else {
-                console.log('[handleActionSpellDamageClick] mapName:', mapName, 'using buildCtx');
                 buildCtx(attack).then(ctx => {
-                    console.log('[handleActionSpellDamageClick] ctx.targetName:', ctx?.targetName);
                     rollDamage(attack.name, formula, total, rolls, modifier, ctx);
                 }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); throw e; });
             }
@@ -170,7 +168,7 @@ export function useActionSpellMetamagic({
             _currentSP: currentSP,
             isPsionic: isPsionic && hasPsionic,
             psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
-            action: (metaCtx) => {
+            action: async (metaCtx) => {
                 const wasCrit = popupHtml?.isCrit;
                 if (wasCrit && setPopupHtml) setPopupHtml(null);
                 const rawR = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
@@ -180,7 +178,8 @@ export function useActionSpellMetamagic({
                 const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, affR.formula, affR.total, affR.rolls, affR.modifier);
 
                 if (!mapName) {
-                    rollDamage(attack.name, formula, total, rolls, modifier, { ...buildCtxSync(attack), ...metaCtx });
+                    const ctx = await buildCtxSync(attack);
+                    rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
                 } else {
                     buildCtx(attack).then(ctx => {
                         rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
@@ -214,9 +213,9 @@ export function useActionSpellMetamagic({
             _currentSP: currentSP,
             isPsionic: isPsionic && hasPsionic,
             psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
-            action: (metaCtx) => {
+            action: async (metaCtx) => {
                 if (!mapName) {
-                    const ctx = buildCtxSync(attack);
+                    const ctx = await buildCtxSync(attack);
                     rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, { ...ctx, ...metaCtx });
                 } else {
                     buildCtx(attack).then(ctx => {
@@ -250,14 +249,15 @@ export function useActionSpellMetamagic({
             _currentSP: currentSP,
             isPsionic: isPsionic && hasPsionic,
             psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
-            action: (metaCtx) => {
+            action: async (metaCtx) => {
                 const wasCrit = popupHtml?.isCrit;
                 if (wasCrit && setPopupHtml) setPopupHtml(null);
                 const r = wasCrit ? rollExpressionDoubled(attack.damage) : rollExpression(attack.damage);
                 if (!r) return;
                 const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, attack.damage, r.total, r.rolls, r.modifier);
                 if (!mapName) {
-                    rollDamage(attack.name, formula, total, rolls, modifier, { ...buildCtxSync(attack), ...metaCtx });
+                    const ctx = await buildCtxSync(attack);
+                    rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
                 } else {
                     buildCtx(attack).then(ctx => {
                         rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
