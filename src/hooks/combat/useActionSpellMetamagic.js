@@ -146,9 +146,12 @@ export function useActionSpellMetamagic({
             const { formula, total, rolls, modifier } = applyEmpoweredEvocation(attack, affResult.formula, affResult.total, affResult.rolls, affResult.modifier);
 
             if (!mapName) {
+                console.log('[handleActionSpellDamageClick] no mapName, using buildCtxSync');
                 rollDamage(attack.name, formula, total, rolls, modifier, buildCtxSync(attack));
             } else {
+                console.log('[handleActionSpellDamageClick] mapName:', mapName, 'using buildCtx');
                 buildCtx(attack).then(ctx => {
+                    console.log('[handleActionSpellDamageClick] ctx.targetName:', ctx?.targetName);
                     rollDamage(attack.name, formula, total, rolls, modifier, ctx);
                 }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); throw e; });
             }

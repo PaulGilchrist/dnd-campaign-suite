@@ -286,6 +286,13 @@ router.put('/api/campaigns/:campaign/maps/:mapname/activate', (req, res) => {
   }
 });
 
+// GET /api/campaigns/:campaign/active-map - Get the active map name
+router.get('/api/campaigns/:campaign/active-map', (req, res) => {
+  const { campaign } = req.params;
+  const activeMapName = activeMaps.get(campaign) || null;
+  res.json({ activeMapName });
+});
+
 // PUT /api/campaigns/:campaign/maps/:mapname/description - Update map description
 router.put('/api/campaigns/:campaign/maps/:mapname/description', (req, res) => {
   const { campaign, mapname } = req.params;

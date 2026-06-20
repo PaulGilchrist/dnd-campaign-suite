@@ -1,6 +1,7 @@
 import { sendSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasMinDamage } from '../../services/combat/automation/automationService.js';
+import { loadMapData } from '../../services/maps/mapsService.js';
 
 export function dispatchUnbreakableMajestySave(campaignName, defenderName, attackerName, saveDc, promptId) {
     sendSavePrompt(campaignName, {
@@ -12,8 +13,35 @@ export function dispatchUnbreakableMajestySave(campaignName, defenderName, attac
     });
 }
 
-export function readAoeContext(_campaignName) {
-  return null;
+export async function readAoeContext(campaignName, overlayId) {
+    if (!campaignName || !overlayId) return null;
+    try {
+        const overlayRes = await fetch(`/spell-overlay?campaign=${encodeURIComponent(campaignName)}`);
+        if (!overlayRes.ok) { console.log('[readAoeContext] overlayRes not ok'); return null; }
+        const { overlays } = await overlayRes.json();
+        console.log('[readAoeContext] overlays count:', overlays?.length, 'looking for id:', overlayId);
+        const overlay = overlays?.find(o => o.id === overlayId);
+        if (!overlay) { console.log('[readAoeContext] overlay not found, ids:', overlays?.map(o => o.id)); return null; }
+
+        const activeRes = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/active-map`);
+        if (!activeRes.ok) { console.log('[readAoeContext] activeRes not ok'); return null; }
+        const { activeMapName } = await activeRes.json();
+        console.log('[readAoeContext] activeMapName:', activeMapName);
+        if (!activeMapName) return null;
+
+        const mapData = await loadMapData(campaignName, activeMapName);
+        if (!mapData) { console.log('[readAoeContext] mapData null'); return null; }
+
+        console.log('[readAoeContext] players:', mapData.players?.length, 'placedItems:', mapData.placedItems?.length);
+        return {
+            overlay,
+            players: mapData.players || [],
+            npcs: mapData.placedItems || [],
+        };
+    } catch (err) {
+        console.error('[readAoeContext] Error:', err);
+        return null;
+    }
 }
 
 export function hasPotentCantrip(playerStats) {

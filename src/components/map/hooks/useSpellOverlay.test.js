@@ -52,8 +52,8 @@ describe('useSpellOverlay', () => {
     act(() => {
       result.current.addOverlay({ id: 'o1', name: 'Fireball', radius: 20 });
     });
-    // addOverlay triggered 1 fetch
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    // mount fetch + addOverlay = 2 fetches
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
     fetchSpy.mockClear();
     const updated = { id: 'o1', name: 'Fireball', radius: 30 };
     act(() => {
@@ -78,8 +78,8 @@ describe('useSpellOverlay', () => {
     act(() => {
       result.current.updateOverlayImmediate(updated);
     });
-    // addOverlay called fetch once, updateOverlayImmediate called fetch again
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    // mount fetch + addOverlay + updateOverlayImmediate = 3
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
     fetchSpy.mockRestore();
   });
 
@@ -366,8 +366,8 @@ describe('useSpellOverlay', () => {
     act(() => {
       result.current.updateOverlayImmediate({ ...updated, radius: 40 });
     });
-    // addOverlay called fetch once, updateOverlayImmediate called fetch again
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    // mount fetch + addOverlay + updateOverlayImmediate = 3
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
     fetchSpy.mockRestore();
   });
 

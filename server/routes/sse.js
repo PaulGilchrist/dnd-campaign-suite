@@ -1,7 +1,7 @@
 import express from 'express';
 import path from 'path';
 import guid from 'guid';
-import { subscribers, characterChangeData } from '../utils/changeData.js';
+import { subscribers, characterChangeData, spellOverlayData } from '../utils/changeData.js';
 
 const router = express.Router();
 
@@ -29,6 +29,14 @@ router.get('/subscribe', (req, res) => {
          }
      }
 
+    if (campaignName && spellOverlayData.has(campaignName)) {
+        const overlays = spellOverlayData.get(campaignName);
+        if (overlays.length > 0) {
+            const eventData = `data: ${JSON.stringify({ key: `spell-overlay-${campaignName}`, data: { action: 'add', overlays } })}\n\n`;
+            try { res.write(eventData); } catch (_e) { /* ignore */ }
+        }
+    }
+
     req.on('close', () => {
         const index = subscribers.findIndex(client => client.id === clientId);
         if (index !== -1) subscribers.splice(index, 1);
@@ -39,7 +47,7 @@ router.get('/health', (req, res) => {
     res.status(200).json({ status: 'Healthy' });
 });
 
-router.get(/^(?!\/api).*/, (req, res) => {
+router.get(/^(?!\/(api|spell-overlay)).*/, (req, res) => {
     res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
 });
 

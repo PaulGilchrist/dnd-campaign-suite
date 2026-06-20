@@ -24,14 +24,18 @@ export function getAffectedCreatures(overlay, players, placedItems, combatSummar
     }
   }
 
+  console.log('[getAffectedCreatures] posMap keys:', [...posMap.keys()], 'creature names:', combatSummary.creatures.map(c => c.name));
   const affected = [];
   for (const creature of combatSummary.creatures) {
     const pos = posMap.get(creature.name);
-    if (!pos) continue;
+    if (!pos) { console.log('[getAffectedCreatures] no pos for:', creature.name); continue; }
     if (hitTestOverlay(overlay, pos.gridX, pos.gridY)) {
       affected.push({ creature, gridX: pos.gridX, gridY: pos.gridY });
+    } else {
+      console.log('[getAffectedCreatures] hitTest miss for:', creature.name, 'at', pos.gridX, pos.gridY);
     }
   }
+  console.log('[getAffectedCreatures] affected:', affected.length);
   return affected;
 }
 

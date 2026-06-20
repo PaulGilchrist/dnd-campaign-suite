@@ -173,9 +173,12 @@ export function createLogDamageAndShow(deps) {
 
     async function handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal) {
         const { saveDc, saveType, dcSuccess, damageType, attackerName } = context || {};
-        const aoeCtx = readAoeContext(campaignName);
+        const overlayId = context?.targetName?.startsWith('overlay-') ? context.targetName.slice('overlay-'.length) : null;
+        console.log('[handleAoeDamage] overlayId:', overlayId, 'targetName:', context?.targetName, 'campaign:', campaignName);
+        const aoeCtx = overlayId ? await readAoeContext(campaignName, overlayId) : null;
+        console.log('[handleAoeDamage] aoeCtx:', aoeCtx ? 'found' : 'null');
         const combatSummary = await loadCombatSummary(campaignName);
-        if (!aoeCtx || !combatSummary) return;
+        if (!aoeCtx || !combatSummary) { console.log('[handleAoeDamage] early return — aoeCtx:', !!aoeCtx, 'combatSummary:', !!combatSummary); return; }
 
         const { overlay, players, npcs } = aoeCtx;
         const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
@@ -1023,7 +1026,9 @@ export function createLogDamageAndShow(deps) {
         }
 
         const targetTargetName = context?.targetName;
+        console.log('[logDamageAndShow] targetTargetName:', targetTargetName, 'startsWith overlay:', targetTargetName?.startsWith('overlay-'));
         if (targetTargetName && targetTargetName.startsWith('overlay-')) {
+            console.log('[logDamageAndShow] routing to handleAoeDamage');
             await handleAoeDamage(name, formula, total, rolls, modifier, context, adjustedTotal);
             return;
         }

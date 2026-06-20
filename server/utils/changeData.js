@@ -11,6 +11,9 @@ export let subscribers = [];
 // In-memory store for debounced character changes (HP, spell slots, etc.) keyed by campaign
 export const characterChangeData = new Map();
 
+// In-memory store for spell overlays keyed by campaign (array of overlay objects)
+export const spellOverlayData = new Map();
+
 // Debounce timer for saveFile()
 let saveTimer = null;
 
