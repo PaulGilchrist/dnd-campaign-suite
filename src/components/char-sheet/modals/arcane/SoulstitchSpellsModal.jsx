@@ -51,12 +51,12 @@ function SoulstitchSpellsModal({ action, playerStats, campaignName, maxSelection
                 <div className="sp-body">
                     <p>Cast <strong>{spellName}</strong>. Choose up to <strong>{maxSelections}</strong> creature(s) you can see to automatically succeed on saving throws and take no damage.</p>
                     <p style={{ fontSize: '0.9em', opacity: 0.8, marginTop: '4px' }}>Selected: {selected.length} / {maxSelections}</p>
-                    <div style={{ textAlign: 'left', marginTop: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                    <div style={{ textAlign: 'left', marginTop: '12px', maxHeight: '400px', overflowY: 'auto' }}>
                         {eligibleTargets.map((name, i) => {
                             const isSelected = selected.includes(name);
                             const wasPreviouslyChosen = existingChosen.includes(name);
                             return (
-                                <label key={i} style={{ display: 'block', padding: '6px 12px', margin: '2px 0', borderRadius: '6px', cursor: selected.length >= maxSelections && !isSelected ? 'not-allowed' : 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : (wasPreviouslyChosen && !isSelected ? 'rgba(100,200,255,0.1)' : 'transparent'), border: isSelected ? '1px solid var(--color-link)' : (wasPreviouslyChosen && !isSelected ? '1px dashed var(--color-link)' : '1px solid transparent'), opacity: selected.length >= maxSelections && !isSelected ? 0.5 : 1 }}>
+                                <label key={i} style={{ display: 'block', padding: '2px 12px', borderRadius: '6px', cursor: selected.length >= maxSelections && !isSelected ? 'not-allowed' : 'pointer', background: isSelected ? 'rgba(255,255,255,0.15)' : (wasPreviouslyChosen && !isSelected ? 'rgba(100,200,255,0.1)' : 'transparent'), border: isSelected ? '1px solid var(--color-link)' : (wasPreviouslyChosen && !isSelected ? '1px dashed var(--color-link)' : '1px solid transparent'), opacity: selected.length >= maxSelections && !isSelected ? 0.5 : 1 }}>
                                     <input
                                         type="checkbox"
                                         checked={isSelected}

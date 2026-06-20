@@ -1,33 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getCombatContext } from '../../../../services/rules/combat/damageUtils.js';
+import { getCombatSummary } from '../../../../services/encounters/combatData.js';
 import { addEntry } from '../../../../services/ui/logService.js';
 
 const EVOCATION_SCHOOL = 'evocation';
-
-export async function getCharacterNames(campaignName) {
-    try {
-        const response = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}`);
-        if (!response.ok) return [];
-        const data = await response.json();
-        const files = data.files || [];
-        const characterPromises = files
-            .filter(f => f.endsWith('.json'))
-            .map(async (file) => {
-                try {
-                    const charRes = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(file)}`);
-                    if (!charRes.ok) return null;
-                    const charData = await charRes.json();
-                    return charData?.name || null;
-                } catch {
-                    return null;
-                }
-            });
-        const names = await Promise.all(characterPromises);
-        return names.filter(Boolean);
-    } catch {
-        return [];
-    }
-}
 
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
@@ -53,20 +28,18 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const spellSlotLevel = action.spellSlotLevel || spell?.level || 1;
     const maxSelections = 1 + spellSlotLevel;
 
-    // Get combat context for creature targets
-    const combatSummary = await getCombatContext(campaignName);
-    const combatCreatureNames = combatSummary?.creatures?.map(c => c.name) || [];
+    // Get combat context from in-memory cache (same source as initiative tracker)
+    const combatSummary = getCombatSummary(campaignName);
+    if (!combatSummary?.creatures) {
+        return null;
+    }
 
     // Get previously chosen creatures for this spell cast
-    const castKey = `_${featureName.replace(/\s+/g, '_')}_cast_${Date.now()}`;
+    const castKey = `_${playerName.replace(/\s+/g, '_')}_Soulstitch_Spells_cast_${Date.now()}`;
     const chosenCreatures = getRuntimeValue(playerName, castKey, campaignName) || [];
 
-    // Get all character names from the campaign
-    const characterNames = await getCharacterNames(campaignName);
-
-    // Combine combat creatures and character names, excluding self
-    const allNames = new Set([...combatCreatureNames, ...characterNames]);
-    const eligibleTargets = [...allNames].filter(name => name !== playerName);
+    // All creatures in combat are eligible targets (including self)
+    const eligibleTargets = combatSummary.creatures.map(c => c.name);
 
     return {
         type: 'modal',
@@ -101,11 +74,11 @@ export async function applySoulstitchSelection(action, playerStats, campaignName
         };
     }
 
-    const castKey = `_${featureName.replace(/\s+/g, '_')}_cast_${Date.now()}`;
+    const castKey = `_${playerName.replace(/\s+/g, '_')}_Soulstitch_Spells_cast_${Date.now()}`;
     await setRuntimeValue(playerName, castKey, selectedNames, campaignName);
 
     // Store a persistent key for the current spell cast context
-    const persistentKey = `_${featureName.replace(/\s+/g, '_')}_active`;
+    const persistentKey = `_${playerName.replace(/\s+/g, '_')}_Soulstitch_Spells_active`;
     await setRuntimeValue(playerName, persistentKey, selectedNames, campaignName);
 
     addEntry(campaignName, {

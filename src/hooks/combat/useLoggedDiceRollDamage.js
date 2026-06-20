@@ -196,7 +196,7 @@ export function createLogDamageAndShow(deps) {
 
         for (const pp of soulstitchProtectedPlayers) {
             const creature = pp.creature;
-            const applyResult = applyDamageToTarget(combatSummary, creature.name, 0, [damageType], campaignName, null, false, casterName);
+            const applyResult = applyDamageToTarget(combatSummary, creature.name, 0, [damageType], campaignName, characters, false, casterName);
             npcResults.push({
                 creatureName: creature.name,
                 saveSuccess: true,

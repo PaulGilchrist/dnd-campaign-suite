@@ -292,6 +292,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 const npcCount = merged.creatures.filter(c => c.type === 'npc').length
                 setNumOfNpc(npcCount)
 
+                storage.set('combatSummary', merged, campaignName)
                 setCombatSummary(merged)
                 combatSummaryRef.current = merged
 
