@@ -634,6 +634,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             overchannelActive,
             overchannelUseCount,
             overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
+            playerStats,
         };
         if (spell.status_effects && spell.status_effects.length > 0) {
           context.statusEffects = spell.status_effects;
@@ -652,6 +653,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
           await executeMagicMissile(spell, metaCtx, { rollDamage, playerStats, getTargetInfo, campaignName, mapName, characters });
         } else {
           const rollCtx = innateSorceryActive && !rollContext.forcedMode ? { ...rollContext, forcedMode: 'advantage' } : rollContext;
+          const damageRollResult = rollExpression(overchannelFormula);
           const attackCtx = {
             autoDamageFormula: overchannelFormula,
             autoDamageName: spell.name,
@@ -659,8 +661,10 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
             overchannelActive,
             overchannelUseCount,
             overchannelSpellLevel: metaCtx?.slotLevel || spell.level,
+            autoDamageRollResult: damageRollResult,
               ...rollCtx,
               isCantrip: spell.level === 0,
+              playerStats,
               };
           if (hasInvisible) {
             attackCtx.metamagicHeighten = true;

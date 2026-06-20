@@ -94,6 +94,57 @@ export function createLogDamageAndShow(deps) {
     }
 
     async function handleAutoMiss(name, formula, total, rolls, modifier, context) {
+        const isCantripFlag = context?.isCantrip || false;
+        const hasPotentFlag = hasPotentCantrip(context?.playerStats);
+
+        if (hasPotentFlag && isCantripFlag) {
+            const damageResult = rollExpression(formula);
+            if (damageResult) {
+                const adjustedPotentTotal = applyMinDamageAdjustment(damageResult.total, damageResult.rolls, context?.playerStats, context?.damageType);
+                const halfDamage = Math.floor(adjustedPotentTotal / 2);
+                const combatSummary2 = await loadCombatSummary(campaignName);
+                const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
+                const applyResult = applyDamageToTarget(combatSummary2, context?.targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, characterName);
+                const target = combatSummary2?.creatures?.find(c => c.name === context?.targetName) || null;
+                const targetMaxHp = target?.type === 'player'
+                    ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+                    : target?.maxHp ?? 0;
+                logEntry({
+                    type: 'roll',
+                    characterName,
+                    rollType: 'cantrip-miss-half-damage',
+                    name,
+                    formula,
+                    rolls: damageResult.rolls,
+                    total: halfDamage,
+                    modifier: damageResult.modifier,
+                    damageType: context?.damageType,
+                    targetName: context?.targetName,
+                    isPotentCantrip: true,
+                });
+                setPopupHtml({
+                    type: 'save-damage',
+                    name,
+                    formula,
+                    rolls: damageResult.rolls,
+                    bonus: damageResult.modifier,
+                    modifier: damageResult.modifier,
+                    damageType: context?.damageType,
+                    targetName: context?.targetName,
+                    targetCurrentHp: applyResult?.newHp,
+                    targetMaxHp: targetMaxHp,
+                    saveDc: context?.saveDc,
+                    saveType: context?.saveType,
+                    dcSuccess: 'half',
+                    finalDamage: applyResult?.finalDamage,
+                    damageApplied: true,
+                    damageReduced: applyResult?.damageReduced,
+                    isPotentCantrip: true,
+                });
+                return;
+            }
+        }
+
         logEntry({
             type: 'roll',
             characterName,

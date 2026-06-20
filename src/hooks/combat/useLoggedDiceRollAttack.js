@@ -319,7 +319,7 @@ export function createLogAndShow(deps) {
                 if (grazeDamageAmount > 0) {
                     const combatSummary2 = await loadCombatSummary(campaignName);
                     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, grazeDamageType)) || false;
-                    const applyResult = applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, null, ignoreResistance, characterName);
+                    const applyResult = applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, ignoreResistance, characterName);
                     const grazeTargetMaxHp = target?.type === 'player'
                         ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
                         : target?.maxHp ?? 0;
@@ -367,26 +367,31 @@ export function createLogAndShow(deps) {
                     setRuntimeValue(campaignName, 'targetEffects', clearedEffects, campaignName);
                 }
             }
+        }
 
-            const potentPlayerStats = context?.playerStats;
-            const hasPotentCantripFlag = hasPotentCantrip(potentPlayerStats);
-            if (hasPotentCantripFlag && !hit && !isAutoMiss && autoDamage) {
-                let potentFormula = autoDamage.formula;
+        const potentPlayerStats = context?.playerStats;
+        const hasPotentCantripFlag = hasPotentCantrip(potentPlayerStats);
+        if (hasPotentCantripFlag && !hit && context?.autoDamageFormula) {
+            const potentFormula = context.autoDamageFormula;
+            const storedDamageResult = context?.autoDamageRollResult;
+            if (!isAutoMiss) {
                 const hasEmpoweredEvoc = hasEmpoweredEvocation(potentPlayerStats);
                 const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
-                const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
+                const spellSchool = (context?.autoDamageSchool || '').toLowerCase();
                 const isEvocation = spellSchool === 'evocation';
                 const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+                let finalFormula = potentFormula;
                 if (shouldApplyEmpoweredEvoc) {
-                    potentFormula = `${potentFormula} + ${empEvocIntMod} [Empowered Evocation]`;
+                    finalFormula = `${potentFormula} + ${empEvocIntMod} [Empowered Evocation]`;
                 }
-                const damageResult = rollExpression(potentFormula);
-                if (damageResult) {
-                    const adjustedPotentTotal = applyMinDamageAdjustment(damageResult.total, damageResult.rolls, context?.playerStats, autoDamage.damageType);
-                    const halfDamage = Math.floor(adjustedPotentTotal / 2);
+                let damageResult;
+                if (storedDamageResult) {
+                    const adjustedStoredTotal = applyMinDamageAdjustment(storedDamageResult.total, storedDamageResult.rolls, context?.playerStats, context?.damageType);
+                    const halfDamage = Math.floor(adjustedStoredTotal / 2);
                     const combatSummary2 = await loadCombatSummary(campaignName);
-                    const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, autoDamage.damageType)) || false;
-                    const applyResult = applyDamageToTarget(combatSummary2, targetName, halfDamage, [autoDamage.damageType], campaignName, null, ignoreResistance, autoDamage.attackerName || characterName);
+                    const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
+                    const applyResult = applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, context.attackerName || characterName);
+                    console.log('[PotentCantrip] stored rawTotal=', storedDamageResult.total, 'adjustedPotentTotal=', adjustedStoredTotal, 'halfDamage=', halfDamage, 'finalDamage=', applyResult?.finalDamage, 'damageReduced=', applyResult?.damageReduced, 'damageReducedByFeature=', applyResult?.damageReducedByFeature, 'wardAbsorbed=', applyResult?.wardAbsorbed);
                     const missTargetMaxHp = target?.type === 'player'
                         ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
                         : target?.maxHp ?? 0;
@@ -395,36 +400,147 @@ export function createLogAndShow(deps) {
                         characterName,
                         rollType: 'cantrip-miss-half-damage',
                         name,
-                        formula: potentFormula,
-                        rolls: damageResult.rolls,
+                        formula: finalFormula,
+                        rolls: storedDamageResult.rolls,
                         total: halfDamage,
-                        modifier: damageResult.modifier,
-                        damageType: autoDamage.damageType,
-                        targetName: autoDamage.targetName,
+                        modifier: storedDamageResult.modifier,
+                        damageType: context?.damageType,
+                        targetName: targetName,
                         isPotentCantrip: true,
                     });
                     setPopupHtml({
                         type: 'save-damage',
                         name,
-                        formula: potentFormula,
-                        rolls: damageResult.rolls,
-                        bonus: damageResult.modifier,
-                        modifier: damageResult.modifier,
-                        damageType: autoDamage.damageType,
-                        targetName: autoDamage.targetName,
+                        formula: finalFormula,
+                        rolls: storedDamageResult.rolls,
+                        bonus: storedDamageResult.modifier,
+                        modifier: storedDamageResult.modifier,
+                        damageType: context?.damageType,
+                        targetName: targetName,
                         targetCurrentHp: applyResult?.newHp,
                         targetMaxHp: missTargetMaxHp,
-                        saveDc: autoDamage.saveDc,
-                        saveType: autoDamage.saveType,
+                        saveDc: context?.saveDc,
+                        saveType: context?.saveType,
                         dcSuccess: 'half',
-                        saveResult: { success: true, roll: 1, total: 0, bonus: 0 },
                         finalDamage: applyResult?.finalDamage,
                         damageApplied: true,
                         damageReduced: applyResult?.damageReduced,
                         isPotentCantrip: true,
                     });
                 }
+                else {
+                    damageResult = rollExpression(finalFormula);
+                    if (damageResult) {
+                        const rawTotal = damageResult.total;
+                        const adjustedPotentTotal = applyMinDamageAdjustment(rawTotal, damageResult.rolls, context?.playerStats, context?.damageType);
+                        const halfDamage = Math.floor(adjustedPotentTotal / 2);
+                        const combatSummary2 = await loadCombatSummary(campaignName);
+                        const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
+                        const applyResult = applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, context.attackerName || characterName);
+                        const missTargetMaxHp = target?.type === 'player'
+                            ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+                            : target?.maxHp ?? 0;
+                        logEntry({
+                            type: 'roll',
+                            characterName,
+                            rollType: 'cantrip-miss-half-damage',
+                            name,
+                            formula: finalFormula,
+                            rolls: damageResult.rolls,
+                            total: halfDamage,
+                            modifier: damageResult.modifier,
+                            damageType: context?.damageType,
+                            targetName: targetName,
+                            isPotentCantrip: true,
+                        });
+                        setPopupHtml({
+                            type: 'save-damage',
+                            name,
+                            formula: finalFormula,
+                            rolls: damageResult.rolls,
+                            bonus: damageResult.modifier,
+                            modifier: damageResult.modifier,
+                            damageType: context?.damageType,
+                            targetName: targetName,
+                            targetCurrentHp: applyResult?.newHp,
+                            targetMaxHp: missTargetMaxHp,
+                            saveDc: context?.saveDc,
+                            saveType: context?.saveType,
+                            dcSuccess: 'half',
+                            finalDamage: applyResult?.finalDamage,
+                            damageApplied: true,
+                            damageReduced: applyResult?.damageReduced,
+                            isPotentCantrip: true,
+                        });
+                    }
+                    else {
+                        console.log('[PotentCantrip] rollExpression returned null for formula=', finalFormula);
+                    }
+                }
             }
+            else if (isAutoMiss && context?.saveDc) {
+                const hasEmpoweredEvoc = hasEmpoweredEvocation(potentPlayerStats);
+                const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
+                const spellSchool = (context?.autoDamageSchool || '').toLowerCase();
+                const isEvocation = spellSchool === 'evocation';
+                const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
+                let finalFormula = potentFormula;
+                if (shouldApplyEmpoweredEvoc) {
+                    finalFormula = `${potentFormula} + ${empEvocIntMod} [Empowered Evocation]`;
+                }
+                const damageResult = rollExpression(finalFormula);
+                if (damageResult) {
+                    const adjustedPotentTotal = applyMinDamageAdjustment(damageResult.total, damageResult.rolls, context?.playerStats, context?.damageType);
+                    const halfDamage = Math.floor(adjustedPotentTotal / 2);
+                    const combatSummary2 = await loadCombatSummary(campaignName);
+                    const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
+                    const applyResult = applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, context.attackerName || characterName);
+                    const missTargetMaxHp = target?.type === 'player'
+                        ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+                        : target?.maxHp ?? 0;
+                    logEntry({
+                        type: 'roll',
+                        characterName,
+                        rollType: 'cantrip-miss-half-damage',
+                        name,
+                        formula: finalFormula,
+                        rolls: damageResult.rolls,
+                        total: halfDamage,
+                        modifier: damageResult.modifier,
+                        damageType: context?.damageType,
+                        targetName: targetName,
+                        isPotentCantrip: true,
+                    });
+                    setPopupHtml({
+                        type: 'save-damage',
+                        name,
+                        formula: finalFormula,
+                        rolls: damageResult.rolls,
+                        bonus: damageResult.modifier,
+                        modifier: damageResult.modifier,
+                        damageType: context?.damageType,
+                        targetName: targetName,
+                        targetCurrentHp: applyResult?.newHp,
+                        targetMaxHp: missTargetMaxHp,
+                        saveDc: context?.saveDc,
+                        saveType: context?.saveType,
+                        dcSuccess: 'half',
+                        finalDamage: applyResult?.finalDamage,
+                        damageApplied: true,
+                        damageReduced: applyResult?.damageReduced,
+                        isPotentCantrip: true,
+                    });
+                }
+                else {
+                    console.log('[PotentCantrip] rollExpression returned null for auto-miss formula=', finalFormula);
+                }
+            }
+            else {
+                console.log('[PotentCantrip] isAutoMiss but no saveDc, skipping');
+            }
+        }
+        else {
+            console.log('[PotentCantrip] condition not met');
         }
 
         if (rollType === 'check' || rollType === 'skill') {
