@@ -9,6 +9,10 @@ vi.mock('../../../../services/automation/handlers/class-wizard/soulstitchSpellsH
   applySoulstitchSelection: vi.fn(),
 }));
 
+vi.mock('../../../../services/rules/spells/postCastRiderService.js', () => ({
+  confirmSoulstitchSelection: vi.fn(),
+}));
+
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => []),
   setRuntimeValue: vi.fn(() => Promise.resolve()),

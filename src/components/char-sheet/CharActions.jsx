@@ -256,6 +256,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
     });
 
+    useEffect(() => {
+        const handler = (event) => {
+            setSoulstitchSpellsModal(event.detail);
+        };
+        window.addEventListener('soulstitch-modal-show', handler);
+        return () => window.removeEventListener('soulstitch-modal-show', handler);
+    }, [setSoulstitchSpellsModal]);
+
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
         // Making an attack roll ends any active Friends spell early

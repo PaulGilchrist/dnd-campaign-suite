@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { applySoulstitchSelection } from '../../../../services/automation/handlers/class-wizard/soulstitchSpellsHandler.js';
+import { confirmSoulstitchSelection } from '../../../../services/rules/spells/postCastRiderService.js';
 import '../../CharSheet.css';
 
 function SoulstitchSpellsModal({ action, playerStats, campaignName, onClose }) {
@@ -22,6 +23,7 @@ function SoulstitchSpellsModal({ action, playerStats, campaignName, onClose }) {
     };
 
     const handleApply = async () => {
+        confirmSoulstitchSelection(selected);
         const res = await applySoulstitchSelection(action, playerStats, campaignName, selected);
         setResult(res);
         setApplied(true);

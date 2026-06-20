@@ -621,6 +621,11 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
 
       if (spell.dc) {
+        try {
+            await triggerSoulstitchSpells(spell, metaCtx, playerStats, campaignName, mapName);
+        } catch (e) {
+            console.error('[spellCast] Soulstitch Spells trigger failed:', e);
+        }
         const target = await getTargetInfo();
         const context = {
           targetName: target?.name,
@@ -703,10 +708,6 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     });
     triggerBewitchingMagic(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
         console.error('[spellCast] Bewitching Magic trigger failed:', e);
-    });
-
-    triggerSoulstitchSpells(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {
-        console.error('[spellCast] Soulstitch Spells trigger failed:', e);
     });
 
     triggerExpertDivination(spell, metaCtx, playerStats, campaignName, mapName).catch(e => {

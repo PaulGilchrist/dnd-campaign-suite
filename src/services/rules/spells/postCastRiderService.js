@@ -1,6 +1,9 @@
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../automation/index.js';
 import { isBlockedBySpellThief } from '../../automation/handlers/class-fighter-rogue/spellThiefHandler.js';
+import { applySoulstitchSelection } from '../../automation/handlers/class-wizard/soulstitchSpellsHandler.js';
+
+let soulstitchResolve = null;
 
 const ENCHANTMENT_SCHOOL = 'enchantment';
 const ILLUSION_SCHOOL = 'illusion';
@@ -189,6 +192,15 @@ export async function triggerSoulstitchSpells(spell, metaCtx, playerStats, campa
 
     try {
         const result = await executeHandler(action, playerStats, campaignName, mapName);
+        if (result && result.type === 'modal') {
+            const confirmationPromise = new Promise(resolve => {
+                soulstitchResolve = resolve;
+            });
+            window.dispatchEvent(new CustomEvent('soulstitch-modal-show', { detail: result.payload }));
+            const selectedNames = await confirmationPromise;
+            await applySoulstitchSelection(action, playerStats, campaignName, selectedNames);
+            return null;
+        }
         if (result) {
             return result;
         }
@@ -270,6 +282,13 @@ export async function triggerSpellThief(spell, metaCtx, playerStats, campaignNam
     }
 
     return results.length > 0 ? results : null;
+}
+
+export function confirmSoulstitchSelection(selectedNames) {
+    if (soulstitchResolve) {
+        soulstitchResolve(selectedNames);
+        soulstitchResolve = null;
+    }
 }
 
 export function getBewitchingMagicFeatures(playerStats) {
