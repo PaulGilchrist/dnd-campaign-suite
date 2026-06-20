@@ -595,7 +595,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     }
 
     // Overchannel: maximize damage for Wizard spells (slot levels 1-5) that deal damage
-    let overchannelFormula = empEvocFormula;
+    let overchannelFormula = formula;
     let overchannelActive = false;
     let overchannelUseCount = 0;
     const overchannelPassives = (function() {
@@ -655,6 +655,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
           const attackCtx = {
             autoDamageFormula: overchannelFormula,
             autoDamageName: spell.name,
+            autoDamageSchool: spell.school,
             overchannelActive,
             overchannelUseCount,
             overchannelSpellLevel: metaCtx?.slotLevel || spell.level,

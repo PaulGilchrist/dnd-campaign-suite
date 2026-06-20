@@ -48,7 +48,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
           let autoFormula = autoDamage.formula;
           const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
           const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
-          const spellSchool = (autoDamage.spellSchool || '').toLowerCase();
+          const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
           const isEvocation = spellSchool === 'evocation';
           const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
           if (shouldApplyEmpoweredEvoc) {

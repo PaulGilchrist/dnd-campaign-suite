@@ -197,6 +197,7 @@ export function createLogAndShow(deps) {
         const autoDamage = hit && context?.autoDamageFormula ? {
             name: context.autoDamageName || name,
             formula: context.autoDamageFormula,
+            autoDamageSchool: context.autoDamageSchool,
             damageType: context.damageType,
             targetName: targetName,
             attackerName: context.attackerName || characterName,
@@ -373,7 +374,7 @@ export function createLogAndShow(deps) {
                 let potentFormula = autoDamage.formula;
                 const hasEmpoweredEvoc = hasEmpoweredEvocation(potentPlayerStats);
                 const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
-                const spellSchool = (autoDamage.spellSchool || '').toLowerCase();
+                const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
                 const isEvocation = spellSchool === 'evocation';
                 const shouldApplyEmpoweredEvoc = hasEmpoweredEvoc && isEvocation && empEvocIntMod > 0;
                 if (shouldApplyEmpoweredEvoc) {

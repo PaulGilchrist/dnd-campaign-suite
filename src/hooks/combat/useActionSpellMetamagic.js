@@ -47,7 +47,7 @@ export function useActionSpellMetamagic({
         const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
         if (!hasEmpoweredEvoc) return { formula, total, rolls, modifier };
 
-        const spellSchool = (attack.school || '').toLowerCase();
+        const spellSchool = (attack.autoDamage?.autoDamageSchool || attack.school || '').toLowerCase();
         if (spellSchool !== 'evocation') return { formula, total, rolls, modifier };
 
         const intMod = getEmpoweredEvocationIntModifier(playerStats);
