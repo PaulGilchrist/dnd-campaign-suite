@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import useMapLoader from './useMapLoader.js';
@@ -29,31 +30,41 @@ import * as mapsService from '../../../services/maps/mapsService.js';
 import { hexKey } from '../../../services/maps/hexMapUtils.js';
 import { getDailyHexBudget } from '../../../services/campaign/travelService.js';
 
+const characters = [
+    { name: 'Thorin' },
+    { name: 'Gandalf' },
+];
+
+const baseMapData = {
+    terrain: {},
+    rivers: [],
+    roads: [],
+    pois: [],
+    gridSize: 10,
+    zoom: 2,
+    panX: 0,
+    panY: 0,
+    marchingOrder: [],
+    partyPosition: null,
+    weather: null,
+};
+
+const createMapData = (overrides = {}) => ({ ...baseMapData, ...overrides });
+
+const waitForLoad = async (result) => {
+    await new Promise(r => setTimeout(r, 50));
+    expect(result.current.loading).toBe(false);
+};
+
 describe('useMapLoader - travel state', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         hexKey.mockImplementation((q, r) => `${q},${r}`);
     });
 
-    const characters = [
-        { name: 'Thorin' },
-        { name: 'Gandalf' },
-    ];
-
-    describe('travel state handling', () => {
-        it('loads travelState from existing map data', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+    describe('travelInit from existing map data', () => {
+        it('loads full travelState from existing map data', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     travelPace: 'fast',
@@ -64,422 +75,283 @@ describe('useMapLoader - travel state', () => {
                     path: [{ q: 0, r: 0 }],
                     pathIndex: 0,
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
 
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(result.current.travelInit).not.toBeNull();
-            expect(result.current.travelInit.travelMode).toBe('active');
-            expect(result.current.travelInit.travelPace).toBe('fast');
-            expect(result.current.travelInit.forcedMarchHours).toBe(2);
-            expect(result.current.travelInit.accruedCost).toBe(10);
-            expect(result.current.travelInit.dailyBudget).toBe(6);
-            expect(result.current.travelInit.destination).toBe('City A');
-            expect(result.current.travelInit.path).toEqual([{ q: 0, r: 0 }]);
-            expect(result.current.travelInit.pathIndex).toBe(0);
+            expect(result.current.travelInit).toEqual({
+                travelMode: 'active',
+                travelPace: 'fast',
+                forcedMarchHours: 2,
+                accruedCost: 10,
+                dailyBudget: 6,
+                destination: 'City A',
+                path: [{ q: 0, r: 0 }],
+                pathIndex: 0,
+            });
         });
 
-        it('does not set travelInit when travelMode is inactive and destination is null', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+        it('does not set travelInit when inactive with no destination', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'inactive',
-                    travelPace: 'normal',
                     destination: null,
-                    path: [],
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(result.current.travelInit).toBeNull();
         });
 
         it('sets travelInit when destination exists even if travelMode is inactive', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'inactive',
-                    travelPace: 'normal',
                     destination: 'Distant City',
-                    path: [],
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(result.current.travelInit).not.toBeNull();
+            expect(result.current.travelInit.travelMode).toBe('inactive');
             expect(result.current.travelInit.destination).toBe('Distant City');
         });
 
-        it('uses getDailyHexBudget when dailyBudget is not provided in travelState', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
-                travelState: {
-                    travelMode: 'active',
-                    travelPace: 'slow',
-                    destination: 'City',
-                },
-            });
+        it('does not set travelInit when travelState is missing entirely', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData());
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(getDailyHexBudget).toHaveBeenCalledWith('slow');
-            expect(result.current.travelInit.dailyBudget).toBe(2);
-        });
-
-        it('defaults travelMode to inactive when not provided', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
-                travelState: {
-                    travelPace: 'normal',
-                },
-            });
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(result.current.travelInit).toBeNull();
         });
 
+        it('does not set travelInit when travelState is empty object', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({ travelState: {} }));
+
+            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
+
+            expect(result.current.travelInit).toBeNull();
+        });
+    });
+
+    describe('travelInit field defaults', () => {
+        it('defaults travelMode to inactive when not provided', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
+                travelState: {
+                    destination: 'City',
+                },
+            }));
+
+            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
+
+            expect(result.current.travelInit.travelMode).toBe('inactive');
+        });
+
         it('defaults travelPace to normal when not provided', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(result.current.travelInit.travelPace).toBe('normal');
         });
 
         it('defaults path to empty array when not provided', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(result.current.travelInit.path).toEqual([]);
         });
 
         it('defaults pathIndex to 0 when not provided', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(result.current.travelInit.pathIndex).toBe(0);
         });
 
         it('defaults forcedMarchHours to 0 when not provided', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(result.current.travelInit.forcedMarchHours).toBe(0);
         });
 
         it('defaults accruedCost to 0 when not provided', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(result.current.travelInit.accruedCost).toBe(0);
         });
     });
 
-    describe('travelState handling edge cases', () => {
-        it('handles missing travelState as empty object', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
-            });
-
-            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(result.current.travelInit).toBeNull();
-        });
-
-        it('handles travelState with non-number forcedMarchHours by defaulting to 0', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+    describe('dailyBudget resolution', () => {
+        it('uses explicit dailyBudget when provided as a number', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
-                    forcedMarchHours: 'not a number',
+                    dailyBudget: 12,
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
 
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(result.current.travelInit.forcedMarchHours).toBe(0);
+            expect(getDailyHexBudget).not.toHaveBeenCalled();
+            expect(result.current.travelInit.dailyBudget).toBe(12);
         });
 
-        it('handles travelState with non-number accruedCost by defaulting to 0', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+        it('calls getDailyHexBudget when dailyBudget is missing', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
+                travelState: {
+                    travelMode: 'active',
+                    travelPace: 'slow',
+                    destination: 'City',
+                },
+            }));
+
+            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
+
+            expect(getDailyHexBudget).toHaveBeenCalledWith('slow');
+            expect(result.current.travelInit.dailyBudget).toBe(2);
+        });
+
+        it('calls getDailyHexBudget with normal when travelPace is missing', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
-                    accruedCost: 'not a number',
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
 
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(result.current.travelInit.accruedCost).toBe(0);
+            expect(getDailyHexBudget).toHaveBeenCalledWith('normal');
+            expect(result.current.travelInit.dailyBudget).toBe(4);
         });
 
-        it('handles travelState with non-number dailyBudget by calling getDailyHexBudget', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+        it('calls getDailyHexBudget when dailyBudget is not a number', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
                     dailyBudget: 'not a number',
                     travelPace: 'fast',
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
-
-            await new Promise(r => setTimeout(r, 50));
+            await waitForLoad(result);
 
             expect(getDailyHexBudget).toHaveBeenCalledWith('fast');
             expect(result.current.travelInit.dailyBudget).toBe(6);
         });
+    });
 
-        it('handles travelState with non-number pathIndex by defaulting to 0', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+    describe('type coercion for numeric fields', () => {
+        it.each`
+            field             | badValue        | expected
+            ${'forcedMarchHours'} | ${'not a number'} | ${0}
+            ${'accruedCost'}      | ${'not a number'} | ${0}
+            ${'pathIndex'}        | ${'not a number'} | ${0}
+        `('defaults $field from $badValue to $expected', async ({ field, expected }) => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
-                    pathIndex: 'not a number',
+                    [field]: 'not a number',
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
 
-            await new Promise(r => setTimeout(r, 50));
-
-            expect(result.current.travelInit.pathIndex).toBe(0);
+            expect(result.current.travelInit[field]).toBe(expected);
         });
 
-        it('handles travelState with non-array path by defaulting to empty array', async () => {
-            mapsService.loadMapData.mockResolvedValue({
-                terrain: {},
-                rivers: [],
-                roads: [],
-                pois: [],
-                gridSize: 10,
-                zoom: 2,
-                panX: 0,
-                panY: 0,
-                marchingOrder: [],
-                partyPosition: null,
-                weather: null,
+        it('preserves valid numeric values', async () => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
                 travelState: {
                     travelMode: 'active',
                     destination: 'City',
-                    path: 'not an array',
+                    forcedMarchHours: 3,
+                    accruedCost: 15,
+                    pathIndex: 2,
                 },
-            });
+            }));
 
             const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
 
-            await new Promise(r => setTimeout(r, 50));
+            expect(result.current.travelInit.forcedMarchHours).toBe(3);
+            expect(result.current.travelInit.accruedCost).toBe(15);
+            expect(result.current.travelInit.pathIndex).toBe(2);
+        });
+    });
 
-            expect(result.current.travelInit.path).toEqual([]);
+    describe('type coercion for array fields', () => {
+        it.each`
+            field    | badValue       | expected
+            ${'path'}  | ${'not an array'} | ${[]}
+            ${'path'}  | ${42}             | ${[]}
+            ${'path'}  | ${null}           | ${[]}
+        `('defaults path from $badValue to $expected', async ({ badValue, expected }) => {
+            mapsService.loadMapData.mockResolvedValue(createMapData({
+                travelState: {
+                    travelMode: 'active',
+                    destination: 'City',
+                    path: badValue,
+                },
+            }));
+
+            const { result } = renderHook(() => useMapLoader('test-campaign', 'test-map', characters));
+            await waitForLoad(result);
+
+            expect(result.current.travelInit.path).toEqual(expected);
         });
     });
 });

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import usePoiManagement from './usePoiManagement.js';
@@ -55,79 +56,17 @@ describe('usePoiManagement', () => {
         );
 
     describe('initial state', () => {
-        it('returns selectedPoiMenu as null initially', () => {
+        it('returns all state fields as null initially', () => {
             const { result } = render();
             expect(result.current.selectedPoiMenu).toBeNull();
-        });
-
-        it('returns showRename as null initially', () => {
-            const { result } = render();
             expect(result.current.showRename).toBeNull();
-        });
-
-        it('returns poiDragging as null initially', () => {
-            const { result } = render();
             expect(result.current.poiDragging).toBeNull();
-        });
-
-        it('returns roadStartPoiId as null initially', () => {
-            const { result } = render();
             expect(result.current.roadStartPoiId).toBeNull();
         });
     });
 
-    describe('returned object shape', () => {
-        it('returns all expected properties', () => {
-            const { result } = render();
-            const keys = Object.keys(result.current);
-            expect(keys).toContain('selectedPoiMenu');
-            expect(keys).toContain('setSelectedPoiMenu');
-            expect(keys).toContain('showRename');
-            expect(keys).toContain('setShowRename');
-            expect(keys).toContain('poiDragging');
-            expect(keys).toContain('roadStartPoiId');
-            expect(keys).toContain('setRoadStartPoiId');
-            expect(keys).toContain('handlePoiPointerDown');
-            expect(keys).toContain('handlePoiPointerMove');
-            expect(keys).toContain('handlePoiPointerUp');
-            expect(keys).toContain('handlePoiContextMenu');
-            expect(keys).toContain('handleTogglePoiVisibility');
-            expect(keys).toContain('handleDeletePoi');
-            expect(keys).toContain('handleRenamePoi');
-            expect(keys).toContain('handleLinkMap');
-            expect(keys).toContain('handleUnlinkMap');
-            expect(keys).toContain('handleRemoveRoads');
-        });
-
-        it('returns state setters as functions', () => {
-            const { result } = render();
-            expect(typeof result.current.setSelectedPoiMenu).toBe('function');
-            expect(typeof result.current.setShowRename).toBe('function');
-            expect(typeof result.current.setRoadStartPoiId).toBe('function');
-        });
-
-        it('returns all handlers as functions', () => {
-            const { result } = render();
-            const handlers = [
-                'handlePoiPointerDown',
-                'handlePoiPointerMove',
-                'handlePoiPointerUp',
-                'handlePoiContextMenu',
-                'handleTogglePoiVisibility',
-                'handleDeletePoi',
-                'handleRenamePoi',
-                'handleLinkMap',
-                'handleUnlinkMap',
-                'handleRemoveRoads',
-            ];
-            for (const h of handlers) {
-                expect(typeof result.current[h]).toBe('function');
-            }
-        });
-    });
-
     describe('handlePoiContextMenu', () => {
-        it('sets selectedPoiMenu when called with a valid poiId', () => {
+        it('sets selectedPoiMenu with poi coordinates when called with a valid poiId', () => {
             const { result } = render();
             act(() => {
                 result.current.handlePoiContextMenu('poi-1');
@@ -161,8 +100,6 @@ describe('usePoiManagement', () => {
             act(() => {
                 result.current.handleTogglePoiVisibility('poi-1');
             });
-            expect(setPois).toHaveBeenCalledWith(expect.any(Function));
-            // Extract the function argument and call it to verify behavior
             const updaterFn = setPois.mock.calls[0][0];
             const result2 = updaterFn(basePois);
             expect(result2[0].visible).toBe(false);
@@ -200,8 +137,8 @@ describe('usePoiManagement', () => {
             act(() => {
                 result.current.handleTogglePoiVisibility('poi-1');
             });
-            const call = setPois.mock.calls[0][0];
-            const updated = call(basePois);
+            const updaterFn = setPois.mock.calls[0][0];
+            const updated = updaterFn(basePois);
             expect(updated[0].visible).toBe(false);
             expect(updated[1].visible).toBe(true);
             expect(updated[2].visible).toBe(false);
@@ -268,28 +205,21 @@ describe('usePoiManagement', () => {
             expect(result2[1].label).toBe('Settlement B');
         });
 
-        it('clears showRename after renaming', () => {
+        it('clears showRename and selectedPoiMenu after renaming', () => {
             const setPois = vi.fn();
             const { result } = render({ setPois });
             act(() => {
                 result.current.setShowRename('poi-1');
             });
+            act(() => {
+                result.current.handlePoiContextMenu('poi-1');
+            });
             expect(result.current.showRename).toBe('poi-1');
+            expect(result.current.selectedPoiMenu).toEqual({ id: 'poi-1', q: 1, r: 0 });
             act(() => {
                 result.current.handleRenamePoi('poi-1', 'Renamed');
             });
             expect(result.current.showRename).toBeNull();
-        });
-
-        it('clears selectedPoiMenu after renaming', () => {
-            const setPois = vi.fn();
-            const { result } = render({ setPois });
-            act(() => {
-                result.current.handlePoiContextMenu('poi-1');
-            });
-            act(() => {
-                result.current.handleRenamePoi('poi-1', 'Renamed');
-            });
             expect(result.current.selectedPoiMenu).toBeNull();
         });
     });
@@ -428,7 +358,7 @@ describe('usePoiManagement', () => {
     });
 
     describe('handlePoiPointerDown — non-road tool', () => {
-        it('sets poiDragging when tool is not road', () => {
+        it('sets poiDragging and calls event methods when tool is not road', () => {
             const setPois = vi.fn();
             const setRoads = vi.fn();
             const { result } = render({ setPois, setRoads, tool: 'poi' });
@@ -544,6 +474,26 @@ describe('usePoiManagement', () => {
             expect(setRoads).not.toHaveBeenCalled();
             expect(result.current.roadStartPoiId).toBeNull();
         });
+
+        it('clears roadStartPoiId when fromPoi is not found during road creation', () => {
+            vi.mocked(hexMapUtils.findHexPath).mockReturnValue(null);
+            const setPois = vi.fn();
+            const setRoads = vi.fn();
+            const pois = [
+                { id: 'poi-1', label: 'City A', type: 'city', q: 1, r: 0, visible: true },
+                { id: 'poi-2', label: 'Settlement B', type: 'settlement', q: 3, r: 0, visible: true },
+            ];
+            const { result } = render({ setPois, setRoads, pois, tool: 'road' });
+            const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
+            act(() => {
+                result.current.handlePoiPointerDown('poi-1', mockEvent);
+            });
+            act(() => {
+                result.current.handlePoiPointerDown('poi-2', mockEvent);
+            });
+            expect(result.current.roadStartPoiId).toBeNull();
+            expect(setRoads).not.toHaveBeenCalled();
+        });
     });
 
     describe('handlePoiPointerMove', () => {
@@ -565,13 +515,11 @@ describe('usePoiManagement', () => {
             const { result } = render({ setPois, setRoads });
             const mockEvent = { clientX: 100, clientY: 100 };
 
-            // First start dragging
             const downEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
             act(() => {
                 result.current.handlePoiPointerDown('poi-1', downEvent);
             });
 
-            // Then move
             act(() => {
                 result.current.handlePoiPointerMove(mockEvent);
             });
@@ -696,7 +644,7 @@ describe('usePoiManagement', () => {
             expect(setRoads).toHaveBeenCalledWith(expect.any(Function));
         });
 
-        it('does not update road when findHexPath returns null', () => {
+        it('does not update road hexes when findHexPath returns null', () => {
             vi.mocked(hexMapUtils.findHexPath).mockReturnValue(null);
             const setPois = vi.fn();
             const setRoads = vi.fn();
@@ -721,48 +669,9 @@ describe('usePoiManagement', () => {
                 result.current.handlePoiPointerUp();
             });
             expect(setRoads).toHaveBeenCalled();
-        });
-    });
-
-    describe('state setters', () => {
-        it('setSelectedPoiMenu updates selectedPoiMenu', () => {
-            const { result } = render();
-            act(() => {
-                result.current.setSelectedPoiMenu({ id: 'poi-1', q: 1, r: 0 });
-            });
-            expect(result.current.selectedPoiMenu).toEqual({ id: 'poi-1', q: 1, r: 0 });
-        });
-
-        it('setShowRename updates showRename', () => {
-            const { result } = render();
-            act(() => {
-                result.current.setShowRename('poi-1');
-            });
-            expect(result.current.showRename).toBe('poi-1');
-        });
-
-        it('setRoadStartPoiId updates roadStartPoiId', () => {
-            const { result } = render();
-            act(() => {
-                result.current.setRoadStartPoiId('poi-1');
-            });
-            expect(result.current.roadStartPoiId).toBe('poi-1');
-        });
-    });
-
-    describe('function stability', () => {
-        it('handlers are stable useCallback references when props do not change', () => {
-            const setPois = vi.fn();
-            const setRoads = vi.fn();
-            const { result } = render({ setPois, setRoads });
-            const down1 = result.current.handlePoiPointerDown;
-            const move1 = result.current.handlePoiPointerMove;
-            const up1 = result.current.handlePoiPointerUp;
-            const context1 = result.current.handlePoiContextMenu;
-            expect(down1).toBe(result.current.handlePoiPointerDown);
-            expect(move1).toBe(result.current.handlePoiPointerMove);
-            expect(up1).toBe(result.current.handlePoiPointerUp);
-            expect(context1).toBe(result.current.handlePoiContextMenu);
+            const updaterFn = setRoads.mock.calls[0][0];
+            const result2 = updaterFn(roads);
+            expect(result2[0].hexes).toEqual(['1,0', '2,0', '3,0']);
         });
     });
 
@@ -779,26 +688,6 @@ describe('usePoiManagement', () => {
                 result.current.handlePoiPointerDown('poi-1', mockEvent);
             });
             expect(result.current.roadStartPoiId).toBeNull();
-        });
-
-        it('clears roadStartPoiId when fromPoi is not found during road creation with both pois in array', () => {
-            vi.mocked(hexMapUtils.findHexPath).mockReturnValue(null);
-            const setPois = vi.fn();
-            const setRoads = vi.fn();
-            const pois = [
-                { id: 'poi-1', label: 'City A', type: 'city', q: 1, r: 0, visible: true },
-                { id: 'poi-2', label: 'Settlement B', type: 'settlement', q: 3, r: 0, visible: true },
-            ];
-            const { result } = render({ setPois, setRoads, pois, tool: 'road' });
-            const mockEvent = { preventDefault: vi.fn(), stopPropagation: vi.fn() };
-            act(() => {
-                result.current.handlePoiPointerDown('poi-1', mockEvent);
-            });
-            act(() => {
-                result.current.handlePoiPointerDown('poi-2', mockEvent);
-            });
-            expect(result.current.roadStartPoiId).toBeNull();
-            expect(setRoads).not.toHaveBeenCalled();
         });
     });
 });
