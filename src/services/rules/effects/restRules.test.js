@@ -361,14 +361,19 @@ describe('restRules', () => {
       expect(updates.spell_slots_level_2).toBeUndefined()
     })
 
-    it('resets Signature Spells free cast count', async () => {
+    it('resets Signature Spells per-spell used flags on short rest', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'SignatureSpells_selection') return ['Fireball', 'Counterspell']
+        return undefined
+      })
       const stats = makeStats({
-        automation: { actions: [{ type: 'signature_spells' }] },
+        automation: { specialActions: [{ type: 'signature_spells' }] },
       })
       await applyShortRest(stats, CAMPAIGN)
 
       const updates = getUpdates()
-      expect(updates._Signature_Spells_freeCastCount).toBeNull()
+      expect(updates.SignatureSpells_Fireball_used).toBeNull()
+      expect(updates.SignatureSpells_Counterspell_used).toBeNull()
     })
 
     it('resets Divination Savant selections', async () => {
@@ -614,11 +619,15 @@ describe('restRules', () => {
       )
     })
 
-    it('resets Signature Spells on long rest', async () => {
+    it('resets Signature Spells per-spell used flags on long rest', async () => {
+      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
+        if (key === 'SignatureSpells_selection') return ['Fireball']
+        return undefined
+      })
       await applyLongRest(makeStats(), CAMPAIGN)
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Test Hero', '_Signature_Spells_freeCastCount', null, CAMPAIGN, true
+        'Test Hero', 'SignatureSpells_Fireball_used', null, CAMPAIGN, true
       )
     })
 

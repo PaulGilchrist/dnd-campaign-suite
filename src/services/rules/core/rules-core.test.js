@@ -635,7 +635,7 @@ describe('rules', () => {
         spellCalc2024.getSpellAbilities.mockReturnValue({ modifier: 5 });
         const result = rules.getSpellAbilities(allSpells, playerStats);
         expect(result).toEqual({ modifier: 5 });
-        expect(spellCalc2024.getSpellAbilities).toHaveBeenCalledWith(allSpells, playerStats);
+        expect(spellCalc2024.getSpellAbilities).toHaveBeenCalledWith(allSpells, playerStats, undefined);
       });
 
       it('should use 5e when rules is "5e"', () => {

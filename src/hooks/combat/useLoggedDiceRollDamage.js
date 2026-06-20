@@ -295,7 +295,7 @@ export function createLogDamageAndShow(deps) {
 
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, null, ignoreResistance, characterName);
+        const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, ignoreResistance, characterName);
 
         if (applyResult && applyResult.finalDamage > 0) {
             endInvisibilityOnHostileAction(characterName, campaignName);

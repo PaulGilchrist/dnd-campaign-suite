@@ -3,11 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
-const { mockShowPopup, mockSetPopupHtml, mockHasAutomation, mockExecuteHandler } = vi.hoisted(() => ({
+const { mockShowPopup, mockSetPopupHtml, mockHasAutomation } = vi.hoisted(() => ({
   mockShowPopup: vi.fn(),
   mockSetPopupHtml: vi.fn(),
   mockHasAutomation: vi.fn(),
-  mockExecuteHandler: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
@@ -36,43 +35,9 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
   hasAutomation: mockHasAutomation,
 }));
 
-vi.mock('../../services/automation/index.js', () => ({
-  executeHandler: mockExecuteHandler,
-}));
-
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock('./modals/arcane/SpellMasteryModal.jsx', () => ({
-  default: function SpellMasteryModal({ _payload, _onConfirm, _onClose }) {
-    return (
-      <div data-testid="spell-mastery-modal">
-        <span>Spell Mastery Modal</span>
-      </div>
-    );
-  },
-}));
-
-vi.mock('./modals/arcane/SignatureSpellsModal.jsx', () => ({
-  default: function SignatureSpellsModal({ _payload, _onConfirm, _onClose }) {
-    return (
-      <div data-testid="signature-spells-modal">
-        <span>Signature Spells Modal</span>
-      </div>
-    );
-  },
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/spellMasteryHandler.js', () => ({
-  onSpellMasterySelected: vi.fn().mockResolvedValue(null),
-  handle: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/signatureSpellsHandler.js', () => ({
-  onSignatureSpellsSelected: vi.fn().mockResolvedValue(null),
-  handle: vi.fn().mockResolvedValue(null),
 }));
 
 const createPlayerStats = (overrides = {}) => ({
@@ -187,7 +152,7 @@ describe('CharCharacterAdvancement', () => {
     });
   });
 
-  describe('popup behavior for features with details', () => {
+  describe('feature click behavior', () => {
     it('calls showPopup when clicking a feature with details', () => {
       renderComponent();
       fireEvent.click(screen.getByText('Feature 1:'));
@@ -200,7 +165,7 @@ describe('CharCharacterAdvancement', () => {
       );
     });
 
-    it('calls showPopup when clicking a feature without details but with automation', () => {
+    it('calls showPopup when clicking any feature', () => {
       mockHasAutomation.mockReturnValue(true);
       const stats = createPlayerStats({
         characterAdvancement: [
@@ -209,67 +174,12 @@ describe('CharCharacterAdvancement', () => {
       });
       render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
       fireEvent.click(screen.getByText('Auto Feature:'));
-      expect(mockShowPopup).not.toHaveBeenCalled();
-      expect(mockExecuteHandler).toHaveBeenCalled();
-    });
-  });
-
-  describe('automation click behavior', () => {
-    it('calls executeHandler when clicking a feature with automation', () => {
-      mockHasAutomation.mockReturnValue(true);
-      const stats = createPlayerStats({
-        characterAdvancement: [
-          {
-            name: 'Automated Feature',
-            description: 'Triggers automation',
-            automation: { type: 'test_action' },
-          },
-        ],
-      });
-      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
-
-      fireEvent.click(screen.getByText('Automated Feature:'));
-      expect(mockExecuteHandler).toHaveBeenCalledWith(
+      expect(mockShowPopup).toHaveBeenCalledWith(
         expect.objectContaining({
-          name: 'Automated Feature',
-          automation: { type: 'test_action' },
-        }),
-        expect.any(Object),
-        'test-campaign'
+          name: 'Auto Feature',
+          description: 'Has automation',
+        })
       );
-    });
-
-    it('does not call showPopup when a feature with automation is clicked', () => {
-      mockHasAutomation.mockReturnValue(true);
-      const stats = createPlayerStats({
-        characterAdvancement: [
-          {
-            name: 'Automated Feature',
-            description: 'Triggers automation',
-            automation: { type: 'test_action' },
-          },
-        ],
-      });
-      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
-
-      fireEvent.click(screen.getByText('Automated Feature:'));
-      expect(mockShowPopup).not.toHaveBeenCalled();
-    });
-
-    it('does not call executeHandler when clicking a feature without automation', () => {
-      mockHasAutomation.mockReturnValue(false);
-      const stats = createPlayerStats({
-        characterAdvancement: [
-          {
-            name: 'Normal Feature',
-            description: 'No automation',
-          },
-        ],
-      });
-      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
-
-      fireEvent.click(screen.getByText('Normal Feature:'));
-      expect(mockExecuteHandler).not.toHaveBeenCalled();
     });
   });
 

@@ -110,10 +110,11 @@ describe('collectAutomationFromFeatures – direct action types', () => {
         expect(result.actions).toHaveLength(1)
     })
 
-    it('categorizes signature_spells as action', () => {
+    it('categorizes signature_spells as specialAction', () => {
         const features = [makeFeature({ type: 'signature_spells' })]
         const result = collectAutomationFromFeatures(features, ps)
-        expect(result.actions).toHaveLength(1)
+        expect(result.specialActions).toHaveLength(1)
+        expect(result.specialActions[0].type).toBe('signature_spells')
     })
 
     it('categorizes stealth_attack as action', () => {

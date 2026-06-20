@@ -271,12 +271,12 @@ const rules = {
       },
 
      // === RULESET-SPECIFIC: getSpellAbilities ===
-    getSpellAbilities: (allSpells, playerStats, playerSummary) => {
-        if (is2024(playerStats, playerSummary)) {
-            return getSpellAbilities2024(allSpells, playerStats);
-         }
-        return getSpellAbilities5e(allSpells, playerStats);
-     },
+     getSpellAbilities: (allSpells, playerStats, playerSummary) => {
+         if (is2024(playerStats, playerSummary)) {
+             return getSpellAbilities2024(allSpells, playerStats, playerSummary);
+          }
+         return getSpellAbilities5e(allSpells, playerStats);
+      },
 
      // === RULESET-SPECIFIC: getAttacks ===
     getAttacks: (allEquipment, allSpells, playerStats, playerSummary) => {

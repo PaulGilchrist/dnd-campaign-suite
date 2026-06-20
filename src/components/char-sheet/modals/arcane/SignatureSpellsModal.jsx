@@ -48,10 +48,19 @@ function SignatureSpellsModal({ payload, onConfirm, onClose }) {
                         className="char-btn"
                         onClick={handleConfirm}
                         disabled={!selected1 || !selected2 || selected1 === selected2}
-                        style={{ width: '100%' }}
+                        style={{ width: '100%', marginBottom: '8px' }}
                     >
                         Confirm Selection
                     </button>
+                    {selectedSpells?.length > 0 && (
+                        <button
+                            className="char-btn"
+                            onClick={() => onConfirm(null, null)}
+                            style={{ width: '100%', opacity: 0.7 }}
+                        >
+                            Clear Selection
+                        </button>
+                    )}
                 </div>
             </div>
         </div>

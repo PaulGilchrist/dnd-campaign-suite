@@ -111,36 +111,35 @@ describe('signatureSpellsHandler.handle', () => {
   });
 
   describe('spells already selected', () => {
-    it('returns popup listing available spells', async () => {
+    it('returns modal with current selection', async () => {
       const action = makeAction();
       const ps = makePlayerStats();
 
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce(['Fireball', 'Counterspell']) // selection
         .mockReturnValueOnce(undefined) // Fireball not used
-        .mockReturnValueOnce(undefined); // Counterspell not used
+        .mockReturnValueOnce(undefined); // Counterspell not used;
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.html).toContain('Fireball');
-      expect(result.payload.html).toContain('Counterspell');
-      expect(result.payload.html).toContain('Available free casts');
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('signatureSpells');
+      expect(result.payload.selectedSpells).toEqual(['Fireball', 'Counterspell']);
     });
 
-    it('filters out already-used spells', async () => {
+    it('returns modal even when all spells used (with clear option)', async () => {
       const action = makeAction();
       const ps = makePlayerStats();
 
       useRuntimeState.getRuntimeValue
         .mockReturnValueOnce(['Fireball', 'Counterspell']) // selection
         .mockReturnValueOnce(true) // Fireball used
-        .mockReturnValueOnce(undefined); // Counterspell not used
+        .mockReturnValueOnce(true); // Counterspell used
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.html).toContain('Counterspell');
-      expect(result.payload.html).not.toContain('Fireball');
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('All signature spells have been used');
     });
 
     it('returns info popup when all spells used', async () => {
@@ -171,9 +170,9 @@ describe('signatureSpellsHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      // The key should use the action name with underscores
+      // The key should use SignatureSpells_ prefix with spell name
       const calls = useRuntimeState.getRuntimeValue.mock.calls;
-      const usedKeyCall = calls.find(c => c[1].includes('My_Signature_Spells'));
+      const usedKeyCall = calls.find(c => c[1].includes('SignatureSpells_'));
       expect(usedKeyCall).toBeDefined();
     });
   });
@@ -196,7 +195,7 @@ describe('signatureSpellsHandler.onSignatureSpellsSelected', () => {
     expect(result.payload.description).toContain('Counterspell');
     expect(result.payload.description).toContain('without expending a spell slot');
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'TestWizard', '_Signature_Spells_selection', ['Fireball', 'Counterspell'], campaignName, true,
+      'TestWizard', 'SignatureSpells_selection', ['Fireball', 'Counterspell'], campaignName, true,
     );
     expect(result.payload.automation).toBe(action.automation);
   });
@@ -297,7 +296,7 @@ describe('signatureSpellsHandler.onSignatureSpellsCast', () => {
     await onSignatureSpellsCast(action, ps, campaignName, 'Fireball');
 
     const calls = useRuntimeState.setRuntimeValue.mock.calls;
-    const usedKeyCall = calls.find(c => c[1].includes('My_Signature_Spells'));
+    const usedKeyCall = calls.find(c => c[1].includes('SignatureSpells_'));
     expect(usedKeyCall).toBeDefined();
   });
 });

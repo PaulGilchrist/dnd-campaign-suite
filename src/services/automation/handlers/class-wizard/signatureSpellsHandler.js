@@ -3,7 +3,7 @@ import { loadSpells } from '../../../ui/dataLoader.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
-    const currentSpells = getRuntimeValue(playerName, '_Signature_Spells_selection', campaignName);
+    const currentSpells = getRuntimeValue(playerName, 'SignatureSpells_selection', campaignName);
     const selectedSpells = Array.isArray(currentSpells) ? currentSpells : [];
 
     if (!selectedSpells.length) {
@@ -49,7 +49,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const availableSpells = [];
     for (const sn of selectedSpells) {
-        const usedKey = `_${action.name.replace(/\s+/g, '_')}_${sn.replace(/\s+/g, '_')}_used`;
+        const usedKey = `SignatureSpells_${sn.replace(/\s+/g, '_')}_used`;
         const used = getRuntimeValue(playerName, usedKey, campaignName);
         if (!used) {
             availableSpells.push(sn);
@@ -68,16 +68,39 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    // Load level 3 options for the modal (needed for the change/clear UI)
+    const allSpells = await loadSpells(playerStats.rules || '2024');
+    const level3Spells = allSpells.filter(s => s.level === 3);
+
     return {
-        type: 'popup',
+        type: 'modal',
+        modalName: 'signatureSpells',
         payload: {
-            html: `<b>${action.name}</b><br/>${action.description || ''}<br/><br/><b>Available free casts:</b> ${availableSpells.join(', ')}<br/><br/><em>Open your spell sheet and cast one — no spell slot will be consumed.</em>`,
+            action,
+            playerStats,
+            campaignName,
+            level3Options: level3Spells.map(s => s.name),
+            optionDetails: {},
+            selectedSpells,
         },
     };
 }
 
 export async function onSignatureSpellsSelected(action, playerStats, campaignName, spell1, spell2) {
     const playerName = playerStats.name;
+
+    // Clear selection
+    if (!spell1 && !spell2) {
+        await setRuntimeValue(playerName, 'SignatureSpells_selection', null, campaignName, true);
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'Signature Spells selection cleared.',
+            },
+        };
+    }
 
     if (!spell1 || !spell2 || spell1 === spell2) {
         return {
@@ -90,7 +113,7 @@ export async function onSignatureSpellsSelected(action, playerStats, campaignNam
         };
     }
 
-    await setRuntimeValue(playerName, '_Signature_Spells_selection', [spell1, spell2], campaignName, true);
+    await setRuntimeValue(playerName, 'SignatureSpells_selection', [spell1, spell2], campaignName, true);
 
     return {
         type: 'popup',
@@ -105,7 +128,7 @@ export async function onSignatureSpellsSelected(action, playerStats, campaignNam
 
 export async function onSignatureSpellsCast(action, playerStats, campaignName, spellName) {
     const playerName = playerStats.name;
-    const selection = getRuntimeValue(playerName, '_Signature_Spells_selection', campaignName);
+    const selection = getRuntimeValue(playerName, 'SignatureSpells_selection', campaignName);
     const selectedSpells = Array.isArray(selection) ? selection : [];
 
     if (!selectedSpells.includes(spellName)) {
@@ -119,7 +142,7 @@ export async function onSignatureSpellsCast(action, playerStats, campaignName, s
         };
     }
 
-    const usedKey = `_${action.name.replace(/\s+/g, '_')}_${spellName.replace(/\s+/g, '_')}_used`;
+    const usedKey = `SignatureSpells_${spellName.replace(/\s+/g, '_')}_used`;
     const used = getRuntimeValue(playerName, usedKey, campaignName);
     if (used) {
         return {

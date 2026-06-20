@@ -322,6 +322,17 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                 }
             }
 
+            // Signature Spells: read runtime state for player-chosen signature spells and always prepare them
+            const signatureSpellsSelection = getRuntimeValue(playerStats.name, 'SignatureSpells_selection', campaignName);
+            if (signatureSpellsSelection) {
+                const signatureSpells = Array.isArray(signatureSpellsSelection) ? signatureSpellsSelection : [];
+                for (const spellName of signatureSpells) {
+                    if (!spellAbilities.spells.find(s => s.name === spellName)) {
+                        spellAbilities.spells.push({ name: spellName, prepared: 'Always' });
+                    }
+                }
+            }
+
             // Improved Illusions: grant Minor Illusion cantrip to Illusionist subclass
             const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
             if (hasImprovedIllusions && allSpells) {

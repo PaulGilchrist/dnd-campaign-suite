@@ -120,10 +120,10 @@
     "Invisibility",
     "Misty Step",
     "Counterspell",
-    "Fireball",
     "Poison Spray",
     "Chill Touch",
-    "Feather Fall"
+    "Feather Fall",
+    "Haste"
   ],
   "rules": "2024",
   "xp": 0,

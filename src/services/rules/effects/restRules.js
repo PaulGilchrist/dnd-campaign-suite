@@ -87,10 +87,9 @@ export const LONG_REST_RESOURCES = [
          'wholenessofbodyUses',
          'wildResurgenceReversedThisRest',
          'indomitableUses',
-          'naturalRecoveryFreeCast',
-          'naturalRecoverySlots',
-          '_Signature_Spells_freeCastCount',
-           '_Star_Map_freeCastCount',
+           'naturalRecoveryFreeCast',
+           'naturalRecoverySlots',
+            '_Star_Map_freeCastCount',
            '_Dragon_Companion_freeCastCount',
             '_Contact_Patron_freeCastCount',
             '_Mystic_Arcanum_freeCastCount',
@@ -201,12 +200,18 @@ export async function applyShortRest(playerStats, campaignName) {
       }
     }
 
-    // Signature Spells: Reset free cast count on short or long rest
-    const hasSignatureSpells = (playerStats.automation?.actions ?? []).some(
+    // Signature Spells: Reset per-spell used flags on short or long rest
+    const hasSignatureSpells = (playerStats.automation?.specialActions ?? []).some(
       a => a.type === 'signature_spells'
     )
     if (hasSignatureSpells) {
-      updates._Signature_Spells_freeCastCount = null
+      const selection = getRuntimeValue(name, 'SignatureSpells_selection', campaignName)
+      if (selection && Array.isArray(selection)) {
+        for (const spell of selection) {
+          const usedKey = `SignatureSpells_${spell.replace(/\s+/g, '_')}_used`
+          updates[usedKey] = null
+        }
+      }
     }
 
     // Divination Savant: Reset free cast tracking on short or long rest
@@ -382,7 +387,12 @@ export async function applyLongRest(playerStats, campaignName) {
     setRuntimeValue(name, 'relentlessEnduranceUsed', false, campaignName, true)
 
     // Reset Signature Spells on long rest
-    setRuntimeValue(name, '_Signature_Spells_freeCastCount', null, campaignName, true)
+    const selection = getRuntimeValue(name, 'SignatureSpells_selection', campaignName)
+    if (selection && Array.isArray(selection)) {
+      for (const spell of selection) {
+        setRuntimeValue(name, `SignatureSpells_${spell.replace(/\s+/g, '_')}_used`, null, campaignName, true)
+      }
+    }
 
     // Celestial Resilience: Grant temp HP on long rest for Celestial Patron
      if (playerStats.class?.major?.name === 'Celestial Patron' || playerStats.class?.subclass?.name === 'Celestial Patron') {

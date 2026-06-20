@@ -21,9 +21,9 @@ function isFreeCastAuthorized(playerName, spellName, spellLevel, playerStats, ca
   if (spellName === masteryLevel2 && spellLevel === 2) return true;
 
   // Signature Spells: check runtime state for player-chosen signature spells
-  const sigSpells = getRuntimeValue(playerName, '_Signature_Spells_selection', campaignName);
+  const sigSpells = getRuntimeValue(playerName, 'SignatureSpells_selection', campaignName);
   if (Array.isArray(sigSpells) && sigSpells.includes(spellName) && spellLevel === 3) {
-    const usedKey = `_Signature_Spells_${spellName.replace(/\s+/g, '_')}_used`;
+    const usedKey = `SignatureSpells_${spellName.replace(/\s+/g, '_')}_used`;
     const used = getRuntimeValue(playerName, usedKey, campaignName);
     if (!used) return true;
   }
@@ -208,9 +208,9 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
         }
 
         // Signature Spells: mark as used
-        const sigSpells = getRuntimeValue(playerStats.name, '_Signature_Spells_selection', campaignName);
+        const sigSpells = getRuntimeValue(playerStats.name, 'SignatureSpells_selection', campaignName);
         if (Array.isArray(sigSpells) && sigSpells.includes(spell.name) && spell.level === 3) {
-          const usedKey = `_Signature_Spells_${spell.name.replace(/\s+/g, '_')}_used`;
+          const usedKey = `SignatureSpells_${spell.name.replace(/\s+/g, '_')}_used`;
           setRuntimeValue(playerStats.name, usedKey, true, campaignName);
         }
 

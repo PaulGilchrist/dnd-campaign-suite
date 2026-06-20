@@ -763,7 +763,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 result.specialActions.push(info);
                 break;
             case 'signature_spells':
-                result.actions.push(info);
+                result.specialActions.push(info);
                 break;
             case 'abjuration_savant':
                 result.passives.push(info);
@@ -875,6 +875,12 @@ export function processFeatureAutomation(allActions, allBonusActions, allReactio
     automation.actions.forEach(a => {
         if (!allActions.find(f => f.name === a.name)) {
             allActions.push({ name: a.name, description: '', automation: a, hasAutomation: true })
+        }
+    })
+
+    automation.specialActions.forEach(a => {
+        if (!allSpecialActions.find(f => f.name === a.name)) {
+            allSpecialActions.push({ name: a.name, description: '', automation: a, hasAutomation: true })
         }
     })
 

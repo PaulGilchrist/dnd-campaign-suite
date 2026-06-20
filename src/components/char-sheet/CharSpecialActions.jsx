@@ -7,10 +7,13 @@ import { getFightingStyle } from '../../services/character/fightingStyles.js'
 import { executeHandler } from '../../services/automation/index.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import TeleportModal from './modals/TeleportModal.jsx';
+import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
+import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const [popupHtml, setPopupHtml] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
+    const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
 
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
@@ -21,9 +24,24 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
         } else if (result.type === 'modal') {
             if (result.modalName === 'teleport') {
                 setTeleportModal(result.payload);
+            } else if (result.modalName === 'signatureSpells') {
+                setSignatureSpellsModal(result.payload);
             }
         }
     }, [playerStats, campaignName, cannotAct]);
+
+    const handleSignatureSpellsConfirm = useCallback(async (spell1, spell2) => {
+        if (!signatureSpellsModal) return;
+        const result = await onSignatureSpellsSelected(signatureSpellsModal.action, playerStats, campaignName, spell1, spell2);
+        setSignatureSpellsModal(null);
+        if (result?.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || 'Signature Spells'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [signatureSpellsModal, playerStats, campaignName]);
 
     function formatPopupPayload(payload) {
         if (!payload) return null;
@@ -31,6 +49,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
         if (payload.type === 'automation_info') {
             return `<b>${payload.name || ''}</b><br/>${payload.description || ''}`;
         }
+        if (payload.html) return payload.html;
         return String(payload);
     }
 
@@ -75,6 +94,13 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                     playerStats={teleportModal.playerStats}
                     campaignName={teleportModal.campaignName}
                     onClose={() => setTeleportModal(null)}
+                />
+            )}
+            {signatureSpellsModal && (
+                <SignatureSpellsModal
+                    payload={signatureSpellsModal}
+                    onConfirm={handleSignatureSpellsConfirm}
+                    onClose={() => setSignatureSpellsModal(null)}
                 />
             )}
             {uniqueActions.map((specialAction, index) => {
