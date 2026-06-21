@@ -1192,7 +1192,7 @@ describe('classRules2024', () => {
         level: 5,
       };
       const result = classRules.getWizardFeatures(playerStats);
-      expect(result.showWizardFeatures).toBe(false);
+      expect(result.showWizardFeatures).toBe(true);
       expect(result.arcaneRecoveryLevels).toBe(1);
     });
 

@@ -102,8 +102,6 @@ describe('collectAutomationFromFeatures – switch-matched types not in DISPATCH
         'divination_savant',
         'evocation_savant',
         'illusion_savant',
-        'arcane_ward',
-        'projected_ward',
         'magic_initiate',
         'expert_divination',
         'magical_ambush',

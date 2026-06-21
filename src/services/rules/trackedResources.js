@@ -20,6 +20,8 @@ export const ALL_TRACKED_RESOURCES = [
   'superiorityDice',
   'psionicEnergy',
   'arcaneRecoveryLevels',
+  'arcaneWardHp',
+  'arcaneWardMax',
   'warlockPactMagic',
   'sorcerousRestorationUses',
   'uncannymetabolismUses',
@@ -128,6 +130,15 @@ export function computeTrackedResources(playerStats) {
 
   const maxAR = features?.arcaneRecoveryLevels || 0
   resources.arcaneRecoveryLevels = { current: maxAR, max: maxAR }
+
+  const isWizard = playerStats.class?.name === 'Wizard'
+  let maxWard = 0
+  if (isWizard) {
+    const intMod = playerStats.abilities?.find(a => a.name === 'Intelligence')?.bonus || 0
+    maxWard = (2 * playerStats.level) + intMod
+  }
+  resources.arcaneWardMax = { current: maxWard, max: maxWard }
+  resources.arcaneWardHp = { current: 0, max: maxWard }
 
   const isWarlock = playerStats.class?.name === 'Warlock'
   let maxPM = 0

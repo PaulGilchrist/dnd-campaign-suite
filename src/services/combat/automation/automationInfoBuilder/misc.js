@@ -744,5 +744,47 @@ export const miscHandlers = {
             casting_time: auto.casting_time || '1 bonus action',
             hasAutomation: true
         }
+    },
+
+    'arcane_ward': (feature, playerStats) => {
+        const auto = feature.automation
+        const intMod = getAbilityModifier(playerStats.abilities, 'Intelligence')
+        const wizardLevel = playerStats.level
+        const maxHp = wizardLevel * 2 + intMod
+        return {
+            type: 'arcane_ward',
+            name: feature.name,
+            wardHpExpression: auto.wardHpExpression || `(2 * ${wizardLevel}) + ${intMod}`,
+            wardRestoreExpression: auto.wardRestoreExpression || '2 * spell_slot_level',
+            wardTrigger: auto.wardTrigger || 'abjuration_spell_cast',
+            wardDuration: auto.wardDuration || 'long_rest',
+            bonusActionRestore: !!auto.bonusActionRestore,
+            maxHp,
+            hasAutomation: true
+        }
+    },
+
+    'arcane_ward_bonus_action': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'arcane_ward_bonus_action',
+            name: feature.name,
+            action: 'bonus_action',
+            casting_time: auto.casting_time || '1 bonus action',
+            hasAutomation: true
+        }
+    },
+
+    'projected_ward': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'projected_ward',
+            name: feature.name,
+            range: auto.range || 30,
+            reaction: true,
+            wardTrigger: auto.wardTrigger || 'ally_damage_taken',
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
     }
 }

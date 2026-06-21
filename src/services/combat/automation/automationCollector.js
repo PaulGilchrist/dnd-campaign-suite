@@ -269,6 +269,33 @@ export function collectAutomationFromFeatures(features, playerStats) {
         if (!feature?.automation) return
         const automations = Array.isArray(feature.automation) ? feature.automation : [feature.automation]
         for (const auto of automations) {
+            if (auto?.type === 'passive_rule' && auto?.effect === 'arcane_ward') {
+                result.passives.push({
+                    type: 'arcane_ward',
+                    name: feature.name,
+                    wardHpExpression: auto.wardHpExpression || '',
+                    wardRestoreExpression: auto.wardRestoreExpression || '',
+                    bonusActionRestore: !!auto.bonusActionRestore,
+                })
+                continue
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'projected_ward') {
+                result.reactions.push({
+                    type: 'projected_ward',
+                    name: feature.name,
+                    range: auto.range || 30,
+                    reaction: true,
+                })
+                continue
+            }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'spell_breaker') {
+                result.passives.push({
+                    type: 'spell_breaker',
+                    name: feature.name,
+                    spellLevel: auto.spellLevel || 1,
+                })
+                continue
+            }
             const info = buildAttackInfo({ ...feature, automation: auto }, playerStats)
             if (!info) continue
 
@@ -773,6 +800,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break;
             case 'arcane_ward':
                 result.passives.push(info);
+                break;
+            case 'arcane_ward_bonus_action':
+                result.bonusActions.push(info);
                 break;
             case 'projected_ward':
                 result.reactions.push(info);

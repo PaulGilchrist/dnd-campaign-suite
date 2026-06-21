@@ -168,6 +168,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     // Arcane Ward / Projected Ward: absorb damage before it hits HP
     let wardDamage = finalDamage;
     let wardAbsorbed;
+    let wardSource = null;
+
+    // Self-damage: Arcane Ward absorbs damage to the wizard themselves
     if (isPlayer) {
         const wardActive = getRuntimeValue(creature.name, 'arcaneWardActive', campaignName);
         if (wardActive) {
@@ -177,12 +180,42 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
                 const newWardHp = wardHp - wardAbsorbed;
                 setRuntimeValue(creature.name, 'arcaneWardHp', newWardHp, campaignName);
                 wardDamage -= wardAbsorbed;
-
-                // If ward reaches 0, check for Projected Ward (absorbs for nearby allies too)
-                if (newWardHp <= 0) {
-                    // Ward is depleted — remaining damage will hit the target
-                }
+                wardSource = creature.name;
             }
+        }
+    }
+
+    // Projected Ward: Ward absorbs damage to allies (players and NPCs) within range
+    if (wardDamage > 0 && !wardSource) {
+        // Find the Wizard who has Projected Ward active by checking all characters
+        for (const char of characters) {
+            const charStats = char.computedStats || char;
+            const passives = charStats?.automation?.passives || [];
+            const hasProjectedWard = passives.some(p => p.type === 'projected_ward' || (p.type === 'passive_rule' && p.effect === 'projected_ward'));
+            if (!hasProjectedWard) continue;
+
+            const wizardWardActive = getRuntimeValue(char.name, 'arcaneWardActive', campaignName);
+            if (!wizardWardActive) continue;
+
+            const wizardWardHp = Number(getRuntimeValue(char.name, 'arcaneWardHp', campaignName) ?? 0);
+            if (wizardWardHp <= 0) continue;
+
+            // Check range: find wizard position and target position
+            const wizardCreature = combatSummary.creatures.find(c => c.name === char.name);
+            const targetCreature = combatSummary.creatures.find(c => c.name === creature.name);
+            if (!wizardCreature?.position || !targetCreature?.position) continue;
+
+            const distance = getDistanceFeet(wizardCreature.position, targetCreature.position);
+            const projectedRange = passives.find(p => p.type === 'projected_ward' || (p.type === 'passive_rule' && p.effect === 'projected_ward'))?.range || 30;
+
+            if (distance > projectedRange) continue;
+
+            // Absorb damage with the ward
+            wardAbsorbed = Math.min(wardDamage, wizardWardHp);
+            const newWardHp = wizardWardHp - wardAbsorbed;
+            setRuntimeValue(char.name, 'arcaneWardHp', newWardHp, campaignName);
+            wardDamage -= wardAbsorbed;
+            break;
         }
     }
 

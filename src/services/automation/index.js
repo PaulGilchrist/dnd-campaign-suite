@@ -135,6 +135,7 @@ import { handle as handleCreateThrallTempHp } from './handlers/class-warlock/cre
 import { handle as handleSpellMastery } from './handlers/class-wizard/spellMasteryHandler.js';
 import { handle as handleSignatureSpells } from './handlers/class-wizard/signatureSpellsHandler.js';
 import { handle as handleArcaneWard } from './handlers/class-wizard/arcaneWardHandler.js';
+import { handle as handleArcaneWardBonusActionRestore } from './handlers/class-wizard/arcaneWardHandler.js';
 import { handle as handlePortent } from './handlers/class-wizard/portentHandler.js';
 import { handle as handleExpertDivination } from './handlers/class-wizard/expertDivinationHandler.js';
 import { handle as handleThirdEye } from './handlers/class-wizard/thirdEyeHandler.js';
@@ -249,6 +250,7 @@ const HANDLER_MAP = {
     damage_reduction: handleDamageReduction,
     arcane_ward: handleArcaneWard,
     projected_ward: handleArcaneWard,
+    arcane_ward_bonus_action: handleArcaneWardBonusActionRestore,
     open_hand_technique: handleOpenHandTechnique,
     reaction_save_heal: handleReactionSaveHeal,
         mastery_rider: handleWeaponMastery,

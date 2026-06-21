@@ -395,6 +395,9 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     const hasPortent = (playerStats.automation?.specialActions ?? []).some(
         a => a.type === 'portent' || a.name === 'Portent'
     );
+    const hasProjectedWard = (playerStats.automation?.reactions ?? []).some(
+        a => a.type === 'projected_ward' || a.name === 'Projected Ward'
+    );
     const [portentDice, setPortentDiceState] = React.useState([]);
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
@@ -403,6 +406,17 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
         'greater_comprehension': 'Greater Comprehension',
         'see_invisibility': 'See Invisibility',
     };
+
+    React.useEffect(() => {
+        console.log('[WizardFeatures] render:', {
+            playerName: playerStats.name,
+            hasArcaneWardPassive: (playerStats.automation?.passives ?? []).some(p => p.type === 'arcane_ward'),
+            hasProjectedWardReaction: hasProjectedWard,
+            arcaneWardHp: getRuntimeValue(playerStats.name, 'arcaneWardHp', campaignName),
+            arcaneWardMax: getRuntimeValue(playerStats.name, 'arcaneWardMax', campaignName),
+            arcaneWardActive: getRuntimeValue(playerStats.name, 'arcaneWardActive', campaignName),
+        });
+    });
 
     React.useEffect(() => {
         try {
@@ -423,7 +437,11 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
                      <i className="fas fa-book-open"></i> Arcane Recovery
                  </button>
              </div>
-              {hasPortent && (
+              <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => playerStats._trackedResources?.arcaneWardMax?.current || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+              {hasProjectedWard && (
+                 <div className="automation-badge">Projected Ward: Allies within 30 ft. (Reaction)</div>
+             )}
+             {hasPortent && (
                   <div>
                       <div><b>Portent Dice:</b></div>
                       <div className="portent-dice-display">

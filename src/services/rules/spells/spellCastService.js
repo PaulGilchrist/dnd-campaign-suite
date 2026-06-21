@@ -49,6 +49,7 @@ import { executeHandler as executeLongstrider } from '../../automation/index.js'
 import { executeHandler as executeProtectionFromEnergy } from '../../automation/index.js';
 import { executeHandler as executeProtectionFromPoison } from '../../automation/index.js';
 import { executeHandler as executeStoneSkin } from '../../automation/index.js';
+import { onAbjurationSpellCast } from '../../automation/handlers/class-wizard/arcaneWardHandler.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { addEntry } from '../../../services/ui/logService.js';
@@ -542,6 +543,9 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 };
                 await executeHandler(action, playerStats, campaignName, mapName);
             }
+            triggerArcaneWard(spell, metaCtx, playerStats, campaignName).catch(e => {
+                console.error('[spellCast] Arcane Ward trigger failed:', e);
+            });
             return;
         }
     }
@@ -717,6 +721,10 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName).catch(e => {
         console.error('[spellCast] Spell Breaker slot retention trigger failed:', e);
     });
+
+    triggerArcaneWard(spell, metaCtx, playerStats, campaignName).catch(e => {
+        console.error('[spellCast] Arcane Ward trigger failed:', e);
+    });
 }
 
 async function triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName) {
@@ -743,6 +751,33 @@ async function triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, cam
     if (!checkFailed) return;
 
     setRuntimeValue(playerStats.name, slotKey, currentSlots + 1, campaignName);
+}
+
+async function triggerArcaneWard(spell, metaCtx, playerStats, campaignName) {
+    const passives = playerStats.automation?.passives;
+    if (passives == null) {
+        console.error('[spellCast] triggerArcaneWard: playerStats.automation.passives is missing');
+        throw new Error('playerStats.automation.passives is required for Arcane Ward');
+    }
+    const hasArcaneWard = passives.some(p => p.type === 'arcane_ward' || (p.type === 'passive_rule' && p.effect === 'arcane_ward'));
+    if (!hasArcaneWard) return;
+
+    const school = (spell.school || '').toLowerCase();
+    if (school !== 'abjuration') return;
+
+    if (!usesSpellSlot(spell, metaCtx)) return;
+
+    const spellSlotLevel = metaCtx?.slotLevel || spell.level;
+    const action = {
+        name: 'Arcane Ward',
+        automation: { type: 'arcane_ward' },
+    };
+
+    try {
+        await onAbjurationSpellCast(action, playerStats, spell.name, spellSlotLevel, campaignName);
+    } catch (e) {
+        console.error('[spellCast] Arcane Ward trigger failed:', e);
+    }
 }
 
 

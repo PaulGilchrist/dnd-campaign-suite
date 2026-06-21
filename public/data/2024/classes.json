@@ -12473,6 +12473,15 @@
             }
           },
           {
+            "name": "Arcane Ward - Bonus Action Restore",
+            "description": "Arcane Ward Bonus Action spell slot restore",
+            "level": 3,
+            "automation": {
+              "type": "arcane_ward_bonus_action",
+              "casting_time": "1 bonus action"
+            }
+          },
+          {
             "name": "Projected Ward",
             "description": "When a creature you can see within 30 feet takes damage, take Reaction to cause Arcane Ward to absorb damage. If ward reduced to 0 HP, warded creature takes remaining damage.",
             "level": 6,
