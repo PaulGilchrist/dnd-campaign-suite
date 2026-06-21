@@ -279,12 +279,21 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 })
                 continue
             }
-            if (auto?.type === 'passive_rule' && auto?.effect === 'projected_ward') {
+            if (auto?.type === 'projected_ward') {
                 result.reactions.push({
                     type: 'projected_ward',
                     name: feature.name,
                     range: auto.range || 30,
                     reaction: true,
+                    automation: {
+                        type: 'projected_ward',
+                        name: feature.name,
+                        range: auto.range || 30,
+                        reaction: true,
+                        wardTrigger: auto.wardTrigger || 'ally_damage_taken',
+                        casting_time: auto.casting_time || '1 reaction',
+                        hasAutomation: true,
+                    },
                 })
                 continue
             }

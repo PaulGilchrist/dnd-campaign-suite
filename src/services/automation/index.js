@@ -451,6 +451,7 @@ export async function executeHandler(action, playerStats, campaignName, mapName)
     if (!action?.automation) return null;
 
     const auto = action.automation;
+    console.log('[executeHandler] action:', action.name, 'auto.type:', auto.type, 'auto:', auto);
     let handler;
 
     if (auto.type === 'passive_rule' && PASSIVE_RULE_EFFECTS[auto.effect]) {
@@ -459,10 +460,14 @@ export async function executeHandler(action, playerStats, campaignName, mapName)
         handler = HANDLER_MAP[auto.type];
     }
 
+    console.log('[executeHandler] handler found:', !!handler, 'type:', auto.type);
+
     if (!handler) return null;
 
     try {
-        return await handler(action, playerStats, campaignName, mapName);
+        const result = await handler(action, playerStats, campaignName, mapName);
+        console.log('[executeHandler] handler result:', result);
+        return result;
       } catch (e) {
           console.error(`[automation] Handler ${auto.type}/${auto.effect} failed:`, e);
           return { type: 'popup', payload: { type: 'automation_info', name: action.name, description: `Failed to execute ${action.name}` } };

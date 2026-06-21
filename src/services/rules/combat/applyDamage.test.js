@@ -50,6 +50,7 @@ import { rollD20 } from '../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { sendDeathSavePrompt, sendConcentrationPrompt } from '../../combat/conditions/savePromptService.js';
 import { rollConcentrationSave } from '../../combat/concentration/concentrationRules.js';
+import { getDistanceFeet } from './rangeValidation.js';
 
 // ── Globals ────────────────────────────────────────────────────
 
@@ -986,4 +987,304 @@ describe('applyDamageToTarget — buff resistance merging', () => {
       expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs', 'TestCampaign');
     });
   });
+
+describe('applyDamageToTarget — Projected Ward', () => {
+  function createWizardCharacter(name, extra = {}) {
+    return {
+      name,
+      computedStats: {
+        resistances: [],
+        immunities: [],
+        class_levels: [],
+        equipment: [],
+        characterAdvancement: [],
+        allFeatures: [],
+        automation: {
+          reactions: [
+            { type: 'projected_ward', name: 'Projected Ward', range: 30, reaction: true },
+          ],
+        },
+        ...extra.computedExtra,
+      },
+      ...extra,
+    };
+  }
+
+  function stubWizardRuntime(wizardName, currentHp, wardActive, wardHp, conditions = []) {
+    getRuntimeValue.mockReset();
+    getRuntimeValue
+      .mockImplementation((target, key, _campaignName) => {
+        if (key === 'activeBuffs') return [];
+        if (key === 'currentHitPoints') return currentHp;
+        if (key === 'activeConditions') return conditions;
+        if (key === 'lastMetamagicDamage') return undefined;
+        // Only the wizard has Arcane Ward state
+        if (target === wizardName) {
+          if (key === 'arcaneWardActive') return wardActive;
+          if (key === 'arcaneWardHp') return wardHp;
+        }
+        return undefined;
+      });
+  }
+
+  it('absorbs damage to an ally when wizard has Projected Ward and arcane ward active', () => {
+    // Wizard: Arcane Ward active with 15 HP, ally takes 10 damage
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    const allyCreature = createPlayerCreature(allyName);
+    allyCreature.position = { gridX: 3, gridY: 3 };
+
+    stubWizardRuntime('Diviner', 20, true, 15, []);
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const characters = [
+      createWizardCharacter(wizardName),
+      createPlayerCharacter(allyName),
+    ];
+
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    // Ward absorbs all 10 damage, ally HP stays at 20
+    expect(result.newHp).toBe(20);
+    // Ward HP reduced from 15 to 5
+    expect(setRuntimeValue).toHaveBeenCalledWith(wizardName, 'arcaneWardHp', 5, 'TestCampaign');
+  });
+
+  it('absorbs only up to remaining ward HP', () => {
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    const allyCreature = createPlayerCreature(allyName);
+    allyCreature.position = { gridX: 3, gridY: 3 };
+
+    // Ward only has 3 HP left
+    stubWizardRuntime('Diviner', 20, true, 3, []);
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const characters = [
+      createWizardCharacter(wizardName),
+      createPlayerCharacter(allyName),
+    ];
+
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    // Ward absorbs 3, ally HP reduced by 7 (20 - 7 = 13)
+    expect(result.newHp).toBe(13);
+    expect(setRuntimeValue).toHaveBeenCalledWith(wizardName, 'arcaneWardHp', 0, 'TestCampaign');
+  });
+
+  it('respects range limit — skips absorption when too far', () => {
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    const allyCreature = createPlayerCreature(allyName);
+    // 10 grid cells away = 50 feet, beyond 30 ft range
+    allyCreature.position = { gridX: 11, gridY: 1 };
+
+    stubWizardRuntime('Diviner', 20, true, 15, []);
+
+    vi.mocked(getDistanceFeet).mockReturnValue(50);
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const characters = [
+      createWizardCharacter(wizardName),
+      createPlayerCharacter(allyName),
+    ];
+
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    // Ward is out of range, ally takes full damage
+    expect(result.newHp).toBe(10);
+  });
+
+  it('skips absorption when target is invisible', () => {
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    const allyCreature = createPlayerCreature(allyName);
+    allyCreature.position = { gridX: 3, gridY: 3 };
+
+    // Target has invisible condition
+    stubWizardRuntime('Diviner', 20, true, 15, ['invisible']);
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const characters = [
+      createWizardCharacter(wizardName),
+      createPlayerCharacter(allyName),
+    ];
+
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    // Invisible target — ward doesn't absorb
+    expect(result.newHp).toBe(10);
+  });
+
+  it('skips absorption when arcane ward is not active', () => {
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    const allyCreature = createPlayerCreature(allyName);
+    allyCreature.position = { gridX: 3, gridY: 3 };
+
+    stubWizardRuntime('Diviner', 20, false, 0, []);
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const characters = [
+      createWizardCharacter(wizardName),
+      createPlayerCharacter(allyName),
+    ];
+
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    expect(result.newHp).toBe(10);
+  });
+
+  it('skips absorption when ward HP is 0', () => {
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    const allyCreature = createPlayerCreature(allyName);
+    allyCreature.position = { gridX: 3, gridY: 3 };
+
+    stubWizardRuntime('Diviner', 20, true, 0, []);
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const characters = [
+      createWizardCharacter(wizardName),
+      createPlayerCharacter(allyName),
+    ];
+
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    expect(result.newHp).toBe(10);
+  });
+
+  it('reads range from automation.reactions', () => {
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    const allyCreature = createPlayerCreature(allyName);
+    allyCreature.position = { gridX: 8, gridY: 8 };
+    // 8 grid cells = 40 feet, within 50 ft range
+
+    stubWizardRuntime('Diviner', 20, true, 20, []);
+
+    vi.mocked(getDistanceFeet).mockReturnValue(40);
+
+    const characters = [
+      createWizardCharacter(wizardName, {
+        computedExtra: {
+          automation: {
+            reactions: [
+              { type: 'projected_ward', name: 'Projected Ward', range: 50, reaction: true },
+            ],
+          },
+        },
+      }),
+      createPlayerCharacter(allyName),
+    ];
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    // 40 ft is within 50 ft range, ward absorbs
+    expect(result.newHp).toBe(20);
+  });
+
+  it('does not absorb when wizard has no Projected Ward in reactions', () => {
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    const allyCreature = createPlayerCreature(allyName);
+    allyCreature.position = { gridX: 3, gridY: 3 };
+
+    stubWizardRuntime('Diviner', 20, true, 15, []);
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const characters = [
+      createWizardCharacter(wizardName, {
+        computedExtra: {
+          automation: {
+            reactions: [],
+          },
+        },
+      }),
+      createPlayerCharacter(allyName),
+    ];
+
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    expect(result.newHp).toBe(10);
+  });
+
+  it('handles missing creature position gracefully', () => {
+    const wizardName = 'Diviner';
+    const allyName = 'Rogue';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    // No position
+    delete wizardCreature.position;
+
+    const allyCreature = createPlayerCreature(allyName);
+    allyCreature.position = { gridX: 3, gridY: 3 };
+
+    stubWizardRuntime('Diviner', 20, true, 15, []);
+
+    const cs = makeCombatSummary([wizardCreature, allyCreature]);
+    const characters = [
+      createWizardCharacter(wizardName),
+      createPlayerCharacter(allyName),
+    ];
+
+    const result = applyDamageToTarget(cs, allyName, 10, ['Fire'], 'TestCampaign', characters);
+
+    expect(result.newHp).toBe(10);
+  });
+
+  it('absorbs self-damage first before checking projected ward', () => {
+    const wizardName = 'Diviner';
+
+    const wizardCreature = createPlayerCreature(wizardName);
+    wizardCreature.position = { gridX: 1, gridY: 1 };
+
+    // Wizard takes 10 damage, ward has 15 HP
+    stubWizardRuntime('Diviner', 20, true, 15, []);
+
+    const cs = makeCombatSummary([wizardCreature]);
+    const characters = [
+      createWizardCharacter(wizardName),
+    ];
+
+    const result = applyDamageToTarget(cs, wizardName, 10, ['Fire'], 'TestCampaign', characters);
+
+    // Self-damage: Arcane Ward absorbs first (not Projected Ward)
+    expect(result.newHp).toBe(20);
+    expect(setRuntimeValue).toHaveBeenCalledWith(wizardName, 'arcaneWardHp', 5, 'TestCampaign');
+  });
+});
 

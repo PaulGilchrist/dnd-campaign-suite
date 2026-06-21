@@ -1,9 +1,10 @@
-    import React from 'react'
-    import Popup from '../common/Popup.jsx'
-    import DiceRollResult from './DiceRollResult.jsx'
-    import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
-    import MetamagicPopup from './popups/MetamagicPopup.jsx'
-      import { getCategories } from '../../services/character/featureCategories.js'
+import React from 'react'
+import Popup from '../common/Popup.jsx'
+import DiceRollResult from './DiceRollResult.jsx'
+import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
+import MetamagicPopup from './popups/MetamagicPopup.jsx'
+import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
+import { getCategories } from '../../services/character/featureCategories.js'
       import { sanitizeHtml } from '../../services/ui/sanitize.js';
        import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
        import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
@@ -25,6 +26,7 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
     const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
+    const [arcaneWardRestoreModal, setArcaneWardRestoreModal] = React.useState(null);
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
 
@@ -143,6 +145,16 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
             if (result.payload.eligibleSpells && result.payload.eligibleSpells.length > 0) {
                 setReactiveSpellEligible(result.payload.eligibleSpells);
                 setReactiveSpellWarnings(result.payload.hasWarnings || false);
+            }
+            return;
+        }
+
+        if (result.type === 'modal') {
+            if (result.modalName === 'arcaneWardRestore') {
+                setArcaneWardRestoreModal(result.payload);
+            } else {
+                const html = buildFeatureDetailHtml(reaction);
+                if (html) setPopupHtml(html);
             }
             return;
         }
@@ -293,11 +305,20 @@ const reactionCastAction = React.useCallback((spell, metaCtx) => {
                      </React.Fragment>;
                  })}<div className='half-line'></div>
              </div>}
-             {popupHtml && (
-                <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                    {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
-                     <DiceRollResult {...popupHtml} />}
-                </Popup>
+              {arcaneWardRestoreModal && (
+                <ArcaneWardRestoreModal
+                    {...arcaneWardRestoreModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setArcaneWardRestoreModal(null)}
+                />
+            )}
+              {popupHtml && (
+                 <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                     {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
+                      popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
+                      <DiceRollResult {...popupHtml} />}
+                 </Popup>
             )}
               {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {
                 const isClickable = reaction.details || reaction.name === OPPORTUNITY_ATTACK.name || hasAutomation(reaction);

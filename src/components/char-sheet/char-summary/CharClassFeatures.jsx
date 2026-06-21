@@ -402,6 +402,10 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     const hasProjectedWard = (playerStats.automation?.reactions ?? []).some(
         a => a.type === 'projected_ward' || a.name === 'Projected Ward'
     );
+    const projectedWardReaction = (playerStats.automation?.reactions ?? []).find(
+        a => a.type === 'projected_ward' || a.name === 'Projected Ward'
+    );
+    const projectedWardRange = projectedWardReaction?.range || 30;
     const [portentDice, setPortentDiceState] = React.useState([]);
     const [portentPopup, setPortentPopup] = React.useState(null);
     const [portentModal, setPortentModal] = React.useState(null);
@@ -515,9 +519,9 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
                  </button>
              </div>
               <TrackedResourceInput label="Arcane Ward HP" resourceKey="arcaneWardHp" playerName={playerStats.name} getMax={() => playerStats._trackedResources?.arcaneWardMax?.current || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-              {hasProjectedWard && (
-                 <div className="automation-badge">Projected Ward: Allies within 30 ft. (Reaction)</div>
-             )}
+               {hasProjectedWard && (
+                  <div className="automation-badge">Projected Ward: Allies within {projectedWardRange} ft. (Reaction)</div>
+              )}
              {hasPortent && (
                   <div>
                       <b>Portent Dice:</b>

@@ -12698,16 +12698,23 @@
                         ]
                     },
                     {
-                        "level": 6,
-                        "features": [
-                            {
-                                "name": "Projected Ward",
-                                "level": 6,
-                                "prerequisites": [],
-                                "description": "When a creature that you can see within 30 feet of you takes damage, you can use your reaction to cause your Arcane Ward to absorb that damage. If this damage reduces the ward to 0 hit points, the warded creature takes any remaining damage."
-                            }
-                        ]
-                    },
+                         "level": 6,
+                         "features": [
+                             {
+                                 "name": "Projected Ward",
+                                 "level": 6,
+                                 "prerequisites": [],
+                                 "description": "When a creature that you can see within 30 feet of you takes damage, you can use your reaction to cause your Arcane Ward to absorb that damage. If this damage reduces the ward to 0 hit points, the warded creature takes any remaining damage.",
+                                 "automation": {
+                                     "type": "projected_ward",
+                                     "wardTrigger": "ally_damage_taken",
+                                     "range": 30,
+                                     "reaction": true,
+                                     "casting_time": "1 reaction"
+                                 }
+                             }
+                         ]
+                     },
                     {
                         "level": 10,
                         "features": [

@@ -12486,8 +12486,7 @@
             "description": "When a creature you can see within 30 feet takes damage, take Reaction to cause Arcane Ward to absorb damage. If ward reduced to 0 HP, warded creature takes remaining damage.",
             "level": 6,
             "automation": {
-              "type": "passive_rule",
-              "effect": "projected_ward",
+              "type": "projected_ward",
               "wardTrigger": "ally_damage_taken",
               "range": 30,
               "reaction": true,

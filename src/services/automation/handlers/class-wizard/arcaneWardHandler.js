@@ -1,5 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getCombatSummary } from '../../../encounters/combatData.js';
+import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
 const ARCAN_WARD_KEY = 'arcaneWardHp';
 const ARCAN_WARD_ACTIVE_KEY = 'arcaneWardActive';
@@ -9,7 +11,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
-    // Check if ward is active
     const isActive = getRuntimeValue(playerName, ARCAN_WARD_ACTIVE_KEY, campaignName);
     if (!isActive) {
         return {
@@ -23,10 +24,115 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
+    if (auto.type === 'arcane_ward_bonus_action') {
+        return {
+            type: 'modal',
+            modalName: 'arcaneWardRestore',
+            payload: { action },
+        };
+    }
+
+    // Projected Ward: find the most recent damage event on a creature within range
+    const wardHp = Number(getRuntimeValue(playerName, ARCAN_WARD_KEY, campaignName) ?? 0);
+    const maxHp = Number(getRuntimeValue(playerName, ARCAN_WARD_MAX_KEY, campaignName) ?? 0);
+
+    const combatSummary = getCombatSummary(campaignName);
+    if (!combatSummary) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Arcane Ward is active (${wardHp}/${maxHp} HP). No combat context available.`,
+                automation: auto,
+            },
+        };
+    }
+
+    // Get the current target from combat context
+    const target = getTargetFromAttacker(combatSummary, playerName);
+    const targetName = target?.name || null;
+
+    if (!targetName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Arcane Ward is active (${wardHp}/${maxHp} HP). No target selected.`,
+                automation: auto,
+            },
+        };
+    }
+
+    // Get the most recent damage event on the target
+    const lastDamage = getRuntimeValue(targetName, 'lastMetamagicDamage', campaignName);
+    if (!lastDamage?.rawDamage || lastDamage.rawDamage <= 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                automationType: auto.type,
+                description: `${action.name}: Arcane Ward is active (${wardHp}/${maxHp} HP). No recent damage detected on ${targetName}.`,
+                automation: auto,
+            },
+        };
+    }
+
+    const damageAmount = lastDamage.rawDamage;
+    const absorbed = Math.min(damageAmount, wardHp);
+    const remainingDamage = damageAmount - absorbed;
+    const newWardHp = wardHp - absorbed;
+
+    // Restore target's HP by the absorbed amount
+    const targetHp = getRuntimeValue(targetName, 'currentHitPoints', campaignName);
+    if (targetHp != null) {
+        const newTargetHp = Math.min(targetHp + absorbed, getRuntimeValue(targetName, 'maxHitPoints', campaignName) ?? targetHp + absorbed);
+        await setRuntimeValue(targetName, 'currentHitPoints', newTargetHp, campaignName);
+    }
+
+    // Reduce ward HP
+    if (absorbed > 0) {
+        await setRuntimeValue(playerName, ARCAN_WARD_KEY, newWardHp, campaignName);
+    }
+
+    // Log the reaction use
+    await addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: action.name,
+        description: `${playerName} used ${action.name} on ${targetName}. Arcane Ward absorbed ${absorbed} of ${damageAmount} damage (${wardHp} → ${newWardHp} HP). ${remainingDamage > 0 ? `${targetName} takes ${remainingDamage} remaining damage.` : 'All damage absorbed.'}`,
+    }).catch(() => { });
+
+    // Log ward absorption
+    await addEntry(campaignName, {
+        type: 'ward_absorbed',
+        targetName: targetName,
+        damage: absorbed,
+        wizardName: playerName,
+        remainingWardHp: newWardHp,
+        timestamp: Date.now(),
+    }).catch(() => { });
+
+    let description = `${action.name}: ${targetName} took ${damageAmount} damage. Arcane Ward absorbed ${absorbed} (${wardHp} → ${newWardHp} HP).`;
+    if (remainingDamage > 0) {
+        description += ` ${targetName} takes ${remainingDamage} remaining damage.`;
+    } else {
+        description += ' All damage absorbed.';
+    }
+
     return {
-        type: 'modal',
-        modalName: 'arcaneWardRestore',
-        payload: { action },
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: action.name,
+            automationType: auto.type,
+            description: description,
+            automation: auto,
+        },
     };
 }
 
