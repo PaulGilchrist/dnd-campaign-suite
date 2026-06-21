@@ -291,7 +291,7 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
             // Divination Savant: read runtime state for player-chosen Divination spells
             const divinationSavantSelection = getRuntimeValue(playerStats.name, '_Divination_Savant_selection', campaignName);
             if (divinationSavantSelection) {
-                const divinationSpells = Array.isArray(divinationSavantSelection) ? divinationSpells : [];
+                const divinationSpells = Array.isArray(divinationSavantSelection) ? divinationSavantSelection : [];
                 for (const spellName of divinationSpells) {
                     if (!spellAbilities.spells.find(s => s.name === spellName)) {
                         spellAbilities.spells.push({ name: spellName, prepared: 'Always' });

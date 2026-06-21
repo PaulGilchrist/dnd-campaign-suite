@@ -15,7 +15,13 @@ function SavantModal({ payload, onConfirm, onClose }) {
                 <div style={{ padding: '16px' }}>
                     <h3 style={{ marginTop: 0 }}>{school} Savant</h3>
                     <p>Choose two Wizard spells from the {school} school (no higher than level 2), add to spellbook for free. These are always prepared.</p>
-                    {selectedSpells?.length > 0 && <p style={{ opacity: 0.7 }}>Current: <b>{selectedSpells.join('</b> and <b>')}</b></p>}
+                    {selectedSpells?.length > 0 && (
+                        <p style={{ opacity: 0.7 }}>
+                            Current: {selectedSpells.map((s, i) => (
+                                <span key={s}>{i > 0 && <span> and </span>}<b>{s}</b></span>
+                            ))}
+                        </p>
+                    )}
                     <div style={{ marginBottom: '12px' }}>
                         <label style={{ display: 'block', marginBottom: '4px', fontWeight: 'bold' }}>{school} spell 1:</label>
                         <select
