@@ -12,6 +12,7 @@
         import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
         import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
        import { executeHandler } from '../../services/automation/index.js'
+import { applyWarCasterReaction } from '../../services/automation/handlers/reactions/reactionSpellHandler.js'
      import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js'
      import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
      import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
@@ -21,6 +22,9 @@
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
     const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
     const [selectedSpell, setSelectedSpell] = React.useState(null);
+    const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
+    const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
+    const [isReactiveSpellFlow, setIsReactiveSpellFlow] = React.useState(false);
 
     const activeBuffs = useRuntimeValue(playerStats?.name, 'activeBuffs', campaignName) ?? [];
 
@@ -136,6 +140,10 @@ function CharReactions({ playerStats, campaignName, cannotAct, mapName, characte
 
         if (result.type === 'popup') {
             setPopupHtml(result.payload);
+            if (result.payload.eligibleSpells && result.payload.eligibleSpells.length > 0) {
+                setReactiveSpellEligible(result.payload.eligibleSpells);
+                setReactiveSpellWarnings(result.payload.hasWarnings || false);
+            }
             return;
         }
 
@@ -197,22 +205,67 @@ const reactionCastAction = React.useCallback((spell, metaCtx) => {
         gateMetamagic(spell, metaCtx);
       }, [gateMetamagic, resolveReactionSpellPositions]);
 
+      const handleReactiveSpellCast = React.useCallback(async (spell, metaCtx) => {
+        setReactiveSpellEligible(null);
+        setReactiveSpellWarnings(false);
+        setSelectedSpell(null);
+
+        const targetName = getTargetFromAttacker(await getCombatContext(campaignName), playerStats.name)?.name || 'unknown target';
+        applyWarCasterReaction(targetName, spell.name, spell, playerStats, campaignName);
+
+        await resolveReactionSpellPositions();
+        gateMetamagic(spell, metaCtx);
+      }, [gateMetamagic, resolveReactionSpellPositions, campaignName, playerStats]);
+
     return (
         <div className='char-reactions'>
             <div className='sectionHeader'>Reactions</div>
-               {selectedSpell && (
-                   <Popup onClickOrKeyDown={() => setSelectedSpell(null)}>
-                       <SpellDetailPopup
-                          spell={selectedSpell}
-                          playerStats={playerStats}
-                          campaignName={campaignName}
-                          playerLevel={playerStats.level}
-                          upcastLevels={buildUpcastLevels(selectedSpell)}
-                          onClose={() => setSelectedSpell(null)}
-                           onCast={handleReactionSpellCast}
-                        />
-                   </Popup>
-               )}
+                {selectedSpell && (
+                    <Popup onClickOrKeyDown={() => { setSelectedSpell(null); setIsReactiveSpellFlow(false); }}>
+                        <SpellDetailPopup
+                           spell={selectedSpell}
+                           playerStats={playerStats}
+                           campaignName={campaignName}
+                           playerLevel={playerStats.level}
+                           upcastLevels={buildUpcastLevels(selectedSpell)}
+                           onClose={() => { setSelectedSpell(null); setIsReactiveSpellFlow(false); }}
+                            onCast={isReactiveSpellFlow ? handleReactiveSpellCast : handleReactionSpellCast}
+                         />
+                    </Popup>
+                )}
+                {reactiveSpellEligible && (
+                    <Popup onClickOrKeyDown={() => { setReactiveSpellEligible(null); setReactiveSpellWarnings(false); }}>
+                        <div className="dice-roll-result">
+                            <div className="dice-roll-header">
+                                <i className="fa-solid fa-wand-magic-sparkles"></i>Reactive Spell
+                            </div>
+                            <div>Select a spell with casting time of 1 action to cast as a reaction:</div>
+                            <div className="attacks" style={{ marginTop: '8px' }}>
+                                {reactiveSpellEligible.map((spellData) => (
+                                    <div key={spellData.name} className="clickable" style={{ padding: '4px 0', color: '#4fc3f7' }}
+                                          onClick={(e) => {
+                                              e.stopPropagation();
+                                              setReactiveSpellEligible(null);
+                                              const fullSpell = {
+                                                  ...spellData,
+                                                  prepared: 'Always',
+                                              };
+                                              setSelectedSpell(fullSpell);
+                                              setIsReactiveSpellFlow(true);
+                                          }}>
+                                        {spellData.name}{!spellData.isSingleTarget ? ' <i>(multi-target)</i>' : ''}
+                                    </div>
+                                ))}
+                            </div>
+                            {reactiveSpellWarnings && (
+                                <div className="dice-roll-hint" style={{ color: '#ff9800', marginTop: '8px' }}>
+                                    Some selected spells target more than one creature. Reactive Spell works best with single-target spells.
+                                </div>
+                            )}
+                            <div className="dice-roll-hint" style={{ marginTop: '8px' }}>click to dismiss</div>
+                        </div>
+                    </Popup>
+                )}
                 {pendingMetamagic && (
                     <div>
                      <MetamagicPopup
