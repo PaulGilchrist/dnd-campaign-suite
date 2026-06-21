@@ -152,7 +152,7 @@ describe('rollExpression', () => {
     expect(result).not.toBeNull();
     expect(result.total).toBeGreaterThanOrEqual(7);
     expect(result.total).toBeLessThanOrEqual(38);
-    expect(result.rolls).toHaveLength(6);
+    expect(result.rolls).toHaveLength(3);
     expect(result.modifier).toBe(3);
   });
 

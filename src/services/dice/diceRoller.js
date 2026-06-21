@@ -115,9 +115,9 @@ function rollExpressionDoubled(formula) {
   }
   const parsed = parseExpression(formula);
   if (!parsed) return null;
-  const { sides, modifier } = parsed;
-  const { total, rolls } = rollDice(parsed.count * 2, sides);
-  return { total: total + modifier, rolls, modifier, formula };
+  const { count, sides, modifier } = parsed;
+  const { total, rolls } = rollDice(count, sides);
+  return { total: (total * 2) + modifier, rolls, modifier, formula };
 }
 
 function rollExpressionMaximized(formula) {
