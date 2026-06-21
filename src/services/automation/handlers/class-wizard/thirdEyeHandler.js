@@ -1,6 +1,12 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../common/buffToggle.js';
 
+const EFFECT_NAMES = {
+    'darkvision_120': 'Darkvision (120 feet)',
+    'greater_comprehension': 'Greater Comprehension',
+    'see_invisibility': 'See Invisibility',
+};
+
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -14,7 +20,7 @@ export async function handle(action, playerStats, campaignName) {
             payload: {
                 type: 'automation_info',
                 name: action.name,
-                description: `${action.name} is currently active: ${buff?.effect || 'Unknown'}. Duration: until start of Short or Long Rest.`,
+                description: `${action.name} is currently active: ${EFFECT_NAMES[buff?.effect] || buff?.effect || 'Unknown'}. Duration: until start of Short or Long Rest.`,
                 automation: auto,
             },
         };

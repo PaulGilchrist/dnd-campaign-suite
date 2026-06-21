@@ -292,29 +292,6 @@ describe('collectTurnStartEffects', () => {
             expect(result[0].attunementLimit).toBe(6)
         })
 
-        it('maps third_eye type with default duration', () => {
-            const features = [{
-                name: 'Third Eye',
-                automation: { type: 'third_eye' }
-            }]
-            const result = collectTurnStartEffects(features)
-            expect(result).toHaveLength(1)
-            expect(result[0]).toEqual({
-                type: 'third_eye',
-                name: 'Third Eye',
-                duration: 'short_or_long_rest',
-            })
-        })
-
-        it('maps third_eye type with custom duration', () => {
-            const features = [{
-                name: 'Third Eye',
-                automation: { type: 'third_eye', duration: 'long_rest' }
-            }]
-            const result = collectTurnStartEffects(features)
-            expect(result[0].duration).toBe('long_rest')
-        })
-
         it('maps healing_start_of_turn type with defaults', () => {
             const features = [{
                 name: 'Regeneration',

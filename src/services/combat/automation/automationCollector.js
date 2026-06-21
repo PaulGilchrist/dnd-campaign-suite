@@ -200,13 +200,6 @@ export function collectTurnStartEffects(features) {
                     bodyPartRegrowMinutes: auto.bodyPartRegrowMinutes || 2,
                 })
             }
-            if (auto?.type === 'third_eye') {
-                effects.push({
-                    type: 'third_eye',
-                    name: feature.name,
-                    duration: auto.duration || 'short_or_long_rest',
-                })
-            }
             if (auto?.type === 'passive_rule' && auto?.effect === 'arcane_ward') {
                 effects.push({
                     type: 'arcane_ward',

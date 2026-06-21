@@ -189,6 +189,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     let narrowSpaceActive = false;
     let glisteningFlightHover = false;
     let dragonWingsHover = false;
+    const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
+    const thirdEyeEffect = thirdEyeBuff?.effect || null;
     activeBuffs.forEach(buff => {
         if (buff.effect === 'fly_speed_equals_walk_speed' || buff.flySpeed) flySpeed = speed;
         if (buff.effect === 'fly_speed_20_hover') flySpeed = 20;
@@ -298,6 +300,8 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
                     {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
                     {seeInvisibleRange && <span className="automation-badge">See Invisible {seeInvisibleRange} ft</span>}
+                    {thirdEyeEffect === 'darkvision_120' && <span className="automation-badge">Darkvision 120 ft</span>}
+                    {thirdEyeEffect === 'greater_comprehension' && <span className="automation-badge">Greater Comprehension (read any language)</span>}
                     {narrowSpaceActive && <span className="automation-badge">Narrow Space</span>}
                 </div>
                 <div>

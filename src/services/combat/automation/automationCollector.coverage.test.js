@@ -389,12 +389,6 @@ describe('collectTurnStartEffects – feature automation types', () => {
         expect(result[0].bodyPartRegrowMinutes).toBe(2)
     })
 
-    it('routes third_eye with default duration', () => {
-        const features = [{ name: 'Third Eye', automation: { type: 'third_eye' } }]
-        const result = collectTurnStartEffects(features)
-        expect(result[0].duration).toBe('short_or_long_rest')
-    })
-
     it('routes damage_aura Inner Radiance with defaults', () => {
         const features = [{ name: 'Inner Radiance', automation: { type: 'damage_aura' } }]
         const result = collectTurnStartEffects(features)

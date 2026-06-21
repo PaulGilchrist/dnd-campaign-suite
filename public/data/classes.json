@@ -12854,7 +12854,12 @@
                                 "name": "The Third Eye",
                                 "level": 10,
                                 "prerequisites": [],
-                                "description": "You can use your action to increase your powers of perception. When you do so, choose one of the following benefits, which lasts until you are incapacitated or you take a short or long rest. You can't use the feature again until you finish a rest.<br/><br/><b>Darkvision</b>: You gain darkvision out to a range of 60 feet, as described in chapter 8, &quot;Adventuring.&quot;<br/><br/><b>Ethereal Sight</b>: You can see into the Ethereal Plane within 60 feet of you.<br/><br/><b>Greater Comprehension</b>: You can read any language.<br/><br/><b>See Invisibility</b>: You can see invisible creatures and objects within 10 feet of you that are within line of sight."
+                                "description": "You can use your action to increase your powers of perception. When you do so, choose one of the following benefits, which lasts until you are incapacitated or you take a short or long rest. You can't use the feature again until you finish a rest.<br/><br/><b>Darkvision</b>: You gain darkvision out to a range of 60 feet, as described in chapter 8, &quot;Adventuring.&quot;<br/><br/><b>Ethereal Sight</b>: You can see into the Ethereal Plane within 60 feet of you.<br/><br/><b>Greater Comprehension</b>: You can read any language.<br/><br/><b>See Invisibility</b>: You can see invisible creatures and objects within 10 feet of you that are within line of sight.",
+                                "automation": {
+                                    "type": "third_eye",
+                                    "casting_time": "1 action",
+                                    "duration": "short_or_long_rest"
+                                }
                             }
                         ]
                     },
