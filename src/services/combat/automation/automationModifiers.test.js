@@ -796,7 +796,7 @@ describe('collectSaveModifiers', () => {
   })
 
   describe('passive_rule type', () => {
-    it('extracts spell_breaker dispel bonus when effect matches', () => {
+    it('does not produce spell_breaker_dispel_bonus modifier (bonus handled in SpellDetailPopup)', () => {
       const features = [{
         name: 'Spell Breaker',
         automation: {
@@ -806,25 +806,7 @@ describe('collectSaveModifiers', () => {
         }
       }]
       const result = collectSaveModifiers(features)
-      expect(result).toEqual([{
-        source: 'Spell Breaker',
-        target: 'ability_check',
-        condition: '',
-        effect: 'spell_breaker_dispel_bonus',
-        bonusExpression: 'proficiency_bonus'
-      }])
-    })
-
-    it('defaults dispelAbilityCheckBonus to proficiency_bonus', () => {
-      const features = [{
-        name: 'Spell Breaker',
-        automation: {
-          type: 'passive_rule',
-          effect: 'spell_breaker'
-        }
-      }]
-      const result = collectSaveModifiers(features)
-      expect(result[0].bonusExpression).toBe('proficiency_bonus')
+      expect(result).toEqual([])
     })
 
     it('skips when effect is not spell_breaker', () => {

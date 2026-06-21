@@ -93,7 +93,7 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
 
   const isWarlock = playerStats.class?.name === 'Warlock';
   const hasPsychicSpells = playerStats.automation?.passives?.some(p => p.type === 'psychic_spells');
-  const hasSpellBreaker = playerStats.automation?.passives?.some(p => p.type === 'passive_rule' && p.effect === 'spell_breaker');
+  const hasSpellBreaker = playerStats.automation?.passives?.some(p => p.type === 'spell_breaker');
   const hasImprovedIllusions = playerStats.automation?.passives?.some(p => p.type === 'improved_illusions');
   const hasDamage = !!spell.damage;
   const isEnchantmentOrIllusion = () => {
@@ -143,6 +143,10 @@ function SpellDetailPopup({ spell, playerStats, campaignName, onClose, onCast, u
   const handleCast = () => {
     if (!canCast) return;
     const metaCtx = { overchannel: useOverchannel };
+    if (isDispelMagicAsBonusAction) {
+      const profBonus = Math.floor((playerStats.level - 1) / 4 + 2);
+      metaCtx.dispelAbilityCheckBonus = profBonus;
+    }
     if (isCantrip) {
       const modifiedSpell = cantripAutoLevel ? { ...spell, level: cantripAutoLevel } : spell;
       onCast(modifiedSpell, metaCtx);

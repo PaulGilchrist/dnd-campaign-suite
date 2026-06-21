@@ -330,7 +330,7 @@ describe('SpellDetailPopup', () => {
     const spellBreakerStats = {
       ...baseMockPlayerStats,
       automation: {
-        passives: [{ type: 'passive_rule', effect: 'spell_breaker' }],
+        passives: [{ type: 'spell_breaker' }],
         actions: [],
       },
     };
@@ -589,7 +589,7 @@ describe('SpellDetailPopup', () => {
       const spellBreakerStats = {
         ...baseMockPlayerStats,
         automation: {
-          passives: [{ type: 'passive_rule', effect: 'spell_breaker' }],
+          passives: [{ type: 'spell_breaker' }],
           actions: [],
         },
       };

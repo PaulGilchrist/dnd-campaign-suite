@@ -293,6 +293,10 @@ export function collectAutomationFromFeatures(features, playerStats) {
                     type: 'spell_breaker',
                     name: feature.name,
                     spellLevel: auto.spellLevel || 1,
+                    alwaysPreparedSpells: auto.alwaysPreparedSpells || [],
+                    bonusActionSpells: auto.bonusActionSpells || [],
+                    dispelAbilityCheckBonus: auto.dispelAbilityCheckBonus || '',
+                    slotRetentionSpells: auto.slotRetentionSpells || [],
                 })
                 continue
             }

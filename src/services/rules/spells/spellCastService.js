@@ -518,6 +518,15 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
                 await triggerRemoveCurse(spell, metaCtx, playerStats, campaignName, mapName);
             }
 
+            // Dispel Magic — ability check to dispel a spell on a target
+            if (spell.name && spell.name.toLowerCase() === 'dispel magic') {
+                const dispelTarget = await getTargetInfo();
+                if (dispelTarget) {
+                    const dispelMetaCtx = { ...metaCtx, targetName: dispelTarget.name };
+                    await triggerDispelMagic(dispelMetaCtx, spell, playerStats, campaignName, mapName);
+                }
+            }
+
             // Resistance (2024) — apply damage reduction buff to target
             if (spell.name && spell.name.toLowerCase() === 'resistance') {
                 const target = await getTargetInfo();
@@ -718,39 +727,38 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         console.error('[spellCast] Expert Divination trigger failed:', e);
     });
 
-    triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName).catch(e => {
-        console.error('[spellCast] Spell Breaker slot retention trigger failed:', e);
-    });
-
     triggerArcaneWard(spell, metaCtx, playerStats, campaignName).catch(e => {
         console.error('[spellCast] Arcane Ward trigger failed:', e);
     });
+
+    // Spell Breaker: set up Dispel Magic slot retention listener (Dispel Magic ability check result)
+    if (spell.name === 'Dispel Magic' && metaCtx?.slotLevel > 0) {
+        setupSpellBreakerDispelRetention(playerStats.name, metaCtx.slotLevel, campaignName, playerStats);
+    }
 }
 
-async function triggerSpellBreakerSlotRetention(spell, metaCtx, playerStats, campaignName) {
-    const passives = playerStats.automation?.passives;
-    if (passives == null) {
-        console.error('[spellCast] triggerSpellBreakerSlotRetention: playerStats.automation.passives is missing');
-        throw new Error('playerStats.automation.passives is required for spell breaker');
-    }
-    const spellBreaker = passives.find(p => p.type === 'passive_rule' && p.effect === 'spell_breaker');
-    if (!spellBreaker) return;
+// Spell Breaker slot retention for Dispel Magic: listens for spell-result events
+// dispatched when Dispel Magic ability check resolves. Refunds the slot if the
+// check failed (Dispel Magic didn't stop the spell).
+function setupSpellBreakerDispelRetention(playerName, spellLevel, campaignName, playerStats) {
+    const passives = playerStats?.automation?.passives;
+    const spellBreaker = passives?.find(p => p.type === 'spell_breaker');
+    if (!spellBreaker || !spellBreaker.slotRetentionSpells?.includes('Dispel Magic')) return;
 
-    const retentionSpells = spellBreaker.slotRetentionSpells;
-    if (retentionSpells == null || !Array.isArray(retentionSpells)) {
-        console.error('[spellCast] triggerSpellBreakerSlotRetention: slotRetentionSpells is not an array');
-        throw new Error('slotRetentionSpells must be an array');
-    }
-    if (!retentionSpells.includes(spell.name)) return;
+    const slotKey = `spell_slots_level_${spellLevel}`;
+    const handler = (event) => {
+        if (event.detail?.spellName !== 'Dispel Magic') return;
+        if (event.detail?.checkFailed !== true) return;
 
-    const slotKey = `spell_slots_level_${spell.level}`;
-    const currentSlots = getRuntimeValue(playerStats.name, slotKey);
-    if (currentSlots == null || currentSlots < 0) return;
+        const currentSlots = getRuntimeValue(playerName, slotKey);
+        if (currentSlots != null && currentSlots >= 0) {
+            setRuntimeValue(playerName, slotKey, currentSlots + 1, campaignName);
+        }
 
-    const checkFailed = metaCtx?.saveSuccess === false || metaCtx?.abilityCheckSuccess === false;
-    if (!checkFailed) return;
+        window.removeEventListener('spell-result', handler);
+    };
 
-    setRuntimeValue(playerStats.name, slotKey, currentSlots + 1, campaignName);
+    window.addEventListener('spell-result', handler);
 }
 
 async function triggerArcaneWard(spell, metaCtx, playerStats, campaignName) {
@@ -780,7 +788,40 @@ async function triggerArcaneWard(spell, metaCtx, playerStats, campaignName) {
     }
 }
 
+// Dispel Magic: ability check to dispel a spell on a target.
+// Spell Breaker adds Proficiency Bonus to this check.
+// On failure, dispatches a spell-result event for slot retention.
+async function triggerDispelMagic(metaCtx, spell, playerStats, _campaignName, _mapName) {
+    const profBonus = Math.floor((playerStats.level - 1) / 4 + 2);
 
+    // Build the ability check bonus: spellcasting ability modifier + proficiency bonus + Spell Breaker bonus
+    const spellCastAbility = spell.spellCastingAbility || playerStats.spellAbilities?.spellCastingAbility;
+    let abilityMod = playerStats.spellAbilities?.modifier || 0;
+    if (spellCastAbility && playerStats.abilities) {
+        const ability = playerStats.abilities.find(a => a.name === spellCastAbility);
+        if (ability) {
+            abilityMod = ability.bonus;
+        }
+    }
+
+    const totalCheckBonus = abilityMod + profBonus + (metaCtx?.dispelAbilityCheckBonus || 0);
+
+    // Show a popup prompting for the Dispel Magic ability check
+    const targetName = metaCtx?.targetName || 'unknown target';
+    const spellLevel = metaCtx?.slotLevel || spell.level;
+    const targetDC = 10 + spellLevel;
+
+    window.dispatchEvent(new CustomEvent('spell-result', {
+        detail: {
+            spellName: 'Dispel Magic',
+            targetName,
+            checkBonus: totalCheckBonus,
+            targetDC,
+            isDispelMagic: true,
+        },
+        bubbles: true,
+    }));
+}
 
 export function refundSpellBreakerSlot(playerName, spellLevel, campaignName) {
     const slotKey = `spell_slots_level_${spellLevel}`;

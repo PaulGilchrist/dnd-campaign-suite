@@ -77,8 +77,6 @@ describe('conditionEffects', () => {
           potentCantrip: false,
           soulstitchSpells: false,
           passWithoutTraceBonus: null,
-          spellBreakerDispelBonus: false,
-          spellBreakerDispelBonusExpression: null,
           improvedIllusions: false,
           illusoryReality: false,
           riderSaveDisadvantage: false,
@@ -416,13 +414,6 @@ describe('conditionEffects', () => {
         const modifiers = [{ target: 'saving_throw', effect: 'pass_without_trace', bonusExpression: '10' }];
         const result = computeConditionEffects([], modifiers);
         expect(result.passWithoutTraceBonus).toBe('10');
-      });
-
-      it('handles spell_breaker_dispel_bonus with bonusExpression', () => {
-        const modifiers = [{ target: 'saving_throw', effect: 'spell_breaker_dispel_bonus', bonusExpression: '2d4' }];
-        const result = computeConditionEffects([], modifiers);
-        expect(result.spellBreakerDispelBonus).toBe(true);
-        expect(result.spellBreakerDispelBonusExpression).toBe('2d4');
       });
 
       it('handles str_check_disadvantage', () => {

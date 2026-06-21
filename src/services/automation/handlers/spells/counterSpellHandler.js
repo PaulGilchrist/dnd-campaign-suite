@@ -1,6 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -77,6 +78,16 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 success: true,
                 description: `${targetName} succeeded on ${saveType} save. ${featureName} fails to counter the spell.`,
             }).catch((e) => { console.error("[counterSpell] Error:", e); throw e; });
+
+            const passives = playerStats.automation?.passives;
+            const spellBreaker = passives?.find(p => p.type === 'spell_breaker');
+            if (spellBreaker && spellBreaker.slotRetentionSpells?.includes('Counterspell')) {
+                const slotKey = 'spell_slots_level_3';
+                const currentSlots = getRuntimeValue(playerName, slotKey);
+                if (currentSlots != null && currentSlots >= 0) {
+                    setRuntimeValue(playerName, slotKey, currentSlots + 1, campaignName);
+                }
+            }
         }
 
         window.removeEventListener('save-result', handleSaveResult);

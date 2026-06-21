@@ -242,15 +242,6 @@ export function collectSaveModifiers(features) {
                     effect: 'overchannel',
                 })
             }
-            if (auto.type === 'passive_rule' && auto.effect === 'spell_breaker') {
-                modifiers.push({
-                    source: feature.name,
-                    target: 'ability_check',
-                    condition: '',
-                    effect: 'spell_breaker_dispel_bonus',
-                    bonusExpression: auto.dispelAbilityCheckBonus || 'proficiency_bonus',
-                })
-            }
             if (auto.type === 'conditional_disadvantage') {
                 const abilities = auto.abilities || (auto.saveType ? [auto.saveType.toUpperCase()] : []);
                 const target = auto.target || 'attack_roll';

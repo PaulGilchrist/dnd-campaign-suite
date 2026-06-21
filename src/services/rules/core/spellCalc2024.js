@@ -256,7 +256,7 @@ export function getSpellAbilities(allSpells, playerStats, playerSummary) {
                         }
                     });
                 }
-                if (feature.type === 'passive_rule' && feature.effect === 'spell_breaker' && feature.alwaysPreparedSpells) {
+                if (feature.type === 'spell_breaker' && feature.alwaysPreparedSpells) {
                     feature.alwaysPreparedSpells.forEach(spellName => {
                         const knownSpell = spellAbilities.spells.find(s => s.name === spellName);
                         if (!knownSpell) {
