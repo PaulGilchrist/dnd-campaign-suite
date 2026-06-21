@@ -24,9 +24,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
         if (cannotAct) return;
         const result = await executeHandler(action, playerStats, campaignName, null);
         if (!result) return;
-        if (result.type === 'popup') {
-            setPopupHtml(formatPopupPayload(result.payload));
-        } else if (result.type === 'modal') {
+        if (result.type === 'modal') {
             if (result.modalName === 'teleport') {
                 setTeleportModal(result.payload);
             } else if (result.modalName === 'signatureSpells') {
@@ -77,16 +75,6 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
             setPopupHtml(html);
         }
     }, [savantModal, playerStats, campaignName]);
-
-    function formatPopupPayload(payload) {
-        if (!payload) return null;
-        if (typeof payload === 'string') return payload;
-        if (payload.type === 'automation_info') {
-            return `<b>${payload.name || ''}</b><br/>${payload.description || ''}`;
-        }
-        if (payload.html) return payload.html;
-        return String(payload);
-    }
 
     // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];

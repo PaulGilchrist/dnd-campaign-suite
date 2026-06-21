@@ -113,6 +113,14 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         }
     }
 
+    // Clear Portent once-per-turn flag at start of each creature's turn
+    if (activeName) {
+        const portentUsed = getRuntimeValue(activeName, 'portentUsedThisTurn', campaignName);
+        if (portentUsed) {
+            setRuntimeValue(activeName, 'portentUsedThisTurn', false, campaignName);
+        }
+    }
+
     // Clean up Multiattack Defense effects at start of each creature's turn
     const allTargetEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
     if (allTargetEffects.length > 0) {

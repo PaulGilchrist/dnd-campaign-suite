@@ -3,6 +3,9 @@ import React from 'react'
 import TrackedResourceInput from './TrackedResourceInput.jsx';
 import { getClassFeatures } from '../../../services/character/classFeatures.js';
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { executeHandler } from '../../../services/automation/index.js';
+import { applyPortentChoice } from '../../../services/automation/handlers/class-wizard/portentHandler.js';
+import Popup from '../../common/Popup.jsx';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -392,13 +395,16 @@ const WarlockFeatures = function WarlockFeatures({ playerStats }) {
 /* ─── Wizard ─── */
 const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     const wizardFeatures = getClassFeatures(playerStats);
-    const hasPortent = (playerStats.automation?.specialActions ?? []).some(
-        a => a.type === 'portent' || a.name === 'Portent'
+    const portentAction = (playerStats.specialActions ?? []).find(
+        a => a.automation?.type === 'portent'
     );
+    const hasPortent = !!portentAction;
     const hasProjectedWard = (playerStats.automation?.reactions ?? []).some(
         a => a.type === 'projected_ward' || a.name === 'Projected Ward'
     );
     const [portentDice, setPortentDiceState] = React.useState([]);
+    const [portentPopup, setPortentPopup] = React.useState(null);
+    const [portentModal, setPortentModal] = React.useState(null);
     const activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName);
     const thirdEyeBuff = Array.isArray(activeBuffs) ? (activeBuffs.find(b => b.name === 'The Third Eye') || null) : null;
     const THIRD_EYE_EFFECTS = {
@@ -417,9 +423,86 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
         } catch { /* ignore */ }
     }, [playerStats.name, campaignName]);
 
+    const refreshDiceDisplay = React.useCallback(() => {
+        const stored = getRuntimeValue(playerStats.name, 'portentDice', campaignName);
+        if (stored) {
+            const parsed = typeof stored === 'string' ? JSON.parse(stored) : stored;
+            if (Array.isArray(parsed)) setPortentDiceState(parsed);
+        }
+    }, [playerStats.name, campaignName]);
+
+    const handlePortentClick = React.useCallback(async () => {
+        if (!portentAction) return;
+        const result = await executeHandler(portentAction, playerStats, campaignName, null);
+        if (!result) return;
+        if (result.type === 'modal') {
+            setPortentModal(result.payload);
+        } else if (result.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}`;
+            setPortentPopup(html);
+            refreshDiceDisplay();
+        }
+    }, [portentAction, playerStats, campaignName, refreshDiceDisplay]);
+
+    const handlePortentDieChoice = React.useCallback(async (chosenDie) => {
+        const { action, playerStats: ps, campaignName: cn, targetName, eventType, eventData } = portentModal;
+        const result = await applyPortentChoice(action, ps, cn, targetName, eventType, eventData, chosenDie);
+        setPortentModal(null);
+        if (result?.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}`;
+            setPortentPopup(html);
+            refreshDiceDisplay();
+        }
+    }, [portentModal, refreshDiceDisplay]);
+
+    function getEventDisplayLabel(eventType, eventData) {
+        if (eventType === 'attack') {
+            return `Attack vs AC ${eventData.targetName || 'unknown'}`;
+        }
+        if (eventType === 'ability') {
+            return eventData.checkName || 'Ability check';
+        }
+        return eventData.saveType ? eventData.saveType.toUpperCase() : 'Save';
+    }
+
     if ((wizardFeatures?.showWizardFeatures ?? true) === false) return null;
     return (
          <div data-testid="char-class-wizard">
+             {portentPopup && <Popup html={portentPopup} onClickOrKeyDown={() => setPortentPopup(null)} />}
+             {portentModal && (
+                 <div className="portent-modal-overlay" onClick={() => setPortentModal(null)}>
+                     <div className="portent-modal" onClick={e => e.stopPropagation()}>
+                         <h3>Portent</h3>
+                         <div className="portent-modal-section">
+                             <div className="portent-modal-label">Target: <span className="portent-modal-target">{portentModal.targetName}</span></div>
+                             <div className="portent-modal-label">{getEventDisplayLabel(portentModal.eventType, portentModal.eventData)}</div>
+                             <div className="portent-modal-original">
+                                 Original: d20({portentModal.eventData.d20}) + {portentModal.eventData.bonus} = {portentModal.eventData.d20 + portentModal.eventData.bonus}
+                                 {portentModal.eventType === 'attack' && ` (${portentModal.eventData.hit ? 'Hit' : 'Miss'})`}
+                             </div>
+                         </div>
+                         <div className="portent-modal-section">
+                             <div className="portent-modal-label">Choose a foretelling roll:</div>
+                             <div className="portent-dice-options">
+                                 {portentModal.diceOptions.map(die => (
+                                     <button key={die} className="portent-die-btn" onClick={() => handlePortentDieChoice(die)}>
+                                         {die}
+                                     </button>
+                                 ))}
+                             </div>
+                         </div>
+                         <div className="portent-modal-actions">
+                             <button className="portent-cancel-btn" onClick={() => setPortentModal(null)}>Cancel</button>
+                         </div>
+                     </div>
+                 </div>
+             )}
              <TrackedResourceInput label="Arcane Recovery Levels" resourceKey="arcaneRecoveryLevels" playerName={playerStats.name} getMax={() => wizardFeatures?.arcaneRecoveryLevels || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              <div className="automation-actions">
                  <button className="automation-btn" title="Arcane Recovery: Regain spell slots on short rest">
@@ -436,10 +519,15 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
                       <div className="portent-dice-display">
                           {portentDice.length > 0
                               ? portentDice.map((die, i) => (
-                                  <span key={i} className="portent-die">{die}</span>
+                                  <span key={i} className="portent-die">{die}{i < portentDice.length - 1 ? ', ' : ''}</span>
                               ))
                               : <span className="automation-badge">No dice remaining</span>
                           }
+                      </div>
+                      <div className="automation-actions">
+                          <button className="automation-btn" onClick={handlePortentClick} title="Use Portent to replace a d20 test with a foretelling roll">
+                              <i className="fas fa-dice-d20"></i> Use Portent
+                          </button>
                       </div>
                       <span className="automation-badge">{portentDice.length} remaining (refreshes on Long Rest)</span>
                   </div>

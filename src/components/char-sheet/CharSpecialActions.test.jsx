@@ -249,7 +249,7 @@ describe('CharSpecialActions', () => {
       expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
 
-    it('dismisses the popup when the overlay is clicked', async () => {
+    it('does not show a popup when executeHandler returns popup (popups removed from Special Actions)', async () => {
       executeHandler.mockResolvedValue({
         type: 'popup',
         payload: { type: 'automation_info', name: 'Berserker Rage', description: 'Enter a berserker rage.' },
@@ -262,12 +262,9 @@ describe('CharSpecialActions', () => {
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Berserker Rage/));
       await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+        expect(executeHandler).toHaveBeenCalled();
       });
-      fireEvent.click(screen.getByTestId('popup-overlay'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      });
+      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
   });
 
@@ -296,7 +293,7 @@ describe('CharSpecialActions', () => {
       });
     });
 
-    it('shows an automation info popup when executeHandler returns type popup', async () => {
+    it('does not show a popup when executeHandler returns type popup (popups removed from Special Actions)', async () => {
       executeHandler.mockResolvedValue({
         type: 'popup',
         payload: { type: 'automation_info', name: 'Blink Steps', description: 'Teleported 30 ft.' },
@@ -311,8 +308,9 @@ describe('CharSpecialActions', () => {
       fireEvent.click(screen.getByText(/Blink Steps/));
 
       await waitFor(() => {
-        expect(screen.getByText(/Teleported 30 ft/)).toBeInTheDocument();
+        expect(executeHandler).toHaveBeenCalled();
       });
+      expect(screen.queryByText(/Teleported 30 ft/)).not.toBeInTheDocument();
     });
 
     it('shows a teleport modal when automation returns a teleport modal', async () => {
@@ -475,7 +473,7 @@ describe('CharSpecialActions', () => {
       expect(screen.queryByTestId('teleport-modal')).not.toBeInTheDocument();
     });
 
-    it('handles executeHandler returning an error popup result', async () => {
+    it('does not show error popup result (popups removed from Special Actions)', async () => {
       executeHandler.mockResolvedValue({
         type: 'popup',
         payload: { type: 'automation_info', name: 'Broken Action', description: 'Failed to execute Broken Action' },
@@ -492,10 +490,7 @@ describe('CharSpecialActions', () => {
       await waitFor(() => {
         expect(executeHandler).toHaveBeenCalled();
       });
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-      expect(screen.getByText(/Failed to execute Broken Action/)).toBeInTheDocument();
+      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
 
     it('handles getFightingStyle returning null for unknown style', () => {

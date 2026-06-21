@@ -135,6 +135,9 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       if (mod.effect === 'restore_balance') {
         effects.restoreBalance = true;
       }
+      if (mod.effect === 'portent') {
+        effects.portent = true;
+      }
     } else if (mod.target === 'attack_roll' || mod.target === 'attack_rolls' || mod.target === 'attack_rolls_vs_unmounted_near_mount') {
       if (mod.effect === 'advantage') {
         effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;

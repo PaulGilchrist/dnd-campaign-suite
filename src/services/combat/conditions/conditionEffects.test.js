@@ -386,8 +386,20 @@ describe('conditionEffects', () => {
         expect(result.darkOnesLook).toBe(true);
       });
 
-      it('handles portent', () => {
+      it('handles portent with attack_roll target', () => {
         const modifiers = [{ target: 'attack_roll', effect: 'portent' }];
+        const result = computeConditionEffects([], modifiers);
+        expect(result.portent).toBe(true);
+      });
+
+      it('handles portent with d20 target', () => {
+        const modifiers = [{ target: 'd20', effect: 'portent' }];
+        const result = computeConditionEffects([], modifiers);
+        expect(result.portent).toBe(true);
+      });
+
+      it('handles portent with saving_throw target', () => {
+        const modifiers = [{ target: 'saving_throw', effect: 'portent' }];
         const result = computeConditionEffects([], modifiers);
         expect(result.portent).toBe(true);
       });

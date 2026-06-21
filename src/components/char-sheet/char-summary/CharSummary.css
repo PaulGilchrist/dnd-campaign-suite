@@ -237,6 +237,96 @@
     margin-top: 2px;
 }
 
+/* Portent dice choice modal */
+.portent-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.portent-modal {
+    background-color: var(--background-color-header-inner);
+    border: 1px solid var(--color-header);
+    border-radius: 10px;
+    color: var(--color-header-inner);
+    padding: 20px;
+    max-width: 450px;
+    width: 90%;
+}
+.portent-modal h3 {
+    margin: 0 0 12px;
+    color: var(--color-header);
+}
+.portent-modal-section {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color-light);
+}
+.portent-modal-section:last-of-type {
+    border-bottom: none;
+}
+.portent-modal-label {
+    font-size: 0.9em;
+    margin-bottom: 4px;
+}
+.portent-modal-target {
+    font-weight: bold;
+}
+.portent-modal-original {
+    font-size: 0.95em;
+    margin: 4px 0;
+}
+.portent-dice-options {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 12px 0;
+}
+.portent-die-btn {
+    min-width: 50px;
+    padding: 10px 16px;
+    font-size: 1.2em;
+    font-weight: bold;
+    border: 2px solid var(--color-header);
+    border-radius: 8px;
+    background-color: var(--background-color);
+    color: var(--color);
+    cursor: pointer;
+    transition: background-color 0.15s, transform 0.1s;
+}
+.portent-die-btn:hover {
+    background-color: var(--color-header);
+    color: var(--color-header-inner);
+    transform: scale(1.05);
+}
+.portent-die-btn:active {
+    transform: scale(0.95);
+}
+.portent-modal-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+.portent-cancel-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 4px;
+    background-color: var(--background-color-button-cancel);
+    color: var(--color-text-inverse);
+    cursor: pointer;
+    font-size: 0.9em;
+}
+.portent-cancel-btn:hover {
+    background-color: var(--background-color-button-cancel-hover);
+}
+
 @media print {
     .char-header .avatar-wrapper {
         border: 1px solid black;
