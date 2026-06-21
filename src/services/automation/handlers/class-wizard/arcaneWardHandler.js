@@ -23,22 +23,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const currentHp = Number(getRuntimeValue(playerName, ARCAN_WARD_KEY, campaignName) ?? 0);
-    const maxHp = Number(getRuntimeValue(playerName, ARCAN_WARD_MAX_KEY, campaignName) ?? 0);
-
-    // Show ward status
     return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: action.name,
-            automationType: auto.type,
-            description: `${action.name}: Ward HP: ${currentHp}/${maxHp}.<br/><br/>
-                <b>On Long Rest:</b> Ward is destroyed.<br/>
-                <b>On Abjuration spell cast:</b> Ward regains HP = 2 × spell slot level.<br/>
-                <b>Bonus Action:</b> Expend a spell slot to restore Ward HP = 2 × spell slot level.`,
-            automation: auto,
-        },
+        type: 'modal',
+        modalName: 'arcaneWardRestore',
+        payload: { action },
     };
 }
 

@@ -408,17 +408,6 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     };
 
     React.useEffect(() => {
-        console.log('[WizardFeatures] render:', {
-            playerName: playerStats.name,
-            hasArcaneWardPassive: (playerStats.automation?.passives ?? []).some(p => p.type === 'arcane_ward'),
-            hasProjectedWardReaction: hasProjectedWard,
-            arcaneWardHp: getRuntimeValue(playerStats.name, 'arcaneWardHp', campaignName),
-            arcaneWardMax: getRuntimeValue(playerStats.name, 'arcaneWardMax', campaignName),
-            arcaneWardActive: getRuntimeValue(playerStats.name, 'arcaneWardActive', campaignName),
-        });
-    });
-
-    React.useEffect(() => {
         try {
             const stored = getRuntimeValue(playerStats.name, 'portentDice', campaignName);
             if (stored) {

@@ -1,0 +1,89 @@
+.arcane-ward-restore-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.arcane-ward-restore-modal {
+    background-color: var(--background-color-header-inner);
+    border: 1px solid var(--color-header);
+    border-radius: 10px;
+    color: var(--color-header-inner);
+    padding: 20px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.arcane-ward-restore-modal .sp-body p {
+    margin: 0 0 8px;
+}
+
+.arcane-ward-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.arcane-ward-slot-option {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 8px;
+    border: 1px solid var(--border-color-light);
+    border-radius: 6px;
+    cursor: pointer;
+    gap: 4px;
+    transition: background-color 0.15s, border-color 0.15s;
+}
+
+.arcane-ward-slot-option:hover:not(.disabled) {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+
+.arcane-ward-slot-option.selected {
+    border-color: var(--color-link);
+    background-color: rgba(255, 255, 255, 0.12);
+}
+
+.arcane-ward-slot-option.disabled {
+    opacity: 0.4;
+    cursor: default;
+}
+
+.arcane-ward-slot-option input[type="radio"] {
+    margin-bottom: 4px;
+}
+
+.slot-level {
+    font-weight: bold;
+    font-size: 0.95em;
+}
+
+.slot-available {
+    font-size: 0.8em;
+    opacity: 0.7;
+}
+
+.slot-restore {
+    font-size: 0.85em;
+    color: #10b981;
+    font-weight: bold;
+}
+
+.arcane-ward-preview {
+    margin-top: 12px;
+    padding: 8px 12px;
+    background-color: rgba(16, 185, 129, 0.1);
+    border-radius: 6px;
+    font-size: 0.95em;
+}

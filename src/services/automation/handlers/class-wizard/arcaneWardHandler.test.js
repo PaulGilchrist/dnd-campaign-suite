@@ -41,23 +41,18 @@ describe('arcaneWardHandler', () => {
             expect(result.payload.description).toContain('not active');
         });
 
-        it('should return ward status when ward is active', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
-                if (key === 'arcaneWardActive') return true;
-                if (key === 'arcaneWardHp') return 13;
-                if (key === 'arcaneWardMax') return 13;
-                return undefined;
-            });
+        it('should open modal to choose spell slot level when ward is active', async () => {
+            getRuntimeValue.mockReturnValue(true);
 
             const result = await handle(
-                { name: 'Arcane Ward', description: 'Create a magical ward...', automation: { type: 'passive_rule' } },
+                { name: 'Arcane Ward', description: 'Create a magical ward...', automation: { type: 'arcane_ward_bonus_action' } },
                 mockPlayerStats,
                 mockCampaignName
             );
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('13/13');
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('arcaneWardRestore');
+            expect(result.payload.action.name).toBe('Arcane Ward');
         });
     });
 

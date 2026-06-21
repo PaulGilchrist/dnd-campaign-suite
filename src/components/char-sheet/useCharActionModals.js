@@ -53,6 +53,7 @@ export default function useCharActionModals({
     const [fiendishLegacyModal, setFiendishLegacyModal] = useState(null);
     const [giantAncestryModal, setGiantAncestryModal] = useState(null);
     const [hypnoticPatternShakeModal, setHypnoticPatternShakeModal] = useState(null);
+    const [arcaneWardRestoreModal, setArcaneWardRestoreModal] = useState(null);
     const [eyebiteEffectModal, setEyebiteEffectModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
@@ -148,6 +149,7 @@ export default function useCharActionModals({
         fiendishLegacyModal, setFiendishLegacyModal,
         giantAncestryModal, setGiantAncestryModal,
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
+        arcaneWardRestoreModal, setArcaneWardRestoreModal,
         eyebiteEffectModal, setEyebiteEffectModal,
         divineFuryChoice, setDivineFuryChoice,
         damageTypeChoice, setDamageTypeChoice,

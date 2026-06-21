@@ -41,6 +41,7 @@ import FiendishLegacyModal from './modals/FiendishLegacyModal.jsx'
 import GiantAncestryModal from './modals/racial/GiantAncestryModal.jsx'
 import BreathWeaponShapeModal from './modals/racial/BreathWeaponShapeModal.jsx'
 import HypnoticPatternShakeModal from './modals/shared/HypnoticPatternShakeModal.jsx'
+import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
 import MoonlightStepResourceModal from './modals/MoonlightStepResourceModal.jsx'
 import ConstellationSelectionModal from './modals/ConstellationSelectionModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
@@ -96,6 +97,7 @@ export default function CharActionModals({
     eyebiteEffectModal, setEyebiteEffectModal,
     breathWeaponShapeModal, setBreathWeaponShapeModal,
     hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
+    arcaneWardRestoreModal, setArcaneWardRestoreModal,
     divineFuryChoice,
     damageTypeChoice,
     featureChoice,
@@ -480,6 +482,14 @@ export default function CharActionModals({
                 <HypnoticPatternShakeModal
                     {...hypnoticPatternShakeModal}
                     onClose={() => setHypnoticPatternShakeModal(null)}
+                />
+            )}
+            {arcaneWardRestoreModal && (
+                <ArcaneWardRestoreModal
+                    {...arcaneWardRestoreModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setArcaneWardRestoreModal(null)}
                 />
             )}
             {divineFuryChoice && (

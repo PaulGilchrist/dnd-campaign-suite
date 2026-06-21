@@ -249,6 +249,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleCleaveAttack,
         handleCleaveSkip,
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
+        arcaneWardRestoreModal, setArcaneWardRestoreModal,
     } = useCharActionModals({
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
@@ -520,6 +521,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         setHypnoticPatternShakeModal(shakePayload);
                         break;
                     }
+                    case 'arcaneWardRestore':
+                        setArcaneWardRestoreModal(result.payload);
+                        break;
                     case 'defensiveTactics': {
                         const actionData = result.payload?.action;
                         const defensiveChoice = getRuntimeValue(playerStats.name, '_Defensive_Tactics_choice', campaignName);
@@ -840,6 +844,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     eyebiteEffectModal={eyebiteEffectModal} setEyebiteEffectModal={setEyebiteEffectModal}
                     breathWeaponShapeModal={breathWeaponShapeModal} setBreathWeaponShapeModal={setBreathWeaponShapeModal}
                     hypnoticPatternShakeModal={hypnoticPatternShakeModal} setHypnoticPatternShakeModal={setHypnoticPatternShakeModal}
+                    arcaneWardRestoreModal={arcaneWardRestoreModal} setArcaneWardRestoreModal={setArcaneWardRestoreModal}
                     divineFuryChoice={divineFuryChoice}
                     damageTypeChoice={damageTypeChoice}
                     featureChoice={featureChoice}
