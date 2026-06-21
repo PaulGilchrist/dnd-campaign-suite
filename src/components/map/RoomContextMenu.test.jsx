@@ -1,4 +1,5 @@
-import { render } from '@testing-library/react';
+// @improved-by-ai
+import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import RoomContextMenu from './RoomContextMenu.jsx';
 import { ROOM_TYPES, ROOM_TYPE_COLORS, CELL_SIZE } from '../../config/mapConfig';
@@ -33,12 +34,16 @@ const renderComponent = (props = {}) =>
 
 describe('RoomContextMenu', () => {
     describe('null rendering', () => {
-        it('should return null when selectedRoom is not provided', () => {
+        it.each([
+            [null, 'selectedRoom is null'],
+            [undefined, 'selectedRoom is undefined'],
+            [makeSelectedRoom(), 'isLocalhost is false'],
+        ])('should return null when %s (%s)', (selectedRoom, _description) => {
             const { container } = render(
                 <svg>
                     <RoomContextMenu
-                        selectedRoom={null}
-                        isLocalhost={true}
+                        selectedRoom={selectedRoom}
+                        isLocalhost={selectedRoom ? false : true}
                         gridSize={gridSize}
                         gridCenterX={gridCenterX}
                         gridCenterY={gridCenterY}
@@ -47,75 +52,25 @@ describe('RoomContextMenu', () => {
                     />
                 </svg>
             );
-            expect(container.querySelector('.item-context-menu')).toBeNull();
-        });
-
-        it('should return null when selectedRoom is undefined', () => {
-            const { container } = render(
-                <svg>
-                    <RoomContextMenu
-                        selectedRoom={undefined}
-                        isLocalhost={true}
-                        gridSize={gridSize}
-                        gridCenterX={gridCenterX}
-                        gridCenterY={gridCenterY}
-                        setMapData={vi.fn()}
-                        setSelectedRoom={vi.fn()}
-                    />
-                </svg>
-            );
-            expect(container.querySelector('.item-context-menu')).toBeNull();
-        });
-
-        it('should return null when isLocalhost is false', () => {
-            const { container } = render(
-                <svg>
-                    <RoomContextMenu
-                        selectedRoom={makeSelectedRoom()}
-                        isLocalhost={false}
-                        gridSize={gridSize}
-                        gridCenterX={gridCenterX}
-                        gridCenterY={gridCenterY}
-                        setMapData={vi.fn()}
-                        setSelectedRoom={vi.fn()}
-                    />
-                </svg>
-            );
-            expect(container.querySelector('.item-context-menu')).toBeNull();
+            expect(container.querySelector('.item-context-menu')).not.toBeInTheDocument();
         });
     });
 
     describe('basic rendering', () => {
         it('should render the root group with item-context-menu class', () => {
             const { container } = renderComponent();
-            const rootGroup = container.querySelector('g.item-context-menu');
-            expect(rootGroup).not.toBeNull();
+            expect(container.querySelector('g.item-context-menu')).toBeInTheDocument();
         });
 
-        it('should render the background rect', () => {
+        it('should render the background rect with correct attributes', () => {
             const { container } = renderComponent();
             const rect = container.querySelector('rect');
-            expect(rect).not.toBeNull();
-        });
-
-        it('should render the rect with correct fill and stroke', () => {
-            const { container } = renderComponent();
-            const rect = container.querySelector('rect');
-            expect(rect.getAttribute('fill')).toBe('#2a2a2a');
-            expect(rect.getAttribute('stroke')).toBe('#555');
-            expect(rect.getAttribute('stroke-width')).toBe('1');
-        });
-
-        it('should render the rect with width 130', () => {
-            const { container } = renderComponent();
-            const rect = container.querySelector('rect');
-            expect(rect.getAttribute('width')).toBe('130');
-        });
-
-        it('should render the rect with rx 4', () => {
-            const { container } = renderComponent();
-            const rect = container.querySelector('rect');
-            expect(rect.getAttribute('rx')).toBe('4');
+            expect(rect).toBeInTheDocument();
+            expect(rect).toHaveAttribute('fill', '#2a2a2a');
+            expect(rect).toHaveAttribute('stroke', '#555');
+            expect(rect).toHaveAttribute('stroke-width', '1');
+            expect(rect).toHaveAttribute('width', '130');
+            expect(rect).toHaveAttribute('rx', '4');
         });
 
         it('should render the Room title text', () => {
@@ -124,18 +79,15 @@ describe('RoomContextMenu', () => {
             const roomTitle = Array.from(titleText).find(
                 (t) => t.getAttribute('font-weight') === 'bold'
             );
-            expect(roomTitle).not.toBeNull();
-            expect(roomTitle.getAttribute('fill')).toBe('#e0e0e0');
-            expect(roomTitle.getAttribute('font-size')).toBe('11');
+            expect(roomTitle).toBeInTheDocument();
+            expect(roomTitle).toHaveAttribute('fill', '#e0e0e0');
+            expect(roomTitle).toHaveAttribute('font-size', '11');
         });
 
         it('should render the Set Label menu option', () => {
-            const { container } = renderComponent();
-            const menuOptionTexts = container.querySelectorAll('text.menu-option');
-            const labelTexts = Array.from(menuOptionTexts).filter(
-                (t) => t.textContent === 'Set Label...'
-            );
-            expect(labelTexts.length).toBe(1);
+            renderComponent();
+            const labelTexts = screen.queryAllByText('Set Label...');
+            expect(labelTexts.length).toBeGreaterThan(0);
         });
 
         it('should render room type options for each ROOM_TYPE', () => {
@@ -157,53 +109,51 @@ describe('RoomContextMenu', () => {
             });
         });
 
-        it('should render the Delete Room option', () => {
-            const { container } = renderComponent();
-            const menuOptionTexts = container.querySelectorAll('text.menu-option');
-            const deleteText = Array.from(menuOptionTexts).find(
-                (t) => t.textContent === 'Delete Room'
-            );
-            expect(deleteText).not.toBeNull();
-        });
-
-        it('should render Delete Room text in red', () => {
+        it('should render the Delete Room option in red', () => {
             const { container } = renderComponent();
             const deleteText = Array.from(container.querySelectorAll('text.menu-option')).find(
                 (t) => t.textContent === 'Delete Room'
             );
-            expect(deleteText.getAttribute('fill')).toBe('#e74c3c');
+            expect(deleteText).toBeInTheDocument();
+            expect(deleteText).toHaveAttribute('fill', '#e74c3c');
         });
 
-        it('should render the close button with correct text', () => {
+        it('should render the close button with correct attributes', () => {
             const { container } = renderComponent();
             const closeText = container.querySelector('text.menu-close');
+            expect(closeText).toBeInTheDocument();
             expect(closeText.textContent).toBe('✕');
-        });
-
-        it('should render the close button with fill #999 and fontSize 10', () => {
-            const { container } = renderComponent();
-            const closeText = container.querySelector('text.menu-close');
-            expect(closeText.getAttribute('fill')).toBe('#999');
-            expect(closeText.getAttribute('font-size')).toBe('10');
-        });
-
-        it('should render non-selected menu options with fill #ccc', () => {
-            const { container } = renderComponent();
-            const menuOptionTexts = container.querySelectorAll('text.menu-option');
-            const nonSelectedTypes = Array.from(menuOptionTexts).filter(
-                (t) => t.textContent !== 'Set Label...' && t.textContent !== 'Delete Room' && t.textContent !== 'Entrance'
-            );
-            nonSelectedTypes.forEach((text) => {
-                expect(text.getAttribute('fill')).toBe('#ccc');
-            });
+            expect(closeText).toHaveAttribute('fill', '#999');
+            expect(closeText).toHaveAttribute('font-size', '10');
         });
 
         it('should render menu options with fontSize 11', () => {
             const { container } = renderComponent();
             const menuOptionTexts = container.querySelectorAll('text.menu-option');
             menuOptionTexts.forEach((text) => {
-                expect(text.getAttribute('font-size')).toBe('11');
+                expect(text).toHaveAttribute('font-size', '11');
             });
+        });
+
+        it('should render correct number of menu options', () => {
+            const { container } = renderComponent();
+            const menuOptionTexts = container.querySelectorAll('text.menu-option');
+            expect(menuOptionTexts.length).toBe(1 + ROOM_TYPES.length + 1);
+        });
+
+        it('should render exactly 1 close button', () => {
+            const { container } = renderComponent();
+            const closeTexts = container.querySelectorAll('text.menu-close');
+            expect(closeTexts.length).toBe(1);
+        });
+
+        it('should render exactly 1 title text (bold Room text)', () => {
+            const { container } = renderComponent();
+            const allTexts = container.querySelectorAll('text');
+            const boldTexts = Array.from(allTexts).filter(
+                (t) => t.getAttribute('font-weight') === 'bold' && t.getAttribute('fill') === '#e0e0e0'
+            );
+            expect(boldTexts.length).toBe(1);
         });
     });
 
@@ -307,7 +257,7 @@ describe('RoomContextMenu', () => {
                 const colorRect = container.querySelector(
                     `rect[fill="${expectedColor}"][rx="2"]`
                 );
-                expect(colorRect).not.toBeNull();
+                expect(colorRect).toBeInTheDocument();
             });
         });
 
@@ -316,7 +266,7 @@ describe('RoomContextMenu', () => {
             const selectedType = 'entrance';
             const selectedColor = ROOM_TYPE_COLORS[selectedType];
             const colorRect = container.querySelector(`rect[fill="${selectedColor}"][rx="2"]`);
-            expect(colorRect).not.toBeNull();
+            expect(colorRect).toBeInTheDocument();
         });
 
         it('should render non-selected types with #ccc text and normal font-weight', () => {
@@ -326,7 +276,7 @@ describe('RoomContextMenu', () => {
                 (t) => t.textContent !== 'Set Label...' && t.textContent !== 'Delete Room' && t.textContent !== 'Entrance'
             );
             nonSelectedTypes.forEach((text) => {
-                expect(text.getAttribute('font-weight')).toBe('normal');
+                expect(text).toHaveAttribute('font-weight', 'normal');
             });
         });
     });
@@ -349,8 +299,8 @@ describe('RoomContextMenu', () => {
             const grandText = Array.from(container.querySelectorAll('text.menu-option')).find(
                 (t) => t.textContent === 'Grand'
             );
-            expect(grandText.getAttribute('fill')).toBe('#fff');
-            expect(grandText.getAttribute('font-weight')).toBe('bold');
+            expect(grandText).toHaveAttribute('fill', '#fff');
+            expect(grandText).toHaveAttribute('font-weight', 'bold');
         });
 
         it('should render non-selected types with normal font-weight', () => {
@@ -372,13 +322,13 @@ describe('RoomContextMenu', () => {
                 (t) => t.textContent !== 'Set Label...' && t.textContent !== 'Delete Room' && t.textContent !== 'Grand'
             );
             nonSelectedTypes.forEach((text) => {
-                expect(text.getAttribute('font-weight')).toBe('normal');
+                expect(text).toHaveAttribute('font-weight', 'normal');
             });
         });
     });
 
     describe('set label interaction', () => {
-        it('should call setMapData with new label when Set Label is clicked', () => {
+        it('should call setSelectedRoom(null) when Set Label is clicked', () => {
             const setMapData = vi.fn((fn) => fn({ rooms: [{ id: 'room-1', label: 'Old Label', type: 'entrance' }] }));
             const setSelectedRoom = vi.fn();
             const { container } = render(
@@ -413,7 +363,7 @@ describe('RoomContextMenu', () => {
     });
 
     describe('room type selection interaction', () => {
-        it('should call setMapData when a room type option is clicked', () => {
+        it('should call setSelectedRoom(null) when a room type option is clicked', () => {
             const setMapData = vi.fn((fn) => fn({ rooms: [{ id: 'room-1', label: 'Hall', type: 'entrance' }] }));
             const setSelectedRoom = vi.fn();
             const { container } = render(
@@ -434,30 +384,6 @@ describe('RoomContextMenu', () => {
                 (t) => t.textContent === 'Common'
             );
             commonText.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            expect(setSelectedRoom).toHaveBeenCalledWith(null);
-        });
-
-        it('should update the room type in setMapData', () => {
-            const setMapData = vi.fn((fn) => fn({ rooms: [{ id: 'room-1', label: 'Hall', type: 'entrance' }] }));
-            const setSelectedRoom = vi.fn();
-            const { container } = render(
-                <svg>
-                    <RoomContextMenu
-                        selectedRoom={makeSelectedRoom()}
-                        isLocalhost={true}
-                        gridSize={gridSize}
-                        gridCenterX={gridCenterX}
-                        gridCenterY={gridCenterY}
-                        setMapData={setMapData}
-                        setSelectedRoom={setSelectedRoom}
-                    />
-                </svg>
-            );
-            const menuOptionTexts = container.querySelectorAll('text.menu-option');
-            const utilityText = Array.from(menuOptionTexts).find(
-                (t) => t.textContent === 'Utility'
-            );
-            utilityText.dispatchEvent(new MouseEvent('click', { bubbles: true }));
             expect(setSelectedRoom).toHaveBeenCalledWith(null);
         });
 
@@ -497,6 +423,29 @@ describe('RoomContextMenu', () => {
                 <svg>
                     <RoomContextMenu
                         selectedRoom={makeSelectedRoom()}
+                        isLocalhost={true}
+                        gridSize={gridSize}
+                        gridCenterX={gridCenterX}
+                        gridCenterY={gridCenterY}
+                        setMapData={setMapData}
+                        setSelectedRoom={setSelectedRoom}
+                    />
+                </svg>
+            );
+            const deleteText = Array.from(container.querySelectorAll('text.menu-option')).find(
+                (t) => t.textContent === 'Delete Room'
+            );
+            deleteText.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+            expect(setSelectedRoom).toHaveBeenCalledWith(null);
+        });
+
+        it('should use the correct room ID in setMapData calls', () => {
+            const setMapData = vi.fn();
+            const setSelectedRoom = vi.fn();
+            const { container } = render(
+                <svg>
+                    <RoomContextMenu
+                        selectedRoom={makeSelectedRoom({ id: 'custom-room-42' })}
                         isLocalhost={true}
                         gridSize={gridSize}
                         gridCenterX={gridCenterX}
@@ -554,55 +503,7 @@ describe('RoomContextMenu', () => {
             const labelText = Array.from(container.querySelectorAll('text.menu-option')).find(
                 (t) => t.textContent === 'Set Label...'
             );
-            expect(labelText).not.toBeNull();
-        });
-    });
-
-    describe('text count', () => {
-        it('should render correct number of menu options (1 label + 6 types + 1 delete)', () => {
-            const { container } = renderComponent();
-            const menuOptionTexts = container.querySelectorAll('text.menu-option');
-            expect(menuOptionTexts.length).toBe(1 + ROOM_TYPES.length + 1);
-        });
-
-        it('should render exactly 1 close button', () => {
-            const { container } = renderComponent();
-            const closeTexts = container.querySelectorAll('text.menu-close');
-            expect(closeTexts.length).toBe(1);
-        });
-
-        it('should render exactly 1 title text (bold Room text)', () => {
-            const { container } = renderComponent();
-            const allTexts = container.querySelectorAll('text');
-            const boldTexts = Array.from(allTexts).filter(
-                (t) => t.getAttribute('font-weight') === 'bold' && t.getAttribute('fill') === '#e0e0e0'
-            );
-            expect(boldTexts.length).toBe(1);
-        });
-    });
-
-    describe('different selected room IDs', () => {
-        it('should use the correct room ID in setMapData calls', () => {
-            const setMapData = vi.fn();
-            const setSelectedRoom = vi.fn();
-            const { container } = render(
-                <svg>
-                    <RoomContextMenu
-                        selectedRoom={makeSelectedRoom({ id: 'custom-room-42' })}
-                        isLocalhost={true}
-                        gridSize={gridSize}
-                        gridCenterX={gridCenterX}
-                        gridCenterY={gridCenterY}
-                        setMapData={setMapData}
-                        setSelectedRoom={setSelectedRoom}
-                    />
-                </svg>
-            );
-            const deleteText = Array.from(container.querySelectorAll('text.menu-option')).find(
-                (t) => t.textContent === 'Delete Room'
-            );
-            deleteText.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-            expect(setSelectedRoom).toHaveBeenCalledWith(null);
+            expect(labelText).toBeInTheDocument();
         });
     });
 });

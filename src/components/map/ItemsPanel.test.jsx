@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import ItemsPanel from './ItemsPanel';
 
 // Mock all SVG imports
@@ -35,83 +36,102 @@ const defaultProps = {
 };
 
 describe('ItemsPanel', () => {
-  it('returns null when itemsPanelOpen is false', () => {
-    const { container } = render(<ItemsPanel {...defaultProps} itemsPanelOpen={false} />);
-    expect(container.innerHTML).toBe('');
+  describe('visibility', () => {
+    it('renders nothing when itemsPanelOpen is false', () => {
+      const { container } = render(<ItemsPanel {...defaultProps} itemsPanelOpen={false} />);
+      expect(container.innerHTML).toBe('');
+    });
+
+    it('renders close button when open', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      expect(screen.getByRole('button')).toBeInTheDocument();
+    });
+
+    it('calls onClose when close button clicked', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      fireEvent.click(screen.getByRole('button'));
+      expect(defaultProps.onClose).toHaveBeenCalled();
+    });
   });
 
-  it('renders close button when open', () => {
-    render(<ItemsPanel {...defaultProps} />);
-    expect(screen.getByRole('button')).toBeInTheDocument();
+  describe('items rendering', () => {
+    it('renders indoor items by default', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      expect(screen.getByText('Altar')).toBeInTheDocument();
+      expect(screen.getByText('Door')).toBeInTheDocument();
+      expect(screen.getByText('Treasure Chest')).toBeInTheDocument();
+    });
+
+    it('renders outdoor items when mapVariant is outdoor', () => {
+      render(<ItemsPanel {...defaultProps} mapVariant="outdoor" />);
+      expect(screen.getByText('Barrel')).toBeInTheDocument();
+      expect(screen.getByText('Tree')).toBeInTheDocument();
+      expect(screen.queryByText('Altar')).not.toBeInTheDocument();
+    });
+
+    it('renders NPC item', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      expect(screen.getByText('NPC')).toBeInTheDocument();
+    });
+
+    it('renders indoor items with correct labels', () => {
+      render(<ItemsPanel {...defaultProps} />);
+      const labels = ['Altar', 'Arrow Slit Wall', 'Barrel', 'Bed', 'Bookshelf', 'Chair', 'Treasure Chest', 'Crate', 'Door', 'Fire Pit', 'Fountain', 'Pillar', 'Secret Door', 'Stairs', 'Statue', 'Table', 'Torch', 'Trap', 'Spider Web', 'NPC'];
+      labels.forEach(label => {
+        expect(screen.getByText(label)).toBeInTheDocument();
+      });
+    });
+
+    it('renders fewer items for outdoor variant', () => {
+      render(<ItemsPanel {...defaultProps} mapVariant="outdoor" />);
+      const indoorLabels = ['Altar', 'Arrow Slit Wall', 'Bed', 'Bookshelf', 'Chair', 'Treasure Chest', 'Door', 'Fountain', 'Pillar', 'Secret Door', 'Stairs', 'Statue', 'Table', 'Trap', 'Spider Web'];
+      indoorLabels.forEach(label => {
+        expect(screen.queryByText(label)).not.toBeInTheDocument();
+      });
+    });
+
+    it('renders with empty players and characters arrays', () => {
+      render(<ItemsPanel {...defaultProps} characters={[]} players={[]} />);
+      expect(screen.getByText('Altar')).toBeInTheDocument();
+    });
   });
 
-  it('calls onClose when close button clicked', () => {
-    render(<ItemsPanel {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button'));
-    expect(defaultProps.onClose).toHaveBeenCalled();
-  });
+  describe('characters section', () => {
+    it('renders characters section when characters are not in players', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[{ name: 'Player1' }]} />);
+      expect(screen.getByText('Goblin')).toBeInTheDocument();
+    });
 
-  it('renders indoor items by default', () => {
-    render(<ItemsPanel {...defaultProps} />);
-    expect(screen.getByText('Altar')).toBeInTheDocument();
-    expect(screen.getByText('Door')).toBeInTheDocument();
-    expect(screen.getByText('Treasure Chest')).toBeInTheDocument();
-  });
+    it('does not render characters section when all characters are players', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Player1' }]} players={[{ name: 'Player1' }]} />);
+      expect(screen.queryByText('Characters')).not.toBeInTheDocument();
+    });
 
-  it('renders outdoor items when mapVariant is outdoor', () => {
-    render(<ItemsPanel {...defaultProps} mapVariant="outdoor" />);
-    expect(screen.getByText('Barrel')).toBeInTheDocument();
-    expect(screen.getByText('Tree')).toBeInTheDocument();
-    expect(screen.queryByText('Altar')).not.toBeInTheDocument();
-  });
+    it('does not render characters section when no characters', () => {
+      render(<ItemsPanel {...defaultProps} characters={[]} players={[]} />);
+      expect(screen.queryByText('Characters')).not.toBeInTheDocument();
+    });
 
-  it('renders NPC item', () => {
-    render(<ItemsPanel {...defaultProps} />);
-    expect(screen.getByText('NPC')).toBeInTheDocument();
-  });
+    it('renders character initial when no imagePath', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
+      expect(screen.getByText('G')).toBeInTheDocument();
+    });
 
-  it('renders characters section when characters are not in players', () => {
-    render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[{ name: 'Player1' }]} />);
-    expect(screen.getByText('Goblin')).toBeInTheDocument();
-  });
+    it('renders character image when imagePath provided', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin', imagePath: '/goblin.png' }]} players={[]} />);
+      const img = screen.getByRole('img');
+      expect(img).toHaveAttribute('src', '/goblin.png');
+    });
 
-  it('does not render characters section when all characters are players', () => {
-    render(<ItemsPanel {...defaultProps} characters={[{ name: 'Player1' }]} players={[{ name: 'Player1' }]} />);
-    expect(screen.queryByText('Characters')).not.toBeInTheDocument();
-  });
+    it('renders multiple missing characters', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }, { name: 'Orc' }]} players={[{ name: 'Player1' }]} />);
+      expect(screen.getByText('Goblin')).toBeInTheDocument();
+      expect(screen.getByText('Orc')).toBeInTheDocument();
+    });
 
-  it('does not render characters section when no characters', () => {
-    render(<ItemsPanel {...defaultProps} characters={[]} players={[]} />);
-    expect(screen.queryByText('Characters')).not.toBeInTheDocument();
-  });
-
-  it('renders character initial when no imagePath', () => {
-    render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
-    expect(screen.getByText('G')).toBeInTheDocument();
-  });
-
-  it('renders character image when imagePath provided', () => {
-    render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin', imagePath: '/goblin.png' }]} players={[]} />);
-    const img = screen.getByRole('img');
-    expect(img).toHaveAttribute('src', '/goblin.png');
-  });
-
-  it('renders multiple missing characters', () => {
-    render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }, { name: 'Orc' }]} players={[{ name: 'Player1' }]} />);
-    expect(screen.getByText('Goblin')).toBeInTheDocument();
-    expect(screen.getByText('Orc')).toBeInTheDocument();
-  });
-
-  it('renders with empty players and characters arrays', () => {
-    render(<ItemsPanel {...defaultProps} characters={[]} players={[]} />);
-    expect(screen.getByText('Altar')).toBeInTheDocument();
-  });
-
-  it('renders indoor items with correct labels', () => {
-    render(<ItemsPanel {...defaultProps} />);
-    const labels = ['Altar', 'Arrow Slit Wall', 'Barrel', 'Bed', 'Bookshelf', 'Chair', 'Treasure Chest', 'Crate', 'Door', 'Fire Pit', 'Fountain', 'Pillar', 'Secret Door', 'Stairs', 'Statue', 'Table', 'Torch', 'Trap', 'Spider Web', 'NPC'];
-    labels.forEach(label => {
-      expect(screen.getByText(label)).toBeInTheDocument();
+    it('shows characters section title when characters are missing from players', () => {
+      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
+      expect(screen.getByText('Characters')).toBeInTheDocument();
     });
   });
 
@@ -232,11 +252,6 @@ describe('ItemsPanel', () => {
       vi.advanceTimersByTime(0);
 
       expect(getGhostDivs()).toHaveLength(0);
-    });
-
-    it('shows characters section title when characters are missing from players', () => {
-      render(<ItemsPanel {...defaultProps} characters={[{ name: 'Goblin' }]} players={[]} />);
-      expect(screen.getByText('Characters')).toBeInTheDocument();
     });
   });
 });

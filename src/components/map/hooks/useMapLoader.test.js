@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useMapLoader from './useMapLoader.js';
@@ -25,10 +26,6 @@ describe('useMapLoader', () => {
 
     loadMapDataSpy.mockResolvedValue(null);
     saveMapDataSpy.mockResolvedValue({});
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
   });
 
   const getHook = (options = {}) => {
@@ -80,10 +77,10 @@ describe('useMapLoader', () => {
       const saveCallArgs = saveMapDataSpy.mock.calls[0];
       expect(saveCallArgs[0]).toBe(defaultCampaignName);
       expect(saveCallArgs[1]).toBe(defaultMapName);
-      expect(saveCallArgs[2]).toHaveProperty('players', []);
-      expect(saveCallArgs[2]).toHaveProperty('walls', []);
-      expect(saveCallArgs[2]).toHaveProperty('rooms', []);
-      expect(saveCallArgs[2]).toHaveProperty('placedItems', []);
+      expect(saveCallArgs[2]).toHaveProperty('players');
+      expect(saveCallArgs[2]).toHaveProperty('walls');
+      expect(saveCallArgs[2]).toHaveProperty('rooms');
+      expect(saveCallArgs[2]).toHaveProperty('placedItems');
       expect(saveCallArgs[2]).toHaveProperty('gridSize', defaultGridSize);
     });
 

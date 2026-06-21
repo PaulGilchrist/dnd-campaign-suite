@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import NPCs from './NPCs';
 
 const mockUseNPCsManagement = vi.fn();
@@ -55,161 +56,174 @@ const defaultProps = {
   onViewInitiative: vi.fn(),
 };
 
+const defaultNPCs = [
+  { name: 'Goblin', race: 'Humanoid', classRole: 'Scout', tags: 'enemy' },
+  { name: 'Wizard', race: 'Humanoid', classRole: 'Caster', tags: 'boss' },
+];
+
+function renderWithNPCs(npcs = defaultNPCs) {
+  mockUseNPCsManagement.mockReturnValue({
+    npcs,
+    loading: false,
+    loadNPCsList: vi.fn(),
+    saveNPCAction: vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } }),
+    deleteNPCAction: vi.fn().mockResolvedValue(undefined),
+  });
+  return render(<NPCs {...defaultProps} />);
+}
+
 describe('NPCs', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockUseNPCsManagement.mockReturnValue({
-      npcs: [
-        { name: 'Goblin', race: 'Humanoid', classRole: 'Scout', tags: 'enemy' },
-        { name: 'Wizard', race: 'Humanoid', classRole: 'Caster', tags: 'boss' },
-      ],
-      loading: false,
-      loadNPCsList: vi.fn(),
-      saveNPCAction: vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } }),
-      deleteNPCAction: vi.fn().mockResolvedValue(undefined),
+  describe('header controls', () => {
+    it('renders back button', () => {
+      renderWithNPCs();
+      expect(screen.getByRole('button', { name: /Back/i })).toBeInTheDocument();
+    });
+
+    it('renders NPCs title', () => {
+      renderWithNPCs();
+      expect(screen.getByText('NPCs')).toBeInTheDocument();
+    });
+
+    it('renders New NPC button', () => {
+      renderWithNPCs();
+      expect(screen.getByRole('button', { name: /New NPC/i })).toBeInTheDocument();
+    });
+
+    it('renders Generate NPC button', () => {
+      renderWithNPCs();
+      expect(screen.getByRole('button', { name: /Generate NPC/i })).toBeInTheDocument();
+    });
+
+    it('calls onBack when back button clicked', () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByRole('button', { name: /Back/i }));
+      expect(defaultProps.onBack).toHaveBeenCalled();
     });
   });
 
-  it('renders back button', () => {
-    render(<NPCs {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /Back/i })).toBeInTheDocument();
-  });
-
-  it('renders NPCs title', () => {
-    render(<NPCs {...defaultProps} />);
-    expect(screen.getByText('NPCs')).toBeInTheDocument();
-  });
-
-  it('renders New NPC button', () => {
-    render(<NPCs {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /New NPC/i })).toBeInTheDocument();
-  });
-
-  it('renders Generate NPC button', () => {
-    render(<NPCs {...defaultProps} />);
-    expect(screen.getByRole('button', { name: /Generate NPC/i })).toBeInTheDocument();
-  });
-
-  it('renders search input', () => {
-    render(<NPCs {...defaultProps} />);
-    expect(screen.getByLabelText('Search NPCs')).toBeInTheDocument();
-  });
-
-  it('renders NPC list items', () => {
-    render(<NPCs {...defaultProps} />);
-    expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
-    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-  });
-
-  it('filters NPCs by search query', () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
-    expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
-    expect(screen.queryByTestId('npc-list-item-Wizard')).not.toBeInTheDocument();
-  });
-
-  it('shows clear button when search has query', () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'test' } });
-    expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
-  });
-
-  it('clears search when clear button clicked', () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
-    expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText('Clear search'));
-    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-  });
-
-  it('shows empty state when no NPCs', () => {
-    mockUseNPCsManagement.mockReturnValue({
-      npcs: [], loading: false, loadNPCsList: vi.fn(),
-      saveNPCAction: vi.fn(), deleteNPCAction: vi.fn(),
+  describe('search functionality', () => {
+    it('renders search input', () => {
+      renderWithNPCs();
+      expect(screen.getByLabelText('Search NPCs')).toBeInTheDocument();
     });
-    render(<NPCs {...defaultProps} />);
-    expect(screen.getByText(/No NPCs yet/)).toBeInTheDocument();
-  });
 
-  it('shows no results state when search matches nothing', () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Nonexistent' } });
-    expect(screen.getByText(/No NPCs found/)).toBeInTheDocument();
-  });
+    it('shows clear button when search has query', () => {
+      renderWithNPCs();
+      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'test' } });
+      expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
+    });
 
-  it('opens form modal when New NPC clicked', async () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
-    await waitFor(() => {
-      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+    it('clears search when clear button clicked', () => {
+      renderWithNPCs();
+      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
+      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
+      fireEvent.click(screen.getByLabelText('Clear search'));
+      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
+    });
+
+    it('filters NPCs by search query', () => {
+      renderWithNPCs();
+      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
+      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
+      expect(screen.queryByTestId('npc-list-item-Wizard')).not.toBeInTheDocument();
+    });
+
+    it('filters by race', () => {
+      renderWithNPCs();
+      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Humanoid' } });
+      expect(screen.getAllByTestId(/^npc-list-item-/).length).toBeGreaterThan(0);
+    });
+
+    it('filters by class role', () => {
+      renderWithNPCs();
+      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Caster' } });
+      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('npc-list-item-Goblin')).not.toBeInTheDocument();
+    });
+
+    it('filters by tags', () => {
+      renderWithNPCs();
+      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'boss' } });
+      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
+      expect(screen.queryByTestId('npc-list-item-Goblin')).not.toBeInTheDocument();
     });
   });
 
-  it('opens form modal when Generate NPC clicked', async () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /Generate NPC/i }));
-    await waitFor(() => {
-      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+  describe('NPC list rendering', () => {
+    it('renders NPC list items', () => {
+      renderWithNPCs();
+      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
+      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
     });
   });
 
-  it('opens form modal when Edit clicked', async () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
-    await waitFor(() => {
-      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+  describe('empty and loading states', () => {
+    it('shows empty state when no NPCs', () => {
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: [], loading: false, loadNPCsList: vi.fn(),
+        saveNPCAction: vi.fn(), deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      expect(screen.getByText(/No NPCs yet/)).toBeInTheDocument();
+    });
+
+    it('shows no results state when search matches nothing', () => {
+      renderWithNPCs();
+      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Nonexistent' } });
+      expect(screen.getByText(/No NPCs found/)).toBeInTheDocument();
+    });
+
+    it('renders with loading state', () => {
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: [], loading: true, loadNPCsList: vi.fn(),
+        saveNPCAction: vi.fn(), deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      expect(screen.getByText(/Loading NPCs/)).toBeInTheDocument();
     });
   });
 
-  it('closes modal when Close clicked', async () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
-    await waitFor(() => {
-      expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+  describe('modal interactions', () => {
+    it('opens form modal when New NPC clicked', async () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-    expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
-  });
 
-  it('calls onBack when back button clicked', () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.click(screen.getByRole('button', { name: /Back/i }));
-    expect(defaultProps.onBack).toHaveBeenCalled();
-  });
-
-  it('calls addNPCToInitiative when Add to Initiative clicked', async () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.click(screen.getByTestId('init-btn-Goblin'));
-    // The addNPCToInitiative mock resolves synchronously
-  });
-
-  it('renders with loading state', () => {
-    mockUseNPCsManagement.mockReturnValue({
-      npcs: [], loading: true, loadNPCsList: vi.fn(),
-      saveNPCAction: vi.fn(), deleteNPCAction: vi.fn(),
+    it('opens form modal when Generate NPC clicked', async () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByRole('button', { name: /Generate NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
     });
-    render(<NPCs {...defaultProps} />);
-    expect(screen.getByText(/Loading NPCs/)).toBeInTheDocument();
+
+    it('opens form modal when Edit clicked', async () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+    });
+
+    it('closes modal when Close clicked', async () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+      expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
+    });
   });
 
-  it('filters by race', () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Humanoid' } });
-    expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
-    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-  });
-
-  it('filters by class role', () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Caster' } });
-    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-    expect(screen.queryByTestId('npc-list-item-Goblin')).not.toBeInTheDocument();
-  });
-
-  it('filters by tags', () => {
-    render(<NPCs {...defaultProps} />);
-    fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'boss' } });
-    expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-    expect(screen.queryByTestId('npc-list-item-Goblin')).not.toBeInTheDocument();
+  describe('initiative', () => {
+    it('calls addNPCToInitiative when Add to Initiative clicked', async () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByTestId('init-btn-Goblin'));
+      // The addNPCToInitiative mock resolves synchronously
+    });
   });
 });

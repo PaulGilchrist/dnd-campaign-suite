@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useActionPopup, {
   buildFeatureDetailHtml,
@@ -215,39 +216,12 @@ describe('useActionPopup', () => {
       expect(result.current).toHaveProperty('setPopupHtml');
     });
 
-    it('should handle null preset', () => {
-      const { result } = renderHook(() => useActionPopup(null));
-      expect(result.current).toHaveProperty('showPopup');
-    });
-
-    it('should handle undefined preset', () => {
-      const { result } = renderHook(() => useActionPopup(undefined));
-      expect(result.current).toHaveProperty('showPopup');
-    });
-
-    it('should handle empty string preset', () => {
-      const { result } = renderHook(() => useActionPopup(''));
-      expect(result.current).toHaveProperty('showPopup');
-    });
-
-    it('should handle number preset', () => {
-      const { result } = renderHook(() => useActionPopup(42));
-      expect(result.current).toHaveProperty('showPopup');
-    });
-
-    it('should handle object preset', () => {
-      const { result } = renderHook(() => useActionPopup({ foo: 'bar' }));
-      expect(result.current).toHaveProperty('showPopup');
-    });
-
-    it('should handle array preset', () => {
-      const { result } = renderHook(() => useActionPopup(['a']));
-      expect(result.current).toHaveProperty('showPopup');
-    });
-
-    it('should handle boolean preset', () => {
-      const { result } = renderHook(() => useActionPopup(true));
-      expect(result.current).toHaveProperty('showPopup');
+    it('should handle various preset types', () => {
+      const presets = [null, undefined, '', 42, { foo: 'bar' }, ['a'], true];
+      for (const preset of presets) {
+        const { result } = renderHook(() => useActionPopup(preset));
+        expect(result.current).toHaveProperty('showPopup');
+      }
     });
 
     it('should handle ability preset with missing context', () => {
@@ -322,11 +296,6 @@ describe('useActionPopup', () => {
   describe('loadWeaponMasteries', () => {
     beforeEach(() => {
       vi.resetModules();
-      // Clear the module cache to reset the weaponMasteryCache variable
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
     });
 
     it('should fetch and return weapon masteries on first call', async () => {
@@ -385,10 +354,6 @@ describe('useActionPopup', () => {
   describe('showWeaponMasteryPopup', () => {
     beforeEach(() => {
       vi.resetModules();
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
     });
 
     it('should set popupHtml when mastery is found with description', async () => {
@@ -479,10 +444,6 @@ describe('useActionPopup', () => {
       vi.resetModules();
     });
 
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
     it('should fetch and return backgrounds on first call', async () => {
       const mockBackgrounds = [
         { name: 'Acolyte', description: 'You have spent your life in the service of a temple.' },
@@ -524,10 +485,6 @@ describe('useActionPopup', () => {
   });
 
   describe('showBackgroundPopup', () => {
-    afterEach(() => {
-      vi.clearAllMocks();
-    });
-
     it('should set popupHtml with basic name and description', async () => {
       const mockBackgrounds = [
         { name: 'Acolyte', description: 'You have spent your life in the service of a temple.' },

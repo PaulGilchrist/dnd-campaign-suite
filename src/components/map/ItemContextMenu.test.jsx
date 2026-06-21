@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import ItemContextMenu from './ItemContextMenu.jsx';
@@ -43,87 +44,49 @@ const renderComponent = (props, placedItems = []) =>
 
 describe('ItemContextMenu', () => {
     describe('null rendering', () => {
-        it('should return null when selectedItem is not provided', () => {
-            const { container } = render(
-                <svg>
-                    <ItemContextMenu
-                        selectedItem={null}
-                        placedItems={[]}
-                        gridCenterX={gridCenterX}
-                        gridCenterY={gridCenterY}
-                        handleToggleItemVisibility={vi.fn()}
-                        handleDeleteItem={vi.fn()}
-                        handleRotate={vi.fn()}
-                        handleToggleDoor={vi.fn()}
-                        handleViewStats={vi.fn()}
-                        monsterFound={false}
-                        onRenameClicked={vi.fn()}
-                        onClose={vi.fn()}
-                    />
-                </svg>
-            );
-            expect(container.querySelector('.item-context-menu')).toBeNull();
-        });
-
-        it('should return null when selectedItem is undefined', () => {
-            const { container } = render(
-                <svg>
-                    <ItemContextMenu
-                        selectedItem={undefined}
-                        placedItems={[]}
-                        gridCenterX={gridCenterX}
-                        gridCenterY={gridCenterY}
-                        handleToggleItemVisibility={vi.fn()}
-                        handleDeleteItem={vi.fn()}
-                        handleRotate={vi.fn()}
-                        handleToggleDoor={vi.fn()}
-                        handleViewStats={vi.fn()}
-                        monsterFound={false}
-                        onRenameClicked={vi.fn()}
-                        onClose={vi.fn()}
-                    />
-                </svg>
-            );
-            expect(container.querySelector('.item-context-menu')).toBeNull();
-        });
+        it.each([null, undefined])(
+            'should not render when selectedItem is %s',
+            (value) => {
+                const { container } = render(
+                    <svg>
+                        <ItemContextMenu
+                            selectedItem={value}
+                            placedItems={[]}
+                            gridCenterX={gridCenterX}
+                            gridCenterY={gridCenterY}
+                            handleToggleItemVisibility={vi.fn()}
+                            handleDeleteItem={vi.fn()}
+                            handleRotate={vi.fn()}
+                            handleToggleDoor={vi.fn()}
+                            handleViewStats={vi.fn()}
+                            monsterFound={false}
+                            onRenameClicked={vi.fn()}
+                            onClose={vi.fn()}
+                        />
+                    </svg>
+                );
+                expect(container.querySelector('.item-context-menu')).not.toBeInTheDocument();
+            }
+        );
     });
 
     describe('basic rendering', () => {
         it('should render the root group with item-context-menu class', () => {
             const placedItem = makePlacedItem();
             const { container } = renderComponent({}, [placedItem]);
-            const rootGroup = container.querySelector('g.item-context-menu');
-            expect(rootGroup).not.toBeNull();
+            expect(container.querySelector('g.item-context-menu')).toBeInTheDocument();
         });
 
-        it('should render a rect background', () => {
+        it('should render a rect background with correct attributes', () => {
             const placedItem = makePlacedItem();
             const { container } = renderComponent({}, [placedItem]);
             const rect = container.querySelector('rect');
-            expect(rect).not.toBeNull();
-        });
-
-        it('should render the rect with correct fill and stroke', () => {
-            const placedItem = makePlacedItem();
-            const { container } = renderComponent({}, [placedItem]);
-            const rect = container.querySelector('rect');
-            expect(rect.getAttribute('fill')).toBe('#2a2a2a');
-            expect(rect.getAttribute('stroke')).toBe('#555');
-            expect(rect.getAttribute('stroke-width')).toBe('1');
-        });
-
-        it('should render the rect with width 120', () => {
-            const placedItem = makePlacedItem();
-            const { container } = renderComponent({}, [placedItem]);
-            const rect = container.querySelector('rect');
-            expect(rect.getAttribute('width')).toBe('120');
-        });
-
-        it('should render the rect with rx 4', () => {
-            const placedItem = makePlacedItem();
-            const { container } = renderComponent({}, [placedItem]);
-            const rect = container.querySelector('rect');
-            expect(rect.getAttribute('rx')).toBe('4');
+            expect(rect).toBeInTheDocument();
+            expect(rect).toHaveAttribute('fill', '#2a2a2a');
+            expect(rect).toHaveAttribute('stroke', '#555');
+            expect(rect).toHaveAttribute('stroke-width', '1');
+            expect(rect).toHaveAttribute('width', '120');
+            expect(rect).toHaveAttribute('rx', '4');
         });
 
         it('should position the menu at correct grid position', () => {
@@ -154,6 +117,37 @@ describe('ItemContextMenu', () => {
             expect(Number(rect.getAttribute('y'))).toBe(expectedY);
         });
 
+        it('should render menu option texts with correct fill and fontSize', () => {
+            const placedItem = makePlacedItem();
+            const { container } = renderComponent({}, [placedItem]);
+            const optionTexts = container.querySelectorAll('text.menu-option');
+            optionTexts.forEach((text) => {
+                expect(text).toHaveAttribute('fill', '#ccc');
+                expect(text).toHaveAttribute('font-size', '11');
+                expect(Number(text.getAttribute('x'))).toBe(gridCenterX(2) + 18);
+            });
+        });
+
+        it('should render close text with fill #999 and fontSize 10', () => {
+            const placedItem = makePlacedItem();
+            const { container } = renderComponent({}, [placedItem]);
+            const closeText = container.querySelector('text.menu-close');
+            expect(closeText).toHaveAttribute('fill', '#999');
+            expect(closeText).toHaveAttribute('font-size', '10');
+        });
+
+        it('should render close button with correct position', () => {
+            const placedItem = makePlacedItem();
+            const { container } = renderComponent({}, [placedItem]);
+            const closeText = container.querySelector('text.menu-close');
+            const expectedX = gridCenterX(2) + 10 + 108;
+            const expectedY = gridCenterY(3) + 10 + 12;
+            expect(Number(closeText.getAttribute('x'))).toBe(expectedX);
+            expect(Number(closeText.getAttribute('y'))).toBe(expectedY);
+        });
+    });
+
+    describe('menu text content', () => {
         it('should render Hide text when item is visible', () => {
             const placedItem = makePlacedItem({ visible: true });
             const { container } = renderComponent({}, [placedItem]);
@@ -188,43 +182,6 @@ describe('ItemContextMenu', () => {
             const closeText = container.querySelector('text.menu-close');
             expect(closeText.textContent).toBe('✕');
         });
-
-        it('should render the close button with correct position', () => {
-            const placedItem = makePlacedItem();
-            const { container } = renderComponent({}, [placedItem]);
-            const closeText = container.querySelector('text.menu-close');
-            const expectedX = gridCenterX(2) + 10 + 108;
-            const expectedY = gridCenterY(3) + 10 + 12;
-            expect(Number(closeText.getAttribute('x'))).toBe(expectedX);
-            expect(Number(closeText.getAttribute('y'))).toBe(expectedY);
-        });
-
-        it('should render menu option texts with correct fill and fontSize', () => {
-            const placedItem = makePlacedItem();
-            const { container } = renderComponent({}, [placedItem]);
-            const optionTexts = container.querySelectorAll('text.menu-option');
-            optionTexts.forEach((text) => {
-                expect(text.getAttribute('fill')).toBe('#ccc');
-                expect(text.getAttribute('font-size')).toBe('11');
-            });
-        });
-
-        it('should render menu option texts at x offset 8', () => {
-            const placedItem = makePlacedItem();
-            const { container } = renderComponent({}, [placedItem]);
-            const optionTexts = container.querySelectorAll('text.menu-option');
-            optionTexts.forEach((text) => {
-                expect(Number(text.getAttribute('x'))).toBe(gridCenterX(2) + 18);
-            });
-        });
-
-        it('should render close text with fill #999 and fontSize 10', () => {
-            const placedItem = makePlacedItem();
-            const { container } = renderComponent({}, [placedItem]);
-            const closeText = container.querySelector('text.menu-close');
-            expect(closeText.getAttribute('fill')).toBe('#999');
-            expect(closeText.getAttribute('font-size')).toBe('10');
-        });
     });
 
     describe('menu height variants', () => {
@@ -257,6 +214,39 @@ describe('ItemContextMenu', () => {
             const { container } = renderComponent({}, [placedItem]);
             const rect = container.querySelector('rect');
             expect(Number(rect.getAttribute('height'))).toBe(116);
+        });
+    });
+
+    describe('text count by item type', () => {
+        it('should render 3 menu options for basic item', () => {
+            const placedItem = makePlacedItem();
+            const { container } = renderComponent({}, [placedItem]);
+            const optionTexts = container.querySelectorAll('text.menu-option');
+            expect(optionTexts.length).toBe(3);
+        });
+
+        it('should render 4 menu options for NPC item', () => {
+            const placedItem = makePlacedItem({ type: 'npc' });
+            const { container } = renderComponent({}, [placedItem]);
+            const optionTexts = container.querySelectorAll('text.menu-option');
+            expect(optionTexts.length).toBe(4);
+        });
+
+        it('should render 5 menu options for NPC item with monsterFound', () => {
+            const placedItem = makePlacedItem({ type: 'npc' });
+            const { container } = renderComponent(
+                { monsterFound: true },
+                [placedItem]
+            );
+            const optionTexts = container.querySelectorAll('text.menu-option');
+            expect(optionTexts.length).toBe(5);
+        });
+
+        it('should render 4 menu options for door item', () => {
+            const placedItem = makePlacedItem({ type: 'door' });
+            const { container } = renderComponent({}, [placedItem]);
+            const optionTexts = container.querySelectorAll('text.menu-option');
+            expect(optionTexts.length).toBe(4);
         });
     });
 
@@ -378,7 +368,7 @@ describe('ItemContextMenu', () => {
             const doorTextEl = Array.from(allOptionTexts).find(
                 (t) => t.textContent === 'Open Door'
             );
-            expect(doorTextEl).not.toBeNull();
+            expect(doorTextEl).toBeInTheDocument();
         });
 
         it('should render Close Door text for open door items', () => {
@@ -388,7 +378,7 @@ describe('ItemContextMenu', () => {
             const doorTextEl = Array.from(allOptionTexts).find(
                 (t) => t.textContent === 'Close Door'
             );
-            expect(doorTextEl).not.toBeNull();
+            expect(doorTextEl).toBeInTheDocument();
         });
 
         it('should call handleToggleDoor when Open Door is clicked', () => {
@@ -451,7 +441,7 @@ describe('ItemContextMenu', () => {
             const renameTextEl = Array.from(allOptionTexts).find(
                 (t) => t.textContent === 'Rename'
             );
-            expect(renameTextEl).not.toBeNull();
+            expect(renameTextEl).toBeInTheDocument();
         });
 
         it('should call onRenameClicked when Rename is clicked', () => {
@@ -516,7 +506,7 @@ describe('ItemContextMenu', () => {
             const viewStatsEl = Array.from(allOptionTexts).find(
                 (t) => t.textContent === 'View Stats'
             );
-            expect(viewStatsEl).not.toBeNull();
+            expect(viewStatsEl).toBeInTheDocument();
         });
 
         it('should call handleViewStats when View Stats is clicked', () => {
@@ -616,39 +606,6 @@ describe('ItemContextMenu', () => {
             );
             const expectedY = gridCenterY(3) + 10 + 86;
             expect(Number(viewStatsText.getAttribute('y'))).toBe(expectedY);
-        });
-    });
-
-    describe('text count by item type', () => {
-        it('should render 3 menu options for basic item', () => {
-            const placedItem = makePlacedItem();
-            const { container } = renderComponent({}, [placedItem]);
-            const optionTexts = container.querySelectorAll('text.menu-option');
-            expect(optionTexts.length).toBe(3);
-        });
-
-        it('should render 4 menu options for NPC item', () => {
-            const placedItem = makePlacedItem({ type: 'npc' });
-            const { container } = renderComponent({}, [placedItem]);
-            const optionTexts = container.querySelectorAll('text.menu-option');
-            expect(optionTexts.length).toBe(4);
-        });
-
-        it('should render 5 menu options for NPC item with monsterFound', () => {
-            const placedItem = makePlacedItem({ type: 'npc' });
-            const { container } = renderComponent(
-                { monsterFound: true },
-                [placedItem]
-            );
-            const optionTexts = container.querySelectorAll('text.menu-option');
-            expect(optionTexts.length).toBe(5);
-        });
-
-        it('should render 4 menu options for door item', () => {
-            const placedItem = makePlacedItem({ type: 'door' });
-            const { container } = renderComponent({}, [placedItem]);
-            const optionTexts = container.querySelectorAll('text.menu-option');
-            expect(optionTexts.length).toBe(4);
         });
     });
 

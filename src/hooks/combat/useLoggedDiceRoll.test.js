@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useLoggedDiceRoll from './useLoggedDiceRoll.js';
 
@@ -45,7 +46,6 @@ describe('useLoggedDiceRoll', () => {
   const campaignName = 'test-campaign';
 
   beforeEach(() => {
-    vi.clearAllMocks();
     useDiceRoll.mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn() });
     createLogAndShow.mockReturnValue(vi.fn());
     createLogDamageAndShow.mockReturnValue(vi.fn());
@@ -70,12 +70,17 @@ describe('useLoggedDiceRoll', () => {
       const { result } = renderHook(() =>
         useLoggedDiceRoll(characterName, campaignName)
       );
-      expect(typeof result.current.rollAbilityCheck).toBe('function');
-      expect(typeof result.current.rollSavingThrow).toBe('function');
-      expect(typeof result.current.rollSkillCheck).toBe('function');
-      expect(typeof result.current.rollInitiative).toBe('function');
-      expect(typeof result.current.rollAttack).toBe('function');
-      expect(typeof result.current.rollDamage).toBe('function');
+      const rollFunctions = [
+        'rollAbilityCheck',
+        'rollSavingThrow',
+        'rollSkillCheck',
+        'rollInitiative',
+        'rollAttack',
+        'rollDamage',
+      ];
+      for (const fn of rollFunctions) {
+        expect(typeof result.current[fn]).toBe('function');
+      }
     });
 
     it('returns quickRollPlayerSave and triggerGloriousDefenseCounterAttack from createSaves', () => {

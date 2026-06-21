@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import useWallDrawing from './useWallDrawing.js';
 import { TOOL_PAINT, TOOL_ERASE, TOOL_NONE } from '../../../config/mapConfig.js';
 
@@ -8,7 +9,7 @@ describe('useWallDrawing', () => {
   let getGridFromEvent;
   let setMapData;
 
-  beforeEach(() => {
+  const createMocks = () => {
     svgRef = { current: { setPointerCapture: vi.fn(), releasePointerCapture: vi.fn() } };
     getGridFromEvent = vi.fn();
     setMapData = vi.fn((fn) => {
@@ -16,7 +17,9 @@ describe('useWallDrawing', () => {
       if (typeof fn === 'function') return fn(prev);
       return fn;
     });
-  });
+  };
+
+  beforeEach(createMocks);
 
   const getHook = ({ isLocalhost = true, tool = TOOL_PAINT } = {}) => {
     const { result } = renderHook(() =>
@@ -25,56 +28,25 @@ describe('useWallDrawing', () => {
     return result;
   };
 
-  describe('painting state', () => {
+  describe('initialization', () => {
     it('should initialize painting as null', () => {
       const result = getHook();
       expect(result.current.painting).toBeNull();
     });
 
-    it('should set painting on pointer down', () => {
+    it('should return painting state', () => {
       const result = getHook();
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
-
-      act(() => {
-        result.current.handleGridPointerDown(new Event('down'), setMapData);
-      });
-
-      expect(result.current.painting).toEqual(mockGrid);
+      expect(result.current.painting).toBeDefined();
     });
+  });
 
-    it('should clear painting on pointer up', () => {
+  describe('returned object', () => {
+    it('should return all handler functions', () => {
       const result = getHook();
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
-
-      act(() => {
-        result.current.handleGridPointerDown(new Event('down'), setMapData);
-      });
-      expect(result.current.painting).toEqual(mockGrid);
-
-      act(() => {
-        result.current.handleGridPointerUp(new Event('up'));
-      });
-
-      expect(result.current.painting).toBeNull();
-    });
-
-    it('should clear painting on pointer leave', () => {
-      const result = getHook();
-      const mockGrid = { gridX: 2.5, gridY: 3.5 };
-      getGridFromEvent.mockReturnValue(mockGrid);
-
-      act(() => {
-        result.current.handleGridPointerDown(new Event('down'), setMapData);
-      });
-      expect(result.current.painting).toEqual(mockGrid);
-
-      act(() => {
-        result.current.handleGridPointerLeave(new Event('leave'));
-      });
-
-      expect(result.current.painting).toBeNull();
+      expect(typeof result.current.handleGridPointerDown).toBe('function');
+      expect(typeof result.current.handleGridPointerMove).toBe('function');
+      expect(typeof result.current.handleGridPointerUp).toBe('function');
+      expect(typeof result.current.handleGridPointerLeave).toBe('function');
     });
   });
 
@@ -185,6 +157,18 @@ describe('useWallDrawing', () => {
       const prev = { walls: new Set(['0,0', '1,1']) };
       const updated = callArg(prev);
       expect(updated.walls.has('0,0')).toBe(false);
+    });
+
+    it('should set painting on pointer down', () => {
+      const result = getHook();
+      const mockGrid = { gridX: 2.5, gridY: 3.5 };
+      getGridFromEvent.mockReturnValue(mockGrid);
+
+      act(() => {
+        result.current.handleGridPointerDown(new Event('down'), setMapData);
+      });
+
+      expect(result.current.painting).toEqual(mockGrid);
     });
   });
 
@@ -363,33 +347,6 @@ describe('useWallDrawing', () => {
       });
 
       expect(result.current.painting).toBeNull();
-    });
-  });
-
-  describe('returned object', () => {
-    it('should return painting state', () => {
-      const result = getHook();
-      expect(result.current.painting).toBeDefined();
-    });
-
-    it('should return handleGridPointerDown function', () => {
-      const result = getHook();
-      expect(typeof result.current.handleGridPointerDown).toBe('function');
-    });
-
-    it('should return handleGridPointerMove function', () => {
-      const result = getHook();
-      expect(typeof result.current.handleGridPointerMove).toBe('function');
-    });
-
-    it('should return handleGridPointerUp function', () => {
-      const result = getHook();
-      expect(typeof result.current.handleGridPointerUp).toBe('function');
-    });
-
-    it('should return handleGridPointerLeave function', () => {
-      const result = getHook();
-      expect(typeof result.current.handleGridPointerLeave).toBe('function');
     });
   });
 });

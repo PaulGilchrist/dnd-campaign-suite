@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import useZoomPan from './useZoomPan.js';
 
 describe('useZoomPan', () => {
@@ -15,23 +16,11 @@ describe('useZoomPan', () => {
   };
 
   describe('initial state', () => {
-    it('should initialize zoom to 1', () => {
+    it('should initialize zoom to 1, pan to 0, and panning to null', () => {
       const result = getHook();
       expect(result.current.zoom).toBe(1);
-    });
-
-    it('should initialize panX to 0', () => {
-      const result = getHook();
       expect(result.current.panX).toBe(0);
-    });
-
-    it('should initialize panY to 0', () => {
-      const result = getHook();
       expect(result.current.panY).toBe(0);
-    });
-
-    it('should initialize panning to null', () => {
-      const result = getHook();
       expect(result.current.panning).toBeNull();
     });
   });
@@ -109,7 +98,7 @@ describe('useZoomPan', () => {
   });
 
   describe('resetView', () => {
-    it('should reset zoom to 1', () => {
+    it('should reset zoom, panX, and panY to their initial values', () => {
       const result = getHook();
       act(() => {
         result.current.zoomIn();
@@ -118,27 +107,7 @@ describe('useZoomPan', () => {
         result.current.resetView();
       });
       expect(result.current.zoom).toBe(1);
-    });
-
-    it('should reset panX to 0', () => {
-      const result = getHook();
-      act(() => {
-        result.current.zoomIn();
-      });
-      act(() => {
-        result.current.resetView();
-      });
       expect(result.current.panX).toBe(0);
-    });
-
-    it('should reset panY to 0', () => {
-      const result = getHook();
-      act(() => {
-        result.current.zoomIn();
-      });
-      act(() => {
-        result.current.resetView();
-      });
       expect(result.current.panY).toBe(0);
     });
   });
@@ -180,7 +149,7 @@ describe('useZoomPan', () => {
       expect(pt).toEqual({ x: 50, y: 75 });
     });
 
-    it('should call createSVGPoint and matrixTransform', () => {
+    it('should call createSVGPoint and getScreenCTM', () => {
       const result = getHook();
       result.current.clientToSVG(100, 200);
       expect(mockSvg.createSVGPoint).toHaveBeenCalled();

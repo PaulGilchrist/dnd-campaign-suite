@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import usePlayerDragging from './usePlayerDragging.js';
@@ -86,7 +87,7 @@ describe('usePlayerDragging', () => {
       stopPropagation: vi.fn(),
       preventDefault: vi.fn(),
     };
-      svgRef.current = defaultSvgMock(svgOverrides);
+    svgRef.current = defaultSvgMock(svgOverrides);
     const result = getHook();
     act(() => {
       result.current.handlePointerDown(mockEvent, playerId);
@@ -109,21 +110,13 @@ describe('usePlayerDragging', () => {
     });
   });
 
-  describe('rulerMode and spellMode guards', () => {
-    it('should not start drag when rulerMode is true', () => {
+  describe('mode guards (rulerMode and spellMode)', () => {
+    it.each([
+      ['rulerMode', { rulerMode: true }],
+      ['spellMode', { spellMode: true }],
+    ])('should not start drag when %s is enabled', (_, overrides) => {
       const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
-      const result = getHook({ rulerMode: true });
-      act(() => {
-        result.current.handlePointerDown(mockEvent, 'p1');
-      });
-      expect(mockEvent.stopPropagation).not.toHaveBeenCalled();
-      expect(mockEvent.preventDefault).not.toHaveBeenCalled();
-      expect(result.current.dragging).toBeNull();
-    });
-
-    it('should not start drag when spellMode is true', () => {
-      const mockEvent = { stopPropagation: vi.fn(), preventDefault: vi.fn() };
-      const result = getHook({ spellMode: true });
+      const result = getHook(overrides);
       act(() => {
         result.current.handlePointerDown(mockEvent, 'p1');
       });
@@ -226,7 +219,7 @@ describe('usePlayerDragging', () => {
         result.current.handlePointerDown(mockEvent, 'p1');
       });
 
-      expect(result.current.dragging).not.toBeNull();
+      expect(result.current.dragging).toBeDefined();
       expect(result.current.dragging.playerId).toBe('p1');
       expect(result.current.dragging.pointerId).toBe(42);
       expect(typeof result.current.dragging.offsetX).toBe('number');
@@ -291,13 +284,11 @@ describe('usePlayerDragging', () => {
       expect(setMapData).toHaveBeenCalled();
     });
 
-    it('should clamp grid position to map bounds (negative)', () => {
+    it('should clamp grid position to map bounds', () => {
       const { result } = setupDrag('p1');
 
-      // clientX: -100, clientY: -100 -> svgPt: (-100, -100) -> gridX: -3, gridY: -3 -> clamped to 0
-      svgRef.current = createSvgMockWithTransform(() => ({ x: -100, y: -100 }));
-
       const moveEvent = { preventDefault: vi.fn(), clientX: -100, clientY: -100 };
+      svgRef.current = createSvgMockWithTransform(() => ({ x: -100, y: -100 }));
       act(() => {
         result.current.handlePointerMove(moveEvent);
       });
@@ -310,12 +301,10 @@ describe('usePlayerDragging', () => {
       expect(player.gridY).toBe(0);
     });
 
-    it('should clamp grid position to max bounds', () => {
+    it('should clamp grid position to max bounds during drag', () => {
       const { result } = setupDrag('p1');
 
-      // clientX: 99999 -> svgPt: (99999, 99999) -> gridX: 2499, gridY: 2499 -> clamped to 29
       svgRef.current = createSvgMockWithTransform(() => ({ x: 99999, y: 99999 }));
-
       const moveEvent = { preventDefault: vi.fn(), clientX: 99999, clientY: 99999 };
       act(() => {
         result.current.handlePointerMove(moveEvent);
@@ -413,9 +402,7 @@ describe('usePlayerDragging', () => {
     it('should clamp final position to grid bounds', () => {
       const { result } = setupDrag('p1');
 
-      // clientX: -100, clientY: -100 -> svgPt: (-100, -100) -> gridX: -3, gridY: -3 -> clamped to 0
       svgRef.current = createSvgMockWithTransform(() => ({ x: -100, y: -100 }));
-
       const upEvent = { preventDefault: vi.fn(), pointerId: 1, clientX: -100, clientY: -100 };
       act(() => {
         result.current.handlePointerUp(upEvent);

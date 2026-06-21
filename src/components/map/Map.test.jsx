@@ -1,5 +1,6 @@
-import { render, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { render, fireEvent, screen } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 import Map from './Map.jsx';
 
 const mockGridCenterX = (gx) => gx * 40 + 20;
@@ -29,10 +30,6 @@ const createZoomPanMocks = (overrides = {}) => ({
     handleWheel: vi.fn(),
     clientToSVG: vi.fn(),
     ...overrides,
-});
-
-beforeEach(() => {
-    vi.clearAllMocks();
 });
 
 // Mock EventSource globally before any imports that might use it
@@ -199,20 +196,23 @@ vi.mock('./hooks/useMapDrops.js', () => ({
 
 describe('Map', () => {
     describe('initial rendering', () => {
-        it('should render the root map div', async () => {
+        it('should render the root map div with SVG and toolbar', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const mapDiv = container.querySelector('div.map');
-            expect(mapDiv).not.toBeNull();
+            expect(mapDiv).toBeInTheDocument();
+            expect(mapDiv.querySelector('svg.grid-svg')).toBeInTheDocument();
+            expect(mapDiv.querySelector('.toolbar-row')).toBeInTheDocument();
         });
 
-        it('should render the SVG element', async () => {
+        it('should render the SVG element with grid-svg class', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
+            expect(svg).toBeInTheDocument();
+            expect(svg).toHaveClass('grid-svg');
         });
 
         it('should render the MapToolbar', async () => {
@@ -220,289 +220,58 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const toolbarRow = container.querySelector('.toolbar-row');
-            expect(toolbarRow).not.toBeNull();
+            expect(toolbarRow).toBeInTheDocument();
         });
 
-        it('should render with div.map wrapper containing SVG and toolbar', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const mapDiv = container.querySelector('div.map');
-            expect(mapDiv).not.toBeNull();
-            expect(mapDiv.querySelector('svg.grid-svg')).not.toBeNull();
-            expect(mapDiv.querySelector('.toolbar-row')).not.toBeNull();
-        });
-    });
-
-    describe('SVG defs rendering', () => {
         it('should render all SVG defs', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const defs = container.querySelector('svg defs');
-            expect(defs).not.toBeNull();
-        });
-
-        it('should render all 24 SVG defs in the defs section', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
+            expect(defs).toBeInTheDocument();
             expect(defs.children.length).toBeGreaterThan(0);
         });
+    });
 
-        it('should render BarrelSVG def with id barrel', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const barrelEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'BARRELSVG' && el.getAttribute('id') === 'barrel'
-            );
-            expect(barrelEl).not.toBeNull();
-        });
+    describe('SVG defs rendering', () => {
+        const defTests = [
+            { tagName: 'BARRELSVG', id: 'barrel' },
+            { tagName: 'TABLESVG', id: 'table' },
+            { tagName: 'BEDSVG', id: 'bed' },
+            { tagName: 'FIREPITSVG', id: 'firepit' },
+            { tagName: 'DOORSVG', id: 'door' },
+            { tagName: 'SECRETDOORSVG', id: 'secretDoor' },
+            { tagName: 'TRAPSVG', id: 'trap' },
+            { tagName: 'PILLARSVG', id: 'pillar' },
+            { tagName: 'STAIRSSVG', id: 'stairs' },
+            { tagName: 'ALTARSVG', id: 'altar' },
+            { tagName: 'ARROWSLITWALLSVG', id: 'arrowSlitWall' },
+            { tagName: 'BOOKSHELVESVG', id: 'bookshelf' },
+            { tagName: 'CHAIRSVG', id: 'chair' },
+            { tagName: 'CHESTSVG', id: 'chest' },
+            { tagName: 'CRATESVG', id: 'crate' },
+            { tagName: 'FOUNTAINSVG', id: 'fountain' },
+            { tagName: 'SKELETONSVG', id: 'skeleton' },
+            { tagName: 'STATUESVG', id: 'statue' },
+            { tagName: 'TORCHSVG', id: 'torch' },
+            { tagName: 'WEBSVG', id: 'web' },
+            { tagName: 'TREESVG', id: 'tree' },
+            { tagName: 'BOULDERSVG', id: 'boulder' },
+            { tagName: 'BUSHSVG', id: 'bush' },
+        ];
 
-        it('should render TableSVG def with id table', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const tableEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'TABLESVG' && el.getAttribute('id') === 'table'
-            );
-            expect(tableEl).not.toBeNull();
-        });
-
-        it('should render BedSVG def with id bed', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const bedEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'BEDSVG' && el.getAttribute('id') === 'bed'
-            );
-            expect(bedEl).not.toBeNull();
-        });
-
-        it('should render FirePitSVG def with id firepit', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const firepitEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'FIREPITSVG' && el.getAttribute('id') === 'firepit'
-            );
-            expect(firepitEl).not.toBeNull();
-        });
-
-        it('should render DoorSVG def with id door', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const doorEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'DOORSVG' && el.getAttribute('id') === 'door'
-            );
-            expect(doorEl).not.toBeNull();
-        });
-
-        it('should render SecretDoorSVG def with id secretDoor', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const secretDoorEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'SECRETDOORSVG' && el.getAttribute('id') === 'secretDoor'
-            );
-            expect(secretDoorEl).not.toBeNull();
-        });
-
-        it('should render TrapSVG def with id trap', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const trapEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'TRAPSVG' && el.getAttribute('id') === 'trap'
-            );
-            expect(trapEl).not.toBeNull();
-        });
-
-        it('should render PillarSVG def with id pillar', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const pillarEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'PILLARSVG' && el.getAttribute('id') === 'pillar'
-            );
-            expect(pillarEl).not.toBeNull();
-        });
-
-        it('should render StairsSVG def with id stairs', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const stairsEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'STAIRSSVG' && el.getAttribute('id') === 'stairs'
-            );
-            expect(stairsEl).not.toBeNull();
-        });
-
-        it('should render AltarSVG def with id altar', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const altarEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'ALTARSVG' && el.getAttribute('id') === 'altar'
-            );
-            expect(altarEl).not.toBeNull();
-        });
-
-        it('should render ArrowSlitWallSVG def with id arrowSlitWall', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const arrowEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'ARROWSLITWALLSVG' && el.getAttribute('id') === 'arrowSlitWall'
-            );
-            expect(arrowEl).not.toBeNull();
-        });
-
-        it('should render BookshelfSVG def with id bookshelf', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const bookshelfEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'BOOKSHELVESVG' && el.getAttribute('id') === 'bookshelf'
-            );
-            expect(bookshelfEl).not.toBeNull();
-        });
-
-        it('should render ChairSVG def with id chair', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const chairEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'CHAIRSVG' && el.getAttribute('id') === 'chair'
-            );
-            expect(chairEl).not.toBeNull();
-        });
-
-        it('should render ChestSVG def with id chest', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const chestEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'CHESTSVG' && el.getAttribute('id') === 'chest'
-            );
-            expect(chestEl).not.toBeNull();
-        });
-
-        it('should render CrateSVG def with id crate', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const crateEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'CRATESVG' && el.getAttribute('id') === 'crate'
-            );
-            expect(crateEl).not.toBeNull();
-        });
-
-        it('should render FountainSVG def with id fountain', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const fountainEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'FOUNTAINSVG' && el.getAttribute('id') === 'fountain'
-            );
-            expect(fountainEl).not.toBeNull();
-        });
-
-        it('should render SkeletonSVG def with id skeleton', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const skeletonEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'SKELETONSVG' && el.getAttribute('id') === 'skeleton'
-            );
-            expect(skeletonEl).not.toBeNull();
-        });
-
-        it('should render StatueSVG def with id statue', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const statueEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'STATUESVG' && el.getAttribute('id') === 'statue'
-            );
-            expect(statueEl).not.toBeNull();
-        });
-
-        it('should render TorchSVG def with id torch', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const torchEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'TORCHSVG' && el.getAttribute('id') === 'torch'
-            );
-            expect(torchEl).not.toBeNull();
-        });
-
-        it('should render WebSVG def with id web', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const webEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'WEBSVG' && el.getAttribute('id') === 'web'
-            );
-            expect(webEl).not.toBeNull();
-        });
-
-        it('should render TreeSVG def with id tree', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const treeEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'TREESVG' && el.getAttribute('id') === 'tree'
-            );
-            expect(treeEl).not.toBeNull();
-        });
-
-        it('should render BoulderSVG def with id boulder', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const boulderEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'BOULDERSVG' && el.getAttribute('id') === 'boulder'
-            );
-            expect(boulderEl).not.toBeNull();
-        });
-
-        it('should render BushSVG def with id bush', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const defs = container.querySelector('svg defs');
-            const bushEl = Array.from(defs?.children || []).find(
-                (el) => el.tagName === 'BUSHSVG' && el.getAttribute('id') === 'bush'
-            );
-            expect(bushEl).not.toBeNull();
-        });
+        for (const { tagName, id } of defTests) {
+            it(`should render ${tagName} def with id ${id}`, async () => {
+                const { container } = render(
+                    <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+                );
+                const defs = container.querySelector('svg defs');
+                const el = Array.from(defs?.children || []).find(
+                    (el) => el.tagName === tagName && el.getAttribute('id') === id
+                );
+                expect(el).not.toBeNull();
+            });
+        }
     });
 
     describe('sub-components rendering', () => {
@@ -519,7 +288,7 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const gridBg = container.querySelector('rect.grid-bg');
-            expect(gridBg).not.toBeNull();
+            expect(gridBg).toBeInTheDocument();
         });
 
         it('should render placed items component children', async () => {
@@ -527,7 +296,7 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
+            expect(svg).toBeInTheDocument();
         });
 
         it('should render fog overlay', async () => {
@@ -535,31 +304,7 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
-        });
-
-        it('should render item context menu component', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const itemContextMenu = container.querySelector('g.item-context-menu');
-            expect(itemContextMenu).toBeNull();
-        });
-
-        it('should render room context menu component', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const roomContextMenu = container.querySelector('g.room-context-menu');
-            expect(roomContextMenu).toBeNull();
-        });
-
-        it('should render player context menu component', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const playerContextMenu = container.querySelector('g.player-context-menu');
-            expect(playerContextMenu).toBeNull();
+            expect(svg).toBeInTheDocument();
         });
 
         it('should render spell overlay renderer', async () => {
@@ -567,7 +312,7 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
+            expect(svg).toBeInTheDocument();
         });
 
         it('should render ruler overlay', async () => {
@@ -575,59 +320,29 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
+            expect(svg).toBeInTheDocument();
         });
     });
 
     describe('context menus when null', () => {
-        it('should not render ItemContextMenu content when selectedItem is null', async () => {
+        it('should not render context menus when items, rooms, and players are null', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const itemContextMenu = container.querySelector('g.item-context-menu');
-            expect(itemContextMenu).toBeNull();
-        });
-
-        it('should not render RoomContextMenu content when selectedRoom is null', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const roomContextMenu = container.querySelector('g.room-context-menu');
-            expect(roomContextMenu).toBeNull();
-        });
-
-        it('should not render PlayerContextMenu content when selectedPlayer is null', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const playerContextMenu = container.querySelector('g.player-context-menu');
-            expect(playerContextMenu).toBeNull();
+            expect(container.querySelector('g.item-context-menu')).toBeNull();
+            expect(container.querySelector('g.room-context-menu')).toBeNull();
+            expect(container.querySelector('g.player-context-menu')).toBeNull();
         });
     });
 
     describe('selection rendering', () => {
-        it('should not render selection preview when selectStart is null', async () => {
+        it('should not render selection previews when nothing is selected', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const selectionPreview = container.querySelector('rect.selection-preview');
-            expect(selectionPreview).toBeNull();
-        });
-
-        it('should not render room draw preview when roomDrawRect is null', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const roomDrawPreview = container.querySelector('rect.room-draw-preview');
-            expect(roomDrawPreview).toBeNull();
-        });
-
-        it('should not render selection outline when no items or walls selected', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const selectionOutline = container.querySelector('rect.selection-outline');
-            expect(selectionOutline).toBeNull();
+            expect(container.querySelector('rect.selection-preview')).toBeNull();
+            expect(container.querySelector('rect.room-draw-preview')).toBeNull();
+            expect(container.querySelector('rect.selection-outline')).toBeNull();
         });
     });
 
@@ -636,16 +351,8 @@ describe('Map', () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const roomHighlights = container.querySelectorAll('rect.room-highlight');
-            expect(roomHighlights.length).toBe(0);
-        });
-
-        it('should not render room labels when rooms array is empty', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const roomLabels = container.querySelectorAll('text.room-label');
-            expect(roomLabels.length).toBe(0);
+            expect(container.querySelectorAll('rect.room-highlight').length).toBe(0);
+            expect(container.querySelectorAll('text.room-label').length).toBe(0);
         });
     });
 
@@ -654,87 +361,63 @@ describe('Map', () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const pendingOverlay = container.querySelector('rect.pending-overlay');
-            expect(pendingOverlay).toBeNull();
+            expect(container.querySelector('rect.pending-overlay')).toBeNull();
         });
     });
 
-    describe('rename popover rendering', () => {
+    describe('conditional component rendering', () => {
         it('should not render rename popover when renamePopover is null', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const monsterNameAutocomplete = container.querySelector('monster-name-autocomplete');
-            expect(monsterNameAutocomplete).toBeNull();
+            expect(container.querySelector('monster-name-autocomplete')).toBeNull();
         });
-    });
 
-    describe('items panel rendering', () => {
         it('should not render ItemsPanel when itemsPanelOpen is false', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const itemsPanel = container.querySelector('items-panel');
-            expect(itemsPanel).toBeNull();
+            expect(container.querySelector('items-panel')).toBeNull();
         });
 
         it('should not render ItemsPanel when isLocalhost is false', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
             );
-            const itemsPanel = container.querySelector('items-panel');
-            expect(itemsPanel).toBeNull();
+            expect(container.querySelector('items-panel')).toBeNull();
         });
-    });
 
-    describe('monster card modal rendering', () => {
         it('should not render MonsterCardModal when viewingMonster is null', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const monsterCardModal = container.querySelector('monster-card-modal');
-            expect(monsterCardModal).toBeNull();
+            expect(container.querySelector('monster-card-modal')).toBeNull();
         });
     });
 
     describe('SVG event handlers', () => {
-        it('should render SVG with grid-svg class', async () => {
+        it('should render SVG with correct cursor style', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
-            expect(svg.classList.contains('grid-svg')).toBe(true);
+            expect(svg).toBeInTheDocument();
+            expect(svg.getAttribute('style')).toContain('cursor: grab');
         });
 
-        it('should render SVG with onPointerDown handler', async () => {
+        it('should handle pointer events without throwing', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
-            const event = new PointerEvent('pointerdown', { bubbles: true });
-            expect(() => svg.dispatchEvent(event)).not.toThrow();
+            const pointerEvents = ['pointerdown', 'pointermove', 'pointerup'];
+            for (const eventType of pointerEvents) {
+                const event = new PointerEvent(eventType, { bubbles: true });
+                expect(() => svg.dispatchEvent(event)).not.toThrow();
+            }
         });
 
-        it('should render SVG with onPointerMove handler', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            const event = new PointerEvent('pointermove', { bubbles: true });
-            expect(() => svg.dispatchEvent(event)).not.toThrow();
-        });
-
-        it('should render SVG with onPointerUp handler', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            const event = new PointerEvent('pointerup', { bubbles: true });
-            expect(() => svg.dispatchEvent(event)).not.toThrow();
-        });
-
-        it('should render SVG with onWheel handler', async () => {
+        it('should handle wheel events without throwing', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
@@ -743,29 +426,13 @@ describe('Map', () => {
             expect(() => svg.dispatchEvent(event)).not.toThrow();
         });
 
-        it('should render SVG with drag event handlers', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
-        });
-
-        it('should render SVG with onClick handler', async () => {
+        it('should handle click events without throwing', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
             const event = new MouseEvent('click', { bubbles: true, button: 0 });
             expect(() => svg.dispatchEvent(event)).not.toThrow();
-        });
-
-        it('should render SVG with cursor grab when tool is none', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg.getAttribute('style')).toContain('cursor: grab');
         });
     });
 
@@ -774,49 +441,25 @@ describe('Map', () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
+            expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
         });
 
         it('should render grid and walls on the map', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const gridBg = container.querySelector('rect.grid-bg');
-            expect(gridBg).not.toBeNull();
+            expect(container.querySelector('rect.grid-bg')).toBeInTheDocument();
         });
     });
 
     describe('toolbar rendering', () => {
-        it('should render toolbar buttons', async () => {
+        it('should render toolbar with buttons and back button', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const toolbar = container.querySelector('.toolbar');
-            expect(toolbar).not.toBeNull();
-        });
-
-        it('should render zoom in button', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const zoomInBtn = container.querySelector('.toolbar button');
-            expect(zoomInBtn).not.toBeNull();
-        });
-
-        it('should render zoom out button', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const buttons = container.querySelectorAll('.toolbar button');
-            expect(buttons.length).toBeGreaterThan(0);
-        });
-
-        it('should render reset view button', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const buttons = container.querySelectorAll('.toolbar button');
+            expect(toolbar).toBeInTheDocument();
+            const buttons = toolbar.querySelectorAll('button');
             expect(buttons.length).toBeGreaterThan(2);
         });
 
@@ -825,7 +468,7 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const backBtn = container.querySelector('.toolbar-back-btn');
-            expect(backBtn).not.toBeNull();
+            expect(backBtn).toBeInTheDocument();
         });
 
         it('should render grid size input when isLocalhost is true', async () => {
@@ -833,7 +476,7 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const gridSizeInput = container.querySelector('.grid-size-input');
-            expect(gridSizeInput).not.toBeNull();
+            expect(gridSizeInput).toBeInTheDocument();
         });
 
         it('should not render grid size input when isLocalhost is false', async () => {
@@ -849,18 +492,18 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const mapTitle = container.querySelector('.toolbar-row h4');
-            expect(mapTitle).not.toBeNull();
+            expect(mapTitle).toBeInTheDocument();
             expect(mapTitle.textContent).toBe('test-map');
         });
     });
 
-    describe('campaign name and map name props', () => {
+    describe('campaign and map name props', () => {
         it('should render with campaign name in the component', async () => {
             const { container } = render(
                 <Map campaignName="my-campaign" characters={[]} isLocalhost={true} mapName="my-map" onBack={vi.fn()} />
             );
             const mapDiv = container.querySelector('div.map');
-            expect(mapDiv).not.toBeNull();
+            expect(mapDiv).toBeInTheDocument();
         });
 
         it('should render with map name in the toolbar', async () => {
@@ -868,7 +511,7 @@ describe('Map', () => {
                 <Map campaignName="my-campaign" characters={[]} isLocalhost={true} mapName="my-map" onBack={vi.fn()} />
             );
             const mapTitle = container.querySelector('.toolbar-row h4');
-            expect(mapTitle).not.toBeNull();
+            expect(mapTitle).toBeInTheDocument();
         });
     });
 
@@ -878,48 +521,29 @@ describe('Map', () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={characters} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
+            expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
         });
     });
 
     describe('isLocalhost prop', () => {
-        it('should render grid when isLocalhost is false', async () => {
+        it('should render core map elements when isLocalhost is false', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
             );
-            const gridBg = container.querySelector('rect.grid-bg');
-            expect(gridBg).not.toBeNull();
-        });
-
-        it('should render placed items when isLocalhost is false', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
-        });
-
-        it('should render fog overlay when isLocalhost is false', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
-            );
-            const svg = container.querySelector('svg.grid-svg');
-            expect(svg).not.toBeNull();
+            expect(container.querySelector('rect.grid-bg')).toBeInTheDocument();
+            expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
         });
     });
 
     describe('onBack prop', () => {
-        it('should pass onBack to MapToolbar which renders back button', async () => {
+        it('should call onBack when back button is clicked', async () => {
             const onBack = vi.fn();
             render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={onBack} />
             );
-            const backBtn = document.querySelector('.toolbar-back-btn');
-            if (backBtn) {
-                fireEvent.click(backBtn);
-                expect(onBack).toHaveBeenCalled();
-            }
+            const backBtn = screen.getByTitle('Back');
+            fireEvent.click(backBtn);
+            expect(onBack).toHaveBeenCalled();
         });
     });
 
@@ -929,8 +553,9 @@ describe('Map', () => {
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
-            expect(svg.getAttribute('viewBox')).toContain('0 0');
-            expect(svg.getAttribute('viewBox')).toContain('1200');
+            const viewBox = svg.getAttribute('viewBox');
+            expect(viewBox).toContain('0 0');
+            expect(viewBox).toContain('1200');
         });
     });
 

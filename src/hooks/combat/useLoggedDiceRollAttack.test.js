@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
@@ -95,7 +96,6 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
     };
 
     beforeEach(() => {
-        vi.clearAllMocks();
         rollD20.mockReturnValue(15);
         rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
         getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
@@ -135,8 +135,10 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
                 name: 'Longsword',
             }));
         });
+    });
 
-        it('determines hit when effectiveD20 + bonus >= effectiveAc', async () => {
+    describe('hit/miss determination', () => {
+        it('marks hit when effectiveD20 + bonus >= effectiveAc', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 17 });
             const fn = createFn();
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
@@ -145,7 +147,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             }));
         });
 
-        it('determines miss when effectiveD20 + bonus < effectiveAc', async () => {
+        it('marks miss when effectiveD20 + bonus < effectiveAc', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 22 });
             const fn = createFn();
             await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
@@ -154,7 +156,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             }));
         });
 
-        it('handles no target (undefined hit)', async () => {
+        it('leaves hit undefined when no target', async () => {
             getTargetFromAttacker.mockReturnValue(null);
             const fn = createFn();
             await fn('Longsword', 5, 'attack', {});
@@ -175,7 +177,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
         });
     });
 
-    describe('coverAcBonus', () => {
+    describe('cover and defensive bonuses', () => {
         it('adds coverAcBonus to effectiveAc', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 15 });
             const fn = createFn();
@@ -183,6 +185,42 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
                 coverAcBonus: 2,
             }));
+        });
+
+        it('adds gloriousDefenseBonus to effectiveAc', async () => {
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+            const fn = createFn();
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', gloriousDefenseBonus: 2 });
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                gloriousDefenseBonus: 2,
+            }));
+        });
+
+        it('adds defensiveDuelistBonus to effectiveAc', async () => {
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+            const fn = createFn();
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', defensiveDuelistBonus: 3 });
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                defensiveDuelistBonus: 3,
+            }));
+        });
+    });
+
+    describe('shield and shield of faith AC bonuses', () => {
+        it('calls shield AC bonus helper when active', async () => {
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+            getShieldAcBonus.mockReturnValue(5);
+            const fn = createFn();
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
+            expect(getShieldAcBonus).toHaveBeenCalledWith('Goblin', 'test-campaign');
+        });
+
+        it('calls shield of faith AC bonus helper when active', async () => {
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
+            getShieldOfFaithAcBonus.mockReturnValue(2);
+            const fn = createFn();
+            await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
+            expect(getShieldOfFaithAcBonus).toHaveBeenCalledWith('Goblin', 'test-campaign');
         });
     });
 
@@ -272,45 +310,7 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
         });
     });
 
-    describe('glorious defense and defensive duelist bonuses', () => {
-        it('adds gloriousDefenseBonus to effectiveAc', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', gloriousDefenseBonus: 2 });
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                gloriousDefenseBonus: 2,
-            }));
-        });
-
-        it('adds defensiveDuelistBonus to effectiveAc', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin', defensiveDuelistBonus: 3 });
-            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                defensiveDuelistBonus: 3,
-            }));
-        });
-    });
-
-    describe('shield and shield of faith AC bonuses', () => {
-        it('adds shield AC bonus when active', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-            getShieldAcBonus.mockReturnValue(5);
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-            expect(getShieldAcBonus).toHaveBeenCalledWith('Goblin', 'test-campaign');
-        });
-
-        it('adds shield of faith AC bonus when active', async () => {
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 12 });
-            getShieldOfFaithAcBonus.mockReturnValue(2);
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', { targetName: 'Goblin' });
-            expect(getShieldOfFaithAcBonus).toHaveBeenCalledWith('Goblin', 'test-campaign');
-        });
-    });
-
-    describe('auto damage context', () => {
+    describe('auto damage', () => {
         it('includes autoDamage in popupHtml when autoDamageFormula is provided', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 10 });
             const fn = createFn();
@@ -340,12 +340,21 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             }));
         });
 
-        it('sets tandemFootworkBonus to 0 if > 0', async () => {
+        it('resets tandemFootworkBonus to 0 if > 0', async () => {
             getTargetFromAttacker.mockReturnValue(null);
             getRuntimeValue.mockReturnValue(null).mockReturnValueOnce(5);
             const fn = createFn();
             await fn('Initiative', 3, 'initiative', {});
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'tandemFootworkBonus', 0, 'test-campaign');
+        });
+
+        it('clears expiration effects on initiative roll', async () => {
+            getTargetFromAttacker.mockReturnValue(null);
+            const { clearAllExpirationEffects } = await import('../../services/rules/effects/expirations.js');
+            clearAllExpirationEffects.mockReturnValue(undefined);
+            const fn = createFn();
+            await fn('Initiative', 3, 'initiative', {});
+            expect(clearAllExpirationEffects).toHaveBeenCalledWith('TestFighter', 'test-campaign');
         });
     });
 
@@ -362,13 +371,12 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
         });
     });
 
-    describe('attack hit path with unbreakable majesty', () => {
-        it('checks majesty when hit and target has majesty active', async () => {
+    describe('unbreakable majesty on hit', () => {
+        it('checks majesty, marks attacker, and dispatches save when hit and target has majesty active', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Mage', ac: 10 });
             isUnbreakableMajestyActive.mockReturnValue(true);
             hasAttackerTriggeredMajesty.mockReturnValue(false);
             getUnbreakableMajestySaveDc.mockReturnValue(15);
-            // Mock setTimeout to avoid the 30s timeout in the promise
             const origSetTimeout = globalThis.setTimeout;
             globalThis.setTimeout = (cb) => { cb(); return 0; };
             const fn = createFn();
@@ -377,17 +385,6 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
             expect(isUnbreakableMajestyActive).toHaveBeenCalledWith('Mage', 'test-campaign');
             expect(markAttackerTriggeredMajesty).toHaveBeenCalledWith('Mage', 'TestFighter', 'test-campaign');
             expect(dispatchUnbreakableMajestySave).toHaveBeenCalled();
-        });
-    });
-
-    describe('veteran initiative handling', () => {
-        it('clears expiration effects on initiative roll', async () => {
-            getTargetFromAttacker.mockReturnValue(null);
-            const { clearAllExpirationEffects } = await import('../../services/rules/effects/expirations.js');
-            clearAllExpirationEffects.mockReturnValue(undefined);
-            const fn = createFn();
-            await fn('Initiative', 3, 'initiative', {});
-            expect(clearAllExpirationEffects).toHaveBeenCalledWith('TestFighter', 'test-campaign');
         });
     });
 });

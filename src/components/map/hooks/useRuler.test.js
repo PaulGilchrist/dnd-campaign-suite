@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import useRuler from './useRuler.js';
 
 describe('useRuler', () => {
@@ -20,46 +21,23 @@ describe('useRuler', () => {
     return result;
   };
 
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
   describe('initial state', () => {
-    it('should start with rulerMode false', () => {
+    it('should start with rulerMode false and all positions null', () => {
       const result = getHook();
       expect(result.current.rulerMode).toBe(false);
-    });
-
-    it('should start with rulerStart null', () => {
-      const result = getHook();
       expect(result.current.rulerStart).toBeNull();
-    });
-
-    it('should start with rulerEnd null', () => {
-      const result = getHook();
       expect(result.current.rulerEnd).toBeNull();
-    });
-
-    it('should start with rulerPreview null', () => {
-      const result = getHook();
       expect(result.current.rulerPreview).toBeNull();
     });
   });
 
   describe('setRulerMode', () => {
-    it('should enable ruler mode', () => {
+    it('should enable and disable ruler mode', () => {
       const result = getHook();
       act(() => {
         result.current.setRulerMode(true);
       });
       expect(result.current.rulerMode).toBe(true);
-    });
-
-    it('should disable ruler mode', () => {
-      const result = getHook();
-      act(() => {
-        result.current.setRulerMode(true);
-      });
       act(() => {
         result.current.setRulerMode(false);
       });
@@ -488,32 +466,19 @@ describe('useRuler', () => {
           mockSvgRef
         );
       });
-      // Should not throw
       expect(result.current.rulerMode).toBe(false);
     });
   });
 
   describe('returned object shape', () => {
-    it('should return rulerMode and setRulerMode', () => {
+    it('should return all expected properties and functions', () => {
       const result = getHook();
       expect(result.current.rulerMode).toBeDefined();
       expect(typeof result.current.setRulerMode).toBe('function');
-    });
-
-    it('should return rulerStart, rulerEnd, rulerPreview', () => {
-      const result = getHook();
       expect(result.current.rulerStart).toBeDefined();
       expect(result.current.rulerEnd).toBeDefined();
       expect(result.current.rulerPreview).toBeDefined();
-    });
-
-    it('should return resetRuler function', () => {
-      const result = getHook();
       expect(typeof result.current.resetRuler).toBe('function');
-    });
-
-    it('should return handleRulerPointerDown, handleRulerPointerMove, handleRulerPointerUp', () => {
-      const result = getHook();
       expect(typeof result.current.handleRulerPointerDown).toBe('function');
       expect(typeof result.current.handleRulerPointerMove).toBe('function');
       expect(typeof result.current.handleRulerPointerUp).toBe('function');

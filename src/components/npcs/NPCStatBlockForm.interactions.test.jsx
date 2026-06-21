@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import NPCStatBlockForm from './NPCStatBlockForm';
@@ -112,7 +113,7 @@ describe('NPCStatBlockForm interactions', () => {
   });
 
   describe('Ability score changes', () => {
-    it('handles STR ability score change', () => {
+    it('handles ability score change for each stat', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const inputs = container.querySelectorAll('.npcs-ability-input');
@@ -121,16 +122,6 @@ describe('NPCStatBlockForm interactions', () => {
       const result = applyUpdater(updater, baseFormData);
       expect(result.abilityScores.str).toBe(18);
       expect(result.abilityScores.dex).toBe(14);
-    });
-
-    it('handles DEX ability score change', () => {
-      const setFormData = vi.fn();
-      const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const inputs = container.querySelectorAll('.npcs-ability-input');
-      fireEvent.change(inputs[1], { target: { value: '16' } });
-      const updater = getUpdater(setFormData);
-      const result = applyUpdater(updater, baseFormData);
-      expect(result.abilityScores.dex).toBe(16);
     });
 
     it('handles ability score change with invalid input (defaults to 0)', () => {
@@ -155,7 +146,7 @@ describe('NPCStatBlockForm interactions', () => {
   });
 
   describe('Saving throw changes', () => {
-    it('handles STR save bonus change', () => {
+    it('handles save bonus change for existing and new abilities', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const saveInputs = container.querySelectorAll('.npcs-save-input');
@@ -165,7 +156,7 @@ describe('NPCStatBlockForm interactions', () => {
       expect(result.savingThrowBonuses.str).toBe('+5');
     });
 
-    it('handles CON save bonus change (previously undefined)', () => {
+    it('adds a new save bonus when previously undefined', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const saveInputs = container.querySelectorAll('.npcs-save-input');
@@ -233,10 +224,20 @@ describe('NPCStatBlockForm interactions', () => {
   });
 
   describe('Defense array field changes', () => {
+    function getResistInput(container) {
+      return container.querySelector('input[placeholder="fire, cold, poison"]');
+    }
+    function getImmuneInput(container) {
+      return container.querySelector('input[placeholder="necrotic, psychic"]');
+    }
+    function getCondInput(container) {
+      return container.querySelector('input[placeholder="charmed, frightened"]');
+    }
+
     it('handles damage resistances change', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const resistInput = container.querySelector('input[placeholder="fire, cold, poison"]');
+      const resistInput = getResistInput(container);
       fireEvent.change(resistInput, { target: { value: 'fire, cold, lightning' } });
       const updater = getUpdater(setFormData);
       const result = applyUpdater(updater, baseFormData);
@@ -246,7 +247,7 @@ describe('NPCStatBlockForm interactions', () => {
     it('handles damage immunities change', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const immuneInput = container.querySelector('input[placeholder="necrotic, psychic"]');
+      const immuneInput = getImmuneInput(container);
       fireEvent.change(immuneInput, { target: { value: 'necrotic' } });
       const updater = getUpdater(setFormData);
       const result = applyUpdater(updater, baseFormData);
@@ -256,7 +257,7 @@ describe('NPCStatBlockForm interactions', () => {
     it('handles condition immunities change with empty string', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const condInput = container.querySelector('input[placeholder="charmed, frightened"]');
+      const condInput = getCondInput(container);
       fireEvent.change(condInput, { target: { value: '' } });
       const updater = getUpdater(setFormData);
       const result = applyUpdater(updater, baseFormData);
@@ -266,7 +267,7 @@ describe('NPCStatBlockForm interactions', () => {
     it('handles comma-separated input with extra spaces', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
-      const resistInput = container.querySelector('input[placeholder="fire, cold, poison"]');
+      const resistInput = getResistInput(container);
       fireEvent.change(resistInput, { target: { value: '  fire  ,  cold  ,  lightning  ' } });
       const updater = getUpdater(setFormData);
       const result = applyUpdater(updater, baseFormData);
@@ -387,7 +388,7 @@ describe('NPCStatBlockForm interactions', () => {
       expect(result.actions[0].name).toBe('Shortbow');
     });
 
-    it('adds action when actions is null/undefined', () => {
+    it('adds action when actions is undefined', () => {
       const setFormData = vi.fn();
       const data = { ...baseFormData, actions: undefined };
       render(<NPCStatBlockForm formData={data} setFormData={setFormData} />);
@@ -397,7 +398,7 @@ describe('NPCStatBlockForm interactions', () => {
       expect(result.actions).toHaveLength(1);
     });
 
-    it('handleActionChange works when prev.actions is undefined', () => {
+    it('handles action change when prev.actions is undefined', () => {
       const setFormData = vi.fn();
       const { container } = render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const nameInput = container.querySelector('.npcs-action-name');
@@ -409,7 +410,7 @@ describe('NPCStatBlockForm interactions', () => {
       expect(result.actions[0].name).toBe('Greatsword');
     });
 
-    it('handleRemoveAction works when prev.actions is undefined', () => {
+    it('handles action removal when prev.actions is undefined', () => {
       const setFormData = vi.fn();
       render(<NPCStatBlockForm formData={baseFormData} setFormData={setFormData} />);
       const removeBtn = screen.getByRole('button', { name: /Remove action/i });
