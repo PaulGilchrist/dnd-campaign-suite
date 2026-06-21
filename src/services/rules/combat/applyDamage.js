@@ -186,6 +186,13 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     // Save damage event under target's key for reaction features (including Projected Ward)
     if (isPlayer) {
         saveDamageEventForTarget(creature.name, rawDamage, damageTypes, campaignName);
+        // Store the latest single hit separately (not accumulated) for Projected Ward
+        setRuntimeValue(creature.name, 'projectedWardDamage', {
+            targetName: creature.name,
+            rawDamage,
+            damageTypes,
+            timestamp: Date.now(),
+        }, campaignName);
     }
 
     let oldHp, newHp;

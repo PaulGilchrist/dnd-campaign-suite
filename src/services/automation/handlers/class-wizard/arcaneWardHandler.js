@@ -67,9 +67,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    // Get the most recent damage event on the target
-    const lastDamage = getRuntimeValue(targetName, 'lastMetamagicDamage', campaignName);
-    if (!lastDamage?.rawDamage || lastDamage.rawDamage <= 0) {
+    // Get the most recent single damage hit on the target
+    const latestDamage = getRuntimeValue(targetName, 'projectedWardDamage', campaignName);
+    if (!latestDamage?.rawDamage || latestDamage.rawDamage <= 0) {
         return {
             type: 'popup',
             payload: {
@@ -82,7 +82,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const damageAmount = lastDamage.rawDamage;
+    const damageAmount = latestDamage.rawDamage;
     const absorbed = Math.min(damageAmount, wardHp);
     const remainingDamage = damageAmount - absorbed;
     const newWardHp = wardHp - absorbed;
