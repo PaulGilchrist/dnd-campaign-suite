@@ -1,4 +1,3 @@
- 
 import { useState, useCallback } from 'react';
 import Popup from '../common/Popup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
@@ -9,14 +8,17 @@ import { hasAutomation } from '../../services/combat/automation/automationServic
 import TeleportModal from './modals/TeleportModal.jsx';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
 import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
+import SavantModal from './modals/arcane/SavantModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
+import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const [popupHtml, setPopupHtml] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
     const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
     const [spellMasteryModal, setSpellMasteryModal] = useState(null);
+    const [savantModal, setSavantModal] = useState(null);
 
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
@@ -31,6 +33,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 setSignatureSpellsModal(result.payload);
             } else if (result.modalName === 'spellMastery') {
                 setSpellMasteryModal(result.payload);
+            } else if (result.modalName?.includes('Savant')) {
+                setSavantModal(result.payload);
             }
         }
     }, [playerStats, campaignName, cannotAct]);
@@ -60,6 +64,19 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
             setPopupHtml(html);
         }
     }, [spellMasteryModal, playerStats, campaignName]);
+
+    const handleSavantConfirm = useCallback(async (spell1, spell2) => {
+        if (!savantModal) return;
+        const result = await onSavantSelected(savantModal.action, playerStats, campaignName, spell1, spell2, savantModal.school);
+        setSavantModal(null);
+        if (result?.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-magic"></i> ${payload.name || savantModal.school} Savant</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [savantModal, playerStats, campaignName]);
 
     function formatPopupPayload(payload) {
         if (!payload) return null;
@@ -126,6 +143,13 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                     payload={spellMasteryModal}
                     onConfirm={handleSpellMasteryConfirm}
                     onClose={() => setSpellMasteryModal(null)}
+                />
+            )}
+            {savantModal && (
+                <SavantModal
+                    payload={savantModal}
+                    onConfirm={handleSavantConfirm}
+                    onClose={() => setSavantModal(null)}
                 />
             )}
             {uniqueActions.map((specialAction, index) => {

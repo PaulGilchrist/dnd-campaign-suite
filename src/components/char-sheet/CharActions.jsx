@@ -35,8 +35,6 @@ import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDesc
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
-import { onDivinationSavantSelected } from '../../services/automation/handlers/class-wizard/divinationSavantHandler.js';
-import { onIllusionSavantSelected } from '../../services/automation/handlers/class-wizard/illusionSavantHandler.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import './CharActions.css'
 import { isEqual } from 'lodash';
@@ -218,10 +216,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         boonOfEnergyResistanceModal, setBoonOfEnergyResistanceModal,
         dragonCompanionModal, setDragonCompanionModal,
         wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
-        wildMagicTamedModal, setWildMagicTamedModal,
-        divinationSavantModal, setDivinationSavantModal,
-        illusionSavantModal, setIllusionSavantModal,
-        thirdEyeModal, setThirdEyeModal,
+                    wildMagicTamedModal, setWildMagicTamedModal,
+                    thirdEyeModal, setThirdEyeModal,
         soulstitchSpellsModal, setSoulstitchSpellsModal,
         illusoryRealityModal, setIllusoryRealityModal,
         celestialRevelationModal, setCelestialRevelationModal,
@@ -490,12 +486,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'wildMagicTamed':
                         setWildMagicTamedModal(result.payload);
                         break;
-                    case 'divinationSavant':
-                        setDivinationSavantModal(result.payload);
-                        break;
-                    case 'illusionSavant':
-                        setIllusionSavantModal(result.payload);
-                        break;
                     case 'thirdEye':
                         setThirdEyeModal(result.payload);
                         break;
@@ -607,25 +597,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             });
         }
     }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction, characters]);
-
-    const handleDivinationSavantConfirm = React.useCallback(async (spell1, spell2) => {
-        if (!divinationSavantModal) return;
-        const result = await onDivinationSavantSelected(divinationSavantModal.payload.action, playerStats, campaignName, spell1, spell2);
-        setDivinationSavantModal(null);
-        if (result && result.type === 'popup') {
-            setPopupHtml(result.payload);
-        }
-    }, [divinationSavantModal, playerStats, campaignName, setPopupHtml, setDivinationSavantModal]);
-
-    const handleIllusionSavantConfirm = React.useCallback(async (spell1, spell2) => {
-        if (!illusionSavantModal) return;
-        const result = await onIllusionSavantSelected(illusionSavantModal.payload.action, playerStats, campaignName, spell1, spell2);
-        setIllusionSavantModal(null);
-        if (result && result.type === 'popup') {
-            setPopupHtml(result.payload);
-        }
-    }, [illusionSavantModal, playerStats, campaignName, setPopupHtml, setIllusionSavantModal]);
-
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {
             return null;
@@ -858,8 +829,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     dragonCompanionModal={dragonCompanionModal} setDragonCompanionModal={setDragonCompanionModal}
                     wildMagicDoubleRollModal={wildMagicDoubleRollModal} setWildMagicDoubleRollModal={setWildMagicDoubleRollModal}
                     wildMagicTamedModal={wildMagicTamedModal} setWildMagicTamedModal={setWildMagicTamedModal}
-                    divinationSavantModal={divinationSavantModal} setDivinationSavantModal={setDivinationSavantModal}
-                    illusionSavantModal={illusionSavantModal} setIllusionSavantModal={setIllusionSavantModal}
                     thirdEyeModal={thirdEyeModal} setThirdEyeModal={setThirdEyeModal}
                     soulstitchSpellsModal={soulstitchSpellsModal} setSoulstitchSpellsModal={setSoulstitchSpellsModal}
                     illusoryRealityModal={illusoryRealityModal} setIllusoryRealityModal={setIllusoryRealityModal}
@@ -892,8 +861,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleConstellationSelect={handleConstellationSelect}
                     handleElderChampionRestore={handleElderChampionRestore}
                     handleDivineInterventionCast={handleDivineInterventionCast}
-                    handleDivinationSavantConfirm={handleDivinationSavantConfirm}
-                    handleIllusionSavantConfirm={handleIllusionSavantConfirm}
                     pendingDamageRef={pendingDamageRef}
                 />
                 <CharActionSpellPopups

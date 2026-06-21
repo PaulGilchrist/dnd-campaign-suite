@@ -152,7 +152,6 @@ const categories2024 = {
         "Druidic",        
         "Eldritch Invocations",
         "Epic Boon",
-        "Evocation Savant",
         "Extra Attack",
         "Two Extra Attacks",
         "Three Extra Attacks",

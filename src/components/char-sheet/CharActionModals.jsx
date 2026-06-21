@@ -31,8 +31,6 @@ import BoonOfEnergyResistanceModal from './modals/racial/BoonOfEnergyResistanceM
 import DragonCompanionModal from './modals/DragonCompanionModal.jsx'
 import WildMagicDoubleRollModal from './modals/WildMagicDoubleRollModal.jsx'
 import WildMagicTamedModal from './modals/WildMagicTamedModal.jsx'
-import DivinationSavantModal from './modals/arcane/DivinationSavantModal.jsx'
-import IllusionSavantModal from './modals/arcane/IllusionSavantModal.jsx'
 import ThirdEyeModal from './modals/arcane/ThirdEyeModal.jsx'
 import SoulstitchSpellsModal from './modals/arcane/SoulstitchSpellsModal.jsx'
 import IllusoryRealityModal from './modals/arcane/IllusoryRealityModal.jsx'
@@ -87,8 +85,6 @@ export default function CharActionModals({
     dragonCompanionModal, setDragonCompanionModal,
     wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
     wildMagicTamedModal, setWildMagicTamedModal,
-    divinationSavantModal, setDivinationSavantModal,
-    illusionSavantModal, setIllusionSavantModal,
     thirdEyeModal, setThirdEyeModal,
     soulstitchSpellsModal, setSoulstitchSpellsModal,
     illusoryRealityModal, setIllusoryRealityModal,
@@ -121,8 +117,6 @@ export default function CharActionModals({
     handleConstellationSelect,
     handleElderChampionRestore,
     handleDivineInterventionCast,
-    handleDivinationSavantConfirm,
-    handleIllusionSavantConfirm,
     pendingDamageRef,
 }) {
     return (
@@ -424,20 +418,6 @@ export default function CharActionModals({
                 <WildMagicTamedModal
                     {...wildMagicTamedModal}
                     onClose={() => setWildMagicTamedModal(null)}
-                />
-            )}
-            {divinationSavantModal && (
-                <DivinationSavantModal
-                    payload={divinationSavantModal.payload}
-                    onConfirm={handleDivinationSavantConfirm}
-                    onClose={() => setDivinationSavantModal(null)}
-                />
-            )}
-            {illusionSavantModal && (
-                <IllusionSavantModal
-                    payload={illusionSavantModal.payload}
-                    onConfirm={handleIllusionSavantConfirm}
-                    onClose={() => setIllusionSavantModal(null)}
                 />
             )}
             {thirdEyeModal && (

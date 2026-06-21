@@ -134,10 +134,6 @@ import { handle as handleCreateThrall } from './handlers/class-warlock/createThr
 import { handle as handleCreateThrallTempHp } from './handlers/class-warlock/createThrallTempHpHandler.js';
 import { handle as handleSpellMastery } from './handlers/class-wizard/spellMasteryHandler.js';
 import { handle as handleSignatureSpells } from './handlers/class-wizard/signatureSpellsHandler.js';
-import { handle as handleAbjurationSavant } from './handlers/class-wizard/abjurationSavantHandler.js';
-import { handle as handleDivinationSavant } from './handlers/class-wizard/divinationSavantHandler.js';
-import { handle as handleEvocationSavant } from './handlers/class-wizard/evocationSavantHandler.js';
-import { handle as handleIllusionSavant } from './handlers/class-wizard/illusionSavantHandler.js';
 import { handle as handleArcaneWard } from './handlers/class-wizard/arcaneWardHandler.js';
 import { handle as handlePortent } from './handlers/class-wizard/portentHandler.js';
 import { handle as handleExpertDivination } from './handlers/class-wizard/expertDivinationHandler.js';
@@ -196,6 +192,26 @@ import { handle as handleRayOfEnfeeblement, isRayOfEnfeeblementActive } from './
 import { handle as handleSentinelGuardian } from './handlers/combat/sentinelGuardianHandler.js';
 import { handle as handleSentinelHalt } from './handlers/combat/sentinelHaltHandler.js';
 import { handle as handleWebAreaSave } from './handlers/spells/webAreaSaveHandler.js';
+import { handle as handleSavant } from './handlers/class-wizard/SavantHandler.js';
+
+const SAVANT_SCHOOLS = {
+    abjuration_savant: 'Abjuration',
+    divination_savant: 'Divination',
+    evocation_savant: 'Evocation',
+    illusion_savant: 'Illusion',
+};
+
+function makeSavantHandler(effect) {
+    const school = SAVANT_SCHOOLS[effect];
+    return school ? (action, playerStats, campaignName, mapName) => handleSavant(action, playerStats, campaignName, mapName, school) : null;
+}
+
+const PASSIVE_RULE_EFFECTS = {
+    abjuration_savant: makeSavantHandler('abjuration_savant'),
+    divination_savant: makeSavantHandler('divination_savant'),
+    evocation_savant: makeSavantHandler('evocation_savant'),
+    illusion_savant: makeSavantHandler('illusion_savant'),
+};
 
 const HANDLER_MAP = {
     save_only: handleSaveOnly,
@@ -353,10 +369,6 @@ const HANDLER_MAP = {
                 create_thrall: handleCreateThrall,
                 create_thrall_temp_hp: handleCreateThrallTempHp,
                 memorize_spell: handleGenericPopup,
-                abjuration_savant: handleAbjurationSavant,
-                divination_savant: handleDivinationSavant,
-                evocation_savant: handleEvocationSavant,
-                illusion_savant: handleIllusionSavant,
                 spell_mastery: handleSpellMastery,
                 signature_spells: handleSignatureSpells,
                 spell_breaker: handleGenericPopup,
@@ -452,13 +464,21 @@ export {
 export async function executeHandler(action, playerStats, campaignName, mapName) {
     if (!action?.automation) return null;
 
-    const handler = HANDLER_MAP[action.automation.type];
+    const auto = action.automation;
+    let handler;
+
+    if (auto.type === 'passive_rule' && PASSIVE_RULE_EFFECTS[auto.effect]) {
+        handler = PASSIVE_RULE_EFFECTS[auto.effect];
+    } else {
+        handler = HANDLER_MAP[auto.type];
+    }
+
     if (!handler) return null;
 
     try {
         return await handler(action, playerStats, campaignName, mapName);
       } catch (e) {
-          console.error(`[automation] Handler ${action.automation.type} failed:`, e);
+          console.error(`[automation] Handler ${auto.type}/${auto.effect} failed:`, e);
           return { type: 'popup', payload: { type: 'automation_info', name: action.name, description: `Failed to execute ${action.name}` } };
       }
 }

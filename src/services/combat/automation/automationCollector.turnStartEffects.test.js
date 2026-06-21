@@ -9,7 +9,6 @@ describe('collectTurnStartEffects', () => {
             ['umbral_sight', 'umbral_sight'],
             ['naturally_stealthy', 'naturally_stealthy'],
             ['mage_hand_legerdemain', 'mage_hand_legerdemain'],
-            ['abjuration_savant', 'abjuration_savant'],
             ['divination_savant', 'divination_savant'],
             ['evocation_savant', 'evocation_savant'],
             ['illusion_savant', 'illusion_savant'],

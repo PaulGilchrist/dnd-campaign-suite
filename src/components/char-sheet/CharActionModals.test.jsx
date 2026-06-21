@@ -136,12 +136,6 @@ vi.mock('./modals/WildMagicDoubleRollModal.jsx', () => ({
 vi.mock('./modals/WildMagicTamedModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="wild-magic-tamed-modal">WildMagicTamedModal</div>; },
 }));
-vi.mock('./modals/arcane/DivinationSavantModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="divination-savant-modal">DivinationSavantModal</div>; },
-}));
-vi.mock('./modals/arcane/IllusionSavantModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="illusion-savant-modal">IllusionSavantModal</div>; },
-}));
 vi.mock('./modals/arcane/ThirdEyeModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="third-eye-modal">ThirdEyeModal</div>; },
 }));
@@ -345,8 +339,6 @@ describe('CharActionModals', () => {
       { name: 'dragon-companion', prop: 'dragonCompanionModal', value: {} },
       { name: 'wild-magic-double-roll', prop: 'wildMagicDoubleRollModal', value: {} },
       { name: 'wild-magic-tamed', prop: 'wildMagicTamedModal', value: {} },
-      { name: 'divination-savant', prop: 'divinationSavantModal', value: { payload: {} } },
-      { name: 'illusion-savant', prop: 'illusionSavantModal', value: { payload: {} } },
       { name: 'third-eye', prop: 'thirdEyeModal', value: { action: {}, playerStats: {}, campaignName: 'test' } },
       { name: 'soulstitch-spells', prop: 'soulstitchSpellsModal', value: {} },
       { name: 'illusory-reality', prop: 'illusoryRealityModal', value: {} },

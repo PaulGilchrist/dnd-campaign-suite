@@ -143,12 +143,6 @@ export function collectTurnStartEffects(features) {
                     attunementLimit: auto.attunementLimit || 4,
                 })
             }
-            if (auto?.type === 'passive_rule' && auto?.effect === 'abjuration_savant') {
-                effects.push({
-                    type: 'abjuration_savant',
-                    name: feature.name,
-                })
-            }
             if (auto?.type === 'passive_rule' && auto?.effect === 'divination_savant') {
                 effects.push({
                     type: 'divination_savant',
@@ -767,9 +761,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break;
             case 'spell_mastery':
                 result.specialActions.push(info);
-                break;
-            case 'abjuration_savant':
-                result.passives.push(info);
                 break;
             case 'divination_savant':
                 result.passives.push(info);
