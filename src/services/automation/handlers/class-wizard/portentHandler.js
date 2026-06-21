@@ -1,9 +1,9 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { rollD20 } from '../../../../services/dice/diceRoller.js';
+import { rollD20, rollExpression } from '../../../../services/dice/diceRoller.js';
 import { infoPopup } from '../../common/infoPopup.js';
-import { resolveTarget } from '../../common/targetResolver.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -27,14 +27,13 @@ function setPortentDice(playerName, dice, campaignName) {
     setRuntimeValue(playerName, 'portentDice', JSON.stringify(dice), campaignName);
 }
 
-function buildPortentDescription(action, d20, bonus, label, replacedValue, targetName, outcomeNote) {
+function buildPortentDescription(action, eventType, newDie, bonus, label, replacedValue, targetName, outcomeNote) {
     const originalTotal = replacedValue + bonus;
-    const newTotal = d20 + bonus;
+    const newTotal = newDie + bonus;
 
-    let description = `<b>${action.name}</b><br/>`;
-    description += `Target: ${targetName}<br/>`;
+    let description = `Target: ${targetName}<br/>`;
     description += `${label}: Original d20(${replacedValue}) + ${bonus} = ${originalTotal}`;
-    description += ` → Portent d20(${d20}) + ${bonus} = <strong>${newTotal}</strong>`;
+    description += ` → Portent d20(${newDie}) + ${bonus} = <strong>${newTotal}</strong>`;
     if (outcomeNote) {
         description += `<br/><i>${outcomeNote}</i>`;
     }
@@ -42,32 +41,18 @@ function buildPortentDescription(action, d20, bonus, label, replacedValue, targe
     return description;
 }
 
-function getRollEvents(targetName, campaignName) {
-    const attackEvent = getRuntimeValue(targetName, 'lastAttackRoll', campaignName);
-    const abilityEvent = getRuntimeValue(targetName, 'lastAbilityCheck', campaignName);
-    const saveEvent = getRuntimeValue(targetName, 'lastSaveRoll', campaignName);
-    return { attackEvent, abilityEvent, saveEvent };
-}
-
-function updateStoredRoll(targetName, campaignName, eventType, newEvent) {
-    setRuntimeValue(targetName, eventType, newEvent, campaignName);
-}
-
-function getEventDetails(event, eventType) {
-    const { d20: originalD20, bonus } = event;
-    let label;
+function getEventLabel(eventData, eventType) {
     if (eventType === 'attack') {
-        label = `Attack vs AC ${event.targetName || 'unknown'}`;
-    } else if (eventType === 'ability') {
-        label = event.checkName || 'Ability check';
-    } else {
-        label = event.saveType ? event.saveType.toUpperCase() : 'Save';
+        const acLabel = eventData.targetName || 'unknown';
+        return `Attack vs ${acLabel}`;
     }
-    return { originalD20, bonus, label };
+    if (eventType === 'ability') {
+        return eventData.checkName || 'Ability check';
+    }
+    return eventData.saveType ? eventData.saveType.toUpperCase() : 'Save';
 }
 
-function computeOutcomeNote(eventType, eventData, chosenDie, bonus) {
-    if (eventType !== 'attack') return null;
+function computeHitOutcome(eventData, chosenDie, bonus) {
     const targetAc = eventData.targetAc;
     if (targetAc == null) return null;
     const newHit = (chosenDie + bonus) >= targetAc;
@@ -77,7 +62,60 @@ function computeOutcomeNote(eventType, eventData, chosenDie, bonus) {
     return 'The attack still misses.';
 }
 
-async function handle(action, playerStats, campaignName, mapName) {
+async function findMostRecentEvent(campaignName) {
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.creatures) return null;
+
+    let bestEvent = null;
+    let bestTimestamp = 0;
+    let bestCreature = null;
+    let bestEventType = null;
+    let bestEventKey = null;
+
+    for (const creature of cs.creatures) {
+        const name = creature.name;
+
+        const attack = getRuntimeValue(name, 'lastAttackRoll', campaignName);
+        const ability = getRuntimeValue(name, 'lastAbilityCheck', campaignName);
+        const save = getRuntimeValue(name, 'lastSaveRoll', campaignName);
+
+        if (attack && !isStale(attack) && attack.timestamp > bestTimestamp) {
+            bestTimestamp = attack.timestamp;
+            bestCreature = name;
+            bestEventType = 'attack';
+            bestEventKey = 'lastAttackRoll';
+            bestEvent = attack;
+        }
+        if (ability && !isStale(ability) && ability.timestamp > bestTimestamp) {
+            bestTimestamp = ability.timestamp;
+            bestCreature = name;
+            bestEventType = 'ability';
+            bestEventKey = 'lastAbilityCheck';
+            bestEvent = ability;
+        }
+        if (save && !isStale(save) && save.timestamp > bestTimestamp) {
+            bestTimestamp = save.timestamp;
+            bestCreature = name;
+            bestEventType = 'save';
+            bestEventKey = 'lastSaveRoll';
+            bestEvent = save;
+        }
+    }
+
+    if (!bestCreature) return null;
+
+    const context = getRuntimeValue(bestCreature, '_lastRollContext', campaignName);
+
+    return {
+        creatureName: bestCreature,
+        eventType: bestEventType,
+        eventData: bestEvent,
+        eventKey: bestEventKey,
+        context,
+    };
+}
+
+async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
@@ -91,63 +129,9 @@ async function handle(action, playerStats, campaignName, mapName) {
         return infoPopup(action.name, `${action.name} can only be used once per turn.`, auto);
     }
 
-    let targetName = playerName;
-    if (mapName) {
-        const targetInfo = await resolveTarget(campaignName, playerName);
-        if (targetInfo?.target) {
-            targetName = targetInfo.target.name;
-        }
-    }
-
-    let attackEvent, abilityEvent, saveEvent;
-    let attackFresh, abilityFresh, saveFresh;
-
-    function readEvents(name) {
-        const events = getRollEvents(name, campaignName);
-        attackEvent = events.attackEvent;
-        abilityEvent = events.abilityEvent;
-        saveEvent = events.saveEvent;
-        attackFresh = attackEvent && !isStale(attackEvent);
-        abilityFresh = abilityEvent && !isStale(abilityEvent);
-        saveFresh = saveEvent && !isStale(saveEvent);
-    }
-
-    readEvents(targetName);
-
-    if (!attackFresh && !abilityFresh && !saveFresh && targetName !== playerName) {
-        readEvents(playerName);
-        if (attackFresh || abilityFresh || saveFresh) {
-            targetName = playerName;
-        }
-    }
-
-    if (!attackFresh && !abilityFresh && !saveFresh && targetName === playerName) {
-        const cs = await getCombatContext(campaignName);
-        if (cs?.creatures) {
-            for (const creature of cs.creatures) {
-                if (creature.name === playerName) continue;
-                const ae = getRuntimeValue(creature.name, 'lastAttackRoll', campaignName);
-                if (ae && ae.targetName === playerName && !isStale(ae)) {
-                    targetName = creature.name;
-                    readEvents(targetName);
-                    break;
-                }
-            }
-        }
-    }
-
-    let eventType, eventData;
-    if (attackFresh) {
-        eventType = 'attack';
-        eventData = attackEvent;
-    } else if (abilityFresh) {
-        eventType = 'ability';
-        eventData = abilityEvent;
-    } else if (saveFresh) {
-        eventType = 'save';
-        eventData = saveEvent;
-    } else {
-        return infoPopup(action.name, `No recent D20 test found for ${targetName}. Portent can only be used on a recent attack roll, ability check, or saving throw.`, auto);
+    const result = await findMostRecentEvent(campaignName);
+    if (!result) {
+        return infoPopup(action.name, `No recent D20 test found. Portent can only be used on a recent attack roll, ability check, or saving throw.`, auto);
     }
 
     const diceOptions = [...portentDice].sort((a, b) => b - a);
@@ -159,15 +143,16 @@ async function handle(action, playerStats, campaignName, mapName) {
             action,
             playerStats,
             campaignName,
-            targetName,
-            eventType,
-            eventData,
+            targetName: result.creatureName,
+            eventType: result.eventType,
+            eventData: result.eventData,
+            context: result.context,
             diceOptions,
         },
     };
 }
 
-async function applyPortentChoice(action, playerStats, campaignName, targetName, eventType, eventData, chosenDie) {
+async function applyPortentChoice(action, playerStats, campaignName, targetName, eventType, eventData, context, chosenDie) {
     const playerName = playerStats.name;
 
     const portentDice = getPortentDice(playerName, campaignName);
@@ -182,52 +167,104 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
     }
     setPortentDice(playerName, remainingDice, campaignName);
 
-    const { originalD20, bonus, label } = getEventDetails(eventData, eventType);
-    const outcomeNote = computeOutcomeNote(eventType, eventData, chosenDie, bonus);
+    const { d20: originalD20, bonus } = eventData;
+    const label = getEventLabel(eventData, eventType);
+    let outcomeNote = null;
+    let damageRolled = null;
 
     if (eventType === 'attack') {
         const targetAc = eventData.targetAc;
         const newHit = targetAc != null ? (chosenDie + bonus >= targetAc) : eventData.hit;
-        updateStoredRoll(targetName, campaignName, 'lastAttackRoll', {
+        outcomeNote = computeHitOutcome(eventData, chosenDie, bonus);
+
+        const eventKey = 'lastAttackRoll';
+        setRuntimeValue(targetName, eventKey, {
             ...eventData,
             d20: chosenDie,
             hit: newHit,
             portentUsed: true,
             portentOriginalD20: originalD20,
             timestamp: Date.now(),
-        });
+        }, campaignName);
+
+        // Miss→hit: trigger damage
+        if (!eventData.hit && newHit) {
+            const damageFormula = context?.damageFormula || null;
+            if (damageFormula) {
+                const dmgResult = rollExpression(damageFormula);
+                if (dmgResult && dmgResult.total > 0) {
+                    const cs = await getCombatContext(campaignName);
+                    const characters = [playerStats];
+                    try {
+                        const appliedDmg = applyDamageToTarget(cs, eventData.targetName, dmgResult.total, [context?.damageType || 'unknown'], campaignName, characters, false, playerName);
+                        if (appliedDmg) {
+                            damageRolled = dmgResult.total;
+                        }
+                    } catch (e) {
+                        console.error('[portent] applyDamageToTarget failed:', e);
+                    }
+                }
+            }
+        }
+
+        // Hit→miss: undo damage
+        if (eventData.hit && !newHit) {
+            const lastDamage = getRuntimeValue(campaignName, '_lastDamageDealt', campaignName);
+            if (lastDamage && lastDamage.targetName === eventData.targetName && lastDamage.attackerName === targetName) {
+                const currentHp = getRuntimeValue(eventData.targetName, 'currentHitPoints', campaignName);
+                const maxHp = getRuntimeValue(eventData.targetName, 'maxHitPoints', campaignName);
+                if (currentHp != null) {
+                    const healedHp = Math.min(currentHp + lastDamage.damage, maxHp != null ? maxHp : 99999);
+                    setRuntimeValue(eventData.targetName, 'currentHitPoints', healedHp, campaignName);
+                    outcomeNote = `${outcomeNote} Undid ${lastDamage.damage} damage.`;
+                }
+            }
+        }
     } else if (eventType === 'ability') {
-        updateStoredRoll(targetName, campaignName, 'lastAbilityCheck', {
+        setRuntimeValue(targetName, 'lastAbilityCheck', {
             ...eventData,
             d20: chosenDie,
             portentUsed: true,
             portentOriginalD20: originalD20,
             timestamp: Date.now(),
-        });
+        }, campaignName);
     } else {
-        updateStoredRoll(targetName, campaignName, 'lastSaveRoll', {
+        const saveDc = context?.saveDc || null;
+        const newTotal = chosenDie + bonus;
+        let saveNote = null;
+        if (saveDc != null && context?.oldSuccess != null) {
+            const newSuccess = newTotal >= saveDc;
+            if (context.oldSuccess && !newSuccess) saveNote = 'The save now fails!';
+            else if (!context.oldSuccess && newSuccess) saveNote = 'The save now succeeds!';
+        }
+
+        setRuntimeValue(targetName, 'lastSaveRoll', {
             ...eventData,
             d20: chosenDie,
             portentUsed: true,
             portentOriginalD20: originalD20,
             timestamp: Date.now(),
-        });
+        }, campaignName);
+
+        if (saveNote) outcomeNote = saveNote;
     }
 
     setRuntimeValue(playerName, 'portentUsedThisTurn', true, campaignName);
 
+    let logDesc = `${playerName} used ${action.name} on ${targetName}: replaced d20 with ${chosenDie}. Dice remaining: ${remainingDice.length}.`;
+    if (damageRolled != null) logDesc += ` Damage rolled: ${damageRolled}.`;
     addEntry(campaignName, {
         type: 'ability_use',
         characterName: playerName,
         abilityName: action.name,
-        description: `${playerName} used ${action.name} on ${targetName}: replaced d20 with ${chosenDie}. Dice remaining: ${remainingDice.length}.`,
+        description: logDesc,
         portentDie: chosenDie,
         targetName,
         diceRemaining: remainingDice.length,
         timestamp: Date.now(),
     }).catch((e) => { console.error("[portent] Error:", e); throw e; });
 
-    const description = buildPortentDescription(action, chosenDie, bonus, label, originalD20, targetName, outcomeNote);
+    const description = buildPortentDescription(action, eventType, chosenDie, bonus, label, originalD20, targetName, outcomeNote);
     return infoPopup(action.name, description, action.automation);
 }
 

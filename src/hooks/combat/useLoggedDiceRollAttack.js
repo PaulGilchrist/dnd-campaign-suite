@@ -285,6 +285,17 @@ export function createLogAndShow(deps) {
                 timestamp: Date.now(),
             }, campaignName);
 
+            setRuntimeValue(characterName, '_lastRollContext', {
+                type: 'attack',
+                attackName: name,
+                damageFormula: context?.autoDamageFormula || null,
+                damageType: context?.damageType || null,
+                targetName,
+                oldTotal: effectiveD20 + bonus,
+                oldHit: hit,
+                timestamp: Date.now(),
+            }, campaignName);
+
             const ps = context?.playerStats;
             const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
             const hasSoulBlades = isSoulknife && ps?.level >= 9;
@@ -552,6 +563,13 @@ export function createLogAndShow(deps) {
                 targetName,
                 timestamp: Date.now(),
             }, campaignName);
+
+            setRuntimeValue(characterName, '_lastRollContext', {
+                type: 'check',
+                checkName: name,
+                oldTotal: effectiveD20 + bonus,
+                timestamp: Date.now(),
+            }, campaignName);
         }
 
         if (rollType === 'save') {
@@ -560,6 +578,17 @@ export function createLogAndShow(deps) {
                 bonus,
                 saveType: context?.saveType || null,
                 targetName,
+                timestamp: Date.now(),
+            }, campaignName);
+
+            setRuntimeValue(characterName, '_lastRollContext', {
+                type: 'save',
+                saveType: context?.saveType || null,
+                saveDc: context?.saveDc || null,
+                actionName: context?.actionName || name,
+                targetName,
+                oldTotal: effectiveD20 + bonus,
+                oldSuccess: context?.saveDc != null ? (effectiveD20 + bonus >= context.saveDc) : null,
                 timestamp: Date.now(),
             }, campaignName);
 

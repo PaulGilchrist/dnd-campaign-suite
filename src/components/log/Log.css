@@ -688,3 +688,29 @@
     color: #f39c12;
     background: rgba(243, 156, 18, 0.15);
 }
+
+/* Ability use entries */
+.log-ability-use {
+    border-left: 3px solid #f59e0b;
+}
+
+.log-ability-details {
+    padding-left: 28px;
+    margin-top: 2px;
+}
+
+.log-ability-description {
+    font-size: 0.85rem;
+    color: var(--color-text);
+}
+
+.log-ability-description b,
+.log-ability-description strong {
+    font-weight: 700;
+    color: var(--color-header);
+}
+
+.log-ability-description i {
+    font-style: italic;
+    color: var(--color-text-muted);
+}

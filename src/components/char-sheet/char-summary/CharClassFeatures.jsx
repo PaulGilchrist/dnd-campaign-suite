@@ -448,16 +448,21 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
     }, [portentAction, playerStats, campaignName, refreshDiceDisplay]);
 
     const handlePortentDieChoice = React.useCallback(async (chosenDie) => {
-        const { action, playerStats: ps, campaignName: cn, targetName, eventType, eventData } = portentModal;
-        const result = await applyPortentChoice(action, ps, cn, targetName, eventType, eventData, chosenDie);
-        setPortentModal(null);
-        if (result?.type === 'popup') {
-            const payload = result.payload;
-            const html = typeof payload === 'string'
-                ? payload
-                : `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}`;
-            setPortentPopup(html);
-            refreshDiceDisplay();
+        const { action, playerStats: ps, campaignName: cn, targetName, eventType, eventData, context } = portentModal;
+        try {
+            const result = await applyPortentChoice(action, ps, cn, targetName, eventType, eventData, context, chosenDie);
+            setPortentModal(null);
+            if (result?.type === 'popup') {
+                const payload = result.payload;
+                const html = typeof payload === 'string'
+                    ? payload
+                    : `<b>${payload.name || 'Portent'}</b><br/>${payload.description || ''}`;
+                setPortentPopup(html);
+                refreshDiceDisplay();
+            }
+        } catch (e) {
+            console.error('[Portent] Failed to apply die choice:', e);
+            setPortentModal(null);
         }
     }, [portentModal, refreshDiceDisplay]);
 
@@ -480,10 +485,10 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
                      <div className="portent-modal" onClick={e => e.stopPropagation()}>
                          <h3>Portent</h3>
                          <div className="portent-modal-section">
-                             <div className="portent-modal-label">Target: <span className="portent-modal-target">{portentModal.targetName}</span></div>
+                             <div className="portent-modal-label">Creature: <span className="portent-modal-target">{portentModal.targetName}</span></div>
                              <div className="portent-modal-label">{getEventDisplayLabel(portentModal.eventType, portentModal.eventData)}</div>
                              <div className="portent-modal-original">
-                                 Original: d20({portentModal.eventData.d20}) + {portentModal.eventData.bonus} = {portentModal.eventData.d20 + portentModal.eventData.bonus}
+                                 d20({portentModal.eventData.d20}) + {portentModal.eventData.bonus} = {portentModal.eventData.d20 + portentModal.eventData.bonus}
                                  {portentModal.eventType === 'attack' && ` (${portentModal.eventData.hit ? 'Hit' : 'Miss'})`}
                              </div>
                          </div>
@@ -515,15 +520,15 @@ const WizardFeatures = function WizardFeatures({ playerStats, campaignName }) {
              )}
              {hasPortent && (
                   <div>
-                      <div><b>Portent Dice:</b></div>
-                      <div className="portent-dice-display">
+                      <b>Portent Dice:</b>
+                      <span className="portent-dice-display">
                           {portentDice.length > 0
                               ? portentDice.map((die, i) => (
                                   <span key={i} className="portent-die">{die}{i < portentDice.length - 1 ? ', ' : ''}</span>
                               ))
                               : <span className="automation-badge">No dice remaining</span>
                           }
-                      </div>
+                      </span>
                       <div className="automation-actions">
                           <button className="automation-btn" onClick={handlePortentClick} title="Use Portent to replace a d20 test with a foretelling roll">
                               <i className="fas fa-dice-d20"></i> Use Portent

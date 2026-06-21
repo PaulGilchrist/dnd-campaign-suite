@@ -240,7 +240,18 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       creature.currentHp = newHp;
      }
 
-    // Tasha's Hideous Laughter: damage-triggered repeat WIS save with Advantage
+     if (wardDamage > 0) {
+         setRuntimeValue(campaignName, '_lastDamageDealt', {
+             targetName,
+             damage: wardDamage,
+             attackerName,
+             damageTypes,
+             isPlayer,
+             timestamp: Date.now(),
+         }, campaignName);
+     }
+
+     // Tasha's Hideous Laughter: damage-triggered repeat WIS save with Advantage
     if (wardDamage > 0 && !isPlayer) {
         // For NPCs, check creature.conditions directly (no getRuntimeValue call needed)
         const rawConditions = creature.conditions || [];
@@ -319,8 +330,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     }
     if (isPlayer) {
       const rawConditions = getRuntimeValue(creature.name, 'activeConditions');
-      if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
-      const conditions = rawConditions;
+      const conditions = rawConditions || [];
       if (conditions.some(c => String(c).toLowerCase() === 'frightened')) {
         const filtered = conditions.filter(c => String(c).toLowerCase() !== 'frightened');
         setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
@@ -378,8 +388,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       const attackerBuffArray = Array.isArray(attackerBuffs) ? attackerBuffs : [];
       if (attackerBuffArray.some(b => b.name === 'Psychic Veil')) {
         const rawAttackerConditions = getRuntimeValue(attackerName, 'activeConditions');
-        if (rawAttackerConditions == null || !Array.isArray(rawAttackerConditions)) { console.error('[applyDamage] attacker activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
-        const attackerConditions = rawAttackerConditions;
+        const attackerConditions = rawAttackerConditions || [];
         const attackerCondArray = attackerConditions;
         const filteredConditions = attackerCondArray.filter(c => String(c).toLowerCase() !== 'invisible');
         if (filteredConditions.length !== attackerCondArray.length) {
@@ -394,8 +403,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       const stealthAttackCost = getRuntimeValue(attackerName, 'stealthAttackCost', campaignName);
       if (stealthAttackCost && stealthAttackCost > 0) {
         const rawAttackerConditions2 = getRuntimeValue(attackerName, 'activeConditions');
-        if (rawAttackerConditions2 == null || !Array.isArray(rawAttackerConditions2)) { console.error('[applyDamage] attacker activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
-        const attackerConditions2 = rawAttackerConditions2;
+        const attackerConditions2 = rawAttackerConditions2 || [];
         const attackerCondArray2 = attackerConditions2;
         const hasInvisible = attackerCondArray2.some(c => String(c).toLowerCase() === 'invisible');
         if (hasInvisible) {
@@ -426,8 +434,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
                 const saveTotal = saveRoll + conBonus;
                 if (saveTotal < conSaveDc) {
                   const rawAttackerConditions = getRuntimeValue(attackerName, 'activeConditions');
-                  if (rawAttackerConditions == null || !Array.isArray(rawAttackerConditions)) { console.error('[applyDamage] attacker activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
-                  const attackerConditions = rawAttackerConditions;
+                  const attackerConditions = rawAttackerConditions || [];
                   const attackerCondArray = attackerConditions;
                   const existingBlinded = attackerCondArray.find(c => String(c).toLowerCase() === 'blinded');
                   if (!existingBlinded) {
@@ -678,8 +685,7 @@ function checkUndyingSentinel(creature, playerComputed, campaignName) {
 
     // Remove unconscious condition
     const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
-    if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
-    const conditions = rawConditions;
+    const conditions = rawConditions || [];
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
     setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
 
@@ -750,8 +756,7 @@ function checkBoonOfRecoveryLastStand(creature, playerComputed, campaignName) {
     setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName);
 
     const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
-    if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
-    const conditions = rawConditions;
+    const conditions = rawConditions || [];
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
     setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
 
@@ -825,8 +830,7 @@ function checkRelentlessEndurance(creature, playerComputed, campaignName) {
 
     // Remove unconscious condition
     const rawConditions = getRuntimeValue(creature.name, 'activeConditions', campaignName);
-    if (rawConditions == null || !Array.isArray(rawConditions)) { console.error('[applyDamage] activeConditions is not an array'); throw new Error('activeConditions must be an array'); }
-    const conditions = rawConditions;
+    const conditions = rawConditions || [];
     const filtered = conditions.filter(c => String(c).toLowerCase() !== 'unconscious');
     setRuntimeValue(creature.name, 'activeConditions', filtered, campaignName);
 

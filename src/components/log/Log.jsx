@@ -419,6 +419,22 @@ function MetamagicEntry({ entry }) {
   );
 }
 
+function AbilityUseEntry({ entry }) {
+  return (
+    <div className="log-entry log-ability-use">
+      <div className="log-entry-header">
+        <span className="log-icon"><i className="fas fa-bolt"></i></span>
+        <span className="log-character">{entry.characterName}</span>
+        <span className="log-name">{entry.abilityName}</span>
+        <span className="log-time">{formatTimestamp(entry.timestamp)}</span>
+      </div>
+      <div className="log-ability-details">
+        {entry.description && <span className="log-ability-description" dangerouslySetInnerHTML={{ __html: entry.description }} />}
+      </div>
+    </div>
+  );
+}
+
 export default function Log({ campaignName, characters }) {
   const { logEntries, initialized, addEntry } = useLog(campaignName);
   const [noteText, setNoteText] = useState('');
@@ -488,6 +504,7 @@ export default function Log({ campaignName, characters }) {
             {entry.type === 'death_save' && <DeathSaveEntry entry={entry}/>}
             {entry.type === 'spell' && <SpellEntry entry={entry}/>}
             {entry.type === 'metamagic' && <MetamagicEntry entry={entry}/>}
+            {entry.type === 'ability_use' && <AbilityUseEntry entry={entry}/>}
           </div>
         ))}
       </div>
