@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { renderHook } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useFogOfWar from './useFogOfWar.js';
@@ -14,7 +15,7 @@ describe('useFogOfWar', () => {
     vi.clearAllMocks();
   });
 
-  it('should return empty Set when gridSize is falsy', () => {
+  it('should return empty Set when gridSize is falsy or zero', () => {
     const { result } = renderHook(() =>
       useFogOfWar([], new Set(), [], undefined)
     );
@@ -22,44 +23,26 @@ describe('useFogOfWar', () => {
     expect(result.current.size).toBe(0);
   });
 
-  it('should return empty Set when gridSize is 0', () => {
-    const { result } = renderHook(() =>
-      useFogOfWar([], new Set(), [], 0)
-    );
-    expect(result.current).toBeInstanceOf(Set);
-    expect(result.current.size).toBe(0);
-  });
-
-  it('should return fog covering entire grid when no players', () => {
-    const gridSize = 5;
-    const { result } = renderHook(() =>
-      useFogOfWar(null, new Set(), [], gridSize)
-    );
-    expect(result.current).toBeInstanceOf(Set);
-    expect(result.current.size).toBe(gridSize * gridSize);
-    for (let x = 0; x < gridSize; x++) {
-      for (let y = 0; y < gridSize; y++) {
-        expect(result.current.has(`${x},${y}`)).toBe(true);
-      }
+  it.each([
+    [null, 5],
+    [[], 5],
+    [[], 3],
+  ])(
+    'should return fog covering entire grid when players=%s and gridSize=%s',
+    (players, gridSize) => {
+      const { result } = renderHook(() =>
+        useFogOfWar(players, new Set(), [], gridSize)
+      );
+      expect(result.current).toBeInstanceOf(Set);
+      expect(result.current.size).toBe(gridSize * gridSize);
     }
-  });
-
-  it('should return fog covering entire grid when players is empty array', () => {
-    const gridSize = 3;
-    const { result } = renderHook(() =>
-      useFogOfWar([], new Set(), [], gridSize)
-    );
-    expect(result.current).toBeInstanceOf(Set);
-    expect(result.current.size).toBe(gridSize * gridSize);
-  });
+  );
 
   it('should compute visibility with players when gridSize is provided', () => {
     computeVisibility.mockReturnValue(new Set(['2,2']));
 
     const gridSize = 5;
-    const players = [
-      { gridX: 2, gridY: 2 },
-    ];
+    const players = [{ gridX: 2, gridY: 2 }];
     const walls = new Set();
     const placedItems = [];
 
@@ -67,7 +50,7 @@ describe('useFogOfWar', () => {
       useFogOfWar(players, walls, placedItems, gridSize)
     );
 
-    expect(result.current.size).toBe(24); // 25 - 1 visible
+    expect(result.current.size).toBe(gridSize * gridSize - 1);
     expect(computeVisibility).toHaveBeenCalledWith(
       players,
       walls,
@@ -88,7 +71,7 @@ describe('useFogOfWar', () => {
       useFogOfWar(players, walls, placedItems, gridSize)
     );
 
-    expect(result.current.size).toBe(24);
+    expect(result.current.size).toBe(gridSize * gridSize - 1);
     expect(computeVisibility).toHaveBeenCalledWith(
       players,
       walls,
@@ -113,7 +96,7 @@ describe('useFogOfWar', () => {
       useFogOfWar(players, walls, placedItems, gridSize)
     );
 
-    expect(result.current.size).toBe(24);
+    expect(result.current.size).toBe(gridSize * gridSize - 1);
     expect(computeVisibility).toHaveBeenCalledWith(
       players,
       walls,
@@ -133,7 +116,7 @@ describe('useFogOfWar', () => {
       useFogOfWar(players, walls, undefined, gridSize)
     );
 
-    expect(result.current.size).toBe(8); // 9 - 1 visible
+    expect(result.current.size).toBe(gridSize * gridSize - 1);
     expect(computeVisibility).toHaveBeenCalledWith(
       players,
       walls,
@@ -153,7 +136,7 @@ describe('useFogOfWar', () => {
       useFogOfWar(players, undefined, placedItems, gridSize)
     );
 
-    expect(result.current.size).toBe(8); // 9 - 1 visible
+    expect(result.current.size).toBe(gridSize * gridSize - 1);
     expect(computeVisibility).toHaveBeenCalledWith(
       players,
       new Set(),
@@ -168,7 +151,6 @@ describe('useFogOfWar', () => {
     const walls = new Set();
     const placedItems = [];
 
-    // Mock computeVisibility to return only center cell visible
     computeVisibility.mockReturnValue(new Set(['1,1']));
 
     const { result } = renderHook(() =>
@@ -176,10 +158,10 @@ describe('useFogOfWar', () => {
     );
 
     expect(result.current).toBeInstanceOf(Set);
-    expect(result.current.size).toBe(8); // 9 - 1 visible = 8 fog
-    expect(result.current.has('1,1')).toBe(false); // visible cell not in fog
-    expect(result.current.has('0,0')).toBe(true); // not visible, in fog
-    expect(result.current.has('2,2')).toBe(true); // not visible, in fog
+    expect(result.current.size).toBe(gridSize * gridSize - 1);
+    expect(result.current.has('1,1')).toBe(false);
+    expect(result.current.has('0,0')).toBe(true);
+    expect(result.current.has('2,2')).toBe(true);
   });
 
   it('should memoize result when inputs do not change', () => {

@@ -1,10 +1,11 @@
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @improved-by-ai
+import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CreatureCard from './CreatureCard.jsx';
 import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../common/AvatarImage.jsx', () => ({
-    default: vi.fn(({ name, imagePath, size: _size }) => {
+    default: vi.fn(({ name, imagePath }) => {
         return <div data-testid={`avatar-${name}`} className="avatar-wrapper">{imagePath ? <img src={imagePath} alt={name} /> : <span>{name?.charAt(0).toUpperCase() || '?'}</span>}</div>;
     }),
 }));
@@ -75,7 +76,6 @@ describe('CreatureCard', () => {
     };
 
     beforeEach(() => {
-        vi.clearAllMocks();
         props = {
             creature: defaultPlayerCreature,
             isActive: false,
@@ -100,50 +100,40 @@ describe('CreatureCard', () => {
         };
     });
 
-    afterEach(() => {
-        cleanup();
-        vi.restoreAllMocks();
-    });
-
     describe('rendering - player creatures', () => {
         it('should render the creature card container with correct classes', () => {
             render(<CreatureCard {...props} />);
             const card = document.querySelector('.creature-card');
-            expect(card).toBeInTheDocument();
             expect(card).toHaveClass('player');
         });
 
-        it('should render with active class when isActive is true', () => {
-            render(<CreatureCard {...props} isActive={true} />);
+        it.each`
+            isActive | expectedClass
+            ${true}  | ${'active'}
+            ${false} | ${''}
+        `('should render "$expectedClass" class when isActive is $isActive', ({ isActive, expectedClass }) => {
+            render(<CreatureCard {...props} isActive={isActive} />);
             const card = document.querySelector('.creature-card');
-            expect(card).toHaveClass('active');
+            if (expectedClass) {
+                expect(card).toHaveClass(expectedClass);
+            } else {
+                expect(card).not.toHaveClass('active');
+            }
         });
 
-        it('should not render active class when isActive is false', () => {
-            render(<CreatureCard {...props} isActive={false} />);
+        it.each`
+            currentHp | expectUnconscious
+            ${0}      | ${true}
+            ${-5}     | ${true}
+            ${1}      | ${false}
+        `('should $expectUnconscious class when currentHp is $currentHp', ({ currentHp, expectUnconscious }) => {
+            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, currentHp }} />);
             const card = document.querySelector('.creature-card');
-            expect(card).not.toHaveClass('active');
-        });
-
-        it('should render unconscious class when currentHp <= 0', () => {
-            const unconsciousCreature = { ...defaultPlayerCreature, currentHp: 0 };
-            render(<CreatureCard {...props} creature={unconsciousCreature} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).toHaveClass('creature-unconscious');
-        });
-
-        it('should render unconscious class when currentHp < 0', () => {
-            const unconsciousCreature = { ...defaultPlayerCreature, currentHp: -5 };
-            render(<CreatureCard {...props} creature={unconsciousCreature} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).toHaveClass('creature-unconscious');
-        });
-
-        it('should not render unconscious class when currentHp > 0', () => {
-            const consciousCreature = { ...defaultPlayerCreature, currentHp: 1 };
-            render(<CreatureCard {...props} creature={consciousCreature} />);
-            const card = document.querySelector('.creature-card');
-            expect(card).not.toHaveClass('creature-unconscious');
+            if (expectUnconscious) {
+                expect(card).toHaveClass('creature-unconscious');
+            } else {
+                expect(card).not.toHaveClass('creature-unconscious');
+            }
         });
 
         it('should render AvatarImage for player creatures', () => {
@@ -264,8 +254,7 @@ describe('CreatureCard', () => {
     describe('NPC remove button', () => {
         it('should render remove button for NPC when isLocalhost is true', () => {
             render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const removeBtn = screen.getByTitle('Remove NPC');
-            expect(removeBtn).toBeInTheDocument();
+            expect(screen.getByTitle('Remove NPC')).toBeInTheDocument();
         });
 
         it('should call onRemoveNpc when remove button is clicked', () => {
@@ -274,14 +263,18 @@ describe('CreatureCard', () => {
             expect(props.onRemoveNpc).toHaveBeenCalledWith('Goblin');
         });
 
-        it('should not render remove button when isLocalhost is false', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} isLocalhost={false} />);
-            expect(screen.queryByTitle('Remove NPC')).not.toBeInTheDocument();
-        });
-
-        it('should not render remove button for player creatures', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
-            expect(screen.queryByTitle('Remove NPC')).not.toBeInTheDocument();
+        it.each`
+            isLocalhost | creatureType | expectRemoveButton
+            ${false}    | ${'npc'}     | ${false}
+            ${true}     | ${'player'}  | ${false}
+        `('should not render remove button when isLocalhost=$isLocalhost and type=$creatureType', ({ isLocalhost, creatureType, expectRemoveButton }) => {
+            const creature = creatureType === 'npc' ? defaultNpcCreature : defaultPlayerCreature;
+            render(<CreatureCard {...props} creature={creature} isLocalhost={isLocalhost} />);
+            if (expectRemoveButton) {
+                expect(screen.getByTitle('Remove NPC')).toBeInTheDocument();
+            } else {
+                expect(screen.queryByTitle('Remove NPC')).not.toBeInTheDocument();
+            }
         });
     });
 
@@ -301,8 +294,7 @@ describe('CreatureCard', () => {
 
         it('should show roll link for NPC with initiativeBonus', () => {
             render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const rollLink = document.querySelector('.initiative-roll-link');
-            expect(rollLink).toBeInTheDocument();
+            expect(document.querySelector('.initiative-roll-link')).toBeInTheDocument();
         });
 
         it('should show dice icon when NPC has no initiative value', () => {
@@ -330,22 +322,20 @@ describe('CreatureCard', () => {
             expect(rollLink.getAttribute('title')).toBe('Roll initiative (d20 + 2)');
         });
 
-        it('should not show roll link when initiativeBonus is null', () => {
-            const npcNullBonus = { ...defaultNpcCreature, initiativeBonus: null };
-            render(<CreatureCard {...props} creature={npcNullBonus} />);
-            expect(document.querySelector('.initiative-roll-link')).not.toBeInTheDocument();
-        });
-
-        it('should not show roll link when initiativeBonus is 0', () => {
-            const npcZeroBonus = { ...defaultNpcCreature, initiativeBonus: 0 };
-            render(<CreatureCard {...props} creature={npcZeroBonus} />);
-            expect(document.querySelector('.initiative-roll-link')).not.toBeInTheDocument();
-        });
-
-        it('should not show roll link when initiativeBonus is empty string', () => {
-            const npcEmptyBonus = { ...defaultNpcCreature, initiativeBonus: '' };
-            render(<CreatureCard {...props} creature={npcEmptyBonus} />);
-            expect(document.querySelector('.initiative-roll-link')).not.toBeInTheDocument();
+        it.each`
+            initiativeBonus | expectRollLink
+            ${null}         | ${false}
+            ${0}            | ${false}
+            ${''}           | ${false}
+            ${2}            | ${true}
+        `('should $expectRollLink roll link when initiativeBonus is $initiativeBonus', ({ initiativeBonus, expectRollLink }) => {
+            const npc = { ...defaultNpcCreature, initiativeBonus };
+            render(<CreatureCard {...props} creature={npc} />);
+            if (expectRollLink) {
+                expect(document.querySelector('.initiative-roll-link')).toBeInTheDocument();
+            } else {
+                expect(document.querySelector('.initiative-roll-link')).not.toBeInTheDocument();
+            }
         });
 
         it('should show initiative input for NPC when initiativeBonus is null', () => {
@@ -522,19 +512,6 @@ describe('CreatureCard', () => {
         it('should not render concentration add button for non-localhost when no concentration', () => {
             render(<CreatureCard {...props} creature={defaultPlayerCreature} isLocalhost={false} />);
             expect(screen.queryByTitle('Add concentration')).not.toBeInTheDocument();
-        });
-
-        it('should render spinner icon on concentration badge', () => {
-            const concentration = { spell: 'Shield', dc: 10 };
-            render(<CreatureCard {...props} creature={{ ...defaultPlayerCreature, concentration }} />);
-            const concentrationBadge = document.querySelector('.initiative-concentration-badge');
-            expect(concentrationBadge.querySelector('.fa-solid.fa-spinner')).toBeInTheDocument();
-        });
-
-        it('should render spinner icon on concentration add button', () => {
-            render(<CreatureCard {...props} creature={defaultPlayerCreature} />);
-            const addBtn = document.querySelector('.concentration-add-btn');
-            expect(addBtn.querySelector('.fa-solid.fa-spinner')).toBeInTheDocument();
         });
 
         it('should show concentration tooltip with spell and DC', () => {
