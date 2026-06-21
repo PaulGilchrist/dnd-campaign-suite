@@ -10,7 +10,7 @@ vi.mock('./handlers/buffs/conditionHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/resources/sorceryHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/spells/spellCastHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/combat/initiativeHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/class-other/genericPopupHandler.js', () => ({ handle: vi.fn() }));
+
 vi.mock('./handlers/resources/resourcePoolHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/resources/fontOfMagicHandler.js', () => ({ handle: vi.fn() }));
 vi.mock('./handlers/healing/healingPoolHandler.js', () => ({ handle: vi.fn() }));
@@ -47,7 +47,7 @@ import * as conditionHandler from './handlers/buffs/conditionHandler.js';
 import * as sorceryHandler from './handlers/resources/sorceryHandler.js';
 import * as spellCastHandler from './handlers/spells/spellCastHandler.js';
 import * as initiativeHandler from './handlers/combat/initiativeHandler.js';
-import * as genericPopupHandler from './handlers/class-other/genericPopupHandler.js';
+
 import * as resourcePoolHandler from './handlers/resources/resourcePoolHandler.js';
 import * as fontOfMagicHandler from './handlers/resources/fontOfMagicHandler.js';
 import * as healingPoolHandler from './handlers/healing/healingPoolHandler.js';
@@ -531,14 +531,12 @@ describe('executeHandler', () => {
       expect(firstCall).toHaveLength(secondCall.length);
     });
 
-    it('bonus_attacks maps to genericPopup handler', async () => {
+    it('bonus_attacks has no handler and returns null', async () => {
       const action = makeAction({ type: 'bonus_attacks' });
-      genericPopupHandler.handle.mockResolvedValue({ result: 'bonus' });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(genericPopupHandler.handle).toHaveBeenCalledOnce();
-      expect(result).toEqual({ result: 'bonus' });
+      expect(result).toBeNull();
     });
 
     it('extra_action maps to extraAction handler', async () => {
@@ -561,64 +559,52 @@ describe('executeHandler', () => {
       expect(result).toEqual({ result: 'eyebite' });
     });
 
-    it('damage_aura maps to genericPopup handler', async () => {
+    it('damage_aura has no handler and returns null', async () => {
       const action = makeAction({ type: 'damage_aura' });
-      genericPopupHandler.handle.mockResolvedValue({ result: 'aura_dmg' });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(genericPopupHandler.handle).toHaveBeenCalled();
-      expect(result).toEqual({ result: 'aura_dmg' });
+      expect(result).toBeNull();
     });
 
-    it('damage_modifier maps to genericPopup handler', async () => {
+    it('damage_modifier has no handler and returns null', async () => {
       const action = makeAction({ type: 'damage_modifier' });
-      genericPopupHandler.handle.mockResolvedValue({ result: 'mod' });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(genericPopupHandler.handle).toHaveBeenCalled();
-      expect(result).toEqual({ result: 'mod' });
+      expect(result).toBeNull();
     });
 
-    it('conditional_disadvantage maps to genericPopup handler', async () => {
+    it('conditional_disadvantage has no handler and returns null', async () => {
       const action = makeAction({ type: 'conditional_disadvantage' });
-      genericPopupHandler.handle.mockResolvedValue({ result: 'disadvantage' });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(genericPopupHandler.handle).toHaveBeenCalled();
-      expect(result).toEqual({ result: 'disadvantage' });
+      expect(result).toBeNull();
     });
 
-    it('conditional_advantage maps to genericPopup handler', async () => {
+    it('conditional_advantage has no handler and returns null', async () => {
       const action = makeAction({ type: 'conditional_advantage' });
-      genericPopupHandler.handle.mockResolvedValue({ result: 'advantage' });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(genericPopupHandler.handle).toHaveBeenCalled();
-      expect(result).toEqual({ result: 'advantage' });
+      expect(result).toBeNull();
     });
 
-    it('passive_rule maps to genericPopup handler', async () => {
+    it('passive_rule has no handler and returns null', async () => {
       const action = makeAction({ type: 'passive_rule' });
-      genericPopupHandler.handle.mockResolvedValue({ result: 'passive' });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(genericPopupHandler.handle).toHaveBeenCalled();
-      expect(result).toEqual({ result: 'passive' });
+      expect(result).toBeNull();
     });
 
-    it('post_cast_self_heal maps to genericPopup handler', async () => {
+    it('post_cast_self_heal has no handler and returns null', async () => {
       const action = makeAction({ type: 'post_cast_self_heal' });
-      genericPopupHandler.handle.mockResolvedValue({ result: 'self_heal' });
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(genericPopupHandler.handle).toHaveBeenCalled();
-      expect(result).toEqual({ result: 'self_heal' });
+      expect(result).toBeNull();
     });
   });
 });

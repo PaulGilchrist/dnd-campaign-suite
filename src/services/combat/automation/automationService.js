@@ -11,6 +11,32 @@ export function hasAutomation(feature) {
     return !!(feature?.automation)
 }
 
+const GENERIC_POPUP_TYPES = new Set([
+    'bonus_attacks', 'damage_aura', 'damage_modifier',
+    'conditional_disadvantage', 'conditional_advantage',
+    'post_cast_self_heal', 'healing_bonus',
+    'moonlight_step_rider', 'shadow_step_rider',
+    'primal_companion_double_strike', 'primal_companion_dodge',
+    'memorize_spell', 'spell_breaker',
+    'tavern_brawler_push', 'grapple_damage',
+]);
+
+const INTERACTIVE_PASSIVE_EFFECTS = new Set([
+    'abjuration_savant',
+    'divination_savant',
+    'evocation_savant',
+    'illusion_savant',
+]);
+
+export function isInteractiveAutomation(feature) {
+    if (!feature?.automation) return false;
+    const auto = Array.isArray(feature.automation) ? feature.automation[0] : feature.automation;
+    if (auto.type === 'passive_rule') {
+        return auto.effect && INTERACTIVE_PASSIVE_EFFECTS.has(auto.effect);
+    }
+    return !GENERIC_POPUP_TYPES.has(auto.type);
+}
+
 export function getEvasionEffects(features) {
     const effects = [];
     if (!features) return effects;

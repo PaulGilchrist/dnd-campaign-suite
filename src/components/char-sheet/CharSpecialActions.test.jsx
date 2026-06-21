@@ -8,9 +8,10 @@ vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
 }));
 
-// Mock hasAutomation
+// Mock automation service
 vi.mock('../../services/combat/automation/automationService.js', () => ({
   hasAutomation: vi.fn((action) => !!(action?.automation)),
+  isInteractiveAutomation: vi.fn((action) => !!(action?.automation)),
 }));
 
 // Mock TeleportModal
@@ -222,7 +223,7 @@ describe('CharSpecialActions', () => {
   });
 
   describe('popup behavior', () => {
-    it('shows a popup when a special action with details is clicked', () => {
+    it('does not show a popup when a special action with details but no automation is clicked', () => {
       const playerStats = createPlayerStats({
         specialActions: [
           {
@@ -234,10 +235,10 @@ describe('CharSpecialActions', () => {
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Second Wind/));
-      expect(screen.getByText(/This feature comes from the Fighter class/)).toBeInTheDocument();
+      expect(screen.queryByText(/This feature comes from the Fighter class/)).not.toBeInTheDocument();
     });
 
-    it('shows a popup when a non-clickable special action is clicked', () => {
+    it('does not show a popup when a non-clickable special action is clicked', () => {
       const playerStats = createPlayerStats({
         specialActions: [
           { name: 'Berserker Rage', description: 'Enter a berserker rage.' },
@@ -245,15 +246,17 @@ describe('CharSpecialActions', () => {
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Berserker Rage/));
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      const elements = screen.getAllByText(/Enter a berserker rage/);
-      expect(elements.length).toBeGreaterThanOrEqual(1);
+      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
 
     it('dismisses the popup when the overlay is clicked', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'popup',
+        payload: { type: 'automation_info', name: 'Berserker Rage', description: 'Enter a berserker rage.' },
+      });
       const playerStats = createPlayerStats({
         specialActions: [
-          { name: 'Berserker Rage', description: 'Enter a berserker rage.' },
+          { name: 'Berserker Rage', description: 'Enter a berserker rage.', automation: true },
         ],
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
@@ -413,16 +416,7 @@ describe('CharSpecialActions', () => {
       });
     });
 
-    it('allows non-automation actions when cannotAct is true', () => {
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Second Wind', description: 'Regain hit points.', details: 'Fighter class feature.' },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={true} />);
-      fireEvent.click(screen.getByText(/Second Wind/));
-      expect(screen.getByText(/Fighter class feature/)).toBeInTheDocument();
-    });
+
   });
 
   describe('edge cases and null safety', () => {

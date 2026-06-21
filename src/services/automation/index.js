@@ -8,7 +8,7 @@ import { handle as handleTelekineticShove } from './handlers/feats/telekineticSh
 import { handle as handleSorcery } from './handlers/resources/sorceryHandler.js';
 import { handle as handleSpellCast } from './handlers/spells/spellCastHandler.js';
 import { handle as handleInitiative } from './handlers/combat/initiativeHandler.js';
-import { handle as handleGenericPopup } from './handlers/class-other/genericPopupHandler.js';
+
 import { handle as handleResourcePool } from './handlers/resources/resourcePoolHandler.js';
 import { handle as handleFontOfMagic } from './handlers/resources/fontOfMagicHandler.js';
 import { handle as handleHealingPool } from './handlers/healing/healingPoolHandler.js';
@@ -225,7 +225,6 @@ const HANDLER_MAP = {
     sorcery_incarnate: handleSorcery,
     free_spell: handleSpellCast,
     initiative_action: handleInitiative,
-    bonus_attacks: handleGenericPopup,
     bonus_action_attack: handleBonusActionAttack,
     buff_ally: handleBuffAlly,
     resource_pool: handleResourcePool,
@@ -235,14 +234,9 @@ const HANDLER_MAP = {
     healing_pool: handleHealingPool,
     extra_action: handleExtraAction,
     combat_stance: handleCombatStance,
-    damage_aura: handleGenericPopup,
     attack_rider: handleAttackRider,
-    damage_modifier: handleGenericPopup,
     spell_modifier: handleSpellModifier,
     temp_hp_buff: handleTempHpBuff,
-    conditional_disadvantage: handleGenericPopup,
-    conditional_advantage: handleGenericPopup,
-    passive_rule: handleGenericPopup,
     auto_reroll: handleAutoReroll,
     reaction_damage: handleReactionDamage,
     reaction_debuff: handleReactionDebuff,
@@ -260,9 +254,7 @@ const HANDLER_MAP = {
        bardic_inspiration_use: handleBardicInspirationUse,
       heroic_inspiration_buff: handleEncouragingSong,
      reaction_bonus: handleReactionBonus,
-     post_cast_rider: handlePostCastRider,
-      post_cast_self_heal: handleGenericPopup,
-    healing_bonus: handleGenericPopup,
+      post_cast_rider: handlePostCastRider,
        bardic_inspiration_defense: handleBardicInspirationDefense,
       bardic_inspiration_offense: handleBardicInspirationOffense,
         countercharm: handleCountercharm,
@@ -271,8 +263,6 @@ const HANDLER_MAP = {
         divine_order: handleDivineOrder,
         nature_sanctuary: handleNaturesSanctuary,
         nature_sanctuary_move: handleNaturesSanctuaryMove,
-        moonlight_step_rider: handleGenericPopup,
-        shadow_step_rider: handleGenericPopup,
         starry_form: handleStarryForm,
         cosmic_omen: handleCosmicOmen,
         twinkling_constellations: handleTwinklingConstellation,
@@ -314,10 +304,8 @@ const HANDLER_MAP = {
         primal_companion_restore: handlePrimalCompanionRestore,
         primal_companion_bonus_action_command: handlePrimalCompanionBonusActionCommand,
         primal_companion_bonus_action_command_apply: applyPrimalCompanionBonusActionCommand,
-        primal_companion_double_strike: handleGenericPopup,
         primal_companion_spell_share: handlePrimalCompanionSpellShare,
         primal_companion_spell_share_apply: applyPrimalCompanionSpellShare,
-        primal_companion_dodge: handleGenericPopup,
         reaction_save: handleBeguilingTwist,
         fey_reinforcements: handleFeyReinforcements,
         fey_reinforcements_confirm: handleFeyReinforcementsConfirm,
@@ -370,10 +358,8 @@ const HANDLER_MAP = {
                 psychic_spells: handlePsychicSpells,
                 create_thrall: handleCreateThrall,
                 create_thrall_temp_hp: handleCreateThrallTempHp,
-                memorize_spell: handleGenericPopup,
                 spell_mastery: handleSpellMastery,
                 signature_spells: handleSignatureSpells,
-                spell_breaker: handleGenericPopup,
                 portent: handlePortent,
                  expert_divination: handleExpertDivination,
                  third_eye: handleThirdEye,
@@ -451,8 +437,6 @@ const HANDLER_MAP = {
         telekinetic_shove: handleTelekineticShove,
         sentinel_guardian: handleSentinelGuardian,
         sentinel: handleSentinelHalt,
-        tavern_brawler_push: handleGenericPopup,
-        grapple_damage: handleGenericPopup,
 };
 export {
     applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect,

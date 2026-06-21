@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
 const mockShowPopup = vi.fn();
@@ -62,31 +62,17 @@ describe('CharCharacterAdvancement - Feature display', () => {
   };
 
   describe('feature click behavior', () => {
-    it('renders feature as clickable when it has automation', () => {
+    it('does not render feature as clickable when it has automation', () => {
       render(<CharCharacterAdvancement {...baseProps} />);
       const feature = screen.getByText('Auto Feature:');
-      expect(feature).toHaveClass('clickable');
+      expect(feature).not.toHaveClass('clickable');
     });
 
-    it('calls showPopup when clicking a feature with automation (no longer triggers executeHandler)', async () => {
+    it('does not show a popup when clicking a feature', async () => {
       render(<CharCharacterAdvancement {...baseProps} />);
       fireEvent.click(screen.getByText('Auto Feature:'));
-      await waitFor(() => {
-        expect(mockShowPopup).toHaveBeenCalledWith(
-          expect.objectContaining({
-            name: 'Auto Feature',
-            description: 'Has automation',
-          })
-        );
-      });
-    });
-
-    it('does not render popup-overlay when clicking a feature', async () => {
-      render(<CharCharacterAdvancement {...baseProps} />);
-      fireEvent.click(screen.getByText('Auto Feature:'));
-      await waitFor(() => {
-        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      });
+      expect(mockShowPopup).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
   });
 });

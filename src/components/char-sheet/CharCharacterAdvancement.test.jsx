@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
 const { mockShowPopup, mockSetPopupHtml, mockHasAutomation } = vi.hoisted(() => ({
@@ -128,58 +128,10 @@ describe('CharCharacterAdvancement', () => {
   });
 
   describe('clickable feature behavior', () => {
-    it('applies clickable class when feature has details', () => {
+    it('does not apply clickable class to any feature', () => {
       renderComponent();
-      expect(screen.getByText('Feature 1:')).toHaveClass('clickable');
-    });
-
-    it('does not apply clickable class when feature has no details and no automation', () => {
-      renderComponent();
+      expect(screen.getByText('Feature 1:')).not.toHaveClass('clickable');
       expect(screen.getByText('Feature 2:')).not.toHaveClass('clickable');
-    });
-
-    it('applies clickable class when feature has automation but no details', () => {
-      mockHasAutomation.mockReturnValueOnce(true).mockReturnValueOnce(false);
-      const stats = createPlayerStats({
-        characterAdvancement: [
-          { name: 'Auto Feature', description: 'Has automation' },
-          { name: 'No Auto', description: 'No automation' },
-        ],
-      });
-      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
-      expect(screen.getByText('Auto Feature:')).toHaveClass('clickable');
-      expect(screen.getByText('No Auto:')).not.toHaveClass('clickable');
-    });
-  });
-
-  describe('feature click behavior', () => {
-    it('calls showPopup when clicking a feature with details', () => {
-      renderComponent();
-      fireEvent.click(screen.getByText('Feature 1:'));
-      expect(mockShowPopup).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Feature 1',
-          description: 'A feature description',
-          details: 'Feature details',
-        })
-      );
-    });
-
-    it('calls showPopup when clicking any feature', () => {
-      mockHasAutomation.mockReturnValue(true);
-      const stats = createPlayerStats({
-        characterAdvancement: [
-          { name: 'Auto Feature', description: 'Has automation' },
-        ],
-      });
-      render(<CharCharacterAdvancement playerStats={stats} campaignName="test-campaign" />);
-      fireEvent.click(screen.getByText('Auto Feature:'));
-      expect(mockShowPopup).toHaveBeenCalledWith(
-        expect.objectContaining({
-          name: 'Auto Feature',
-          description: 'Has automation',
-        })
-      );
     });
   });
 

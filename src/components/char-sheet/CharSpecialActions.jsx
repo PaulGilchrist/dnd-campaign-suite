@@ -4,7 +4,7 @@ import { getCategories } from '../../services/character/featureCategories.js'
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
 import { getFightingStyle } from '../../services/character/fightingStyles.js'
 import { executeHandler } from '../../services/automation/index.js';
-import { hasAutomation } from '../../services/combat/automation/automationService.js';
+import { isInteractiveAutomation } from '../../services/combat/automation/automationService.js';
 import TeleportModal from './modals/TeleportModal.jsx';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
 import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
@@ -153,20 +153,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 />
             )}
             {uniqueActions.map((specialAction, index) => {
-                const isClickable = specialAction.details ? true : hasAutomation(specialAction);
-                const handleClick = () => {
-                    if (isClickable && hasAutomation(specialAction)) {
-                        handleAutomationClick(specialAction);
-                    } else {
-                        if (specialAction.details) {
-                            setPopupHtml(`<b>${specialAction.name}</b><br/>${specialAction.description}<br/><br/>${specialAction.details}`);
-                        } else {
-                            setPopupHtml(`<b>${specialAction.name}</b><br/><br/>${specialAction.description}`);
-                        }
-                    }
-                };
+                const isClickable = isInteractiveAutomation(specialAction);
                 return <div key={specialAction.name || `special-action-${index}`}>
-                        <b className={isClickable ? "clickable" : ""} onClick={handleClick}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: renderMarkdownInline(specialAction.description) }}></span>
+                        <b className={isClickable ? "clickable" : ""} onClick={isClickable ? () => handleAutomationClick(specialAction) : undefined}>{specialAction.name}:</b> <span dangerouslySetInnerHTML={{ __html: renderMarkdownInline(specialAction.description) }}></span>
                     </div>
                 })}
            </div>
