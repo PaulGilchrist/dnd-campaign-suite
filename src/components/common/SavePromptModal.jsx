@@ -72,8 +72,12 @@ function SavePromptModal({ campaignName, characters, activeMapName }) {
     } else if (!current.disadvantage && saveModifiers && saveModifiers.length > 0) {
       const conditionSet = new Set(activeConditions);
       for (const mod of saveModifiers) {
-        if (mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition) {
-          if (conditionSet.has(mod.condition)) {
+        if (mod.target === 'saving_throw' && mod.effect === 'advantage') {
+          if (mod.condition === 'against_spell') {
+            hasAdvantage = true;
+            break;
+          }
+          if (mod.condition && conditionSet.has(mod.condition)) {
             hasAdvantage = true;
             break;
           }

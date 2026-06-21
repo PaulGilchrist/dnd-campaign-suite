@@ -164,7 +164,8 @@ describe('createSaves (useLoggedDiceRollSaves)', () => {
                 expect.any(Object),
                 'DEX',
                 15,
-                true
+                true,
+                false
             );
         });
 

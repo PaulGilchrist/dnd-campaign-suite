@@ -264,7 +264,10 @@ export function createLogDamageAndShow(deps) {
 
         const disadvantage = context?.metamagicHeighten || false;
         const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
-        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
+        const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
+        const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
+        const advantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
         let finalDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(adjustedTotal, saveResult.success, dcSuccess);
         const isCantripFlag = context?.isCantrip || false;
         const hasPotentFlag = hasPotentCantrip(context?.playerStats);
@@ -392,7 +395,10 @@ export function createLogDamageAndShow(deps) {
             const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
             if (twinTarget && twinTarget.name !== target.name) {
                 const twinDisadvantage = context?.metamagicHeighten || false;
-                const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage);
+                const twinCharacter = (characters || []).find(c => utils.getName(c.name) === twinTarget.name);
+                const twinSaveModifiers = twinCharacter?.saveModifiers || twinCharacter?.computedStats?.saveModifiers || [];
+                const twinAdvantage = twinSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+                const twinSaveResult = rollSaveForCreature(twinTarget, saveType, saveDc, twinDisadvantage, twinAdvantage);
                 let twinFinalDamage = computeDamageAfterSave(total, twinSaveResult.success, dcSuccess);
                 if (hasPotentFlag && isCantripFlag && twinSaveResult.success && dcSuccess === 'none') {
                     twinFinalDamage = Math.floor(total / 2);
@@ -444,7 +450,10 @@ export function createLogDamageAndShow(deps) {
             const multiTarget = combatSummary?.creatures?.find(c => c.name === context.multiTarget);
             if (multiTarget && multiTarget.name !== target.name) {
                 if (saveType && saveDc) {
-                    const multiSaveResult = rollSaveForCreature(multiTarget, saveType, saveDc, false);
+                    const multiCharacter = (characters || []).find(c => utils.getName(c.name) === multiTarget.name);
+                    const multiSaveModifiers = multiCharacter?.saveModifiers || multiCharacter?.computedStats?.saveModifiers || [];
+                    const multiAdvantage = multiSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+                    const multiSaveResult = rollSaveForCreature(multiTarget, saveType, saveDc, false, multiAdvantage);
                     let multiFinalDamage = computeDamageAfterSave(total, multiSaveResult.success, dcSuccess);
                     if (hasPotentFlag && isCantripFlag && multiSaveResult.success && dcSuccess === 'none') {
                         multiFinalDamage = Math.floor(total / 2);
@@ -788,7 +797,10 @@ export function createLogDamageAndShow(deps) {
             const dsSaveDc = deathStrikeEffect.saveDc;
             const dsSaveType = deathStrikeEffect.saveType;
             if (dsSaveDc && dsSaveType) {
-                const dsSaveResult = rollSaveForCreature(target, dsSaveType, dsSaveDc, false);
+                const dsCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
+                const dsSaveModifiers = dsCharacter?.saveModifiers || dsCharacter?.computedStats?.saveModifiers || [];
+                const dsAdvantage = dsSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+                const dsSaveResult = rollSaveForCreature(target, dsSaveType, dsSaveDc, false, dsAdvantage);
                 if (!dsSaveResult.success) {
                     const doubledTotal = adjustedTotal * 2;
                     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;

@@ -12726,7 +12726,14 @@
                                 "name": "Spell Resistance",
                                 "level": 14,
                                 "prerequisites": [],
-                                "description": "You have advantage on saving throws against spells. Furthermore, you have resistance against the damage of spells."
+                                "description": "You have advantage on saving throws against spells. Furthermore, you have resistance against the damage of spells.",
+                                "automation": {
+                                    "type": "conditional_advantage",
+                                    "target": "saving_throw",
+                                    "condition": "against_spell",
+                                    "effect": "advantage",
+                                    "casting_time": "passive"
+                                }
                             }
                         ]
                     }

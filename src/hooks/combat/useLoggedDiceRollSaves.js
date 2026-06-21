@@ -97,9 +97,11 @@ export function createSaves(deps) {
         if (!target) return;
 
         const disadvantage = pending.metamagicHeighten || false;
-        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage);
-        const saveTypeUpper = (saveType || '').toUpperCase();
         const targetChar = (charactersRef.current || []).find(c => c.name === pending.targetName);
+        const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
+        const advantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');
+        const saveResult = rollSaveForCreature(target, saveType, saveDc, disadvantage, advantage);
+        const saveTypeUpper = (saveType || '').toUpperCase();
         const targetConditions = getRuntimeValue(pending.targetName, 'activeConditions', campaignName) || [];
         const isIncapacitated = targetConditions.some(c => String(c).toLowerCase() === 'incapacitated');
 

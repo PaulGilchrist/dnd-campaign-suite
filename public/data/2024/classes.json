@@ -12515,7 +12515,7 @@
               {
                 "type": "conditional_advantage",
                 "target": "saving_throw",
-                "condition": "",
+                "condition": "against_spell",
                 "effect": "advantage",
                 "casting_time": "passive"
               },

@@ -151,7 +151,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
           ...(effects.saveAdvantageAbilities || []),
           ...mod.abilities
         ])];
-      } else {
+      } else if (mod.condition !== 'against_spell') {
         effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
       }
     } else if (mod.effect === 'disadvantage') {
@@ -160,7 +160,7 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
           ...(effects.saveDisadvantageAbilities || []),
           ...mod.abilities
         ])];
-      } else {
+      } else if (mod.condition !== 'against_spell') {
         effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
       }
     } else if (mod.effect === 'reroll') {
@@ -355,7 +355,10 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
         // Track per-ability advantage for traits like Gnomish Cunning
         if (mod.effect === 'advantage') effects.saveAdvantageAbilities = [...(effects.saveAdvantageAbilities || []), ...mod.abilities];
         if (mod.effect === 'disadvantage') effects.saveDisadvantageAbilities = [...(effects.saveDisadvantageAbilities || []), ...mod.abilities];
-       } else if (mod.condition === 'visible_effect' && [...CONDITIONS_THAT_CANNOT_ACT].some(c => conditionSet.has(c))) {
+        } else if (mod.condition === 'against_spell') {
+        if (mod.effect === 'advantage') effects.saveAdvantage.push('against_spell');
+        if (mod.effect === 'disadvantage') effects.saveDisadvantage.push('against_spell');
+        } else if (mod.condition === 'visible_effect' && [...CONDITIONS_THAT_CANNOT_ACT].some(c => conditionSet.has(c))) {
         continue; // Danger Sense disabled while incapacitated
        }
      }
@@ -711,6 +714,10 @@ function combineAttackModes(attackerEffects, targetEffects, attackRange) {
 
 function hasSaveAdvantage(effects, saveType, restoreBalance) {
   if (!effects) return false;
+  if (effects.saveAdvantage?.includes('against_spell')) {
+    if (restoreBalance) return true;
+    return true;
+  }
   if (restoreBalance) {
     const effectiveAdvCount = Math.max(0, (effects.saveAdvantageCount || 0) - 1);
     if (effectiveAdvCount > 0) return true;

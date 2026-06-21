@@ -94,11 +94,11 @@ export function computeDamageAfterEvasion(rawDamage, saveSuccess, dcSuccess, eva
   return computeDamageAfterSave(rawDamage, saveSuccess, dcSuccess);
 }
 
-export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = false) {
+export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = false, advantage = false) {
   const bonus = creature?.saveBonuses?.[saveType] ?? 0;
   const roll1 = rollD20();
-  const roll2 = disadvantage ? rollD20() : roll1;
-  const finalRoll = disadvantage ? Math.min(roll1, roll2) : roll1;
+  const roll2 = disadvantage || advantage ? rollD20() : roll1;
+  const finalRoll = disadvantage ? Math.min(roll1, roll2) : advantage ? Math.max(roll1, roll2) : roll1;
   const total = finalRoll + bonus;
   const success = total >= saveDc;
   return { roll: finalRoll, total, bonus, success, rawRolls: [roll1, roll2] };
