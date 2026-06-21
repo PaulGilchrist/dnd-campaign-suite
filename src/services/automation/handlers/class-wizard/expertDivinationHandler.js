@@ -9,7 +9,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const spell = action.spell || {};
     const spellSlotLevel = action.spellSlotLevel || spell.level;
 
-    // Only trigger when casting a Divination spell with a 2+ spell slot
     const school = (spell.school || '').toLowerCase();
     if (school !== DIVINATION_SCHOOL) {
         return null;
@@ -19,22 +18,28 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return null;
     }
 
-    // Determine which slot levels we can regain: lower than expended, max level 5
     const maxRegainLevel = Math.min(5, spellSlotLevel - 1);
     if (maxRegainLevel < 1) {
         return null;
     }
 
-    // Check each eligible slot level for available slots
-    let bestLevel = null;
-    let bestRemaining = 0;
+    const spellAbilities = playerStats.spellAbilities || {};
 
-    for (let level = 1; level <= maxRegainLevel; level++) {
+    // Iterate from highest eligible level downward; pick the first level
+    // that has at least one expended slot (0 < current < max)
+    let bestLevel = null;
+    let bestCurrentSlots = null;
+
+    for (let level = maxRegainLevel; level >= 1; level--) {
         const slotKey = `spell_slots_level_${level}`;
+        const maxSlots = spellAbilities[slotKey] ?? 0;
+        if (maxSlots <= 0) continue;
+
         const currentSlots = getRuntimeValue(playerName, slotKey, campaignName);
-        if (currentSlots != null && currentSlots > 0 && currentSlots > bestRemaining) {
+        if (currentSlots != null && currentSlots > 0 && currentSlots < maxSlots) {
             bestLevel = level;
-            bestRemaining = currentSlots;
+            bestCurrentSlots = currentSlots;
+            break;
         }
     }
 
@@ -50,9 +55,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    // Restore one slot of the best available level
     const slotKey = `spell_slots_level_${bestLevel}`;
-    const newCount = bestRemaining + 1;
+    const newCount = bestCurrentSlots + 1;
     await setRuntimeValue(playerName, slotKey, newCount, campaignName);
 
     addEntry(campaignName, {

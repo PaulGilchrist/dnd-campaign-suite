@@ -19,6 +19,7 @@ const GENERIC_POPUP_TYPES = new Set([
     'primal_companion_double_strike', 'primal_companion_dodge',
     'memorize_spell', 'spell_breaker',
     'tavern_brawler_push', 'grapple_damage',
+    'expert_divination',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

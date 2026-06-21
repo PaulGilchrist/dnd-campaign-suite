@@ -961,7 +961,7 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
     });
 }
 
-const DIVINATION_SCHOOL = 'Divination';
+const DIVINATION_SCHOOL = 'divination';
 
 function usesSpellSlot(spell, metaCtx) {
     return metaCtx?.slotLevel > 0 || spell.level > 0;

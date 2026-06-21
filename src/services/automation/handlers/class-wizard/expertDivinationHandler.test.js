@@ -20,6 +20,13 @@ function makePlayerStats(overrides = {}) {
     name: 'TestWizard',
     level: 14,
     proficiency: 6,
+    spellAbilities: {
+      spell_slots_level_1: 4,
+      spell_slots_level_2: 3,
+      spell_slots_level_3: 3,
+      spell_slots_level_4: 3,
+      spell_slots_level_5: 2,
+    },
     ...overrides,
   };
 }
@@ -184,7 +191,23 @@ describe('expertDivinationHandler.handle', () => {
       expect(result.payload.description).toContain('No eligible spell slots');
     });
 
-    it('restores level 1 slot when casting with level 2 slot', async () => {
+    it('returns info popup when all eligible levels are at max capacity', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'spell_slots_level_1') return 4;
+        if (key === 'spell_slots_level_2') return 3;
+        return null;
+      });
+
+      const result = await handle(
+        makeAction({ level: 3 }),
+        makePlayerStats(), campaignName, null,
+      );
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No eligible spell slots');
+    });
+
+    it('restores level 1 slot when casting with level 2 slot (only eligible level)', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'spell_slots_level_1') return 1;
         return null;
@@ -200,9 +223,27 @@ describe('expertDivinationHandler.handle', () => {
       expect(result.payload.description).toContain('level 1');
     });
 
-    it('picks the slot level with the highest remaining count', async () => {
+    it('picks highest eligible level with expended slots', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 1;
+        if (key === 'spell_slots_level_1') return 2;
+        if (key === 'spell_slots_level_2') return 1;
+        if (key === 'spell_slots_level_3') return 2;
+        return null;
+      });
+
+      const result = await handle(
+        makeAction({ level: 4 }),
+        makePlayerStats(), campaignName, null,
+      );
+
+      // maxRegainLevel=3, iterates 3→1: level 3 (2<3) matches first
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_3', 3, campaignName);
+      expect(result.payload.description).toContain('level 3');
+    });
+
+    it('skips levels at max capacity and picks highest level with expended slots', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'spell_slots_level_1') return 4;
         if (key === 'spell_slots_level_2') return 2;
         if (key === 'spell_slots_level_3') return 1;
         return null;
@@ -213,41 +254,26 @@ describe('expertDivinationHandler.handle', () => {
         makePlayerStats(), campaignName, null,
       );
 
-      // level 2 has count 2 which is highest
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_2', 3, campaignName);
-      expect(result.payload.description).toContain('level 2');
+      // maxRegainLevel=3, level 3: 1<3 true, picked
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_3', 2, campaignName);
+      expect(result.payload.description).toContain('level 3');
     });
 
-    it('picks lowest level when multiple levels have equal counts', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'spell_slots_level_1') return 2;
-        if (key === 'spell_slots_level_2') return 2;
-        if (key === 'spell_slots_level_3') return 2;
-        return null;
-      });
-
-      await handle(
-        makeAction({ level: 4 }),
-        makePlayerStats(), campaignName, null,
-      );
-
-      // All have count 2, iterates from 1 to 3, picks first one (level 1)
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_1', 3, campaignName);
-    });
-
-    it('picks level 1 when no higher levels have any slots', async () => {
+    it('picks lowest level when all higher levels are at max capacity', async () => {
       getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'spell_slots_level_1') return 1;
-        if (key === 'spell_slots_level_2') return 0;
+        if (key === 'spell_slots_level_2') return 3;
         return null;
       });
 
-      await handle(
+      const result = await handle(
         makeAction({ level: 3 }),
         makePlayerStats(), campaignName, null,
       );
 
+      // maxRegainLevel=2, level 2: 3<3 false (at max), level 1: 1<4 true
       expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_1', 2, campaignName);
+      expect(result.payload.description).toContain('level 1');
     });
   });
 
@@ -264,8 +290,7 @@ describe('expertDivinationHandler.handle', () => {
         makePlayerStats(), campaignName, null,
       );
 
-      // maxRegainLevel = Math.min(5, 8) = 5
-      // level 6 is never checked, level 5 is restored
+      // maxRegainLevel = Math.min(5, 8) = 5, level 5: 1<2 true
       expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_5', 2, campaignName);
       expect(result.payload.description).toContain('level 5');
     });
@@ -302,13 +327,9 @@ describe('expertDivinationHandler.handle', () => {
         makePlayerStats(), campaignName, null,
       );
 
+      // maxRegainLevel=2, iterates 2→1: level 2 (1<3) matches first
       expect(setRuntimeValue).toHaveBeenCalledTimes(1);
-      // level 2 has count 1 >= level 1 count 1, but since iteration goes
-      // 1→3 and uses > (not >=), level 1 sets best=1, bestR=1;
-      // level 2: currentSlots=1, bestRemaining=1, 1 > 1 is false, so no update
-      // level 3: null, skip
-      // restores level 1
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_1', 2, campaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_2', 2, campaignName);
     });
 
     it('logs an entry with correct details', async () => {

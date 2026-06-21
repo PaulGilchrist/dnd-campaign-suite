@@ -830,9 +830,6 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'portent':
                 result.specialActions.push(info)
                 break
-            case 'expert_divination':
-                result.passives.push(info)
-                break
             case 'potent_cantrip':
                 result.passives.push(info)
                 break

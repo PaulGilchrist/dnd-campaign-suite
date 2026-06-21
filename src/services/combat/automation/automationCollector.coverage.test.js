@@ -103,7 +103,6 @@ describe('collectAutomationFromFeatures – switch-matched types not in DISPATCH
         'evocation_savant',
         'illusion_savant',
         'magic_initiate',
-        'expert_divination',
         'magical_ambush',
         'versatile_trickster',
         'web_area_save',
