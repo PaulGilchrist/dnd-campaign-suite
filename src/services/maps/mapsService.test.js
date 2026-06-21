@@ -1,15 +1,24 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { toKebabCase, formatMapName } from './mapsService.js';
+import { toKebabCase, formatMapName, loadMaps, createMap, deleteMap, renameMap, activateMap, saveMapData, loadMapData, updateMapDescription } from './mapsService.js';
+
+// Shared mock response factory — uses native Response when available, falls back to shape
+function createMockResponse(json, options = {}) {
+  const status = options.status ?? (json && json.error ? 400 : 200);
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => json,
+  };
+}
 
 describe('mapsService', () => {
   beforeEach(() => {
-    vi.resetModules();
-    global.fetch = vi.fn();
+    vi.spyOn(global, 'fetch').mockResolvedValue(createMockResponse([]));
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    delete global.fetch;
   });
 
   describe('toKebabCase', () => {
@@ -17,7 +26,7 @@ describe('mapsService', () => {
       expect(toKebabCase('My Map')).toBe('my-map');
     });
 
-    it('removes non-alphanumeric characters', () => {
+    it('removes non-alphanumeric characters except hyphens', () => {
       expect(toKebabCase('Map #1!')).toBe('map-1');
     });
 
@@ -36,339 +45,25 @@ describe('mapsService', () => {
     it('returns empty string for empty input', () => {
       expect(toKebabCase('')).toBe('');
     });
-  });
 
-  describe('loadMaps', () => {
-    it('fetches maps from the API', async () => {
-      const mockMaps = [{ name: 'Dungeon', fileName: 'dungeon.json' }];
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => mockMaps,
-      });
-
-      const { loadMaps } = await import('./mapsService.js');
-      const result = await loadMaps('testCampaign');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps',
-        expect.objectContaining({ method: 'GET' })
-      );
-      expect(result).toEqual(mockMaps);
+    it('removes .json extension and converts spaces', () => {
+      expect(toKebabCase('My Map.json')).toBe('my-map');
     });
 
-    it('throws error on non-ok response', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'Not found' }),
-      });
-
-      const { loadMaps } = await import('./mapsService.js');
-      await expect(loadMaps('testCampaign')).rejects.toThrow('Not found');
+    it('collapses consecutive spaces into a single hyphen', () => {
+      expect(toKebabCase('map   name')).toBe('map-name');
     });
 
-    it('catches and re-throws fetch errors', async () => {
-      global.fetch.mockRejectedValue(new Error('network error'));
-
-      const { loadMaps } = await import('./mapsService.js');
-      await expect(loadMaps('testCampaign')).rejects.toThrow('network error');
+    it('strips leading and trailing special characters', () => {
+      expect(toKebabCase('!my-map!')).toBe('my-map');
     });
 
-    it('encodes campaign name in URL', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => [],
-      });
-
-      const { loadMaps } = await import('./mapsService.js');
-      await loadMaps('my campaign');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/my%20campaign/maps',
-        expect.anything()
-      );
-    });
-  });
-
-  describe('createMap', () => {
-    it('creates a map via POST', async () => {
-      const mockMap = { name: 'Dungeon', fileName: 'dungeon.json' };
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => mockMap,
-      });
-
-      const { createMap } = await import('./mapsService.js');
-      const result = await createMap('testCampaign', 'Dungeon');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify({ name: 'Dungeon', type: 'indoor' }),
-        })
-      );
-      expect(result).toEqual(mockMap);
+    it('handles input with only special characters', () => {
+      expect(toKebabCase('!@#$%')).toBe('');
     });
 
-    it('creates a map with additional options', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ name: 'Room', fileName: 'room.json' }),
-      });
-
-      const { createMap } = await import('./mapsService.js');
-      await createMap('testCampaign', 'Room', { grid: true, gridSize: 5 });
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps',
-        expect.objectContaining({
-          body: JSON.stringify({ name: 'Room', type: 'indoor', grid: true, gridSize: 5 }),
-        })
-      );
-    });
-
-    it('resolves existing map when map already exists', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'map already exists' }),
-      });
-
-      const { createMap } = await import('./mapsService.js');
-      const result = await createMap('testCampaign', 'Dungeon');
-      expect(result.alreadyExists).toBe(true);
-      expect(result.name).toBe('Dungeon');
-      expect(result.fileName).toBe('dungeon.json');
-    });
-
-    it('throws error for other non-ok responses', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'server error' }),
-      });
-
-      const { createMap } = await import('./mapsService.js');
-      await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow('server error');
-    });
-
-    it('handles empty error response on conflict', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => { throw new Error('empty'); },
-      });
-
-      const { createMap } = await import('./mapsService.js');
-      await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow();
-    });
-
-    it('encodes campaign name in URL', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ name: 'Map', fileName: 'map.json' }),
-      });
-
-      const { createMap } = await import('./mapsService.js');
-      await createMap('my campaign', 'Map');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/my%20campaign/maps',
-        expect.anything()
-      );
-    });
-  });
-
-  describe('deleteMap', () => {
-    it('deletes a map via DELETE', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      const { deleteMap } = await import('./mapsService.js');
-      const result = await deleteMap('testCampaign', 'Dungeon');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/dungeon',
-        expect.objectContaining({ method: 'DELETE' })
-      );
-      expect(result).toEqual({ success: true });
-    });
-
-    it('encodes map name in URL', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      const { deleteMap } = await import('./mapsService.js');
-      await deleteMap('testCampaign', 'My Dungeon');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/my-dungeon',
-        expect.anything()
-      );
-    });
-
-    it('throws error on non-ok response', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'not found' }),
-      });
-
-      const { deleteMap } = await import('./mapsService.js');
-      await expect(deleteMap('testCampaign', 'Dungeon')).rejects.toThrow('not found');
-    });
-  });
-
-  describe('renameMap', () => {
-    it('renames a map via PUT', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      const { renameMap } = await import('./mapsService.js');
-      const result = await renameMap('testCampaign', 'OldName', 'NewName');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/oldname/rename',
-        expect.objectContaining({
-          method: 'PUT',
-          body: JSON.stringify({ newName: 'NewName' }),
-        })
-      );
-      expect(result).toEqual({ success: true });
-    });
-
-    it('encodes both old and new map names', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      const { renameMap } = await import('./mapsService.js');
-      await renameMap('testCampaign', 'Old Map', 'New Map');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/old-map/rename',
-        expect.anything()
-      );
-    });
-
-    it('throws error on non-ok response', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'not found' }),
-      });
-
-      const { renameMap } = await import('./mapsService.js');
-      await expect(renameMap('testCampaign', 'Old', 'New')).rejects.toThrow('not found');
-    });
-  });
-
-  describe('activateMap', () => {
-    it('activates a map via PUT', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      const { activateMap } = await import('./mapsService.js');
-      const result = await activateMap('testCampaign', 'Dungeon');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/dungeon/activate',
-        expect.objectContaining({ method: 'PUT' })
-      );
-      expect(result).toEqual({ success: true });
-    });
-
-    it('throws error on non-ok response', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'not found' }),
-      });
-
-      const { activateMap } = await import('./mapsService.js');
-      await expect(activateMap('testCampaign', 'Dungeon')).rejects.toThrow('not found');
-    });
-  });
-
-  describe('saveMapData', () => {
-    it('saves map data via PUT', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      const { saveMapData } = await import('./mapsService.js');
-      const data = { tiles: [], tokens: [] };
-      const result = await saveMapData('testCampaign', 'Dungeon', data);
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/dungeon',
-        expect.objectContaining({
-          method: 'PUT',
-          body: JSON.stringify(data),
-        })
-      );
-      expect(result).toEqual({ success: true });
-    });
-
-    it('throws error on non-ok response', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'save failed' }),
-      });
-
-      const { saveMapData } = await import('./mapsService.js');
-      await expect(saveMapData('testCampaign', 'Dungeon', {})).rejects.toThrow('save failed');
-    });
-  });
-
-  describe('loadMapData', () => {
-    it('loads map data via GET', async () => {
-      const mockData = { tiles: [], tokens: [] };
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => mockData,
-      });
-
-      const { loadMapData } = await import('./mapsService.js');
-      const result = await loadMapData('testCampaign', 'Dungeon');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/dungeon',
-        expect.objectContaining({ method: 'GET' })
-      );
-      expect(result).toEqual(mockData);
-    });
-
-    it('throws error on non-ok response', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'not found' }),
-      });
-
-      const { loadMapData } = await import('./mapsService.js');
-      await expect(loadMapData('testCampaign', 'Dungeon')).rejects.toThrow('not found');
-    });
-  });
-
-  describe('updateMapDescription', () => {
-    it('updates map description via PUT', async () => {
-      global.fetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({ success: true }),
-      });
-
-      const { updateMapDescription } = await import('./mapsService.js');
-      const result = await updateMapDescription('testCampaign', 'Dungeon', 'A dark dungeon');
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/campaigns/testCampaign/maps/dungeon/description',
-        expect.objectContaining({
-          method: 'PUT',
-          body: JSON.stringify({ description: 'A dark dungeon' }),
-        })
-      );
-      expect(result).toEqual({ success: true });
-    });
-
-    it('throws error on non-ok response', async () => {
-      global.fetch.mockResolvedValue({
-        ok: false,
-        json: async () => ({ error: 'not found' }),
-      });
-
-      const { updateMapDescription } = await import('./mapsService.js');
-      await expect(updateMapDescription('testCampaign', 'Dungeon', 'desc')).rejects.toThrow('not found');
+    it('handles numbers mixed with letters and spaces', () => {
+      expect(toKebabCase('Room 123-A')).toBe('room-123-a');
     });
   });
 
@@ -399,6 +94,377 @@ describe('mapsService', () => {
 
     it('handles multiple hyphens', () => {
       expect(formatMapName('deep-dungeon-map')).toBe('Deep Dungeon Map');
+    });
+
+    it('converts already title-cased input', () => {
+      expect(formatMapName('Dungeon-Map')).toBe('Dungeon Map');
+    });
+
+    it('handles mixed case kebab-case input', () => {
+      expect(formatMapName('My-Dungeon-Map')).toBe('My Dungeon Map');
+    });
+
+    it('removes .json from single word', () => {
+      expect(formatMapName('dungeon.json')).toBe('Dungeon');
+    });
+  });
+
+  describe('loadMaps', () => {
+    it('fetches maps from the API and returns the JSON body', async () => {
+      const mockMaps = [{ name: 'Dungeon', fileName: 'dungeon.json' }];
+      global.fetch.mockResolvedValueOnce(createMockResponse(mockMaps));
+
+      const result = await loadMaps('testCampaign');
+      expect(result).toEqual(mockMaps);
+    });
+
+    it('encodes campaign name with spaces in the URL', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse([]));
+
+      await loadMaps('my campaign');
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/my%20campaign/maps',
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('throws an error with the server message on non-ok response', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'Campaign not found' }, { status: 404 }));
+
+      await expect(loadMaps('badCampaign')).rejects.toThrow('Campaign not found');
+    });
+
+    it('throws a generic error when response.json yields no error field', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ other: 'data' }, { status: 500 }));
+
+      await expect(loadMaps('badCampaign')).rejects.toThrow('Failed to load maps');
+    });
+
+    it('re-throws network errors from fetch', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('network error'));
+
+      await expect(loadMaps('testCampaign')).rejects.toThrow('network error');
+    });
+  });
+
+  describe('createMap', () => {
+    it('creates a map via POST with default options', async () => {
+      const mockMap = { name: 'Dungeon', fileName: 'dungeon.json' };
+      global.fetch.mockResolvedValueOnce(createMockResponse(mockMap));
+
+      const result = await createMap('testCampaign', 'Dungeon');
+      expect(result).toEqual(mockMap);
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ name: 'Dungeon', type: 'indoor' }),
+        })
+      );
+    });
+
+    it('passes additional options to the request body', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ name: 'Room', fileName: 'room.json' }));
+
+      await createMap('testCampaign', 'Room', { grid: true, gridSize: 5 });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps',
+        expect.objectContaining({
+          body: JSON.stringify({ name: 'Room', type: 'indoor', grid: true, gridSize: 5 }),
+        })
+      );
+    });
+
+    it('returns an alreadyExists object when the server reports map conflict', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'map already exists' }, { status: 409 }));
+
+      const result = await createMap('testCampaign', 'Dungeon');
+      expect(result).toEqual({
+        name: 'Dungeon',
+        fileName: 'dungeon.json',
+        alreadyExists: true,
+      });
+    });
+
+    it('returns an alreadyExists object with case-insensitive conflict detection', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'Map Already Exists' }, { status: 409 }));
+
+      const result = await createMap('testCampaign', 'Dungeon');
+      expect(result.alreadyExists).toBe(true);
+    });
+
+    it('throws a generic error for non-conflict server errors', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'server error' }, { status: 500 }));
+
+      await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow('server error');
+    });
+
+    it('throws a generic error when response.json fails and there is no error field', async () => {
+      // Simulate response.json throwing — the service falls back to {} and throws generic
+      const erroringResponse = {
+        ok: false,
+        status: 500,
+        json: async () => { throw new Error('parse error'); },
+      };
+      global.fetch.mockResolvedValueOnce(erroringResponse);
+
+      await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow('Failed to create map');
+    });
+
+    it('encodes campaign name with spaces in the URL', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ name: 'Map', fileName: 'map.json' }));
+
+      await createMap('my campaign', 'Map');
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/my%20campaign/maps',
+        expect.anything()
+      );
+    });
+
+    it('re-throws network errors from fetch', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('network error'));
+
+      await expect(createMap('testCampaign', 'Dungeon')).rejects.toThrow('network error');
+    });
+  });
+
+  describe('deleteMap', () => {
+    it('deletes a map via DELETE and returns the JSON body', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      const result = await deleteMap('testCampaign', 'Dungeon');
+      expect(result).toEqual({ success: true });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon',
+        expect.objectContaining({ method: 'DELETE' })
+      );
+    });
+
+    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      await deleteMap('testCampaign', 'My Dungeon');
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/my-dungeon',
+        expect.anything()
+      );
+    });
+
+    it('encodes special characters in map name', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      await deleteMap('testCampaign', 'Dungeon & Cave');
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon--cave',
+        expect.anything()
+      );
+    });
+
+    it('throws an error with the server message on non-ok response', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
+
+      await expect(deleteMap('testCampaign', 'Dungeon')).rejects.toThrow('not found');
+    });
+
+    it('throws a generic error when response.json yields no error field', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ other: 'data' }, { status: 500 }));
+
+      await expect(deleteMap('testCampaign', 'Dungeon')).rejects.toThrow('Failed to delete map');
+    });
+
+    it('re-throws network errors from fetch', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('network error'));
+
+      await expect(deleteMap('testCampaign', 'Dungeon')).rejects.toThrow('network error');
+    });
+  });
+
+  describe('renameMap', () => {
+    it('renames a map via PUT and returns the JSON body', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      const result = await renameMap('testCampaign', 'OldName', 'NewName');
+      expect(result).toEqual({ success: true });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/oldname/rename',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ newName: 'NewName' }),
+        })
+      );
+    });
+
+    it('encodes both old and new map names in the URL', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      await renameMap('testCampaign', 'Old Map', 'New Map');
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/old-map/rename',
+        expect.objectContaining({
+          body: JSON.stringify({ newName: 'New Map' }),
+        })
+      );
+    });
+
+    it('throws an error with the server message on non-ok response', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
+
+      await expect(renameMap('testCampaign', 'Old', 'New')).rejects.toThrow('not found');
+    });
+
+    it('re-throws network errors from fetch', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('network error'));
+
+      await expect(renameMap('testCampaign', 'Old', 'New')).rejects.toThrow('network error');
+    });
+  });
+
+  describe('activateMap', () => {
+    it('activates a map via PUT and returns the JSON body', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      const result = await activateMap('testCampaign', 'Dungeon');
+      expect(result).toEqual({ success: true });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon/activate',
+        expect.objectContaining({ method: 'PUT' })
+      );
+    });
+
+    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      await activateMap('testCampaign', 'My Dungeon');
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/my-dungeon/activate',
+        expect.anything()
+      );
+    });
+
+    it('throws an error with the server message on non-ok response', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
+
+      await expect(activateMap('testCampaign', 'Dungeon')).rejects.toThrow('not found');
+    });
+
+    it('re-throws network errors from fetch', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('network error'));
+
+      await expect(activateMap('testCampaign', 'Dungeon')).rejects.toThrow('network error');
+    });
+  });
+
+  describe('saveMapData', () => {
+    it('saves map data via PUT and returns the JSON body', async () => {
+      const data = { tiles: [], tokens: [] };
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      const result = await saveMapData('testCampaign', 'Dungeon', data);
+      expect(result).toEqual({ success: true });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify(data),
+        })
+      );
+    });
+
+    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      await saveMapData('testCampaign', 'My Dungeon', { tiles: [] });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/my-dungeon',
+        expect.anything()
+      );
+    });
+
+    it('throws an error with the server message on non-ok response', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'save failed' }, { status: 400 }));
+
+      await expect(saveMapData('testCampaign', 'Dungeon', {})).rejects.toThrow('save failed');
+    });
+
+    it('re-throws network errors from fetch', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('network error'));
+
+      await expect(saveMapData('testCampaign', 'Dungeon', { tiles: [] })).rejects.toThrow('network error');
+    });
+  });
+
+  describe('loadMapData', () => {
+    it('loads map data via GET and returns the JSON body', async () => {
+      const mockData = { tiles: [], tokens: [] };
+      global.fetch.mockResolvedValueOnce(createMockResponse(mockData));
+
+      const result = await loadMapData('testCampaign', 'Dungeon');
+      expect(result).toEqual(mockData);
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon',
+        expect.objectContaining({ method: 'GET' })
+      );
+    });
+
+    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
+      const mockData = { tiles: [], tokens: [] };
+      global.fetch.mockResolvedValueOnce(createMockResponse(mockData));
+
+      await loadMapData('testCampaign', 'My Dungeon');
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/my-dungeon',
+        expect.anything()
+      );
+    });
+
+    it('throws an error with the server message on non-ok response', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
+
+      await expect(loadMapData('testCampaign', 'Dungeon')).rejects.toThrow('not found');
+    });
+
+    it('re-throws network errors from fetch', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('network error'));
+
+      await expect(loadMapData('testCampaign', 'Dungeon')).rejects.toThrow('network error');
+    });
+  });
+
+  describe('updateMapDescription', () => {
+    it('updates map description via PUT and returns the JSON body', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      const result = await updateMapDescription('testCampaign', 'Dungeon', 'A dark dungeon');
+      expect(result).toEqual({ success: true });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/dungeon/description',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ description: 'A dark dungeon' }),
+        })
+      );
+    });
+
+    it('encodes map name with spaces (via toKebabCase) in the URL', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ success: true }));
+
+      await updateMapDescription('testCampaign', 'My Dungeon', 'desc');
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/testCampaign/maps/my-dungeon/description',
+        expect.anything()
+      );
+    });
+
+    it('throws an error with the server message on non-ok response', async () => {
+      global.fetch.mockResolvedValueOnce(createMockResponse({ error: 'not found' }, { status: 404 }));
+
+      await expect(updateMapDescription('testCampaign', 'Dungeon', 'desc')).rejects.toThrow('not found');
+    });
+
+    it('re-throws network errors from fetch', async () => {
+      global.fetch.mockRejectedValueOnce(new Error('network error'));
+
+      await expect(updateMapDescription('testCampaign', 'Dungeon', 'desc')).rejects.toThrow('network error');
     });
   });
 });

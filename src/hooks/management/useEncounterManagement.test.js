@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import useEncounterManagement from './useEncounterManagement.js';
 
@@ -138,6 +139,24 @@ describe('useEncounterManagement', () => {
       expect(result.current.modalOpen).toBe(false);
       expect(result.current.modalMode).toBeNull();
     });
+
+    it('closeModal resets mode set by openLoadModal', async () => {
+      mockLoadEncounters.mockResolvedValue({ encounters: [] });
+
+      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
+
+      await act(async () => {
+        await result.current.openLoadModal();
+      });
+      expect(result.current.modalMode).toBe('load');
+
+      act(() => {
+        result.current.closeModal();
+      });
+
+      expect(result.current.modalOpen).toBe(false);
+      expect(result.current.modalMode).toBeNull();
+    });
   });
 
   describe('saveEncounter', () => {
@@ -164,7 +183,8 @@ describe('useEncounterManagement', () => {
       expect(result.current.encounters).toEqual(updatedEncounters);
     });
 
-    it('throws error when save fails', async () => {
+    it('throws error and logs when save fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockSaveEncounter.mockRejectedValue(new Error('Save failed'));
 
       const { result } = renderHook(() => useEncounterManagement('test-campaign'));
@@ -180,11 +200,16 @@ describe('useEncounterManagement', () => {
 
       expect(caughtError).toBeInstanceOf(Error);
       expect(caughtError.message).toBe('Save failed');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to save encounter:',
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
     });
   });
 
   describe('loadEncounterData', () => {
-    it('loads a single encounter, closes modal, and resets loading', async () => {
+    it('loads a single encounter, closes modal, and returns data', async () => {
       const encounterData = { name: 'goblin-ambush', monsters: ['goblin'] };
       mockLoadEncounter.mockResolvedValue(encounterData);
 
@@ -202,7 +227,31 @@ describe('useEncounterManagement', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    it('sets loading to false even when load fails', async () => {
+    it('sets loading to true during load and false after completion', async () => {
+      let resolveLoad;
+      mockLoadEncounter.mockImplementation(
+        () => new Promise((resolve) => { resolveLoad = resolve; })
+      );
+
+      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
+
+      // Start the load inside act so the loading=true state update is captured
+      await act(async () => {
+        result.current.loadEncounterData('goblin-ambush');
+      });
+      expect(result.current.loading).toBe(true);
+
+      // Resolve the load and wait for completion
+      resolveLoad({ name: 'goblin-ambush', monsters: ['goblin'] });
+      await act(async () => {
+        // The loadPromise was already consumed; just flush remaining effects
+        await Promise.resolve();
+      });
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('throws error and logs when load fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockLoadEncounter.mockRejectedValue(new Error('Load failed'));
 
       const { result } = renderHook(() => useEncounterManagement('test-campaign'));
@@ -218,7 +267,31 @@ describe('useEncounterManagement', () => {
 
       expect(caughtError).toBeInstanceOf(Error);
       expect(caughtError.message).toBe('Load failed');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to load encounter:',
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it('sets loading to false even when load fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      mockLoadEncounter.mockRejectedValue(new Error('Load failed'));
+
+      const { result } = renderHook(() => useEncounterManagement('test-campaign'));
+
+      let caughtError;
+      await act(async () => {
+        try {
+          await result.current.loadEncounterData('test');
+        } catch (err) {
+          caughtError = err;
+        }
+      });
+
+      expect(caughtError).toBeInstanceOf(Error);
       expect(result.current.loading).toBe(false);
+      consoleSpy.mockRestore();
     });
   });
 
@@ -240,7 +313,8 @@ describe('useEncounterManagement', () => {
       expect(result.current.encounters).toEqual([]);
     });
 
-    it('throws error when delete fails', async () => {
+    it('throws error and logs when delete fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockDeleteEncounter.mockRejectedValue(new Error('Delete failed'));
 
       const { result } = renderHook(() => useEncounterManagement('test-campaign'));
@@ -256,6 +330,11 @@ describe('useEncounterManagement', () => {
 
       expect(caughtError).toBeInstanceOf(Error);
       expect(caughtError.message).toBe('Delete failed');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to delete encounter:',
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
     });
   });
 
@@ -283,7 +362,8 @@ describe('useEncounterManagement', () => {
       expect(result.current.encounters).toEqual(updatedEncounters);
     });
 
-    it('throws error when rename fails', async () => {
+    it('throws error and logs when rename fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockRenameEncounter.mockRejectedValue(new Error('Rename failed'));
 
       const { result } = renderHook(() => useEncounterManagement('test-campaign'));
@@ -299,6 +379,11 @@ describe('useEncounterManagement', () => {
 
       expect(caughtError).toBeInstanceOf(Error);
       expect(caughtError.message).toBe('Rename failed');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to rename encounter:',
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
     });
   });
 
@@ -318,11 +403,11 @@ describe('useEncounterManagement', () => {
         'goblin-ambush',
         updateData
       );
-      // updateExistingEncounter does NOT reload the list
       expect(mockLoadEncounters).not.toHaveBeenCalled();
     });
 
-    it('throws error when update fails', async () => {
+    it('throws error and logs when update fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockUpdateEncounter.mockRejectedValue(new Error('Update failed'));
 
       const { result } = renderHook(() => useEncounterManagement('test-campaign'));
@@ -338,6 +423,11 @@ describe('useEncounterManagement', () => {
 
       expect(caughtError).toBeInstanceOf(Error);
       expect(caughtError.message).toBe('Update failed');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to update encounter:',
+        expect.any(Error)
+      );
+      consoleSpy.mockRestore();
     });
   });
 });

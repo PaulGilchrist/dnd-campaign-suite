@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   ABILITY_ABBR,
   ABILITY_LABELS,
@@ -11,11 +11,11 @@ import {
 
 describe('npcFormUtils', () => {
   describe('constants', () => {
-    it('ABILITY_ABBR should list all six ability score abbreviations', () => {
+    it('ABILITY_ABBR should list all six ability score abbreviations in correct order', () => {
       expect(ABILITY_ABBR).toEqual(['str', 'dex', 'con', 'int', 'wis', 'cha']);
     });
 
-    it('ABILITY_LABELS should map each ability abbreviation to its display label', () => {
+    it('ABILITY_LABELS should map each abbreviation to its uppercase label', () => {
       expect(ABILITY_LABELS).toEqual({
         str: 'STR',
         dex: 'DEX',
@@ -26,56 +26,74 @@ describe('npcFormUtils', () => {
       });
     });
 
-    it('ATTITUDE_OPTIONS should have 5 options with value and label', () => {
+    it('ABILITY_LABELS keys should match ABILITY_ABBR', () => {
+      expect(Object.keys(ABILITY_LABELS)).toEqual(ABILITY_ABBR);
+    });
+
+    it('ATTITUDE_OPTIONS should have 5 options each with value and label', () => {
       expect(ATTITUDE_OPTIONS).toHaveLength(5);
       for (const option of ATTITUDE_OPTIONS) {
         expect(option).toHaveProperty('value');
         expect(option).toHaveProperty('label');
+        expect(typeof option.value).toBe('string');
+        expect(typeof option.label).toBe('string');
       }
     });
 
-    it('ATTITUDE_COLORS should have entries for all attitude values', () => {
-      for (const option of ATTITUDE_OPTIONS) {
-        expect(ATTITUDE_COLORS).toHaveProperty(option.value);
-        const colors = ATTITUDE_COLORS[option.value];
+    it('ATTITUDE_OPTIONS values should match ATTITUDE_COLORS keys', () => {
+      const attitudeValues = ATTITUDE_OPTIONS.map((o) => o.value);
+      const colorKeys = Object.keys(ATTITUDE_COLORS);
+      expect(attitudeValues).toEqual(colorKeys);
+    });
+
+    it('ATTITUDE_COLORS should have bg, color, and border for each attitude', () => {
+      for (const [, colors] of Object.entries(ATTITUDE_COLORS)) {
         expect(colors).toHaveProperty('bg');
         expect(colors).toHaveProperty('color');
         expect(colors).toHaveProperty('border');
+        expect(typeof colors.bg).toBe('string');
+        expect(typeof colors.color).toBe('string');
+        expect(typeof colors.border).toBe('string');
       }
     });
   });
 
   describe('getDefaultFormData', () => {
-    it('should return an object with all expected default fields', () => {
-      const form = getDefaultFormData();
-      expect(form).toHaveProperty('name', '');
-      expect(form).toHaveProperty('race', '');
-      expect(form).toHaveProperty('classRole', '');
-      expect(form).toHaveProperty('appearance', '');
-      expect(form).toHaveProperty('personality', '');
-      expect(form).toHaveProperty('goals', '');
-      expect(form).toHaveProperty('secrets', '');
-      expect(form).toHaveProperty('notes', '');
-      expect(form).toHaveProperty('tags', '');
-      expect(form).toHaveProperty('attitude', 'neutral');
-      expect(form).toHaveProperty('image', '');
-      expect(form).toHaveProperty('imageName', '');
-      expect(form).toHaveProperty('imagePath', '');
-      expect(form).toHaveProperty('armorClass', 10);
-      expect(form).toHaveProperty('hitPoints', '');
-      expect(form).toHaveProperty('hitDice', '');
-      expect(form).toHaveProperty('initiativeBonus', '');
-      expect(form).toHaveProperty('speed', { walk: '30 ft.' });
-      expect(form).toHaveProperty('abilityScores');
-      expect(form).toHaveProperty('savingThrowBonuses', {});
-      expect(form).toHaveProperty('skillBonuses', {});
-      expect(form).toHaveProperty('damageResistances', []);
-      expect(form).toHaveProperty('damageImmunities', []);
-      expect(form).toHaveProperty('conditionImmunities', []);
-      expect(form).toHaveProperty('actions', []);
-      expect(form).toHaveProperty('traits', '');
-      expect(form).toHaveProperty('reactions', '');
-    });
+    const defaults = {
+      name: '',
+      race: '',
+      classRole: '',
+      appearance: '',
+      personality: '',
+      goals: '',
+      secrets: '',
+      notes: '',
+      tags: '',
+      attitude: 'neutral',
+      image: '',
+      imageName: '',
+      imagePath: '',
+      armorClass: 10,
+      hitPoints: '',
+      hitDice: '',
+      initiativeBonus: '',
+      speed: { walk: '30 ft.' },
+      savingThrowBonuses: {},
+      skillBonuses: {},
+      damageResistances: [],
+      damageImmunities: [],
+      conditionImmunities: [],
+      actions: [],
+      traits: '',
+      reactions: '',
+    };
+
+    for (const [key, expectedValue] of Object.entries(defaults)) {
+      it(`should default ${key} to the correct value`, () => {
+        const form = getDefaultFormData();
+        expect(form[key]).toEqual(expectedValue);
+      });
+    }
 
     it('should default all ability scores to 10', () => {
       const form = getDefaultFormData();
@@ -84,37 +102,20 @@ describe('npcFormUtils', () => {
       }
     });
 
-    it('should override specific fields when overrides are provided', () => {
+    it('should apply override scalar fields', () => {
       const form = getDefaultFormData({ name: 'Grog', hitPoints: 20, armorClass: 15 });
       expect(form.name).toBe('Grog');
       expect(form.hitPoints).toBe(20);
       expect(form.armorClass).toBe(15);
     });
 
-    it('should override the entire abilityScores object', () => {
+    it('should apply override object fields by replacing entirely', () => {
       const customScores = { str: 18, dex: 14, con: 16, int: 10, wis: 8, cha: 12 };
       const form = getDefaultFormData({ abilityScores: customScores });
       expect(form.abilityScores).toEqual(customScores);
     });
 
-    it('should return a fresh object each time (no shared mutation)', () => {
-      const form1 = getDefaultFormData();
-      const form2 = getDefaultFormData();
-      form1.abilityScores.str = 20;
-      expect(form2.abilityScores.str).toBe(10);
-    });
-
-    it('should allow overriding the attitude', () => {
-      const form = getDefaultFormData({ attitude: 'positive' });
-      expect(form.attitude).toBe('positive');
-    });
-
-    it('should allow overriding the speed object', () => {
-      const form = getDefaultFormData({ speed: { walk: '40 ft.', burrow: '20 ft.' } });
-      expect(form.speed).toEqual({ walk: '40 ft.', burrow: '20 ft.' });
-    });
-
-    it('should allow overriding array fields via overrides', () => {
+    it('should apply override array fields by replacing entirely', () => {
       const form = getDefaultFormData({
         damageResistances: ['fire', 'cold'],
         damageImmunities: ['psychic'],
@@ -124,38 +125,52 @@ describe('npcFormUtils', () => {
       expect(form.damageImmunities).toEqual(['psychic']);
       expect(form.actions).toEqual([{ name: 'Longsword' }]);
     });
+
+    it('should return a fresh object each call with independent arrays/objects', () => {
+      const form1 = getDefaultFormData();
+      const form2 = getDefaultFormData();
+      form1.abilityScores.str = 20;
+      form1.damageResistances.push('fire');
+      expect(form2.abilityScores.str).toBe(10);
+      expect(form2.damageResistances).toEqual([]);
+    });
+
+    it('should return a fresh object each call with independent speed objects', () => {
+      const form1 = getDefaultFormData();
+      const form2 = getDefaultFormData();
+      form1.speed.walk = '40 ft.';
+      expect(form2.speed.walk).toBe('30 ft.');
+    });
   });
 
   describe('cleanNPCData', () => {
-    it('should return the data object as-is when AC is valid', () => {
-      const data = { name: 'Grog', armorClass: 16 };
+    it('should return data unchanged when AC is a valid number', () => {
+      const data = { name: 'Grog', armorClass: 16, race: 'Orc' };
       const cleaned = cleanNPCData(data);
+      expect(cleaned).not.toBe(data);
       expect(cleaned.armorClass).toBe(16);
       expect(cleaned.name).toBe('Grog');
+      expect(cleaned.race).toBe('Orc');
     });
 
-    it('should default null AC to 10', () => {
-      const data = { name: 'Grog', armorClass: null };
-      const cleaned = cleanNPCData(data);
+    it('should default AC to 10 when AC is null', () => {
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: null });
       expect(cleaned.armorClass).toBe(10);
     });
 
-    it('should default undefined AC to 10', () => {
-      const data = { name: 'Grog', armorClass: undefined };
-      const cleaned = cleanNPCData(data);
+    it('should default AC to 10 when AC is undefined', () => {
+      const cleaned = cleanNPCData({ name: 'Grog' });
       expect(cleaned.armorClass).toBe(10);
     });
 
-    it('should default empty string AC to 10', () => {
-      const data = { name: 'Grog', armorClass: '' };
-      const cleaned = cleanNPCData(data);
+    it('should default AC to 10 when AC is an empty string', () => {
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: '' });
       expect(cleaned.armorClass).toBe(10);
     });
 
-    it('should default non-numeric AC to 10 and log error', () => {
-      const data = { name: 'Grog', armorClass: '16' };
+    it('should default AC to 10 when AC is a numeric string and log an error', () => {
       const consoleSpy = vi.spyOn(console, 'error');
-      const cleaned = cleanNPCData(data);
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: '16' });
       expect(cleaned.armorClass).toBe(10);
       expect(consoleSpy).toHaveBeenCalledWith(
         '[AC] NPC "Grog" has invalid AC: 16. Defaulting to 10.',
@@ -163,16 +178,27 @@ describe('npcFormUtils', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should default boolean AC to 10 and log error', () => {
-      const data = { name: 'Grog', armorClass: true };
+    it('should default AC to 10 when AC is a boolean and log an error', () => {
       const consoleSpy = vi.spyOn(console, 'error');
-      const cleaned = cleanNPCData(data);
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: true });
       expect(cleaned.armorClass).toBe(10);
-      expect(consoleSpy).toHaveBeenCalled();
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[AC] NPC "Grog" has invalid AC: true. Defaulting to 10.',
+      );
       consoleSpy.mockRestore();
     });
 
-    it('should preserve other fields during cleaning', () => {
+    it('should default AC to 10 when AC is NaN and log an error', () => {
+      const consoleSpy = vi.spyOn(console, 'error');
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: NaN });
+      expect(cleaned.armorClass).toBe(10);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[AC] NPC "Grog" has invalid AC: NaN. Defaulting to 10.',
+      );
+      consoleSpy.mockRestore();
+    });
+
+    it('should preserve other fields while correcting AC', () => {
       const data = {
         name: 'Grog',
         race: 'Hill Dwarf',
@@ -187,110 +213,79 @@ describe('npcFormUtils', () => {
       expect(cleaned.speed).toEqual({ walk: '25 ft.' });
     });
 
-    it('should leave AC unchanged when it is a valid number 0', () => {
-      const data = { name: 'Grog', armorClass: 0 };
-      const cleaned = cleanNPCData(data);
+    it('should accept AC of 0 as valid', () => {
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: 0 });
       expect(cleaned.armorClass).toBe(0);
     });
 
-    it('should leave AC unchanged when it is a negative number', () => {
-      const data = { name: 'Grog', armorClass: -5 };
-      const cleaned = cleanNPCData(data);
+    it('should accept negative AC values', () => {
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: -5 });
       expect(cleaned.armorClass).toBe(-5);
     });
 
     it('should not mutate the original data object', () => {
       const data = { name: 'Grog', armorClass: null };
-      const originalAC = data.armorClass;
       const cleaned = cleanNPCData(data);
-      expect(data.armorClass).toBe(originalAC);
+      expect(data.armorClass).toBe(null);
       expect(cleaned.armorClass).toBe(10);
+    });
+
+    it('should log error with "undefined" name when name is missing', () => {
+      const consoleSpy = vi.spyOn(console, 'error');
+      const cleaned = cleanNPCData({ armorClass: 'bad' });
+      expect(cleaned.armorClass).toBe(10);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '[AC] NPC "undefined" has invalid AC: bad. Defaulting to 10.',
+      );
+      consoleSpy.mockRestore();
     });
   });
 
   describe('getAttitudeStyle', () => {
-    it('should return correct style for "deep bonds"', () => {
-      const style = getAttitudeStyle('deep bonds');
-      expect(style).toEqual({
+    it('should return a style object with backgroundColor, color, and borderColor', () => {
+      const style = getAttitudeStyle('neutral');
+      expect(style).toHaveProperty('backgroundColor');
+      expect(style).toHaveProperty('color');
+      expect(style).toHaveProperty('borderColor');
+    });
+
+    it('should return correct style for each known attitude', () => {
+      expect(getAttitudeStyle('deep bonds')).toEqual({
         backgroundColor: '#1a472a',
         color: '#90ee90',
         borderColor: '#2d6a4f',
       });
-    });
-
-    it('should return correct style for "positive"', () => {
-      const style = getAttitudeStyle('positive');
-      expect(style).toEqual({
+      expect(getAttitudeStyle('positive')).toEqual({
         backgroundColor: '#1b4332',
         color: '#b7e4c7',
         borderColor: '#40916c',
       });
-    });
-
-    it('should return correct style for "neutral"', () => {
-      const style = getAttitudeStyle('neutral');
-      expect(style).toEqual({
+      expect(getAttitudeStyle('neutral')).toEqual({
         backgroundColor: '#4a4a4a',
         color: '#e0e0e0',
         borderColor: '#6b6b6b',
       });
-    });
-
-    it('should return correct style for "negative"', () => {
-      const style = getAttitudeStyle('negative');
-      expect(style).toEqual({
+      expect(getAttitudeStyle('negative')).toEqual({
         backgroundColor: '#7b241c',
         color: '#f4a0a0',
         borderColor: '#a43330',
       });
-    });
-
-    it('should return correct style for "extreme opposition"', () => {
-      const style = getAttitudeStyle('extreme opposition');
-      expect(style).toEqual({
+      expect(getAttitudeStyle('extreme opposition')).toEqual({
         backgroundColor: '#5c030e',
         color: '#ff6b6b',
         borderColor: '#8b0000',
       });
     });
 
-    it('should fall back to neutral style for unknown attitude', () => {
-      const style = getAttitudeStyle('unknown-value');
-      expect(style).toEqual({
-        backgroundColor: '#4a4a4a',
-        color: '#e0e0e0',
-        borderColor: '#6b6b6b',
-      });
+    it('should return neutral style for unknown, null, undefined, and empty string attitudes', () => {
+      const neutralStyle = getAttitudeStyle('neutral');
+      expect(getAttitudeStyle('unknown-value')).toEqual(neutralStyle);
+      expect(getAttitudeStyle(null)).toEqual(neutralStyle);
+      expect(getAttitudeStyle(undefined)).toEqual(neutralStyle);
+      expect(getAttitudeStyle('')).toEqual(neutralStyle);
     });
 
-    it('should fall back to neutral style for null attitude', () => {
-      const style = getAttitudeStyle(null);
-      expect(style).toEqual({
-        backgroundColor: '#4a4a4a',
-        color: '#e0e0e0',
-        borderColor: '#6b6b6b',
-      });
-    });
-
-    it('should fall back to neutral style for undefined attitude', () => {
-      const style = getAttitudeStyle(undefined);
-      expect(style).toEqual({
-        backgroundColor: '#4a4a4a',
-        color: '#e0e0e0',
-        borderColor: '#6b6b6b',
-      });
-    });
-
-    it('should fall back to neutral style for empty string attitude', () => {
-      const style = getAttitudeStyle('');
-      expect(style).toEqual({
-        backgroundColor: '#4a4a4a',
-        color: '#e0e0e0',
-        borderColor: '#6b6b6b',
-      });
-    });
-
-    it('should return a new style object each call', () => {
+    it('should return a new object on each call (not reused)', () => {
       const style1 = getAttitudeStyle('neutral');
       const style2 = getAttitudeStyle('neutral');
       expect(style1).not.toBe(style2);

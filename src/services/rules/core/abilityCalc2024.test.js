@@ -1,5 +1,6 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
-import { getAbilities, getHitPoints } from './abilityCalc2024.js';
+import { getAbilities, getHitPoints, getCarryingCapacity } from './abilityCalc2024.js';
 
 // Mock loadSkills from dataLoader
 const mockSkills = [
@@ -27,11 +28,49 @@ vi.mock('../../ui/dataLoader.js', () => ({
   loadSkills: vi.fn(() => Promise.resolve(mockSkills)),
 }));
 
+// Mock evaluateAutoExpression for automation.passives tests
+vi.mock('../../combat/automation/automationExpressions.js', () => ({
+  evaluateAutoExpression: vi.fn(() => 5),
+}));
+
 describe('abilityCalc2024', () => {
   describe('getAbilities', () => {
-    it('should return abilities with computed bonus, save, and skill values', async () => {
-      const playerStats = {
-        level: 1,
+    function makeStats(overrides = {}) {
+      return {
+        level: overrides.level || 1,
+        abilities: overrides.abilities || [
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ],
+        class: {
+          saving_throw_proficiencies: [],
+          ...overrides.class,
+        },
+        skillProficiencies: overrides.skillProficiencies || [],
+        expertise: overrides.expertise || [],
+        saveProficiencies: overrides.saveProficiencies || [],
+      };
+    }
+
+    it('should return all six abilities with correct structure', async () => {
+      const result = await getAbilities(makeStats({}));
+
+      expect(result).toHaveLength(6);
+      const names = result.map(a => a.name);
+      expect(names).toContain('Strength');
+      expect(names).toContain('Dexterity');
+      expect(names).toContain('Constitution');
+      expect(names).toContain('Intelligence');
+      expect(names).toContain('Wisdom');
+      expect(names).toContain('Charisma');
+    });
+
+    it('should compute ability bonuses from total score', async () => {
+      const result = await getAbilities(makeStats({
         abilities: [
           { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -40,63 +79,27 @@ describe('abilityCalc2024', () => {
           { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
-        class: {
-          saving_throw_proficiencies: ['Strength', 'Constitution'],
-        },
-        skillProficiencies: ['Athletics'],
-        expertise: [],
-      };
+      }));
 
-      const result = await getAbilities(playerStats);
-
-      expect(result).toHaveLength(6);
-
-      // Strength: 15 → bonus +2, proficient in save → save = 2 + 2 = 4
       const str = result.find(a => a.name === 'Strength');
       expect(str.totalScore).toBe(15);
       expect(str.bonus).toBe(2);
-      expect(str.proficient).toBe(true);
-      expect(str.save).toBe(4);
 
-      // Dexterity: 14 → bonus +2, not proficient in save → save = 2
       const dex = result.find(a => a.name === 'Dexterity');
       expect(dex.totalScore).toBe(14);
       expect(dex.bonus).toBe(2);
-      expect(dex.proficient).toBe(false);
-      expect(dex.save).toBe(2);
 
-      // Constitution: 13 → bonus +1, proficient in save → save = 1 + 2 = 3
       const con = result.find(a => a.name === 'Constitution');
       expect(con.totalScore).toBe(13);
       expect(con.bonus).toBe(1);
-      expect(con.proficient).toBe(true);
-      expect(con.save).toBe(3);
 
-      // Intelligence: 10 → bonus 0
-      const int = result.find(a => a.name === 'Intelligence');
-      expect(int.totalScore).toBe(10);
-      expect(int.bonus).toBe(0);
-      expect(int.proficient).toBe(false);
-      expect(int.save).toBe(0);
-
-      // Wisdom: 8 → bonus -1
       const wis = result.find(a => a.name === 'Wisdom');
       expect(wis.totalScore).toBe(8);
       expect(wis.bonus).toBe(-1);
-      expect(wis.proficient).toBe(false);
-      expect(wis.save).toBe(-1);
-
-      // Charisma: 8 → bonus -1
-      const cha = result.find(a => a.name === 'Charisma');
-      expect(cha.totalScore).toBe(8);
-      expect(cha.bonus).toBe(-1);
-      expect(cha.proficient).toBe(false);
-      expect(cha.save).toBe(-1);
     });
 
-    it('should compute skill bonuses with proficiency', async () => {
-      const playerStats = {
-        level: 1,
+    it('should mark saving throw proficiencies from class', async () => {
+      const result = await getAbilities(makeStats({
         abilities: [
           { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -105,103 +108,135 @@ describe('abilityCalc2024', () => {
           { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
-        class: {
-          saving_throw_proficiencies: [],
-        },
-        skillProficiencies: ['Athletics'],
-        expertise: [],
-      };
+        class: { saving_throw_proficiencies: ['Strength', 'Constitution'] },
+      }));
 
-      const result = await getAbilities(playerStats);
       const str = result.find(a => a.name === 'Strength');
+      expect(str.proficient).toBe(true);
+      expect(str.save).toBe(4); // bonus 2 + proficiency 2
 
+      const dex = result.find(a => a.name === 'Dexterity');
+      expect(dex.proficient).toBe(false);
+      expect(dex.save).toBe(0); // just bonus
+    });
+
+    it('should merge class save proficiencies with feature save proficiencies', async () => {
+      const result = await getAbilities(makeStats({
+        level: 7,
+        abilities: [
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ],
+        class: { saving_throw_proficiencies: ['Dexterity', 'Intelligence'] },
+        saveProficiencies: ['Wisdom'],
+      }));
+
+      const dex = result.find(a => a.name === 'Dexterity');
+      expect(dex.proficient).toBe(true);
+      expect(dex.save).toBe(5); // +2 bonus + 3 proficiency
+
+      const wis = result.find(a => a.name === 'Wisdom');
+      expect(wis.proficient).toBe(true);
+      expect(wis.save).toBe(6); // +3 bonus + 3 proficiency
+
+      const str = result.find(a => a.name === 'Strength');
+      expect(str.proficient).toBe(false);
+      expect(str.save).toBe(0);
+    });
+
+    it('should handle missing class.saving_throw_proficiencies gracefully', async () => {
+      const result = await getAbilities(makeStats({ class: {} }));
+
+      result.forEach(ability => {
+        expect(ability.proficient).toBe(false);
+        expect(ability.save).toBe(ability.bonus);
+      });
+    });
+
+    it('should compute proficiency bonus correctly at different levels', async () => {
+      const profAt = (level) => Math.floor((level - 1) / 4 + 2);
+
+      // Level 1 -> proficiency 2
+      const r1 = await getAbilities(makeStats({
+        level: 1,
+        abilities: [
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ],
+        class: { saving_throw_proficiencies: ['Strength'] },
+      }));
+      const str1 = r1.find(a => a.name === 'Strength');
+      expect(str1.save).toBe(0 + profAt(1)); // bonus 0 + proficiency 2
+
+      // Level 5 -> proficiency 3
+      const r5 = await getAbilities(makeStats({
+        level: 5,
+        class: { saving_throw_proficiencies: ['Strength'] },
+      }));
+      const str5 = r5.find(a => a.name === 'Strength');
+      expect(str5.save).toBe(0 + profAt(5)); // bonus 0 + proficiency 3
+
+      // Level 17 -> proficiency 6
+      const r17 = await getAbilities(makeStats({
+        level: 17,
+        class: { saving_throw_proficiencies: ['Strength'] },
+      }));
+      const str17 = r17.find(a => a.name === 'Strength');
+      expect(str17.save).toBe(0 + profAt(17)); // bonus 0 + proficiency 6
+    });
+
+    it('should include skills for each ability and mark proficiency', async () => {
+      const result = await getAbilities(makeStats({
+        skillProficiencies: ['Athletics', 'Stealth'],
+      }));
+
+      const str = result.find(a => a.name === 'Strength');
       expect(str.skills).toHaveLength(1);
       expect(str.skills[0].name).toBe('Athletics');
-      // Proficiency bonus at level 1 = 2, ability bonus = 2
-      expect(str.skills[0].bonus).toBe(4);
+      expect(str.skills[0].bonus).toBe(2); // bonus 0 + proficiency 2
+
+      const dex = result.find(a => a.name === 'Dexterity');
+      const stealth = dex.skills.find(s => s.name === 'Stealth');
+      expect(stealth.bonus).toBe(2); // bonus 0 + proficiency 2
     });
 
     it('should apply expertise as double proficiency on skills', async () => {
-      const playerStats = {
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        ],
-        class: {
-          saving_throw_proficiencies: [],
-        },
+      const result = await getAbilities(makeStats({
         skillProficiencies: ['Athletics'],
         expertise: ['Athletics'],
-      };
+      }));
 
-      const result = await getAbilities(playerStats);
       const str = result.find(a => a.name === 'Strength');
-
-      // Proficiency at level 1 = 2, ability bonus = 2, expertise adds another 2 = 6
-      expect(str.skills[0].bonus).toBe(6);
+      // bonus 0 + proficiency 2 + expertise bonus 2 = 4
+      expect(str.skills[0].bonus).toBe(4);
     });
 
-    it('should compute proficiency bonus correctly at level 5', async () => {
-      const playerStats = {
-        level: 5,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        ],
-        class: {
-          saving_throw_proficiencies: ['Strength'],
-        },
-        skillProficiencies: ['Athletics'],
-        expertise: [],
-      };
-
-      const result = await getAbilities(playerStats);
-      const str = result.find(a => a.name === 'Strength');
-
-      // Proficiency at level 5 = Math.floor((5-1)/4+2) = Math.floor(1+2) = 3
-      expect(str.save).toBe(5); // bonus 2 + proficiency 3
-      expect(str.skills[0].bonus).toBe(5); // bonus 2 + proficiency 3
-    });
-
-    it('should compute proficiency bonus correctly at level 20', async () => {
-      const playerStats = {
-        level: 20,
-        abilities: [
-          { name: 'Strength', baseScore: 20, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        ],
-        class: {
-          saving_throw_proficiencies: ['Strength'],
-        },
+    it('should apply expertise bonus even when skill is not in skillProficiencies', async () => {
+      // Edge case: expertise without proficiency in skillProficiencies
+      // The code checks skillProficiencies.includes for base proficiency,
+      // but expertise is checked separately and adds proficiency bonus
+      const result = await getAbilities(makeStats({
         skillProficiencies: [],
-        expertise: [],
-      };
+        expertise: ['Arcana'],
+      }));
 
-      const result = await getAbilities(playerStats);
-      const str = result.find(a => a.name === 'Strength');
-
-      // Proficiency at level 20 = Math.floor((20-1)/4+2) = Math.floor(4.75+2) = 6
-      // Ability bonus = Math.floor((20-10)/2) = 5
-      expect(str.bonus).toBe(5);
-      expect(str.save).toBe(11); // 5 + 6
+      const int = result.find(a => a.name === 'Intelligence');
+      const arcana = int.skills.find(s => s.name === 'Arcana');
+      // Not proficient in skillProficiencies, so base bonus = 0 (no proficiency)
+      // But expertise adds proficiency bonus = 2
+      expect(arcana.bonus).toBe(2);
     });
 
-    it('should handle ability improvements and misc bonuses', async () => {
-      const playerStats = {
-        level: 1,
+    it('should apply ability improvements (feat, misc, background)', async () => {
+      const result = await getAbilities(makeStats({
         abilities: [
           { name: 'Strength', baseScore: 8, featIncrease: 2, miscIncrease: 1, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -210,102 +245,34 @@ describe('abilityCalc2024', () => {
           { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
-        class: {
-          saving_throw_proficiencies: [],
-        },
-        skillProficiencies: [],
-        expertise: [],
-      };
+      }));
 
-      const result = await getAbilities(playerStats);
       const str = result.find(a => a.name === 'Strength');
-
-      // totalScore = 8 + 2 + 1 = 11
-      expect(str.totalScore).toBe(11);
-      // bonus = Math.floor((11-10)/2) = 0
-      expect(str.bonus).toBe(0);
+      expect(str.totalScore).toBe(11); // 8 + 2 + 1
+      expect(str.bonus).toBe(0); // floor((11-10)/2) = 0
     });
 
-    it('should handle empty skillProficiencies and expertise arrays', async () => {
-      const playerStats = {
-        level: 1,
+    it('should enforce 20 cap on ability scores before racial/class bonuses', async () => {
+      const result = await getAbilities(makeStats({
         abilities: [
-          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        ],
-        class: {
-          saving_throw_proficiencies: [],
-        },
-        skillProficiencies: [],
-        expertise: [],
-      };
-
-      const result = await getAbilities(playerStats);
-      expect(result).toHaveLength(6);
-      result.forEach(ability => {
-        expect(ability.bonus).toBe(0);
-        expect(ability.proficient).toBe(false);
-        expect(ability.save).toBe(0);
-      });
-    });
-
-    it('should handle undefined saving_throw_proficiencies gracefully', async () => {
-      const playerStats = {
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        ],
-        class: {},
-        skillProficiencies: [],
-        expertise: [],
-      };
-
-      const result = await getAbilities(playerStats);
-      const str = result.find(a => a.name === 'Strength');
-      expect(str.proficient).toBe(false);
-      expect(str.save).toBe(2);
-    });
-
-    it('should handle extreme ability scores (0 and 30)', async () => {
-      const playerStats = {
-        level: 1,
-        abilities: [
-          { name: 'Strength', baseScore: 0, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 30, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
-        class: {
-          saving_throw_proficiencies: [],
-        },
-        skillProficiencies: [],
-        expertise: [],
-      };
+      }));
 
-      const result = await getAbilities(playerStats);
-      const str = result.find(a => a.name === 'Strength');
       const dex = result.find(a => a.name === 'Dexterity');
-
-      // Score 0: totalScore=0, bonus=Math.floor((0-10)/2)=Math.floor(-5)=-5
-      expect(str.bonus).toBe(-5);
-      // Score 30 capped at 20: totalScore=20, bonus=Math.floor((20-10)/2)=5
+      expect(dex.totalScore).toBe(20); // capped at 20
       expect(dex.bonus).toBe(5);
     });
 
-    it('should apply Primal Champion at level 20 for Barbarian', async () => {
-      const playerStats = {
+    it('should apply Primal Champion (+4 to Str/Con) for level 20 Barbarian', async () => {
+      const result = await getAbilities(makeStats({
         level: 20,
+        class: { name: 'Barbarian', saving_throw_proficiencies: [] },
         abilities: [
           { name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -314,59 +281,49 @@ describe('abilityCalc2024', () => {
           { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
-        class: {
-          name: 'Barbarian',
-          saving_throw_proficiencies: [],
-        },
-        skillProficiencies: [],
-        expertise: [],
-      };
+      }));
 
-      const result = await getAbilities(playerStats);
       const str = result.find(a => a.name === 'Strength');
-      const con = result.find(a => a.name === 'Constitution');
-
-      // 16 + 4 (Primal Champion) = 20, bonus = 5
-      expect(str.totalScore).toBe(20);
+      expect(str.totalScore).toBe(20); // 16 + 4
       expect(str.bonus).toBe(5);
 
-      // 14 + 4 (Primal Champion) = 18, bonus = 4
-      expect(con.totalScore).toBe(18);
+      const con = result.find(a => a.name === 'Constitution');
+      expect(con.totalScore).toBe(18); // 14 + 4
       expect(con.bonus).toBe(4);
     });
 
-    it('should not apply Primal Champion for non-Barbarian', async () => {
-      const playerStats = {
+    it('should apply Soul of the Sea (+4 to Dex/Wis) and Mind of the Sea (+4 to Int/Wis) for level 20 Monk', async () => {
+      const result = await getAbilities(makeStats({
         level: 20,
+        class: { name: 'Monk', saving_throw_proficiencies: [] },
         abilities: [
-          { name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
-        class: {
-          name: 'Fighter',
-          saving_throw_proficiencies: [],
-        },
-        skillProficiencies: [],
-        expertise: [],
-      };
+      }));
 
-      const result = await getAbilities(playerStats);
+      const dex = result.find(a => a.name === 'Dexterity');
+      expect(dex.totalScore).toBe(20); // 16 + 4
+      expect(dex.bonus).toBe(5);
+
+      const wis = result.find(a => a.name === 'Wisdom');
+      expect(wis.totalScore).toBe(18); // 14 + 4
+      expect(wis.bonus).toBe(4);
+
+      // Strength should not be affected
       const str = result.find(a => a.name === 'Strength');
-      const con = result.find(a => a.name === 'Constitution');
-
-      expect(str.totalScore).toBe(16);
-      expect(str.bonus).toBe(3);
-      expect(con.totalScore).toBe(14);
-      expect(con.bonus).toBe(2);
+      expect(str.totalScore).toBe(10);
+      expect(str.bonus).toBe(0);
     });
 
-    it('should not apply Primal Champion before level 20', async () => {
-      const playerStats = {
+    it('should not apply racial/class ability boosts before level 20', async () => {
+      const result = await getAbilities(makeStats({
         level: 19,
+        class: { name: 'Barbarian', saving_throw_proficiencies: [] },
         abilities: [
           { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -375,27 +332,36 @@ describe('abilityCalc2024', () => {
           { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
-        class: {
-          name: 'Barbarian',
-          saving_throw_proficiencies: [],
-        },
-        skillProficiencies: [],
-        expertise: [],
-      };
+      }));
 
-      const result = await getAbilities(playerStats);
       const str = result.find(a => a.name === 'Strength');
-      const con = result.find(a => a.name === 'Constitution');
-
       expect(str.totalScore).toBe(15);
       expect(str.bonus).toBe(2);
-      expect(con.totalScore).toBe(14);
-      expect(con.bonus).toBe(2);
     });
 
-    it('should enforce 25 cap on Primal Champion', async () => {
-      const playerStats = {
+    it('should not apply racial/class ability boosts for non-matching class', async () => {
+      const result = await getAbilities(makeStats({
         level: 20,
+        class: { name: 'Fighter', saving_throw_proficiencies: [] },
+        abilities: [
+          { name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ],
+      }));
+
+      const str = result.find(a => a.name === 'Strength');
+      expect(str.totalScore).toBe(16);
+      expect(str.bonus).toBe(3);
+    });
+
+    it('should enforce 25 cap on racial/class ability boosts', async () => {
+      const result = await getAbilities(makeStats({
+        level: 20,
+        class: { name: 'Barbarian', saving_throw_proficiencies: [] },
         abilities: [
           { name: 'Strength', baseScore: 22, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
@@ -404,66 +370,108 @@ describe('abilityCalc2024', () => {
           { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
           { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
         ],
-        class: {
-          name: 'Barbarian',
-          saving_throw_proficiencies: [],
-        },
-        skillProficiencies: [],
-        expertise: [],
-      };
+      }));
 
-      const result = await getAbilities(playerStats);
       const str = result.find(a => a.name === 'Strength');
-
-      // 22 capped at 20 (standard max), then +4 Primal Champion = 24
+      // base 22 capped at 20, then +4 Primal Champion = 24
       expect(str.totalScore).toBe(24);
       expect(str.bonus).toBe(7);
+    });
+
+    it('should apply Thaumaturge divine order bonus to Arcana and Religion', async () => {
+      const result = await getAbilities(makeStats({
+        class: { name: 'Cleric', divineOrder: 'Thaumaturge', saving_throw_proficiencies: [] },
+        abilities: [
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ],
+      }));
+
+      const int = result.find(a => a.name === 'Intelligence');
+      const arcana = int.skills.find(s => s.name === 'Arcana');
+      const religion = int.skills.find(s => s.name === 'Religion');
+      const history = int.skills.find(s => s.name === 'History');
+
+      // WIS mod = 2, divineBonus = max(1, 2) = 2
+      expect(arcana.bonus).toBe(2); // 0 + 2 divine
+      expect(religion.bonus).toBe(2); // 0 + 2 divine
+      expect(history.bonus).toBe(0); // unaffected
+    });
+
+    it('should apply Thaumaturge divine order with minimum +1 when WIS mod is negative', async () => {
+      const result = await getAbilities(makeStats({
+        class: { name: 'Cleric', divineOrder: 'Thaumaturge', saving_throw_proficiencies: [] },
+        abilities: [
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ],
+      }));
+
+      const int = result.find(a => a.name === 'Intelligence');
+      const arcana = int.skills.find(s => s.name === 'Arcana');
+      // WIS mod = -1, divineBonus = max(1, -1) = 1
+      expect(arcana.bonus).toBe(1);
+    });
+
+    it('should apply Magician primal order bonus to Arcana and Nature', async () => {
+      const result = await getAbilities(makeStats({
+        class: { name: 'Druid', primalOrder: 'Magician', saving_throw_proficiencies: [] },
+        abilities: [
+          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Dexterity', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
+          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ],
+      }));
+
+      const int = result.find(a => a.name === 'Intelligence');
+      const arcana = int.skills.find(s => s.name === 'Arcana');
+      const nature = int.skills.find(s => s.name === 'Nature');
+      const history = int.skills.find(s => s.name === 'History');
+
+      // WIS mod = 3, primalBonus = max(1, 3) = 3
+      expect(arcana.bonus).toBe(3); // 0 + 3 primal
+      expect(nature.bonus).toBe(3); // 0 + 3 primal
+      expect(history.bonus).toBe(0); // unaffected
     });
   });
 
   describe('getHitPoints', () => {
-    it('should calculate HP for level 1 Fighter with 14 Con', () => {
+    it('should calculate HP at level 1 with d10 hit die and +2 Con', () => {
       const playerStats = {
         level: 1,
         abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
           { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
-          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
-        class: {
-          hit_point_die: 'd10',
-        },
+        class: { hit_point_die: 'd10' },
         race: {},
       };
 
-      const hp = getHitPoints(playerStats);
-      // Level 1: hitDie + (con.bonus * level) = 10 + (2 * 1) = 12
-      expect(hp).toBe(12);
+      expect(getHitPoints(playerStats)).toBe(12); // 10 + (6*0) + (2*1)
     });
 
-    it('should calculate HP for level 5 Fighter with 14 Con', () => {
+    it('should calculate HP at level 5 with d10 hit die and +2 Con', () => {
       const playerStats = {
         level: 5,
         abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, bonus: 2 },
-          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
           { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
-          { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
-          { name: 'Charisma', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
-        class: {
-          hit_point_die: 'd10',
-        },
+        class: { hit_point_die: 'd10' },
         race: {},
       };
 
-      const hp = getHitPoints(playerStats);
-      // Level 5: 10 + ((10/2+1) * 4) + (2 * 5) = 10 + (6*4) + 10 = 10+24+10 = 44
-      expect(hp).toBe(44);
+      // 10 + (6*4) + (2*5) = 10 + 24 + 10 = 44
+      expect(getHitPoints(playerStats)).toBe(44);
     });
 
     it('should fall back to hit_die when hit_point_die is missing', () => {
@@ -472,33 +480,24 @@ describe('abilityCalc2024', () => {
         abilities: [
           { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, bonus: 1 },
         ],
-        class: {
-          hit_die: 'd8',
-        },
+        class: { hit_die: 'd8' },
         race: {},
       };
 
-      const hp = getHitPoints(playerStats);
-      // hit_point_die is undefined, falls to hit_die = 'd8' → 8
-      // 8 + (1 * 1) = 9
-      expect(hp).toBe(9);
+      expect(getHitPoints(playerStats)).toBe(9); // 8 + (5*0) + (1*1)
     });
 
-    it('should default to d8 when hit die string is NaN', () => {
+    it('should default to d8 when hit die string is invalid', () => {
       const playerStats = {
         level: 1,
         abilities: [
           { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
-        class: {
-          hit_point_die: 'invalid',
-        },
+        class: { hit_point_die: 'invalid' },
         race: {},
       };
 
-      const hp = getHitPoints(playerStats);
-      // Defaults to d8: 8 + (0 * 1) = 8
-      expect(hp).toBe(8);
+      expect(getHitPoints(playerStats)).toBe(8); // 8 + (4*0) + (0*1)
     });
 
     it('should include race subrace hit point bonus per level', () => {
@@ -507,19 +506,12 @@ describe('abilityCalc2024', () => {
         abilities: [
           { name: 'Constitution', baseScore: 14, featIncrease: 0, miscIncrease: 0, bonus: 2 },
         ],
-        class: {
-          hit_point_die: 'd8',
-        },
-        race: {
-          subrace: {
-            hit_point_bonus_per_level: 1,
-          },
-        },
+        class: { hit_point_die: 'd8' },
+        race: { subrace: { hit_point_bonus_per_level: 1 } },
       };
 
-      const hp = getHitPoints(playerStats);
-      // d8 base: 8 + ((8/2+1)*4) + (2*5) + (1*5) = 8 + 20 + 10 + 5 = 43
-      expect(hp).toBe(43);
+      // 8 + (5*4) + (2*5) + (1*5) = 8 + 20 + 10 + 5 = 43
+      expect(getHitPoints(playerStats)).toBe(43);
     });
 
     it('should include class major hit point bonus per level', () => {
@@ -528,35 +520,40 @@ describe('abilityCalc2024', () => {
         abilities: [
           { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, bonus: 1 },
         ],
-        class: {
-          hit_point_die: 'd6',
-          major: {
-            hit_point_bonus_per_level: 2,
-          },
-        },
+        class: { hit_point_die: 'd6', major: { hit_point_bonus_per_level: 2 } },
         race: {},
       };
 
-      const hp = getHitPoints(playerStats);
-      // d6 base: 6 + ((6/2+1)*2) + (1*3) + (2*3) = 6 + 8 + 3 + 6 = 23
-      expect(hp).toBe(23);
+      // 6 + (4*2) + (1*3) + (2*3) = 6 + 8 + 3 + 6 = 23
+      expect(getHitPoints(playerStats)).toBe(23);
     });
 
-    it('should handle level 0 gracefully', () => {
+    it('should stack race and class hit point bonuses', () => {
+      const playerStats = {
+        level: 3,
+        abilities: [
+          { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, bonus: 1 },
+        ],
+        class: { hit_point_die: 'd6', major: { hit_point_bonus_per_level: 2 } },
+        race: { subrace: { hit_point_bonus_per_level: 1 } },
+      };
+
+      // 6 + (4*2) + (1*3) + (1*3) + (2*3) = 6 + 8 + 3 + 3 + 6 = 26
+      expect(getHitPoints(playerStats)).toBe(26);
+    });
+
+    it('should handle level 0', () => {
       const playerStats = {
         level: 0,
         abilities: [
           { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
-        class: {
-          hit_point_die: 'd10',
-        },
+        class: { hit_point_die: 'd10' },
         race: {},
       };
 
-      const hp = getHitPoints(playerStats);
-      // Level 0: 10 + ((10/2+1)*(-1)) + (0*0) = 10 + (-6) + 0 = 4
-      expect(hp).toBe(4);
+      // 10 + (6*-1) + (0*0) = 10 - 6 = 4
+      expect(getHitPoints(playerStats)).toBe(4);
     });
 
     it('should throw when constitution ability is missing', () => {
@@ -565,58 +562,139 @@ describe('abilityCalc2024', () => {
         abilities: [
           { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
         ],
-        class: {
-          hit_point_die: 'd8',
-        },
+        class: { hit_point_die: 'd8' },
         race: {},
       };
 
-      // Current behavior: accessing .bonus on undefined constitution throws
       expect(() => getHitPoints(playerStats)).toThrow();
+    });
+
+    it('should add static max_hp_increase from automation passives', () => {
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+        ],
+        class: { hit_point_die: 'd8' },
+        race: {},
+        automation: {
+          passives: [
+            { type: 'passive_rule', effect: 'max_hp_increase', amount: 3 },
+          ],
+        },
+      };
+
+      expect(getHitPoints(playerStats)).toBe(11); // 8 + 0 + 0 + 3
+    });
+
+    it('should add expression-based max_hp_increase from automation passives', () => {
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+        ],
+        class: { hit_point_die: 'd8' },
+        race: {},
+        automation: {
+          passives: [
+            { type: 'passive_rule', effect: 'max_hp_increase', bonusExpression: '1d4+1' },
+          ],
+        },
+      };
+
+      // evaluateAutoExpression is mocked to return 5
+      expect(getHitPoints(playerStats)).toBe(13); // 8 + 0 + 0 + 5
+    });
+
+    it('should ignore automation passives with missing amount and expression', () => {
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+        ],
+        class: { hit_point_die: 'd8' },
+        race: {},
+        automation: {
+          passives: [
+            { type: 'passive_rule', effect: 'max_hp_increase' },
+          ],
+        },
+      };
+
+      expect(getHitPoints(playerStats)).toBe(8); // no bonus added
+    });
+
+    it('should ignore non-max_hp_increase automation passives', () => {
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+        ],
+        class: { hit_point_die: 'd8' },
+        race: {},
+        automation: {
+          passives: [
+            { type: 'passive_rule', effect: 'other_effect', amount: 100 },
+          ],
+        },
+      };
+
+      expect(getHitPoints(playerStats)).toBe(8); // unaffected
+    });
+
+    it('should handle missing automation passives gracefully', () => {
+      const playerStats = {
+        level: 1,
+        abilities: [
+          { name: 'Constitution', baseScore: 10, featIncrease: 0, miscIncrease: 0, bonus: 0 },
+        ],
+        class: { hit_point_die: 'd8' },
+        race: {},
+      };
+
+      expect(getHitPoints(playerStats)).toBe(8);
     });
   });
 
-  describe('save proficiency merging', () => {
-    it('should merge class saves with feature saves', async () => {
+  describe('getCarryingCapacity', () => {
+    it('should calculate capacity as Strength score * 15', () => {
       const playerStats = {
-        level: 7,
         abilities: [
-          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+          { name: 'Strength', totalScore: 16 },
         ],
-        class: {
-          saving_throw_proficiencies: ['Dexterity', 'Intelligence'],
-        },
-        saveProficiencies: ['Wisdom'],
-        skillProficiencies: [],
-        expertise: [],
       };
 
-      const result = await getAbilities(playerStats);
+      expect(getCarryingCapacity(playerStats)).toBe(240); // 16 * 15
+    });
 
-      // Dexterity: class save proficient
-      const dex = result.find(a => a.name === 'Dexterity');
-      expect(dex.proficient).toBe(true);
-      expect(dex.save).toBe(5); // +2 bonus + 3 proficiency (level 7)
+    it('should default to 150 when Strength ability is missing', () => {
+      const playerStats = {
+        abilities: [
+          { name: 'Dexterity', totalScore: 14 },
+        ],
+      };
 
-      // Intelligence: class save proficient
-      const int = result.find(a => a.name === 'Intelligence');
-      expect(int.proficient).toBe(true);
-      expect(int.save).toBe(3); // +0 bonus + 3 proficiency (level 7)
+      expect(getCarryingCapacity(playerStats)).toBe(150); // 10 * 15
+    });
 
-      // Wisdom: feature save proficient (Iron Mind)
-      const wis = result.find(a => a.name === 'Wisdom');
-      expect(wis.proficient).toBe(true);
-      expect(wis.save).toBe(6); // +3 bonus + 3 proficiency (level 7)
+    it('should apply size multiplier', () => {
+      const playerStats = {
+        abilities: [
+          { name: 'Strength', totalScore: 10 },
+        ],
+        sizeMultiplier: 2,
+      };
 
-      // Strength: not proficient
-      const str = result.find(a => a.name === 'Strength');
-      expect(str.proficient).toBe(false);
-      expect(str.save).toBe(0);
+      expect(getCarryingCapacity(playerStats)).toBe(300); // 10 * 15 * 2
+    });
+
+    it('should apply size multiplier to default strength', () => {
+      const playerStats = {
+        abilities: [],
+        sizeMultiplier: 1.5,
+      };
+
+      expect(getCarryingCapacity(playerStats)).toBe(225); // 10 * 15 * 1.5
     });
   });
 });

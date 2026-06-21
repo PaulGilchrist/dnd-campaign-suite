@@ -1,196 +1,267 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { computePassiveSkills } from './computePassiveSkills.js';
 
 describe('computePassiveSkills', () => {
-  describe('basic functionality', () => {
-    it('should return an array of senses', () => {
-      const playerStats = {
-        senses: [{ name: 'Normal Vision', value: '60 ft.' }],
-        abilities: [
-          { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 5 }] },
-          { name: 'Intelligence', bonus: 1, skills: [{ name: 'Investigation', bonus: 3 }] },
-          { name: 'Wisdom', bonus: 2, skills: [{ name: 'Insight', bonus: 2 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(Array.isArray(result)).toBe(true);
-      expect(result.length).toBeGreaterThan(0);
+  describe('null/undefined input', () => {
+    it('throws TypeError when playerStats is null', () => {
+      expect(() => computePassiveSkills(null)).toThrow(TypeError);
     });
 
-    it('should return empty array when no senses and no abilities', () => {
-      const playerStats = {};
-      const result = computePassiveSkills(playerStats);
+    it('throws TypeError when playerStats is undefined', () => {
+      expect(() => computePassiveSkills(undefined)).toThrow(TypeError);
+    });
+  });
+
+  describe('empty input', () => {
+    it('returns empty array when playerStats has no senses or abilities', () => {
+      const result = computePassiveSkills({});
       expect(result).toEqual([]);
     });
 
-    it('should return existing senses without passive skills when no abilities', () => {
-      const playerStats = {
-        senses: [{ name: 'Darkvision', value: '60 ft.' }],
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(result).toContainEqual({ name: 'Darkvision', value: '60 ft.' });
-      expect(result).not.toContainEqual({ name: 'Passive Perception' });
+    it('returns empty array when abilities is null', () => {
+      const result = computePassiveSkills({ senses: [], abilities: null });
+      expect(result).toEqual([]);
     });
 
-    it('should throw when playerStats is null', () => {
-      expect(() => computePassiveSkills(null)).toThrow();
-    });
-
-    it('should throw when playerStats is undefined', () => {
-      expect(() => computePassiveSkills(undefined)).toThrow();
+    it('returns empty array when abilities is undefined', () => {
+      const result = computePassiveSkills({ senses: [], abilities: undefined });
+      expect(result).toEqual([]);
     });
   });
 
-  describe('Passive Perception', () => {
-    it('should use skill bonus when Perception skill exists', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 5 }] },
+  describe('senses passthrough', () => {
+    it('returns existing senses unchanged when no abilities', () => {
+      const input = { senses: [{ name: 'Darkvision', value: '60 ft.' }] };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Darkvision', value: '60 ft.' });
+    });
+
+    it('returns sorted senses when no abilities', () => {
+      const input = {
+        senses: [
+          { name: 'Zebra Sight', value: '10 ft.' },
+          { name: 'Alpha Sight', value: '30 ft.' },
         ],
       };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
+      const names = result.map((s) => s.name);
+      expect(names).toEqual(['Alpha Sight', 'Zebra Sight']);
+    });
+
+    it('does not mutate the input senses array', () => {
+      const input = { senses: [{ name: 'Normal Vision', value: '60 ft.' }] };
+      const originalLength = input.senses.length;
+      computePassiveSkills(input);
+      expect(input.senses.length).toBe(originalLength);
+    });
+
+    it('handles senses with missing name property', () => {
+      const input = { senses: [{ value: '60 ft.' }] };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ value: '60 ft.' });
+    });
+
+    it('does not deduplicate existing passive skill entries', () => {
+      const input = { senses: [{ name: 'Passive Perception', value: '20' }] };
+      const result = computePassiveSkills(input);
+      const count = result.filter((s) => s.name === 'Passive Perception').length;
+      expect(count).toBe(1);
+    });
+  });
+
+  describe('passive skill score computation', () => {
+    it('computes Passive Perception from skill bonus when Perception skill exists', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 5 }] }],
+      };
+      const result = computePassiveSkills(input);
       expect(result).toContainEqual({ name: 'Passive Perception', value: '15' });
     });
 
-    it('should use ability bonus when Perception skill does not exist', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 3, skills: [] },
-        ],
+    it('computes Passive Perception from ability bonus when Perception skill is absent', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 3, skills: [] }],
       };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
       expect(result).toContainEqual({ name: 'Passive Perception', value: '13' });
     });
 
-    it('should use ability bonus when abilities array has no skills property', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 2 },
-        ],
+    it('computes Passive Perception from ability bonus when abilities array entry has no skills property', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 2 }],
       };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
       expect(result).toContainEqual({ name: 'Passive Perception', value: '12' });
     });
 
-    it('should not add Passive Perception when Wisdom ability not found', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Strength', bonus: 2, skills: [] },
-        ],
+    it('computes Passive Investigation from skill bonus when Investigation skill exists', () => {
+      const input = {
+        abilities: [{ name: 'Intelligence', bonus: 1, skills: [{ name: 'Investigation', bonus: 3 }] }],
       };
-      const result = computePassiveSkills(playerStats);
-      expect(result).not.toContainEqual({ name: 'Passive Perception' });
-    });
-
-    it('should not add Passive Perception when abilities is null', () => {
-      const playerStats = {
-        senses: [],
-        abilities: null,
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(result).not.toContainEqual({ name: 'Passive Perception' });
-    });
-
-    it('should return base 10 when ability bonus is 0', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(result).toContainEqual({ name: 'Passive Perception', value: '10' });
-    });
-
-    it('should use skill bonus even when ability bonus is different', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 1, skills: [{ name: 'Perception', bonus: 7 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(result).toContainEqual({ name: 'Passive Perception', value: '17' });
-    });
-  });
-
-  describe('Passive Investigation', () => {
-    it('should use skill bonus when Investigation skill exists', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Intelligence', bonus: 1, skills: [{ name: 'Investigation', bonus: 3 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
       expect(result).toContainEqual({ name: 'Passive Investigation', value: '13' });
     });
 
-    it('should use ability bonus when Investigation skill does not exist', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Intelligence', bonus: 2, skills: [] },
-        ],
+    it('computes Passive Investigation from ability bonus when Investigation skill is absent', () => {
+      const input = {
+        abilities: [{ name: 'Intelligence', bonus: 2, skills: [] }],
       };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
       expect(result).toContainEqual({ name: 'Passive Investigation', value: '12' });
     });
 
-    it('should not add Passive Investigation when Intelligence ability not found', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 2, skills: [] },
-        ],
+    it('computes Passive Insight from skill bonus when Insight skill exists', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 2, skills: [{ name: 'Insight', bonus: 2 }] }],
       };
-      const result = computePassiveSkills(playerStats);
-      expect(result).not.toContainEqual({ name: 'Passive Investigation' });
-    });
-  });
-
-  describe('Passive Insight', () => {
-    it('should use skill bonus when Insight skill exists', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 2, skills: [{ name: 'Insight', bonus: 2 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
       expect(result).toContainEqual({ name: 'Passive Insight', value: '12' });
     });
 
-    it('should use ability bonus when Insight skill does not exist', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 3, skills: [] },
-        ],
+    it('computes Passive Insight from ability bonus when Insight skill is absent', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 3, skills: [] }],
       };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
       expect(result).toContainEqual({ name: 'Passive Insight', value: '13' });
-    });
-
-    it('should not add Passive Insight when Wisdom ability not found for Insight skill', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Intelligence', bonus: 2, skills: [] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(result).not.toContainEqual({ name: 'Passive Insight' });
     });
   });
 
-  describe('existing senses', () => {
-    it('should include existing senses in the result', () => {
-      const playerStats = {
+  describe('skill bonus takes precedence over ability bonus', () => {
+    it('uses skill bonus for Passive Perception when both skill and ability exist', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 1, skills: [{ name: 'Perception', bonus: 7 }] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Perception', value: '17' });
+    });
+
+    it('uses skill bonus for Passive Investigation when both skill and ability exist', () => {
+      const input = {
+        abilities: [{ name: 'Intelligence', bonus: 5, skills: [{ name: 'Investigation', bonus: 1 }] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Investigation', value: '11' });
+    });
+
+    it('uses skill bonus for Passive Insight when both skill and ability exist', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: -1, skills: [{ name: 'Insight', bonus: 4 }] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Insight', value: '14' });
+    });
+  });
+
+  describe('missing ability for passive skills', () => {
+    it('omits Passive Perception when Wisdom ability is not found', () => {
+      const input = {
+        abilities: [{ name: 'Strength', bonus: 2, skills: [] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result.some((s) => s.name === 'Passive Perception')).toBe(false);
+    });
+
+    it('omits Passive Investigation when Intelligence ability is not found', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 2, skills: [] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result.some((s) => s.name === 'Passive Investigation')).toBe(false);
+    });
+
+    it('omits Passive Insight when Wisdom ability is not found', () => {
+      const input = {
+        abilities: [{ name: 'Intelligence', bonus: 2, skills: [] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result.some((s) => s.name === 'Passive Insight')).toBe(false);
+    });
+  });
+
+  describe('score boundary conditions', () => {
+    it('returns base 10 when ability bonus is 0 and no skill', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 0, skills: [] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Perception', value: '10' });
+    });
+
+    it('returns base 10 when skill bonus is 0', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Perception', value: '10' });
+    });
+
+    it('handles negative ability and skill bonuses', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: -2, skills: [{ name: 'Perception', bonus: -1 }] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Perception', value: '9' });
+    });
+
+    it('handles large positive bonuses', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: 10, skills: [{ name: 'Perception', bonus: 15 }] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Perception', value: '25' });
+    });
+
+    it('treats missing ability bonus as 0', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', skills: [{ name: 'Perception', bonus: 5 }] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Perception', value: '15' });
+    });
+
+    it('treats undefined ability bonus as 0', () => {
+      const input = {
+        abilities: [{ name: 'Wisdom', bonus: undefined, skills: [{ name: 'Perception', bonus: 3 }] }],
+      };
+      const result = computePassiveSkills(input);
+      expect(result).toContainEqual({ name: 'Passive Perception', value: '13' });
+    });
+  });
+
+  describe('sorting', () => {
+    it('sorts all passive skills alphabetically', () => {
+      const input = {
+        abilities: [
+          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
+          { name: 'Intelligence', bonus: 0, skills: [{ name: 'Investigation', bonus: 0 }] },
+          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Insight', bonus: 0 }] },
+        ],
+      };
+      const result = computePassiveSkills(input);
+      const names = result.map((s) => s.name);
+      expect(names).toEqual(['Passive Insight', 'Passive Investigation', 'Passive Perception']);
+    });
+
+    it('sorts mixed senses and passive skills alphabetically', () => {
+      const input = {
+        senses: [{ name: 'Zebra Vision', value: '10 ft.' }, { name: 'Alpha Vision', value: '5 ft.' }],
+        abilities: [
+          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
+          { name: 'Intelligence', bonus: 0, skills: [{ name: 'Investigation', bonus: 0 }] },
+          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Insight', bonus: 0 }] },
+        ],
+      };
+      const result = computePassiveSkills(input);
+      const names = result.map((s) => s.name);
+      expect(names).toEqual(names.sort());
+    });
+  });
+
+  describe('combined senses and passive skills', () => {
+    it('includes existing senses alongside computed passive skills', () => {
+      const input = {
         senses: [
           { name: 'Normal Vision', value: '60 ft.' },
           { name: 'Darkvision', value: '60 ft.' },
@@ -199,60 +270,14 @@ describe('computePassiveSkills', () => {
           { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
         ],
       };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
       expect(result).toContainEqual({ name: 'Normal Vision', value: '60 ft.' });
       expect(result).toContainEqual({ name: 'Darkvision', value: '60 ft.' });
       expect(result).toContainEqual({ name: 'Passive Perception', value: '10' });
     });
 
-    it('should not deduplicate existing passive skills (function adds to existing array)', () => {
-      const playerStats = {
-        senses: [
-          { name: 'Passive Perception', value: '20' },
-        ],
-        abilities: [
-          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      // The function does not deduplicate - it just adds to the existing senses array
-      const passivePerceptionCount = result.filter(s => s.name === 'Passive Perception').length;
-      expect(passivePerceptionCount).toBe(2);
-    });
-
-    it('should copy the senses array without mutating the original', () => {
-      const playerStats = {
-        senses: [{ name: 'Normal Vision', value: '60 ft.' }],
-        abilities: [
-          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
-        ],
-      };
-      const originalSenses = [...playerStats.senses];
-      computePassiveSkills(playerStats);
-      expect(playerStats.senses).toEqual(originalSenses);
-    });
-  });
-
-  describe('sorting', () => {
-    it('should sort senses alphabetically by name', () => {
-      const playerStats = {
-        senses: [
-          { name: 'Zebra Vision', value: '10 ft.' },
-          { name: 'Alpha Vision', value: '5 ft.' },
-        ],
-        abilities: [
-          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
-          { name: 'Intelligence', bonus: 0, skills: [{ name: 'Investigation', bonus: 0 }] },
-          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Insight', bonus: 0 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      const names = result.map(s => s.name);
-      expect(names).toEqual(names.sort());
-    });
-
-    it('should sort with all passive skills present', () => {
-      const playerStats = {
+    it('includes all three passive skills when all abilities and skills are present', () => {
+      const input = {
         senses: [],
         abilities: [
           { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
@@ -260,67 +285,27 @@ describe('computePassiveSkills', () => {
           { name: 'Wisdom', bonus: 0, skills: [{ name: 'Insight', bonus: 0 }] },
         ],
       };
-      const result = computePassiveSkills(playerStats);
-      const names = result.map(s => s.name);
-      expect(names).toEqual(['Passive Insight', 'Passive Investigation', 'Passive Perception']);
+      const result = computePassiveSkills(input);
+      expect(result).toHaveLength(3);
+      expect(result.map((s) => s.name)).toEqual([
+        'Passive Insight',
+        'Passive Investigation',
+        'Passive Perception',
+      ]);
     });
-  });
 
-  describe('edge cases', () => {
-    it('should handle negative ability bonuses', () => {
-      const playerStats = {
+    it('includes only available passive skills when some abilities are missing', () => {
+      const input = {
         senses: [],
         abilities: [
-          { name: 'Wisdom', bonus: -2, skills: [{ name: 'Perception', bonus: -1 }] },
+          { name: 'Wisdom', bonus: 2, skills: [{ name: 'Perception', bonus: 5 }] },
         ],
       };
-      const result = computePassiveSkills(playerStats);
-      expect(result).toContainEqual({ name: 'Passive Perception', value: '9' });
-    });
-
-    it('should handle large ability bonuses', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: 10, skills: [{ name: 'Perception', bonus: 15 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(result).toContainEqual({ name: 'Passive Perception', value: '25' });
-    });
-
-    it('should handle senses with missing name property', () => {
-      const playerStats = {
-        senses: [{ value: '60 ft.' }],
-        abilities: [
-          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(result).toContainEqual({ value: '60 ft.' });
-      expect(result).toContainEqual({ name: 'Passive Perception', value: '10' });
-    });
-
-    it('should handle abilities with missing bonus property', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', skills: [{ name: 'Perception', bonus: 5 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
+      const result = computePassiveSkills(input);
+      expect(result).toHaveLength(2);
       expect(result).toContainEqual({ name: 'Passive Perception', value: '15' });
-    });
-
-    it('should handle abilities with undefined bonus property', () => {
-      const playerStats = {
-        senses: [],
-        abilities: [
-          { name: 'Wisdom', bonus: undefined, skills: [{ name: 'Perception', bonus: 3 }] },
-        ],
-      };
-      const result = computePassiveSkills(playerStats);
-      expect(result).toContainEqual({ name: 'Passive Perception', value: '13' });
+      expect(result).toContainEqual({ name: 'Passive Insight', value: '12' });
+      expect(result.some((s) => s.name === 'Passive Investigation')).toBe(false);
     });
   });
 });

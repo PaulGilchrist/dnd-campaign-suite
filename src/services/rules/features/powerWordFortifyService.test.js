@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerPowerWordFortify } from './powerWordFortifyService.js';
 import { rollExpression } from '../../dice/diceRoller.js';
@@ -29,69 +30,72 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
 }));
 
 describe('powerWordFortifyService', () => {
+    const campaignName = 'TestCampaign';
+    const mapName = 'testMap';
+    const casterName = 'Wizard';
+
+    const validSpell = {
+        name: 'Power Word Fortify',
+        level: 7,
+        automation: {
+            tempHpExpression: '8d8',
+            maxTargets: 6,
+            range: '60 feet',
+        },
+        range: '60 feet',
+    };
+
+    const combatSummary = {
+        players: [{ name: casterName, gridX: 10, gridY: 10 }],
+        creatures: [
+            { name: 'Goblin', gridX: 12, gridY: 10 },
+            { name: 'Orc', gridX: 15, gridY: 10 },
+            { name: 'Troll', gridX: 25, gridY: 10 },
+        ],
+        placedItems: [],
+    };
+
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     describe('triggerPowerWordFortify', () => {
-        const campaignName = 'TestCampaign';
-        const mapName = 'testMap';
-        const playerStats = { name: 'Wizard' };
-
-        const validSpell = {
-            name: 'Power Word Fortify',
-            level: 7,
-            automation: {
-                tempHpExpression: '8d8',
-                maxTargets: 6,
-                range: '60 feet',
-            },
-            range: '60 feet',
-        };
-
-        const combatSummary = {
-            players: [{ name: 'Wizard', gridX: 10, gridY: 10 }],
-            creatures: [
-                { name: 'Goblin', gridX: 12, gridY: 10 },
-                { name: 'Orc', gridX: 15, gridY: 10 },
-                { name: 'Troll', gridX: 25, gridY: 10 },
-            ],
-            placedItems: [],
-        };
-
         it('returns null for non-Power Word Fortify spells', async () => {
             const result = await triggerPowerWordFortify(
                 { name: 'Fire Bolt', level: 0 },
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
+
             expect(result).toBeNull();
             expect(rollExpression).not.toHaveBeenCalled();
             expect(getCombatContext).not.toHaveBeenCalled();
         });
 
-        it('handles spell with null name', async () => {
+        it('returns null when spell name is null', async () => {
             const result = await triggerPowerWordFortify(
                 { level: 7 },
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
+
             expect(result).toBeNull();
             expect(rollExpression).not.toHaveBeenCalled();
         });
 
-        it('handles spell with undefined name', async () => {
+        it('returns null when spell name is undefined', async () => {
             const result = await triggerPowerWordFortify(
                 {},
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
+
             expect(result).toBeNull();
             expect(rollExpression).not.toHaveBeenCalled();
         });
@@ -102,25 +106,28 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
+
             expect(result).toBeNull();
+            expect(rollExpression).toHaveBeenCalledWith('8d8');
             expect(getCombatContext).not.toHaveBeenCalled();
         });
 
-        it('returns null when getCombatContext returns null', async () => {
+        it('returns null when getCombatContext resolves to null', async () => {
             rollExpression.mockReturnValue({ total: 32 });
             getCombatContext.mockResolvedValue(null);
 
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
+
             expect(result).toBeNull();
         });
 
@@ -129,10 +136,12 @@ describe('powerWordFortifyService', () => {
             getCombatContext.mockResolvedValue(combatSummary);
             getRuntimeValue.mockReturnValue(0);
 
+            const spell = { name: 'Power Word Fortify', level: 7 };
+
             const result = await triggerPowerWordFortify(
-                { name: 'Power Word Fortify', level: 7 },
+                spell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -145,19 +154,21 @@ describe('powerWordFortifyService', () => {
             });
         });
 
-        it('uses default tempHpExpression when automation exists but no tempHpExpression', async () => {
+        it('uses default tempHpExpression "120" when automation exists but no tempHpExpression', async () => {
             rollExpression.mockReturnValue({ total: 120 });
             getCombatContext.mockResolvedValue(combatSummary);
             getRuntimeValue.mockReturnValue(0);
 
+            const spell = {
+                name: 'Power Word Fortify',
+                level: 7,
+                automation: { maxTargets: 3 },
+            };
+
             await triggerPowerWordFortify(
-                {
-                    name: 'Power Word Fortify',
-                    level: 7,
-                    automation: { maxTargets: 3 },
-                },
+                spell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -165,8 +176,8 @@ describe('powerWordFortifyService', () => {
             expect(rollExpression).toHaveBeenCalledWith('120');
         });
 
-        it('substitutes spellSlotLevel into tempHpExpression', async () => {
-            rollExpression.mockReturnValue({ total: 56 });
+        it('substitutes spellSlotLevel with spell.level when metaCtx has no slotLevel', async () => {
+            rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue(combatSummary);
             getRuntimeValue.mockReturnValue(0);
 
@@ -179,7 +190,7 @@ describe('powerWordFortifyService', () => {
             await triggerPowerWordFortify(
                 spell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -187,7 +198,7 @@ describe('powerWordFortifyService', () => {
             expect(rollExpression).toHaveBeenCalledWith('8d6+5');
         });
 
-        it('uses metaCtx slotLevel over spell.level', async () => {
+        it('substitutes spellSlotLevel with metaCtx slotLevel over spell.level', async () => {
             rollExpression.mockReturnValue({ total: 63 });
             getCombatContext.mockResolvedValue(combatSummary);
             getRuntimeValue.mockReturnValue(0);
@@ -195,64 +206,42 @@ describe('powerWordFortifyService', () => {
             const spell = {
                 name: 'Power Word Fortify',
                 level: 5,
-                automation: { tempHpExpression: '9d7' },
+                automation: { tempHpExpression: '9d7+spellSlotLevel' },
             };
 
             await triggerPowerWordFortify(
                 spell,
                 { slotLevel: 9 },
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
 
-            expect(rollExpression).toHaveBeenCalledWith('9d7');
+            expect(rollExpression).toHaveBeenCalledWith('9d7+9');
         });
 
-        it('falls back to spell.level when metaCtx has no slotLevel', async () => {
+        it('falls back to default level 7 when no slotLevel and no spell.level', async () => {
             rollExpression.mockReturnValue({ total: 42 });
             getCombatContext.mockResolvedValue(combatSummary);
             getRuntimeValue.mockReturnValue(0);
 
             const spell = {
                 name: 'Power Word Fortify',
-                level: 7,
-                automation: { tempHpExpression: '6d7' },
+                automation: { tempHpExpression: '6d7+spellSlotLevel' },
             };
 
             await triggerPowerWordFortify(
                 spell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
 
-            expect(rollExpression).toHaveBeenCalledWith('6d7');
+            expect(rollExpression).toHaveBeenCalledWith('6d7+7');
         });
 
-        it('falls back to default level 7 when no slotLevel or spell.level', async () => {
-            rollExpression.mockReturnValue({ total: 42 });
-            getCombatContext.mockResolvedValue(combatSummary);
-            getRuntimeValue.mockReturnValue(0);
-
-            const spell = {
-                name: 'Power Word Fortify',
-                automation: { tempHpExpression: '6d7' },
-            };
-
-            await triggerPowerWordFortify(
-                spell,
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(rollExpression).toHaveBeenCalledWith('6d7');
-        });
-
-        it('returns {noTargets: true} when no targets are in range', async () => {
+        it('returns {noTargets: true} when no creatures are within range', async () => {
             rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue(combatSummary);
             rangeToFeet.mockReturnValue(10);
@@ -261,7 +250,7 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -271,10 +260,10 @@ describe('powerWordFortifyService', () => {
             expect(postLogEntry).not.toHaveBeenCalled();
         });
 
-        it('returns {noTargets: true} when there are no creatures', async () => {
+        it('returns {noTargets: true} when creatures array is empty', async () => {
             rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue({
-                players: [{ name: 'Wizard', gridX: 10, gridY: 10 }],
+                players: [{ name: casterName, gridX: 10, gridY: 10 }],
                 creatures: [],
                 placedItems: [],
             });
@@ -283,7 +272,7 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -291,11 +280,11 @@ describe('powerWordFortifyService', () => {
             expect(result).toEqual({ noTargets: true });
         });
 
-        it('grants temp HP to targets within range', async () => {
+        it('grants temp HP to targets within range and excludes the caster', async () => {
             rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'Goblin', gridX: 12, gridY: 10 },
                     { name: 'Orc', gridX: 15, gridY: 10 },
                     { name: 'Troll', gridX: 25, gridY: 10 },
@@ -314,7 +303,7 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -322,58 +311,28 @@ describe('powerWordFortifyService', () => {
             expect(result.targets.length).toBe(3);
             expect(result.totalGranted).toBe(48);
             expect(result.formula).toBe('8d8');
-        });
-
-        it('excludes the caster from targets', async () => {
-            rollExpression.mockReturnValue({ total: 48 });
-            getCombatContext.mockResolvedValue({
-                players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
-                    { name: 'Goblin', gridX: 12, gridY: 10 },
-                    { name: 'Orc', gridX: 15, gridY: 10 },
-                ],
-                creatures: [
-                    { name: 'Goblin' },
-                    { name: 'Wizard' },
-                    { name: 'Orc' },
-                ],
-                placedItems: [],
-            });
-            rangeToFeet.mockReturnValue(60);
-            getDistanceFeet.mockImplementation(() => 10);
-            getRuntimeValue.mockReturnValue(0);
-
-            const result = await triggerPowerWordFortify(
-                validSpell,
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
 
             const targetNames = result.targets.map(t => t.targetName);
-            expect(targetNames).toContain('Goblin');
-            expect(targetNames).toContain('Orc');
-            expect(targetNames).not.toContain('Wizard');
+            expect(targetNames).not.toContain(casterName);
         });
 
-        it('respects maxTargets limit', async () => {
+        it('respects maxTargets limit from automation', async () => {
             rollExpression.mockReturnValue({ total: 200 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
-                    { name: 'Goblin', gridX: 11, gridY: 10 },
-                    { name: 'Orc', gridX: 12, gridY: 10 },
-                    { name: 'Troll', gridX: 13, gridY: 10 },
-                    { name: 'Dragon', gridX: 14, gridY: 10 },
-                    { name: 'Behemoth', gridX: 15, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
+                    { name: 'A', gridX: 11, gridY: 10 },
+                    { name: 'B', gridX: 12, gridY: 10 },
+                    { name: 'C', gridX: 13, gridY: 10 },
+                    { name: 'D', gridX: 14, gridY: 10 },
+                    { name: 'E', gridX: 15, gridY: 10 },
                 ],
                 creatures: [
-                    { name: 'Goblin' },
-                    { name: 'Orc' },
-                    { name: 'Troll' },
-                    { name: 'Dragon' },
-                    { name: 'Behemoth' },
+                    { name: 'A' },
+                    { name: 'B' },
+                    { name: 'C' },
+                    { name: 'D' },
+                    { name: 'E' },
                 ],
                 placedItems: [],
             });
@@ -392,7 +351,7 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 spell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -400,11 +359,11 @@ describe('powerWordFortifyService', () => {
             expect(result.targets.length).toBe(2);
         });
 
-        it('distributes temp HP evenly with remainder distributed one per target', async () => {
+        it('distributes temp HP evenly when division is exact', async () => {
             rollExpression.mockReturnValue({ total: 10 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'A', gridX: 11, gridY: 10 },
                     { name: 'B', gridX: 12, gridY: 10 },
                     { name: 'C', gridX: 13, gridY: 10 },
@@ -427,22 +386,21 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
 
-            // 10 / 5 = 2 each, no remainder
             const amounts = result.targets.map(t => t.tempHpAmount);
             expect(amounts).toEqual([2, 2, 2, 2, 2]);
             expect(result.totalGranted).toBe(10);
         });
 
-        it('distributes remainder when division is not even', async () => {
+        it('distributes remainder one per target when division is not even', async () => {
             rollExpression.mockReturnValue({ total: 11 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'A', gridX: 11, gridY: 10 },
                     { name: 'B', gridX: 12, gridY: 10 },
                     { name: 'C', gridX: 13, gridY: 10 },
@@ -461,12 +419,11 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
 
-            // 11 / 3 = 3 perTarget + 2 remaining = [4, 4, 3]
             const amounts = result.targets.map(t => t.tempHpAmount);
             expect(amounts).toEqual([4, 4, 3]);
             expect(result.totalGranted).toBe(11);
@@ -476,7 +433,7 @@ describe('powerWordFortifyService', () => {
             rollExpression.mockReturnValue({ total: 12 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'A', gridX: 11, gridY: 10 },
                     { name: 'B', gridX: 12, gridY: 10 },
                 ],
@@ -493,20 +450,21 @@ describe('powerWordFortifyService', () => {
             await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
 
+            // 12 / 2 = 6 each, no remainder
             expect(setRuntimeValue).toHaveBeenCalledWith('A', 'tempHp', 11, campaignName);
             expect(setRuntimeValue).toHaveBeenCalledWith('B', 'tempHp', 6, campaignName);
         });
 
-        it('targets are sorted by distance (closest first)', async () => {
+        it('targets are sorted by distance closest first', async () => {
             rollExpression.mockReturnValue({ total: 15 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'Far', gridX: 30, gridY: 10 },
                     { name: 'Near', gridX: 11, gridY: 10 },
                     { name: 'Mid', gridX: 20, gridY: 10 },
@@ -529,7 +487,7 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -541,7 +499,7 @@ describe('powerWordFortifyService', () => {
         it('uses grid positions from placedItems when creature name matches', async () => {
             rollExpression.mockReturnValue({ total: 15 });
             getCombatContext.mockResolvedValue({
-                players: [{ name: 'Wizard', gridX: 10, gridY: 10 }],
+                players: [{ name: casterName, gridX: 10, gridY: 10 }],
                 creatures: [{ name: 'Puppet', gridX: 99, gridY: 99 }],
                 placedItems: [{ name: 'Puppet', gridX: 12, gridY: 10 }],
             });
@@ -552,7 +510,7 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -565,7 +523,7 @@ describe('powerWordFortifyService', () => {
             rollExpression.mockReturnValue({ total: 15 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'HasGrid', gridX: 12, gridY: 10 },
                 ],
                 creatures: [
@@ -581,7 +539,7 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -590,11 +548,11 @@ describe('powerWordFortifyService', () => {
             expect(result.targets[0].targetName).toBe('HasGrid');
         });
 
-        it('posts log entries for each target', async () => {
+        it('posts log entries with correct structure for each target', async () => {
             rollExpression.mockReturnValue({ total: 15 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'A', gridX: 11, gridY: 10 },
                     { name: 'B', gridX: 12, gridY: 10 },
                 ],
@@ -611,26 +569,32 @@ describe('powerWordFortifyService', () => {
             await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
 
             expect(postLogEntry).toHaveBeenCalledTimes(2);
-            expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+
+            const firstLog = postLogEntry.mock.calls[0][1];
+            expect(firstLog).toMatchObject({
                 type: 'hp_change',
                 targetName: 'A',
                 delta: 8,
                 isTempHp: true,
-                sourceName: 'Wizard',
+                sourceName: casterName,
                 note: 'Power Word Fortify',
                 formula: '8d8',
-            }));
-            expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            });
+            expect(firstLog).toHaveProperty('timestamp');
+
+            const secondLog = postLogEntry.mock.calls[1][1];
+            expect(secondLog).toMatchObject({
                 type: 'hp_change',
                 targetName: 'B',
                 isTempHp: true,
-            }));
+                sourceName: casterName,
+            });
         });
 
         it('uses spell.automation.range when available', async () => {
@@ -649,7 +613,7 @@ describe('powerWordFortifyService', () => {
                     range: '60 feet',
                 },
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -671,7 +635,7 @@ describe('powerWordFortifyService', () => {
                     range: '45 feet',
                 },
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -679,7 +643,7 @@ describe('powerWordFortifyService', () => {
             expect(rangeToFeet).toHaveBeenCalledWith('45 feet');
         });
 
-        it('handles rangeToFeet returning null (no grid filtering)', async () => {
+        it('targets all creatures without distance filtering when range is null', async () => {
             rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue(combatSummary);
             rangeToFeet.mockReturnValue(null);
@@ -688,16 +652,15 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
 
-            // When range is null, all creatures are targeted without distance filtering
             expect(result.targets.length).toBe(3);
         });
 
-        it('handles caster not found in players list (no grid position)', async () => {
+        it('targets all creatures when caster has no grid position', async () => {
             rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue({
                 players: [],
@@ -713,12 +676,11 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: 'Wizard' },
                 campaignName,
                 mapName,
             );
 
-            // Without grid position, all creatures are targeted (no distance filtering)
             expect(result.targets.length).toBe(2);
         });
 
@@ -726,14 +688,13 @@ describe('powerWordFortifyService', () => {
             rollExpression.mockReturnValue({ total: 100 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'A', gridX: 11, gridY: 10 },
                     { name: 'B', gridX: 12, gridY: 10 },
                     { name: 'C', gridX: 13, gridY: 10 },
                     { name: 'D', gridX: 14, gridY: 10 },
                     { name: 'E', gridX: 15, gridY: 10 },
                     { name: 'F', gridX: 16, gridY: 10 },
-                    { name: 'G', gridX: 17, gridY: 10 },
                 ],
                 creatures: [
                     { name: 'A' },
@@ -759,7 +720,7 @@ describe('powerWordFortifyService', () => {
             const result = await triggerPowerWordFortify(
                 spell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -767,11 +728,11 @@ describe('powerWordFortifyService', () => {
             expect(result.targets.length).toBe(6);
         });
 
-        it('dispatches combat-summary-updated event', async () => {
+        it('dispatches combat-summary-updated event on success', async () => {
             rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'Goblin', gridX: 12, gridY: 10 },
                     { name: 'Orc', gridX: 15, gridY: 10 },
                     { name: 'Troll', gridX: 25, gridY: 10 },
@@ -792,7 +753,7 @@ describe('powerWordFortifyService', () => {
             await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -804,10 +765,10 @@ describe('powerWordFortifyService', () => {
             dispatchEventSpy.mockRestore();
         });
 
-        it('handles empty creatures array', async () => {
+        it('throws when creatures is null', async () => {
             rollExpression.mockReturnValue({ total: 48 });
             getCombatContext.mockResolvedValue({
-                players: [{ name: 'Wizard', gridX: 10, gridY: 10 }],
+                players: [{ name: casterName, gridX: 10, gridY: 10 }],
                 creatures: null,
                 placedItems: [],
             });
@@ -816,17 +777,17 @@ describe('powerWordFortifyService', () => {
             await expect(triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             )).rejects.toThrow('Expected array, got null');
         });
 
-        it('handles getRuntimeValue returning undefined', async () => {
+        it('handles getRuntimeValue returning undefined as 0', async () => {
             rollExpression.mockReturnValue({ total: 12 });
             getCombatContext.mockResolvedValue({
                 players: [
-                    { name: 'Wizard', gridX: 10, gridY: 10 },
+                    { name: casterName, gridX: 10, gridY: 10 },
                     { name: 'A', gridX: 11, gridY: 10 },
                 ],
                 creatures: [
@@ -841,7 +802,7 @@ describe('powerWordFortifyService', () => {
             await triggerPowerWordFortify(
                 validSpell,
                 {},
-                playerStats,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
@@ -849,49 +810,51 @@ describe('powerWordFortifyService', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('A', 'tempHp', 12, campaignName);
         });
 
-        it('handles metaCtx with only slotLevel', async () => {
-            rollExpression.mockReturnValue({ total: 63 });
-            getCombatContext.mockResolvedValue(combatSummary);
-            rangeToFeet.mockReturnValue(60);
-            getRuntimeValue.mockReturnValue(0);
-
-            const spell = {
-                name: 'Power Word Fortify',
-                level: 5,
-                automation: { tempHpExpression: '9d7' },
-            };
-
-            await triggerPowerWordFortify(
-                spell,
-                { slotLevel: 9 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(rollExpression).toHaveBeenCalledWith('9d7');
-        });
-
-        it('handles spell with no level property', async () => {
+        it('handles metaCtx being null', async () => {
             rollExpression.mockReturnValue({ total: 42 });
             getCombatContext.mockResolvedValue(combatSummary);
             rangeToFeet.mockReturnValue(60);
             getRuntimeValue.mockReturnValue(0);
 
-            const spell = {
-                name: 'Power Word Fortify',
-                automation: { tempHpExpression: '6d7' },
-            };
-
             await triggerPowerWordFortify(
-                spell,
-                {},
-                playerStats,
+                validSpell,
+                null,
+                { name: casterName },
                 campaignName,
                 mapName,
             );
 
-            expect(rollExpression).toHaveBeenCalledWith('6d7');
+            expect(rollExpression).toHaveBeenCalledWith('8d8');
+        });
+
+        it('returns result with correct structure on success', async () => {
+            rollExpression.mockReturnValue({ total: 24 });
+            getCombatContext.mockResolvedValue({
+                players: [
+                    { name: casterName, gridX: 10, gridY: 10 },
+                    { name: 'A', gridX: 12, gridY: 10 },
+                ],
+                creatures: [{ name: 'A' }],
+                placedItems: [],
+            });
+            rangeToFeet.mockReturnValue(60);
+            getDistanceFeet.mockImplementation(() => 10);
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await triggerPowerWordFortify(
+                validSpell,
+                {},
+                { name: casterName },
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toHaveProperty('targets');
+            expect(result).toHaveProperty('formula', '8d8');
+            expect(result).toHaveProperty('totalGranted', 24);
+            expect(Array.isArray(result.targets)).toBe(true);
+            expect(result.targets[0]).toHaveProperty('targetName', 'A');
+            expect(result.targets[0]).toHaveProperty('tempHpAmount', 24);
         });
     });
 });

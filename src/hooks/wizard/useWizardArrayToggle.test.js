@@ -1,353 +1,279 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardArrayToggle from './useWizardArrayToggle.js';
 
 describe('useWizardArrayToggle', () => {
+  let currentData;
+  let setFormData;
+  let setErrors;
+
   beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should return toggleItem, setItem, and removeItem functions', () => {
-    const setFormData = vi.fn();
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    expect(typeof result.current.toggleItem).toBe('function');
-    expect(typeof result.current.setItem).toBe('function');
-    expect(typeof result.current.removeItem).toBe('function');
-  });
-
-  it('toggleItem should add item when not in array', () => {
-    let currentData = { testField: [] };
-    const setFormData = vi.fn((fn) => {
+    currentData = {};
+    setFormData = vi.fn((fn) => {
       currentData = fn(currentData);
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.toggleItem('Item1');
-    });
-    expect(currentData.testField).toContain('Item1');
+    setErrors = vi.fn();
   });
 
-  it('toggleItem should remove item when in array', () => {
-    let currentData = { testField: ['Item1', 'Item2'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
+  function renderToggle(field, preSelectedItems = []) {
+    return renderHook(() =>
+      useWizardArrayToggle(setFormData, setErrors, field, preSelectedItems)
     );
-    act(() => {
-      result.current.toggleItem('Item1');
+  }
+
+  describe('return value', () => {
+    it('returns toggleItem, setItem, and removeItem functions', () => {
+      const { result } = renderToggle('testField');
+      expect(typeof result.current.toggleItem).toBe('function');
+      expect(typeof result.current.setItem).toBe('function');
+      expect(typeof result.current.removeItem).toBe('function');
     });
-    expect(currentData.testField).not.toContain('Item1');
   });
 
-  it('toggleItem should toggle item on and off', () => {
-    let currentData = { testField: [] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+  describe('toggleItem', () => {
+    it('adds item when not in array', () => {
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.toggleItem('Item1');
+      });
+      expect(currentData.testField).toContain('Item1');
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.toggleItem('Item1');
+
+    it('removes item when already in array', () => {
+      currentData = { testField: ['Item1', 'Item2'] };
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.toggleItem('Item1');
+      });
+      expect(currentData.testField).not.toContain('Item1');
+      expect(currentData.testField).toEqual(['Item2']);
     });
-    expect(currentData.testField).toContain('Item1');
-    act(() => {
-      result.current.toggleItem('Item1');
+
+    it('toggles item on and off', () => {
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.toggleItem('Item1');
+      });
+      expect(currentData.testField).toContain('Item1');
+      act(() => {
+        result.current.toggleItem('Item1');
+      });
+      expect(currentData.testField).not.toContain('Item1');
     });
-    expect(currentData.testField).not.toContain('Item1');
+
+    it('clears error on toggle', () => {
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.toggleItem('Item1');
+      });
+      expect(setErrors).toHaveBeenCalledWith(expect.any(Function));
+    });
+
+    it('does not toggle when opt is true', () => {
+      currentData = { testField: ['PreItem'] };
+      const { result } = renderToggle('testField', ['PreItem']);
+      act(() => {
+        result.current.toggleItem('PreItem', true);
+      });
+      expect(currentData.testField).toContain('PreItem');
+    });
+
+    it('does not toggle when opt.isPreSelected is true', () => {
+      currentData = { testField: ['PreItem'] };
+      const { result } = renderToggle('testField', ['PreItem']);
+      act(() => {
+        result.current.toggleItem('PreItem', { isPreSelected: true });
+      });
+      expect(currentData.testField).toContain('PreItem');
+    });
+
+    it('does not toggle pre-selected items even when opt is false', () => {
+      currentData = { testField: ['PreItem'] };
+      const { result } = renderToggle('testField', ['PreItem']);
+      act(() => {
+        result.current.toggleItem('PreItem', false);
+      });
+      expect(currentData.testField).toContain('PreItem');
+    });
+
+    it('toggles non-pre-selected items even when they are in preSelectedItems array', () => {
+      currentData = { testField: ['PreItem', 'OtherItem'] };
+      const { result } = renderToggle('testField', ['PreItem']);
+      act(() => {
+        result.current.toggleItem('OtherItem');
+      });
+      expect(currentData.testField).not.toContain('OtherItem');
+    });
   });
 
-  it('toggleItem should clear error on toggle', () => {
-    let currentData = { testField: [] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+  describe('setItem', () => {
+    it('adds item when not present', () => {
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.setItem('Item2');
+      });
+      expect(currentData.testField).toContain('Item2');
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.toggleItem('Item1');
+
+    it('does not duplicate item when already present', () => {
+      currentData = { testField: ['Item1'] };
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.setItem('Item1');
+      });
+      expect(currentData.testField.filter((i) => i === 'Item1').length).toBe(1);
     });
-    expect(setFormData).toHaveBeenCalled();
-    expect(setErrors).toHaveBeenCalledWith(expect.any(Function));
+
+    it('clears error', () => {
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.setItem('Item2');
+      });
+      expect(setErrors).toHaveBeenCalledWith(expect.any(Function));
+    });
   });
 
-  it('toggleItem should not toggle pre-selected items when opt is true', () => {
-    let currentData = { testField: ['PreItem'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+  describe('removeItem', () => {
+    it('removes item when present', () => {
+      currentData = { testField: ['Item1', 'Item2'] };
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.removeItem('Item1');
+      });
+      expect(currentData.testField).not.toContain('Item1');
+      expect(currentData.testField).toEqual(['Item2']);
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', ['PreItem'])
-    );
-    act(() => {
-      result.current.toggleItem('PreItem', true);
+
+    it('does nothing when item not present', () => {
+      currentData = { testField: ['Item1'] };
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.removeItem('NonExistent');
+      });
+      expect(currentData.testField).toEqual(['Item1']);
     });
-    expect(currentData.testField).toContain('PreItem');
+
+    it('clears error', () => {
+      currentData = { testField: ['Item1'] };
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.removeItem('Item1');
+      });
+      expect(setErrors).toHaveBeenCalledWith(expect.any(Function));
+    });
   });
 
-  it('toggleItem should not toggle pre-selected items with isPreSelected flag', () => {
-    let currentData = { testField: ['PreItem'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+  describe('nested field paths', () => {
+    it('handles dot-notation field paths', () => {
+      currentData = { nested: { field: ['Item1'] } };
+      const { result } = renderToggle('nested.field');
+      act(() => {
+        result.current.toggleItem('Item2');
+      });
+      expect(currentData.nested.field).toContain('Item2');
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', ['PreItem'])
-    );
-    act(() => {
-      result.current.toggleItem('PreItem', { isPreSelected: true });
+
+    it('creates nested path when it does not exist', () => {
+      currentData = {};
+      const { result } = renderToggle('new.nested.field');
+      act(() => {
+        result.current.setItem('Item1');
+      });
+      expect(currentData.new.nested.field).toContain('Item1');
     });
-    expect(currentData.testField).toContain('PreItem');
+
+    it('handles nested field with setItem', () => {
+      currentData = { nested: { field: ['Item1'] } };
+      const { result } = renderToggle('nested.field');
+      act(() => {
+        result.current.setItem('Item2');
+      });
+      expect(currentData.nested.field).toContain('Item2');
+    });
+
+    it('handles nested field with removeItem', () => {
+      currentData = { nested: { field: ['Item1', 'Item2'] } };
+      const { result } = renderToggle('nested.field');
+      act(() => {
+        result.current.removeItem('Item1');
+      });
+      expect(currentData.nested.field).not.toContain('Item1');
+    });
   });
 
-  it('should not toggle pre-selected items when in preSelectedItems (regardless of opt)', () => {
-    let currentData = { testField: ['PreItem'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+  describe('preSelectedItems edge cases', () => {
+    it('toggles normally when preSelectedItems is undefined', () => {
+      currentData = { testField: ['Item1'] };
+      const { result } = renderHook(() =>
+        useWizardArrayToggle(setFormData, setErrors, 'testField', undefined)
+      );
+      act(() => {
+        result.current.toggleItem('Item1');
+      });
+      expect(currentData.testField).not.toContain('Item1');
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', ['PreItem'])
-    );
-    act(() => {
-      result.current.toggleItem('PreItem', false);
+
+    it('toggles normally when preSelectedItems is empty array', () => {
+      currentData = { testField: ['Item1'] };
+      const { result } = renderHook(() =>
+        useWizardArrayToggle(setFormData, setErrors, 'testField', [])
+      );
+      act(() => {
+        result.current.toggleItem('Item1');
+      });
+      expect(currentData.testField).not.toContain('Item1');
     });
-    // preSelectedItems check blocks toggling even with opt=false
-    expect(currentData.testField).toContain('PreItem');
   });
 
-  it('setItem should add item when not present', () => {
-    let currentData = { testField: ['Item1'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+  describe('sequential operations', () => {
+    it('handles multiple operations in sequence', () => {
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.toggleItem('A');
+      });
+      expect(currentData.testField).toEqual(['A']);
+      act(() => {
+        result.current.setItem('B');
+      });
+      expect(currentData.testField).toEqual(['A', 'B']);
+      act(() => {
+        result.current.removeItem('A');
+      });
+      expect(currentData.testField).toEqual(['B']);
+      act(() => {
+        result.current.toggleItem('A');
+      });
+      expect(currentData.testField).toEqual(['B', 'A']);
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.setItem('Item2');
-    });
-    expect(currentData.testField).toContain('Item2');
   });
 
-  it('setItem should not duplicate item when already present', () => {
-    let currentData = { testField: ['Item1'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+  describe('null item handling', () => {
+    it('toggles null item on and off', () => {
+      currentData = { testField: [null] };
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.toggleItem(null);
+      });
+      expect(currentData.testField).not.toContain(null);
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.setItem('Item1');
-    });
-    expect(currentData.testField.filter(i => i === 'Item1').length).toBe(1);
-  });
 
-  it('setItem should clear error', () => {
-    let currentData = { testField: ['Item1'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+    it('adds null item via setItem', () => {
+      currentData = { testField: ['Item1'] };
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.setItem(null);
+      });
+      expect(currentData.testField).toContain(null);
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.setItem('Item2');
-    });
-    expect(setErrors).toHaveBeenCalledWith(expect.any(Function));
-  });
 
-  it('removeItem should remove item when present', () => {
-    let currentData = { testField: ['Item1', 'Item2'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
+    it('removes null item via removeItem', () => {
+      currentData = { testField: ['Item1', null] };
+      const { result } = renderToggle('testField');
+      act(() => {
+        result.current.removeItem(null);
+      });
+      expect(currentData.testField).not.toContain(null);
     });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.removeItem('Item1');
-    });
-    expect(currentData.testField).not.toContain('Item1');
-  });
-
-  it('removeItem should do nothing when item not present', () => {
-    let currentData = { testField: ['Item1'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.removeItem('NonExistent');
-    });
-    expect(currentData.testField).toEqual(['Item1']);
-  });
-
-  it('removeItem should clear error', () => {
-    let currentData = { testField: ['Item1'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.removeItem('Item1');
-    });
-    expect(setErrors).toHaveBeenCalledWith(expect.any(Function));
-  });
-
-  it('should handle nested field paths', () => {
-    let currentData = { nested: { field: ['Item1'] } };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'nested.field', [])
-    );
-    act(() => {
-      result.current.toggleItem('Item2');
-    });
-    expect(currentData.nested.field).toContain('Item2');
-  });
-
-  it('should handle preSelectedItems as undefined', () => {
-    let currentData = { testField: ['Item1'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', undefined)
-    );
-    act(() => {
-      result.current.toggleItem('Item1');
-    });
-    expect(currentData.testField).not.toContain('Item1');
-  });
-
-  it('should handle preSelectedItems as empty array', () => {
-    let currentData = { testField: ['Item1'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.toggleItem('Item1');
-    });
-    expect(currentData.testField).not.toContain('Item1');
-  });
-
-  it('should handle nested field that does not exist yet', () => {
-    let currentData = {};
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'new.nested.field', [])
-    );
-    act(() => {
-      result.current.setItem('Item1');
-    });
-    expect(currentData.new.nested.field).toContain('Item1');
-  });
-
-  it('should handle multiple toggles in sequence', () => {
-    let currentData = { testField: [] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.toggleItem('A');
-    });
-    expect(currentData.testField).toEqual(['A']);
-    act(() => {
-      result.current.setItem('B');
-    });
-    expect(currentData.testField).toEqual(['A', 'B']);
-    act(() => {
-      result.current.removeItem('A');
-    });
-    expect(currentData.testField).toEqual(['B']);
-    act(() => {
-      result.current.toggleItem('A');
-    });
-    expect(currentData.testField).toEqual(['B', 'A']);
-  });
-
-  it('should handle toggleItem with null item', () => {
-    let currentData = { testField: [null] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.toggleItem(null);
-    });
-    expect(currentData.testField).not.toContain(null);
-  });
-
-  it('should handle setItem with null item', () => {
-    let currentData = { testField: ['Item1'] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.setItem(null);
-    });
-    expect(currentData.testField).toContain(null);
-  });
-
-  it('should handle removeItem with null item', () => {
-    let currentData = { testField: ['Item1', null] };
-    const setFormData = vi.fn((fn) => {
-      currentData = fn(currentData);
-    });
-    const setErrors = vi.fn();
-    const { result } = renderHook(() =>
-      useWizardArrayToggle(setFormData, setErrors, 'testField', [])
-    );
-    act(() => {
-      result.current.removeItem(null);
-    });
-    expect(currentData.testField).not.toContain(null);
   });
 });

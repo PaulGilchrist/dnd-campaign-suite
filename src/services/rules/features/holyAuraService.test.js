@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerHolyAura } from './holyAuraService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -19,424 +20,292 @@ describe('holyAuraService', () => {
     describe('triggerHolyAura', () => {
         const campaignName = 'TestCampaign';
         const mapName = 'testMap';
-        const playerStats = {
+        const basePlayerStats = {
             name: 'Paladin',
             spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Charisma', toHit: 9 },
             proficiency: 4,
         };
+        const baseSpell = { name: 'Holy Aura', level: 9 };
 
-        it('sets runtime value for holyAuraSaveDc', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
+        function callTrigger(spell = baseSpell, metaCtx = {}, stats = basePlayerStats) {
+            return triggerHolyAura(spell, metaCtx, stats, campaignName, mapName);
+        }
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+        describe('save DC computation', () => {
+            it('uses spellAbilities.saveDc when provided', async () => {
+                executeHandler.mockResolvedValue({ success: true });
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerStats.name,
-                'holyAuraSaveDc',
-                15,
-                campaignName,
-            );
+                await callTrigger();
+
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    basePlayerStats.name,
+                    'holyAuraSaveDc',
+                    15,
+                    campaignName,
+                );
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ dc: 15 }),
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('computes 8 + proficiency when spellAbilities.saveDc is missing', async () => {
+                executeHandler.mockResolvedValue({ success: true });
+                const stats = { name: 'Paladin', proficiency: 3 };
+
+                await callTrigger(baseSpell, {}, stats);
+
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    stats.name,
+                    'holyAuraSaveDc',
+                    11,
+                    campaignName,
+                );
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ dc: 11 }),
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('computes 8 + proficiency when spellAbilities is undefined', async () => {
+                executeHandler.mockResolvedValue({ success: true });
+                const stats = { name: 'Paladin', proficiency: 5 };
+
+                await callTrigger(baseSpell, {}, stats);
+
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    stats.name,
+                    'holyAuraSaveDc',
+                    13,
+                    campaignName,
+                );
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ dc: 13 }),
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('falls back to 8 + proficiency when spellAbilities.saveDc is undefined', async () => {
+                executeHandler.mockResolvedValue({ success: true });
+                const stats = {
+                    name: 'Paladin',
+                    spellAbilities: { modifier: 4 },
+                    proficiency: 4,
+                };
+
+                await callTrigger(baseSpell, {}, stats);
+
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    stats.name,
+                    'holyAuraSaveDc',
+                    12,
+                    campaignName,
+                );
+            });
+
+            it('produces NaN when proficiency is missing', async () => {
+                executeHandler.mockResolvedValue({ success: true });
+                const stats = { name: 'Paladin' };
+
+                await callTrigger(baseSpell, {}, stats);
+
+                expect(setRuntimeValue).toHaveBeenCalledWith(
+                    stats.name,
+                    'holyAuraSaveDc',
+                    NaN,
+                    campaignName,
+                );
+            });
         });
 
-        it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Paladin', proficiency: 3 };
+        describe('action passed to executeHandler', () => {
+            it('includes automation type holy_aura with default auraRange 30', async () => {
+                executeHandler.mockResolvedValue({ success: true });
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
+                await callTrigger();
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                stats.name,
-                'holyAuraSaveDc',
-                11,
-                campaignName,
-            );
-        });
-
-        it('produces NaN when proficiency is missing and no spellAbilities', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Paladin' };
-
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                stats.name,
-                'holyAuraSaveDc',
-                NaN,
-                campaignName,
-            );
-        });
-
-        it('passes spellSaveDc to executeHandler action via dc and automation', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({
-                        type: 'holy_aura',
-                        auraRange: 30,
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({
+                            type: 'holy_aura',
+                            auraRange: 30,
+                        }),
                     }),
-                    dc: 15,
-                    spell: { name: 'Holy Aura', level: 9 },
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
 
-        it('uses spell.duration when provided', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+            it('includes spell duration when provided', async () => {
+                executeHandler.mockResolvedValue({ success: true });
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9, duration: '10_minutes' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                await callTrigger({ ...baseSpell, duration: '10_minutes' });
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({
-                        duration: '10_minutes',
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({
+                            duration: '10_minutes',
+                        }),
                     }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
 
-        it('uses default duration of 1_minute when spell.duration is missing', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+            it('uses default duration 1_minute when spell.duration is missing', async () => {
+                executeHandler.mockResolvedValue({ success: true });
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                await callTrigger();
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({
-                        duration: '1_minute',
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({
+                            duration: '1_minute',
+                        }),
                     }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
 
-        it('uses spell.casting_time when provided', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+            it('includes spell casting_time when provided', async () => {
+                executeHandler.mockResolvedValue({ success: true });
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9, casting_time: '1 reaction' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                await callTrigger({ ...baseSpell, casting_time: '1 reaction' });
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({
-                        casting_time: '1 reaction',
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({
+                            casting_time: '1 reaction',
+                        }),
                     }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
 
-        it('uses default casting_time when spell.casting_time is missing', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+            it('uses default casting_time 1_action when spell.casting_time is missing', async () => {
+                executeHandler.mockResolvedValue({ success: true });
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                await callTrigger();
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({
-                        casting_time: '1 action',
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({
+                            casting_time: '1 action',
+                        }),
                     }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
 
-        it('returns result from executeHandler on success', async () => {
-            const expectedResult = {
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Holy Aura', description: 'A protective aura...' },
-            };
-            executeHandler.mockResolvedValue(expectedResult);
+            it('passes the full spell object into the action', async () => {
+                executeHandler.mockResolvedValue({ success: true });
+                const spell = { name: 'Holy Aura', level: 9, school: 'Abjuration' };
 
-            const result = await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                await callTrigger(spell);
 
-            expect(result).toBe(expectedResult);
-        });
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spell }),
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
 
-        it('returns null when executeHandler returns null', async () => {
-            executeHandler.mockResolvedValue(null);
+            it('passes campaignName and mapName to executeHandler', async () => {
+                executeHandler.mockResolvedValue({ success: true });
 
-            const result = await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                await callTrigger();
 
-            expect(result).toBeNull();
-        });
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.any(Object),
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
 
-        it('returns null and logs error when executeHandler throws', async () => {
-            executeHandler.mockRejectedValue(new Error('Handler failed'));
-            const consoleSpy = vi.spyOn(console, 'error');
+            it('handles empty spell object with defaults', async () => {
+                executeHandler.mockResolvedValue({ success: true });
 
-            const result = await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                await callTrigger({}, {});
 
-            expect(result).toBeNull();
-            expect(consoleSpy).toHaveBeenCalledWith(
-                '[holyAura] Trigger failed:',
-                expect.any(Error),
-            );
-            consoleSpy.mockRestore();
-        });
-
-        it('passes the spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Holy Aura', level: 9, school: 'Abjuration' };
-
-            await triggerHolyAura(spell, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses spellAbilities.saveDc when provided', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = {
-                name: 'Paladin',
-                spellAbilities: { saveDc: 18, modifier: 5 },
-                proficiency: 4,
-            };
-
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                stats.name,
-                'holyAuraSaveDc',
-                18,
-                campaignName,
-            );
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({
-                        type: 'holy_aura',
-                        auraRange: 30,
+                expect(executeHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        name: 'Holy Aura',
+                        automation: expect.objectContaining({
+                            duration: '1_minute',
+                            casting_time: '1 action',
+                            auraRange: 30,
+                        }),
                     }),
-                    dc: 18,
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
         });
 
-        it('falls back to 8 + proficiency when spellAbilities is undefined', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Paladin', proficiency: 5 };
+        describe('return value', () => {
+            it('returns executeHandler result on success', async () => {
+                const expectedResult = {
+                    type: 'popup',
+                    payload: { type: 'automation_info', name: 'Holy Aura', description: 'A protective aura...' },
+                };
+                executeHandler.mockResolvedValue(expectedResult);
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
+                const result = await callTrigger();
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                stats.name,
-                'holyAuraSaveDc',
-                13,
-                campaignName,
-            );
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({
-                        type: 'holy_aura',
-                        auraRange: 30,
-                    }),
-                    dc: 13,
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
+                expect(result).toBe(expectedResult);
+            });
 
-        it('produces NaN when both spellAbilities and proficiency are missing', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Paladin' };
+            it('returns executeHandler result without modification', async () => {
+                const expectedResult = {
+                    success: true,
+                    affectedEnemies: 3,
+                    saveResults: ['success', 'failure', 'failure'],
+                };
+                executeHandler.mockResolvedValue(expectedResult);
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
+                const result = await callTrigger();
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                stats.name,
-                'holyAuraSaveDc',
-                NaN,
-                campaignName,
-            );
-        });
+                expect(result).toEqual(expectedResult);
+            });
 
-        it('calls setRuntimeValue with campaignName', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+            it('returns null when executeHandler returns null', async () => {
+                executeHandler.mockResolvedValue(null);
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                const result = await callTrigger();
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerStats.name,
-                'holyAuraSaveDc',
-                15,
-                campaignName,
-            );
-        });
+                expect(result).toBeNull();
+            });
 
-        it('passes campaignName and mapName to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+            it('returns null and logs error when executeHandler throws', async () => {
+                executeHandler.mockRejectedValue(new Error('Handler failed'));
+                const consoleSpy = vi.spyOn(console, 'error');
 
-            await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+                const result = await callTrigger();
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles empty spell object with defaults', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerHolyAura(
-                {},
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    name: 'Holy Aura',
-                    automation: expect.objectContaining({
-                        duration: '1_minute',
-                        casting_time: '1 action',
-                        auraRange: 30,
-                    }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('returns executeHandler result directly without modification', async () => {
-            const expectedResult = {
-                success: true,
-                affectedEnemies: 3,
-                saveResults: ['success', 'failure', 'failure'],
-            };
-            executeHandler.mockResolvedValue(expectedResult);
-
-            const result = await triggerHolyAura(
-                { name: 'Holy Aura', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual(expectedResult);
+                expect(result).toBeNull();
+                expect(consoleSpy).toHaveBeenCalledWith(
+                    '[holyAura] Trigger failed:',
+                    expect.any(Error),
+                );
+                consoleSpy.mockRestore();
+            });
         });
     });
 });

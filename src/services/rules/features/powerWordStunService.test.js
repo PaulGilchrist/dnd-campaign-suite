@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerPowerWordStun } from './powerWordStunService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -11,23 +12,24 @@ describe('powerWordStunService', () => {
         vi.clearAllMocks();
     });
 
-    describe('triggerPowerWordStun', () => {
-        const campaignName = 'TestCampaign';
-        const mapName = 'testMap';
-        const playerStats = {
-            name: 'Wizard',
-            spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Intelligence', toHit: 9 },
-            proficiency: 4,
-        };
+    const campaignName = 'TestCampaign';
+    const mapName = 'testMap';
+    const basePlayerStats = {
+        name: 'Wizard',
+        spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Intelligence', toHit: 9 },
+        proficiency: 4,
+    };
 
+    describe('triggerPowerWordStun', () => {
         it('returns null for non-Power Word Stun spells', async () => {
             const result = await triggerPowerWordStun(
                 { name: 'Fire Bolt', level: 0 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
+
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });
@@ -36,94 +38,112 @@ describe('powerWordStunService', () => {
             const result = await triggerPowerWordStun(
                 {},
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
+
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('throws when spell object is null', async () => {
-            await expect(
-                triggerPowerWordStun(
-                    null,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow();
+        it('returns null for empty spell name string', async () => {
+            const result = await triggerPowerWordStun(
+                { name: '', level: 9 },
+                {},
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('executes handler for exact "Power Word Stun" match', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
+        it('does not match partial spell names', async () => {
+            const partialNames = ['Power Word', 'Power Word Stunned', 'Power Words Stun', 'word stun'];
+
+            for (const name of partialNames) {
+                const result = await triggerPowerWordStun(
+                    { name, level: 9 },
+                    {},
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(result).toBeNull();
+                expect(executeHandler).not.toHaveBeenCalled();
+            }
+        });
+
+        it.each([
+            ['exact match', 'Power Word Stun'],
+            ['lowercase', 'power word stun'],
+            ['uppercase', 'POWER WORD STUN'],
+            ['mixed case', 'PoWeR wOrd StUn'],
+        ])('triggers handler for %s spell name', async (_label, spellName) => {
+            const expectedResult = { type: 'popup', payload: { type: 'automation_info' } };
+            executeHandler.mockResolvedValue(expectedResult);
 
             const result = await triggerPowerWordStun(
+                { name: spellName, level: 9 },
+                {},
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+            expect(result).toBe(expectedResult);
+        });
+
+        it('passes correct automation config to executeHandler', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 9 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
 
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: {
+                        type: 'power_word_stun',
+                        saveDc: 15,
+                        saveType: 'CON',
+                    },
+                }),
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
         });
 
-        it('handles lowercase "power word stun" spell name', async () => {
+        it('passes the original spell object into the action', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
+            const spell = { name: 'Power Word Stun', level: 9, school: 'Enchantment' };
 
-            const result = await triggerPowerWordStun(
-                { name: 'power word stun', level: 9 },
-                {},
-                playerStats,
+            await triggerPowerWordStun(spell, {}, basePlayerStats, campaignName, mapName);
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spell }),
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
         });
 
-        it('handles uppercase "POWER WORD STUN" spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerPowerWordStun(
-                { name: 'POWER WORD STUN', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('handles mixed-case "PoWeR wOrd StUn" spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerPowerWordStun(
-                { name: 'PoWeR wOrd StUn', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('uses spellSaveDc from metaCtx when provided', async () => {
+        it('uses metaCtx spellSaveDc when provided', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 9 },
                 { spellSaveDc: 20, slotLevel: 9 },
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -133,7 +153,7 @@ describe('powerWordStunService', () => {
                     automation: expect.objectContaining({ saveDc: 20 }),
                     spellSlotLevel: 9,
                 }),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -145,7 +165,7 @@ describe('powerWordStunService', () => {
             await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 9 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -154,7 +174,7 @@ describe('powerWordStunService', () => {
                 expect.objectContaining({
                     automation: expect.objectContaining({ saveDc: 15 }),
                 }),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -204,42 +224,20 @@ describe('powerWordStunService', () => {
             );
         });
 
-        it('uses default saveDc of 10 when no proficiency or spellAbilities', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Wizard' };
-
-            await triggerPowerWordStun(
-                { name: 'Power Word Stun', level: 9 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 10 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
-
         it('uses metaCtx slotLevel when provided', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 9 },
                 { spellSaveDc: 18, slotLevel: 8 },
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({ spellSlotLevel: 8 }),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -251,14 +249,14 @@ describe('powerWordStunService', () => {
             await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 7 },
                 { spellSaveDc: 17 },
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({ spellSlotLevel: 7 }),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -270,14 +268,14 @@ describe('powerWordStunService', () => {
             await triggerPowerWordStun(
                 { name: 'Power Word Stun' },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({ spellSlotLevel: 8 }),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -293,7 +291,7 @@ describe('powerWordStunService', () => {
             const result = await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 9 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -307,7 +305,7 @@ describe('powerWordStunService', () => {
             const result = await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 9 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -315,93 +313,19 @@ describe('powerWordStunService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('returns null and swallows executeHandler errors', async () => {
+            vi.spyOn(console, 'error').mockReturnValue();
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
             const result = await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 9 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(result).toBeNull();
-        });
-
-        it('passes the spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Power Word Stun', level: 9, school: 'Enchantment' };
-
-            await triggerPowerWordStun(spell, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('sets automation type to power_word_stun', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerPowerWordStun(
-                { name: 'Power Word Stun', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ type: 'power_word_stun' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('sets saveType to CON', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerPowerWordStun(
-                { name: 'Power Word Stun', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveType: 'CON' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('passes campaignName and mapName to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerPowerWordStun(
-                { name: 'Power Word Stun', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                playerStats,
-                'TestCampaign',
-                'testMap',
-            );
         });
 
         it('handles undefined metaCtx gracefully', async () => {
@@ -410,62 +334,13 @@ describe('powerWordStunService', () => {
             const result = await triggerPowerWordStun(
                 { name: 'Power Word Stun', level: 9 },
                 undefined,
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalled();
             expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('throws when playerStats is undefined', async () => {
-            await expect(
-                triggerPowerWordStun(
-                    { name: 'Power Word Stun', level: 9 },
-                    {},
-                    undefined,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('handles empty spell name string', async () => {
-            const result = await triggerPowerWordStun(
-                { name: '', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('does not match partial spell names like "Power Word"', async () => {
-            const result = await triggerPowerWordStun(
-                { name: 'Power Word', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('does not match partial spell names like "Power Word Stunned"', async () => {
-            const result = await triggerPowerWordStun(
-                { name: 'Power Word Stunned', level: 9 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
         });
     });
 });

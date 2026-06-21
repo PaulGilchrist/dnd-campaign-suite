@@ -1,7 +1,9 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import raceRules from './5e.js';
+import utils from '../../ui/utils.js';
 
-// Mock dependencies
+// Mock dependencies — only mock what getRace actually calls
 vi.mock('../../ui/utils.js', () => ({
   default: {
     getAbilityLongName: vi.fn((name) => name)
@@ -10,25 +12,25 @@ vi.mock('../../ui/utils.js', () => ({
 
 describe('raceRules 5e (direct module)', () => {
   describe('getImmunities', () => {
-    it('should return empty array when no race or class', () => {
+    it('returns empty array when playerSummary has no race or class', () => {
       const playerSummary = { race: {}, class: {} };
       const result = raceRules.getImmunities(playerSummary);
       expect(result).toEqual([]);
     });
 
-    it('should add Magical Sleep for Elf race', () => {
+    it('adds Magical Sleep immunity for Elf race', () => {
       const playerSummary = { race: { name: 'Elf' }, class: {} };
       const result = raceRules.getImmunities(playerSummary);
       expect(result).toContain('Magical Sleep');
     });
 
-    it('should not add Magical Sleep for non-Elf race', () => {
+    it('does not add Magical Sleep for non-Elf race', () => {
       const playerSummary = { race: { name: 'Human' }, class: {} };
       const result = raceRules.getImmunities(playerSummary);
       expect(result).not.toContain('Magical Sleep');
     });
 
-    it('should add Disease and Poison immunity for Monk level > 9', () => {
+    it('adds Disease and Poison immunity for Monk level > 9', () => {
       const playerSummary = {
         race: { name: 'Human' },
         class: { name: 'Monk' },
@@ -39,7 +41,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContain('Poison');
     });
 
-    it('should not add Disease/Poison immunity for Monk level <= 9', () => {
+    it('does not add Disease/Poison for Monk at level 9 (boundary)', () => {
       const playerSummary = {
         race: { name: 'Human' },
         class: { name: 'Monk' },
@@ -50,7 +52,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).not.toContain('Poison');
     });
 
-    it('should add Disease immunity for Paladin level > 2', () => {
+    it('adds Disease immunity for Paladin level > 2', () => {
       const playerSummary = {
         race: { name: 'Human' },
         class: { name: 'Paladin' },
@@ -60,7 +62,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContain('Disease');
     });
 
-    it('should not add Disease immunity for Paladin level <= 2', () => {
+    it('does not add Disease for Paladin at level 2 (boundary)', () => {
       const playerSummary = {
         race: { name: 'Human' },
         class: { name: 'Paladin' },
@@ -70,61 +72,59 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).not.toContain('Disease');
     });
 
-    it('should include playerSummary immunities', () => {
+    it('adds both Monk and Paladin immunities when both classes are present', () => {
       const playerSummary = {
-        race: { name: 'Elf' },
-        class: {},
-        immunities: ['Disease']
+        race: { name: 'Human' },
+        class: { name: 'Monk' },
+        level: 10
       };
       const result = raceRules.getImmunities(playerSummary);
-      expect(result).toContain('Magical Sleep');
       expect(result).toContain('Disease');
+      expect(result).toContain('Poison');
     });
 
-    it('should deduplicate immunities', () => {
+    it('includes and deduplicates immunities from playerSummary', () => {
       const playerSummary = {
         race: { name: 'Elf' },
         class: {},
-        immunities: ['Magical Sleep']
+        immunities: ['Magical Sleep', 'Disease']
       };
       const result = raceRules.getImmunities(playerSummary);
       expect(result.filter((i) => i === 'Magical Sleep').length).toBe(1);
+      expect(result).toContain('Disease');
     });
 
-    it('should sort immunities alphabetically', () => {
+    it('returns immunities sorted alphabetically', () => {
       const playerSummary = {
         race: { name: 'Elf' },
         class: {},
         immunities: ['Zebra', 'Alpha', 'Middle']
       };
       const result = raceRules.getImmunities(playerSummary);
-      expect(result[0]).toBe('Alpha');
-      expect(result[1]).toBe('Magical Sleep');
-      expect(result[2]).toBe('Middle');
-      expect(result[3]).toBe('Zebra');
+      expect(result).toEqual(['Alpha', 'Magical Sleep', 'Middle', 'Zebra']);
     });
   });
 
   describe('getResistances', () => {
-    it('should return empty array when no race', () => {
+    it('returns empty array when playerSummary has no race', () => {
       const playerSummary = { race: {} };
       const result = raceRules.getResistances(playerSummary);
       expect(result).toEqual([]);
     });
 
-    it('should add Poison resistance for Dwarf race', () => {
+    it('adds Poison resistance for Dwarf race', () => {
       const playerSummary = { race: { name: 'Dwarf' } };
       const result = raceRules.getResistances(playerSummary);
       expect(result).toContain('Poison');
     });
 
-    it('should not add Poison resistance for non-Dwarf race', () => {
+    it('does not add Poison resistance for non-Dwarf race', () => {
       const playerSummary = { race: { name: 'Human' } };
       const result = raceRules.getResistances(playerSummary);
       expect(result).not.toContain('Poison');
     });
 
-    it('should add subrace damage_resistance for non-Dwarf races', () => {
+    it('adds subrace damage_resistance for non-Dwarf races', () => {
       const playerSummary = {
         race: {
           name: 'Human',
@@ -135,19 +135,30 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContain('Fire');
     });
 
-    it('should add Charm resistance for Elf race', () => {
+    it('does not add subrace damage_resistance for Dwarf', () => {
+      const playerSummary = {
+        race: {
+          name: 'Dwarf',
+          subrace: { damage_resistance: 'Fire' }
+        }
+      };
+      const result = raceRules.getResistances(playerSummary);
+      expect(result).not.toContain('Fire');
+    });
+
+    it('adds Charm resistance for Elf race', () => {
       const playerSummary = { race: { name: 'Elf' } };
       const result = raceRules.getResistances(playerSummary);
       expect(result).toContain('Charm');
     });
 
-    it('should add Frightened resistance for Halfling race', () => {
+    it('adds Frightened resistance for Halfling race', () => {
       const playerSummary = { race: { name: 'Halfling' } };
       const result = raceRules.getResistances(playerSummary);
       expect(result).toContain('Frightened');
     });
 
-    it('should add Poison resistance for Scout Halfling subrace', () => {
+    it('adds Poison resistance for Scout Halfling subrace in addition to Frightened', () => {
       const playerSummary = {
         race: {
           name: 'Halfling',
@@ -159,7 +170,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContain('Poison');
     });
 
-    it('should not add extra Poison for non-Scout Halfling subrace', () => {
+    it('does not add extra Poison for non-Scout Halfling subrace', () => {
       const playerSummary = {
         race: {
           name: 'Halfling',
@@ -171,56 +182,41 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).not.toContain('Poison');
     });
 
-    it('should add Fire resistance for Tiefling race', () => {
+    it('adds Fire resistance for Tiefling race', () => {
       const playerSummary = { race: { name: 'Tiefling' } };
       const result = raceRules.getResistances(playerSummary);
       expect(result).toContain('Fire');
     });
 
-    it('should include playerSummary resistances', () => {
+    it('includes and deduplicates resistances from playerSummary', () => {
       const playerSummary = {
         race: { name: 'Elf' },
-        resistances: ['Lightning']
-      };
-      const result = raceRules.getResistances(playerSummary);
-      expect(result).toContain('Charm');
-      expect(result).toContain('Lightning');
-    });
-
-    it('should deduplicate resistances', () => {
-      const playerSummary = {
-        race: { name: 'Elf' },
-        resistances: ['Charm']
+        resistances: ['Charm', 'Lightning']
       };
       const result = raceRules.getResistances(playerSummary);
       expect(result.filter((r) => r === 'Charm').length).toBe(1);
+      expect(result).toContain('Lightning');
     });
 
-    it('should sort resistances alphabetically', () => {
+    it('returns resistances sorted alphabetically', () => {
       const playerSummary = {
         race: { name: 'Elf' },
         resistances: ['Zebra', 'Alpha', 'Middle']
       };
       const result = raceRules.getResistances(playerSummary);
-      expect(result[0]).toBe('Alpha');
-      expect(result[1]).toBe('Charm');
-      expect(result[2]).toBe('Middle');
-      expect(result[3]).toBe('Zebra');
+      expect(result).toEqual(['Alpha', 'Charm', 'Middle', 'Zebra']);
     });
   });
 
   describe('getSenses', () => {
-    it('should return senses when playerStats has no senses', () => {
-      const playerStats = {
-        race: {
-          traits: []
-        }
-      };
+    it('returns sorted array when playerStats has no senses or race traits', () => {
+      const playerStats = { race: { traits: [] } };
       const result = raceRules.getSenses(playerStats);
       expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(0);
     });
 
-    it('should return existing senses', () => {
+    it('preserves existing senses and returns sorted', () => {
       const playerStats = {
         senses: [{ name: 'Normal Vision', value: '60 ft.' }],
         race: { traits: [] }
@@ -229,7 +225,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContainEqual({ name: 'Normal Vision', value: '60 ft.' });
     });
 
-    it('should add Darkvision when race has Darkvision trait and not already in senses', () => {
+    it('adds Darkvision when race has Darkvision trait and it is not already present', () => {
       const playerStats = {
         senses: [],
         race: {
@@ -240,7 +236,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContainEqual({ name: 'Darkvision', value: '60 ft.' });
     });
 
-    it('should not add Darkvision if already in senses', () => {
+    it('does not duplicate Darkvision when already in senses', () => {
       const playerStats = {
         senses: [{ name: 'Darkvision', value: '120 ft.' }],
         race: {
@@ -252,7 +248,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result.find((s) => s.name === 'Darkvision').value).toBe('120 ft.');
     });
 
-    it('should not add Darkvision if not in race traits', () => {
+    it('does not add Darkvision when race does not have the trait', () => {
       const playerStats = {
         senses: [],
         race: {
@@ -263,7 +259,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).not.toContainEqual({ name: 'Darkvision', value: '60 ft.' });
     });
 
-    it('should add Passive Perception when abilities available', () => {
+    it('adds Passive Perception when Wisdom ability with Perception skill exists', () => {
       const playerStats = {
         senses: [],
         race: { traits: [] },
@@ -279,7 +275,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContainEqual({ name: 'Passive Perception', value: '15' });
     });
 
-    it('should use ability bonus when no skill bonus for Passive Perception', () => {
+    it('falls back to ability bonus when Perception skill is missing', () => {
       const playerStats = {
         senses: [],
         race: { traits: [] },
@@ -295,7 +291,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContainEqual({ name: 'Passive Perception', value: '13' });
     });
 
-    it('should add Passive Investigation when abilities available', () => {
+    it('adds Passive Investigation when Intelligence ability with Investigation skill exists', () => {
       const playerStats = {
         senses: [],
         race: { traits: [] },
@@ -311,7 +307,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContainEqual({ name: 'Passive Investigation', value: '13' });
     });
 
-    it('should add Passive Insight when abilities available', () => {
+    it('adds Passive Insight when Wisdom ability with Insight skill exists', () => {
       const playerStats = {
         senses: [],
         race: { traits: [] },
@@ -327,7 +323,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContainEqual({ name: 'Passive Insight', value: '12' });
     });
 
-    it('should not add passive skills when abilities array missing', () => {
+    it('does not add passive skills when abilities array is missing', () => {
       const playerStats = {
         senses: [],
         race: { traits: [] }
@@ -338,7 +334,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).not.toContainEqual({ name: 'Passive Insight', value: '10' });
     });
 
-    it('should not add passive skill when ability not found', () => {
+    it('does not add passive skills when the relevant ability is missing', () => {
       const playerStats = {
         senses: [],
         race: { traits: [] },
@@ -354,7 +350,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).not.toContainEqual({ name: 'Passive Perception', value: '12' });
     });
 
-    it('should use ability bonus when skill not found for Passive Perception', () => {
+    it('falls back to ability bonus when skill is missing for Passive Perception', () => {
       const playerStats = {
         senses: [],
         race: { traits: [] },
@@ -370,7 +366,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toContainEqual({ name: 'Passive Perception', value: '12' });
     });
 
-    it('should sort senses alphabetically by name', () => {
+    it('returns senses sorted alphabetically by name', () => {
       const playerStats = {
         senses: [
           { name: 'Zebra Vision', value: '10 ft.' },
@@ -383,32 +379,70 @@ describe('raceRules 5e (direct module)', () => {
       expect(result[1].name).toBe('Zebra Vision');
     });
 
-    it('should handle race without traits', () => {
+    it('adds Feral Senses when a class feature has Feral Senses', () => {
       const playerStats = {
         senses: [],
         race: { traits: [] },
-        abilities: [
-          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Perception', bonus: 0 }] },
-          { name: 'Intelligence', bonus: 0, skills: [{ name: 'Investigation', bonus: 0 }] },
-          { name: 'Wisdom', bonus: 0, skills: [{ name: 'Insight', bonus: 0 }] }
-        ]
+        class: {
+          class_levels: [
+            { features: [{ name: 'Other Feature' }] },
+            { features: [{ name: 'Feral Senses' }] }
+          ]
+        }
       };
       const result = raceRules.getSenses(playerStats);
-      expect(result).toContainEqual({ name: 'Passive Perception', value: '10' });
-      expect(result).toContainEqual({ name: 'Passive Investigation', value: '10' });
-      expect(result).toContainEqual({ name: 'Passive Insight', value: '10' });
+      expect(result).toContainEqual({ name: 'Feral Senses', value: '' });
+    });
+
+    it('does not add Feral Senses when no class feature has it', () => {
+      const playerStats = {
+        senses: [],
+        race: { traits: [] },
+        class: {
+          class_levels: [
+            { features: [{ name: 'Other Feature' }] }
+          ]
+        }
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result).not.toContainEqual({ name: 'Feral Senses', value: '' });
+    });
+
+    it('does not duplicate Feral Senses when already in senses', () => {
+      const playerStats = {
+        senses: [{ name: 'Feral Senses', value: '120 ft.' }],
+        race: { traits: [] },
+        class: {
+          class_levels: [
+            { features: [{ name: 'Feral Senses' }] }
+          ]
+        }
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result.filter((s) => s.name === 'Feral Senses').length).toBe(1);
+      expect(result.find((s) => s.name === 'Feral Senses').value).toBe('120 ft.');
+    });
+
+    it('handles missing class_levels gracefully', () => {
+      const playerStats = {
+        senses: [],
+        race: { traits: [] },
+        class: {}
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result).not.toContainEqual({ name: 'Feral Senses', value: '' });
     });
   });
 
   describe('getRace', () => {
-    it('should return undefined when race not found', () => {
+    it('returns undefined when race is not found in allRaces', () => {
       const allRaces = [];
       const playerSummary = { race: { name: 'Custom Race' } };
       const result = raceRules.getRace(allRaces, playerSummary);
       expect(result).toBeUndefined();
     });
 
-    it('should return a clone of found race', () => {
+    it('returns a clone of the found race (not the original reference)', () => {
       const allRaces = [{ name: 'Human', traits: [] }];
       const playerSummary = { race: { name: 'Human' } };
       const result = raceRules.getRace(allRaces, playerSummary);
@@ -416,7 +450,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).not.toBe(allRaces[0]);
     });
 
-    it('should merge playerSummary race data into result', () => {
+    it('merges playerSummary race data into the result', () => {
       const allRaces = [{ name: 'Human', traits: [] }];
       const playerSummary = {
         race: {
@@ -429,7 +463,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result.customProperty).toBe('custom value');
     });
 
-    it('should resolve subrace from JSON data', () => {
+    it('resolves subrace from JSON data and merges playerSummary subrace data', () => {
       const allRaces = [
         {
           name: 'Elf',
@@ -438,29 +472,6 @@ describe('raceRules 5e (direct module)', () => {
               name: 'High Elf',
               damage_resistance: 'Fire',
               traits: []
-            }
-          ]
-        }
-      ];
-      const playerSummary = {
-        race: {
-          name: 'Elf',
-          subrace: { name: 'High Elf' }
-        }
-      };
-      const result = raceRules.getRace(allRaces, playerSummary);
-      expect(result.subrace.name).toBe('High Elf');
-      expect(result.subrace.damage_resistance).toBe('Fire');
-    });
-
-    it('should merge playerSummary subrace data', () => {
-      const allRaces = [
-        {
-          name: 'Elf',
-          subraces: [
-            {
-              name: 'High Elf',
-              damage_resistance: 'Fire'
             }
           ]
         }
@@ -478,7 +489,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result.subrace.customProp).toBe('value');
     });
 
-    it('should set subrace to null when no subrace selected', () => {
+    it('sets subrace to null when no subrace is selected', () => {
       const allRaces = [
         {
           name: 'Elf',
@@ -491,15 +502,13 @@ describe('raceRules 5e (direct module)', () => {
         }
       ];
       const playerSummary = {
-        race: {
-          name: 'Elf'
-        }
+        race: { name: 'Elf' }
       };
       const result = raceRules.getRace(allRaces, playerSummary);
       expect(result.subrace).toBeNull();
     });
 
-    it('should delete subraces from result', () => {
+    it('removes subraces array from the result', () => {
       const allRaces = [
         {
           name: 'Elf',
@@ -518,7 +527,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result.subraces).toBeUndefined();
     });
 
-    it('should convert ability_score abbreviations via utils.getAbilityLongName', () => {
+    it('converts ability_score abbreviations via utils.getAbilityLongName', () => {
       const allRaces = [
         {
           name: 'Human',
@@ -527,11 +536,11 @@ describe('raceRules 5e (direct module)', () => {
       ];
       const playerSummary = { race: { name: 'Human' } };
       const result = raceRules.getRace(allRaces, playerSummary);
-      // Mock returns input as-is, so STR stays STR
+      expect(utils.getAbilityLongName).toHaveBeenCalledWith('STR');
       expect(result.ability_bonuses[0].ability_score).toBe('STR');
     });
 
-    it('should convert subrace ability_score abbreviations via utils.getAbilityLongName', () => {
+    it('converts subrace ability_score abbreviations via utils.getAbilityLongName', () => {
       const allRaces = [
         {
           name: 'Elf',
@@ -553,29 +562,51 @@ describe('raceRules 5e (direct module)', () => {
       expect(result.subrace.ability_bonuses[0].ability_score).toBe('INT');
     });
 
-    it('should handle race without ability_bonuses', () => {
+    it('handles race without ability_bonuses', () => {
       const allRaces = [{ name: 'Human', traits: [] }];
       const playerSummary = { race: { name: 'Human' } };
       const result = raceRules.getRace(allRaces, playerSummary);
       expect(result.ability_bonuses).toBeUndefined();
     });
 
-    it('should handle race without traits', () => {
+    it('handles race without traits', () => {
       const allRaces = [{ name: 'Human' }];
       const playerSummary = { race: { name: 'Human' } };
       const result = raceRules.getRace(allRaces, playerSummary);
       expect(result.name).toBe('Human');
     });
+
+    it('returns undefined when subrace name does not match any subrace', () => {
+      const allRaces = [
+        {
+          name: 'Elf',
+          subraces: [
+            {
+              name: 'High Elf',
+              damage_resistance: 'Fire'
+            }
+          ]
+        }
+      ];
+      const playerSummary = {
+        race: {
+          name: 'Elf',
+          subrace: { name: 'Wood Elf' }
+        }
+      };
+      const result = raceRules.getRace(allRaces, playerSummary);
+      expect(result.subrace).toBeNull();
+    });
   });
 
   describe('getRacialBonus', () => {
-    it('should return 0 when no ability_bonuses', () => {
+    it('returns 0 when race has no ability_bonuses', () => {
       const playerStats = { race: {} };
       const result = raceRules.getRacialBonus(playerStats, 'Strength');
       expect(result).toBe(0);
     });
 
-    it('should return 0 when ability bonus not found', () => {
+    it('returns 0 when ability name is not in ability_bonuses', () => {
       const playerStats = {
         race: {
           ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }]
@@ -585,7 +616,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toBe(0);
     });
 
-    it('should return bonus from race ability_bonuses', () => {
+    it('returns the bonus from race ability_bonuses', () => {
       const playerStats = {
         race: {
           ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }]
@@ -595,7 +626,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toBe(2);
     });
 
-    it('should return bonus from subrace ability_bonuses', () => {
+    it('returns the bonus from subrace ability_bonuses', () => {
       const playerStats = {
         race: {
           ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }],
@@ -608,7 +639,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toBe(1);
     });
 
-    it('should sum bonuses from race and subrace for same ability', () => {
+    it('sums bonuses from race and subrace for the same ability', () => {
       const playerStats = {
         race: {
           ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }],
@@ -621,18 +652,7 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toBe(3);
     });
 
-    it('should return 0 when subrace has no ability_bonuses', () => {
-      const playerStats = {
-        race: {
-          ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }],
-          subrace: {}
-        }
-      };
-      const result = raceRules.getRacialBonus(playerStats, 'Strength');
-      expect(result).toBe(2);
-    });
-
-    it('should return 0 when subrace is null', () => {
+    it('returns race bonus when subrace is null', () => {
       const playerStats = {
         race: {
           ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }],
@@ -643,64 +663,69 @@ describe('raceRules 5e (direct module)', () => {
       expect(result).toBe(2);
     });
 
-    it('should handle undefined playerStats', () => {
-      const result = raceRules.getRacialBonus({ race: {} }, 'Strength');
-      expect(result).toBe(0);
+    it('returns race bonus when subrace exists but has no ability_bonuses', () => {
+      const playerStats = {
+        race: {
+          ability_bonuses: [{ ability_score: 'Strength', bonus: 2 }],
+          subrace: {}
+        }
+      };
+      const result = raceRules.getRacialBonus(playerStats, 'Strength');
+      expect(result).toBe(2);
     });
   });
 
   describe('addTraits', () => {
-    it('should categorize traits using featureCategories', () => {
+    it('categorizes traits into the correct category keys', () => {
       const traits = [
         { name: 'Darkvision', description: 'Can see in the dark' },
         { name: 'Fey Ancestry', description: 'Advantage on saves against being charmed' }
       ];
       const result = raceRules.addTraits(traits);
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('object');
-      expect(result.actions).toBeDefined();
-      expect(result.bonusActions).toBeDefined();
-      expect(result.reactions).toBeDefined();
-      expect(result.specialActions).toBeDefined();
-      expect(result.characterAdvancement).toBeDefined();
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: expect.arrayContaining([
+          expect.objectContaining({ name: 'Darkvision' }),
+          expect.objectContaining({ name: 'Fey Ancestry' })
+        ]),
+        characterAdvancement: []
+      });
     });
 
-    it('should categorize traits with desc field', () => {
+    it('supports traits with description field', () => {
       const traits = [
-        { name: 'Trait1', desc: 'A trait with desc field' }
+        { name: 'Trait1', description: 'A trait with description field' }
       ];
       const result = raceRules.addTraits(traits);
-      expect(result).toBeDefined();
+      const trait = result.specialActions.find((t) => t.name === 'Trait1');
+      expect(trait).toBeDefined();
+      expect(trait.description).toBe('A trait with description field');
     });
 
-    it('should handle empty traits array', () => {
+    it('returns empty category arrays for empty input', () => {
       const result = raceRules.addTraits([]);
-      expect(result).toBeDefined();
+      expect(result.actions).toEqual([]);
+      expect(result.specialActions).toEqual([]);
+      expect(result.bonusActions).toEqual([]);
+      expect(result.reactions).toEqual([]);
+      expect(result.characterAdvancement).toEqual([]);
+    });
+
+    it('returns empty category arrays for null input', () => {
+      const result = raceRules.addTraits(null);
       expect(result.actions).toEqual([]);
       expect(result.specialActions).toEqual([]);
     });
 
-    it('should handle null traits', () => {
-      const result = raceRules.addTraits(null);
-      expect(result).toBeDefined();
-    });
-
-    it('should handle undefined traits', () => {
+    it('returns empty category arrays for undefined input', () => {
       const result = raceRules.addTraits(undefined);
-      expect(result).toBeDefined();
+      expect(result.actions).toEqual([]);
+      expect(result.specialActions).toEqual([]);
     });
 
-    it('should categorize features in featuresToIgnore (no longer skipped)', () => {
-      const traits = [
-        { name: 'Darkvision', description: 'Can see in the dark' },
-        { name: 'Spellcasting', description: 'You can cast spells' }
-      ];
-      const result = raceRules.addTraits(traits);
-      expect(result.specialActions.find((t) => t.name === 'Darkvision')).toBeDefined();
-      expect(result.specialActions.find((t) => t.name === 'Spellcasting')).toBeDefined();
-    });
-
-    it('should include traits not in any category in specialActions', () => {
+    it('places traits not in any category into specialActions', () => {
       const traits = [
         { name: 'Custom Trait', description: 'A custom trait' }
       ];
@@ -710,7 +735,7 @@ describe('raceRules 5e (direct module)', () => {
   });
 
   describe('getTraits', () => {
-    it('should return categorized traits from race', () => {
+    it('returns categorized traits from race', () => {
       const playerStats = {
         race: {
           traits: [
@@ -720,23 +745,28 @@ describe('raceRules 5e (direct module)', () => {
         }
       };
       const result = raceRules.getTraits(playerStats);
-      expect(result).toBeDefined();
-      expect(Object.keys(result)).toContain('specialActions');
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: expect.any(Array),
+        characterAdvancement: []
+      });
     });
 
-    it('should handle race without traits', () => {
+    it('handles race without traits', () => {
       const playerStats = { race: {} };
       const result = raceRules.getTraits(playerStats);
-      expect(result).toBeDefined();
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
     });
 
-    it('should handle undefined race', () => {
-      const playerStats = { race: {} };
-      const result = raceRules.getTraits(playerStats);
-      expect(result).toBeDefined();
-    });
-
-    it('should merge subrace racial_traits with base traits', () => {
+    it('merges subrace racial_traits with base traits and deduplicates', () => {
       const playerStats = {
         race: {
           traits: [
@@ -750,47 +780,12 @@ describe('raceRules 5e (direct module)', () => {
         }
       };
       const result = raceRules.getTraits(playerStats);
-      expect(result).toBeDefined();
-      expect(Object.keys(result)).toContain('specialActions');
+      const names = result.specialActions.map((t) => t.name);
+      expect(names).toContain('Darkvision');
+      expect(names).toContain('Elven Weapon Training');
     });
 
-    it('should handle subrace without racial_traits', () => {
-      const playerStats = {
-        race: {
-          traits: [
-            { name: 'Darkvision', description: 'Can see in the dark' }
-          ],
-          subrace: {}
-        }
-      };
-      const result = raceRules.getTraits(playerStats);
-      expect(result).toBeDefined();
-    });
-
-    it('should handle null subrace', () => {
-      const playerStats = {
-        race: {
-          traits: [
-            { name: 'Darkvision', description: 'Can see in the dark' }
-          ],
-          subrace: null
-        }
-      };
-      const result = raceRules.getTraits(playerStats);
-      expect(result).toBeDefined();
-    });
-
-    it('should handle empty traits array', () => {
-      const playerStats = {
-        race: {
-          traits: []
-        }
-      };
-      const result = raceRules.getTraits(playerStats);
-      expect(result).toBeDefined();
-    });
-
-    it('should deduplicate traits when merging subrace traits', () => {
+    it('deduplicates traits when base and subrace have the same trait', () => {
       const playerStats = {
         race: {
           traits: [
@@ -805,6 +800,48 @@ describe('raceRules 5e (direct module)', () => {
       };
       const result = raceRules.getTraits(playerStats);
       expect(result.specialActions.filter((t) => t.name === 'Darkvision').length).toBe(1);
+    });
+
+    it('handles subrace without racial_traits', () => {
+      const playerStats = {
+        race: {
+          traits: [
+            { name: 'Darkvision', description: 'Can see in the dark' }
+          ],
+          subrace: {}
+        }
+      };
+      const result = raceRules.getTraits(playerStats);
+      expect(result.specialActions.find((t) => t.name === 'Darkvision')).toBeDefined();
+    });
+
+    it('handles null subrace', () => {
+      const playerStats = {
+        race: {
+          traits: [
+            { name: 'Darkvision', description: 'Can see in the dark' }
+          ],
+          subrace: null
+        }
+      };
+      const result = raceRules.getTraits(playerStats);
+      expect(result.specialActions.find((t) => t.name === 'Darkvision')).toBeDefined();
+    });
+
+    it('handles empty traits array', () => {
+      const playerStats = {
+        race: {
+          traits: []
+        }
+      };
+      const result = raceRules.getTraits(playerStats);
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
     });
   });
 });

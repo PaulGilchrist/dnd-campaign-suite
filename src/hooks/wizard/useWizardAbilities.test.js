@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { renderHook, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardAbilities from './useWizardAbilities.js';
@@ -20,18 +21,32 @@ const DEFAULT_COSTS = {
   15: 9
 };
 
+function makeAbility(name, baseScore, featIncrease = 0, miscIncrease = 0, backgroundIncrease = 0) {
+  return { name, baseScore, featIncrease, miscIncrease, backgroundIncrease };
+}
+
+function makeFormData(abilities, rules = '5e') {
+  return { abilities, rules };
+}
+
+function defaultAbilities() {
+  return [
+    makeAbility('Strength', 15),
+    makeAbility('Dexterity', 14),
+    makeAbility('Constitution', 12),
+    makeAbility('Intelligence', 10),
+    makeAbility('Wisdom', 8),
+    makeAbility('Charisma', 8)
+  ];
+}
+
+function renderWizardAbilities(formData, currentStep, setErrors, updateAbility) {
+  return renderHook(() =>
+    useWizardAbilities(formData ?? makeFormData(defaultAbilities()), currentStep, setErrors, updateAbility)
+  );
+}
+
 describe('useWizardAbilities', () => {
-  const mockFormData = {
-    abilities: [
-      { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-      { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-      { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-      { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-      { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-      { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-    ],
-    rules: '5e'
-  };
   const mockSetErrors = vi.fn();
   const mockUpdateAbility = vi.fn();
 
@@ -40,219 +55,122 @@ describe('useWizardAbilities', () => {
     getPointBuyCosts.mockResolvedValue(DEFAULT_COSTS);
   });
 
-  describe('validation effect (step 5)', () => {
-    it('should not validate when not on step 5', async () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 4, mockSetErrors)
-      );
+  describe('validation (step 5)', () => {
+    it('should skip validation when not on step 5', () => {
+      renderWizardAbilities(makeFormData(defaultAbilities()), 4, mockSetErrors);
 
-      await waitFor(() => {
-        // Wait for useEffect to run
-        expect(result.current).toHaveProperty('calculateTotalPointsSpent');
-      });
-
-      // Should not have called setErrors for validation
       expect(mockSetErrors).not.toHaveBeenCalled();
     });
 
-    it('should validate abilities when on step 5', async () => {
-      renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+    it('should run validation when on step 5', async () => {
+      renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
     });
 
-    it('should report error when base score is below 8', async () => {
-      const formDataWithLowScore = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 7, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          ...mockFormData.abilities.slice(1)
-        ]
-      };
+    it('should error when base score is below 8', async () => {
+      const formData = makeFormData([
+        makeAbility('Strength', 7),
+        ...defaultAbilities().slice(1)
+      ]);
 
-      renderHook(() =>
-        useWizardAbilities(formDataWithLowScore, 5, mockSetErrors)
-      );
+      renderWizardAbilities(formData, 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      expect(typeof setErrorsCall).toBe('function');
-
-      const errors = setErrorsCall({});
-      expect(errors).toHaveProperty('ability_0_baseScore');
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(errors.ability_0_baseScore).toBeDefined();
     });
 
-    it('should report error when base score exceeds 15', async () => {
-      const formDataWithHighScore = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          ...mockFormData.abilities.slice(1)
-        ]
-      };
+    it('should error when base score exceeds 15', async () => {
+      const formData = makeFormData([
+        makeAbility('Strength', 16),
+        ...defaultAbilities().slice(1)
+      ]);
 
-      renderHook(() =>
-        useWizardAbilities(formDataWithHighScore, 5, mockSetErrors)
-      );
+      renderWizardAbilities(formData, 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      expect(typeof setErrorsCall).toBe('function');
-
-      const errors = setErrorsCall({});
-      expect(errors).toHaveProperty('ability_0_baseScore');
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(errors.ability_0_baseScore).toBeDefined();
     });
 
-    it('should report error when total score exceeds 20', async () => {
-      const formDataWithHighTotal = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 6, miscIncrease: 0 },
-          ...mockFormData.abilities.slice(1)
-        ]
-      };
+    it('should error when total score (base + improvements) exceeds 20', async () => {
+      const formData = makeFormData([
+        makeAbility('Strength', 15, 6),
+        ...defaultAbilities().slice(1)
+      ]);
 
-      renderHook(() =>
-        useWizardAbilities(formDataWithHighTotal, 5, mockSetErrors)
-      );
+      renderWizardAbilities(formData, 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      expect(typeof setErrorsCall).toBe('function');
-
-      const errors = setErrorsCall({});
-      expect(errors).toHaveProperty('ability_0_totalScore');
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(errors.ability_0_totalScore).toBeDefined();
     });
 
-    it('should report error when points exceed 27 budget', async () => {
-      const formDataWithExcessPoints = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-        ]
-      };
+    it('should error when point buy exceeds 27', async () => {
+      const formData = makeFormData(defaultAbilities().map(() => makeAbility('Stat', 15)));
 
-      renderHook(() =>
-        useWizardAbilities(formDataWithExcessPoints, 5, mockSetErrors)
-      );
+      renderWizardAbilities(formData, 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      expect(typeof setErrorsCall).toBe('function');
-
-      const errors = setErrorsCall({});
-      expect(errors).toHaveProperty('pointsExceeded');
-    });
-
-    it('should include point total in pointsExceeded message', async () => {
-      // 6 abilities at 15 = 6 * 9 = 54 points
-      const formDataWithExcessPoints = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-        ]
-      };
-
-      renderHook(() =>
-        useWizardAbilities(formDataWithExcessPoints, 5, mockSetErrors)
-      );
-
-      await waitFor(() => {
-        expect(mockSetErrors).toHaveBeenCalled();
-      });
-
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      const errors = setErrorsCall({});
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(errors.pointsExceeded).toBeDefined();
       expect(errors.pointsExceeded).toContain('54');
     });
 
-    it('should not report error for negative featIncrease (source does not validate it)', async () => {
-      const formDataWithNegativeImprovements = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: -1, miscIncrease: 0, backgroundIncrease: 0 },
-          ...mockFormData.abilities.slice(1)
-        ]
-      };
+    it('should error when miscIncrease is negative', async () => {
+      const formData = makeFormData([
+        makeAbility('Strength', 15, 0, -2),
+        ...defaultAbilities().slice(1)
+      ]);
 
-      renderHook(() =>
-        useWizardAbilities(formDataWithNegativeImprovements, 5, mockSetErrors)
-      );
+      renderWizardAbilities(formData, 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      expect(typeof setErrorsCall).toBe('function');
-
-      const errors = setErrorsCall({});
-      expect(errors).not.toHaveProperty('ability_0_featIncrease');
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(errors.ability_0_miscIncrease).toBeDefined();
     });
 
-    it('should report error when miscIncrease is negative', async () => {
-      const formDataWithNegativeMisc = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: -2 },
-          ...mockFormData.abilities.slice(1)
-        ]
-      };
+    it('should not error for negative featIncrease', async () => {
+      const formData = makeFormData([
+        makeAbility('Strength', 15, -1),
+        ...defaultAbilities().slice(1)
+      ]);
 
-      renderHook(() =>
-        useWizardAbilities(formDataWithNegativeMisc, 5, mockSetErrors)
-      );
+      renderWizardAbilities(formData, 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      expect(typeof setErrorsCall).toBe('function');
-
-      const errors = setErrorsCall({});
-      expect(errors).toHaveProperty('ability_0_miscIncrease');
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(errors.ability_0_featIncrease).toBeUndefined();
     });
 
     it('should clear stale ability errors from previous validation', async () => {
-      renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+      renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
       });
 
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      expect(typeof setErrorsCall).toBe('function');
-
-      // Simulate a previous state with stale ability errors
       const prevErrors = {
         ability_0_baseScore: 'old error',
         ability_3_totalScore: 'old error',
@@ -260,19 +178,43 @@ describe('useWizardAbilities', () => {
         unrelatedField: 'should be preserved'
       };
 
-      const errors = setErrorsCall(prevErrors);
-      // Old ability errors should be cleared
-      expect(errors).not.toHaveProperty('ability_0_baseScore');
-      expect(errors).not.toHaveProperty('ability_3_totalScore');
-      expect(errors).not.toHaveProperty('pointsExceeded');
-      // Unrelated errors should be preserved
-      expect(errors).toHaveProperty('unrelatedField');
+      const errors = mockSetErrors.mock.calls[0][0](prevErrors);
+      expect(errors.ability_0_baseScore).toBeUndefined();
+      expect(errors.ability_3_totalScore).toBeUndefined();
+      expect(errors.pointsExceeded).toBeUndefined();
+      expect(errors.unrelatedField).toBe('should be preserved');
     });
 
-    it('should pass the ruleset to getPointBuyCosts', async () => {
-      renderHook(() =>
-        useWizardAbilities({ ...mockFormData, rules: '2024' }, 5, mockSetErrors)
-      );
+    it('should not produce errors for all abilities at minimum (8)', async () => {
+      const allEights = defaultAbilities().map(() => makeAbility('Stat', 8));
+      renderWizardAbilities(makeFormData(allEights), 5, mockSetErrors);
+
+      await waitFor(() => {
+        expect(mockSetErrors).toHaveBeenCalled();
+      });
+
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(Object.keys(errors)).toHaveLength(0);
+    });
+
+    it('should treat NaN baseScore as 8 (valid)', async () => {
+      const formData = makeFormData([
+        { name: 'Strength', baseScore: NaN, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ...defaultAbilities().slice(1)
+      ]);
+
+      renderWizardAbilities(formData, 5, mockSetErrors);
+
+      await waitFor(() => {
+        expect(mockSetErrors).toHaveBeenCalled();
+      });
+
+      const errors = mockSetErrors.mock.calls[0][0]({});
+      expect(errors.ability_0_baseScore).toBeUndefined();
+    });
+
+    it('should use ruleset from formData for point cost lookup', async () => {
+      renderWizardAbilities(makeFormData(defaultAbilities(), '2024'), 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
@@ -281,12 +223,8 @@ describe('useWizardAbilities', () => {
       expect(getPointBuyCosts).toHaveBeenCalledWith('2024');
     });
 
-    it('should default to 5e when no ruleset is provided', async () => {
-      const formDataNoRules = { ...mockFormData, rules: undefined };
-
-      renderHook(() =>
-        useWizardAbilities(formDataNoRules, 5, mockSetErrors)
-      );
+    it('should default to 5e ruleset when rules is undefined', async () => {
+      renderWizardAbilities(makeFormData(defaultAbilities(), undefined), 5, mockSetErrors);
 
       await waitFor(() => {
         expect(mockSetErrors).toHaveBeenCalled();
@@ -294,192 +232,93 @@ describe('useWizardAbilities', () => {
 
       expect(getPointBuyCosts).toHaveBeenCalledWith('5e');
     });
-
-    it('should not produce errors for all abilities at minimum (8)', async () => {
-      const allEights = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Dexterity', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-        ]
-      };
-
-      renderHook(() =>
-        useWizardAbilities(allEights, 5, mockSetErrors)
-      );
-
-      await waitFor(() => {
-        expect(mockSetErrors).toHaveBeenCalled();
-      });
-
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      const errors = setErrorsCall({});
-      // No errors at all — all 8s is valid (0 points, under 27)
-      expect(Object.keys(errors)).toHaveLength(0);
-    });
-
-    it('should handle NaN baseScore gracefully (default to 8)', async () => {
-      const formDataNaN = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: NaN, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          ...mockFormData.abilities.slice(1)
-        ]
-      };
-
-      renderHook(() =>
-        useWizardAbilities(formDataNaN, 5, mockSetErrors)
-      );
-
-      await waitFor(() => {
-        expect(mockSetErrors).toHaveBeenCalled();
-      });
-
-      const setErrorsCall = mockSetErrors.mock.calls[0][0];
-      const errors = setErrorsCall({});
-      // NaN becomes 8 which is valid
-      expect(errors).not.toHaveProperty('ability_0_baseScore');
-    });
   });
 
   describe('calculateTotalPointsSpent', () => {
-    it('should return calculateTotalPointsSpent function', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+    it('should return a function', () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
-      expect(result.current).toHaveProperty('calculateTotalPointsSpent');
       expect(typeof result.current.calculateTotalPointsSpent).toBe('function');
     });
 
-    it('should calculate total points spent for all abilities', async () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+    it('should calculate total points for default abilities (22)', async () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
-      const totalPoints = await result.current.calculateTotalPointsSpent(
-        mockFormData.abilities,
-        -1,
-        null
-      );
+      const total = await result.current.calculateTotalPointsSpent(defaultAbilities(), -1, null);
 
-      // 15 (9) + 14 (7) + 12 (4) + 10 (2) + 8 (0) + 8 (0) = 22
-      expect(totalPoints).toBe(22);
+      // 9 + 7 + 4 + 2 + 0 + 0 = 22
+      expect(total).toBe(22);
     });
 
     it('should return 0 for all abilities at score 8', async () => {
-      const allEights = [
-        { name: 'Strength', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Dexterity', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Constitution', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Intelligence', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-      ];
+      const allEights = defaultAbilities().map(() => makeAbility('Stat', 8));
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+      const total = await result.current.calculateTotalPointsSpent(allEights, -1, null);
 
-      const totalPoints = await result.current.calculateTotalPointsSpent(
-        allEights,
-        -1,
-        null
-      );
-
-      expect(totalPoints).toBe(0);
+      expect(total).toBe(0);
     });
 
-    it('should calculate 54 for all abilities at score 15', async () => {
-      const allFifteens = [
-        { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Dexterity', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Constitution', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Intelligence', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Wisdom', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Charisma', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-      ];
+    it('should return 54 for all abilities at score 15', async () => {
+      const allFifteens = defaultAbilities().map(() => makeAbility('Stat', 15));
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+      const total = await result.current.calculateTotalPointsSpent(allFifteens, -1, null);
 
-      const totalPoints = await result.current.calculateTotalPointsSpent(
-        allFifteens,
-        -1,
-        null
-      );
-
-      expect(totalPoints).toBe(54);
+      expect(total).toBe(54);
     });
 
-    it('should replace a specific ability cost when index is provided', async () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+    it('should replace cost for a specific ability by index', async () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
-      // Replace index 2 (Constitution, baseScore 12 → cost 4) with baseScore 15 → cost 9
-      // Original: 9 (Str) + 7 (Dex) + 4 (Con) + 2 (Int) + 0 (Wis) + 0 (Cha) = 22
-      // Replaced: 9 (Str) + 7 (Dex) + 9 (Con) + 2 (Int) + 0 (Wis) + 0 (Cha) = 27
-      const totalPoints = await result.current.calculateTotalPointsSpent(
-        mockFormData.abilities,
-        2,
-        15
-      );
+      // Constitution (index 2) changes from 12 (cost 4) to 15 (cost 9): 22 - 4 + 9 = 27
+      const total = await result.current.calculateTotalPointsSpent(defaultAbilities(), 2, 15);
 
-      expect(totalPoints).toBe(27);
+      expect(total).toBe(27);
     });
 
-    it('should replace index even when newBaseScore is not in rules table', async () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+    it('should treat unknown baseScore as cost 0', async () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
-      // Replace index 0 (Strength, baseScore 15 → cost 9) with baseScore 7 → not in rules
-      const totalPoints = await result.current.calculateTotalPointsSpent(
-        mockFormData.abilities,
-        0,
-        7
-      );
+      // Replace index 0 (cost 9) with 7 (not in table, cost 0): 22 - 9 + 0 = 13
+      const total = await result.current.calculateTotalPointsSpent(defaultAbilities(), 0, 7);
 
-      // 0 (Str replaced by 7, no cost) + 7 (Dex) + 4 (Con) + 2 (Int) + 0 (Wis) + 0 (Cha) = 13
-      expect(totalPoints).toBe(13);
+      expect(total).toBe(13);
     });
 
-    it('should handle NaN baseScore entries (default to 8, cost 0)', async () => {
+    it('should treat NaN baseScore entries as cost 0', async () => {
       const abilitiesWithNaN = [
         { name: 'Strength', baseScore: NaN, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-        { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
+        ...defaultAbilities().slice(1)
       ];
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+      const total = await result.current.calculateTotalPointsSpent(abilitiesWithNaN, -1, null);
 
-      const totalPoints = await result.current.calculateTotalPointsSpent(
-        abilitiesWithNaN,
-        -1,
-        null
-      );
+      // 0 (NaN) + 7 + 4 + 2 + 0 + 0 = 13
+      expect(total).toBe(13);
+    });
 
-      // NaN becomes 8 (cost 0) + 7 (14) + 4 (12) + 2 (10) + 0 (8) + 0 (8) = 13
-      expect(totalPoints).toBe(13);
+    it('should use 2024 ruleset when configured', async () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities(), '2024'), 5, mockSetErrors);
+
+      await result.current.calculateTotalPointsSpent(defaultAbilities(), -1, null);
+
+      expect(getPointBuyCosts).toHaveBeenCalledWith('2024');
+    });
+
+    it('should default to 5e when rules is undefined', async () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities(), undefined), 5, mockSetErrors);
+
+      await result.current.calculateTotalPointsSpent(defaultAbilities(), -1, null);
+
+      expect(getPointBuyCosts).toHaveBeenCalledWith('5e');
     });
   });
 
   describe('onAbilityBaseScoreChange', () => {
-    it('should call updateAbility with parsed value', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
+    it('should call updateAbility with parsed integer value', () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
 
       result.current.onAbilityBaseScoreChange(2, '15');
 
@@ -487,9 +326,7 @@ describe('useWizardAbilities', () => {
     });
 
     it('should default to 8 when value is not a valid number', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
 
       result.current.onAbilityBaseScoreChange(3, 'abc');
 
@@ -497,136 +334,93 @@ describe('useWizardAbilities', () => {
     });
 
     it('should default to 8 when value is empty string', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
 
       result.current.onAbilityBaseScoreChange(4, '');
 
       expect(mockUpdateAbility).toHaveBeenCalledWith(4, 'baseScore', 8);
     });
-  });
 
+    it('should not perform any validation — delegates to updateAbility only', () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
+
+      // Setting a score above 15 should still call updateAbility (validation is separate)
+      result.current.onAbilityBaseScoreChange(0, '20');
+
+      expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'baseScore', 20);
+      expect(mockSetErrors).not.toHaveBeenCalled();
+    });
+  });
 
   describe('onAbilityMiscIncreaseChange', () => {
     it('should call updateAbility with valid misc bonus', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
 
       result.current.onAbilityMiscIncreaseChange(0, '2');
 
-      // Strength: baseScore 15 + improvements 0 + misc 2 = 17 (<= 20)
       expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscIncrease', 2);
     });
 
-    it('should not update when misc bonus is negative', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
+    it('should reject negative misc bonus', () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
 
       result.current.onAbilityMiscIncreaseChange(2, '-3');
 
       expect(mockUpdateAbility).not.toHaveBeenCalled();
     });
 
-    it('should not update when total score would exceed 20', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
+    it('should reject misc bonus that would push total above 20', () => {
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
 
-      // Strength: baseScore 15 + improvements 0 + misc 6 = 21 (> 20)
+      // Strength: 15 + 0 + 0 + 6 = 21 > 20
       result.current.onAbilityMiscIncreaseChange(0, '6');
 
       expect(mockUpdateAbility).not.toHaveBeenCalled();
     });
 
     it('should default to 0 when value is not a valid number', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors, mockUpdateAbility)
-      );
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors, mockUpdateAbility);
 
       result.current.onAbilityMiscIncreaseChange(4, 'abc');
 
-      // NaN → 0, total = 8 + 0 + 0 = 8, valid
+      // Charisma: 8 + 0 + 0 + 0 = 8, valid
       expect(mockUpdateAbility).toHaveBeenCalledWith(4, 'miscIncrease', 0);
     });
 
-    it('should handle NaN baseScore in formData (default to 8)', () => {
-      const formWithNaN = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: NaN, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          ...mockFormData.abilities.slice(1)
-        ]
-      };
+    it('should treat NaN baseScore as 8 when computing total', () => {
+      const formWithNaN = makeFormData([
+        { name: 'Strength', baseScore: NaN, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+        ...defaultAbilities().slice(1)
+      ]);
 
-      const { result } = renderHook(() =>
-        useWizardAbilities(formWithNaN, 5, mockSetErrors, mockUpdateAbility)
-      );
+      const { result } = renderWizardAbilities(formWithNaN, 5, mockSetErrors, mockUpdateAbility);
 
-      // NaN baseScore → parseInt returns NaN → || 8 → baseScore = 8
-      // misc 10 + baseScore 8 + improvements 0 = 18 (<= 20), valid
+      // NaN baseScore → 8, misc 10 → total 18, valid
       result.current.onAbilityMiscIncreaseChange(0, '10');
       expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscIncrease', 10);
     });
 
-    it('should allow misc bonus up to but not exceeding 20 total with improvements', () => {
-      const formWithImprovements = {
-        ...mockFormData,
-        abilities: [
-          { name: 'Strength', baseScore: 15, featIncrease: 3, miscIncrease: 0 },
-          { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Constitution', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Wisdom', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
-          { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 }
-        ]
-      };
+    it('should account for featIncrease when checking total cap', () => {
+      const formWithImprovements = makeFormData([
+        makeAbility('Strength', 15, 3),
+        ...defaultAbilities().slice(1)
+      ]);
 
-      const { result } = renderHook(() =>
-        useWizardAbilities(formWithImprovements, 5, mockSetErrors, mockUpdateAbility)
-      );
+      const { result } = renderWizardAbilities(formWithImprovements, 5, mockSetErrors, mockUpdateAbility);
 
-      // Strength: baseScore 15 + improvements 3 = 18, misc 2 → total 20, valid
+      // 15 + 3 + 0 + 2 = 20, valid
       result.current.onAbilityMiscIncreaseChange(0, '2');
       expect(mockUpdateAbility).toHaveBeenCalledWith(0, 'miscIncrease', 2);
 
-      // Strength: baseScore 15 + improvements 3 = 18, misc 3 → total 21, blocked
+      // 15 + 3 + 0 + 3 = 21, blocked
       result.current.onAbilityMiscIncreaseChange(0, '3');
-      expect(mockUpdateAbility).toHaveBeenCalledTimes(1); // still only the first call
-    });
-  });
-
-  describe('2024 ruleset', () => {
-    it('should pass ruleset to getPointBuyCosts in calculateTotalPointsSpent', async () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities({ ...mockFormData, rules: '2024' }, 5, mockSetErrors)
-      );
-
-      await result.current.calculateTotalPointsSpent(mockFormData.abilities, -1, null);
-
-      expect(getPointBuyCosts).toHaveBeenCalledWith('2024');
-    });
-
-    it('should default to 5e when no ruleset is provided in calculateTotalPointsSpent', async () => {
-      const formDataNoRules = { ...mockFormData, rules: undefined };
-
-      const { result } = renderHook(() =>
-        useWizardAbilities(formDataNoRules, 5, mockSetErrors)
-      );
-
-      await result.current.calculateTotalPointsSpent(mockFormData.abilities, -1, null);
-
-      expect(getPointBuyCosts).toHaveBeenCalledWith('5e');
+      expect(mockUpdateAbility).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('return value shape', () => {
     it('should return all expected functions', () => {
-      const { result } = renderHook(() =>
-        useWizardAbilities(mockFormData, 5, mockSetErrors)
-      );
+      const { result } = renderWizardAbilities(makeFormData(defaultAbilities()), 5, mockSetErrors);
 
       expect(result.current).toHaveProperty('calculateTotalPointsSpent');
       expect(result.current).toHaveProperty('onAbilityBaseScoreChange');

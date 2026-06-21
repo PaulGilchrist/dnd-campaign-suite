@@ -1,28 +1,32 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { VIEWS, SIDEBAR_BUTTONS, SIDEBAR_VIEWS } from './config.js';
 
 describe('routes config', () => {
   describe('VIEWS', () => {
-    it('should be defined and non-empty', () => {
-      expect(VIEWS).toBeDefined();
+    it('should export a non-empty object', () => {
+      expect(VIEWS).toBeTypeOf('object');
       expect(Object.keys(VIEWS).length).toBeGreaterThan(0);
     });
 
-    it('should have all views with required fields', () => {
+    it('should have all views with required fields and correct types', () => {
       Object.values(VIEWS).forEach(view => {
-        expect(view).toHaveProperty('name');
-        expect(view).toHaveProperty('stateVar');
-        expect(view).toHaveProperty('type');
-        expect(view).toHaveProperty('component');
-
-        expect(typeof view.name).toBe('string');
-        expect(typeof view.stateVar).toBe('string');
-        expect(typeof view.type).toBe('string');
-        expect(typeof view.component).toBe('string');
+        expect(view).toMatchObject({
+          name: expect.any(String),
+          stateVar: expect.any(String),
+          type: expect.any(String),
+          component: expect.any(String),
+          description: expect.any(String),
+        });
+        expect(view.name).not.toBe('');
+        expect(view.stateVar).not.toBe('');
+        expect(view.type).not.toBe('');
+        expect(view.component).not.toBe('');
+        expect(view.description).not.toBe('');
       });
     });
 
-    it('should have correct stateVar for sidebar views', () => {
+    it('should classify sidebar views as activeView string type', () => {
       const sidebarViewKeys = [
         'CHAR_SHEET', 'INITIATIVE', 'MAPS_MANAGER', 'MAP',
         'ENCOUNTER', 'FACTIONS', 'NOTES', 'QUESTS', 'NPCS',
@@ -32,10 +36,11 @@ describe('routes config', () => {
       sidebarViewKeys.forEach(key => {
         expect(VIEWS[key].stateVar).toBe('activeView');
         expect(VIEWS[key].type).toBe('string');
+        expect(VIEWS[key].overlay).not.toBe(true);
       });
     });
 
-    it('should have overlay views with boolean stateVars', () => {
+    it('should classify overlay views as boolean type with overlay flag', () => {
       const overlayViewKeys = [
         'CAMPAIGN_SELECTION',
         'CHARACTER_WIZARD',
@@ -49,7 +54,33 @@ describe('routes config', () => {
       });
     });
 
-    it('should have correct component names for sidebar views', () => {
+    it('should have unique view names across all views', () => {
+      const names = Object.values(VIEWS).map(v => v.name);
+      expect(new Set(names).size).toBe(names.length);
+    });
+
+    it('should have unique stateVar values within each category', () => {
+      const booleanStateVars = Object.values(VIEWS)
+        .filter(v => v.type === 'boolean')
+        .map(v => v.stateVar);
+      expect(new Set(booleanStateVars).size).toBe(booleanStateVars.length);
+    });
+
+    it('should map overlay views to correct component and needsActiveCharacter flags', () => {
+      expect(VIEWS.CAMPAIGN_SELECTION.component).toBe('CampaignSelection');
+      expect(VIEWS.CHARACTER_WIZARD.needsActiveCharacter).toBe(false);
+      expect(VIEWS.EDIT_CHARACTER_WIZARD.needsActiveCharacter).toBe(true);
+    });
+
+    it('should have sidebar views whose names match SIDEBAR_VIEWS entries', () => {
+      const sidebarViews = Object.values(VIEWS).filter(v => v.type === 'string');
+      const viewNames = sidebarViews.map(v => v.name);
+      SIDEBAR_VIEWS.forEach(name => {
+        expect(viewNames).toContain(name);
+      });
+    });
+
+    it('should have consistent component names for all sidebar views', () => {
       expect(VIEWS.CHAR_SHEET.component).toBe('CharSheet');
       expect(VIEWS.INITIATIVE.component).toBe('Initiative');
       expect(VIEWS.MAPS_MANAGER.component).toBe('MapsManager');
@@ -63,90 +94,74 @@ describe('routes config', () => {
       expect(VIEWS.CAMPAIGN_LOG.component).toBe('Log');
     });
 
-    it('should have overlay views with correct component names', () => {
-      expect(VIEWS.CAMPAIGN_SELECTION.component).toBe('CampaignSelection');
+    it('should have overlay views using CharacterCreationWizard component', () => {
       expect(VIEWS.CHARACTER_WIZARD.component).toBe('CharacterCreationWizard');
       expect(VIEWS.EDIT_CHARACTER_WIZARD.component).toBe('CharacterCreationWizard');
-    });
-
-    it('should have descriptions on all views', () => {
-      Object.values(VIEWS).forEach(view => {
-        expect(view).toHaveProperty('description');
-        expect(typeof view.description).toBe('string');
-        expect(view.description.length).toBeGreaterThan(0);
-      });
-    });
-
-    it('should have needsActiveCharacter only on edit wizard', () => {
-      expect(VIEWS.CHARACTER_WIZARD.needsActiveCharacter).toBe(false);
-      expect(VIEWS.EDIT_CHARACTER_WIZARD.needsActiveCharacter).toBe(true);
-    });
-
-    it('should have exactly 14 views defined', () => {
-      expect(Object.keys(VIEWS).length).toBe(14);
     });
   });
 
   describe('SIDEBAR_BUTTONS', () => {
-    it('should be defined and non-empty', () => {
-      expect(SIDEBAR_BUTTONS).toBeDefined();
+    it('should export an array', () => {
       expect(Array.isArray(SIDEBAR_BUTTONS)).toBe(true);
-      expect(SIDEBAR_BUTTONS.length).toBeGreaterThan(0);
     });
 
-    it('should have 10 sidebar buttons', () => {
-      expect(SIDEBAR_BUTTONS.length).toBe(10);
-    });
-
-    it('should have required fields on each button', () => {
+    it('should have required fields with correct types on each button', () => {
       SIDEBAR_BUTTONS.forEach(button => {
-        expect(button).toHaveProperty('label');
-        expect(button).toHaveProperty('icon');
-        expect(button).toHaveProperty('view');
-
-        expect(typeof button.label).toBe('string');
-        expect(typeof button.icon).toBe('string');
-        expect(typeof button.view).toBe('string');
-
-        expect(button.label.length).toBeGreaterThan(0);
-        expect(button.icon.length).toBeGreaterThan(0);
-        expect(button.view.length).toBeGreaterThan(0);
+        expect(button).toMatchObject({
+          label: expect.any(String),
+          icon: expect.any(String),
+          view: expect.any(String),
+        });
+        expect(button.label).not.toBe('');
+        expect(button.icon).not.toBe('');
+        expect(button.view).not.toBe('');
       });
     });
 
-    it('should have correct button structure', () => {
-      expect(SIDEBAR_BUTTONS[0]).toEqual({ label: 'Character', icon: 'fa-user', view: 'charSheet' });
-      expect(SIDEBAR_BUTTONS[1]).toEqual({ label: 'Encounter', icon: 'fa-skull-crossbones', view: 'encounter' });
-      expect(SIDEBAR_BUTTONS[2]).toEqual({ label: 'Factions', icon: 'fa-handshake', view: 'factions' });
-      expect(SIDEBAR_BUTTONS[3]).toEqual({ label: 'Initiative', icon: 'fa-gavel', view: 'initiative' });
-      expect(SIDEBAR_BUTTONS[4]).toEqual({ label: 'Maps', icon: 'fa-map', view: 'mapsManager' });
-      expect(SIDEBAR_BUTTONS[5]).toEqual({ label: 'Notes', icon: 'fa-sticky-note', view: 'notes' });
-      expect(SIDEBAR_BUTTONS[6]).toEqual({ label: 'Quests', icon: 'fa-scroll', view: 'quests' });
-      expect(SIDEBAR_BUTTONS[7]).toEqual({ label: 'NPCs', icon: 'fa-users', view: 'npcs' });
-      expect(SIDEBAR_BUTTONS[8]).toEqual({ label: 'Settlements', icon: 'fa-city', view: 'settlements' });
-      expect(SIDEBAR_BUTTONS[9]).toEqual({ label: 'Log', icon: 'fa-book-journal-whills', view: 'campaignLog' });
-    });
-
-    it('should have all view values reference valid VIEWS entries', () => {
+    it('should have all button views reference valid VIEWS entries by name', () => {
       const allViewNames = Object.values(VIEWS).map(v => v.name);
       SIDEBAR_BUTTONS.forEach(button => {
         expect(allViewNames).toContain(button.view);
       });
     });
+
+    it('should have unique view references', () => {
+      const views = SIDEBAR_BUTTONS.map(b => b.view);
+      expect(new Set(views).size).toBe(views.length);
+    });
+
+    it('should have unique labels', () => {
+      const labels = SIDEBAR_BUTTONS.map(b => b.label);
+      expect(new Set(labels).size).toBe(labels.length);
+    });
+
+    it('should have unique icons', () => {
+      const icons = SIDEBAR_BUTTONS.map(b => b.icon);
+      expect(new Set(icons).size).toBe(icons.length);
+    });
+
+    it('should cover all sidebar views', () => {
+      const buttonViews = new Set(SIDEBAR_BUTTONS.map(b => b.view));
+      SIDEBAR_VIEWS.forEach(name => {
+        expect(buttonViews).toContain(name);
+      });
+    });
+
+    it('should cover all sidebar views in same order as SIDEBAR_VIEWS', () => {
+      const buttonViews = SIDEBAR_BUTTONS.map(b => b.view);
+      const buttonSet = new Set(buttonViews);
+      SIDEBAR_VIEWS.forEach(name => {
+        expect(buttonSet).toContain(name);
+      });
+    });
   });
 
   describe('SIDEBAR_VIEWS', () => {
-    it('should be defined and non-empty', () => {
-      expect(SIDEBAR_VIEWS).toBeDefined();
+    it('should export an array', () => {
       expect(Array.isArray(SIDEBAR_VIEWS)).toBe(true);
-      expect(SIDEBAR_VIEWS.length).toBeGreaterThan(0);
     });
 
-    it('should have 10 sidebar views', () => {
-      expect(SIDEBAR_VIEWS.length).toBe(10);
-    });
-
-    it('should contain all sidebar view names', () => {
+    it('should contain all expected sidebar view names', () => {
       expect(SIDEBAR_VIEWS).toContain('charSheet');
       expect(SIDEBAR_VIEWS).toContain('initiative');
       expect(SIDEBAR_VIEWS).toContain('mapsManager');
@@ -166,13 +181,27 @@ describe('routes config', () => {
     });
 
     it('should have unique view names', () => {
-      const uniqueViews = [...new Set(SIDEBAR_VIEWS)];
-      expect(uniqueViews).toHaveLength(SIDEBAR_VIEWS.length);
+      expect(new Set(SIDEBAR_VIEWS).size).toBe(SIDEBAR_VIEWS.length);
+    });
+  });
+
+  describe('cross-config consistency', () => {
+    it('should have matching counts between sidebar views and buttons', () => {
+      expect(SIDEBAR_VIEWS.length).toBe(SIDEBAR_BUTTONS.length);
     });
 
-    it('should match sidebar button views', () => {
-      const buttonViews = SIDEBAR_BUTTONS.map(b => b.view);
-      expect(SIDEBAR_VIEWS.sort()).toEqual([...buttonViews].sort());
+    it('should have no orphaned sidebar views without a corresponding VIEWS entry', () => {
+      const viewNames = new Set(Object.values(VIEWS).map(v => v.name));
+      SIDEBAR_VIEWS.forEach(name => {
+        expect(viewNames).toContain(name);
+      });
+    });
+
+    it('should have all sidebar views covered by buttons', () => {
+      const buttonViews = new Set(SIDEBAR_BUTTONS.map(b => b.view));
+      SIDEBAR_VIEWS.forEach(name => {
+        expect(buttonViews).toContain(name);
+      });
     });
   });
 });

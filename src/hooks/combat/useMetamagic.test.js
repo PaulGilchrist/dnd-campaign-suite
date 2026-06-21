@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useMetamagic from './useMetamagic.js';
@@ -38,15 +39,16 @@ describe('spendSorceryPoints', () => {
   beforeEach(() => {
     localStorage.clear();
     localStorage.setItem('TestSorcerer', JSON.stringify({ sorceryPoints: 5 }));
-    vi.clearAllMocks();
   });
 
   it('deducts sorcery points and returns remaining', async () => {
     const { spendSorceryPoints } = await import('./useMetamagic.js');
     const remaining = spendSorceryPoints('TestSorcerer', 3, 'test-campaign');
     expect(remaining).toBe(2);
-    const stored = JSON.parse(localStorage.getItem('TestSorcerer'));
-    expect(stored.sorceryPoints).toBe(2);
+    expect(localStorage.setItem).toHaveBeenLastCalledWith(
+      'TestSorcerer',
+      JSON.stringify({ sorceryPoints: 2 })
+    );
   });
 
   it('does not go below 0', async () => {
@@ -59,7 +61,6 @@ describe('spendSorceryPoints', () => {
 describe('getCurrentSorceryPoints', () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.clearAllMocks();
   });
 
   it('returns stored value', async () => {
@@ -85,7 +86,6 @@ describe('getMaxSorceryPoints', () => {
 describe('saveLastDamageEvent / getLastDamageEvent / clearLastDamageEvent', () => {
   beforeEach(() => {
     localStorage.clear();
-    vi.clearAllMocks();
   });
 
   it('stores and retrieves last damage event', async () => {
@@ -107,7 +107,6 @@ describe('useMetamagic hook', () => {
   beforeEach(() => {
     localStorage.clear();
     localStorage.setItem('TestSorcerer', JSON.stringify({ sorceryPoints: 5 }));
-    vi.clearAllMocks();
   });
 
   it('returns current and max SP', () => {

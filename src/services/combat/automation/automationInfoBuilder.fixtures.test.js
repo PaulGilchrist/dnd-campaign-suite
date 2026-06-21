@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import {
     normalizeAbilityName,
@@ -9,52 +10,53 @@ import {
 
 describe('automationInfoBuilder.fixtures', () => {
     describe('normalizeAbilityName', () => {
-        it('returns canonical name for lowercase abbreviations', () => {
-            expect(normalizeAbilityName('str')).toBe('Strength');
-            expect(normalizeAbilityName('dex')).toBe('Dexterity');
-            expect(normalizeAbilityName('con')).toBe('Constitution');
-            expect(normalizeAbilityName('int')).toBe('Intelligence');
-            expect(normalizeAbilityName('wis')).toBe('Wisdom');
-            expect(normalizeAbilityName('cha')).toBe('Charisma');
+        const canonicalPairs = [
+            ['str', 'Strength'],
+            ['dex', 'Dexterity'],
+            ['con', 'Constitution'],
+            ['int', 'Intelligence'],
+            ['wis', 'Wisdom'],
+            ['cha', 'Charisma'],
+            ['STR', 'Strength'],
+            ['DEX', 'Dexterity'],
+            ['CON', 'Constitution'],
+            ['INT', 'Intelligence'],
+            ['WIS', 'Wisdom'],
+            ['CHA', 'Charisma'],
+            ['Strength', 'Strength'],
+            ['Dexterity', 'Dexterity'],
+            ['Constitution', 'Constitution'],
+            ['Intelligence', 'Intelligence'],
+            ['Wisdom', 'Wisdom'],
+            ['Charisma', 'Charisma'],
+            ['StReNgTh', 'Strength'],
+            ['InTeLlIgEnCe', 'Intelligence'],
+        ];
+
+        it('returns canonical ability name for all accepted inputs', () => {
+            for (const [input, expected] of canonicalPairs) {
+                expect(normalizeAbilityName(input)).toBe(expected);
+            }
         });
 
-        it('returns canonical name for uppercase abbreviations', () => {
-            expect(normalizeAbilityName('STR')).toBe('Strength');
-            expect(normalizeAbilityName('DEX')).toBe('Dexterity');
-            expect(normalizeAbilityName('CON')).toBe('Constitution');
-            expect(normalizeAbilityName('INT')).toBe('Intelligence');
-            expect(normalizeAbilityName('WIS')).toBe('Wisdom');
-            expect(normalizeAbilityName('CHA')).toBe('Charisma');
-        });
-
-        it('returns canonical name for full ability names', () => {
-            expect(normalizeAbilityName('Strength')).toBe('Strength');
-            expect(normalizeAbilityName('Dexterity')).toBe('Dexterity');
-            expect(normalizeAbilityName('Constitution')).toBe('Constitution');
-            expect(normalizeAbilityName('Intelligence')).toBe('Intelligence');
-            expect(normalizeAbilityName('Wisdom')).toBe('Wisdom');
-            expect(normalizeAbilityName('Charisma')).toBe('Charisma');
-        });
-
-        it('returns null for names with extra words', () => {
-            expect(normalizeAbilityName('Strength Modifier')).toBeNull();
-            expect(normalizeAbilityName('Dexterity Bonus')).toBeNull();
-        });
-
-        it('returns null for empty input', () => {
+        it('returns null for falsy inputs', () => {
             expect(normalizeAbilityName('')).toBeNull();
             expect(normalizeAbilityName(null)).toBeNull();
             expect(normalizeAbilityName(undefined)).toBeNull();
         });
 
-        it('returns null for unrecognized ability names', () => {
+        it('returns null for unrecognized names', () => {
             expect(normalizeAbilityName('Unknown')).toBeNull();
             expect(normalizeAbilityName('Foo')).toBeNull();
         });
 
-        it('handles mixed case', () => {
-            expect(normalizeAbilityName('StReNgTh')).toBe('Strength');
-            expect(normalizeAbilityName('InTeLlIgEnCe')).toBe('Intelligence');
+        it('returns null for names with extra content', () => {
+            expect(normalizeAbilityName('Strength Modifier')).toBeNull();
+            expect(normalizeAbilityName('Dexterity Bonus')).toBeNull();
+        });
+
+        it('returns null for whitespace-only input', () => {
+            expect(normalizeAbilityName('   ')).toBeNull();
         });
     });
 
@@ -62,103 +64,165 @@ describe('automationInfoBuilder.fixtures', () => {
         it('returns an object with all expected methods', () => {
             const mockExprs = createMockAutomationExpressions();
 
-            expect(mockExprs.evaluateAutoExpression).toBeDefined();
-            expect(mockExprs.resolveHealingPoolExpression).toBeDefined();
-            expect(mockExprs.getSaveDc).toBeDefined();
-            expect(mockExprs.resolveUses).toBeDefined();
-            expect(mockExprs.resolveDiceExpression).toBeDefined();
-            expect(mockExprs.resolveScaling).toBeDefined();
+            expect(typeof mockExprs.evaluateAutoExpression).toBe('function');
+            expect(typeof mockExprs.resolveHealingPoolExpression).toBe('function');
+            expect(typeof mockExprs.getSaveDc).toBe('function');
+            expect(typeof mockExprs.resolveUses).toBe('function');
+            expect(typeof mockExprs.resolveDiceExpression).toBe('function');
+            expect(typeof mockExprs.resolveScaling).toBe('function');
         });
 
-        it('evaluateAutoExpression returns 2 for non-empty expression', () => {
-            const mockExprs = createMockAutomationExpressions();
+        describe('evaluateAutoExpression', () => {
+            it('returns 0 for null, undefined, and empty string', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            expect(mockExprs.evaluateAutoExpression('1d20+5', {})).toBe(2);
+                expect(mockExprs.evaluateAutoExpression(null, {})).toBe(0);
+                expect(mockExprs.evaluateAutoExpression(undefined, {})).toBe(0);
+                expect(mockExprs.evaluateAutoExpression('', {})).toBe(0);
+            });
+
+            it('returns 2 for any non-empty expression', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                expect(mockExprs.evaluateAutoExpression('1d20+5', {})).toBe(2);
+                expect(mockExprs.evaluateAutoExpression('d6', {})).toBe(2);
+            });
         });
 
-        it('evaluateAutoExpression returns 0 for empty expression', () => {
-            const mockExprs = createMockAutomationExpressions();
+        describe('resolveHealingPoolExpression', () => {
+            it('returns base expression when no scaling is provided', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            expect(mockExprs.evaluateAutoExpression(null, {})).toBe(0);
-            expect(mockExprs.evaluateAutoExpression(undefined, {})).toBe(0);
-            expect(mockExprs.evaluateAutoExpression('', {})).toBe(0);
+                expect(mockExprs.resolveHealingPoolExpression('2d8', null, {})).toBe('2d8');
+                expect(mockExprs.resolveHealingPoolExpression('2d8', null, undefined)).toBe('2d8');
+            });
+
+            it('returns base expression when stats is nullish', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                const scaling = [{ level: 5, expression: '4d8' }];
+                expect(mockExprs.resolveHealingPoolExpression('2d8', scaling, null)).toBe('2d8');
+            });
+
+            it('returns the highest matching scaled expression', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                const scaling = { 5: '3d8', 11: '4d8', 17: '5d8' };
+                expect(mockExprs.resolveHealingPoolExpression('2d8', scaling, { level: 3 })).toBe('2d8');
+                expect(mockExprs.resolveHealingPoolExpression('2d8', scaling, { level: 7 })).toBe('3d8');
+                expect(mockExprs.resolveHealingPoolExpression('2d8', scaling, { level: 14 })).toBe('4d8');
+                expect(mockExprs.resolveHealingPoolExpression('2d8', scaling, { level: 20 })).toBe('5d8');
+            });
         });
 
-        it('resolveHealingPoolExpression returns base when no scaling', () => {
-            const mockExprs = createMockAutomationExpressions();
+        describe('getSaveDc', () => {
+            it('returns 8 + ability bonus + proficiency', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            expect(mockExprs.resolveHealingPoolExpression('2d8', null, {})).toBe('2d8');
-            expect(mockExprs.resolveHealingPoolExpression('2d8', null, undefined)).toBe('2d8');
+                const stats = {
+                    abilities: [{ name: 'Strength', bonus: 4 }],
+                };
+
+                expect(mockExprs.getSaveDc(stats, 'STR', 3)).toBe(15);
+            });
+
+            it('returns 8 + ability bonus when proficiency is missing', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                const stats = {
+                    abilities: [{ name: 'Wisdom', bonus: 5 }],
+                };
+
+                expect(mockExprs.getSaveDc(stats, 'WIS')).toBe(13);
+            });
+
+            it('returns 8 + 0 when ability is not found in stats', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                const stats = { abilities: [{ name: 'Strength', bonus: 4 }] };
+                expect(mockExprs.getSaveDc(stats, 'Constitution', 2)).toBe(10);
+            });
         });
 
-        it('resolveHealingPoolExpression returns base when no stats', () => {
-            const mockExprs = createMockAutomationExpressions();
+        describe('resolveUses', () => {
+            it('returns the number directly when usesSpec is a number', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            const scaling = [{ level: 5, expression: '4d8' }];
-            expect(mockExprs.resolveHealingPoolExpression('2d8', scaling, null)).toBe('2d8');
+                expect(mockExprs.resolveUses({}, 3)).toBe(3);
+            });
+
+            it('returns proficiency_bonus when usesSpec is that string', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                const stats = { proficiency: 4 };
+                expect(mockExprs.resolveUses(stats, 'proficiency_bonus')).toBe(4);
+            });
+
+            it('returns 0 when proficiency_bonus is requested but proficiency is missing', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                expect(mockExprs.resolveUses({}, 'proficiency_bonus')).toBe(0);
+            });
+
+            it('returns level as fallback for unknown strings', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                const stats = { level: 5 };
+                expect(mockExprs.resolveUses(stats, 'unknown')).toBe(5);
+            });
+
+            it('returns 1 as ultimate fallback when level is also missing', () => {
+                const mockExprs = createMockAutomationExpressions();
+
+                expect(mockExprs.resolveUses({}, 'unknown')).toBe(1);
+            });
         });
 
-        it('getSaveDc returns 8 + ability bonus + proficiency', () => {
-            const mockExprs = createMockAutomationExpressions();
+        describe('resolveDiceExpression', () => {
+            it('returns the expression unchanged', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            const stats = {
-                abilities: [{ name: 'Strength', bonus: 4 }],
-                proficiency: 3,
-            };
-
-            expect(mockExprs.getSaveDc(stats, 'STR', 3)).toBe(15);
+                expect(mockExprs.resolveDiceExpression('2d8+3')).toBe('2d8+3');
+                expect(mockExprs.resolveDiceExpression('4d6')).toBe('4d6');
+            });
         });
 
-        it('getSaveDc returns 8 + ability bonus when no proficiency provided', () => {
-            const mockExprs = createMockAutomationExpressions();
+        describe('resolveScaling', () => {
+            it('returns the highest entry at or below the character level', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            const stats = {
-                abilities: [{ name: 'Wisdom', bonus: 5 }],
-            };
+                const scaling = [
+                    { level: 1, expression: '1d4' },
+                    { level: 5, expression: '2d4' },
+                    { level: 11, expression: '3d4' },
+                ];
 
-            expect(mockExprs.getSaveDc(stats, 'WIS')).toBe(13);
-        });
+                expect(mockExprs.resolveScaling({ level: 1 }, scaling)).toEqual({ level: 1, expression: '1d4' });
+                expect(mockExprs.resolveScaling({ level: 3 }, scaling)).toEqual({ level: 1, expression: '1d4' });
+                expect(mockExprs.resolveScaling({ level: 7 }, scaling)).toEqual({ level: 5, expression: '2d4' });
+                expect(mockExprs.resolveScaling({ level: 15 }, scaling)).toEqual({ level: 11, expression: '3d4' });
+            });
 
-        it('resolveUses returns number when usesSpec is a number', () => {
-            const mockExprs = createMockAutomationExpressions();
+            it('returns null when stats has no level', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            expect(mockExprs.resolveUses({}, 3)).toBe(3);
-        });
+                const scaling = [{ level: 1, expression: '1d4' }];
+                expect(mockExprs.resolveScaling({}, scaling)).toBeNull();
+            });
 
-        it('resolveUses returns proficiency_bonus when usesSpec is that string', () => {
-            const mockExprs = createMockAutomationExpressions();
+            it('returns null when scaling is null', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            const stats = { proficiency: 4 };
-            expect(mockExprs.resolveUses(stats, 'proficiency_bonus')).toBe(4);
-        });
+                expect(mockExprs.resolveScaling({ level: 5 }, null)).toBeNull();
+            });
 
-        it('resolveUses returns level as fallback', () => {
-            const mockExprs = createMockAutomationExpressions();
+            it('returns null when level is below the first entry', () => {
+                const mockExprs = createMockAutomationExpressions();
 
-            const stats = { level: 5 };
-            expect(mockExprs.resolveUses(stats, 'unknown')).toBe(5);
-        });
-
-        it('resolveDiceExpression returns expression unchanged', () => {
-            const mockExprs = createMockAutomationExpressions();
-
-            expect(mockExprs.resolveDiceExpression('2d8+3')).toBe('2d8+3');
-        });
-
-        it('resolveScaling returns matching entry or null', () => {
-            const mockExprs = createMockAutomationExpressions();
-
-            const scaling = [
-                { level: 1, expression: '1d4' },
-                { level: 5, expression: '2d4' },
-                { level: 11, expression: '3d4' },
-            ];
-
-            expect(mockExprs.resolveScaling({ level: 3 }, scaling)).toEqual({ level: 1, expression: '1d4' });
-            expect(mockExprs.resolveScaling({ level: 7 }, scaling)).toEqual({ level: 5, expression: '2d4' });
-            expect(mockExprs.resolveScaling({ level: 15 }, scaling)).toEqual({ level: 11, expression: '3d4' });
-            expect(mockExprs.resolveScaling({ level: 0 }, scaling)).toBeNull();
-            expect(mockExprs.resolveScaling({}, null)).toBeNull();
+                const scaling = [{ level: 3, expression: '2d6' }];
+                expect(mockExprs.resolveScaling({ level: 0 }, scaling)).toBeNull();
+                expect(mockExprs.resolveScaling({ level: 2 }, scaling)).toBeNull();
+            });
         });
     });
 
@@ -182,23 +246,25 @@ describe('automationInfoBuilder.fixtures', () => {
         it('has correct bonus values', () => {
             const bonuses = {};
             BASE_STATS.abilities.forEach(a => { bonuses[a.name] = a.bonus; });
-            expect(bonuses.Strength).toBe(4);
-            expect(bonuses.Dexterity).toBe(2);
-            expect(bonuses.Constitution).toBe(3);
-            expect(bonuses.Intelligence).toBe(1);
-            expect(bonuses.Wisdom).toBe(5);
-            expect(bonuses.Charisma).toBe(2);
+            expect(bonuses).toEqual({
+                Strength: 4,
+                Dexterity: 2,
+                Constitution: 3,
+                Intelligence: 1,
+                Wisdom: 5,
+                Charisma: 2,
+            });
         });
     });
 
     describe('BASE_FEATURE', () => {
-        it('has a name property', () => {
+        it('has name set to Test Feature', () => {
             expect(BASE_FEATURE.name).toBe('Test Feature');
         });
     });
 
     describe('makeFeature', () => {
-        it('creates a feature with name and automation', () => {
+        it('creates a feature with default name and provided automation', () => {
             const automation = { type: 'test' };
             const feature = makeFeature(automation);
 
@@ -206,13 +272,13 @@ describe('automationInfoBuilder.fixtures', () => {
             expect(feature.automation).toBe(automation);
         });
 
-        it('accepts custom name', () => {
+        it('accepts a custom name', () => {
             const feature = makeFeature({ type: 'test' }, 'Custom Feature');
 
             expect(feature.name).toBe('Custom Feature');
         });
 
-        it('accepts custom automation', () => {
+        it('passes through the automation object as-is', () => {
             const automation = { type: 'custom', value: 42 };
             const feature = makeFeature(automation);
 

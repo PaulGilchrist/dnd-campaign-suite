@@ -55,7 +55,7 @@ export function cleanNPCData(data) {
   if (cleaned.armorClass === null || cleaned.armorClass === undefined || cleaned.armorClass === '') {
     cleaned.armorClass = 10;
   }
-  if (typeof cleaned.armorClass !== 'number') {
+  if (typeof cleaned.armorClass !== 'number' || Number.isNaN(cleaned.armorClass)) {
     console.error(`[AC] NPC "${cleaned.name}" has invalid AC: ${cleaned.armorClass}. Defaulting to 10.`);
     cleaned.armorClass = 10;
   }

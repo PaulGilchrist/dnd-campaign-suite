@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/encounters/combatData.js', () => ({
@@ -65,7 +66,6 @@ describe('createSaves (useLoggedDiceRollSaves)', () => {
     };
 
     beforeEach(() => {
-        vi.clearAllMocks();
         getCombatContext.mockResolvedValue(null);
         loadCombatSummary.mockResolvedValue(null);
         getRuntimeValue.mockReturnValue(null);

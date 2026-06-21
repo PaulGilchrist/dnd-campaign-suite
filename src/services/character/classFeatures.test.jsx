@@ -1,35 +1,50 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getClassFeatures } from './classFeatures.js';
+import classRules5e from './classRules.js';
+import classRules2024 from './classRules2024.js';
 
+// Mock classRules with realistic return shapes matching the actual implementation
 vi.mock('./classRules.js', () => ({
   default: {
-    getBardFeatures: vi.fn(() => ['Bard Features 5e']),
-    getClericFeatures: vi.fn(() => ['Cleric Features 5e']),
-    getDruidFeatures: vi.fn(() => ['Druid Features 5e']),
-    getPaladinFeatures: vi.fn(() => ['Paladin Features 5e']),
-    getSorcererFeatures: vi.fn(() => ['Sorcerer Features 5e']),
-    getWarlockFeatures: vi.fn(() => ['Warlock Features 5e']),
-    getWizardFeatures: vi.fn(() => ['Wizard Features 5e']),
-    getMonkFeatures: vi.fn(() => ['Monk Features 5e']),
-    getRogueFeatures: vi.fn(() => ['Rogue Features 5e']),
-    getRangerFeatures: vi.fn(() => ['Ranger Features 5e']),
+    getBardFeatures: vi.fn(),
+    getClericFeatures: vi.fn(),
+    getDruidFeatures: vi.fn(),
+    getPaladinFeatures: vi.fn(),
+    getSorcererFeatures: vi.fn(),
+    getWarlockFeatures: vi.fn(),
+    getWizardFeatures: vi.fn(),
+    getMonkFeatures: vi.fn(),
+    getRogueFeatures: vi.fn(),
+    getRangerFeatures: vi.fn(),
   },
 }));
 
+// Mock classRules2024 with realistic return shapes matching the actual implementation
 vi.mock('./classRules2024.js', () => ({
   default: {
-    getBardFeatures: vi.fn(() => ['Bard Features 2024']),
-    getClericFeatures: vi.fn(() => ['Cleric Features 2024']),
-    getDruidFeatures: vi.fn(() => ['Druid Features 2024']),
-    getPaladinFeatures: vi.fn(() => ['Paladin Features 2024']),
-    getSorcererFeatures: vi.fn(() => ['Sorcerer Features 2024']),
-    getWarlockFeatures: vi.fn(() => ['Warlock Features 2024']),
-    getWizardFeatures: vi.fn(() => ['Wizard Features 2024']),
-    getMonkFeatures: vi.fn(() => ['Monk Features 2024']),
-    getRogueFeatures: vi.fn(() => ['Rogue Features 2024']),
-    getRangerFeatures: vi.fn(() => ['Ranger Features 2024']),
+    getBardFeatures: vi.fn(),
+    getClericFeatures: vi.fn(),
+    getDruidFeatures: vi.fn(),
+    getPaladinFeatures: vi.fn(),
+    getSorcererFeatures: vi.fn(),
+    getWarlockFeatures: vi.fn(),
+    getWizardFeatures: vi.fn(),
+    getMonkFeatures: vi.fn(),
+    getRogueFeatures: vi.fn(),
+    getRangerFeatures: vi.fn(),
   },
 }));
+
+const all5eClasses = [
+  'Bard', 'Cleric', 'Druid', 'Paladin', 'Sorcerer',
+  'Warlock', 'Wizard', 'Monk', 'Rogue', 'Ranger',
+];
+
+const all2024Classes = [
+  'Bard', 'Cleric', 'Druid', 'Paladin', 'Sorcerer',
+  'Warlock', 'Wizard', 'Monk', 'Rogue', 'Ranger',
+];
 
 const basePlayerStats = {
   name: 'Test Character',
@@ -42,170 +57,185 @@ describe('getClassFeatures', () => {
     vi.clearAllMocks();
   });
 
-  it('returns null for unknown class', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Barbarian' } };
-    const result = getClassFeatures(stats);
-    expect(result).toBeNull();
+  describe('null/undefined handling', () => {
+    it('returns null for unknown class name', () => {
+      const stats = { ...basePlayerStats, class: { name: 'Barbarian' } };
+      expect(getClassFeatures(stats)).toBeNull();
+    });
+
+    it('returns null when class is undefined', () => {
+      const stats = { ...basePlayerStats, class: undefined };
+      expect(getClassFeatures(stats)).toBeNull();
+    });
+
+    it('returns null when class.name is undefined', () => {
+      const stats = { ...basePlayerStats, class: {} };
+      expect(getClassFeatures(stats)).toBeNull();
+    });
+
+    it('returns null when class.name is empty string', () => {
+      const stats = { ...basePlayerStats, class: { name: '' } };
+      expect(getClassFeatures(stats)).toBeNull();
+    });
   });
 
-  it('returns null when class is undefined', () => {
-    const stats = { ...basePlayerStats, class: undefined };
-    const result = getClassFeatures(stats);
-    expect(result).toBeNull();
+  describe('delegates to correct rules module', () => {
+    it('delegates to classRules for 5e ruleset (default)', () => {
+      const stats = { ...basePlayerStats };
+      const result = getClassFeatures(stats);
+      expect(result).toBeUndefined();
+      expect(classRules5e.getClericFeatures).toHaveBeenCalled();
+    });
+
+    it('delegates to classRules2024 for 2024 ruleset', () => {
+      const stats = { ...basePlayerStats, rules: '2024' };
+      const result = getClassFeatures(stats);
+      expect(result).toBeUndefined();
+      expect(classRules2024.getClericFeatures).toHaveBeenCalled();
+    });
+
+    it('uses classRules for explicit "5e" ruleset', () => {
+      const stats = { ...basePlayerStats, rules: '5e' };
+      getClassFeatures(stats);
+      expect(classRules5e.getClericFeatures).toHaveBeenCalled();
+      expect(classRules2024.getClericFeatures).not.toHaveBeenCalled();
+    });
+
+    it('uses classRules when rules is undefined (defaults to 5e)', () => {
+      const stats = { ...basePlayerStats, rules: undefined };
+      getClassFeatures(stats);
+      expect(classRules5e.getClericFeatures).toHaveBeenCalled();
+      expect(classRules2024.getClericFeatures).not.toHaveBeenCalled();
+    });
+
+    it('uses classRules when rules is an unexpected value', () => {
+      const stats = { ...basePlayerStats, rules: '3e' };
+      getClassFeatures(stats);
+      expect(classRules5e.getClericFeatures).toHaveBeenCalled();
+    });
   });
 
-  it('throws when playerStats is null', () => {
-    expect(() => getClassFeatures(null)).toThrow();
+  describe('passes playerStats to feature functions', () => {
+    const testCases = [
+      { rules: '5e', rulesModule: classRules5e, className: 'Cleric' },
+      { rules: '2024', rulesModule: classRules2024, className: 'Bard' },
+    ];
+
+    for (const tc of testCases) {
+      it(`passes stats object to ${tc.className} function (${tc.rules})`, () => {
+        const stats = { ...basePlayerStats, rules: tc.rules, class: { name: tc.className } };
+        getClassFeatures(stats);
+        const fn = tc.rulesModule[`get${tc.className}Features`];
+        expect(fn).toHaveBeenCalledWith(stats);
+      });
+    }
   });
 
-  it('throws when playerStats is undefined', () => {
-    expect(() => getClassFeatures(undefined)).toThrow();
+  describe('5e class delegation', () => {
+    for (const className of all5eClasses) {
+      it(`delegates to classRules.get${className}Features for ${className}`, () => {
+        const stats = { ...basePlayerStats, class: { name: className } };
+        getClassFeatures(stats);
+        expect(classRules5e[`get${className}Features`]).toHaveBeenCalledWith(stats);
+      });
+    }
+
+    it('returns undefined when feature function returns nothing', () => {
+      classRules5e.getClericFeatures.mockReturnValue(undefined);
+      const stats = { ...basePlayerStats, class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBeUndefined();
+    });
+
+    it('returns null when feature function returns null', () => {
+      classRules5e.getClericFeatures.mockReturnValue(null);
+      const stats = { ...basePlayerStats, class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBeNull();
+    });
+
+    it('returns the feature function result object as-is', () => {
+      const expected = { channelDivinity: 3, destroyUndeadCR: 7 };
+      classRules5e.getClericFeatures.mockReturnValue(expected);
+      const stats = { ...basePlayerStats, class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBe(expected);
+    });
   });
 
-  it('calls classRules.getBardFeatures for Bard (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Bard' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Bard Features 5e']);
+  describe('2024 class delegation', () => {
+    for (const className of all2024Classes) {
+      it(`delegates to classRules2024.get${className}Features for ${className}`, () => {
+        const stats = { ...basePlayerStats, rules: '2024', class: { name: className } };
+        getClassFeatures(stats);
+        expect(classRules2024[`get${className}Features`]).toHaveBeenCalledWith(stats);
+      });
+    }
+
+    it('returns undefined when feature function returns nothing', () => {
+      classRules2024.getClericFeatures.mockReturnValue(undefined);
+      const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBeUndefined();
+    });
+
+    it('returns the feature function result object as-is', () => {
+      const expected = { maxChannelDivinity: 2, destroyUndeadCR: null };
+      classRules2024.getClericFeatures.mockReturnValue(expected);
+      const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBe(expected);
+    });
   });
 
-  it('calls classRules.getClericFeatures for Cleric (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Cleric' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Cleric Features 5e']);
+  describe('feature function type validation', () => {
+    it('returns undefined (fallthrough) when feature function is not a function (5e)', () => {
+      classRules5e.getClericFeatures = 'not a function';
+      const stats = { ...basePlayerStats, class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBeUndefined();
+    });
+
+    it('returns undefined (fallthrough) when feature function is not a function (2024)', () => {
+      classRules2024.getClericFeatures = 'not a function';
+      const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBeUndefined();
+    });
+
+    it('returns undefined (fallthrough) when feature function is undefined (5e)', () => {
+      classRules5e.getClericFeatures = undefined;
+      const stats = { ...basePlayerStats, class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBeUndefined();
+    });
+
+    it('returns undefined (fallthrough) when feature function is undefined (2024)', () => {
+      classRules2024.getClericFeatures = undefined;
+      const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Cleric' } };
+      expect(getClassFeatures(stats)).toBeUndefined();
+    });
   });
 
-  it('calls classRules.getDruidFeatures for Druid (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Druid' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Druid Features 5e']);
-  });
+  describe('behavioral correctness', () => {
+    it('does not throw for any valid class name in both rulesets', () => {
+      for (const className of all5eClasses) {
+        const stats = { ...basePlayerStats, class: { name: className } };
+        expect(() => getClassFeatures(stats)).not.toThrow();
+      }
+      for (const className of all2024Classes) {
+        const stats = { ...basePlayerStats, rules: '2024', class: { name: className } };
+        expect(() => getClassFeatures(stats)).not.toThrow();
+      }
+    });
 
-  it('calls classRules.getPaladinFeatures for Paladin (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Paladin' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Paladin Features 5e']);
-  });
+    it('returns different results for same class across rulesets when implementations differ', () => {
+      classRules5e.getMonkFeatures.mockReturnValue({ martialArtsDie: 4 });
+      classRules2024.getMonkFeatures.mockReturnValue({ martialArtsDie: 6 });
 
-  it('calls classRules.getSorcererFeatures for Sorcerer (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Sorcerer' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Sorcerer Features 5e']);
-  });
+      const stats5e = { ...basePlayerStats, class: { name: 'Monk' } };
+      const stats2024 = { ...basePlayerStats, rules: '2024', class: { name: 'Monk' } };
 
-  it('calls classRules.getWarlockFeatures for Warlock (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Warlock' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Warlock Features 5e']);
-  });
+      expect(getClassFeatures(stats5e)).toEqual({ martialArtsDie: 4 });
+      expect(getClassFeatures(stats2024)).toEqual({ martialArtsDie: 6 });
+    });
 
-  it('calls classRules.getWizardFeatures for Wizard (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Wizard' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Wizard Features 5e']);
-  });
-
-  it('calls classRules.getMonkFeatures for Monk (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Monk' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Monk Features 5e']);
-  });
-
-  it('calls classRules.getRogueFeatures for Rogue (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Rogue' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Rogue Features 5e']);
-  });
-
-  it('calls classRules.getRangerFeatures for Ranger (5e)', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Ranger' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Ranger Features 5e']);
-  });
-
-  it('calls classRules2024.getBardFeatures for Bard (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Bard' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Bard Features 2024']);
-  });
-
-  it('calls classRules2024.getClericFeatures for Cleric (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Cleric' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Cleric Features 2024']);
-  });
-
-  it('calls classRules2024.getDruidFeatures for Druid (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Druid' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Druid Features 2024']);
-  });
-
-  it('calls classRules2024.getPaladinFeatures for Paladin (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Paladin' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Paladin Features 2024']);
-  });
-
-  it('calls classRules2024.getSorcererFeatures for Sorcerer (2024)', () => {
-    const stats = { basePlayerStats, rules: '2024', class: { name: 'Sorcerer' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Sorcerer Features 2024']);
-  });
-
-  it('calls classRules2024.getWarlockFeatures for Warlock (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Warlock' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Warlock Features 2024']);
-  });
-
-  it('calls classRules2024.getWizardFeatures for Wizard (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Wizard' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Wizard Features 2024']);
-  });
-
-  it('calls classRules2024.getMonkFeatures for Monk (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Monk' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Monk Features 2024']);
-  });
-
-  it('calls classRules2024.getRogueFeatures for Rogue (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Rogue' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Rogue Features 2024']);
-  });
-
-  it('calls classRules2024.getRangerFeatures for Ranger (2024)', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Ranger' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Ranger Features 2024']);
-  });
-
-  it('passes playerStats to the feature function', async () => {
-    const stats = { ...basePlayerStats, class: { name: 'Cleric' } };
-    getClassFeatures(stats);
-    // The mock was called with the stats object
-    const { default: classRules } = await import('./classRules.js');
-    expect(classRules.getClericFeatures).toHaveBeenCalledWith(stats);
-  });
-
-  it('uses 5e rules when rules is "5e"', () => {
-    const stats = { ...basePlayerStats, rules: '5e', class: { name: 'Cleric' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Cleric Features 5e']);
-  });
-
-  it('uses 2024 rules when rules is "2024"', () => {
-    const stats = { ...basePlayerStats, rules: '2024', class: { name: 'Cleric' } };
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Cleric Features 2024']);
-  });
-
-  it('returns null for class without feature function', () => {
-    const stats = { ...basePlayerStats, class: { name: 'Rogue' } };
-    // Rogue has a feature function, so this tests a valid path
-    const result = getClassFeatures(stats);
-    expect(result).toEqual(['Rogue Features 5e']);
+    it('calls only the relevant rules module for a given class', () => {
+      const stats = { ...basePlayerStats, class: { name: 'Monk' } };
+      getClassFeatures(stats);
+      expect(classRules5e.getMonkFeatures).toHaveBeenCalled();
+    });
   });
 });

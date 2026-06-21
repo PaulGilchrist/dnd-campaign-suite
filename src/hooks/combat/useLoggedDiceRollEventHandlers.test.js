@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/rules/effects/expirations.js', () => ({
@@ -52,7 +53,6 @@ vi.mock('./useLoggedDiceRollUtils.js', () => ({
 }));
 
 import { addExpiration } from '../../services/rules/effects/expirations.js';
-// rollExpression is mocked but not directly imported in this test file
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
@@ -72,19 +72,23 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
     };
 
     beforeEach(() => {
-        vi.clearAllMocks();
-        delete window.__pendingResultHandlersInstalled;
         delete window.__pendingSaves;
         getCombatSummary.mockReturnValue(null);
         getRuntimeValue.mockReturnValue(null);
         setRuntimeValue.mockReturnValue(undefined);
         hasSoulstitchProtection.mockReturnValue(false);
         computeDamageAfterEvasion.mockReturnValue(10);
+        applyDamageToTarget.mockReset();
         applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 5, damageReduced: false });
+        endInvisibilityOnHostileAction.mockReset();
         endInvisibilityOnHostileAction.mockReturnValue(undefined);
+        addExpiration.mockReset();
         addExpiration.mockReturnValue(undefined);
+        storage.set.mockReset();
         storage.set.mockReturnValue(Promise.resolve());
+        hasIgnoreResistance.mockReset();
         hasIgnoreResistance.mockReturnValue(false);
+        playerIsImmuneToCondition.mockReset();
         playerIsImmuneToCondition.mockReturnValue(false);
         utils.getName.mockImplementation((n) => n);
     });
@@ -93,27 +97,32 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
         setupEventListeners(deps);
     }
 
+    function createSavePrompt(promptId, overrides = {}) {
+        return {
+            promptId,
+            targetName: 'Goblin',
+            rawDamage: 15,
+            saveDc: 15,
+            saveType: 'DEX',
+            dcSuccess: 'half',
+            damageType: 'fire',
+            attackerName: 'TestWizard',
+            name: 'Fireball',
+            formula: '8d6',
+            rolls: [3, 4, 5, 2, 3, 3],
+            modifier: 0,
+            campaignName: 'test-campaign',
+            setPopupHtml: vi.fn(),
+            ...overrides,
+        };
+    }
+
     describe('save-result event', () => {
         it('handles save-result event with pending save', () => {
             setup();
             const promptId = 'test-prompt-1';
             window.__pendingSaves = {
-                [promptId]: {
-                    promptId,
-                    targetName: 'Goblin',
-                    rawDamage: 15,
-                    saveDc: 15,
-                    saveType: 'DEX',
-                    dcSuccess: 'half',
-                    damageType: 'fire',
-                    attackerName: 'TestWizard',
-                    name: 'Fireball',
-                    formula: '8d6',
-                    rolls: [3, 4, 5, 2, 3, 3],
-                    modifier: 0,
-                    campaignName: 'test-campaign',
-                    setPopupHtml: vi.fn(),
-                },
+                [promptId]: createSavePrompt(promptId),
             };
 
             window.dispatchEvent(new CustomEvent('save-result', {
@@ -149,22 +158,9 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             hasSoulstitchProtection.mockReturnValue(true);
             const promptId = 'test-prompt-2';
             window.__pendingSaves = {
-                [promptId]: {
-                    promptId,
+                [promptId]: createSavePrompt(promptId, {
                     targetName: 'Ally',
-                    rawDamage: 15,
-                    saveDc: 15,
-                    saveType: 'DEX',
-                    dcSuccess: 'half',
-                    damageType: 'fire',
-                    attackerName: 'TestWizard',
-                    name: 'Fireball',
-                    formula: '8d6',
-                    rolls: [3, 4, 5, 2, 3, 3],
-                    modifier: 0,
-                    campaignName: 'test-campaign',
-                    setPopupHtml: vi.fn(),
-                },
+                }),
             };
 
             window.dispatchEvent(new CustomEvent('save-result', {
@@ -191,22 +187,9 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             ];
             const promptId = 'test-prompt-3';
             window.__pendingSaves = {
-                [promptId]: {
-                    promptId,
+                [promptId]: createSavePrompt(promptId, {
                     targetName: 'Ally',
-                    rawDamage: 15,
-                    saveDc: 15,
-                    saveType: 'DEX',
-                    dcSuccess: 'half',
-                    damageType: 'fire',
-                    attackerName: 'TestWizard',
-                    name: 'Fireball',
-                    formula: '8d6',
-                    rolls: [3, 4, 5, 2, 3, 3],
-                    modifier: 0,
-                    campaignName: 'test-campaign',
-                    setPopupHtml: vi.fn(),
-                },
+                }),
             };
 
             window.dispatchEvent(new CustomEvent('save-result', {
@@ -228,22 +211,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             const setPopupHtml = vi.fn();
             const promptId = 'test-prompt-7';
             window.__pendingSaves = {
-                [promptId]: {
-                    promptId,
-                    targetName: 'Goblin',
-                    rawDamage: 15,
-                    saveDc: 15,
-                    saveType: 'DEX',
-                    dcSuccess: 'half',
-                    damageType: 'fire',
-                    attackerName: 'TestWizard',
-                    name: 'Fireball',
-                    formula: '8d6',
-                    rolls: [3, 4, 5, 2, 3, 3],
-                    modifier: 0,
-                    campaignName: 'test-campaign',
-                    setPopupHtml,
-                },
+                [promptId]: createSavePrompt(promptId, { setPopupHtml }),
             };
 
             window.dispatchEvent(new CustomEvent('save-result', {
@@ -267,22 +235,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             setup();
             const promptId = 'test-prompt-8';
             window.__pendingSaves = {
-                [promptId]: {
-                    promptId,
-                    targetName: 'Goblin',
-                    rawDamage: 15,
-                    saveDc: 15,
-                    saveType: 'DEX',
-                    dcSuccess: 'half',
-                    damageType: 'fire',
-                    attackerName: 'TestWizard',
-                    name: 'Fireball',
-                    formula: '8d6',
-                    rolls: [3, 4, 5, 2, 3, 3],
-                    modifier: 0,
-                    campaignName: 'test-campaign',
-                    setPopupHtml: vi.fn(),
-                },
+                [promptId]: createSavePrompt(promptId),
             };
 
             window.dispatchEvent(new CustomEvent('save-result', {
@@ -301,7 +254,7 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
     });
 
     describe('death-save-result event', () => {
-        it('logs death save entry', () => {
+        it('logs death save entry with basic fields', () => {
             setup();
             window.dispatchEvent(new CustomEvent('death-save-result', {
                 detail: {
@@ -436,7 +389,6 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
             setup();
             setup();
             setup();
-            // The flag should prevent re-installation
             expect(window.__pendingResultHandlersInstalled).toBe(true);
         });
     });

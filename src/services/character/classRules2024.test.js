@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import classRules from './classRules2024.js';
 
@@ -115,9 +116,7 @@ describe('classRules2024', () => {
     });
 
     it('adds Martial Weapons and Heavy Armor for Divine Order Protector Cleric', () => {
-      const allClasses = [{
-        name: 'Cleric',
-      }];
+      const allClasses = [{ name: 'Cleric' }];
       const result = classRules.getClass(allClasses, {
         class: { name: 'Cleric', divineOrder: 'Protector' },
       });
@@ -126,9 +125,7 @@ describe('classRules2024', () => {
     });
 
     it('adds Martial Weapons and Medium Armor for Primal Order Warden Druid', () => {
-      const allClasses = [{
-        name: 'Druid',
-      }];
+      const allClasses = [{ name: 'Druid' }];
       const result = classRules.getClass(allClasses, {
         class: { name: 'Druid', primalOrder: 'Warden' },
       });
@@ -137,13 +134,92 @@ describe('classRules2024', () => {
     });
 
     it('handles missing major by setting to null', () => {
-      const allClasses = [{
-        name: 'Cleric',
-      }];
+      const allClasses = [{ name: 'Cleric' }];
       const result = classRules.getClass(allClasses, {
         class: { name: 'Cleric' },
       });
       expect(result.major).toBeNull();
+    });
+
+    it('handles legacy subclass format via subclass.name fallback', () => {
+      const allClasses = [{
+        name: 'Cleric',
+        majors: [{ name: 'Life' }],
+      }];
+      const result = classRules.getClass(allClasses, {
+        class: { name: 'Cleric', subclass: { name: 'Life' } },
+      });
+      expect(result.major).toEqual({ name: 'Life' });
+    });
+
+    it('creates major with empty features when subclass not found in majors', () => {
+      const allClasses = [{
+        name: 'Cleric',
+        majors: [{ name: 'Life' }],
+      }];
+      const result = classRules.getClass(allClasses, {
+        class: { name: 'Cleric', subclass: { name: 'Unknown' } },
+      });
+      expect(result.major).toEqual({ name: 'Unknown', features: [] });
+    });
+
+    it('handles unknown weapon_proficiencies value gracefully', () => {
+      const allClasses = [{
+        name: 'Cleric',
+        weapon_proficiencies: 'Unknown weapon type',
+      }];
+      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
+      expect(result.proficiencies).toEqual([]);
+    });
+
+    it('handles unknown armor_training value gracefully', () => {
+      const allClasses = [{
+        name: 'Fighter',
+        armor_training: 'Unknown armor type',
+      }];
+      const result = classRules.getClass(allClasses, { class: { name: 'Fighter' } });
+      expect(result.proficiencies).toEqual([]);
+    });
+
+    it('skips armor_training when value is None', () => {
+      const allClasses = [{
+        name: 'Barbarian',
+        armor_training: 'None',
+      }];
+      const result = classRules.getClass(allClasses, { class: { name: 'Barbarian' } });
+      expect(result.proficiencies).toEqual([]);
+    });
+
+    it('falls back to skill_proficiencies_choices when skill_proficiencies is null', () => {
+      const allClasses = [{
+        name: 'Cleric',
+        skill_proficiencies: null,
+        skill_proficiencies_choices: 'History, Religion',
+      }];
+      const result = classRules.getClass(allClasses, { class: { name: 'Cleric' } });
+      expect(result.proficiencies).toContain('Skill: History');
+      expect(result.proficiencies).toContain('Skill: Religion');
+    });
+
+    it('deletes majors property from returned class object', () => {
+      const allClasses = [{
+        name: 'Cleric',
+        majors: [{ name: 'Life' }, { name: 'Knowledge' }],
+      }];
+      const result = classRules.getClass(allClasses, {
+        class: { name: 'Cleric', major: { name: 'Life' } },
+      });
+      expect(result.majors).toBeUndefined();
+    });
+
+    it('throws when playerSummary.class is null', () => {
+      const allClasses = [{ name: 'Cleric' }];
+      expect(() => classRules.getClass(allClasses, { class: null })).toThrow(TypeError);
+    });
+
+    it('throws when playerSummary.class is undefined', () => {
+      const allClasses = [{ name: 'Cleric' }];
+      expect(() => classRules.getClass(allClasses, { class: undefined })).toThrow(TypeError);
     });
   });
 
@@ -185,6 +261,36 @@ describe('classRules2024', () => {
       };
       expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(2);
     });
+
+    it('returns 0 when class_levels is undefined', () => {
+      const playerStats = {
+        class: {},
+        level: 3,
+      };
+      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(0);
+    });
+
+    it('returns 1 for Moon subclass at level 2', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{ level: 2, beast_max_cr: 0.25 }],
+          major: { name: 'Moon' },
+        },
+        level: 2,
+      };
+      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(1);
+    });
+
+    it('does not override for non-Moon subclass', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{ level: 8, beast_max_cr: 0.5 }],
+          major: { name: 'Spores' },
+        },
+        level: 8,
+      };
+      expect(classRules.getDruidMaxWildShapeChallengeRating(playerStats)).toBe(0.5);
+    });
   });
 
   describe('getDruidWildShapeUses', () => {
@@ -203,6 +309,19 @@ describe('classRules2024', () => {
       };
       expect(classRules.getDruidWildShapeUses(playerStats)).toBe(0);
     });
+
+    it('returns 0 when wild_shape is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 3 }] },
+        level: 3,
+      };
+      expect(classRules.getDruidWildShapeUses(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 3 };
+      expect(classRules.getDruidWildShapeUses(playerStats)).toBe(0);
+    });
   });
 
   describe('getDruidBeastKnownForms', () => {
@@ -217,6 +336,14 @@ describe('classRules2024', () => {
     it('returns 0 when no class_level found', () => {
       const playerStats = {
         class: { class_levels: [] },
+        level: 3,
+      };
+      expect(classRules.getDruidBeastKnownForms(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when beast_known_forms is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 3 }] },
         level: 3,
       };
       expect(classRules.getDruidBeastKnownForms(playerStats)).toBe(0);
@@ -247,10 +374,18 @@ describe('classRules2024', () => {
       };
       expect(classRules.getDruidBeastFlySpeed(playerStats)).toBe(false);
     });
+
+    it('returns false when beast_fly_speed is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 3 }] },
+        level: 3,
+      };
+      expect(classRules.getDruidBeastFlySpeed(playerStats)).toBe(false);
+    });
   });
 
   describe('getFeatures', () => {
-    it('returns features from class levels', () => {
+    it('returns categorized features object with all category keys', () => {
       const playerStats = {
         class: {
           class_levels: [
@@ -261,7 +396,11 @@ describe('classRules2024', () => {
         level: 2,
       };
       const result = classRules.getFeatures(playerStats);
-      expect(result).toBeDefined();
+      expect(result).toHaveProperty('actions');
+      expect(result).toHaveProperty('bonusActions');
+      expect(result).toHaveProperty('reactions');
+      expect(result).toHaveProperty('specialActions');
+      expect(result).toHaveProperty('characterAdvancement');
     });
 
     it('filters out features above player level', () => {
@@ -276,36 +415,71 @@ describe('classRules2024', () => {
         level: 2,
       };
       const result = classRules.getFeatures(playerStats);
-      expect(result).toBeDefined();
+      const allFeatureNames = [
+        ...result.actions,
+        ...result.bonusActions,
+        ...result.reactions,
+        ...result.specialActions,
+        ...result.characterAdvancement,
+      ].map(f => f.name);
+      expect(allFeatureNames).not.toContain('Level 3 Feature');
+      expect(allFeatureNames).toContain('Level 1 Feature');
     });
 
-    it('handles Heightened replacement for Monk at level >= 10', () => {
+    it('replaces base monk features with Heightened versions at level >= 10', () => {
       const playerStats = {
         class: {
           class_levels: [
-            { level: 1, features: [{ name: 'Flurry of Blows', level: 2 }] },
-            { level: 2, features: [{ name: 'Heightened Flurry of Blows', level: 10 }] },
-            { level: 3, features: [] },
+            { level: 1, features: [
+              { name: 'Flurry of Blows', level: 2 },
+              { name: 'Patient Defense', level: 2 },
+              { name: 'Step of the Wind', level: 2 },
+            ]},
+            { level: 2, features: [
+              { name: 'Heightened Flurry of Blows', level: 10 },
+            ]},
           ],
         },
         level: 10,
       };
       const result = classRules.getFeatures(playerStats);
-      expect(result).toBeDefined();
+      const allFeatureNames = [
+        ...result.actions,
+        ...result.bonusActions,
+        ...result.reactions,
+        ...result.specialActions,
+        ...result.characterAdvancement,
+      ].map(f => f.name);
+      expect(allFeatureNames).not.toContain('Flurry of Blows');
+      expect(allFeatureNames).not.toContain('Patient Defense');
+      expect(allFeatureNames).not.toContain('Step of the Wind');
+      expect(allFeatureNames).toContain('Heightened Flurry of Blows');
     });
 
-    it('handles Deflect Energy replacement at level >= 13', () => {
+    it('replaces Deflect Attacks with Deflect Energy at level >= 13', () => {
       const playerStats = {
         class: {
           class_levels: [
-            { level: 1, features: [{ name: 'Deflect Attacks', level: 1 }] },
-            { level: 2, features: [{ name: 'Deflect Energy', level: 13 }] },
+            { level: 1, features: [
+              { name: 'Deflect Attacks', level: 1 },
+            ]},
+            { level: 2, features: [
+              { name: 'Deflect Energy', level: 13 },
+            ]},
           ],
         },
         level: 13,
       };
       const result = classRules.getFeatures(playerStats);
-      expect(result).toBeDefined();
+      const allFeatureNames = [
+        ...result.actions,
+        ...result.bonusActions,
+        ...result.reactions,
+        ...result.specialActions,
+        ...result.characterAdvancement,
+      ].map(f => f.name);
+      expect(allFeatureNames).not.toContain('Deflect Attacks');
+      expect(allFeatureNames).toContain('Deflect Energy');
     });
 
     it('includes major features when major exists', () => {
@@ -319,7 +493,51 @@ describe('classRules2024', () => {
         level: 1,
       };
       const result = classRules.getFeatures(playerStats);
-      expect(result).toBeDefined();
+      const allFeatureNames = [
+        ...result.actions,
+        ...result.bonusActions,
+        ...result.reactions,
+        ...result.specialActions,
+        ...result.characterAdvancement,
+      ].map(f => f.name);
+      expect(allFeatureNames).toContain('Major Feature');
+    });
+
+    it('filters out major features above player level', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{ level: 1, features: [] }],
+          major: {
+            features: [
+              { name: 'Low Feature', level: 1 },
+              { name: 'High Feature', level: 15 },
+            ],
+          },
+        },
+        level: 5,
+      };
+      const result = classRules.getFeatures(playerStats);
+      const allFeatureNames = [
+        ...result.actions,
+        ...result.bonusActions,
+        ...result.reactions,
+        ...result.specialActions,
+        ...result.characterAdvancement,
+      ].map(f => f.name);
+      expect(allFeatureNames).toContain('Low Feature');
+      expect(allFeatureNames).not.toContain('High Feature');
+    });
+
+    it('throws when playerStats has no class property', () => {
+      const playerStats = {};
+      expect(() => classRules.getFeatures(playerStats)).toThrow(TypeError);
+    });
+
+    it('handles playerStats with no class_levels', () => {
+      const playerStats = { class: {}, level: 5 };
+      const result = classRules.getFeatures(playerStats);
+      expect(result).toHaveProperty('actions');
+      expect(result.actions).toEqual([]);
     });
   });
 
@@ -358,6 +576,23 @@ describe('classRules2024', () => {
         level: 10,
       };
       expect(classRules.getHighestMajorLevel(playerStats)).toBe(1);
+    });
+
+    it('returns 0 when major has no features', () => {
+      const playerStats = {
+        class: {
+          major: { features: [] },
+        },
+        level: 10,
+      };
+      expect(classRules.getHighestMajorLevel(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when major is null', () => {
+      const playerStats = {
+        class: { major: null },
+      };
+      expect(classRules.getHighestMajorLevel(playerStats)).toBe(0);
     });
   });
 
@@ -398,6 +633,42 @@ describe('classRules2024', () => {
       };
       expect(classRules.getEnergy(playerStats)).toBeNull();
     });
+
+    it('returns energy when required_major matches', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{ level: 5, energy: { type: 'psi', required_major: 'Storm Sorcery' } }],
+          major: { name: 'Storm Sorcery' },
+        },
+        level: 5,
+      };
+      expect(classRules.getEnergy(playerStats)).toEqual({ type: 'psi', required_major: 'Storm Sorcery' });
+    });
+
+    it('returns null when no major but required_major is set', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{ level: 5, energy: { type: 'psi', required_major: 'Storm Sorcery' } }],
+        },
+        level: 5,
+      };
+      expect(classRules.getEnergy(playerStats)).toBeNull();
+    });
+
+    it('returns energy when no required_major field', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{ level: 5, energy: { type: 'psi' } }],
+        },
+        level: 5,
+      };
+      expect(classRules.getEnergy(playerStats)).toEqual({ type: 'psi' });
+    });
+
+    it('returns null when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      expect(classRules.getEnergy(playerStats)).toBeNull();
+    });
   });
 
   describe('getSecondWind', () => {
@@ -424,6 +695,11 @@ describe('classRules2024', () => {
       };
       expect(classRules.getSecondWind(playerStats)).toBe(0);
     });
+
+    it('returns 0 when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      expect(classRules.getSecondWind(playerStats)).toBe(0);
+    });
   });
 
   describe('getWeaponMastery', () => {
@@ -440,6 +716,19 @@ describe('classRules2024', () => {
         class: { class_levels: [] },
         level: 5,
       };
+      expect(classRules.getWeaponMastery(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when weapon_mastery is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 5 }] },
+        level: 5,
+      };
+      expect(classRules.getWeaponMastery(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
       expect(classRules.getWeaponMastery(playerStats)).toBe(0);
     });
   });
@@ -460,6 +749,19 @@ describe('classRules2024', () => {
       };
       expect(classRules.getMartialArtsDie(playerStats)).toBe(4);
     });
+
+    it('returns 4 (d4) when martial_arts_die is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 5 }] },
+        level: 5,
+      };
+      expect(classRules.getMartialArtsDie(playerStats)).toBe(4);
+    });
+
+    it('returns 4 (d4) when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      expect(classRules.getMartialArtsDie(playerStats)).toBe(4);
+    });
   });
 
   describe('getFocusPoints', () => {
@@ -476,6 +778,19 @@ describe('classRules2024', () => {
         class: { class_levels: [] },
         level: 5,
       };
+      expect(classRules.getFocusPoints(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when focus_points is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 5 }] },
+        level: 5,
+      };
+      expect(classRules.getFocusPoints(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
       expect(classRules.getFocusPoints(playerStats)).toBe(0);
     });
   });
@@ -496,6 +811,19 @@ describe('classRules2024', () => {
       };
       expect(classRules.getUnarmoredMovementIncrease(playerStats)).toBe(0);
     });
+
+    it('returns 0 when unarmored_movement_increase is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 5 }] },
+        level: 5,
+      };
+      expect(classRules.getUnarmoredMovementIncrease(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      expect(classRules.getUnarmoredMovementIncrease(playerStats)).toBe(0);
+    });
   });
 
   describe('getFavoredEnemy', () => {
@@ -514,6 +842,19 @@ describe('classRules2024', () => {
       };
       expect(classRules.getFavoredEnemy(playerStats)).toBe(0);
     });
+
+    it('returns 0 when favored_enemy is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 5 }] },
+        level: 5,
+      };
+      expect(classRules.getFavoredEnemy(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      expect(classRules.getFavoredEnemy(playerStats)).toBe(0);
+    });
   });
 
   describe('getRogueSneakAttack', () => {
@@ -525,11 +866,24 @@ describe('classRules2024', () => {
       expect(classRules.getRogueSneakAttack(playerStats)).toEqual({ dice_count: 3, dice_value: 6 });
     });
 
-    it('returns 0 when no class_level found', () => {
+    it('returns 0 dice_count when no class_level found', () => {
       const playerStats = {
         class: { class_levels: [] },
         level: 5,
       };
+      expect(classRules.getRogueSneakAttack(playerStats)).toEqual({ dice_count: 0, dice_value: 6 });
+    });
+
+    it('returns 0 dice_count when sneak_attack_num_d6 is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{}, {}, {}, {}, {}] },
+        level: 5,
+      };
+      expect(classRules.getRogueSneakAttack(playerStats)).toEqual({ dice_count: 0, dice_value: 6 });
+    });
+
+    it('returns 0 dice_count when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
       expect(classRules.getRogueSneakAttack(playerStats)).toEqual({ dice_count: 0, dice_value: 6 });
     });
   });
@@ -550,6 +904,19 @@ describe('classRules2024', () => {
       };
       expect(classRules.getEldritchInvocations(playerStats)).toBe(0);
     });
+
+    it('returns 0 when eldritch_invocations is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{}, {}, {}, {}, {}] },
+        level: 5,
+      };
+      expect(classRules.getEldritchInvocations(playerStats)).toBe(0);
+    });
+
+    it('returns 0 when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      expect(classRules.getEldritchInvocations(playerStats)).toBe(0);
+    });
   });
 
   describe('getClericFeatures', () => {
@@ -562,11 +929,26 @@ describe('classRules2024', () => {
       expect(result).toEqual({ maxChannelDivinity: 3, destroyUndeadCR: null });
     });
 
-    it('returns 0 when no class_level found', () => {
+    it('returns 0 maxChannelDivinity when no class_level found', () => {
       const playerStats = {
         class: { class_levels: [] },
         level: 5,
       };
+      const result = classRules.getClericFeatures(playerStats);
+      expect(result).toEqual({ maxChannelDivinity: 0, destroyUndeadCR: null });
+    });
+
+    it('returns 0 maxChannelDivinity when channel_divinity is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{}, {}, {}, {}, {}] },
+        level: 5,
+      };
+      const result = classRules.getClericFeatures(playerStats);
+      expect(result).toEqual({ maxChannelDivinity: 0, destroyUndeadCR: null });
+    });
+
+    it('returns 0 maxChannelDivinity when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
       const result = classRules.getClericFeatures(playerStats);
       expect(result).toEqual({ maxChannelDivinity: 0, destroyUndeadCR: null });
     });
@@ -597,6 +979,26 @@ describe('classRules2024', () => {
       const result = classRules.getDruidFeatures(playerStats);
       expect(result.wildShapeLimitations).toBe('walk or swim only (no fly)');
     });
+
+    it('returns no fly limitation when beast_fly_speed is undefined', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{ level: 3, wild_shape: 2, beast_max_cr: 0.5, beast_known_forms: 2 }],
+        },
+        level: 3,
+      };
+      const result = classRules.getDruidFeatures(playerStats);
+      expect(result.wildShapeLimitations).toBe('walk or swim only (no fly)');
+    });
+
+    it('returns zero values when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 3 };
+      const result = classRules.getDruidFeatures(playerStats);
+      expect(result.maxWildShapeUses).toBe(0);
+      expect(result.maxWildShapeChallengeRating).toBe(0);
+      expect(result.beastKnownForms).toBe(0);
+      expect(result.wildShapeLimitations).toBe('walk or swim only (no fly)');
+    });
   });
 
   describe('getPaladinFeatures', () => {
@@ -619,12 +1021,29 @@ describe('classRules2024', () => {
       const result = classRules.getPaladinFeatures(playerStats);
       expect(result.extraAttacks).toBe(0);
     });
+
+    it('returns 0 maxChannelDivinity when channel_divinity is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{}, {}, {}, {}, {}] },
+        level: 5,
+      };
+      const result = classRules.getPaladinFeatures(playerStats);
+      expect(result.maxChannelDivinity).toBe(0);
+    });
+
+    it('returns 0 maxChannelDivinity when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      const result = classRules.getPaladinFeatures(playerStats);
+      expect(result.maxChannelDivinity).toBe(0);
+    });
   });
 
   describe('getSorcererFeatures', () => {
     it('returns metamagicKnown based on level', () => {
+      const classLevels = Array.from({ length: 20 }, (_, i) => ({ level: i + 1 }));
+      classLevels[19] = { level: 20, sorcery_points: 5 };
       const playerStats = {
-        class: { class_levels: [{}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, { sorcery_points: 5 }] },
+        class: { class_levels: classLevels },
         level: 20,
       };
       const result = classRules.getSorcererFeatures(playerStats);
@@ -634,8 +1053,10 @@ describe('classRules2024', () => {
     });
 
     it('returns metamagicKnown=4 for level >= 10', () => {
+      const classLevels = Array.from({ length: 12 }, (_, i) => ({ level: i + 1 }));
+      classLevels[11] = { level: 12, sorcery_points: 5 };
       const playerStats = {
-        class: { class_levels: [{}, {}, {}, {}, {}, {}, {}, {}, {}, { sorcery_points: 5 }] },
+        class: { class_levels: classLevels },
         level: 12,
       };
       const result = classRules.getSorcererFeatures(playerStats);
@@ -643,8 +1064,10 @@ describe('classRules2024', () => {
     });
 
     it('returns metamagicKnown=2 for level >= 3', () => {
+      const classLevels = Array.from({ length: 5 }, (_, i) => ({ level: i + 1 }));
+      classLevels[4] = { level: 5, sorcery_points: 5 };
       const playerStats = {
-        class: { class_levels: [{}, {}, { sorcery_points: 5 }] },
+        class: { class_levels: classLevels },
         level: 5,
       };
       const result = classRules.getSorcererFeatures(playerStats);
@@ -652,19 +1075,43 @@ describe('classRules2024', () => {
     });
 
     it('returns metamagicKnown=0 for level < 3', () => {
+      const classLevels = Array.from({ length: 2 }, (_, i) => ({ level: i + 1 }));
+      classLevels[1] = { level: 2, sorcery_points: 5 };
       const playerStats = {
-        class: { class_levels: [{ sorcery_points: 5 }] },
+        class: { class_levels: classLevels },
         level: 2,
       };
       const result = classRules.getSorcererFeatures(playerStats);
       expect(result.metamagicKnown).toBe(0);
     });
+
+    it('returns 0 maxSorceryPoints when sorcery_points is undefined', () => {
+      const classLevels = [{ level: 5 }];
+      const playerStats = {
+        class: { class_levels: classLevels },
+        level: 5,
+      };
+      const result = classRules.getSorcererFeatures(playerStats);
+      expect(result.maxSorceryPoints).toBe(0);
+    });
+
+    it('returns 0 maxSorceryPoints when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      const result = classRules.getSorcererFeatures(playerStats);
+      expect(result.maxSorceryPoints).toBe(0);
+    });
+
+    it('returns empty creatingSpellSlotCosts array', () => {
+      const playerStats = { class: { class_levels: [{ level: 1 }] }, level: 1 };
+      const result = classRules.getSorcererFeatures(playerStats);
+      expect(result.creatingSpellSlotCosts).toEqual([]);
+    });
   });
 
   describe('getWarlockFeatures', () => {
     it('returns warlock features with arcanum for level > 10', () => {
-      const classLevels = Array(15).fill(null);
-      classLevels[14] = { eldritch_invocations: 4 };
+      const classLevels = Array.from({ length: 15 }, (_, i) => ({ level: i + 1 }));
+      classLevels[14] = { level: 15, eldritch_invocations: 4 };
       const playerStats = {
         class: {
           class_levels: classLevels,
@@ -685,8 +1132,8 @@ describe('classRules2024', () => {
     });
 
     it('returns null arcanumLevels for level <= 10', () => {
-      const classLevels = Array(11).fill(null);
-      classLevels[9] = { eldritch_invocations: 2 };
+      const classLevels = Array.from({ length: 11 }, (_, i) => ({ level: i + 1 }));
+      classLevels[9] = { level: 10, eldritch_invocations: 2 };
       const playerStats = {
         class: {
           class_levels: classLevels,
@@ -699,6 +1146,38 @@ describe('classRules2024', () => {
       const result = classRules.getWarlockFeatures(playerStats);
       expect(result.hasArcanum).toBe(false);
       expect(result.arcanumLevels).toBeNull();
+    });
+
+    it('returns correct arcanum levels at each threshold', () => {
+      const makeStats = (level) => ({
+        class: {
+          class_levels: Array.from({ length: level }, (_, i) => ({ level: i + 1 })),
+          arcanums: [],
+          pactBoon: null,
+          invocations: [],
+        },
+        level,
+      });
+      const testArcanum = (level, expected) => {
+        const result = classRules.getWarlockFeatures(makeStats(level));
+        expect(result.arcanumLevels).toEqual(expected);
+      };
+      testArcanum(11, { level6: 1, level7: 0, level8: 0, level9: 0 });
+      testArcanum(13, { level6: 1, level7: 1, level8: 0, level9: 0 });
+      testArcanum(15, { level6: 1, level7: 1, level8: 1, level9: 0 });
+      testArcanum(17, { level6: 1, level7: 1, level8: 1, level9: 1 });
+    });
+
+    it('returns empty arrays when arcanums and invocations are undefined', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{ level: 1 }],
+        },
+        level: 1,
+      };
+      const result = classRules.getWarlockFeatures(playerStats);
+      expect(result.arcanums).toEqual([]);
+      expect(result.invocations).toEqual([]);
     });
   });
 
@@ -729,6 +1208,21 @@ describe('classRules2024', () => {
       const result = classRules.getWizardFeatures(playerStats);
       expect(result.arcaneRecoveryLevels).toBe(0);
     });
+
+    it('returns 0 arcaneRecoveryLevels when class_specific is undefined', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 5 }] },
+        level: 5,
+      };
+      const result = classRules.getWizardFeatures(playerStats);
+      expect(result.arcaneRecoveryLevels).toBe(0);
+    });
+
+    it('returns 0 arcaneRecoveryLevels when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      const result = classRules.getWizardFeatures(playerStats);
+      expect(result.arcaneRecoveryLevels).toBe(0);
+    });
   });
 
   describe('getMonkFeatures', () => {
@@ -748,6 +1242,15 @@ describe('classRules2024', () => {
       expect(result.martialArtsDie).toBe(6);
       expect(result.unarmoredMovementIncrease).toBe(10);
       expect(result.maxFocusPoints).toBe(8);
+      expect(result.wisdomBonus).toBe(0);
+    });
+
+    it('returns default values when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      const result = classRules.getMonkFeatures(playerStats);
+      expect(result.martialArtsDie).toBe(4);
+      expect(result.unarmoredMovementIncrease).toBe(0);
+      expect(result.maxFocusPoints).toBe(0);
       expect(result.wisdomBonus).toBe(0);
     });
   });
@@ -778,6 +1281,22 @@ describe('classRules2024', () => {
       const result = classRules.getRangerFeatures(playerStats);
       expect(result.extraAttacks).toBe(0);
     });
+
+    it('returns 0 favoredEnemies when favored_enemy is undefined', () => {
+      const classLevels = [{ level: 5 }];
+      const playerStats = {
+        class: { class_levels: classLevels },
+        level: 5,
+      };
+      const result = classRules.getRangerFeatures(playerStats);
+      expect(result.favoredEnemies).toBe(0);
+    });
+
+    it('returns 0 favoredEnemies when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      const result = classRules.getRangerFeatures(playerStats);
+      expect(result.favoredEnemies).toBe(0);
+    });
   });
 
   describe('getRogueFeatures', () => {
@@ -793,11 +1312,28 @@ describe('classRules2024', () => {
       expect(result.sneakAttack).toEqual({ dice_count: 3, dice_value: 6 });
       expect(result.expertise).toEqual(['Stealth', 'Persuasion']);
     });
+
+    it('returns empty expertise array when expertise is undefined', () => {
+      const playerStats = {
+        class: {
+          class_levels: [{}, {}, {}, {}, { sneak_attack_num_d6: 3 }],
+        },
+        level: 5,
+      };
+      const result = classRules.getRogueFeatures(playerStats);
+      expect(result.expertise).toEqual([]);
+    });
+
+    it('returns empty expertise array when class is undefined', () => {
+      const playerStats = { level: 5 };
+      const result = classRules.getRogueFeatures(playerStats);
+      expect(result.expertise).toEqual([]);
+    });
   });
 
   describe('getBardFeatures', () => {
     it('returns bard features with bardicDie and magicalSecrets', () => {
-      const classLevels = Array(9).fill(null).map((_, i) => ({ level: i + 1 }));
+      const classLevels = Array.from({ length: 9 }, (_, i) => ({ level: i + 1 }));
       classLevels[9] = { level: 10, bardic_die: 6, class_specific: { magical_secrets: 2 } };
       const playerStats = {
         class: { class_levels: classLevels },
@@ -821,6 +1357,51 @@ describe('classRules2024', () => {
       };
       const result = classRules.getBardFeatures(playerStats);
       expect(result.bardicDie).toBe(0);
+    });
+
+    it('returns null magicalSecrets when class_specific is undefined', () => {
+      const classLevels = [{ level: 5 }];
+      const playerStats = {
+        class: { class_levels: classLevels },
+        level: 5,
+      };
+      const result = classRules.getBardFeatures(playerStats);
+      expect(result.magicalSecrets).toBeNull();
+    });
+
+    it('returns null magicalSecrets when class_specific.magical_secrets is undefined', () => {
+      const classLevels = [{ level: 5, class_specific: {} }];
+      const playerStats = {
+        class: { class_levels: classLevels },
+        level: 5,
+      };
+      const result = classRules.getBardFeatures(playerStats);
+      expect(result.magicalSecrets).toBeNull();
+    });
+
+    it('returns null songOfRestDie', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 1, bardic_die: 4 }] },
+        level: 1,
+      };
+      const result = classRules.getBardFeatures(playerStats);
+      expect(result.songOfRestDie).toBeNull();
+    });
+
+    it('returns 0 subclassMagicalSecrets', () => {
+      const playerStats = {
+        class: { class_levels: [{ level: 1, bardic_die: 4 }] },
+        level: 1,
+      };
+      const result = classRules.getBardFeatures(playerStats);
+      expect(result.subclassMagicalSecrets).toBe(0);
+    });
+
+    it('returns 0 bardicDie and null magicalSecrets when class_levels is undefined', () => {
+      const playerStats = { class: {}, level: 5 };
+      const result = classRules.getBardFeatures(playerStats);
+      expect(result.bardicDie).toBe(0);
+      expect(result.magicalSecrets).toBeNull();
     });
   });
 });

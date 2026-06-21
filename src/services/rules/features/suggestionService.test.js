@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerSuggestion } from './suggestionService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -32,10 +33,43 @@ describe('suggestionService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null when spell name is "suggestion" case-insensitive and executes handler', async () => {
+        it('matches spell name case-insensitively', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            const spellNames = ['Suggestion', 'suggestion', 'SUGGESTION', 'SuGgEsTiOn'];
+            for (const name of spellNames) {
+                await triggerSuggestion(
+                    { name, level: 3 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+                expect(executeHandler).toHaveBeenCalled();
+                vi.clearAllMocks();
+            }
+        });
+
+        it('returns null for empty or missing spell name', async () => {
+            const emptyNames = ['', undefined, null];
+            for (const name of emptyNames) {
+                const result = await triggerSuggestion(
+                    { name },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+                expect(result).toBeNull();
+                expect(executeHandler).not.toHaveBeenCalled();
+                vi.clearAllMocks();
+            }
+        });
+
+        it('builds action with correct automation structure and calls executeHandler', async () => {
             executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
 
-            const result = await triggerSuggestion(
+            await triggerSuggestion(
                 { name: 'Suggestion', level: 3 },
                 {},
                 playerStats,
@@ -46,78 +80,167 @@ describe('suggestionService', () => {
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
                     name: 'Suggestion',
-                    automation: expect.objectContaining({
+                    automation: {
                         type: 'suggestion',
                         saveDc: 15,
                         saveType: 'WIS',
-                    }),
+                    },
                     spellSlotLevel: 3,
                 }),
                 playerStats,
                 campaignName,
                 mapName,
             );
-            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
         });
 
-        it('handles lowercase "suggestion" spell name', async () => {
+        it('passes the original spell object into the action', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
+            const spell = { name: 'Suggestion', level: 3, school: 'Enchantment' };
 
-            const result = await triggerSuggestion(
-                { name: 'suggestion', level: 3 },
-                {},
+            await triggerSuggestion(spell, {}, playerStats, campaignName, mapName);
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spell }),
                 playerStats,
                 campaignName,
                 mapName,
             );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
         });
 
-        it('handles mixed-case "SUGGESTION" spell name', async () => {
+        it('resolves saveDc from metaCtx first, then playerStats, then proficiency fallback', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
-            const result = await triggerSuggestion(
-                { name: 'SUGGESTION', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('uses spellSaveDc from metaCtx when provided', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
+            // metaCtx overrides playerStats
             await triggerSuggestion(
                 { name: 'Suggestion', level: 3 },
-                { spellSaveDc: 18, slotLevel: 5 },
+                { spellSaveDc: 18 },
                 playerStats,
                 campaignName,
                 mapName,
             );
-
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
                     automation: expect.objectContaining({ saveDc: 18 }),
-                    spellSlotLevel: 5,
                 }),
+                expect.anything(),
+                expect.anything(),
+                expect.anything(),
+            );
+            vi.clearAllMocks();
+
+            // playerStats.spellAbilities.saveDc fallback
+            await triggerSuggestion(
+                { name: 'Suggestion', level: 3 },
+                {},
                 playerStats,
+                campaignName,
+                mapName,
+            );
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ saveDc: 15 }),
+                }),
+                expect.anything(),
+                expect.anything(),
+                expect.anything(),
+            );
+            vi.clearAllMocks();
+
+            // proficiency-based fallback: 8 + proficiency
+            const statsWithProficiency = { name: 'Wizard', proficiency: 3 };
+            await triggerSuggestion(
+                { name: 'Suggestion', level: 3 },
+                {},
+                statsWithProficiency,
+                campaignName,
+                mapName,
+            );
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ saveDc: 11 }),
+                }),
+                statsWithProficiency,
+                campaignName,
+                mapName,
+            );
+            vi.clearAllMocks();
+
+            // default proficiency of 2 when missing
+            const statsNoProficiency = { name: 'Wizard' };
+            await triggerSuggestion(
+                { name: 'Suggestion', level: 3 },
+                {},
+                statsNoProficiency,
+                campaignName,
+                mapName,
+            );
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: expect.objectContaining({ saveDc: 10 }),
+                }),
+                statsNoProficiency,
                 campaignName,
                 mapName,
             );
         });
 
-        it('falls back to playerStats spellAbilities saveDc when metaCtx lacks it', async () => {
+        it('resolves slotLevel from metaCtx first, then spell.level, then default of 2', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            // metaCtx slotLevel takes priority
+            await triggerSuggestion(
+                { name: 'Suggestion', level: 3 },
+                { slotLevel: 5 },
+                playerStats,
+                campaignName,
+                mapName,
+            );
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spellSlotLevel: 5 }),
+                expect.anything(),
+                expect.anything(),
+                expect.anything(),
+            );
+            vi.clearAllMocks();
+
+            // spell.level fallback
+            await triggerSuggestion(
+                { name: 'Suggestion', level: 7 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spellSlotLevel: 7 }),
+                expect.anything(),
+                expect.anything(),
+                expect.anything(),
+            );
+            vi.clearAllMocks();
+
+            // default slot level of 2
+            await triggerSuggestion(
+                { name: 'Suggestion' },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spellSlotLevel: 2 }),
+                expect.anything(),
+                expect.anything(),
+                expect.anything(),
+            );
+        });
+
+        it('handles undefined metaCtx by falling back to playerStats', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerSuggestion(
                 { name: 'Suggestion', level: 3 },
-                {},
+                undefined,
                 playerStats,
                 campaignName,
                 mapName,
@@ -126,6 +249,7 @@ describe('suggestionService', () => {
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
                     automation: expect.objectContaining({ saveDc: 15 }),
+                    spellSlotLevel: 3,
                 }),
                 playerStats,
                 campaignName,
@@ -133,73 +257,7 @@ describe('suggestionService', () => {
             );
         });
 
-        it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Wizard', proficiency: 3 };
-
-            await triggerSuggestion(
-                { name: 'Suggestion', level: 3 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 11 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses default proficiency of 2 when not available', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Wizard' };
-
-            await triggerSuggestion(
-                { name: 'Suggestion', level: 3 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 10 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses spellAbilities.saveDc when proficiency is undefined', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Wizard', spellAbilities: { saveDc: 12 } };
-
-            await triggerSuggestion(
-                { name: 'Suggestion', level: 3 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 12 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('returns result from executeHandler on success', async () => {
+        it('returns executeHandler result on success', async () => {
             const expectedResult = {
                 type: 'popup',
                 payload: { type: 'automation_info', name: 'Suggestion', description: 'Suggestion affects...' },
@@ -231,7 +289,8 @@ describe('suggestionService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('returns null and logs error when executeHandler throws', async () => {
+            const consoleSpy = vi.spyOn(console, 'error').mockReturnValue();
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
             const result = await triggerSuggestion(
@@ -243,183 +302,11 @@ describe('suggestionService', () => {
             );
 
             expect(result).toBeNull();
-        });
-
-        it('passes the spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Suggestion', level: 3, school: 'Enchantment' };
-
-            await triggerSuggestion(spell, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
+            expect(consoleSpy).toHaveBeenCalledWith(
+                expect.stringContaining('[suggestionService] Failed to execute Suggestion handler'),
+                expect.any(Error),
             );
-        });
-
-        it('uses spell.level as fallback when metaCtx has no slotLevel', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSuggestion(
-                { name: 'Suggestion', level: 5 },
-                { spellSaveDc: 17 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 5 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses default slot level of 2 when no slotLevel is available', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSuggestion(
-                { name: 'Suggestion' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 2 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles undefined spell name gracefully', async () => {
-            const result = await triggerSuggestion(
-                {},
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('throws when spell is null', async () => {
-            await expect(
-                triggerSuggestion(
-                    null,
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow("Cannot read properties of null (reading 'name')");
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('handles undefined metaCtx gracefully', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSuggestion(
-                { name: 'Suggestion', level: 3 },
-                undefined,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-        });
-
-        it('throws when playerStats is undefined', async () => {
-            await expect(
-                triggerSuggestion(
-                    { name: 'Suggestion', level: 3 },
-                    {},
-                    undefined,
-                    campaignName,
-                    mapName,
-                ),
-            ).rejects.toThrow("Cannot read properties of undefined (reading 'spellAbilities')");
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('sets automation type to suggestion', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSuggestion(
-                { name: 'Suggestion', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ type: 'suggestion' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('sets saveType to WIS', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSuggestion(
-                { name: 'Suggestion', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveType: 'WIS' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('passes campaignName and mapName to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSuggestion(
-                { name: 'Suggestion', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles spell with empty string name', async () => {
-            const result = await triggerSuggestion(
-                { name: '', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+            consoleSpy.mockRestore();
         });
     });
 });

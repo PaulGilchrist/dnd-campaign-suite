@@ -1,6 +1,7 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
+// ── Mocks ───────────────────────────────────────────────────────
 
 vi.mock('../../rules/combat/rangeValidation.js', () => ({
   getDistanceFeet: vi.fn(),
@@ -10,7 +11,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
 }))
 
-// ── Imports (Vite returns mocked versions) ─────────────────────
+// ── Imports ─────────────────────────────────────────────────────
 
 import { getCoronaSaveDisadvantage } from './coronaAuraUtils.js'
 import { getDistanceFeet } from '../../rules/combat/rangeValidation.js'
@@ -38,172 +39,107 @@ describe('getCoronaSaveDisadvantage', () => {
   beforeEach(() => {
     getRuntimeValue.mockReset()
     getDistanceFeet.mockReset()
+    getRuntimeValue.mockReturnValue([])
   })
 
-  // ── Early return: mapData missing or empty players ────────────
-  describe('early return when mapData is invalid (skipRangeCheck false)', () => {
-    it('returns disadvantage false when mapData is undefined', () => {
+  // ── Early returns: invalid mapData / no players ──────────────
+
+  describe('early returns when mapData is invalid', () => {
+    it.each([
+      [undefined, false],
+      [undefined, true],
+      [null, false],
+      [null, true],
+    ])('returns { disadvantage: false } when mapData is %s (skipRangeCheck=%s)', (mapData, skipRangeCheck) => {
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
         campaignName: '',
-        mapData: undefined,
+        mapData,
         damageType: 'Fire',
-        skipRangeCheck: false,
+        skipRangeCheck,
       })
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('returns disadvantage false when mapData is null', () => {
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: null,
-        damageType: 'Fire',
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
+    it('returns false when mapData.players is missing or empty', () => {
+      expect(
+        getCoronaSaveDisadvantage({
+          targetName: 'Target',
+          campaignName: '',
+          mapData: {},
+          damageType: 'Fire',
+          skipRangeCheck: false,
+        }),
+      ).toEqual({ disadvantage: false })
 
-    it('returns disadvantage false when mapData has no players field', () => {
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: {},
-        damageType: 'Fire',
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('returns disadvantage false when mapData.players is empty array', () => {
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([]),
-        damageType: 'Fire',
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
+      expect(
+        getCoronaSaveDisadvantage({
+          targetName: 'Target',
+          campaignName: '',
+          mapData: makeMapData([]),
+          damageType: 'Fire',
+          skipRangeCheck: false,
+        }),
+      ).toEqual({ disadvantage: false })
     })
   })
 
   // ── skipRangeCheck = true (no range checking) ────────────────
-  describe('skipRangeCheck is true (no range check)', () => {
-    it('returns disadvantage false when mapData is undefined', () => {
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: undefined,
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
 
-    it('returns disadvantage false when mapData is null', () => {
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: null,
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('returns disadvantage false when no players have corona aura buff', () => {
-      getRuntimeValue.mockImplementation(() => [])
-
+  describe('skipRangeCheck is true', () => {
+    it('returns false when no player has a corona aura buff', () => {
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
         campaignName: '',
         mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
+        damageType: null,
         skipRangeCheck: true,
       })
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('returns disadvantage false when getRuntimeValue returns null', () => {
-      getRuntimeValue.mockImplementation(() => null)
+    it('returns false when buffs is null, undefined, or a non-array', () => {
+      getRuntimeValue
+        .mockReturnValueOnce(null)
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce('not-an-array')
+        .mockReturnValueOnce(42)
+        .mockReturnValueOnce({ effect: 'other' })
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
         campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
+        mapData: makeMapData([
+          makePlayer('Target'),
+          makePlayer('P1'),
+          makePlayer('P2'),
+          makePlayer('P3'),
+          makePlayer('P4'),
+          makePlayer('P5'),
+        ]),
+        damageType: null,
         skipRangeCheck: true,
       })
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('returns disadvantage false when getRuntimeValue returns undefined', () => {
-      getRuntimeValue.mockImplementation(() => undefined)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('returns disadvantage false when getRuntimeValue returns non-array string', () => {
-      getRuntimeValue.mockImplementation(() => 'not-an-array')
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('returns disadvantage false when buffs is a number', () => {
-      getRuntimeValue.mockImplementation(() => 42)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('returns disadvantage false when buffs is a plain object', () => {
-      getRuntimeValue.mockImplementation(() => ({ notArray: true }))
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('skips the target itself even if they have corona aura buff', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
+    it('skips the target itself even if they have a corona aura buff', () => {
+      getRuntimeValue.mockReturnValue([makeCoronaBuff()])
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
         campaignName: '',
         mapData: makeMapData([makePlayer('Target')]),
-        damageType: 'Fire',
+        damageType: null,
         skipRangeCheck: true,
       })
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('returns disadvantage true when a player has corona aura buff (no damage type)', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
+    it('returns disadvantage with source when a non-target player has a corona aura buff', () => {
+      getRuntimeValue.mockImplementation((name) =>
+        name === 'Paladin' ? [makeCoronaBuff()] : [],
+      )
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -215,8 +151,10 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
     })
 
-    it('returns the first player with corona aura buff', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
+    it('returns the first non-target player with a corona aura buff', () => {
+      getRuntimeValue.mockImplementation((name) =>
+        name === 'Paladin1' || name === 'Paladin2' ? [makeCoronaBuff()] : [],
+      )
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -232,27 +170,26 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: true, source: 'Paladin1' })
     })
 
-    it('calls getRuntimeValue with the correct arguments', () => {
-      getRuntimeValue.mockImplementation(() => [])
+    it('finds a corona aura buff among other buff entries', () => {
+      getRuntimeValue.mockReturnValue([
+        { effect: 'other_aura' },
+        makeCoronaBuff(),
+      ])
 
-      getCoronaSaveDisadvantage({
+      const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
-        campaignName: 'MyCampaign',
+        campaignName: '',
         mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
         damageType: null,
         skipRangeCheck: true,
       })
-      expect(getRuntimeValue).toHaveBeenCalledWith(
-        'Paladin',
-        'activeBuffs',
-        'MyCampaign',
-      )
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
     })
 
-    it('iterates past players without corona aura to find one who does', () => {
-      getRuntimeValue.mockImplementation((name) => {
-        return name === 'Paladin' ? [makeCoronaBuff()] : []
-      })
+    it('skips players without corona aura to find one that has it', () => {
+      getRuntimeValue.mockImplementation((name) =>
+        name === 'Paladin' ? [makeCoronaBuff()] : [],
+      )
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -268,8 +205,10 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
     })
 
-    it('does not call getDistanceFeet when skipRangeCheck is true', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
+    it('does not call getDistanceFeet', () => {
+      getRuntimeValue.mockImplementation((name) =>
+        name === 'Paladin' ? [makeCoronaBuff()] : [],
+      )
 
       getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -281,113 +220,30 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(getDistanceFeet).not.toHaveBeenCalled()
     })
 
-    it('finds corona aura among other buffs in the array', () => {
-      getRuntimeValue.mockImplementation(() => [
-        { effect: 'other_aura' },
-        makeCoronaBuff(),
-      ])
+    it.each([
+      ['empty saves array grants disadvantage for any damage type', { damageType: 'Fire', saves: [], expected: true }],
+      ['damage type matches saves array', { damageType: 'Fire', saves: ['Fire'], expected: true }],
+      ['damage type casing is normalized to match saves', { damageType: 'fire', saves: ['Fire'], expected: true }],
+      ['uppercase damage type casing is normalized', { damageType: 'FIRE', saves: ['Fire'], expected: true }],
+      ['damage type does not match saves array', { damageType: 'Fire', saves: ['Lightning'], expected: false }],
+      ['cold not in multi-entry saves array', { damageType: 'Cold', saves: ['Fire', 'Lightning'], expected: false }],
+      ['cold matches one of many saves', { damageType: 'Cold', saves: ['Fire', 'Cold', 'Lightning'], expected: true }],
+      ['null damage type ignores saves filter', { damageType: null, saves: ['Fire'], expected: true }],
+      ['undefined damage type ignores saves filter', { damageType: undefined, saves: ['Fire'], expected: true }],
+    ])('damage type filtering: %s', (_, { damageType, saves, expected }) => {
+      getRuntimeValue.mockReturnValue([makeCoronaBuff(null, saves)])
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
         campaignName: '',
         mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: null,
+        damageType,
         skipRangeCheck: true,
       })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+      expect(result).toEqual(expected ? { disadvantage: true, source: 'Paladin' } : { disadvantage: false })
     })
 
-    it('handles buffs array with non-corona entries only', () => {
-      getRuntimeValue.mockImplementation(() => [
-        { effect: 'other_aura' },
-        { effect: 'another_aura' },
-      ])
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: null,
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    // ── Damage type filtering (skipRangeCheck = true) ──────────
-    it('returns disadvantage true when enemiesDisadvantageSaves is empty and damageType is provided', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff(null, [])])
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('returns disadvantage true when damageType matches enemiesDisadvantageSaves', () => {
-      getRuntimeValue.mockImplementation(() => [
-        makeCoronaBuff(null, ['Fire']),
-      ])
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('normalizes lowercase damageType to match enemiesDisadvantageSaves', () => {
-      getRuntimeValue.mockImplementation(() => [
-        makeCoronaBuff(null, ['Fire']),
-      ])
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('normalizes uppercase damageType to match enemiesDisadvantageSaves', () => {
-      getRuntimeValue.mockImplementation(() => [
-        makeCoronaBuff(null, ['Fire']),
-      ])
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'FIRE',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('returns disadvantage false when damageType does not match enemiesDisadvantageSaves (skip range mode)', () => {
-      getRuntimeValue.mockImplementation(() => [
-        makeCoronaBuff(null, ['Lightning']),
-      ])
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Fire',
-        skipRangeCheck: true,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('skips to next player when damageType does not match and finds matching aura on another', () => {
+    it('skips a player whose saves do not match and finds a matching one', () => {
       getRuntimeValue.mockImplementation((name) => {
         if (name === 'Paladin1') return [makeCoronaBuff(null, ['Lightning'])]
         if (name === 'Paladin2') return [makeCoronaBuff(null, ['Fire'])]
@@ -408,24 +264,8 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: true, source: 'Paladin2' })
     })
 
-    it('handles multiple enemiesDisadvantageSaves entries in array', () => {
-      getRuntimeValue.mockImplementation(() => [
-        makeCoronaBuff(null, ['Fire', 'Cold', 'Lightning']),
-       ])
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: 'Cold',
-        skipRangeCheck: true,
-       })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-     })
-
-    it('uses fallback empty array when enemiesDisadvantageSaves is missing on buff (skip range mode)', () => {
-      // Buff object with no enemiesDisadvantageSaves property at all — exercises the || [] branch
-      getRuntimeValue.mockImplementation(() => [{ effect: 'sunlight_aura' }])
+    it('handles a buff object missing enemiesDisadvantageSaves (defaults to empty array)', () => {
+      getRuntimeValue.mockReturnValue([{ effect: 'sunlight_aura' }])
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -433,40 +273,15 @@ describe('getCoronaSaveDisadvantage', () => {
         mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
         damageType: 'Fire',
         skipRangeCheck: true,
-       })
+      })
       expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-     })
-
-    it('uses fallback empty array when enemiesDisadvantageSaves is missing on buff and no damage type (skip range mode)', () => {
-      getRuntimeValue.mockImplementation(() => [{ effect: 'sunlight_aura' }])
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target'), makePlayer('Paladin')]),
-        damageType: null,
-        skipRangeCheck: true,
-       })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-     })
+    })
   })
 
-  // ── skipRangeCheck = false (range checking mode) ─────────────
-  describe('skipRangeCheck is false (range check)', () => {
-    it('returns disadvantage false when target not in mapData.players', () => {
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'NonExistent',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Paladin')]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
+  // ── skipRangeCheck = false (range checking) ──────────────────
 
-    it('does not iterate other players when target is not found', () => {
-      getRuntimeValue.mockImplementation(() => [])
-
+  describe('skipRangeCheck is false', () => {
+    it('returns false when target is not found in mapData.players', () => {
       const result = getCoronaSaveDisadvantage({
         targetName: 'NonExistent',
         campaignName: '',
@@ -478,9 +293,7 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(getRuntimeValue).not.toHaveBeenCalled()
     })
 
-    it('returns disadvantage false when no other players have corona aura buff', () => {
-      getRuntimeValue.mockImplementation(() => [])
-
+    it('returns false when no other player has a corona aura buff', () => {
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
         campaignName: '',
@@ -495,7 +308,7 @@ describe('getCoronaSaveDisadvantage', () => {
     })
 
     it('skips the target itself in range-check mode', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
+      getRuntimeValue.mockReturnValue([makeCoronaBuff()])
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -507,9 +320,31 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('returns disadvantage true when corona buff is within range at boundary', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
-      getDistanceFeet.mockReturnValue(60) // exactly at default 60ft boundary
+    it('returns false when only the target is in mapData', () => {
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: '',
+        mapData: makeMapData([makePlayer('Target')]),
+        damageType: null,
+        skipRangeCheck: false,
+      })
+      expect(result).toEqual({ disadvantage: false })
+    })
+
+    it.each([
+      ['at default 60ft boundary', { dist: 60, range: undefined, expected: true }],
+      ['within default 60ft range', { dist: 30, range: undefined, expected: true }],
+      ['zero distance (same square)', { dist: 0, range: undefined, expected: true }],
+      ['within custom 60ft string range', { dist: 59, range: '60 ft', expected: true }],
+      ['at custom 30ft string boundary', { dist: 30, range: '30 ft', expected: true }],
+      ['within custom 30ft string range', { dist: 25, range: '30 ft', expected: true }],
+      ['within numeric range value', { dist: 40, range: 45, expected: true }],
+      ['NaN range falls back to 60, within range', { dist: 50, range: 'unreachable', expected: true }],
+    ])('returns disadvantage when in range: %s', (_, { dist, range, expected }) => {
+      getRuntimeValue.mockImplementation(() =>
+        range !== undefined ? [makeCoronaBuff(range)] : [makeCoronaBuff()],
+      )
+      getDistanceFeet.mockReturnValue(dist)
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -521,29 +356,18 @@ describe('getCoronaSaveDisadvantage', () => {
         damageType: null,
         skipRangeCheck: false,
       })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
+      expect(result).toEqual(expected ? { disadvantage: true, source: 'Paladin' } : { disadvantage: false })
     })
 
-    it('returns disadvantage true when corona buff is within range under boundary', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
-      getDistanceFeet.mockReturnValue(30) // well within 60ft default range
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 6, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('returns disadvantage false when corona buff is out of range (default 60ft)', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
-      getDistanceFeet.mockReturnValue(70) // outside default 60ft
+    it.each([
+      ['out of default 60ft range', { dist: 70, range: undefined, expected: false }],
+      ['just over custom 30ft boundary', { dist: 31, range: '30 ft', expected: false }],
+      ['NaN range falls back to 60, out of range', { dist: 70, range: 'unreachable', expected: false }],
+    ])('returns false when out of range: %s', (_, { dist, range, expected }) => {
+      getRuntimeValue.mockImplementation(() =>
+        range !== undefined ? [makeCoronaBuff(range)] : [makeCoronaBuff()],
+      )
+      getDistanceFeet.mockReturnValue(dist)
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -555,11 +379,11 @@ describe('getCoronaSaveDisadvantage', () => {
         damageType: null,
         skipRangeCheck: false,
       })
-      expect(result).toEqual({ disadvantage: false })
+      expect(result).toEqual(expected ? { disadvantage: true, source: 'Paladin' } : { disadvantage: false })
     })
 
-    it('returns disadvantage false when getDistanceFeet returns null', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
+    it('returns false when getDistanceFeet returns null', () => {
+      getRuntimeValue.mockReturnValue([makeCoronaBuff()])
       getDistanceFeet.mockReturnValue(null)
 
       const result = getCoronaSaveDisadvantage({
@@ -575,76 +399,8 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('uses custom distance from coronaBuff.distance string (parsed as number)', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff('30 ft')])
-      getDistanceFeet.mockReturnValue(25) // within 30ft but outside default range if different
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 5, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('uses default 60 ft distance when coronaBuff.distance is missing', () => {
-      getRuntimeValue.mockImplementation(() => [{ effect: 'sunlight_aura' }]) // no .distance → defaults to '60 ft'
-      getDistanceFeet.mockReturnValue(60) // exactly at boundary
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 12, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('falls back to 60 when parseInt of coronaBuff.distance gives NaN (in range)', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff('unreachable')]) // parseInt → NaN → || 60
-      getDistanceFeet.mockReturnValue(50) // within 60ft default fallback
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 10, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('uses the default 60 fallback when parseInt(distance) is NaN and distance exceeds 60', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff('unreachable')])
-      getDistanceFeet.mockReturnValue(70) // > 60ft default
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 14, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('handles getRuntimeValue returning a non-array in range-check mode', () => {
-      getRuntimeValue.mockImplementation(() => 'not-an-array')
+    it('returns false when buffs is a non-array', () => {
+      getRuntimeValue.mockReturnValue('not-an-array')
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -659,40 +415,8 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('handles getRuntimeValue returning null in range-check mode', () => {
-      getRuntimeValue.mockImplementation(() => null)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 1, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('handles getRuntimeValue returning undefined in range-check mode', () => {
-      getRuntimeValue.mockImplementation(() => undefined)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 1, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('handles buffs array with non-corona entries only (range-check mode)', () => {
-      getRuntimeValue.mockImplementation(() => [
+    it('returns false when only non-corona buffs are present', () => {
+      getRuntimeValue.mockReturnValue([
         { effect: 'other_aura' },
         { effect: 'another_aura' },
       ])
@@ -710,8 +434,8 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: false })
     })
 
-    it('finds corona aura among other buffs in the array (range-check mode)', () => {
-      getRuntimeValue.mockImplementation(() => [
+    it('finds a corona aura buff among other buff entries', () => {
+      getRuntimeValue.mockReturnValue([
         { effect: 'other_aura' },
         makeCoronaBuff(),
       ])
@@ -721,7 +445,7 @@ describe('getCoronaSaveDisadvantage', () => {
         targetName: 'Target',
         campaignName: '',
         mapData: makeMapData([
-          makePlayer('Paladin', 1, 0), // first non-target, has corona aura among other buffs
+          makePlayer('Paladin', 1, 0),
           makePlayer('Target', 2, 0),
         ]),
         damageType: null,
@@ -730,8 +454,74 @@ describe('getCoronaSaveDisadvantage', () => {
       expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
     })
 
-    it('passes correct arguments to getDistanceFeet', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
+    it('skips players without corona aura or out of range to find a matching one', () => {
+      getRuntimeValue.mockImplementation((name) =>
+        name === 'Player2' ? [makeCoronaBuff()] : [],
+      )
+      getDistanceFeet.mockReturnValue(30)
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: '',
+        mapData: makeMapData([
+          makePlayer('Player1'),
+          makePlayer('Player2'),
+          makePlayer('Target'),
+        ]),
+        damageType: null,
+        skipRangeCheck: false,
+      })
+      expect(result).toEqual({ disadvantage: true, source: 'Player2' })
+    })
+
+    it('skips an in-range player whose saves do not match and finds a matching one', () => {
+      getRuntimeValue.mockImplementation((name) => {
+        if (name === 'Paladin1') return [makeCoronaBuff(null, ['Lightning'])]
+        if (name === 'Paladin2') return [makeCoronaBuff(null, ['Fire'])]
+        return []
+      })
+      getDistanceFeet.mockReturnValue(30)
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: '',
+        mapData: makeMapData([
+          makePlayer('Target'),
+          makePlayer('Paladin1'),
+          makePlayer('Paladin2'),
+        ]),
+        damageType: 'Fire',
+        skipRangeCheck: false,
+      })
+      expect(result).toEqual({ disadvantage: true, source: 'Paladin2' })
+    })
+
+    it.each([
+      ['empty saves array grants disadvantage for any damage type', { damageType: 'Fire', saves: [], expected: true }],
+      ['damage type matches saves array', { damageType: 'Fire', saves: ['Fire'], expected: true }],
+      ['damage type casing is normalized', { damageType: 'fire', saves: ['Fire'], expected: true }],
+      ['uppercase damage type casing is normalized', { damageType: 'FIRE', saves: ['Fire'], expected: true }],
+      ['damage type does not match saves array', { damageType: 'Fire', saves: ['Lightning'], expected: false }],
+      ['null damage type ignores saves filter', { damageType: null, saves: ['Fire'], expected: true }],
+    ])('damage type filtering in range mode: %s', (_, { damageType, saves, expected }) => {
+      getRuntimeValue.mockReturnValue([makeCoronaBuff(null, saves)])
+      getDistanceFeet.mockReturnValue(30)
+
+      const result = getCoronaSaveDisadvantage({
+        targetName: 'Target',
+        campaignName: '',
+        mapData: makeMapData([
+          makePlayer('Target', 0, 0),
+          makePlayer('Paladin', 6, 0),
+        ]),
+        damageType,
+        skipRangeCheck: false,
+      })
+      expect(result).toEqual(expected ? { disadvantage: true, source: 'Paladin' } : { disadvantage: false })
+    })
+
+    it('passes correct grid coordinates to getDistanceFeet', () => {
+      getRuntimeValue.mockReturnValue([makeCoronaBuff()])
       getDistanceFeet.mockReturnValue(30)
 
       getCoronaSaveDisadvantage({
@@ -752,7 +542,7 @@ describe('getCoronaSaveDisadvantage', () => {
     })
 
     it('calls getRuntimeValue with correct campaignName', () => {
-      getRuntimeValue.mockImplementation(() => [])
+      getRuntimeValue.mockReturnValue([])
 
       getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -769,193 +559,9 @@ describe('getCoronaSaveDisadvantage', () => {
       )
     })
 
-    it('iterates players until corona aura is found in range', () => {
-      getRuntimeValue.mockImplementation((name) => {
-        return name === 'Player2' ? [makeCoronaBuff()] : []
-      })
-      getDistanceFeet.mockReturnValue(30)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Player1'),
-          makePlayer('Player2'),
-          makePlayer('Target'),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-
-      expect(result).toEqual({ disadvantage: true, source: 'Player2' })
-    })
-
-    it('returns exactly at range boundary (dist === rangeNum)', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff('30 ft')])
-      getDistanceFeet.mockReturnValue(30) // exactly at 30ft boundary
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 6, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('returns disadvantage false just over range boundary (dist > rangeNum)', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff('30 ft')])
-      getDistanceFeet.mockReturnValue(31) // 1ft over 30ft
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 6, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('uses numeric coronaBuff.distance value directly via parseInt', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff(45)])
-      getDistanceFeet.mockReturnValue(40) // parseInt(45)=45, distance 40 <= 45
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 8, 0),
-        ]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    // ── Damage type filtering in range-check mode ───────────────
-    it('returns disadvantage true when enemiesDisadvantageSaves is empty and damageType provided (range mode)', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff(null, [])])
-      getDistanceFeet.mockReturnValue(30)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 6, 0),
-        ]),
-        damageType: 'Fire',
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('returns disadvantage true when damageType matches enemiesDisadvantageSaves (range mode)', () => {
-      getRuntimeValue.mockImplementation(() => [
-        makeCoronaBuff(null, ['Fire']),
-      ])
-      getDistanceFeet.mockReturnValue(30)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 6, 0),
-        ]),
-        damageType: 'Fire',
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('returns disadvantage false when damageType does not match enemiesDisadvantageSaves (range mode)', () => {
-      getRuntimeValue.mockImplementation(() => [
-        makeCoronaBuff(null, ['Lightning']),
-      ])
-      getDistanceFeet.mockReturnValue(30)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 6, 0),
-        ]),
-        damageType: 'Fire',
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('normalizes damageType casing in range-check mode', () => {
-      getRuntimeValue.mockImplementation(() => [
-        makeCoronaBuff(null, ['Radiant']),
-      ])
-      getDistanceFeet.mockReturnValue(30)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target', 0, 0),
-          makePlayer('Paladin', 6, 0),
-        ]),
-        damageType: 'RADIANT',
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
-    })
-
-    it('skips to next player when in-range but damage mismatch, finds matching next (range mode)', () => {
-      getRuntimeValue.mockImplementation((name) => {
-        if (name === 'Paladin1') return [makeCoronaBuff(null, ['Lightning'])]
-        if (name === 'Paladin2') return [makeCoronaBuff(null, ['Fire'])]
-        return []
-      })
-      getDistanceFeet.mockReturnValue(30)
-
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([
-          makePlayer('Target'),
-          makePlayer('Paladin1'),
-          makePlayer('Paladin2'),
-        ]),
-        damageType: 'Fire',
-        skipRangeCheck: false,
-      })
-      expect(result).toEqual({ disadvantage: true, source: 'Paladin2' })
-    })
-
-    it('only the target in mapData (no other players to check)', () => {
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target')]),
-        damageType: null,
-        skipRangeCheck: false,
-      })
-
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('multiple corona buffs all out of range', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
-      getDistanceFeet.mockReturnValue(70) // > 60ft default for both
+    it('returns false when multiple corona-buffed players are all out of range', () => {
+      getRuntimeValue.mockReturnValue([makeCoronaBuff()])
+      getDistanceFeet.mockReturnValue(70)
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -968,14 +574,14 @@ describe('getCoronaSaveDisadvantage', () => {
         damageType: null,
         skipRangeCheck: false,
       })
-
       expect(result).toEqual({ disadvantage: false })
     })
   })
 
-  // ── Edge cases for falsy/undefined arguments ─────────────────
-  describe('edge cases', () => {
-    it('handles skipRangeCheck as undefined (treated as false) with valid mapData but no aura', () => {
+  // ── skipRangeCheck edge cases ─────────────────────────────────
+
+  describe('skipRangeCheck edge cases', () => {
+    it('treats undefined skipRangeCheck as false (uses range checking)', () => {
       getRuntimeValue.mockImplementation(() => [])
 
       const result = getCoronaSaveDisadvantage({
@@ -985,27 +591,16 @@ describe('getCoronaSaveDisadvantage', () => {
         damageType: null,
         skipRangeCheck: undefined,
       })
-
       expect(result).toEqual({ disadvantage: false })
     })
+  })
 
-    it('handles only one player (the target) in no-range mode', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff()])
+  // ── Empty / edge buff distance values ─────────────────────────
 
-      const result = getCoronaSaveDisadvantage({
-        targetName: 'Target',
-        campaignName: '',
-        mapData: makeMapData([makePlayer('Target')]),
-        damageType: null,
-        skipRangeCheck: true,
-      })
-
-      expect(result).toEqual({ disadvantage: false })
-    })
-
-    it('handles coronaBuff with distance as empty string (uses default 60)', () => {
-      getRuntimeValue.mockImplementation(() => [makeCoronaBuff('')])
-      getDistanceFeet.mockReturnValue(50) // within 60ft fallback
+  describe('edge cases for buff distance', () => {
+    it('treats empty string distance as NaN and falls back to default 60ft', () => {
+      getRuntimeValue.mockReturnValue([makeCoronaBuff('')])
+      getDistanceFeet.mockReturnValue(50)
 
       const result = getCoronaSaveDisadvantage({
         targetName: 'Target',
@@ -1017,7 +612,6 @@ describe('getCoronaSaveDisadvantage', () => {
         damageType: null,
         skipRangeCheck: false,
       })
-
       expect(result).toEqual({ disadvantage: true, source: 'Paladin' })
     })
   })

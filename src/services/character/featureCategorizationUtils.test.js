@@ -1,576 +1,541 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest';
-import { categorizeFeatures, mergeCategorizedFeatures } from './featureCategorizationUtils.js';
+import {
+  categorizeFeatures,
+  mergeCategorizedFeatures,
+  addFeatures
+} from './featureCategorizationUtils.js';
+
+const mockCategories = {
+  featuresToIgnore: ['Proficiency', 'Skill Proficiencies'],
+  actions: ['Action Surge', 'Second Wind'],
+  bonusActions: ['Cunning Action', 'Patient Defense'],
+  reactions: ['Dodge', 'Parry'],
+  characterAdvancement: ['Ability Score Improvement', 'Feat']
+};
+
+const makeFeature = (name, overrides = {}) => ({
+  name,
+  description: 'Test description',
+  ...overrides
+});
 
 describe('featureCategorizationUtils', () => {
   describe('categorizeFeatures', () => {
-    const mockCategories = {
-      featuresToIgnore: ['Proficiency', 'Skill Proficiencies'],
-      actions: ['Action Surge', 'Second Wind'],
-      bonusActions: ['Cunning Action', 'Patient Defense'],
-      reactions: ['Dodge', 'Parry'],
-      characterAdvancement: ['Ability Score Improvement', 'Feat']
-       };
+    it('should return empty arrays when items is null', () => {
+      const result = categorizeFeatures(null, mockCategories);
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
+    });
 
-    it('should categorize actions correctly', () => {
+    it('should return empty arrays when items is undefined', () => {
+      const result = categorizeFeatures(undefined, mockCategories);
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
+    });
+
+    it('should return empty arrays when items is not an array', () => {
+      const result = categorizeFeatures('not an array', mockCategories);
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
+    });
+
+    it('should return empty arrays for empty input array', () => {
+      const result = categorizeFeatures([], mockCategories);
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
+    });
+
+    it('should categorize features by name into actions', () => {
       const items = [
-            { name: 'Action Surge', description: 'Take an additional action' },
-            { name: 'Second Wind', description: 'Regain hit points' }
-            ];
-
+        makeFeature('Action Surge'),
+        makeFeature('Second Wind')
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.actions).toHaveLength(2);
-      expect(result.actions[0].name).toBe('Action Surge');
-      expect(result.actions[0].description).toBe('Take an additional action');
-      expect(result.bonusActions).toHaveLength(0);
-         });
+      expect(result.actions.map(f => f.name)).toEqual(['Action Surge', 'Second Wind']);
+    });
 
-    it('should categorize bonus actions correctly', () => {
+    it('should categorize features by name into bonusActions', () => {
       const items = [
-            { name: 'Cunning Action', description: 'Dash, Disengage, or Hide as bonus action' },
-            { name: 'Patient Defense', description: 'Dodge as bonus action' }
-            ];
-
+        makeFeature('Cunning Action'),
+        makeFeature('Patient Defense')
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.bonusActions).toHaveLength(2);
-      expect(result.bonusActions[0].name).toBe('Cunning Action');
-         });
+      expect(result.bonusActions.map(f => f.name)).toEqual(['Cunning Action', 'Patient Defense']);
+    });
 
-    it('should categorize reactions correctly', () => {
+    it('should categorize features by name into reactions', () => {
       const items = [
-            { name: 'Dodge', description: 'Make all attacks against you have disadvantage' },
-            { name: 'Parry', description: 'Reduce melee damage' }
-            ];
-
+        makeFeature('Dodge'),
+        makeFeature('Parry')
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.reactions).toHaveLength(2);
-      expect(result.reactions[0].name).toBe('Dodge');
-         });
+      expect(result.reactions.map(f => f.name)).toEqual(['Dodge', 'Parry']);
+    });
 
-    it('should categorize character advancement correctly', () => {
+    it('should categorize features by name into characterAdvancement', () => {
       const items = [
-            { name: 'Ability Score Improvement', description: 'Increase ability score' },
-            { name: 'Feat', description: 'Take a feat' }
-            ];
-
+        makeFeature('Ability Score Improvement'),
+        makeFeature('Feat')
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.characterAdvancement).toHaveLength(2);
-      expect(result.characterAdvancement[0].name).toBe('Ability Score Improvement');
-         });
+      expect(result.characterAdvancement.map(f => f.name)).toEqual(['Ability Score Improvement', 'Feat']);
+    });
 
-    it('should categorize uncategorized features as special actions', () => {
-      const items = [
-            { name: 'Unarmored Defense', description: 'Increase AC' }
-            ];
-
+    it('should place unrecognized features into specialActions', () => {
+      const items = [makeFeature('Unarmored Defense')];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.specialActions).toHaveLength(1);
       expect(result.specialActions[0].name).toBe('Unarmored Defense');
-         });
+    });
 
-    it('should categorize features in featuresToIgnore (no longer skipped)', () => {
+    it('should skip null entries in the items array', () => {
       const items = [
-            { name: 'Proficiency', description: 'Increase proficiency' },
-            { name: 'Action Surge', description: 'Take an additional action' }
-            ];
-
+        null,
+        makeFeature('Action Surge'),
+        null
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Action Surge');
-      expect(result.specialActions).toHaveLength(1);
-      expect(result.specialActions[0].name).toBe('Proficiency');
-          });
+    });
 
-    it('should deduplicate features by name', () => {
+    it('should deduplicate features by name, keeping the first occurrence', () => {
       const items = [
-            { name: 'Action Surge', description: 'First level' },
-            { name: 'Action Surge', description: 'Higher level' }
-            ];
-
+        makeFeature('Action Surge', { description: 'Level 2' }),
+        makeFeature('Action Surge', { description: 'Level 17' })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].description).toBe('First level');
-         });
+      expect(result.actions[0].description).toBe('Level 2');
+    });
 
-    it('should handle null items', () => {
-      const result = categorizeFeatures(null, mockCategories);
-
-      expect(result.actions).toHaveLength(0);
-      expect(result.bonusActions).toHaveLength(0);
-      expect(result.reactions).toHaveLength(0);
-      expect(result.specialActions).toHaveLength(0);
-      expect(result.characterAdvancement).toHaveLength(0);
-         });
-
-    it('should handle undefined items', () => {
-      const result = categorizeFeatures(undefined, mockCategories);
-
-      expect(result.actions).toHaveLength(0);
-         });
-
-    it('should handle non-array items', () => {
-      const result = categorizeFeatures('not an array', mockCategories);
-
-      expect(result.actions).toHaveLength(0);
-         });
-
-    it('should handle empty array', () => {
-      const result = categorizeFeatures([], mockCategories);
-
-      expect(result.actions).toHaveLength(0);
-      expect(result.bonusActions).toHaveLength(0);
-      expect(result.reactions).toHaveLength(0);
-      expect(result.specialActions).toHaveLength(0);
-      expect(result.characterAdvancement).toHaveLength(0);
-         });
-
-    it('should skip null items in array', () => {
+    it('should preserve description from the configured descriptionField', () => {
       const items = [
-            null,
-            { name: 'Action Surge', description: 'Take an additional action' },
-            null
-            ];
-
-      const result = categorizeFeatures(items, mockCategories);
-
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].name).toBe('Action Surge');
-         });
-
-    it('should use descriptionField option', () => {
-      const items = [
-            { name: 'Action Surge', desc: 'Take an additional action' }
-            ];
-
+        makeFeature('Action Surge', { desc: 'Custom desc field' })
+      ];
       const result = categorizeFeatures(items, mockCategories, { descriptionField: 'desc' });
+      expect(result.actions[0].description).toBe('Custom desc field');
+    });
 
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].description).toBe('Take an additional action');
-         });
-
-    it('should use default description field when not specified', () => {
-      const items = [
-            { name: 'Action Surge', description: 'Take an additional action' }
-            ];
-
+    it('should preserve description from default description field when not overridden', () => {
+      const items = [makeFeature('Action Surge', { description: 'Default desc' })];
       const result = categorizeFeatures(items, mockCategories);
+      expect(result.actions[0].description).toBe('Default desc');
+    });
 
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].description).toBe('Take an additional action');
-         });
-
-    it('should reverse order when reverseOrder is true', () => {
-      const items = [
-            { name: 'Action Surge', description: 'Level 2 version' },
-            { name: 'Action Surge', description: 'Level 17 version' }
-            ];
-
-      const result = categorizeFeatures(items, mockCategories, { reverseOrder: true });
-
-      expect(result.actions).toHaveLength(1);
-        // With reverse order, should keep the last one (highest level)
-      expect(result.actions[0].description).toBe('Level 17 version');
-         });
-
-    it('should not reverse order by default', () => {
-      const items = [
-            { name: 'Action Surge', description: 'Level 2 version' },
-            { name: 'Action Surge', description: 'Level 17 version' }
-            ];
-
+    it('should preserve details field in the summary', () => {
+      const items = [makeFeature('Action Surge', { details: 'Extra details' })];
       const result = categorizeFeatures(items, mockCategories);
-
-      expect(result.actions).toHaveLength(1);
-        // Without reverse order, should keep the first one
-      expect(result.actions[0].description).toBe('Level 2 version');
-         });
-
-    it('should handle items without description', () => {
-      const items = [
-            { name: 'Action Surge' }
-            ];
-
-      const result = categorizeFeatures(items, mockCategories);
-
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].description).toBeUndefined();
-         });
-
-    it('should include details field in summary', () => {
-      const items = [
-            { name: 'Action Surge', description: 'Desc', details: 'Extra details' }
-            ];
-
-      const result = categorizeFeatures(items, mockCategories);
-
-      expect(result.actions).toHaveLength(1);
       expect(result.actions[0].details).toBe('Extra details');
-         });
+    });
 
-    it('should categorize features by casting_time on automation', () => {
-      const items = [
-        { name: 'Action Surge', description: 'Extra action', automation: { casting_time: '1 action', type: 'extra_action' } },
-        { name: 'Second Wind', description: 'Heal', automation: { casting_time: '1 bonus action', type: 'self_healing' } },
-        { name: 'Slow Fall', description: 'Reduce damage', automation: { casting_time: '1 reaction', type: 'damage_reduction', reaction: true } }
-            ];
-
+    it('should omit description when the feature has no description field', () => {
+      const items = [{ name: 'Action Surge' }];
       const result = categorizeFeatures(items, mockCategories);
+      expect(result.actions[0].description).toBeUndefined();
+    });
 
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].name).toBe('Action Surge');
+    it('should categorize by automation.casting_time when present, overriding name-based categorization', () => {
+      const items = [
+        // "Second Wind" is in mockCategories.actions by name, but casting_time sends it to bonusActions
+        makeFeature('Second Wind', {
+          automation: { casting_time: '1 bonus action', type: 'self_healing' }
+        })
+      ];
+      const result = categorizeFeatures(items, mockCategories);
+      expect(result.actions).toHaveLength(0);
       expect(result.bonusActions).toHaveLength(1);
       expect(result.bonusActions[0].name).toBe('Second Wind');
-      expect(result.reactions).toHaveLength(1);
-      expect(result.reactions[0].name).toBe('Slow Fall');
-         });
+    });
 
-    it('should categorize features by alternative casting_time formats (without "1 " prefix)', () => {
+    it('should support casting_time without the "1 " prefix', () => {
       const items = [
-        { name: 'Action Feature', description: 'Uses "action" format', automation: { casting_time: 'action', type: 'extra_action' } },
-        { name: 'Bonus Feature', description: 'Uses "bonus action" format', automation: { casting_time: 'bonus action', type: 'self_healing' } },
-        { name: 'Reaction Feature', description: 'Uses "reaction" format', automation: { casting_time: 'reaction', type: 'damage_reduction' } }
-            ];
-
+        makeFeature('Action Feature', { automation: { casting_time: 'action' } }),
+        makeFeature('Bonus Feature', { automation: { casting_time: 'bonus action' } }),
+        makeFeature('Reaction Feature', { automation: { casting_time: 'reaction' } })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
-      expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Action Feature');
-      expect(result.bonusActions).toHaveLength(1);
       expect(result.bonusActions[0].name).toBe('Bonus Feature');
-      expect(result.reactions).toHaveLength(1);
       expect(result.reactions[0].name).toBe('Reaction Feature');
-         });
+    });
 
-    it('should handle casting_time with extra whitespace', () => {
+    it('should trim whitespace from casting_time before matching', () => {
       const items = [
-        { name: 'Trimmed Feature', description: 'Has extra spaces', automation: { casting_time: '  1 bonus action  ', type: 'self_healing' } }
-            ];
-
+        makeFeature('Trimmed Feature', {
+          automation: { casting_time: '  1 bonus action  ' }
+        })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.bonusActions).toHaveLength(1);
       expect(result.bonusActions[0].name).toBe('Trimmed Feature');
-         });
+    });
 
-    it('should prefer casting_time over name-based categorization', () => {
+    it('should treat unknown casting_time values as specialActions', () => {
       const items = [
-        // "Second Wind" is in mockCategories.actions by name, but casting_time should override
-        { name: 'Second Wind', description: 'Bonus action heal', automation: { casting_time: '1 bonus action', type: 'self_healing' } }
-            ];
-
+        makeFeature('Ritual Feature', {
+          automation: { casting_time: '1 minute' }
+        })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
-      expect(result.actions).toHaveLength(0);
-      expect(result.bonusActions).toHaveLength(1);
-      expect(result.bonusActions[0].name).toBe('Second Wind');
-         });
-
-    it('should fall back to name-based categorization when no casting_time present', () => {
-      const items = [
-        { name: 'Second Wind', description: 'Heal' }
-            ];
-
-      const result = categorizeFeatures(items, mockCategories);
-
-      // "Second Wind" in mockCategories.actions
-      expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].name).toBe('Second Wind');
-         });
-
-    it('should categorize features with unknown casting_time as special actions', () => {
-      const items = [
-        { name: 'Mystery Feature', description: 'Unknown', automation: { casting_time: '1 minute', type: 'ritual' } }
-            ];
-
-      const result = categorizeFeatures(items, mockCategories);
-
       expect(result.specialActions).toHaveLength(1);
-      expect(result.specialActions[0].name).toBe('Mystery Feature');
-         });
+      expect(result.specialActions[0].name).toBe('Ritual Feature');
+    });
 
-    it('should categorize features with casting_time "passive" as specialActions unless in characterAdvancement category', () => {
+    it('should categorize casting_time "passive" as specialActions unless the name is in characterAdvancement', () => {
       const items = [
-        { name: 'Racial Trait', description: 'Passive ability', automation: { casting_time: 'passive', type: 'racial' } }
-            ];
-
+        makeFeature('Racial Trait', { automation: { casting_time: 'passive' } }),
+        makeFeature('Feat', { automation: { casting_time: 'passive' } })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.specialActions).toHaveLength(1);
       expect(result.specialActions[0].name).toBe('Racial Trait');
-         });
+      expect(result.characterAdvancement).toHaveLength(1);
+      expect(result.characterAdvancement[0].name).toBe('Feat');
+    });
 
-    it('should deduplicate specialActions by name when casting_time is passive', () => {
+    it('should deduplicate by name when processing casting_time "passive" entries', () => {
       const items = [
-        { name: 'Racial Trait', description: 'First level', automation: { casting_time: 'passive' } },
-        { name: 'Racial Trait', description: 'Higher level', automation: { casting_time: 'passive' } },
-            ];
-
+        makeFeature('Racial Trait', {
+          description: 'First level',
+          automation: { casting_time: 'passive' }
+        }),
+        makeFeature('Racial Trait', {
+          description: 'Higher level',
+          automation: { casting_time: 'passive' }
+        })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
       expect(result.specialActions).toHaveLength(1);
       expect(result.specialActions[0].description).toBe('First level');
-         });
+    });
 
-    it('should prefer casting_time categorization over name-based for characterAdvancement', () => {
+    it('should fall back to name-based categorization when automation lacks casting_time', () => {
       const items = [
-        // "Ability Score Improvement" is in mockCategories.characterAdvancement by name,
-        // but casting_time should also categorize it there
-        { name: 'Ability Score Improvement', description: 'Level 4', automation: { casting_time: 'passive' } },
-            ];
-
+        makeFeature('Feature With Automation', {
+          automation: { type: 'extra_action' }
+        })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
-      expect(result.characterAdvancement).toHaveLength(1);
-      expect(result.characterAdvancement[0].name).toBe('Ability Score Improvement');
-         });
-
-    it('should handle items with automation but no casting_time', () => {
-      const items = [
-        { name: 'Feature With Automation', description: 'Has automation but no casting_time', automation: { type: 'extra_action' } },
-            ];
-
-      const result = categorizeFeatures(items, mockCategories);
-
-      // Falls back to name-based categorization → specialActions
       expect(result.specialActions).toHaveLength(1);
       expect(result.specialActions[0].name).toBe('Feature With Automation');
-         });
+    });
 
-    it('should handle automation with null casting_time', () => {
+    it('should treat null casting_time as absent and fall back to name-based categorization', () => {
       const items = [
-        { name: 'Feature', description: 'Test', automation: { casting_time: null } },
-            ];
-
+        makeFeature('Feature', { automation: { casting_time: null } })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
-      // null casting_time is falsy → falls back to name-based
       expect(result.specialActions).toHaveLength(1);
-         });
+    });
 
-    it('should handle automation with undefined casting_time', () => {
+    it('should handle automation as an array and pick the first item with casting_time', () => {
       const items = [
-        { name: 'Feature', description: 'Test', automation: {} },
-            ];
-
+        makeFeature('Multi-Auto Feature', {
+          automation: [
+            { casting_time: '1 action', type: 'extra' },
+            { casting_time: '1 bonus action', type: 'self_healing' }
+          ]
+        })
+      ];
       const result = categorizeFeatures(items, mockCategories);
-
-      expect(result.specialActions).toHaveLength(1);
-         });
-
-    it('should categorize mixed features correctly', () => {
-      const items = [
-            { name: 'Action Surge', description: 'Action' },
-            { name: 'Cunning Action', description: 'Bonus Action' },
-            { name: 'Dodge', description: 'Reaction' },
-            { name: 'Ability Score Improvement', description: 'Advancement' },
-            { name: 'Unarmored Defense', description: 'Special' },
-            { name: 'Proficiency', description: 'Ignored' }
-            ];
-
-      const result = categorizeFeatures(items, mockCategories);
-
       expect(result.actions).toHaveLength(1);
-      expect(result.bonusActions).toHaveLength(1);
-      expect(result.reactions).toHaveLength(1);
-      expect(result.characterAdvancement).toHaveLength(1);
-      expect(result.specialActions).toHaveLength(2);
-         });
-       });
+      expect(result.actions[0].name).toBe('Multi-Auto Feature');
+    });
 
-  describe('mergeCategorizedFeatures', () => {
-    it('should merge two categorized feature objects', () => {
-      const base = {
-        actions: [{ name: 'Action Surge', description: 'Level 2' }],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-          };
-      const additional = {
-        actions: [{ name: 'Second Wind', description: 'Heal' }],
-        bonusActions: [{ name: 'Cunning Action', description: 'Dash' }],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-          };
+    it('should reverse processing order when reverseOrder is true, keeping the last occurrence', () => {
+      const items = [
+        makeFeature('Action Surge', { description: 'Level 2' }),
+        makeFeature('Action Surge', { description: 'Level 17' })
+      ];
+      const result = categorizeFeatures(items, mockCategories, { reverseOrder: true });
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].description).toBe('Level 17');
+    });
 
-      const result = mergeCategorizedFeatures(base, additional);
-
-      expect(result.actions).toHaveLength(2);
+    it('should categorize a mixed set of features into the correct categories', () => {
+      const items = [
+        makeFeature('Action Surge'),
+        makeFeature('Cunning Action'),
+        makeFeature('Dodge'),
+        makeFeature('Ability Score Improvement'),
+        makeFeature('Unarmored Defense'),
+        makeFeature('Proficiency')
+      ];
+      const result = categorizeFeatures(items, mockCategories);
+      expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Action Surge');
-      expect(result.actions[1].name).toBe('Second Wind');
       expect(result.bonusActions).toHaveLength(1);
       expect(result.bonusActions[0].name).toBe('Cunning Action');
-         });
+      expect(result.reactions).toHaveLength(1);
+      expect(result.reactions[0].name).toBe('Dodge');
+      expect(result.characterAdvancement).toHaveLength(1);
+      expect(result.characterAdvancement[0].name).toBe('Ability Score Improvement');
+      expect(result.specialActions).toHaveLength(2);
+      expect(result.specialActions.map(f => f.name)).toEqual(['Unarmored Defense', 'Proficiency']);
+    });
+  });
 
-    it('should deduplicate by name in each category', () => {
-      const base = {
-        actions: [{ name: 'Action Surge', description: 'Level 2' }],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-          };
-      const additional = {
-        actions: [{ name: 'Action Surge', description: 'Level 17' }],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-          };
-
-      const result = mergeCategorizedFeatures(base, additional);
-
+  describe('addFeatures', () => {
+    it('should flatten features from all levels and categorize them', () => {
+      const levels = [
+        { features: [makeFeature('Action Surge')] },
+        { features: [makeFeature('Cunning Action')] },
+        { features: [makeFeature('Dodge')] }
+      ];
+      const result = addFeatures(levels, mockCategories);
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Action Surge');
-      expect(result.actions[0].description).toBe('Level 2'); // Keeps base version
-         });
+      expect(result.bonusActions).toHaveLength(1);
+      expect(result.bonusActions[0].name).toBe('Cunning Action');
+      expect(result.reactions).toHaveLength(1);
+      expect(result.reactions[0].name).toBe('Dodge');
+    });
 
-    it('should merge all categories', () => {
+    it('should already process highest level first; reverseOrder:true double-reverses', () => {
+      // addFeatures already flattens highest-level-first. With reverseOrder:true,
+      // categorizeFeatures reverses again, so lowest level comes first and is kept.
+      const levels = [
+        { features: [makeFeature('Action Surge', { description: 'Level 2' })] },
+        { features: [makeFeature('Action Surge', { description: 'Level 17' })] }
+      ];
+      const result = addFeatures(levels, mockCategories, { reverseOrder: true });
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].description).toBe('Level 2');
+    });
+
+    it('should skip levels without features', () => {
+      const levels = [
+        { features: [makeFeature('Action Surge')] },
+        {},
+        { features: [makeFeature('Dodge')] }
+      ];
+      const result = addFeatures(levels, mockCategories);
+      expect(result.actions).toHaveLength(1);
+      expect(result.reactions).toHaveLength(1);
+    });
+
+    it('should handle levels with empty features array', () => {
+      const levels = [
+        { features: [] },
+        { features: [makeFeature('Action Surge')] }
+      ];
+      const result = addFeatures(levels, mockCategories);
+      expect(result.actions).toHaveLength(1);
+    });
+
+    it('should handle empty levels array', () => {
+      const result = addFeatures([], mockCategories);
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
+    });
+  });
+
+  describe('mergeCategorizedFeatures', () => {
+    it('should merge features from both objects into each category', () => {
       const base = {
-        actions: [{ name: 'Action Surge' }],
-        bonusActions: [{ name: 'Second Wind' }],
-        reactions: [{ name: 'Dodge' }],
-        specialActions: [{ name: 'Unarmored Defense' }],
-        characterAdvancement: [{ name: 'ASI' }]
-          };
+        actions: [makeFeature('Action Surge')],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      };
       const additional = {
-        actions: [{ name: 'Extra Attack' }],
-        bonusActions: [{ name: 'Cunning Action' }],
-        reactions: [{ name: 'Parry' }],
-        specialActions: [{ name: 'Martial Arts' }],
-        characterAdvancement: [{ name: 'Feat' }]
-          };
-
+        actions: [makeFeature('Second Wind')],
+        bonusActions: [makeFeature('Cunning Action')],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      };
       const result = mergeCategorizedFeatures(base, additional);
+      expect(result.actions).toHaveLength(2);
+      expect(result.actions.map(f => f.name)).toEqual(['Action Surge', 'Second Wind']);
+      expect(result.bonusActions).toHaveLength(1);
+      expect(result.bonusActions[0].name).toBe('Cunning Action');
+    });
 
+    it('should deduplicate by name, keeping the first occurrence (from base)', () => {
+      const base = {
+        actions: [makeFeature('Action Surge', { description: 'Base' })],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      };
+      const additional = {
+        actions: [makeFeature('Action Surge', { description: 'Additional' })],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      };
+      const result = mergeCategorizedFeatures(base, additional);
+      expect(result.actions).toHaveLength(1);
+      expect(result.actions[0].description).toBe('Base');
+    });
+
+    it('should merge across all five categories', () => {
+      const base = {
+        actions: [makeFeature('Action Surge')],
+        bonusActions: [makeFeature('Second Wind')],
+        reactions: [makeFeature('Dodge')],
+        specialActions: [makeFeature('Unarmored Defense')],
+        characterAdvancement: [makeFeature('ASI')]
+      };
+      const additional = {
+        actions: [makeFeature('Extra Attack')],
+        bonusActions: [makeFeature('Cunning Action')],
+        reactions: [makeFeature('Parry')],
+        specialActions: [makeFeature('Martial Arts')],
+        characterAdvancement: [makeFeature('Feat')]
+      };
+      const result = mergeCategorizedFeatures(base, additional);
       expect(result.actions).toHaveLength(2);
       expect(result.bonusActions).toHaveLength(2);
       expect(result.reactions).toHaveLength(2);
       expect(result.specialActions).toHaveLength(2);
       expect(result.characterAdvancement).toHaveLength(2);
-         });
+    });
 
-    it('should handle empty base object', () => {
+    it('should preserve order: base items first, then additional items', () => {
+      const base = {
+        actions: [
+          makeFeature('First'),
+          makeFeature('Second')
+        ],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      };
+      const additional = {
+        actions: [
+          makeFeature('Third'),
+          makeFeature('Fourth')
+        ],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      };
+      const result = mergeCategorizedFeatures(base, additional);
+      expect(result.actions.map(f => f.name)).toEqual(['First', 'Second', 'Third', 'Fourth']);
+    });
+
+    it('should handle an empty base object', () => {
       const base = {
         actions: [],
         bonusActions: [],
         reactions: [],
         specialActions: [],
         characterAdvancement: []
-          };
+      };
       const additional = {
-        actions: [{ name: 'Action Surge' }],
+        actions: [makeFeature('Action Surge')],
         bonusActions: [],
         reactions: [],
         specialActions: [],
         characterAdvancement: []
-          };
-
+      };
       const result = mergeCategorizedFeatures(base, additional);
-
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Action Surge');
-         });
+    });
 
-    it('should handle empty additional object', () => {
+    it('should handle an empty additional object', () => {
       const base = {
-        actions: [{ name: 'Action Surge' }],
+        actions: [makeFeature('Action Surge')],
         bonusActions: [],
         reactions: [],
         specialActions: [],
         characterAdvancement: []
-          };
+      };
       const additional = {
         actions: [],
         bonusActions: [],
         reactions: [],
         specialActions: [],
         characterAdvancement: []
-          };
-
+      };
       const result = mergeCategorizedFeatures(base, additional);
-
       expect(result.actions).toHaveLength(1);
       expect(result.actions[0].name).toBe('Action Surge');
-         });
+    });
 
-    it('should handle both empty objects', () => {
+    it('should return all empty arrays when both inputs are empty', () => {
       const base = {
         actions: [],
         bonusActions: [],
         reactions: [],
         specialActions: [],
         characterAdvancement: []
-          };
+      };
       const additional = {
         actions: [],
         bonusActions: [],
         reactions: [],
         specialActions: [],
         characterAdvancement: []
-          };
-
+      };
       const result = mergeCategorizedFeatures(base, additional);
+      expect(result).toEqual({
+        actions: [],
+        bonusActions: [],
+        reactions: [],
+        specialActions: [],
+        characterAdvancement: []
+      });
+    });
 
-      expect(result.actions).toHaveLength(0);
-      expect(result.bonusActions).toHaveLength(0);
-      expect(result.reactions).toHaveLength(0);
-      expect(result.specialActions).toHaveLength(0);
-      expect(result.characterAdvancement).toHaveLength(0);
-         });
-
-    it('should preserve order from base then additional', () => {
+    it('should deduplicate across base and additional in each category independently', () => {
       const base = {
-        actions: [{ name: 'First' }, { name: 'Second' }],
-        bonusActions: [],
+        actions: [makeFeature('Action Surge')],
+        bonusActions: [makeFeature('Cunning Action')],
         reactions: [],
         specialActions: [],
         characterAdvancement: []
-          };
+      };
       const additional = {
-        actions: [{ name: 'Third' }, { name: 'Fourth' }],
-        bonusActions: [],
-        reactions: [],
+        actions: [makeFeature('Action Surge')],
+        bonusActions: [makeFeature('Cunning Action')],
+        reactions: [makeFeature('Dodge')],
         specialActions: [],
         characterAdvancement: []
-          };
-
+      };
       const result = mergeCategorizedFeatures(base, additional);
-
-      expect(result.actions).toHaveLength(4);
-      expect(result.actions[0].name).toBe('First');
-      expect(result.actions[1].name).toBe('Second');
-      expect(result.actions[2].name).toBe('Third');
-      expect(result.actions[3].name).toBe('Fourth');
-         });
-
-    it('should keep base version when duplicate exists', () => {
-      const base = {
-        actions: [{ name: 'Action Surge', description: 'Base' }],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-          };
-      const additional = {
-        actions: [{ name: 'Action Surge', description: 'Additional' }],
-        bonusActions: [],
-        reactions: [],
-        specialActions: [],
-        characterAdvancement: []
-          };
-
-      const result = mergeCategorizedFeatures(base, additional);
-
       expect(result.actions).toHaveLength(1);
-      expect(result.actions[0].description).toBe('Base');
-         });
-       });
+      expect(result.bonusActions).toHaveLength(1);
+      expect(result.reactions).toHaveLength(1);
+    });
+  });
 });

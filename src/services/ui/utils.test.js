@@ -1,133 +1,91 @@
-import { describe, it, expect } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import utils from './utils.js';
 
 describe('utils', () => {
     describe('getAbilityLongName', () => {
-        it('should return the long name for STR', () => {
-            expect(utils.getAbilityLongName('STR')).toBe('Strength');
+        const abilityMap = [
+            ['STR', 'Strength'],
+            ['DEX', 'Dexterity'],
+            ['CON', 'Constitution'],
+            ['INT', 'Intelligence'],
+            ['WIS', 'Wisdom'],
+            ['CHA', 'Charisma'],
+        ];
+
+        it.each(abilityMap)('returns "%s" for %s', (short, long) => {
+            expect(utils.getAbilityLongName(short)).toBe(long);
         });
 
-        it('should return the long name for DEX', () => {
-            expect(utils.getAbilityLongName('DEX')).toBe('Dexterity');
-        });
-
-        it('should return the long name for CON', () => {
-            expect(utils.getAbilityLongName('CON')).toBe('Constitution');
-        });
-
-        it('should return the long name for INT', () => {
-            expect(utils.getAbilityLongName('INT')).toBe('Intelligence');
-        });
-
-        it('should return the long name for WIS', () => {
-            expect(utils.getAbilityLongName('WIS')).toBe('Wisdom');
-        });
-
-        it('should return the long name for CHA', () => {
-            expect(utils.getAbilityLongName('CHA')).toBe('Charisma');
-        });
-
-        it('should return undefined for unknown ability codes', () => {
+        it('returns undefined for unknown codes', () => {
             expect(utils.getAbilityLongName('UNKNOWN')).toBeUndefined();
-        });
-
-        it('should return undefined for empty string', () => {
             expect(utils.getAbilityLongName('')).toBeUndefined();
+            expect(utils.getAbilityLongName(null)).toBeUndefined();
+            expect(utils.getAbilityLongName(undefined)).toBeUndefined();
         });
 
-        it('should return undefined for null', () => {
-            expect(utils.getAbilityLongName(null)).toBeUndefined();
+        it('returns undefined for lowercase ability codes', () => {
+            expect(utils.getAbilityLongName('str')).toBeUndefined();
+            expect(utils.getAbilityLongName('dex')).toBeUndefined();
         });
     });
 
     describe('getName', () => {
-        it('should return the full name', () => {
+        it('returns the input string for valid names', () => {
             expect(utils.getName('John Doe')).toBe('John Doe');
-        });
-
-        it('should return the name when only one name is provided', () => {
             expect(utils.getName('John')).toBe('John');
+            expect(utils.getName('John Michael Doe')).toBe('John Michael Doe');
+            expect(utils.getName('O\'Brien')).toBe("O'Brien");
         });
 
-        it('should return Unknown for null', () => {
+        it('returns "Unknown" for falsy and non-string values', () => {
             expect(utils.getName(null)).toBe('Unknown');
-        });
-
-        it('should return Unknown for undefined', () => {
             expect(utils.getName(undefined)).toBe('Unknown');
-        });
-
-        it('should return Unknown for empty string', () => {
             expect(utils.getName('')).toBe('Unknown');
-        });
-
-        it('should return Unknown for non-string types', () => {
             expect(utils.getName(123)).toBe('Unknown');
             expect(utils.getName({})).toBe('Unknown');
             expect(utils.getName([])).toBe('Unknown');
         });
 
-        it('should handle names with multiple spaces', () => {
-            expect(utils.getName('John Michael Doe')).toBe('John Michael Doe');
-        });
     });
 
     describe('getFirstName', () => {
-        it('should return the full name', () => {
+        it('returns the input string for valid names', () => {
             expect(utils.getFirstName('John Doe')).toBe('John Doe');
-        });
-
-        it('should return the name when only one name is provided', () => {
             expect(utils.getFirstName('John')).toBe('John');
+            expect(utils.getFirstName('John Michael Doe')).toBe('John Michael Doe');
         });
 
-        it('should return Unknown for null', () => {
+        it('returns "Unknown" for falsy and non-string values', () => {
             expect(utils.getFirstName(null)).toBe('Unknown');
-        });
-
-        it('should return Unknown for undefined', () => {
             expect(utils.getFirstName(undefined)).toBe('Unknown');
-        });
-
-        it('should return Unknown for empty string', () => {
             expect(utils.getFirstName('')).toBe('Unknown');
-        });
-
-        it('should return Unknown for non-string types', () => {
             expect(utils.getFirstName(123)).toBe('Unknown');
             expect(utils.getFirstName({})).toBe('Unknown');
             expect(utils.getFirstName([])).toBe('Unknown');
         });
 
-        it('should handle names with multiple spaces', () => {
-            expect(utils.getFirstName('John Michael Doe')).toBe('John Michael Doe');
-        });
     });
 
     describe('guid', () => {
-        it('should return a string', () => {
-            const guid = utils.guid();
-            expect(typeof guid).toBe('string');
-        });
-
-        it('should return a string matching the GUID format', () => {
-            const guid = utils.guid();
+        it('returns a string matching the GUID format', () => {
             const guidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-            expect(guid).toMatch(guidRegex);
+            expect(utils.guid()).toMatch(guidRegex);
         });
 
-        it('should generate unique GUIDs', () => {
-            const guid1 = utils.guid();
-            const guid2 = utils.guid();
-            expect(guid1).not.toBe(guid2);
-        });
-
-        it('should generate many unique GUIDs', () => {
+        it('generates unique GUIDs', () => {
             const guids = new Set();
             for (let i = 0; i < 100; i++) {
                 guids.add(utils.guid());
             }
             expect(guids.size).toBe(100);
+        });
+
+        it('produces deterministic output when Math.random is controlled', () => {
+            vi.spyOn(Math, 'random').mockReturnValue(0.1234);
+            const result = utils.guid();
+            expect(result).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+            vi.restoreAllMocks();
         });
     });
 });

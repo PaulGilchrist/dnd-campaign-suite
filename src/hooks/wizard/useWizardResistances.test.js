@@ -1,174 +1,258 @@
+// @improved-by-ai
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import useWizardResistances from './useWizardResistances.js';
 
-// Mock the resistances validation service
 vi.mock('../../services/character/resistancesValidation.js', () => ({
   getPreSelectedResistances: vi.fn(),
-  validateResistances: vi.fn()
+  validateResistances: vi.fn(),
 }));
 
-import {
-  getPreSelectedResistances,
-  validateResistances
-} from '../../services/character/resistancesValidation.js';
+import { getPreSelectedResistances, validateResistances } from '../../services/character/resistancesValidation.js';
 
 describe('useWizardResistances', () => {
-  const mockFormData = {
+  const baseFormData = {
     class: { name: 'Fighter' },
     race: { name: 'Dwarf', subrace: { name: 'Hill Dwarf' } },
     background: 'Soldier',
     resistances: [],
     immunities: [],
     rules: '5e',
-    level: 1
-       };
+    level: 1,
+  };
+
   const mockSetFormData = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     validateResistances.mockResolvedValue([]);
     getPreSelectedResistances.mockResolvedValue({ resistances: [], immunities: [] });
-       });
+  });
 
-  it('should initialize with empty arrays', () => {
-    const { result } = renderHook(() =>
-      useWizardResistances(mockFormData, mockSetFormData)
-         );
+  function renderHookWithResistances(formData = baseFormData, setFn = mockSetFormData) {
+    return renderHook(() => useWizardResistances(formData, setFn));
+  }
 
-    expect(result.current.resistanceWarnings).toEqual([]);
-    expect(result.current.preSelectedResistancesList).toEqual({ resistances: [], immunities: [] });
-       });
+  describe('initial state', () => {
+    it('returns empty resistanceWarnings array', () => {
+      const { result } = renderHookWithResistances();
+      expect(result.current.resistanceWarnings).toEqual([]);
+    });
 
-  it('should load resistance warnings', async () => {
-    validateResistances.mockResolvedValue(['Invalid resistance']);
+    it('returns empty preSelectedResistancesList with resistances and immunities arrays', () => {
+      const { result } = renderHookWithResistances();
+      expect(result.current.preSelectedResistancesList).toEqual({ resistances: [], immunities: [] });
+    });
 
-    const { result } = renderHook(() =>
-      useWizardResistances(mockFormData, mockSetFormData)
-         );
+    it('returns setResistanceWarnings as a function', () => {
+      const { result } = renderHookWithResistances();
+      expect(typeof result.current.setResistanceWarnings).toBe('function');
+    });
+  });
 
-    await waitFor(() => {
-      expect(result.current.resistanceWarnings.length).toBeGreaterThan(0);
-         });
+  describe('resistance warnings from validation', () => {
+    it('loads validation warnings from validateResistances result', async () => {
+      const warnings = ['Invalid resistance'];
+      validateResistances.mockResolvedValue(warnings);
 
-    expect(result.current.resistanceWarnings).toEqual(['Invalid resistance']);
-       });
+      const { result } = renderHookWithResistances();
+      await waitFor(() => {
+        expect(result.current.resistanceWarnings).toEqual(warnings);
+      });
+    });
 
-  it('should load pre-selected resistances and immunities', async () => {
-    getPreSelectedResistances.mockResolvedValue({
-      resistances: ['Poison'],
-      immunities: ['Disease']
-       });
+    it('handles validation returning multiple warnings', async () => {
+      const warnings = [
+        { message: 'Warning 1', type: 'warning' },
+        { message: 'Warning 2', type: 'info' },
+      ];
+      validateResistances.mockResolvedValue(warnings);
 
-    const { result } = renderHook(() =>
-      useWizardResistances(mockFormData, mockSetFormData)
-         );
+      const { result } = renderHookWithResistances();
+      await waitFor(() => {
+        expect(result.current.resistanceWarnings).toEqual(warnings);
+      });
+    });
 
-    await waitFor(() => {
-      expect(result.current.preSelectedResistancesList.resistances.length).toBeGreaterThan(0);
-         });
+    it('handles validation errors gracefully without crashing', async () => {
+      validateResistances.mockRejectedValue(new Error('Validation error'));
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    expect(result.current.preSelectedResistancesList).toEqual({
-      resistances: ['Poison'],
-      immunities: ['Disease']
-       });
-       });
+      const { result } = renderHookWithResistances();
+      await waitFor(() => {
+        expect(result.current.resistanceWarnings).toEqual([]);
+      });
 
-  it('should add missing pre-selected resistances to form data', async () => {
-    getPreSelectedResistances.mockResolvedValue({
-      resistances: ['Poison'],
-      immunities: ['Disease']
-        });
+      expect(mockConsoleError).toHaveBeenCalled();
+      mockConsoleError.mockRestore();
+    });
+  });
 
-    renderHook(() =>
-      useWizardResistances(mockFormData, mockSetFormData)
-          );
-
-    await waitFor(() => {
-      expect(mockSetFormData).toHaveBeenCalled();
-         });
-
-    expect(mockSetFormData).toHaveBeenCalledWith(expect.any(Function));
-       });
-
-  it('should not add resistances that are already in form data', async () => {
-      const formDataWithResistances = {
-            ...mockFormData,
-        resistances: ['Poison'],
-        immunities: ['Disease']
-              };
+  describe('pre-selected resistances', () => {
+    it('loads pre-selected resistances from getPreSelectedResistances', async () => {
       getPreSelectedResistances.mockResolvedValue({
         resistances: ['Poison'],
-        immunities: ['Disease']
-            });
+        immunities: ['Disease'],
+      });
 
-      const { result } = renderHook(() =>
-        useWizardResistances(formDataWithResistances, mockSetFormData)
-              );
+      const { result } = renderHookWithResistances();
+      await waitFor(() => {
+        expect(result.current.preSelectedResistancesList).toEqual({
+          resistances: ['Poison'],
+          immunities: ['Disease'],
+        });
+      });
+    });
+
+    it('handles pre-select errors gracefully without crashing', async () => {
+      getPreSelectedResistances.mockRejectedValue(new Error('Fetch error'));
+      const mockConsoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const { result } = renderHookWithResistances();
+      await waitFor(() => {
+        expect(result.current.preSelectedResistancesList).toEqual({ resistances: [], immunities: [] });
+      });
+
+      expect(mockConsoleError).toHaveBeenCalled();
+      mockConsoleError.mockRestore();
+    });
+
+    it('merges missing pre-selected resistances into form data', async () => {
+      getPreSelectedResistances.mockResolvedValue({
+        resistances: ['Poison', 'Cold'],
+        immunities: ['Disease'],
+      });
+
+      renderHookWithResistances();
 
       await waitFor(() => {
-                // Wait for pre-select to run
-        expect(result.current.preSelectedResistancesList.resistances.length).toBeGreaterThan(0);
-              });
+        expect(mockSetFormData).toHaveBeenCalledWith(expect.any(Function));
+      });
 
-              // setFormData is called but with an identity function that returns prev unchanged
-              // because all resistances are already present
-      expect(mockSetFormData).toHaveBeenCalled();
-      const setFormDataCall = mockSetFormData.mock.calls[0][0];
-      expect(typeof setFormDataCall).toBe('function');
-    
-      // Call the function with the current form data to verify it returns unchanged data
-      const returnedData = setFormDataCall(formDataWithResistances);
-      expect(returnedData).toEqual(formDataWithResistances);
-            });
+      const mergeFn = mockSetFormData.mock.calls[0][0];
+      const merged = mergeFn({ ...baseFormData, resistances: ['Poison'], immunities: [] });
 
-  it('should handle validation errors gracefully', async () => {
-    validateResistances.mockRejectedValue(new Error('Validation error'));
-    console.error = vi.fn();
+      // Should add 'Cold' (not already present) but not duplicate 'Poison'
+      expect(merged.resistances).toContain('Poison');
+      expect(merged.resistances).toContain('Cold');
+      expect(merged.resistances.length).toBe(2);
+      expect(merged.immunities).toContain('Disease');
+    });
 
-    const { result } = renderHook(() =>
-      useWizardResistances(mockFormData, mockSetFormData)
-         );
+    it('does not duplicate resistances already in form data', async () => {
+      getPreSelectedResistances.mockResolvedValue({
+        resistances: ['Poison'],
+        immunities: ['Disease'],
+      });
 
-    await waitFor(() => {
-           // Should still have empty warnings even on error
+      const existingResistances = {
+        ...baseFormData,
+        resistances: ['Poison'],
+        immunities: ['Disease'],
+      };
+
+      renderHookWithResistances(existingResistances);
+
+      await waitFor(() => {
+        expect(mockSetFormData).toHaveBeenCalled();
+      });
+
+      const mergeFn = mockSetFormData.mock.calls[0][0];
+      const merged = mergeFn(existingResistances);
+
+      expect(merged).toEqual(existingResistances);
+    });
+
+    it('handles pre-selected immunities merge correctly', async () => {
+      getPreSelectedResistances.mockResolvedValue({
+        resistances: [],
+        immunities: ['Fire', 'Cold'],
+      });
+
+      renderHookWithResistances();
+
+      await waitFor(() => {
+        expect(mockSetFormData).toHaveBeenCalled();
+      });
+
+      const mergeFn = mockSetFormData.mock.calls[0][0];
+      const merged = mergeFn({ ...baseFormData, immunities: ['Fire'] });
+
+      expect(merged.immunities).toContain('Fire');
+      expect(merged.immunities).toContain('Cold');
+      expect(merged.immunities.length).toBe(2);
+    });
+  });
+
+  describe('setResistanceWarnings', () => {
+    it('updates resistanceWarnings when called', () => {
+      const { result } = renderHookWithResistances();
+
+      act(() => {
+        result.current.setResistanceWarnings(['New warning']);
+      });
+
+      expect(result.current.resistanceWarnings).toEqual(['New warning']);
+    });
+
+    it('replaces all warnings with a new array', () => {
+      const { result } = renderHookWithResistances();
+
+      act(() => {
+        result.current.setResistanceWarnings(['Warning A', 'Warning B', 'Warning C']);
+      });
+
+      expect(result.current.resistanceWarnings).toEqual(['Warning A', 'Warning B', 'Warning C']);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('handles formData with missing optional fields', () => {
+      const minimalFormData = { resistances: [], immunities: [], rules: '5e', level: 1 };
+      const { result } = renderHookWithResistances(minimalFormData);
+
       expect(result.current.resistanceWarnings).toEqual([]);
-         });
-       });
-
-  it('should handle pre-select errors gracefully', async () => {
-    getPreSelectedResistances.mockRejectedValue(new Error('Fetch error'));
-    console.error = vi.fn();
-
-    const { result } = renderHook(() =>
-      useWizardResistances(mockFormData, mockSetFormData)
-         );
-
-    await waitFor(() => {
-           // Should still have empty preSelectedResistancesList even on error
       expect(result.current.preSelectedResistancesList).toEqual({ resistances: [], immunities: [] });
-         });
-       });
+    });
 
-  it('should return all expected properties', () => {
-    const { result } = renderHook(() =>
-      useWizardResistances(mockFormData, mockSetFormData)
-         );
+    it('handles formData with null race/class', () => {
+      const nullRaceFormData = {
+        ...baseFormData,
+        class: null,
+        race: null,
+      };
+      const { result } = renderHookWithResistances(nullRaceFormData);
 
-    expect(result.current).toHaveProperty('resistanceWarnings');
-    expect(result.current).toHaveProperty('preSelectedResistancesList');
-    expect(result.current).toHaveProperty('setResistanceWarnings');
-       });
+      expect(result.current.resistanceWarnings).toEqual([]);
+      expect(result.current.preSelectedResistancesList).toEqual({ resistances: [], immunities: [] });
+    });
 
-  it('should allow setting resistance warnings', () => {
-    const { result } = renderHook(() =>
-      useWizardResistances(mockFormData, mockSetFormData)
-         );
+    it('handles preSelect.merge with undefined prev resistances/immunities', async () => {
+      getPreSelectedResistances.mockResolvedValue({
+        resistances: ['Fire'],
+        immunities: ['Cold'],
+      });
 
-    act(() => {
-      result.current.setResistanceWarnings(['New warning']);
-         });
+      const noArraysFormData = {
+        class: { name: 'Fighter' },
+        race: { name: 'Human' },
+        resistances: undefined,
+        immunities: undefined,
+        rules: '5e',
+        level: 1,
+      };
 
-    expect(result.current.resistanceWarnings).toEqual(['New warning']);
-       });
+      renderHookWithResistances(noArraysFormData);
+
+      await waitFor(() => {
+        expect(mockSetFormData).toHaveBeenCalled();
+      });
+
+      const mergeFn = mockSetFormData.mock.calls[0][0];
+      const merged = mergeFn(noArraysFormData);
+
+      expect(merged.resistances).toEqual(['Fire']);
+      expect(merged.immunities).toEqual(['Cold']);
+    });
+  });
 });

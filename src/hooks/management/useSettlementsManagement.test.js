@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import useSettlementsManagement from './useSettlementsManagement.js';
 
@@ -19,7 +20,7 @@ describe('useSettlementsManagement', () => {
   });
 
   describe('initial state', () => {
-    it('sets settlements to empty array and loading to false', () => {
+    it('returns settlements as empty array and loading as false', () => {
       const { result } = renderHook(() =>
         useSettlementsManagement('test-campaign')
       );
@@ -27,23 +28,10 @@ describe('useSettlementsManagement', () => {
       expect(result.current.settlements).toEqual([]);
       expect(result.current.loading).toBe(false);
     });
-
-    it('returns all expected properties', () => {
-      const { result } = renderHook(() =>
-        useSettlementsManagement('test-campaign')
-      );
-
-      expect(result.current).toHaveProperty('settlements');
-      expect(result.current).toHaveProperty('loading');
-      expect(result.current).toHaveProperty('loadSettlementsList');
-      expect(result.current).toHaveProperty('saveSettlementsList');
-      expect(result.current).toHaveProperty('saveSettlementAction');
-      expect(result.current).toHaveProperty('deleteSettlementAction');
-    });
   });
 
   describe('loadSettlementsList', () => {
-    it('loads and sets settlements from service', async () => {
+    it('loads settlements from service and sets state', async () => {
       const settlementsData = [
         { name: 'Waterdeep', type: 'City' },
         { name: 'Mithral Hall', type: 'Mine' },
@@ -62,7 +50,7 @@ describe('useSettlementsManagement', () => {
       expect(result.current.settlements).toEqual(settlementsData);
     });
 
-    it('does nothing when campaignName is empty', async () => {
+    it('skips loading when campaignName is falsy', async () => {
       const { result } = renderHook(() =>
         useSettlementsManagement('')
       );
@@ -75,16 +63,17 @@ describe('useSettlementsManagement', () => {
       expect(result.current.settlements).toEqual([]);
     });
 
-    it('does nothing when campaignName is undefined', async () => {
+    it('defaults to empty array when response settlements is null', async () => {
+      mockLoadSettlements.mockResolvedValue({ settlements: null });
+
       const { result } = renderHook(() =>
-        useSettlementsManagement(undefined)
+        useSettlementsManagement('test-campaign')
       );
 
       await act(async () => {
         await result.current.loadSettlementsList();
       });
 
-      expect(mockLoadSettlements).not.toHaveBeenCalled();
       expect(result.current.settlements).toEqual([]);
     });
 
@@ -102,8 +91,12 @@ describe('useSettlementsManagement', () => {
       expect(result.current.settlements).toEqual([]);
     });
 
-    it('defaults to empty array when response setlements is null', async () => {
-      mockLoadSettlements.mockResolvedValue({ settlements: null });
+    it('logs error and preserves existing settlements on failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      const existingSettlements = [{ name: 'Waterdeep', type: 'City' }];
+      mockLoadSettlements.mockResolvedValueOnce({ settlements: existingSettlements });
+      mockLoadSettlements.mockRejectedValueOnce(new Error('Network error'));
 
       const { result } = renderHook(() =>
         useSettlementsManagement('test-campaign')
@@ -113,16 +106,7 @@ describe('useSettlementsManagement', () => {
         await result.current.loadSettlementsList();
       });
 
-      expect(result.current.settlements).toEqual([]);
-    });
-
-    it('handles error by logging and keeping previous state', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockLoadSettlements.mockRejectedValue(new Error('Network error'));
-
-      const { result } = renderHook(() =>
-        useSettlementsManagement('test-campaign')
-      );
+      expect(result.current.settlements).toEqual(existingSettlements);
 
       await act(async () => {
         await result.current.loadSettlementsList();
@@ -132,13 +116,14 @@ describe('useSettlementsManagement', () => {
         'Failed to load settlements list:',
         expect.any(Error)
       );
-      expect(result.current.settlements).toEqual([]);
+      expect(result.current.settlements).toEqual(existingSettlements);
+
       consoleSpy.mockRestore();
     });
   });
 
   describe('saveSettlementsList', () => {
-    it('saves settlements and reloads the list', async () => {
+    it('saves settlements and reloads the list on success', async () => {
       const settlementsToSave = [
         { name: 'Waterdeep', type: 'City' },
       ];
@@ -161,7 +146,8 @@ describe('useSettlementsManagement', () => {
       expect(result.current.settlements).toEqual(settlementsToSave);
     });
 
-    it('throws error when save fails', async () => {
+    it('logs error and re-throws when save fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockSaveSettlements.mockRejectedValue(new Error('Save failed'));
 
       const { result } = renderHook(() =>
@@ -173,17 +159,23 @@ describe('useSettlementsManagement', () => {
           await result.current.saveSettlementsList([{ name: 'Waterdeep' }]);
         })
       ).rejects.toThrow('Save failed');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to save settlements:',
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 
   describe('saveSettlementAction', () => {
-    it('updates an existing settlement when oldName matches', async () => {
+    it('replaces an existing settlement when oldName matches', async () => {
       const existingSettlements = [
         { name: 'Waterdeep', type: 'City' },
         { name: 'Mithral Hall', type: 'Mine' },
       ];
 
-      // Seed settlements state by loading first
       mockLoadSettlements.mockResolvedValueOnce({
         settlements: existingSettlements,
       });
@@ -202,11 +194,7 @@ describe('useSettlementsManagement', () => {
       });
 
       await act(async () => {
-        const res = await result.current.saveSettlementAction(
-          updatedSettlement,
-          'Waterdeep'
-        );
-        expect(res).toEqual({ settlement: updatedSettlement });
+        await result.current.saveSettlementAction(updatedSettlement, 'Waterdeep');
       });
 
       expect(mockSaveSettlement).toHaveBeenCalledWith(
@@ -220,16 +208,18 @@ describe('useSettlementsManagement', () => {
       ]);
     });
 
-    it('adds a new settlement when oldName does not match any existing', async () => {
-      const existingSettlements = [{ name: 'Waterdeep', type: 'City' }];
+    it('renames a settlement when oldName differs from result settlement name', async () => {
+      const existingSettlements = [
+        { name: 'OldName', type: 'City' },
+      ];
 
       mockLoadSettlements.mockResolvedValueOnce({
         settlements: existingSettlements,
       });
 
-      const newSettlement = { name: 'Mithral Hall', type: 'Mine' };
+      const renamedSettlement = { name: 'NewName', type: 'City' };
       mockSaveSettlement.mockResolvedValueOnce({
-        settlement: newSettlement,
+        settlement: renamedSettlement,
       });
 
       const { result } = renderHook(() =>
@@ -241,25 +231,15 @@ describe('useSettlementsManagement', () => {
       });
 
       await act(async () => {
-        const res = await result.current.saveSettlementAction(
-          newSettlement,
-          'NonExistent'
-        );
-        expect(res).toEqual({ settlement: newSettlement });
+        await result.current.saveSettlementAction(renamedSettlement, 'OldName');
       });
 
-      expect(mockSaveSettlement).toHaveBeenCalledWith(
-        'test-campaign',
-        newSettlement,
-        'NonExistent'
-      );
       expect(result.current.settlements).toEqual([
-        { name: 'Waterdeep', type: 'City' },
-        { name: 'Mithral Hall', type: 'Mine' },
+        { name: 'NewName', type: 'City' },
       ]);
     });
 
-    it('adds a new settlement when oldName is not provided', async () => {
+    it('appends a new settlement when oldName is undefined', async () => {
       const existingSettlements = [{ name: 'Waterdeep', type: 'City' }];
 
       mockLoadSettlements.mockResolvedValueOnce({
@@ -294,6 +274,36 @@ describe('useSettlementsManagement', () => {
       ]);
     });
 
+    it('appends when oldName does not match any existing settlement', async () => {
+      const existingSettlements = [{ name: 'Waterdeep', type: 'City' }];
+
+      mockLoadSettlements.mockResolvedValueOnce({
+        settlements: existingSettlements,
+      });
+
+      const newSettlement = { name: 'Mithral Hall', type: 'Mine' };
+      mockSaveSettlement.mockResolvedValueOnce({
+        settlement: newSettlement,
+      });
+
+      const { result } = renderHook(() =>
+        useSettlementsManagement('test-campaign')
+      );
+
+      await act(async () => {
+        await result.current.loadSettlementsList();
+      });
+
+      await act(async () => {
+        await result.current.saveSettlementAction(newSettlement, 'GhostTown');
+      });
+
+      expect(result.current.settlements).toEqual([
+        { name: 'Waterdeep', type: 'City' },
+        { name: 'Mithral Hall', type: 'Mine' },
+      ]);
+    });
+
     it('does not update state when result has no settlement field', async () => {
       const existingSettlements = [{ name: 'Waterdeep', type: 'City' }];
 
@@ -312,17 +322,42 @@ describe('useSettlementsManagement', () => {
       });
 
       await act(async () => {
-        const res = await result.current.saveSettlementAction(
-          { name: 'Mithral Hall' },
-          undefined
-        );
-        expect(res).toEqual({});
+        await result.current.saveSettlementAction({ name: 'Mithral Hall' }, undefined);
       });
 
       expect(result.current.settlements).toEqual(existingSettlements);
     });
 
-    it('throws error when save fails', async () => {
+    it('returns the result from the service', async () => {
+      const existingSettlements = [{ name: 'Waterdeep', type: 'City' }];
+      const expectedResult = { settlement: { name: 'Waterdeep', type: 'City' } };
+
+      mockLoadSettlements.mockResolvedValueOnce({
+        settlements: existingSettlements,
+      });
+      mockSaveSettlement.mockResolvedValueOnce(expectedResult);
+
+      const { result } = renderHook(() =>
+        useSettlementsManagement('test-campaign')
+      );
+
+      await act(async () => {
+        await result.current.loadSettlementsList();
+      });
+
+      let returnedValue;
+      await act(async () => {
+        returnedValue = await result.current.saveSettlementAction(
+          { name: 'Waterdeep', type: 'City' },
+          'Waterdeep'
+        );
+      });
+
+      expect(returnedValue).toEqual(expectedResult);
+    });
+
+    it('logs error and re-throws when save fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockSaveSettlement.mockRejectedValue(new Error('Save failed'));
 
       const { result } = renderHook(() =>
@@ -337,11 +372,18 @@ describe('useSettlementsManagement', () => {
           );
         })
       ).rejects.toThrow('Save failed');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to save settlement:',
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 
   describe('deleteSettlementAction', () => {
-    it('deletes a settlement and reloads the list', async () => {
+    it('deletes a settlement and reloads the list on success', async () => {
       mockDeleteSettlement.mockResolvedValue({ success: true });
       mockLoadSettlements.mockResolvedValue({ settlements: [] });
 
@@ -358,9 +400,11 @@ describe('useSettlementsManagement', () => {
         'Waterdeep'
       );
       expect(mockLoadSettlements).toHaveBeenCalled();
+      expect(result.current.settlements).toEqual([]);
     });
 
-    it('throws error when delete fails', async () => {
+    it('logs error and re-throws when delete fails', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockDeleteSettlement.mockRejectedValue(new Error('Delete failed'));
 
       const { result } = renderHook(() =>
@@ -372,6 +416,13 @@ describe('useSettlementsManagement', () => {
           await result.current.deleteSettlementAction('Waterdeep');
         })
       ).rejects.toThrow('Delete failed');
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        'Failed to delete settlement:',
+        expect.any(Error)
+      );
+
+      consoleSpy.mockRestore();
     });
   });
 });

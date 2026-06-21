@@ -1,16 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { loadFactions, saveFactions, loadFaction, deleteFaction } from './factionsService.js';
 
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
 describe('factionsService', () => {
+  let mockFetch;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockFetch = vi.fn();
+    vi.stubGlobal('fetch', mockFetch);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   describe('loadFactions', () => {
-    it('should return factions from API response', async () => {
+    it('returns factions array from successful API response', async () => {
       const mockFactions = [
         { id: '1', name: 'Harpers', description: 'Secret society' },
         { id: '2', name: 'Order of the Gauntlet', description: 'Holy knights' },
@@ -23,13 +28,20 @@ describe('factionsService', () => {
       const result = await loadFactions('campaign1');
 
       expect(result).toEqual(mockFactions);
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/factions',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
     });
 
-    it('should encode campaign name in URL', async () => {
+    it('returns empty array when API returns no factions', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+
+      const result = await loadFactions('campaign1');
+
+      expect(result).toEqual([]);
+    });
+
+    it('encodes campaign name with spaces in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve([]),
@@ -43,33 +55,59 @@ describe('factionsService', () => {
       );
     });
 
-    it('should throw on API error', async () => {
+    it('encodes campaign name with special characters in URL', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+
+      await loadFactions('campaign/with/slashes');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/campaigns/campaign%2Fwith%2Fslashes/factions',
+        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    it('throws with custom error message on API error', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        statusText: 'Not Found',
         json: () => Promise.resolve({ error: 'Campaign not found' }),
       });
 
       await expect(loadFactions('campaign1')).rejects.toThrow('Campaign not found');
     });
 
-    it('should throw generic message when error is missing', async () => {
+    it('throws generic message when API error has no error field', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        statusText: 'Internal Server Error',
         json: () => Promise.resolve({}),
       });
 
       await expect(loadFactions('campaign1')).rejects.toThrow('Failed to load Factions');
     });
 
-    it('should throw on network error', async () => {
+    it('throws the original error on network failure', async () => {
+      mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
+
+      await expect(loadFactions('campaign1')).rejects.toThrow('ENOTFOUND');
+    });
+
+    it('calls console.error on failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(loadFactions('campaign1')).rejects.toThrow('Network error');
+
+      expect(consoleSpy).toHaveBeenCalledWith('Error loading Factions:', expect.any(Error));
+      consoleSpy.mockRestore();
     });
   });
 
   describe('saveFactions', () => {
-    it('should save factions and return response', async () => {
+    it('sends POST with factions array and returns response on success', async () => {
       const factions = [{ id: '1', name: 'Harpers' }];
       const responseData = { success: true, savedCount: 1 };
 
@@ -91,7 +129,24 @@ describe('factionsService', () => {
       );
     });
 
-    it('should encode campaign name in URL', async () => {
+    it('sends empty array when factions is empty', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      await saveFactions('campaign1', []);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/campaigns/campaign1/factions',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ factions: [] }),
+        })
+      );
+    });
+
+    it('encodes campaign name with spaces in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
@@ -105,33 +160,59 @@ describe('factionsService', () => {
       );
     });
 
-    it('should throw on API error', async () => {
+    it('encodes campaign name with special characters in URL', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      await saveFactions('campaign/with/slashes', []);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/campaigns/campaign%2Fwith%2Fslashes/factions',
+        expect.any(Object)
+      );
+    });
+
+    it('throws with custom error message on API error', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        statusText: 'Bad Request',
         json: () => Promise.resolve({ error: 'Invalid factions data' }),
       });
 
       await expect(saveFactions('campaign1', [])).rejects.toThrow('Invalid factions data');
     });
 
-    it('should throw generic message when error is missing', async () => {
+    it('throws generic message when API error has no error field', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        statusText: 'Internal Server Error',
         json: () => Promise.resolve({}),
       });
 
       await expect(saveFactions('campaign1', [])).rejects.toThrow('Failed to save Factions');
     });
 
-    it('should throw on network error', async () => {
+    it('throws the original error on network failure', async () => {
+      mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
+
+      await expect(saveFactions('campaign1', [])).rejects.toThrow('ENOTFOUND');
+    });
+
+    it('calls console.error on failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(saveFactions('campaign1', [])).rejects.toThrow('Network error');
+
+      expect(consoleSpy).toHaveBeenCalledWith('Error saving Factions:', expect.any(Error));
+      consoleSpy.mockRestore();
     });
   });
 
   describe('loadFaction', () => {
-    it('should return a single faction from API response', async () => {
+    it('returns a single faction from API response', async () => {
       const mockFaction = { id: 'faction-1', name: 'Harpers', description: 'Secret society' };
       mockFetch.mockResolvedValue({
         ok: true,
@@ -141,13 +222,9 @@ describe('factionsService', () => {
       const result = await loadFaction('campaign1', 'faction-1');
 
       expect(result).toEqual(mockFaction);
-      expect(mockFetch).toHaveBeenCalledWith(
-        '/api/campaigns/campaign1/factions/faction-1',
-        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
-      );
     });
 
-    it('should encode campaign and faction IDs in URL', async () => {
+    it('encodes campaign and faction IDs with spaces in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({}),
@@ -161,33 +238,59 @@ describe('factionsService', () => {
       );
     });
 
-    it('should throw on API error', async () => {
+    it('encodes campaign and faction IDs with special characters in URL', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      });
+
+      await loadFaction('campaign/1', 'faction/abc');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/campaigns/campaign%2F1/factions/faction%2Fabc',
+        { method: 'GET', headers: { 'Content-Type': 'application/json' } }
+      );
+    });
+
+    it('throws with custom error message on API error', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        statusText: 'Not Found',
         json: () => Promise.resolve({ error: 'Faction not found' }),
       });
 
       await expect(loadFaction('campaign1', 'faction-1')).rejects.toThrow('Faction not found');
     });
 
-    it('should throw generic message when error is missing', async () => {
+    it('throws generic message when API error has no error field', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        statusText: 'Internal Server Error',
         json: () => Promise.resolve({}),
       });
 
       await expect(loadFaction('campaign1', 'faction-1')).rejects.toThrow('Failed to load Faction');
     });
 
-    it('should throw on network error', async () => {
+    it('throws the original error on network failure', async () => {
+      mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
+
+      await expect(loadFaction('campaign1', 'faction-1')).rejects.toThrow('ENOTFOUND');
+    });
+
+    it('calls console.error on failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(loadFaction('campaign1', 'faction-1')).rejects.toThrow('Network error');
+
+      expect(consoleSpy).toHaveBeenCalledWith('Error loading Faction:', expect.any(Error));
+      consoleSpy.mockRestore();
     });
   });
 
   describe('deleteFaction', () => {
-    it('should delete a faction and return response', async () => {
+    it('sends DELETE request and returns response on success', async () => {
       const responseData = { success: true, deleted: 'faction-1' };
       mockFetch.mockResolvedValue({
         ok: true,
@@ -203,7 +306,7 @@ describe('factionsService', () => {
       );
     });
 
-    it('should encode campaign and faction IDs in URL', async () => {
+    it('encodes campaign and faction IDs with spaces in URL', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ success: true }),
@@ -217,28 +320,54 @@ describe('factionsService', () => {
       );
     });
 
-    it('should throw on API error', async () => {
+    it('encodes campaign and faction IDs with special characters in URL', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      await deleteFaction('campaign/1', 'faction/abc');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/campaigns/campaign%2F1/factions/faction%2Fabc',
+        { method: 'DELETE' }
+      );
+    });
+
+    it('throws with custom error message on API error', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        statusText: 'Not Found',
         json: () => Promise.resolve({ error: 'Faction not found' }),
       });
 
       await expect(deleteFaction('campaign1', 'faction-1')).rejects.toThrow('Faction not found');
     });
 
-    it('should throw generic message when error is missing', async () => {
+    it('throws generic message when API error has no error field', async () => {
       mockFetch.mockResolvedValue({
         ok: false,
+        statusText: 'Internal Server Error',
         json: () => Promise.resolve({}),
       });
 
       await expect(deleteFaction('campaign1', 'faction-1')).rejects.toThrow('Failed to delete Faction');
     });
 
-    it('should throw on network error', async () => {
+    it('throws the original error on network failure', async () => {
+      mockFetch.mockRejectedValue(new Error('ENOTFOUND'));
+
+      await expect(deleteFaction('campaign1', 'faction-1')).rejects.toThrow('ENOTFOUND');
+    });
+
+    it('calls console.error on failure', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(deleteFaction('campaign1', 'faction-1')).rejects.toThrow('Network error');
+
+      expect(consoleSpy).toHaveBeenCalledWith('Error deleting Faction:', expect.any(Error));
+      consoleSpy.mockRestore();
     });
   });
 });

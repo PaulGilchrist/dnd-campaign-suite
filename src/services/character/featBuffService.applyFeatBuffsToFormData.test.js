@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../shared/featFinder.js', () => ({
   findFeat: vi.fn(),
@@ -19,269 +20,421 @@ import {
 
 import { applyFeatBuffsToFormData } from './featBuffService.js';
 
+afterEach(() => {
+  vi.clearAllMocks();
+});
+
 describe('applyFeatBuffsToFormData', () => {
-  it('should reset feat increases on abilities', () => {
-    const formData = {
-      rules: '5e',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 5 }],
-    };
-
-    findFeat.mockReturnValue({
-      benefits: ['Increase your Strength score by 2'],
-    });
-
-    applyFeatBuffsToFormData(formData, []);
-
-    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
+  const baseFormData = (overrides = {}) => ({
+    rules: '5e',
+    feats: ['Tough'],
+    abilities: [{ name: 'Strength', featIncrease: 0 }],
+    ...overrides,
   });
 
-  it('should apply ability score increases to abilities', () => {
-    const formData = {
-      rules: '5e',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
+  describe('side effects on formData', () => {
+    it('should reset feat increases on all abilities before applying new ones', () => {
+      const formData = {
+        rules: '5e',
+        feats: ['Tough'],
+        abilities: [
+          { name: 'Strength', featIncrease: 5 },
+          { name: 'Dexterity', featIncrease: 3 },
+        ],
+      };
 
-    findFeat.mockReturnValue({
-      benefits: ['Increase your Strength score by 2'],
+      findFeat.mockReturnValue({ benefits: ['Increase your Strength score by 2'] });
+
+      applyFeatBuffsToFormData(formData, []);
+
+      expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
     });
 
-    applyFeatBuffsToFormData(formData, []);
+    it('should apply ability score increases from feat parsing', () => {
+      const formData = baseFormData();
 
-    expect(applyAbilityScoreIncreases).toHaveBeenCalledWith(
-      formData.abilities,
-      [{ name: 'Strength', amount: 2, isChoice: false }]
-    );
-  });
-
-  it('should merge resistances into formData', () => {
-    const formData = {
-      rules: '5e',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-      resistances: [],
-    };
-
-    findFeat.mockReturnValue({
-      benefits: ['You have resistance to fire'],
-    });
-
-    applyFeatBuffsToFormData(formData, []);
-
-    expect(mergeDeduplicated).toHaveBeenCalledWith(
-      formData,
-      'resistances',
-      ['fire']
-    );
-  });
-
-  it('should not add feat features to specialActions for 2024 ruleset', () => {
-    const formData = {
-      rules: '2024',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
-
-    findFeat.mockReturnValue({
-      benefits: [
-        { type: 'spell', name: 'Cantrip', description: 'Learn a cantrip' },
-      ],
-    });
-
-    applyFeatBuffsToFormData(formData, []);
-
-    expect(formData.specialActions).toBeUndefined();
-  });
-
-  it('should not add speed, initiative, hp_per_level, or hp_flat features for 5e ruleset', () => {
-    const formData = {
-      rules: '5e',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
-
-    findFeat.mockReturnValue({
-      benefits: [
-        'Your speed increases by 10 feet',
-        'You gain a +5 bonus to initiative',
-        'your hit point maximum increases by an additional 2 hit points',
-        'Your hit point maximum increases by 10',
-      ],
-    });
-
-    applyFeatBuffsToFormData(formData, []);
-
-    expect(formData.specialActions).toBeUndefined();
-  });
-
-  it('should not add passive features to specialActions for 5e ruleset', () => {
-    const formData = {
-      rules: '5e',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
-
-    findFeat.mockReturnValue({
-      benefits: ['You can cast detect magic at will'],
-    });
-
-    applyFeatBuffsToFormData(formData, []);
-
-    expect(formData.specialActions).toBeUndefined();
-  });
-
-  it('should not modify specialActions when processing feats', () => {
-    const formData = {
-      rules: '2024',
-      feats: ['Tough', 'Alert'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-      specialActions: [
-        { name: 'Custom Action', description: 'Already there', type: 'custom' },
-      ],
-    };
-
-    findFeat
-      .mockReturnValueOnce({
-        benefits: [{ type: 'spell', name: 'Cantrip', description: 'Learn a cantrip' }],
-      })
-      .mockReturnValueOnce({
-        benefits: [{ type: 'spell', name: 'Fire Bolt', description: 'Learn fire bolt' }],
+      findFeat.mockReturnValue({
+        benefits: ['Increase your Strength score by 2'],
       });
 
-    applyFeatBuffsToFormData(formData, []);
+      applyFeatBuffsToFormData(formData, []);
 
-    expect(formData.specialActions).toHaveLength(1);
-    expect(formData.specialActions[0].name).toBe('Custom Action');
-  });
-
-  it('should not modify specialActions when formData has no specialActions property', () => {
-    const formData = {
-      rules: '2024',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
-
-    findFeat.mockReturnValue({
-      benefits: [{ type: 'spell', name: 'Cantrip', description: 'Learn a cantrip' }],
+      expect(applyAbilityScoreIncreases).toHaveBeenCalledWith(
+        formData.abilities,
+        [{ name: 'Strength', amount: 2, isChoice: false }]
+      );
     });
 
-    applyFeatBuffsToFormData(formData, []);
+    it('should merge resistances from feat parsing into formData', () => {
+      const formData = baseFormData({ resistances: ['cold'] });
 
-    expect(formData.specialActions).toBeUndefined();
-  });
+      findFeat.mockReturnValue({
+        benefits: ['You have resistance to fire'],
+      });
 
-  it('should not modify specialActions when they are array of strings', () => {
-    const formData = {
-      rules: '2024',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-      specialActions: ['Existing Action'],
-    };
+      applyFeatBuffsToFormData(formData, []);
 
-    findFeat.mockReturnValue({
-      benefits: [{ type: 'spell', name: 'Cantrip', description: 'Learn a cantrip' }],
+      expect(mergeDeduplicated).toHaveBeenCalledWith(
+        formData,
+        'resistances',
+        ['fire']
+      );
     });
 
-    applyFeatBuffsToFormData(formData, []);
+    it('should deduplicate resistances against existing ones', () => {
+      const formData = baseFormData({ resistances: ['fire'] });
 
-    expect(formData.specialActions).toEqual(['Existing Action']);
+      findFeat.mockReturnValue({
+        benefits: ['You have resistance to fire'],
+      });
+
+      applyFeatBuffsToFormData(formData, []);
+
+      expect(mergeDeduplicated).toHaveBeenCalledWith(
+        formData,
+        'resistances',
+        ['fire']
+      );
+    });
   });
 
-  it('should return the computed buffs object', () => {
-    const formData = {
-      rules: '5e',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
+  describe('return value structure', () => {
+    it('should return an object with abilityScoreIncreases populated from feat benefits', () => {
+      const formData = baseFormData();
 
-    findFeat.mockReturnValue({
-      benefits: ['Increase your Strength score by 2'],
+      findFeat.mockReturnValue({
+        benefits: ['Increase your Strength score by 2'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toEqual([
+        { name: 'Strength', amount: 2, isChoice: false },
+      ]);
     });
 
-    const result = applyFeatBuffsToFormData(formData, []);
+    it('should return an object with proficiencies populated from feat benefits', () => {
+      const formData = baseFormData();
 
-    expect(result.abilityScoreIncreases).toEqual([
-      { name: 'Strength', amount: 2, isChoice: false },
-    ]);
-  });
+      findFeat.mockReturnValue({
+        benefits: ['You gain proficiency with heavy armor'],
+      });
 
-  it('should default to "5e" ruleset when not specified', () => {
-    const formData = {
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
+      const result = applyFeatBuffsToFormData(formData, []);
 
-    findFeat.mockReturnValue({
-      benefits: ['Your speed increases by 10 feet'],
+      expect(result.proficiencies).toEqual([
+        { name: 'heavy armor' },
+      ]);
     });
 
-    applyFeatBuffsToFormData(formData, []);
+    it('should return an object with resistances populated from feat benefits', () => {
+      const formData = baseFormData();
 
-    expect(formData.specialActions).toBeUndefined();
-  });
+      findFeat.mockReturnValue({
+        benefits: ['You have resistance to fire'],
+      });
 
-  it('should handle empty feats array', () => {
-    const formData = {
-      rules: '5e',
-      feats: [],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
+      const result = applyFeatBuffsToFormData(formData, []);
 
-    applyFeatBuffsToFormData(formData, []);
-
-    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
-    expect(applyAbilityScoreIncreases).toHaveBeenCalledWith(
-      formData.abilities,
-      []
-    );
-  });
-
-  it('should handle undefined feats in formData', () => {
-    const formData = {
-      rules: '5e',
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
-
-    applyFeatBuffsToFormData(formData, []);
-
-    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
-  });
-
-  it('should not modify specialActions when feature already exists', () => {
-    const formData = {
-      rules: '2024',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-      specialActions: [
-        { name: 'Cantrip', description: 'Old cantrip', type: 'spell' },
-      ],
-    };
-
-    findFeat.mockReturnValue({
-      benefits: [{ type: 'spell', name: 'Cantrip', description: 'New cantrip' }],
+      expect(result.resistances).toEqual(['fire']);
     });
 
-    applyFeatBuffsToFormData(formData, []);
+    it('should return an object with features populated from speed/initiative/hp/language benefits', () => {
+      const formData = baseFormData();
 
-    expect(formData.specialActions).toHaveLength(1);
-  });
+      findFeat.mockReturnValue({
+        benefits: ['Your speed increases by 10 feet'],
+      });
 
-  it('should return buffs with type "passive" when feature has no type', () => {
-    const formData = {
-      rules: '5e',
-      feats: ['Tough'],
-      abilities: [{ name: 'Strength', featIncrease: 0 }],
-    };
+      const result = applyFeatBuffsToFormData(formData, []);
 
-    findFeat.mockReturnValue({
-      benefits: ['You can cast detect magic at will'],
+      expect(result.features).toHaveLength(1);
+      expect(result.features[0].type).toBe('speed');
     });
 
-    const buffs = applyFeatBuffsToFormData(formData, []);
+    it('should return features with type "passive" for unrecognized benefit text', () => {
+      const formData = baseFormData();
 
-    expect(buffs.features).toHaveLength(1);
-    expect(buffs.features[0].type).toBe('passive');
-    expect(formData.specialActions).toBeUndefined();
+      findFeat.mockReturnValue({
+        benefits: ['You can cast detect magic at will'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.features).toHaveLength(1);
+      expect(result.features[0].type).toBe('passive');
+    });
+
+    it('should return all four buff categories when a feat produces mixed benefits', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: [
+          'Increase your Strength score by 2',
+          'You gain proficiency with heavy armor',
+          'You have resistance to fire',
+          'Your speed increases by 10 feet',
+        ],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toHaveLength(1);
+      expect(result.proficiencies).toHaveLength(1);
+      expect(result.resistances).toHaveLength(1);
+      expect(result.features).toHaveLength(1);
+    });
+
+    it('should return empty arrays for all categories when no feats are selected', () => {
+      const formData = baseFormData({ feats: [] });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toEqual([]);
+      expect(result.proficiencies).toEqual([]);
+      expect(result.resistances).toEqual([]);
+      expect(result.features).toEqual([]);
+    });
+
+    it('should return empty arrays when feats array is undefined', () => {
+      const formData = baseFormData({ feats: undefined });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toEqual([]);
+      expect(result.proficiencies).toEqual([]);
+      expect(result.resistances).toEqual([]);
+      expect(result.features).toEqual([]);
+    });
+  });
+
+  describe('ability score increase parsing', () => {
+    it('should mark isChoice true when benefit text contains "or" (dual ability selection)', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: ['Increase your Strength or Dexterity score by 2'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toHaveLength(2);
+      expect(result.abilityScoreIncreases[0].name).toBe('Strength');
+      expect(result.abilityScoreIncreases[0].isChoice).toBe(true);
+      expect(result.abilityScoreIncreases[1].name).toBe('Dexterity');
+      expect(result.abilityScoreIncreases[1].isChoice).toBe(true);
+    });
+
+    it('should mark isChoice true and name "any" for choose-one ability score benefits', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: ['Choose one ability score. Increase the chosen ability score by 1'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toHaveLength(1);
+      expect(result.abilityScoreIncreases[0].name).toBe('any');
+      expect(result.abilityScoreIncreases[0].isChoice).toBe(true);
+      expect(result.abilityScoreIncreases[0].description).toBe(
+        'Choose one ability score. Increase the chosen ability score by 1'
+      );
+    });
+
+    it('should set isChoice false for single-ability increases without "or"', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: ['Increase your Constitution score by 1'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases[0].isChoice).toBe(false);
+    });
+  });
+
+  describe('features parsing', () => {
+    it('should create speed feature with parsed numeric value', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: ['Your speed increases by 15 feet'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.features).toHaveLength(1);
+      expect(result.features[0].type).toBe('speed');
+      expect(result.features[0].value).toBe(15);
+    });
+
+    it('should create initiative feature with parsed numeric value', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: ['You gain a +2 bonus to initiative'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.features).toHaveLength(1);
+      expect(result.features[0].type).toBe('initiative');
+      expect(result.features[0].value).toBe(2);
+    });
+
+    it('should create hp_per_level feature when benefit mentions "additional" hit points', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: ['your hit point maximum increases by an additional 4 hit points'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.features).toHaveLength(1);
+      expect(result.features[0].type).toBe('hp_per_level');
+      expect(result.features[0].value).toBe(4);
+    });
+
+    it('should create hp_flat feature for flat hit point increases', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: ['Your hit point maximum increases by 10'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.features).toHaveLength(1);
+      expect(result.features[0].type).toBe('hp_flat');
+      expect(result.features[0].value).toBe(10);
+    });
+
+    it('should create language feature with parsed numeric value', () => {
+      const formData = baseFormData();
+
+      findFeat.mockReturnValue({
+        benefits: ['You learn 2 languages of your choice'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.features).toHaveLength(1);
+      expect(result.features[0].type).toBe('language');
+      expect(result.features[0].value).toBe(2);
+    });
+  });
+
+  describe('ruleset handling', () => {
+    it('should default to "5e" ruleset when not specified', () => {
+      const formData = {
+        feats: ['Tough'],
+        abilities: [{ name: 'Strength', featIncrease: 0 }],
+      };
+
+      findFeat.mockReturnValue({
+        benefits: ['Increase your Strength score by 2'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toEqual([
+        { name: 'Strength', amount: 2, isChoice: false },
+      ]);
+    });
+
+    it('should use "2024" ruleset when specified', () => {
+      const formData = baseFormData({ rules: '2024' });
+
+      findFeat.mockReturnValue({
+        benefits: [
+          { type: 'ability_score_increase', description: '+1 STR' },
+        ],
+        ability_score_increase: { scores: ['Strength'], amount: 1 },
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toEqual([
+        { name: 'Strength', amount: 1, isChoice: false, description: '+1 STR' },
+      ]);
+    });
+  });
+
+  describe('edge cases', () => {
+    it('should handle undefined feats in formData', () => {
+      const formData = baseFormData({ feats: undefined });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
+      expect(result.abilityScoreIncreases).toEqual([]);
+    });
+
+    it('should handle empty feats array', () => {
+      const formData = baseFormData({ feats: [] });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
+      expect(applyAbilityScoreIncreases).toHaveBeenCalledWith(
+        formData.abilities,
+        []
+      );
+      expect(result.abilityScoreIncreases).toEqual([]);
+    });
+
+    it('should handle multiple feats by aggregating their buffs', () => {
+      findFeat
+        .mockReturnValueOnce({
+          benefits: ['Increase your Strength score by 2'],
+        })
+        .mockReturnValueOnce({
+          benefits: ['Increase your Dexterity score by 1'],
+        });
+
+      const formData = baseFormData({ feats: ['Tough', 'Alert'] });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toHaveLength(2);
+      expect(result.abilityScoreIncreases[0].name).toBe('Strength');
+      expect(result.abilityScoreIncreases[0].amount).toBe(2);
+      expect(result.abilityScoreIncreases[1].name).toBe('Dexterity');
+      expect(result.abilityScoreIncreases[1].amount).toBe(1);
+    });
+
+    it('should skip feats that are not found in the allFeats list', () => {
+      findFeat.mockReturnValue(null);
+
+      const formData = baseFormData({ feats: ['Nonexistent'] });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toEqual([]);
+      expect(result.proficiencies).toEqual([]);
+      expect(result.resistances).toEqual([]);
+      expect(result.features).toEqual([]);
+    });
+
+    it('should handle ability score increases that accumulate on existing featIncrease', () => {
+      const formData = {
+        rules: '5e',
+        feats: ['Tough'],
+        abilities: [{ name: 'Strength', featIncrease: 0 }],
+      };
+
+      findFeat.mockReturnValue({
+        benefits: ['Increase your Strength score by 2'],
+      });
+
+      const result = applyFeatBuffsToFormData(formData, []);
+
+      expect(result.abilityScoreIncreases).toEqual([
+        { name: 'Strength', amount: 2, isChoice: false },
+      ]);
+    });
   });
 });

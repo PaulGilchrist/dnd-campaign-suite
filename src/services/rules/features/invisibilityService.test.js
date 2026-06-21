@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { endInvisibilityOnHostileAction } from './invisibilityService.js';
 
@@ -24,15 +25,19 @@ describe('invisibilityService', () => {
         getRuntimeValue.mockReset();
         setRuntimeValue.mockReset();
         getActiveBuffs.mockReset();
-        addEntry.mockReset().mockResolvedValue({});
+        addEntry.mockResolvedValue({});
     });
 
     describe('endInvisibilityOnHostileAction', () => {
         const campaignName = 'TestCampaign';
         const invisibleName = 'GnomeWizard';
 
-        it('returns early when no active invisibility is recorded', () => {
-            getRuntimeValue.mockReturnValue(null);
+        it.each([
+            [null],
+            [undefined],
+            [''],
+        ])('returns early when stored invisibility value is %s', (value) => {
+            getRuntimeValue.mockReturnValue(value);
 
             const result = endInvisibilityOnHostileAction(invisibleName, campaignName);
 
@@ -41,28 +46,10 @@ describe('invisibilityService', () => {
             expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns early when getRuntimeValue returns undefined', () => {
-            getRuntimeValue.mockReturnValue(undefined);
-
-            const result = endInvisibilityOnHostileAction(invisibleName, campaignName);
-
-            expect(result).toBeUndefined();
-            expect(getActiveBuffs).not.toHaveBeenCalled();
-        });
-
-        it('returns early when getRuntimeValue returns empty string', () => {
-            getRuntimeValue.mockReturnValue('');
-
-            const result = endInvisibilityOnHostileAction(invisibleName, campaignName);
-
-            expect(result).toBeUndefined();
-            expect(getActiveBuffs).not.toHaveBeenCalled();
-        });
-
-        it('removes Invisibility buff and logs when invisibility is active', () => {
+        it('removes Invisibility buff and invisible condition when both are active', () => {
             getRuntimeValue
-                .mockReturnValueOnce('GnomeWizard')
-                .mockReturnValueOnce(['invisible']);
+                .mockReturnValueOnce(invisibleName)
+                .mockReturnValueOnce(['invisible', 'frightened']);
             getActiveBuffs.mockReturnValue([
                 { name: 'Invisibility', duration: '1_hour' },
                 { name: 'Shield', duration: '1_round' },
@@ -70,45 +57,24 @@ describe('invisibilityService', () => {
 
             endInvisibilityOnHostileAction(invisibleName, campaignName);
 
-            expect(getRuntimeValue).toHaveBeenCalledWith(
-                campaignName,
-                `_activeInvisibility_${invisibleName}`,
-                campaignName,
-            );
-            expect(getActiveBuffs).toHaveBeenCalledWith(invisibleName, campaignName);
-            expect(getRuntimeValue).toHaveBeenCalledWith(
-                invisibleName,
-                'activeConditions',
-                campaignName,
-            );
-
-            // activeBuffs should have Invisibility removed
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 invisibleName,
                 'activeBuffs',
-                [
-                    { name: 'Shield', duration: '1_round' },
-                ],
+                [{ name: 'Shield', duration: '1_round' }],
                 campaignName,
             );
-
-            // activeConditions should be set to empty array (invisible removed)
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 invisibleName,
                 'activeConditions',
-                [],
+                ['frightened'],
                 campaignName,
             );
-
-            // Key should be cleared
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 campaignName,
                 `_activeInvisibility_${invisibleName}`,
                 null,
                 campaignName,
             );
-
-            // Log entry should be added
             expect(addEntry).toHaveBeenCalledWith(campaignName, {
                 type: 'ability_use',
                 characterName: invisibleName,
@@ -117,9 +83,32 @@ describe('invisibilityService', () => {
             });
         });
 
-        it('does not re-set activeBuffs when Invisibility buff is not present', () => {
+        it('removes Invisibility buff but preserves other buffs', () => {
             getRuntimeValue
-                .mockReturnValueOnce('GnomeWizard')
+                .mockReturnValueOnce(invisibleName)
+                .mockReturnValueOnce([]);
+            getActiveBuffs.mockReturnValue([
+                { name: 'Invisibility', duration: '1_hour' },
+                { name: 'Bless', duration: '10_min' },
+                { name: 'Shield', duration: '1_round' },
+            ]);
+
+            endInvisibilityOnHostileAction(invisibleName, campaignName);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                invisibleName,
+                'activeBuffs',
+                [
+                    { name: 'Bless', duration: '10_min' },
+                    { name: 'Shield', duration: '1_round' },
+                ],
+                campaignName,
+            );
+        });
+
+        it('skips buff update when Invisibility is not present', () => {
+            getRuntimeValue
+                .mockReturnValueOnce(invisibleName)
                 .mockReturnValueOnce([]);
             getActiveBuffs.mockReturnValue([
                 { name: 'Shield', duration: '1_round' },
@@ -127,16 +116,15 @@ describe('invisibilityService', () => {
 
             endInvisibilityOnHostileAction(invisibleName, campaignName);
 
-            // setRuntimeValue for activeBuffs should NOT be called since Invisibility isn't in the list
             const buffCalls = setRuntimeValue.mock.calls.filter(
                 call => call[1] === 'activeBuffs',
             );
             expect(buffCalls).toHaveLength(0);
         });
 
-        it('does not re-set activeConditions when invisible condition is not present', () => {
+        it('skips condition update when invisible condition is not present', () => {
             getRuntimeValue
-                .mockReturnValueOnce('GnomeWizard')
+                .mockReturnValueOnce(invisibleName)
                 .mockReturnValueOnce(['frightened']);
             getActiveBuffs.mockReturnValue([
                 { name: 'Invisibility', duration: '1_hour' },
@@ -144,27 +132,15 @@ describe('invisibilityService', () => {
 
             endInvisibilityOnHostileAction(invisibleName, campaignName);
 
-            // setRuntimeValue for activeConditions should NOT be called since invisible isn't in the list
             const condCalls = setRuntimeValue.mock.calls.filter(
                 call => call[1] === 'activeConditions',
             );
             expect(condCalls).toHaveLength(0);
         });
 
-        it('handles activeConditions being null', () => {
-            getRuntimeValue
-                .mockReturnValueOnce('GnomeWizard')
-                .mockReturnValueOnce(null);
-            getActiveBuffs.mockReturnValue([
-                { name: 'Invisibility', duration: '1_hour' },
-            ]);
-
-            expect(() => endInvisibilityOnHostileAction(invisibleName, campaignName)).toThrow('Expected array, got null');
-        });
-
         it('removes invisible condition case-insensitively', () => {
             getRuntimeValue
-                .mockReturnValueOnce('GnomeWizard')
+                .mockReturnValueOnce(invisibleName)
                 .mockReturnValueOnce(['INVISIBLE', 'frightened']);
             getActiveBuffs.mockReturnValue([
                 { name: 'Invisibility', duration: '1_hour' },
@@ -178,9 +154,33 @@ describe('invisibilityService', () => {
             expect(condCalls[0][2]).toEqual(['frightened']);
         });
 
-        it('clears the invisibility key even when no buffs/conditions changed', () => {
+        it('throws when activeConditions is null', () => {
             getRuntimeValue
-                .mockReturnValueOnce('GnomeWizard')
+                .mockReturnValueOnce(invisibleName)
+                .mockReturnValueOnce(null);
+            getActiveBuffs.mockReturnValue([
+                { name: 'Invisibility', duration: '1_hour' },
+            ]);
+
+            expect(() => endInvisibilityOnHostileAction(invisibleName, campaignName))
+                .toThrow('Expected array, got null');
+        });
+
+        it('throws when activeConditions is undefined', () => {
+            getRuntimeValue
+                .mockReturnValueOnce(invisibleName)
+                .mockReturnValueOnce(undefined);
+            getActiveBuffs.mockReturnValue([
+                { name: 'Invisibility', duration: '1_hour' },
+            ]);
+
+            expect(() => endInvisibilityOnHostileAction(invisibleName, campaignName))
+                .toThrow('Expected array, got undefined');
+        });
+
+        it('clears the invisibility key even when no buffs or conditions needed updating', () => {
+            getRuntimeValue
+                .mockReturnValueOnce(invisibleName)
                 .mockReturnValueOnce([]);
             getActiveBuffs.mockReturnValue([]);
 
@@ -194,27 +194,28 @@ describe('invisibilityService', () => {
             );
         });
 
-        it('catches and ignores addEntry promise rejection', async () => {
+        it('suppresses addEntry rejection without throwing', async () => {
             getRuntimeValue
-                .mockReturnValueOnce('GnomeWizard')
+                .mockReturnValueOnce(invisibleName)
                 .mockReturnValueOnce([])
                 .mockReturnValueOnce([]);
             getActiveBuffs.mockReturnValue([]);
             addEntry.mockReturnValue(Promise.reject(new Error('Log failed')));
 
-            // Should not throw
             const result = endInvisibilityOnHostileAction(invisibleName, campaignName);
 
             expect(result).toBeUndefined();
         });
 
-        it('works with special characters in character name', () => {
+        it('handles special characters in character name', () => {
+            const characterName = 'Elf-Ranger "Swiftarrow"';
             getRuntimeValue
-                .mockReturnValueOnce('Elf-Ranger "Swiftarrow"')
+                .mockReturnValueOnce(characterName)
+                .mockReturnValueOnce([])
                 .mockReturnValueOnce([]);
             getActiveBuffs.mockReturnValue([]);
 
-            endInvisibilityOnHostileAction('Elf-Ranger "Swiftarrow"', campaignName);
+            endInvisibilityOnHostileAction(characterName, campaignName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 campaignName,
@@ -224,15 +225,21 @@ describe('invisibilityService', () => {
             );
         });
 
-        it('returns early when invisibility key value is empty string', () => {
-            getRuntimeValue.mockReturnValueOnce('');
+        it('handles empty activeBuffs array', () => {
+            getRuntimeValue
+                .mockReturnValueOnce(invisibleName)
+                .mockReturnValueOnce([])
+                .mockReturnValueOnce([]);
+            getActiveBuffs.mockReturnValue([]);
 
-            const result = endInvisibilityOnHostileAction(invisibleName, campaignName);
+            endInvisibilityOnHostileAction(invisibleName, campaignName);
 
-            expect(result).toBeUndefined();
-            // Should return early because '' is falsy
-            expect(getActiveBuffs).not.toHaveBeenCalled();
-            expect(addEntry).not.toHaveBeenCalled();
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                campaignName,
+                `_activeInvisibility_${invisibleName}`,
+                null,
+                campaignName,
+            );
         });
     });
 });

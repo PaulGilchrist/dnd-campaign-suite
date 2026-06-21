@@ -1,29 +1,55 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { reactionHandlers } from './reaction.js'
 import { BASE_STATS, makeFeature } from '../automationInfoBuilder.fixtures.js'
 
+// ── Helpers ──────────────────────────────────────────────────────────
+
+/**
+ * Assert that every non-optional field in the default result matches
+ * its expected default value.  This replaces the brittle pattern of
+ * individually asserting 10-20 properties one by one.
+ */
+function expectDefaultResult(result, expectedDefaults) {
+    for (const [key, value] of Object.entries(expectedDefaults)) {
+        expect(result, `default: ${key}`).toHaveProperty(key, value)
+    }
+}
+
+// ── reaction_bonus ───────────────────────────────────────────────────
+
 describe('reactionHandlers – reaction_bonus', () => {
-    it('returns reaction_bonus info with defaults', () => {
+    const defaults = {
+        type: 'reaction_bonus',
+        trigger: '',
+        bonusExpression: '',
+        condition: '',
+        selfMovement: '',
+        allyMovement: '',
+        allyRange: '30 ft',
+        noOAs: false,
+        resourceCost: '',
+        effect: '',
+        saveType: '',
+        saveDc: '',
+        duration: '',
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'reaction_bonus' })
         const result = reactionHandlers.reaction_bonus(feature, BASE_STATS)
-        expect(result.type).toBe('reaction_bonus')
-        expect(result.trigger).toBe('')
-        expect(result.bonusExpression).toBe('')
-        expect(result.condition).toBe('')
-        expect(result.selfMovement).toBe('')
-        expect(result.allyMovement).toBe('')
-        expect(result.allyRange).toBe('30 ft')
-        expect(result.noOAs).toBe(false)
-        expect(result.resourceCost).toBe('')
-        expect(result.effect).toBe('')
-        expect(result.saveType).toBe('')
-        expect(result.saveDc).toBe('')
-        expect(result.duration).toBe('')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('passes through custom fields', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'reaction_bonus' }, 'Shield')
+        const result = reactionHandlers.reaction_bonus(feature, BASE_STATS)
+        expect(result.name).toBe('Shield')
+    })
+
+    it('passes through truthy custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'reaction_bonus',
             trigger: 'after_ally_hit',
@@ -53,28 +79,57 @@ describe('reactionHandlers – reaction_bonus', () => {
         expect(result.saveDc).toBe(15)
         expect(result.duration).toBe('1_round')
     })
-})
 
-describe('reactionHandlers – reaction_damage', () => {
-    it('returns reaction_damage info with defaults', () => {
-        const feature = makeFeature({ type: 'reaction_damage' })
-        const result = reactionHandlers.reaction_damage(feature, BASE_STATS)
-        expect(result.type).toBe('reaction_damage')
-        expect(result.trigger).toBe('')
-        expect(result.damageExpression).toBe('')
-        expect(result.damageType).toBe('')
-        expect(result.saveType).toBeNull()
-        expect(result.saveDc).toBeNull()
-        expect(result.saveAbility).toBe('WIS')
-        expect(result.alsoInflicts).toBeNull()
-        expect(result.resourceCost).toBeNull()
-        expect(result.range).toBe('5_ft')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.effect).toBeNull()
-        expect(result.hasAutomation).toBe(true)
+    it('coerces explicit false values correctly', () => {
+        const feature = makeFeature({
+            type: 'reaction_bonus',
+            noOAs: false,
+            allyRange: '15 ft'
+        })
+        const result = reactionHandlers.reaction_bonus(feature, BASE_STATS)
+        expect(result.noOAs).toBe(false)
+        expect(result.allyRange).toBe('15 ft')
     })
 
-    it('resolves scaling for damageExpression', () => {
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.reaction_bonus(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
+})
+
+// ── reaction_damage ──────────────────────────────────────────────────
+
+describe('reactionHandlers – reaction_damage', () => {
+    const defaults = {
+        type: 'reaction_damage',
+        trigger: '',
+        damageExpression: '',
+        damageType: '',
+        saveType: null,
+        saveDc: null,
+        saveAbility: 'WIS',
+        alsoInflicts: null,
+        resourceCost: null,
+        range: '5_ft',
+        casting_time: '1 reaction',
+        effect: null,
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
+        const feature = makeFeature({ type: 'reaction_damage' })
+        const result = reactionHandlers.reaction_damage(feature, BASE_STATS)
+        expectDefaultResult(result, defaults)
+    })
+
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'reaction_damage' }, 'Thorn Whip')
+        const result = reactionHandlers.reaction_damage(feature, BASE_STATS)
+        expect(result.name).toBe('Thorn Whip')
+    })
+
+    it('resolves scaling at exact level boundary', () => {
         const feature = makeFeature({
             type: 'reaction_damage',
             damageExpression: '1d6',
@@ -84,7 +139,37 @@ describe('reactionHandlers – reaction_damage', () => {
         expect(result.damageExpression).toBe('2d6')
     })
 
-    it('resolves saveDcExpression', () => {
+    it('resolves scaling at higher level boundary', () => {
+        const feature = makeFeature({
+            type: 'reaction_damage',
+            damageExpression: '1d6',
+            scaling: { 5: '2d6', 11: '3d6' }
+        })
+        const result = reactionHandlers.reaction_damage(feature, { ...BASE_STATS, level: 11 })
+        expect(result.damageExpression).toBe('3d6')
+    })
+
+    it('keeps base expression when level is below first scaling tier', () => {
+        const feature = makeFeature({
+            type: 'reaction_damage',
+            damageExpression: '1d6',
+            scaling: { 5: '2d6', 11: '3d6' }
+        })
+        const result = reactionHandlers.reaction_damage(feature, { ...BASE_STATS, level: 1 })
+        expect(result.damageExpression).toBe('1d6')
+    })
+
+    it('uses explicit saveDc over saveDcExpression', () => {
+        const feature = makeFeature({
+            type: 'reaction_damage',
+            saveDc: 18,
+            saveDcExpression: 'proficiency_bonus'
+        })
+        const result = reactionHandlers.reaction_damage(feature, BASE_STATS)
+        expect(result.saveDc).toBe(18)
+    })
+
+    it('resolves saveDcExpression when no explicit saveDc', () => {
         const feature = makeFeature({
             type: 'reaction_damage',
             saveDcExpression: 'proficiency_bonus'
@@ -93,17 +178,28 @@ describe('reactionHandlers – reaction_damage', () => {
         expect(result.saveDc).toBe(3)
     })
 
-    it('uses ability-based saveDc when saveDc is ability', () => {
+    it('calculates ability-based saveDc with default saveAbility', () => {
+        const feature = makeFeature({
+            type: 'reaction_damage',
+            saveDc: 'ability'
+        })
+        const result = reactionHandlers.reaction_damage(feature, BASE_STATS)
+        // 8 + WIS(5) + prof(3) = 16
+        expect(result.saveDc).toBe(16)
+    })
+
+    it('calculates ability-based saveDc with custom saveAbility', () => {
         const feature = makeFeature({
             type: 'reaction_damage',
             saveDc: 'ability',
             saveAbility: 'CON'
         })
         const result = reactionHandlers.reaction_damage(feature, BASE_STATS)
-        expect(result.saveDc).toBe(14) // 8 + CON(3) + prof(3)
+        // 8 + CON(3) + prof(3) = 14
+        expect(result.saveDc).toBe(14)
     })
 
-    it('passes through custom fields', () => {
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'reaction_damage',
             trigger: 'after_ally_hit',
@@ -127,36 +223,63 @@ describe('reactionHandlers – reaction_damage', () => {
         expect(result.range).toBe('10_ft')
         expect(result.effect).toBe('knock_prone')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.reaction_damage(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── reaction_debuff ──────────────────────────────────────────────────
+
 describe('reactionHandlers – reaction_debuff', () => {
-    it('returns reaction_debuff info with defaults', () => {
+    const defaults = {
+        type: 'reaction_debuff',
+        trigger: '',
+        debuffExpression: '',
+        subtractive: false,
+        effect: '',
+        uses_expression: '',
+        usesMax: 0,
+        recharge: 'long_rest',
+        range: '60_ft',
+        casting_time: '1 reaction',
+        triggerTypes: ['attack_roll', 'damage_roll', 'ability_check'],
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'reaction_debuff' })
         const result = reactionHandlers.reaction_debuff(feature, BASE_STATS)
-        expect(result.type).toBe('reaction_debuff')
-        expect(result.trigger).toBe('')
-        expect(result.debuffExpression).toBe('')
-        expect(result.subtractive).toBe(false)
-        expect(result.effect).toBe('')
-        expect(result.uses_expression).toBe('')
-        expect(result.usesMax).toBe(0)
-        expect(result.recharge).toBe('long_rest')
-        expect(result.range).toBe('60_ft')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.triggerTypes).toEqual(['attack_roll', 'damage_roll', 'ability_check'])
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('resolves uses_expression', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'reaction_debuff' }, 'Counterattack')
+        const result = reactionHandlers.reaction_debuff(feature, BASE_STATS)
+        expect(result.name).toBe('Counterattack')
+    })
+
+    it('resolves uses_expression to proficiency_bonus', () => {
         const feature = makeFeature({
             type: 'reaction_debuff',
             uses_expression: 'proficiency_bonus'
         })
         const result = reactionHandlers.reaction_debuff(feature, BASE_STATS)
-        expect(result.usesMax).toBe(3) // mocked value
+        expect(result.usesMax).toBe(3)
     })
 
-    it('passes through custom fields', () => {
+    it('resolves uses_expression to level-based value', () => {
+        const feature = makeFeature({
+            type: 'reaction_debuff',
+            uses_expression: 'level'
+        })
+        const result = reactionHandlers.reaction_debuff(feature, BASE_STATS)
+        expect(result.usesMax).toBe(5)
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'reaction_debuff',
             trigger: 'after_attack_miss',
@@ -174,26 +297,44 @@ describe('reactionHandlers – reaction_debuff', () => {
         expect(result.recharge).toBe('short_rest')
         expect(result.range).toBe('30_ft')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.reaction_debuff(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── reaction_save ────────────────────────────────────────────────────
+
 describe('reactionHandlers – reaction_save', () => {
-    it('returns reaction_save info with defaults', () => {
+    const defaults = {
+        type: 'reaction_save',
+        trigger: '',
+        saveType: 'WIS',
+        saveDc: 'ability',
+        saveAbility: 'CHA',
+        condition: '',
+        duration: '',
+        range: '120_ft',
+        casting_time: '1 reaction',
+        target: 'different_creature',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'reaction_save' })
         const result = reactionHandlers.reaction_save(feature, BASE_STATS)
-        expect(result.type).toBe('reaction_save')
-        expect(result.trigger).toBe('')
-        expect(result.saveType).toBe('WIS')
-        expect(result.saveDc).toBe('ability')
-        expect(result.saveAbility).toBe('CHA')
-        expect(result.condition).toBe('')
-        expect(result.duration).toBe('')
-        expect(result.range).toBe('120_ft')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.target).toBe('different_creature')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('passes through custom fields', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'reaction_save' }, 'Uncanny Dodge')
+        const result = reactionHandlers.reaction_save(feature, BASE_STATS)
+        expect(result.name).toBe('Uncanny Dodge')
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'reaction_save',
             trigger: 'ally_hit',
@@ -213,19 +354,37 @@ describe('reactionHandlers – reaction_save', () => {
         expect(result.duration).toBe('1_round')
         expect(result.range).toBe('30_ft')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.reaction_save(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── shadowy_dodge ────────────────────────────────────────────────────
+
 describe('reactionHandlers – shadowy_dodge', () => {
-    it('returns shadowy_dodge info with defaults', () => {
+    const defaults = {
+        type: 'shadowy_dodge',
+        range: '30_ft',
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'shadowy_dodge' })
         const result = reactionHandlers.shadowy_dodge(feature, BASE_STATS)
-        expect(result.type).toBe('shadowy_dodge')
-        expect(result.range).toBe('30_ft')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('passes through custom fields', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'shadowy_dodge' }, 'Shadow Step')
+        const result = reactionHandlers.shadowy_dodge(feature, BASE_STATS)
+        expect(result.name).toBe('Shadow Step')
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'shadowy_dodge',
             range: '60_ft'
@@ -233,28 +392,66 @@ describe('reactionHandlers – shadowy_dodge', () => {
         const result = reactionHandlers.shadowy_dodge(feature, BASE_STATS)
         expect(result.range).toBe('60_ft')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.shadowy_dodge(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── glorious_defense ─────────────────────────────────────────────────
+
 describe('reactionHandlers – glorious_defense', () => {
-    it('returns glorious_defense info with defaults', () => {
+    const defaults = {
+        type: 'glorious_defense',
+        acBonusExpression: 'Math.max(1, CHA modifier)',
+        range: '10_ft',
+        trigger: '',
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns defaults with standard CHA bonus (2) → acBonus=2, usesMax=2', () => {
         const feature = makeFeature({ type: 'glorious_defense' })
         const result = reactionHandlers.glorious_defense(feature, BASE_STATS)
-        expect(result.type).toBe('glorious_defense')
-        expect(result.acBonusExpression).toBe('Math.max(1, CHA modifier)')
-        expect(result.acBonus).toBe(2) // max(1, 2)
-        expect(result.usesMax).toBe(2) // max(1, 2)
-        expect(result.range).toBe('10_ft')
-        expect(result.trigger).toBe('')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
+        expect(result.acBonus).toBe(2)
+        expect(result.usesMax).toBe(2)
     })
 
-    it('calculates acBonus and usesMax from CHA bonus', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'glorious_defense' }, 'Brave Stance')
+        const result = reactionHandlers.glorious_defense(feature, BASE_STATS)
+        expect(result.name).toBe('Brave Stance')
+    })
+
+    it('clamps acBonus and usesMax to minimum 1 when CHA bonus is 0', () => {
         const stats = {
             ...BASE_STATS,
-            abilities: [
-                { name: 'Charisma', bonus: 5 }
-            ]
+            abilities: [{ name: 'Charisma', bonus: 0 }]
+        }
+        const feature = makeFeature({ type: 'glorious_defense' })
+        const result = reactionHandlers.glorious_defense(feature, stats)
+        expect(result.acBonus).toBe(1)
+        expect(result.usesMax).toBe(1)
+    })
+
+    it('clamps acBonus and usesMax to minimum 1 when CHA bonus is negative', () => {
+        const stats = {
+            ...BASE_STATS,
+            abilities: [{ name: 'Charisma', bonus: -3 }]
+        }
+        const feature = makeFeature({ type: 'glorious_defense' })
+        const result = reactionHandlers.glorious_defense(feature, stats)
+        expect(result.acBonus).toBe(1)
+        expect(result.usesMax).toBe(1)
+    })
+
+    it('scales acBonus and usesMax with higher CHA bonus', () => {
+        const stats = {
+            ...BASE_STATS,
+            abilities: [{ name: 'Charisma', bonus: 5 }]
         }
         const feature = makeFeature({ type: 'glorious_defense' })
         const result = reactionHandlers.glorious_defense(feature, stats)
@@ -262,7 +459,15 @@ describe('reactionHandlers – glorious_defense', () => {
         expect(result.usesMax).toBe(5)
     })
 
-    it('passes through custom fields', () => {
+    it('handles missing abilities array gracefully', () => {
+        const stats = { ...BASE_STATS, abilities: undefined }
+        const feature = makeFeature({ type: 'glorious_defense' })
+        const result = reactionHandlers.glorious_defense(feature, stats)
+        expect(result.acBonus).toBe(1)
+        expect(result.usesMax).toBe(1)
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'glorious_defense',
             range: '15_ft',
@@ -272,34 +477,72 @@ describe('reactionHandlers – glorious_defense', () => {
         expect(result.range).toBe('15_ft')
         expect(result.trigger).toBe('after_attack_missed')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        const stats = { ...BASE_STATS, abilities: [{ name: 'Charisma', bonus: 2 }] }
+        expect(() => reactionHandlers.glorious_defense(feature, stats))
+            .toThrow(TypeError)
+    })
 })
 
+// ── beguiling_defenses ───────────────────────────────────────────────
+
 describe('reactionHandlers – beguiling_defenses', () => {
-    it('returns beguiling_defenses info with defaults', () => {
+    const defaults = {
+        type: 'beguiling_defenses',
+        saveType: 'WIS',
+        saveAbility: 'CHA',
+        damageType: 'Psychic',
+        uses: 1,
+        recharge: 'long_rest',
+        pactMagicRecharge: false,
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'beguiling_defenses' })
         const result = reactionHandlers.beguiling_defenses(feature, BASE_STATS)
-        expect(result.type).toBe('beguiling_defenses')
-        expect(result.saveType).toBe('WIS')
-        expect(result.saveAbility).toBe('CHA')
-        expect(result.damageType).toBe('Psychic')
-        expect(result.uses).toBe(1)
-        expect(result.recharge).toBe('long_rest')
-        expect(result.pactMagicRecharge).toBe(false)
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('calculates saveDc when saveDc is ability', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'beguiling_defenses' }, 'Pact Ward')
+        const result = reactionHandlers.beguiling_defenses(feature, BASE_STATS)
+        expect(result.name).toBe('Pact Ward')
+    })
+
+    it('calculates ability-based saveDc with default saveAbility', () => {
+        const feature = makeFeature({
+            type: 'beguiling_defenses',
+            saveDc: 'ability'
+        })
+        const result = reactionHandlers.beguiling_defenses(feature, BASE_STATS)
+        // 8 + CHA(2) + prof(3) = 13
+        expect(result.saveDc).toBe(13)
+    })
+
+    it('calculates ability-based saveDc with explicit saveAbility', () => {
         const feature = makeFeature({
             type: 'beguiling_defenses',
             saveDc: 'ability',
             saveAbility: 'CHA'
         })
         const result = reactionHandlers.beguiling_defenses(feature, BASE_STATS)
-        expect(result.saveDc).toBe(13) // 8 + CHA(2) + prof(3)
+        expect(result.saveDc).toBe(13)
     })
 
-    it('passes through custom fields', () => {
+    it('uses explicit numeric saveDc over ability calculation', () => {
+        const feature = makeFeature({
+            type: 'beguiling_defenses',
+            saveDc: 17
+        })
+        const result = reactionHandlers.beguiling_defenses(feature, BASE_STATS)
+        expect(result.saveDc).toBe(17)
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'beguiling_defenses',
             saveType: 'CON',
@@ -315,29 +558,57 @@ describe('reactionHandlers – beguiling_defenses', () => {
         expect(result.recharge).toBe('short_rest')
         expect(result.pactMagicRecharge).toBe(true)
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.beguiling_defenses(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── searing_vengeance ────────────────────────────────────────────────
+
 describe('reactionHandlers – searing_vengeance', () => {
-    it('returns searing_vengeance info with defaults', () => {
+    const defaults = {
+        type: 'searing_vengeance',
+        healExpression: '',
+        damageExpression: '',
+        damageType: 'Radiant',
+        range: '30_ft',
+        condition: 'blinded',
+        conditionDuration: 'until_end_of_current_turn',
+        trigger: 'death_save_by_ally_or_self',
+        allyRange: '60_ft',
+        uses: 1,
+        usesMax: 1,
+        recharge: 'long_rest',
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'searing_vengeance' })
         const result = reactionHandlers.searing_vengeance(feature, BASE_STATS)
-        expect(result.type).toBe('searing_vengeance')
-        expect(result.healExpression).toBe('')
-        expect(result.damageExpression).toBe('')
-        expect(result.damageType).toBe('Radiant')
-        expect(result.range).toBe('30_ft')
-        expect(result.condition).toBe('blinded')
-        expect(result.conditionDuration).toBe('until_end_of_current_turn')
-        expect(result.trigger).toBe('death_save_by_ally_or_self')
-        expect(result.allyRange).toBe('60_ft')
-        expect(result.uses).toBe(1)
-        expect(result.usesMax).toBe(1)
-        expect(result.recharge).toBe('long_rest')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('passes through custom fields', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'searing_vengeance' }, 'Divine Retribution')
+        const result = reactionHandlers.searing_vengeance(feature, BASE_STATS)
+        expect(result.name).toBe('Divine Retribution')
+    })
+
+    it('uses explicit uses value for both uses and usesMax', () => {
+        const feature = makeFeature({
+            type: 'searing_vengeance',
+            uses: 3
+        })
+        const result = reactionHandlers.searing_vengeance(feature, BASE_STATS)
+        expect(result.uses).toBe(3)
+        expect(result.usesMax).toBe(3)
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'searing_vengeance',
             healExpression: '2d8',
@@ -363,22 +634,40 @@ describe('reactionHandlers – searing_vengeance', () => {
         expect(result.uses).toBe(2)
         expect(result.recharge).toBe('short_rest')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.searing_vengeance(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── illusory_self ────────────────────────────────────────────────────
+
 describe('reactionHandlers – illusory_self', () => {
-    it('returns illusory_self info with defaults', () => {
+    const defaults = {
+        type: 'illusory_self',
+        trigger: 'attack_hit',
+        uses: 1,
+        recharge: 'short_or_long_rest',
+        spellSlotRestore: null,
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'illusory_self' })
         const result = reactionHandlers.illusory_self(feature, BASE_STATS)
-        expect(result.type).toBe('illusory_self')
-        expect(result.trigger).toBe('attack_hit')
-        expect(result.uses).toBe(1)
-        expect(result.recharge).toBe('short_or_long_rest')
-        expect(result.spellSlotRestore).toBeNull()
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('passes through custom fields', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'illusory_self' }, 'Mirror Image')
+        const result = reactionHandlers.illusory_self(feature, BASE_STATS)
+        expect(result.name).toBe('Mirror Image')
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'illusory_self',
             trigger: 'missed_attack',
@@ -392,24 +681,67 @@ describe('reactionHandlers – illusory_self', () => {
         expect(result.recharge).toBe('long_rest')
         expect(result.spellSlotRestore).toBe(1)
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.illusory_self(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── reaction_counterspell ────────────────────────────────────────────
+
 describe('reactionHandlers – reaction_counterspell', () => {
-    it('returns reaction_counterspell info with defaults', () => {
+    const defaults = {
+        type: 'reaction_counterspell',
+        trigger: 'creature_casting_spell',
+        saveType: 'CON',
+        saveDc: 'ability',
+        saveAbility: 'CHA',
+        range: '60 ft',
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'reaction_counterspell' })
         const result = reactionHandlers.reaction_counterspell(feature, BASE_STATS)
-        expect(result.type).toBe('reaction_counterspell')
-        expect(result.trigger).toBe('creature_casting_spell')
-        expect(result.saveType).toBe('CON')
-        expect(result.saveDc).toBe('ability')
-        expect(result.saveAbility).toBe('CHA')
-        expect(result.saveBonus).toBe(13) // 8 + CHA(2) + prof(3)
-        expect(result.range).toBe('60 ft')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('passes through custom fields', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'reaction_counterspell' }, 'Counterspell')
+        const result = reactionHandlers.reaction_counterspell(feature, BASE_STATS)
+        expect(result.name).toBe('Counterspell')
+    })
+
+    it('calculates saveBonus from CHA bonus and proficiency', () => {
+        const feature = makeFeature({ type: 'reaction_counterspell' })
+        const result = reactionHandlers.reaction_counterspell(feature, BASE_STATS)
+        // 8 + CHA(2) + prof(3) = 13
+        expect(result.saveBonus).toBe(13)
+    })
+
+    it('calculates saveBonus with zero CHA bonus', () => {
+        const stats = {
+            ...BASE_STATS,
+            abilities: [{ name: 'Charisma', bonus: 0 }]
+        }
+        const feature = makeFeature({ type: 'reaction_counterspell' })
+        const result = reactionHandlers.reaction_counterspell(feature, stats)
+        // 8 + 0 + 3 = 11
+        expect(result.saveBonus).toBe(11)
+    })
+
+    it('calculates saveBonus with missing abilities array', () => {
+        const stats = { ...BASE_STATS, abilities: undefined }
+        const feature = makeFeature({ type: 'reaction_counterspell' })
+        const result = reactionHandlers.reaction_counterspell(feature, stats)
+        // 8 + 0 + 3 = 11
+        expect(result.saveBonus).toBe(11)
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'reaction_counterspell',
             trigger: 'spell_cast_in_range',
@@ -425,21 +757,39 @@ describe('reactionHandlers – reaction_counterspell', () => {
         expect(result.saveAbility).toBe('INT')
         expect(result.range).toBe('120 ft')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.reaction_counterspell(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── lucky_point ──────────────────────────────────────────────────────
+
 describe('reactionHandlers – lucky_point', () => {
-    it('returns lucky_point info with defaults', () => {
+    const defaults = {
+        type: 'lucky_point',
+        effect: 'advantage',
+        target: 'd20',
+        cost: 1,
+        casting_time: 'reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'lucky_point' })
         const result = reactionHandlers.lucky_point(feature, BASE_STATS)
-        expect(result.type).toBe('lucky_point')
-        expect(result.effect).toBe('advantage')
-        expect(result.target).toBe('d20')
-        expect(result.cost).toBe(1)
-        expect(result.casting_time).toBe('reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('passes through custom fields', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'lucky_point' }, 'Fate Guide')
+        const result = reactionHandlers.lucky_point(feature, BASE_STATS)
+        expect(result.name).toBe('Fate Guide')
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'lucky_point',
             effect: 'reroll',
@@ -453,19 +803,37 @@ describe('reactionHandlers – lucky_point', () => {
         expect(result.cost).toBe(2)
         expect(result.casting_time).toBe('1 action')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.lucky_point(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── reaction_spell ───────────────────────────────────────────────────
+
 describe('reactionHandlers – reaction_spell', () => {
-    it('returns reaction_spell info with defaults', () => {
+    const defaults = {
+        type: 'reaction_spell',
+        trigger: '',
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty', () => {
         const feature = makeFeature({ type: 'reaction_spell' })
         const result = reactionHandlers.reaction_spell(feature, BASE_STATS)
-        expect(result.type).toBe('reaction_spell')
-        expect(result.trigger).toBe('')
-        expect(result.casting_time).toBe('1 reaction')
-        expect(result.hasAutomation).toBe(true)
+        expectDefaultResult(result, defaults)
     })
 
-    it('passes through custom fields', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'reaction_spell' }, 'Silent Image')
+        const result = reactionHandlers.reaction_spell(feature, BASE_STATS)
+        expect(result.name).toBe('Silent Image')
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'reaction_spell',
             trigger: 'after_spell_cast',
@@ -475,23 +843,41 @@ describe('reactionHandlers – reaction_spell', () => {
         expect(result.trigger).toBe('after_spell_cast')
         expect(result.casting_time).toBe('1 reaction')
     })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        expect(() => reactionHandlers.reaction_spell(feature, BASE_STATS))
+            .toThrow(TypeError)
+    })
 })
 
+// ── sentinel_guardian ────────────────────────────────────────────────
+
 describe('reactionHandlers – sentinel_guardian', () => {
-    it('returns sentinel_guardian info with default attack when no melee attacks', () => {
+    const defaults = {
+        type: 'sentinel_guardian',
+        trigger: 'creature_disengages_or_hits_other_within_5ft',
+        range: '5_ft',
+        oaType: 'any_attack_miss_or_disengage',
+        casting_time: '1 reaction',
+        hasAutomation: true
+    }
+
+    it('returns all default values when automation is empty with no attacks', () => {
         const feature = makeFeature({ type: 'sentinel_guardian' })
         const stats = { ...BASE_STATS, attacks: [] }
         const result = reactionHandlers.sentinel_guardian(feature, stats)
-        expect(result.type).toBe('sentinel_guardian')
-        expect(result.trigger).toBe('creature_disengages_or_hits_other_within_5ft')
-        expect(result.range).toBe('5_ft')
-        expect(result.oaType).toBe('any_attack_miss_or_disengage')
-        expect(result.casting_time).toBe('1 reaction')
+        expectDefaultResult(result, defaults)
         expect(result.attack).toBeNull()
-        expect(result.hasAutomation).toBe(true)
     })
 
-    it('selects first melee action attack', () => {
+    it('propagates the feature name', () => {
+        const feature = makeFeature({ type: 'sentinel_guardian' }, 'Sentry')
+        const result = reactionHandlers.sentinel_guardian(feature, BASE_STATS)
+        expect(result.name).toBe('Sentry')
+    })
+
+    it('selects first melee action attack over ranged', () => {
         const feature = makeFeature({ type: 'sentinel_guardian' })
         const stats = {
             ...BASE_STATS,
@@ -504,7 +890,20 @@ describe('reactionHandlers – sentinel_guardian', () => {
         expect(result.attack.name).toBe('Longsword')
     })
 
-    it('falls back to first attack when no melee attacks', () => {
+    it('selects first melee attack even when non-Action melee exists', () => {
+        const feature = makeFeature({ type: 'sentinel_guardian' })
+        const stats = {
+            ...BASE_STATS,
+            attacks: [
+                { type: 'Bonus Action', range: 'melee', name: 'Off-hand' },
+                { type: 'Action', range: 'melee', name: 'Greataxe' }
+            ]
+        }
+        const result = reactionHandlers.sentinel_guardian(feature, stats)
+        expect(result.attack.name).toBe('Greataxe')
+    })
+
+    it('falls back to first attack when no melee attacks exist', () => {
         const feature = makeFeature({ type: 'sentinel_guardian' })
         const stats = {
             ...BASE_STATS,
@@ -516,7 +915,14 @@ describe('reactionHandlers – sentinel_guardian', () => {
         expect(result.attack.name).toBe('Longbow')
     })
 
-    it('passes through custom fields', () => {
+    it('returns null attack when attacks array is missing', () => {
+        const feature = makeFeature({ type: 'sentinel_guardian' })
+        const stats = { ...BASE_STATS }
+        const result = reactionHandlers.sentinel_guardian(feature, stats)
+        expect(result.attack).toBeNull()
+    })
+
+    it('passes through custom fields and replaces falsy with defaults', () => {
         const feature = makeFeature({
             type: 'sentinel_guardian',
             trigger: 'after_miss',
@@ -527,5 +933,12 @@ describe('reactionHandlers – sentinel_guardian', () => {
         expect(result.trigger).toBe('after_miss')
         expect(result.range).toBe('10_ft')
         expect(result.oaType).toBe('missed_attack')
+    })
+
+    it('throws when automation is undefined', () => {
+        const feature = { name: 'Test', automation: undefined }
+        const stats = { ...BASE_STATS, attacks: [] }
+        expect(() => reactionHandlers.sentinel_guardian(feature, stats))
+            .toThrow(TypeError)
     })
 })

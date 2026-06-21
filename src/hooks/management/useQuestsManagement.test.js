@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import useQuestsManagement from './useQuestsManagement.js';
 
@@ -17,28 +18,50 @@ describe('useQuestsManagement', () => {
   });
 
   describe('initial state', () => {
-    it('sets quests to empty array', () => {
-      const { result } = renderHook(() => useQuestsManagement('test-campaign'));
-
-      expect(result.current.quests).toEqual([]);
-    });
-
-    it('sets loading to false after initial load completes', async () => {
+    it('sets quests to empty array and loading to false after auto-load completes', async () => {
       mockLoadQuests.mockResolvedValue([]);
 
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
 
       await act(async () => {
-        // Wait for useEffect auto-load to complete
+        await Promise.resolve();
       });
 
+      expect(result.current.quests).toEqual([]);
       expect(result.current.loading).toBe(false);
+    });
+
+    it('does not load quests when campaignName is empty', () => {
+      const { result } = renderHook(() => useQuestsManagement(''));
+
+      expect(result.current.quests).toEqual([]);
+      expect(result.current.loading).toBe(false);
+      expect(mockLoadQuests).not.toHaveBeenCalled();
     });
   });
 
-  describe('auto-load on campaignName change', () => {
+  describe('auto-load on mount', () => {
     it('calls loadQuests when campaignName is provided', async () => {
       const questsData = [{ id: 'quest-1', name: 'Find the Ring' }];
+      mockLoadQuests.mockResolvedValue(questsData);
+
+      const { result } = renderHook(() => useQuestsManagement('test-campaign'));
+
+      // loading should be true during async load
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(mockLoadQuests).toHaveBeenCalledWith('test-campaign');
+      expect(result.current.loading).toBe(false);
+      expect(result.current.quests).toEqual(questsData);
+    });
+
+    it('reloads when campaignName changes', async () => {
+      const questsData = [{ id: 'quest-1', name: 'Find the Ring' }];
+      const newQuests = [{ id: 'quest-2', name: 'Defeat Sauron' }];
       mockLoadQuests.mockResolvedValue(questsData);
 
       const { result, rerender } = renderHook(
@@ -47,34 +70,24 @@ describe('useQuestsManagement', () => {
       );
 
       await act(async () => {
-        // Wait for useEffect to fire
+        await Promise.resolve();
       });
 
       expect(mockLoadQuests).toHaveBeenCalledWith('test-campaign');
       expect(result.current.quests).toEqual(questsData);
 
-      // Change campaign name
-      const newQuests = [{ id: 'quest-2', name: 'Defeat Sauron' }];
       mockLoadQuests.mockResolvedValue(newQuests);
-
       rerender({ campaignName: 'new-campaign' });
 
+      expect(result.current.loading).toBe(true);
+
       await act(async () => {
-        // Wait for useEffect to fire on rerender
+        await Promise.resolve();
       });
 
       expect(mockLoadQuests).toHaveBeenCalledWith('new-campaign');
+      expect(result.current.loading).toBe(false);
       expect(result.current.quests).toEqual(newQuests);
-    });
-
-    it('does not call loadQuests when campaignName is empty', async () => {
-      renderHook(() => useQuestsManagement(''));
-
-      await act(async () => {
-        // Wait for any effects
-      });
-
-      expect(mockLoadQuests).not.toHaveBeenCalled();
     });
   });
 
@@ -87,6 +100,13 @@ describe('useQuestsManagement', () => {
       mockLoadQuests.mockResolvedValue(questsData);
 
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
+
+      // Wait for auto-load to complete first
+      await act(async () => {
+        await Promise.resolve();
+      });
+      vi.clearAllMocks();
+      mockLoadQuests.mockResolvedValue(questsData);
 
       await act(async () => {
         await result.current.loadQuestsList();
@@ -105,21 +125,10 @@ describe('useQuestsManagement', () => {
 
       expect(mockLoadQuests).not.toHaveBeenCalled();
       expect(result.current.quests).toEqual([]);
+      expect(result.current.loading).toBe(false);
     });
 
-    it('defaults to empty array when service returns empty array', async () => {
-      mockLoadQuests.mockResolvedValue([]);
-
-      const { result } = renderHook(() => useQuestsManagement('test-campaign'));
-
-      await act(async () => {
-        await result.current.loadQuestsList();
-      });
-
-      expect(result.current.quests).toEqual([]);
-    });
-
-    it('sets loading to true while loading and false after', async () => {
+    it('sets loading to true during load and false after success', async () => {
       let resolveLoad;
       mockLoadQuests.mockImplementation(() => new Promise(resolve => {
         resolveLoad = resolve;
@@ -127,6 +136,13 @@ describe('useQuestsManagement', () => {
 
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
 
+      // Wait for auto-load setup
+      await act(async () => {
+        await Promise.resolve();
+      });
+      vi.clearAllMocks();
+
+      // Start a manual load
       act(() => {
         result.current.loadQuestsList();
       });
@@ -141,35 +157,30 @@ describe('useQuestsManagement', () => {
       expect(result.current.quests).toEqual([{ id: 'quest-1' }]);
     });
 
-    it('sets loading to false even when load fails', async () => {
+    it('sets loading to false and keeps previous quests on error', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockLoadQuests.mockRejectedValue(new Error('Network error'));
+      const existingQuests = [{ id: 'quest-1', name: 'Existing Quest' }];
+      mockLoadQuests.mockResolvedValue(existingQuests);
 
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
+
+      // Wait for auto-load to set existing quests
+      await act(async () => {
+        await Promise.resolve();
+      });
+      vi.clearAllMocks();
+      mockLoadQuests.mockRejectedValue(new Error('Network error'));
 
       await act(async () => {
         await result.current.loadQuestsList();
       });
 
       expect(result.current.loading).toBe(false);
-      consoleSpy.mockRestore();
-    });
-
-    it('handles error by logging and keeping previous state', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      mockLoadQuests.mockRejectedValue(new Error('Network error'));
-
-      const { result } = renderHook(() => useQuestsManagement('test-campaign'));
-
-      await act(async () => {
-        await result.current.loadQuestsList();
-      });
-
+      expect(result.current.quests).toEqual(existingQuests);
       expect(consoleSpy).toHaveBeenCalledWith(
         'Failed to load quests:',
         expect.any(Error)
       );
-      expect(result.current.quests).toEqual([]);
       consoleSpy.mockRestore();
     });
   });
@@ -181,6 +192,11 @@ describe('useQuestsManagement', () => {
       mockLoadQuests.mockResolvedValue(questsToSave);
 
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      vi.clearAllMocks();
 
       await act(async () => {
         await result.current.saveQuestsList(questsToSave);
@@ -199,18 +215,31 @@ describe('useQuestsManagement', () => {
       });
 
       expect(mockSaveQuests).not.toHaveBeenCalled();
+      expect(mockLoadQuests).not.toHaveBeenCalled();
     });
 
-    it('handles error by logging without rethrowing', async () => {
+    it('does not reload when save fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const existingQuests = [{ id: 'quest-1', name: 'Existing Quest' }];
+      mockLoadQuests.mockResolvedValue(existingQuests);
       mockSaveQuests.mockRejectedValue(new Error('Save failed'));
 
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
 
+      // Wait for auto-load to set existing quests
       await act(async () => {
-        await result.current.saveQuestsList([{ id: 'quest-1' }]);
+        await Promise.resolve();
+      });
+      vi.clearAllMocks();
+      mockSaveQuests.mockRejectedValue(new Error('Save failed'));
+
+      await act(async () => {
+        await result.current.saveQuestsList([{ id: 'new-quest' }]);
       });
 
+      expect(mockSaveQuests).toHaveBeenCalledWith('test-campaign', [{ id: 'new-quest' }]);
+      expect(mockLoadQuests).not.toHaveBeenCalled();
+      expect(result.current.quests).toEqual(existingQuests);
       expect(consoleSpy).toHaveBeenCalledWith(
         'Failed to save quests:',
         expect.any(Error)
@@ -221,10 +250,16 @@ describe('useQuestsManagement', () => {
 
   describe('deleteQuestAction', () => {
     it('deletes a quest and reloads the list', async () => {
+      const remainingQuests = [{ id: 'quest-2', name: 'Remaining Quest' }];
       mockDeleteQuest.mockResolvedValue(undefined);
-      mockLoadQuests.mockResolvedValue([]);
+      mockLoadQuests.mockResolvedValue(remainingQuests);
 
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
+
+      await act(async () => {
+        await Promise.resolve();
+      });
+      vi.clearAllMocks();
 
       await act(async () => {
         await result.current.deleteQuestAction('quest-1');
@@ -232,7 +267,7 @@ describe('useQuestsManagement', () => {
 
       expect(mockDeleteQuest).toHaveBeenCalledWith('test-campaign', 'quest-1');
       expect(mockLoadQuests).toHaveBeenCalled();
-      expect(result.current.quests).toEqual([]);
+      expect(result.current.quests).toEqual(remainingQuests);
     });
 
     it('does nothing when campaignName is empty', async () => {
@@ -243,18 +278,31 @@ describe('useQuestsManagement', () => {
       });
 
       expect(mockDeleteQuest).not.toHaveBeenCalled();
+      expect(mockLoadQuests).not.toHaveBeenCalled();
     });
 
-    it('handles error by logging without rethrowing', async () => {
+    it('does not reload when delete fails', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const existingQuests = [{ id: 'quest-1', name: 'Existing Quest' }];
+      mockLoadQuests.mockResolvedValue(existingQuests);
       mockDeleteQuest.mockRejectedValue(new Error('Delete failed'));
 
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
+
+      // Wait for auto-load to set existing quests
+      await act(async () => {
+        await Promise.resolve();
+      });
+      vi.clearAllMocks();
+      mockDeleteQuest.mockRejectedValue(new Error('Delete failed'));
 
       await act(async () => {
         await result.current.deleteQuestAction('quest-1');
       });
 
+      expect(mockDeleteQuest).toHaveBeenCalledWith('test-campaign', 'quest-1');
+      expect(mockLoadQuests).not.toHaveBeenCalled();
+      expect(result.current.quests).toEqual(existingQuests);
       expect(consoleSpy).toHaveBeenCalledWith(
         'Failed to delete quest:',
         expect.any(Error)
@@ -264,14 +312,22 @@ describe('useQuestsManagement', () => {
   });
 
   describe('return value', () => {
-    it('returns all expected properties', () => {
+    it('returns all expected properties with correct types', async () => {
+      mockLoadQuests.mockResolvedValue([]);
+
       const { result } = renderHook(() => useQuestsManagement('test-campaign'));
 
-      expect(result.current).toHaveProperty('quests');
-      expect(result.current).toHaveProperty('loading');
-      expect(result.current).toHaveProperty('loadQuestsList');
-      expect(result.current).toHaveProperty('saveQuestsList');
-      expect(result.current).toHaveProperty('deleteQuestAction');
+      await act(async () => {
+        await Promise.resolve();
+      });
+
+      expect(result.current).toMatchObject({
+        quests: expect.any(Array),
+        loading: expect.any(Boolean),
+        loadQuestsList: expect.any(Function),
+        saveQuestsList: expect.any(Function),
+        deleteQuestAction: expect.any(Function),
+      });
     });
   });
 });

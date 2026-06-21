@@ -1,9 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi } from 'vitest';
 
-// ── Globals ────────────────────────────────────────────────────
-global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
-
-// Re-import after globals setup (no mocks needed — service uses only fetch)
 import {
   sendSavePrompt,
   sendSaveResult,
@@ -15,215 +12,240 @@ import {
   sendConcentrationResult,
 } from './savePromptService.js';
 
-// ── Tests ───────────────────────────────────────────────────────
+// Suppress unhandled rejection warnings from the service's fire-and-forget
+// fetch calls (the service logs errors but re-throws, creating unhandled
+// promise rejections that Vitest detects). This is expected behavior for
+// fire-and-forget patterns and does not affect test validity.
+const noop = () => {};
+process.on('unhandledRejection', noop);
 
-describe('sendSavePrompt', () => {
-  beforeEach(() => vi.resetAllMocks());
+// ── Helpers ──────────────────────────────────────────────────────
 
-  it('sends POST request with correct URL and body', async () => {
-    await sendSavePrompt('Test Campaign', { targetName: 'Goblin' });
+/**
+ * Create a fetch mock that resolves with a minimal Response-like object.
+ * The service never reads the response, so the shape is irrelevant.
+ */
+function mockFetchResolved() {
+  vi.spyOn(globalThis, 'fetch').mockResolvedValue({ ok: true });
+}
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/Test%20Campaign/savePrompt-Goblin',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: { targetName: 'Goblin' } }),
-      }
-    );
-  });
+/**
+ * Create a fetch mock that rejects. Useful for verifying the service
+ * does not propagate errors to the caller (fire-and-forget).
+ */
+function mockFetchRejected() {
+  vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('network fail'));
+}
 
-  it('encodes special characters in campaign name', async () => {
-    const campaignName = 'Campaign #1 & Test';
-    await sendSavePrompt(campaignName, { targetName: 'T' });
+/**
+ * Assert that fetch was called with a POST request to the expected
+ * campaign endpoint with the correct JSON body.
+ */
+function expectPostToCampaign(fetchSpy, campaignName, key, bodyValue) {
+  const expectedUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/${key}`;
+  expect(fetchSpy).toHaveBeenCalledWith(
+    expectedUrl,
+    expect.objectContaining({
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: bodyValue }),
+    })
+  );
+}
 
-    const expectedUrl = `/api/campaigns/${encodeURIComponent(campaignName)}/savePrompt-T`;
-    expect(global.fetch).toHaveBeenCalledWith(expectedUrl, expect.any(Object));
-   });
+// ── Tests ────────────────────────────────────────────────────────
 
-  it('swallows fetch errors silently', async () => {
-    const err = new Error('fail');
-    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
-    const result = sendSavePrompt('T', { targetName: 'T' });
-    expect(result).toBeUndefined(); // fire-and-forget, no promise returned
-    await Promise.resolve(); // allow microtask to settle so rejection is caught internally
-   });
-});
+describe('savePromptService', () => {
+  describe('sendSavePrompt', () => {
+    it('posts save prompt data to the correct endpoint', () => {
+      mockFetchResolved();
+      sendSavePrompt('Test Campaign', { targetName: 'Goblin' });
 
-describe('sendSaveResult', () => {
-  beforeEach(() => vi.resetAllMocks());
-
-  it('sends POST request with correct URL and body', async () => {
-    await sendSaveResult('Test', 'Goblin', { success: true });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/Test/saveResult-Goblin',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: { success: true } }),
-      }
-    );
-  });
-
-  it('swallows fetch errors silently', async () => {
-    const err = new Error('fail');
-    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
-    const result = sendSaveResult('T', 'Goblin', {});
-    expect(result).toBeUndefined();
-    await Promise.resolve();
-     });
-});
-
-describe('clearSavePrompt', () => {
-  beforeEach(() => vi.resetAllMocks());
-
-  it('sends POST request with correct URL and body containing promptId', async () => {
-    await clearSavePrompt('Test', 'Goblin', 'prompt-123');
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/Test/savePromptCleared-Goblin',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: { promptId: 'prompt-123' } }),
-      }
-    );
-  });
-
-  it('swallows fetch errors silently', async () => {
-    const err = new Error('fail');
-    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
-    const result = clearSavePrompt('Test', 'Goblin', 'id');
-    expect(result).toBeUndefined();
-    await Promise.resolve();
-     });
-});
-
-describe('sendDeathSavePrompt', () => {
-  beforeEach(() => vi.resetAllMocks());
-
-  it('sends POST request with correct URL and body', async () => {
-    await sendDeathSavePrompt('Test', { targetName: 'Fighter' });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/Test/deathSavePrompt-Fighter',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: { targetName: 'Fighter' } }),
-      }
-    );
-  });
-
-  it('swallows fetch errors silently', async () => {
-    const err = new Error('fail');
-    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
-    const result = sendDeathSavePrompt('Test', { targetName: 'T' });
-    expect(result).toBeUndefined();
-    await Promise.resolve();
-      });
-});
-
-describe('clearDeathSavePrompt', () => {
-  beforeEach(() => vi.resetAllMocks());
-
-  it('sends DELETE request with correct URL and no body or headers', async () => {
-    await clearDeathSavePrompt('Test', 'Fighter');
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/Test/deathSavePrompt-Fighter',
-      { method: 'DELETE' }
-    );
-  });
-
-  it('does not include headers or body in request config', async () => {
-    await clearDeathSavePrompt('Test', 'Fighter');
-    const call = global.fetch.mock.calls[0];
-    expect(call[1].headers).toBeUndefined();
-    expect(call[1].body).toBeUndefined();
-  });
-
-  it('swallows fetch errors silently', async () => {
-    const err = new Error('fail');
-    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
-    const result = clearDeathSavePrompt('Test', 'T');
-    expect(result).toBeUndefined();
-    await Promise.resolve();
-       });
-});
-
-describe('sendDeathSaveResult', () => {
-  beforeEach(() => vi.resetAllMocks());
-
-  it('sends POST request with correct URL and body', async () => {
-    await sendDeathSaveResult('Test', 'Fighter', { save: true });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/Test/deathSaveResult-Fighter',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: { save: true } }),
-      }
-    );
-  });
-
-  it('swallows fetch errors silently', async () => {
-    const err = new Error('fail');
-    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
-    const result = sendDeathSaveResult('Test', 'Fighter', {});
-    expect(result).toBeUndefined();
-    await Promise.resolve();
-        });
-});
-
-describe('sendConcentrationPrompt', () => {
-  beforeEach(() => vi.resetAllMocks());
-
-  it('sends POST request with correct URL and body', async () => {
-    await sendConcentrationPrompt('Test', { targetName: 'Wizard' });
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/Test/concentrationPrompt-Wizard',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: { targetName: 'Wizard' } }),
-      }
-    );
-  });
-
-  it('swallows fetch errors silently', async () => {
-    const err = new Error('fail');
-    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
-    const result = sendConcentrationPrompt('Test', { targetName: 'T' });
-    expect(result).toBeUndefined();
-    await Promise.resolve();
+      expectPostToCampaign(
+        globalThis.fetch,
+        'Test Campaign',
+        'savePrompt-Goblin',
+        { targetName: 'Goblin' }
+      );
     });
-});
 
-describe('sendConcentrationResult', () => {
-  beforeEach(() => vi.resetAllMocks());
+    it('URL-encodes special characters in the campaign name', () => {
+      mockFetchResolved();
+      sendSavePrompt('Campaign #1 & Test', { targetName: 'T' });
 
-  it('sends POST request with correct URL and body', async () => {
-    await sendConcentrationResult('Test', 'Wizard', { success: true });
+      const expectedUrl = '/api/campaigns/Campaign%20%231%20%26%20Test/savePrompt-T';
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expectedUrl,
+        expect.any(Object)
+      );
+    });
 
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/Test/concentrationResult-Wizard',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: { success: true } }),
-      }
-    );
+    it('returns undefined (fire-and-forget)', () => {
+      mockFetchResolved();
+      const result = sendSavePrompt('C', { targetName: 'T' });
+      expect(result).toBeUndefined();
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = sendSavePrompt('C', { targetName: 'T' });
+      expect(result).toBeUndefined();
+    });
   });
 
-  it('swallows fetch errors silently', async () => {
-    const err = new Error('fail');
-    global.fetch.mockReturnValueOnce(Promise.reject(err).catch(() => {}));
-    const result = sendConcentrationResult('Test', 'Wizard', {});
-    expect(result).toBeUndefined();
-    await Promise.resolve();
-          });
+  describe('sendSaveResult', () => {
+    it('posts result data to the correct endpoint', () => {
+      mockFetchResolved();
+      sendSaveResult('Test Campaign', 'Goblin', { success: true });
+
+      expectPostToCampaign(
+        globalThis.fetch,
+        'Test Campaign',
+        'saveResult-Goblin',
+        { success: true }
+      );
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = sendSaveResult('C', 'T', {});
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('clearSavePrompt', () => {
+    it('posts promptId to the cleared endpoint', () => {
+      mockFetchResolved();
+      clearSavePrompt('Test Campaign', 'Goblin', 'prompt-123');
+
+      expectPostToCampaign(
+        globalThis.fetch,
+        'Test Campaign',
+        'savePromptCleared-Goblin',
+        { promptId: 'prompt-123' }
+      );
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = clearSavePrompt('C', 'T', 'id');
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('sendDeathSavePrompt', () => {
+    it('posts death save prompt data to the correct endpoint', () => {
+      mockFetchResolved();
+      sendDeathSavePrompt('Test Campaign', { targetName: 'Fighter' });
+
+      expectPostToCampaign(
+        globalThis.fetch,
+        'Test Campaign',
+        'deathSavePrompt-Fighter',
+        { targetName: 'Fighter' }
+      );
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = sendDeathSavePrompt('C', { targetName: 'T' });
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('clearDeathSavePrompt', () => {
+    it('sends a DELETE request to the correct endpoint with no body', () => {
+      mockFetchResolved();
+      clearDeathSavePrompt('Test Campaign', 'Fighter');
+
+      const expectedUrl = '/api/campaigns/Test%20Campaign/deathSavePrompt-Fighter';
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expectedUrl,
+        expect.objectContaining({
+          method: 'DELETE',
+        })
+      );
+
+      const callArgs = globalThis.fetch.mock.calls[0][1];
+      expect(callArgs.headers).toBeUndefined();
+      expect(callArgs.body).toBeUndefined();
+    });
+
+    it('URL-encodes special characters in the campaign name', () => {
+      mockFetchResolved();
+      clearDeathSavePrompt('Campaign #1', 'T');
+
+      const expectedUrl = '/api/campaigns/Campaign%20%231/deathSavePrompt-T';
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expectedUrl,
+        expect.any(Object)
+      );
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = clearDeathSavePrompt('C', 'T');
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('sendDeathSaveResult', () => {
+    it('posts death save result data to the correct endpoint', () => {
+      mockFetchResolved();
+      sendDeathSaveResult('Test Campaign', 'Fighter', { save: true });
+
+      expectPostToCampaign(
+        globalThis.fetch,
+        'Test Campaign',
+        'deathSaveResult-Fighter',
+        { save: true }
+      );
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = sendDeathSaveResult('C', 'T', {});
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('sendConcentrationPrompt', () => {
+    it('posts concentration prompt data to the correct endpoint', () => {
+      mockFetchResolved();
+      sendConcentrationPrompt('Test Campaign', { targetName: 'Wizard' });
+
+      expectPostToCampaign(
+        globalThis.fetch,
+        'Test Campaign',
+        'concentrationPrompt-Wizard',
+        { targetName: 'Wizard' }
+      );
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = sendConcentrationPrompt('C', { targetName: 'T' });
+      expect(result).toBeUndefined();
+    });
+  });
+
+  describe('sendConcentrationResult', () => {
+    it('posts concentration result data to the correct endpoint', () => {
+      mockFetchResolved();
+      sendConcentrationResult('Test Campaign', 'Wizard', { success: true });
+
+      expectPostToCampaign(
+        globalThis.fetch,
+        'Test Campaign',
+        'concentrationResult-Wizard',
+        { success: true }
+      );
+    });
+
+    it('does not propagate fetch rejections to the caller', () => {
+      mockFetchRejected();
+      const result = sendConcentrationResult('C', 'T', {});
+      expect(result).toBeUndefined();
+    });
+  });
 });

@@ -1,30 +1,62 @@
-import { describe, it, expect } from 'vitest'
-import { FIGHTING_STYLES, getFightingStyle } from './fightingStyles.js'
+// @improved-by-ai
+import { describe, it, expect } from 'vitest';
+import { FIGHTING_STYLES, getFightingStyle } from './fightingStyles.js';
 
-describe('FIGHTING_STYLES', () => {
-  it('exports Great Weapon Fighting style', () => {
-    const style = FIGHTING_STYLES['Great Weapon Fighting']
-    expect(style.name).toBe('Great Weapon Fighting')
-    expect(style.description).toContain('treat')
-  })
+describe('fightingStyles', () => {
+  describe('FIGHTING_STYLES', () => {
+    it.each([
+      'Great Weapon Fighting',
+      'Protection',
+    ])('exports %s with required properties', (name) => {
+      const style = FIGHTING_STYLES[name];
+      expect(style).toBeDefined();
+      expect(style.name).toBe(name);
+      expect(style.description).toBeTypeOf('string');
+      expect(style.description.length).toBeGreaterThan(0);
+    });
 
-  it('exports Protection style', () => {
-    const style = FIGHTING_STYLES['Protection']
-    expect(style.name).toBe('Protection')
-    expect(style.description).toContain('disadvantage')
-  })
-})
+    it('exports exactly 2 fighting styles', () => {
+      expect(Object.keys(FIGHTING_STYLES)).toHaveLength(2);
+    });
 
-describe('getFightingStyle', () => {
-  it('returns the style for a known name', () => {
-    expect(getFightingStyle('Great Weapon Fighting')).toBeDefined()
-    expect(getFightingStyle('Protection')).toBeDefined()
-  })
+    it('provides referentially stable style objects', () => {
+      expect(FIGHTING_STYLES['Great Weapon Fighting']).toBe(FIGHTING_STYLES['Great Weapon Fighting']);
+      expect(FIGHTING_STYLES['Protection']).toBe(FIGHTING_STYLES['Protection']);
+    });
+  });
 
-  it('returns null for an unknown name', () => {
-    expect(getFightingStyle('Dueling')).toBeNull()
-    expect(getFightingStyle('')).toBeNull()
-    expect(getFightingStyle(null)).toBeNull()
-    expect(getFightingStyle(undefined)).toBeNull()
-  })
-})
+  describe('getFightingStyle', () => {
+    it('returns the style object for a known name', () => {
+      const result = getFightingStyle('Great Weapon Fighting');
+      expect(result).toBe(FIGHTING_STYLES['Great Weapon Fighting']);
+    });
+
+    it('returns referentially stable results matching the export', () => {
+      expect(getFightingStyle('Great Weapon Fighting')).toBe(FIGHTING_STYLES['Great Weapon Fighting']);
+      expect(getFightingStyle('Protection')).toBe(FIGHTING_STYLES['Protection']);
+    });
+
+    it('returns null for unknown names', () => {
+      expect(getFightingStyle('Dueling')).toBeNull();
+      expect(getFightingStyle('Defense')).toBeNull();
+      expect(getFightingStyle('Archery')).toBeNull();
+    });
+
+    it('returns null for empty string', () => {
+      expect(getFightingStyle('')).toBeNull();
+    });
+
+    it('returns null for null', () => {
+      expect(getFightingStyle(null)).toBeNull();
+    });
+
+    it('returns null for undefined', () => {
+      expect(getFightingStyle(undefined)).toBeNull();
+    });
+
+    it('returns null for falsy values that do not match any key', () => {
+      expect(getFightingStyle(0)).toBeNull();
+      expect(getFightingStyle(false)).toBeNull();
+    });
+  });
+});

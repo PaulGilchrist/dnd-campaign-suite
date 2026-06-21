@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { getProficiencies, getProficiencyChoiceCount } from './proficiencyUtils.js';
 
@@ -8,7 +9,15 @@ describe('proficiencyUtils', () => {
       bonusSource: null,
     };
 
-    it('should return base class and race proficiencies for skills', () => {
+    const skillConfig = {
+      ...defaultConfig,
+      backgroundToolProficiencies: () => ['Tool: Cook\'s Supplies'],
+      backgroundToolProficiencyChoices: () => [
+        { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] },
+      ],
+    };
+
+    it('returns base class and race skill proficiencies plus background allowance', () => {
       const playerStats = {
         class: {
           proficiencies: ['Skill: Athletics', 'Skill: Perception', 'Light Armor'],
@@ -25,10 +34,10 @@ describe('proficiencyUtils', () => {
       expect(proficiencies).toContain('Athletics');
       expect(proficiencies).toContain('Perception');
       expect(proficiencies).toContain('Survival');
-      expect(allowed).toBe(5); // 3 base + 2 from background
+      expect(allowed).toBe(5);
     });
 
-    it('should return non-skill proficiencies', () => {
+    it('returns non-skill proficiencies without Skill-prefixed entries', () => {
       const playerStats = {
         class: {
           proficiencies: ['Light Armor', 'Medium Armor', 'Skill: Athletics'],
@@ -40,15 +49,17 @@ describe('proficiencyUtils', () => {
       };
 
       const getChoiceCount = () => 0;
-      const [, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, defaultConfig);
+      const [allowed, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, defaultConfig);
 
       expect(proficiencies).toContain('Light Armor');
       expect(proficiencies).toContain('Medium Armor');
+      expect(proficiencies).toContain('Darkvision');
       expect(proficiencies).not.toContain('Athletics');
       expect(proficiencies).not.toContain('Skill: Athletics');
+      expect(allowed).toBe(3);
     });
 
-    it('should merge skillProficiencies into the list', () => {
+    it('merges skillProficiencies into the available pool', () => {
       const playerStats = {
         class: {
           proficiencies: ['Skill: Athletics'],
@@ -67,7 +78,7 @@ describe('proficiencyUtils', () => {
       expect(proficiencies).toContain('Perception');
     });
 
-    it('should merge existing non-skill proficiencies', () => {
+    it('merges existing non-skill proficiencies into the available pool', () => {
       const playerStats = {
         class: {
           proficiencies: ['Light Armor'],
@@ -85,7 +96,7 @@ describe('proficiencyUtils', () => {
       expect(proficiencies).toContain('Shields');
     });
 
-    it('should add bonus skill proficiencies from subclass', () => {
+    it('adds bonus skill proficiencies from subclass bonus_skill_proficiencies', () => {
       const config = {
         raceProficiencies: () => [],
         bonusSource: { bonus_skill_proficiencies: 2 },
@@ -104,10 +115,10 @@ describe('proficiencyUtils', () => {
       const getChoiceCount = () => 0;
       const [allowed] = getProficiencies(playerStats, true, getChoiceCount, config);
 
-      expect(allowed).toBe(5); // 1 base + 2 background + 2 bonus
+      expect(allowed).toBe(5);
     });
 
-    it('should add bonus non-skill proficiencies from subclass', () => {
+    it('adds bonus non-skill proficiencies from subclass bonus_proficiencies', () => {
       const config = {
         raceProficiencies: () => [],
         bonusSource: { bonus_proficiencies: ['Heavy Armor', 'Martial Weapons'] },
@@ -132,7 +143,7 @@ describe('proficiencyUtils', () => {
       expect(allowed).toBe(3);
     });
 
-    it('should add class-based skill proficiency choices', () => {
+    it('adds class-based skill proficiency choices to the allowed count', () => {
       const playerStats = {
         class: {
           proficiencies: ['Skill: Athletics'],
@@ -146,22 +157,13 @@ describe('proficiencyUtils', () => {
         skillProficiencies: [],
       };
 
-      const getChoiceCount = (ps, skills) => {
-        let count = 0;
-        (ps.class.proficiency_choices || []).forEach(p => {
-          if ((skills && p.from[0].startsWith('Skill: ')) || (!skills && !p.from[0].startsWith('Skill: '))) {
-            count += p.choose;
-          }
-        });
-        return count;
-      };
-
+      const getChoiceCount = () => 2;
       const [allowed] = getProficiencies(playerStats, true, getChoiceCount, defaultConfig);
 
-      expect(allowed).toBe(5); // 1 base + 2 background + 2 choices
+      expect(allowed).toBe(5);
     });
 
-    it('should deduplicate proficiencies', () => {
+    it('deduplicates proficiencies from all sources', () => {
       const playerStats = {
         class: {
           proficiencies: ['Skill: Athletics', 'Skill: Perception'],
@@ -179,7 +181,7 @@ describe('proficiencyUtils', () => {
       expect(athleticsCount).toBe(1);
     });
 
-    it('should sort proficiencies alphabetically', () => {
+    it('returns proficiencies sorted alphabetically', () => {
       const playerStats = {
         class: {
           proficiencies: ['Skill: Stealth', 'Skill: Athletics', 'Skill: Perception'],
@@ -193,11 +195,10 @@ describe('proficiencyUtils', () => {
       const getChoiceCount = () => 0;
       const [, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, defaultConfig);
 
-      const skillProfs = proficiencies.filter(p => ['Athletics', 'Perception', 'Stealth'].includes(p));
-      expect(skillProfs).toEqual(['Athletics', 'Perception', 'Stealth']);
+      expect(proficiencies).toEqual(['Athletics', 'Perception', 'Stealth']);
     });
 
-    it('should handle race proficiencies from config', () => {
+    it('includes proficiencies returned by raceProficiencies config function', () => {
       const config = {
         raceProficiencies: () => ['Skill: Intimidation'],
         bonusSource: null,
@@ -219,7 +220,7 @@ describe('proficiencyUtils', () => {
       expect(proficiencies).toContain('Intimidation');
     });
 
-    it('should handle empty proficiencies', () => {
+    it('handles empty proficiencies from all sources', () => {
       const playerStats = {
         class: {
           proficiencies: [],
@@ -234,22 +235,247 @@ describe('proficiencyUtils', () => {
       const [allowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, defaultConfig);
 
       expect(proficiencies).toEqual([]);
-      expect(allowed).toBe(2); // 0 base + 2 background
+      expect(allowed).toBe(2);
+    });
+
+    it('handles playerStats with no class property throws', () => {
+      const playerStats = {
+        skillProficiencies: [],
+      };
+
+      const getChoiceCount = () => 0;
+      expect(() => getProficiencies(playerStats, true, getChoiceCount, defaultConfig)).toThrow(TypeError);
+    });
+
+    it('handles playerStats with no race property throws', () => {
+      const playerStats = {
+        class: {
+          proficiencies: ['Skill: Athletics'],
+        },
+        skillProficiencies: [],
+      };
+
+      const getChoiceCount = () => 0;
+      expect(() => getProficiencies(playerStats, true, getChoiceCount, defaultConfig)).toThrow(TypeError);
+    });
+
+    it('handles undefined bonusSource', () => {
+      const config = {
+        raceProficiencies: () => [],
+      };
+
+      const playerStats = {
+        class: {
+          proficiencies: ['Skill: Athletics'],
+        },
+        race: {
+          starting_proficiencies: [],
+        },
+        skillProficiencies: [],
+      };
+
+      const getChoiceCount = () => 0;
+      const [allowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, config);
+
+      expect(proficiencies).toContain('Athletics');
+      expect(allowed).toBe(3);
+    });
+
+    it('merges background tool proficiencies for non-skill', () => {
+      const playerStats = {
+        class: {
+          proficiencies: ['Light Armor'],
+        },
+        race: {
+          starting_proficiencies: [],
+        },
+        proficiencies: [],
+      };
+
+      const getChoiceCount = () => 0;
+      const [, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, skillConfig);
+
+      expect(proficiencies).toContain('Light Armor');
+      expect(proficiencies).toContain('Tool: Cook\'s Supplies');
+    });
+
+    it('merges background tool proficiency choices for non-skill', () => {
+      const playerStats = {
+        class: {
+          proficiencies: ['Light Armor'],
+        },
+        race: {
+          starting_proficiencies: [],
+        },
+        proficiencies: [],
+      };
+
+      const getChoiceCount = () => 0;
+      const [allowed, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, skillConfig);
+
+      expect(proficiencies).toContain('Tool: Alchemist Supplies');
+      expect(proficiencies).toContain('Tool: Brewer Supplies');
+      expect(allowed).toBe(4); // 1 existing + 1 background tool + 2 choices
+    });
+
+    it('deduplicates bonusSource proficiency_choices with existing proficiencies', () => {
+      const playerStats = {
+        class: {
+          proficiencies: ['Skill: History'],
+        },
+        race: {
+          starting_proficiencies: [],
+        },
+        skillProficiencies: [],
+      };
+
+      const config = {
+        raceProficiencies: () => [],
+        bonusSource: {
+          proficiency_choices: [
+            { choose: 1, from: ['Skill: History', 'Skill: Insight'] },
+          ],
+        },
+      };
+
+      const getChoiceCount = () => 0;
+      const [, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, config);
+
+      expect(proficiencies).toContain('History');
+      expect(proficiencies).toContain('Insight');
+      expect(proficiencies.filter(p => p === 'History')).toHaveLength(1);
+    });
+
+    it('merges bonusSource proficiency_choices into skill available pool', () => {
+      const playerStats = {
+        class: {
+          proficiencies: [],
+        },
+        race: {
+          starting_proficiencies: [],
+        },
+        skillProficiencies: [],
+      };
+
+      const config = {
+        raceProficiencies: () => [],
+        bonusSource: {
+          proficiency_choices: [
+            { choose: 1, from: ['Skill: History', 'Skill: Insight'] },
+          ],
+        },
+      };
+
+      const getChoiceCount = () => 0;
+      const [allowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, config);
+
+      expect(proficiencies).toContain('History');
+      expect(proficiencies).toContain('Insight');
+      expect(allowed).toBe(4);
+    });
+
+    it('merges bonusSource proficiency_choices into non-skill available pool', () => {
+      const playerStats = {
+        class: {
+          proficiencies: [],
+        },
+        race: {
+          starting_proficiencies: [],
+        },
+        proficiencies: [],
+      };
+
+      const config = {
+        raceProficiencies: () => [],
+        bonusSource: {
+          proficiency_choices: [
+            { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] },
+          ],
+        },
+      };
+
+      const getChoiceCount = () => 0;
+      const [, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, config);
+
+      expect(proficiencies).toContain('Tool: Alchemist Supplies');
+      expect(proficiencies).toContain('Tool: Brewer Supplies');
+    });
+
+    it('filters bonusSource proficiency_choices by skill vs non-skill correctly', () => {
+      const playerStats = {
+        class: {
+          proficiencies: [],
+        },
+        race: {
+          starting_proficiencies: [],
+        },
+        skillProficiencies: [],
+        proficiencies: [],
+      };
+
+      const config = {
+        raceProficiencies: () => [],
+        bonusSource: {
+          proficiency_choices: [
+            { choose: 1, from: ['Tool: Smith Tools'] },
+            { choose: 1, from: ['Skill: Acrobatics', 'Skill: Athletics'] },
+          ],
+        },
+      };
+
+      const getChoiceCount = () => 0;
+      const [, skillProfs] = getProficiencies(playerStats, true, getChoiceCount, config);
+      const [, toolProfs] = getProficiencies(playerStats, false, getChoiceCount, config);
+
+      expect(skillProfs).toContain('Acrobatics');
+      expect(skillProfs).toContain('Athletics');
+      expect(skillProfs).not.toContain('Tool: Smith Tools');
+      expect(toolProfs).toContain('Tool: Smith Tools');
+      expect(toolProfs).not.toContain('Acrobatics');
+    });
+
+    it('handles empty bonusSource proficiency_choices array', () => {
+      const playerStats = {
+        class: {
+          proficiencies: ['Skill: Athletics'],
+        },
+        race: {
+          starting_proficiencies: [],
+        },
+        skillProficiencies: [],
+      };
+
+      const config = {
+        raceProficiencies: () => [],
+        bonusSource: {
+          proficiency_choices: [],
+        },
+      };
+
+      const getChoiceCount = () => 0;
+      const [allowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, config);
+
+      expect(proficiencies).toContain('Athletics');
+      expect(allowed).toBe(3);
     });
   });
 
   describe('getProficiencyChoiceCount', () => {
-    it('should return 0 when class has no proficiency_choices', () => {
-      const playerStats = {
-        class: {},
-        race: {},
-      };
+    it('returns 0 when class has no proficiency_choices', () => {
+      const playerStats = { class: {}, race: {} };
 
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
       expect(getProficiencyChoiceCount(playerStats, false)).toBe(0);
     });
 
-    it('should count skill proficiency choices', () => {
+    it('throws when playerStats has no class property', () => {
+      const playerStats = { race: {} };
+
+      expect(() => getProficiencyChoiceCount(playerStats, true)).toThrow(TypeError);
+      expect(() => getProficiencyChoiceCount(playerStats, false)).toThrow(TypeError);
+    });
+
+    it('counts skill proficiency choices from class', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
@@ -262,7 +488,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(2);
     });
 
-    it('should count non-skill proficiency choices', () => {
+    it('counts non-skill proficiency choices from class', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
@@ -275,7 +501,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, false)).toBe(1);
     });
 
-    it('should not count skill choices when skills=false', () => {
+    it('excludes skill choices when skills=false', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
@@ -288,7 +514,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, false)).toBe(0);
     });
 
-    it('should not count non-skill choices when skills=true', () => {
+    it('excludes non-skill choices when skills=true', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
@@ -301,7 +527,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
     });
 
-    it('should add race starting_proficiency_options for skills', () => {
+    it('counts race starting_proficiency_options for skills', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
@@ -319,7 +545,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(3);
     });
 
-    it('should not add race starting_proficiency_options for non-skills when skills=true', () => {
+    it('excludes race starting_proficiency_options non-skills when skills=true', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
@@ -337,7 +563,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(2);
     });
 
-    it('should add race starting_proficiency_options for non-skills when skills=false', () => {
+    it('counts race starting_proficiency_options for non-skills when skills=false', () => {
       const playerStats = {
         class: {},
         race: {
@@ -351,7 +577,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, false)).toBe(1);
     });
 
-    it('should handle racial trait proficiency choices', () => {
+    it('counts racial trait proficiency choices from subrace', () => {
       const playerStats = {
         class: {},
         race: {
@@ -371,7 +597,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(1);
     });
 
-    it('should not count racial trait non-skill choices when skills=true', () => {
+    it('excludes racial trait non-skill choices when skills=true', () => {
       const playerStats = {
         class: {},
         race: {
@@ -391,7 +617,7 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
     });
 
-    it('should handle multiple proficiency choice sources', () => {
+    it('sums proficiency choices from multiple sources', () => {
       const playerStats = {
         class: {
           proficiency_choices: [
@@ -420,189 +646,96 @@ describe('proficiencyUtils', () => {
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(5);
     });
 
-    it('should handle missing subrace', () => {
-      const playerStats = {
-        class: {},
-        race: {},
-      };
+    it('handles missing subrace', () => {
+      const playerStats = { class: {}, race: {} };
 
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
     });
 
-    it('should handle subrace without racial_traits', () => {
+    it('handles subrace without racial_traits', () => {
+      const playerStats = { class: {}, race: { subrace: {} } };
+
+      expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
+    });
+
+    it('handles empty racial_traits array', () => {
       const playerStats = {
         class: {},
         race: {
-          subrace: {},
+          subrace: {
+            racial_traits: [],
+          },
         },
       };
 
       expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
     });
-  });
-});
 
-describe('proficiencyUtils - bonusSource proficiency_choices', () => {
-  const getChoiceCount = () => 0;
+    it('handles racial_trait without proficiency_choices', () => {
+      const playerStats = {
+        class: {},
+        race: {
+          subrace: {
+            racial_traits: [
+              { name: 'Extra HP' },
+            ],
+          },
+        },
+      };
 
-  it('should merge bonusSource.proficiency_choices into skill available pool', () => {
-    const playerStats = {
-      class: {
-        proficiencies: [],
-      },
-      race: {
-        starting_proficiencies: [],
-      },
-      skillProficiencies: [],
-    };
+      expect(getProficiencyChoiceCount(playerStats, true)).toBe(0);
+    });
 
-    const config = {
-      raceProficiencies: () => [],
-      bonusSource: {
-        proficiency_choices: [
-          { choose: 1, from: ['Skill: History', 'Skill: Insight'] }
-        ]
-      },
-    };
+    it('handles multiple racial traits with mixed proficiency_choices', () => {
+      const playerStats = {
+        class: {},
+        race: {
+          subrace: {
+            racial_traits: [
+              {
+                proficiency_choices: {
+                  choose: 1,
+                  from: ['Skill: Survival'],
+                },
+              },
+              {
+                proficiency_choices: {
+                  choose: 1,
+                  from: ['Skill: Athletics'],
+                },
+              },
+            ],
+          },
+        },
+      };
 
-    const [skillAllowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, config);
+      expect(getProficiencyChoiceCount(playerStats, true)).toBe(2);
+    });
 
-    expect(proficiencies).toContain('History');
-    expect(proficiencies).toContain('Insight');
-    expect(skillAllowed).toBe(4); // 2 from bonusSource + 2 from background
-  });
+    it('skips racial traits with non-skill choices when skills=true', () => {
+      const playerStats = {
+        class: {},
+        race: {
+          subrace: {
+            racial_traits: [
+              {
+                proficiency_choices: {
+                  choose: 2,
+                  from: ['Skill: Perception'],
+                },
+              },
+              {
+                proficiency_choices: {
+                  choose: 3,
+                  from: ['Heavy Armor', 'Martial Weapons'],
+                },
+              },
+            ],
+          },
+        },
+      };
 
-  it('should merge bonusSource.proficiency_choices into non-skill available pool', () => {
-    const playerStats = {
-      class: {
-        proficiencies: [],
-      },
-      race: {
-        starting_proficiencies: [],
-      },
-      proficiencies: [],
-    };
-
-    const config = {
-      raceProficiencies: () => [],
-      bonusSource: {
-        proficiency_choices: [
-          { choose: 1, from: ['Tool: Alchemist Supplies', 'Tool: Brewer Supplies'] }
-        ]
-      },
-    };
-
-    const [_toolAllowed, proficiencies] = getProficiencies(playerStats, false, getChoiceCount, config);
-    void _toolAllowed;
-
-    expect(proficiencies).toContain('Tool: Alchemist Supplies');
-    expect(proficiencies).toContain('Tool: Brewer Supplies');
-  });
-
-  it('should merge both skill and tool choices from bonusSource', () => {
-    const playerStats = {
-      class: {
-        proficiencies: [],
-      },
-      race: {
-        starting_proficiencies: [],
-      },
-      skillProficiencies: [],
-      proficiencies: [],
-    };
-
-    const config = {
-      raceProficiencies: () => [],
-      bonusSource: {
-        proficiency_choices: [
-          { choose: 1, from: ['Tool: Smith Tools'] },
-          { choose: 1, from: ['Skill: Acrobatics', 'Skill: Athletics'] }
-        ]
-      },
-    };
-
-    const [_skillAllowed, skillProfs] = getProficiencies(playerStats, true, getChoiceCount, config);
-    void _skillAllowed;
-    const [_toolAllowed, toolProfs] = getProficiencies(playerStats, false, getChoiceCount, config);
-    void _toolAllowed;
-
-    expect(skillProfs).toContain('Acrobatics');
-    expect(skillProfs).toContain('Athletics');
-    expect(toolProfs).toContain('Tool: Smith Tools');
-    expect(toolProfs).not.toContain('Acrobatics');
-  });
-
-  it('should deduplicate bonusSource choices with existing proficiencies', () => {
-    const playerStats = {
-      class: {
-        proficiencies: ['Skill: History'],
-      },
-      race: {
-        starting_proficiencies: [],
-      },
-      skillProficiencies: [],
-    };
-
-    const config = {
-      raceProficiencies: () => [],
-      bonusSource: {
-        proficiency_choices: [
-          { choose: 1, from: ['Skill: History', 'Skill: Insight'] }
-        ]
-      },
-    };
-
-    const [_allowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, config);
-    void _allowed;
-
-    expect(proficiencies).toContain('History');
-    expect(proficiencies).toContain('Insight');
-    expect(proficiencies.filter(p => p === 'History')).toHaveLength(1);
-  });
-
-  it('should handle empty bonusSource.proficiency_choices', () => {
-    const playerStats = {
-      class: {
-        proficiencies: ['Skill: Athletics'],
-      },
-      race: {
-        starting_proficiencies: [],
-      },
-      skillProficiencies: [],
-    };
-
-    const config = {
-      raceProficiencies: () => [],
-      bonusSource: {
-        proficiency_choices: []
-      },
-    };
-
-    const [allowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, config);
-
-    expect(proficiencies).toContain('Athletics');
-    expect(allowed).toBe(3); // 1 base + 2 background
-  });
-
-  it('should handle null bonusSource', () => {
-    const playerStats = {
-      class: {
-        proficiencies: ['Skill: Athletics'],
-      },
-      race: {
-        starting_proficiencies: [],
-      },
-      skillProficiencies: [],
-    };
-
-    const config = {
-      raceProficiencies: () => [],
-      bonusSource: null,
-    };
-
-    const [allowed, proficiencies] = getProficiencies(playerStats, true, getChoiceCount, config);
-
-    expect(proficiencies).toContain('Athletics');
-    expect(allowed).toBe(3);
+      expect(getProficiencyChoiceCount(playerStats, true)).toBe(2);
+    });
   });
 });
