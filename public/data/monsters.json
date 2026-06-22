@@ -22634,7 +22634,7 @@
     ],
     "allies": [
       "elves",
-      "sea horse"
+      "seahorse"
     ],
     "enemies": null,
     "challenge_rating": "0.5",
@@ -22657,11 +22657,11 @@
     "traits": [
       {
         "name": "Charge",
-        "description": "If the sea horse moves at least 20 ft. straight toward a target and then hits it with a ram attack on the same turn, the target takes an extra 7 (2d6) bludgeoning damage. If the target is a creature, it must succeed on a DC 11 Strength saving throw or be knocked prone."
+        "description": "If the seahorse moves at least 20 ft. straight toward a target and then hits it with a ram attack on the same turn, the target takes an extra 7 (2d6) bludgeoning damage. If the target is a creature, it must succeed on a DC 11 Strength saving throw or be knocked prone."
       },
       {
         "name": "Water Breathing",
-        "description": "The sea horse can breathe only underwater."
+        "description": "The seahorse can breathe only underwater."
       }
     ],
     "reactions": [],
@@ -22670,7 +22670,7 @@
     "regional_effects": {},
     "book": "Monster Manual",
     "page": 328,
-    "description": "Like their smaller kin, giant sea horses are shy, colorful fish with elongated bodies and curled tails. Aquatic elves train them as mounts."
+    "description": "Like their smaller kin, giant seahorses are shy, colorful fish with elongated bodies and curled tails. Aquatic elves train them as mounts."
   },
   {
     "index": "giant-seahorse",
@@ -49207,7 +49207,7 @@
       "underwater"
     ],
     "allies": [
-      "giant sea horse"
+      "giant seahorse"
     ],
     "enemies": null,
     "challenge_rating": "0",
@@ -49221,7 +49221,7 @@
     "traits": [
       {
         "name": "Water Breathing",
-        "description": "The sea horse can breathe only underwater."
+        "description": "The seahorse can breathe only underwater."
       }
     ],
     "reactions": [],
