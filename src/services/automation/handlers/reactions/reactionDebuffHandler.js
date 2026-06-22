@@ -15,7 +15,7 @@ function getRuntimeUsesKey(featureName) {
 async function handleAttackRollDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
     const auto = action.automation;
 
-    const attackResult = await findLastAttack();
+    const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
     if (!attackEvent || attackResult.attackerName !== attackerName) {
         return {
@@ -68,7 +68,7 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
 async function handleDamageDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
     const auto = action.automation;
 
-    const attackResult = await findLastAttack();
+    const attackResult = await findLastAttack(campaignName);
     const lastEvent = attackResult.attackEvent;
     if (!lastEvent || !attackResult.totalDamage || attackResult.attackerName !== attackerName) {
         return infoPopup(action.name, `No recent damage event found for ${attackerName}. ${action.name} can only be used shortly after a damage roll.`, auto);
@@ -97,7 +97,7 @@ async function handleDamageDebuff(action, _playerStats, campaignName, attackerNa
 async function handleDisadvantageDebuff(action, _playerStats, campaignName, attackerName, combatSummary) {
     const auto = action.automation;
 
-    const attackResult = await findLastAttack();
+    const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
     if (!attackEvent || attackResult.attackerName !== attackerName) {
         return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
@@ -302,7 +302,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             },
         };
     } else if (effect === 'disadvantage_on_attack_roll') {
-        const attackResult = await findLastAttack();
+        const attackResult = await findLastAttack(campaignName);
         const attackEvent = attackResult.attackEvent;
     if (!attackEvent || attackResult.attackerName !== attackerName) {
             return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
@@ -313,7 +313,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const bardicDieSize = classLevel?.bardic_die || 6;
         const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
 
-        const attackResult = await findLastAttack();
+        const attackResult = await findLastAttack(campaignName);
         const attackEvent = attackResult.attackEvent;
         const hasAttack = attackEvent && attackResult.attackerName === attackerName;
 

@@ -10,7 +10,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Misty Escape';
 
     // Check that the player has recently taken damage
-    const attackResult = await findLastAttack();
+    const attackResult = await findLastAttack(campaignName);
     const damageEvent = attackResult.attackEvent;
     if (!damageEvent || attackResult.targetName !== playerName || !attackResult.totalDamage) {
         return {

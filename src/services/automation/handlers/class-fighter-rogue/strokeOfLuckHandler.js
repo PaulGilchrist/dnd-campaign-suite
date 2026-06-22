@@ -30,7 +30,7 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     // Find the most recent failed D20 test (attack, ability check, or save)
-    const attackResult = await findLastAttack();
+    const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
 
     const attackFresh = attackEvent && attackResult.targetName === playerName;

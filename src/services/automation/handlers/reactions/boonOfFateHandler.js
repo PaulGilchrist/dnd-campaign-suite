@@ -25,7 +25,7 @@ export async function handle(action, playerStats, campaignName) {
         return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on Initiative or Short or Long Rest.`, auto);
     }
 
-    const attackResult = await findLastAttack();
+    const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
     const attackFresh = attackEvent && attackResult.targetName === playerName;
 

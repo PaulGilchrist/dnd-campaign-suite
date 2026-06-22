@@ -12,7 +12,7 @@ async function findRecentSuccessfulSave(playerStats, campaignName, mapName, rang
     const playerName = playerStats.name;
 
     if (isSelf) {
-        const attackResult = await findLastAttack();
+        const attackResult = await findLastAttack(campaignName);
         const attackEvent = attackResult.attackEvent;
         if (attackEvent && attackResult.targetName === playerName) {
             const { hit } = attackEvent;
@@ -28,7 +28,7 @@ async function findRecentSuccessfulSave(playerStats, campaignName, mapName, rang
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary?.creatures) return null;
 
-    const attackResult = await findLastAttack();
+    const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
     if (!attackEvent) return null;
 

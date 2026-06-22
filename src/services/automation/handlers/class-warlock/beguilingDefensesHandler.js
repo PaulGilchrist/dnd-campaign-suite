@@ -12,7 +12,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Beguiling Defenses';
 
     // 1. Get the last attack roll against the player
-    const attackResult = await findLastAttack();
+    const attackResult = await findLastAttack(campaignName);
     const attackEvent = attackResult.attackEvent;
     if (!attackEvent || attackResult.targetName !== playerName) {
         return {

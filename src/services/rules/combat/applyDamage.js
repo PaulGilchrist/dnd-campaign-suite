@@ -551,7 +551,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     }
   }
 
-  if (combatSummaryChanged || npcConcentrationBroken) {
+  if (combatSummaryChanged || npcConcentrationBroken || existingAttack) {
     storage.set('combatSummary', combatSummary, campaignName);
   }
 

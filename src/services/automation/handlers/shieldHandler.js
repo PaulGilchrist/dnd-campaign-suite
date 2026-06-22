@@ -23,7 +23,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
         const cs = await getCombatContext(campaignName);
         if (cs) {
-            const attackResult = await findAttackRollAgainstTarget(playerName);
+            const attackResult = await findAttackRollAgainstTarget(playerName, campaignName);
 
             if (attackResult.attackEvent) {
                 const { d20, bonus, targetAc } = attackResult.attackEvent;

@@ -10,7 +10,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Illusory Self';
 
     // 1. Get the last attack roll against the player and the attacker name
-    const { attackEvent, attackerName: storedAttackerName } = await findAttackRollAgainstTarget(playerName);
+    const { attackEvent, attackerName: storedAttackerName } = await findAttackRollAgainstTarget(playerName, campaignName);
 
     if (!attackEvent) {
         return {

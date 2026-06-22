@@ -6,10 +6,11 @@ import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
  * Get the last attack from combatSummary.lastAttack.
  * Single source of truth — contains attacker, target, d20, hit, damage, save info, spell/weapon info, etc.
  *
+ * @param {string} [campaignName] - Campaign name for fetching combat context
  * @returns {{ attackEvent: Object|null, attackerName: string|null, targetName: string|null, primaryDamage: number, secondaryDamage: number, totalDamage: number, damageTypes: string[] }}
  */
-export async function findLastAttack() {
-    const cs = await getCombatContext();
+export async function findLastAttack(campaignName) {
+    const cs = await getCombatContext(campaignName);
     if (!cs?.lastAttack) {
         return { attackEvent: null, attackerName: null, targetName: null, primaryDamage: 0, secondaryDamage: 0, totalDamage: 0, damageTypes: [] };
     }
@@ -31,10 +32,12 @@ export async function findLastAttack() {
  * Find the last attack roll targeting a specific player.
  * Uses combatSummary.lastAttack which is the single source of truth.
  *
+ * @param {string} targetName - Name of the target to find attacks against
+ * @param {string} [campaignName] - Campaign name for fetching combat context
  * @returns {{ attackEvent: Object|null, attackerName: string|null }}
  */
-export async function findAttackRollAgainstTarget(targetName) {
-    const result = await findLastAttack();
+export async function findAttackRollAgainstTarget(targetName, campaignName) {
+    const result = await findLastAttack(campaignName);
     if (!result.attackEvent) return { attackEvent: null, attackerName: null };
     if (result.targetName === targetName) {
         return { attackEvent: result.attackEvent, attackerName: result.attackerName };
@@ -49,14 +52,14 @@ export async function findAttackRollAgainstTarget(targetName) {
  * @returns {number} The amount that was actually healed (may be 0 if target is at max HP)
  */
 export async function rollbackDamage(attackerName, targetName, campaignName, featureName) {
-    const result = await findLastAttack();
+    const result = await findLastAttack(campaignName);
     if (!result.attackEvent) return 0;
 
     const a = result.attackEvent;
     if (a.attackerName !== attackerName || a.targetName !== targetName) return 0;
     if (!result.totalDamage || result.totalDamage <= 0) return 0;
 
-    const cs = await getCombatContext();
+    const cs = await getCombatContext(campaignName);
     if (!cs) return 0;
 
     const healResult = applyHealingToTarget(cs, targetName, result.totalDamage, campaignName);

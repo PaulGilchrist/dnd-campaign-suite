@@ -8,7 +8,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Shadowy Dodge';
 
     // Get the last attack roll against the player
-    const lastAttack = await findLastAttack();
+    const lastAttack = await findLastAttack(campaignName);
     const attackEvent = lastAttack?.attackEvent;
     if (!attackEvent || lastAttack?.targetName !== playerName) {
         return infoPopup(featureName, `No recent attack roll against you found. ${featureName} can only be used shortly after an attack roll.`, auto);

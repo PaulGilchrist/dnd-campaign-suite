@@ -30,7 +30,7 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     const grantedBy = getRuntimeValue(playerName, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
-    const lastAttack = await findLastAttack();
+    const lastAttack = await findLastAttack(campaignName);
     let bonusDescription = '';
     let defenderHp = null;
 

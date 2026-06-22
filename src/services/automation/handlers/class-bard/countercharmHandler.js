@@ -14,7 +14,7 @@ async function findRecentFailedSave(playerStats, campaignName, mapName, rangeFt)
     const playerName = playerStats.name;
 
     const checkSelf = async () => {
-        const attackResult = await findLastAttack();
+        const attackResult = await findLastAttack(campaignName);
         const attackEvent = attackResult.attackEvent;
         if (attackEvent && attackResult.targetName === playerName) {
             return { name: playerName, event: attackEvent, type: 'attack_roll' };
@@ -34,7 +34,7 @@ async function findRecentFailedSave(playerStats, campaignName, mapName, rangeFt)
         for (const creature of combatSummary.creatures) {
             if (creature.name === playerName) continue;
 
-            const attackResult = await findLastAttack();
+            const attackResult = await findLastAttack(campaignName);
             const attackEvent = attackResult.attackEvent;
             if (attackEvent && attackResult.attackerName === creature.name) {
                 if (mapName && rangeFt != null) {
