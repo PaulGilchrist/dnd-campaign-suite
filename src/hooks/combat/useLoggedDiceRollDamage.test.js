@@ -22,10 +22,6 @@ vi.mock('../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
 }));
 
-vi.mock('./useMetamagic.js', () => ({
-    saveLastDamageEvent: vi.fn(),
-}));
-
 vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: vi.fn(),
     playerIsImmuneToCondition: vi.fn(),

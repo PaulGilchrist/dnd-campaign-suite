@@ -1,13 +1,11 @@
 import { handle } from './luckyPointHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
 import * as logService from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-    getLastAttackRoll: vi.fn(),
-    getLastAbilityCheck: vi.fn(),
-    getLastSaveRoll: vi.fn(),
+vi.mock('../../common/damageRollback.js', () => ({
+    findRollsByCreature: vi.fn(),
 }));
 vi.mock('../../../ui/logService.js');
 
@@ -35,9 +33,7 @@ describe('luckyPointHandler.handle', () => {
 
     it('should return error when no recent D20 test found', async () => {
         runtimeState.getRuntimeValue.mockReturnValue(3);
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
+        damageRollback.findRollsByCreature.mockResolvedValue(null);
 
         const result = await handle(
             { name: 'Advantage', automation: { type: 'lucky_point', effect: 'advantage', target: 'd20', cost: 1 } },
@@ -55,11 +51,13 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 3;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 8, bonus: 5, targetName: 'Goblin', hit: false, timestamp: Date.now() - 30000,
+        damageRollback.findRollsByCreature.mockResolvedValue({
+            'TestFighter': {
+                attackEvent: { d20: 8, bonus: 5, targetName: 'Goblin', hit: false, timestamp: Date.now() - 30000 },
+                abilityEvent: null,
+                saveEvent: null,
+            },
         });
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(
@@ -83,11 +81,13 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 2;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue({
-            d20: 7, bonus: 3, checkName: 'Stealth', timestamp: Date.now() - 10000,
+        damageRollback.findRollsByCreature.mockResolvedValue({
+            'TestFighter': {
+                attackEvent: null,
+                abilityEvent: { d20: 7, bonus: 3, checkName: 'Stealth', timestamp: Date.now() - 10000 },
+                saveEvent: null,
+            },
         });
-        metamagic.getLastSaveRoll.mockReturnValue(null);
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(
@@ -106,10 +106,12 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 1;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue({
-            d20: 5, bonus: 2, saveType: 'CON', timestamp: Date.now() - 10000,
+        damageRollback.findRollsByCreature.mockResolvedValue({
+            'TestFighter': {
+                attackEvent: null,
+                abilityEvent: null,
+                saveEvent: { d20: 5, bonus: 2, saveType: 'CON', timestamp: Date.now() - 10000 },
+            },
         });
         logService.addEntry.mockResolvedValue(undefined);
 
@@ -129,14 +131,12 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 5;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastAbilityCheck.mockReturnValue({
-            d20: 8, bonus: 3, checkName: 'Athletics', timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastSaveRoll.mockReturnValue({
-            d20: 4, bonus: 2, saveType: 'CON', timestamp: Date.now() - 10000,
+        damageRollback.findRollsByCreature.mockResolvedValue({
+            'TestFighter': {
+                attackEvent: { d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 10000 },
+                abilityEvent: { d20: 8, bonus: 3, checkName: 'Athletics', timestamp: Date.now() - 10000 },
+                saveEvent: { d20: 4, bonus: 2, saveType: 'CON', timestamp: Date.now() - 10000 },
+            },
         });
         logService.addEntry.mockResolvedValue(undefined);
 
@@ -154,11 +154,13 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 5;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 120000,
+        damageRollback.findRollsByCreature.mockResolvedValue({
+            'TestFighter': {
+                attackEvent: { d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 120000 },
+                abilityEvent: null,
+                saveEvent: null,
+            },
         });
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
 
         const result = await handle(
             { name: 'Advantage', automation: { type: 'lucky_point', effect: 'advantage', target: 'd20', cost: 1 } },

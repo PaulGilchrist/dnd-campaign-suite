@@ -86,9 +86,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
-            d20: 12, bonus: 3, saveType: 'wisdom', timestamp: Date.now() - 10000,
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, saveEvent: { d20: 12, bonus: 3, saveType: 'wisdom', timestamp: Date.now() - 10000 } } });
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -104,12 +102,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
-            d20: 5, bonus: 2, checkName: 'Arcana check', timestamp: Date.now() - 10000,
-        });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
-            d20: 18, bonus: 4, saveType: 'constitution', timestamp: Date.now() - 10000,
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 5, bonus: 2, checkName: 'Arcana check', timestamp: Date.now() - 10000, }, saveEvent: { d20: 18, bonus: 4, saveType: 'constitution', timestamp: Date.now() - 10000, }, } });
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -123,9 +116,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 3;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
-            d20: 10, bonus: 4, checkName: 'Perception check', timestamp: Date.now() - 10000,
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 10, bonus: 4, checkName: 'Perception check', timestamp: Date.now() - 10000, }, saveEvent: null, } });
         logService.addEntry.mockResolvedValue(undefined);
 
         await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -140,9 +131,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
-            d20: 15, bonus: 1, checkName: 'Insight check', timestamp: Date.now() - 10000,
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 15, bonus: 1, checkName: 'Insight check', timestamp: Date.now() - 10000, }, saveEvent: null, } });
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, { ...mockPlayerStats, abilities: [{ name: 'Charisma', bonus: -4 }] }, mockCampaignName);
@@ -156,9 +145,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
-            d20: 10, bonus: 2, checkName: 'Athletics', timestamp: Date.now() - 120000,
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 10, bonus: 2, checkName: 'Athletics', timestamp: Date.now() - 120000, }, saveEvent: null, } });
         damageRollback.findRollsByCreature.mockReturnValue(null);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -171,9 +158,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
-            d20: 8, bonus: 3, saveType: 'dexterity', timestamp: Date.now() - 120000,
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, saveType: 'dexterity', timestamp: Date.now() - 120000, }, saveEvent: null, } });
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 

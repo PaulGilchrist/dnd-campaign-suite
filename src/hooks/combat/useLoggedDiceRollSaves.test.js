@@ -29,10 +29,6 @@ vi.mock('../runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('./useMetamagic.js', () => ({
-    saveLastDamageEvent: vi.fn(),
-}));
-
 vi.mock('../../services/combat/baseCombatActions.js', () => ({
     MELEE_REACH_FEET: 5,
 }));

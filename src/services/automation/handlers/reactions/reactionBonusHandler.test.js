@@ -62,7 +62,6 @@ vi.mock('../../../../services/character/classFeatures.js', () => ({
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import * as damageRollback from '../../common/damageRollback.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

@@ -2,7 +2,7 @@ import { handle } from './superiorHunterDefenseHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
-import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -17,8 +17,8 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-    getLastDamageEvent: vi.fn(),
+vi.mock('../../common/damageRollback.js', () => ({
+    findRollsByCreature: vi.fn(),
 }));
 
 const makePlayerStats = (overrides = {}) => ({
@@ -56,6 +56,9 @@ describe('superiorHunterDefenseHandler', () => {
             damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin' }],
             });
+            damageRollback.findRollsByCreature.mockResolvedValue({
+                'Goblin': { attackEvent: { targetName: 'Other', rawDamage: 10, timestamp: Date.now() }, abilityEvent: null, saveEvent: null },
+            });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
@@ -66,14 +69,9 @@ describe('superiorHunterDefenseHandler', () => {
 
         it('returns error popup when damage event is stale', async () => {
             const staleTimestamp = Date.now() - 70000;
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce({
-                    targetName: 'Test Ranger',
-                    rawDamage: 10,
-                    damageType: 'fire',
-                    timestamp: staleTimestamp,
-                });
-            metamagic.getLastDamageEvent.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockResolvedValue({
+                'Goblin': { attackEvent: { targetName: 'Test Ranger', rawDamage: 10, damageType: 'fire', timestamp: staleTimestamp }, abilityEvent: null, saveEvent: null },
+            });
 
             damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin' }],
@@ -88,14 +86,11 @@ describe('superiorHunterDefenseHandler', () => {
 
         it('applies resistance buff for the damage type on successful use', async () => {
             const freshTimestamp = Date.now();
+            damageRollback.findRollsByCreature.mockResolvedValue({
+                'Goblin': { attackEvent: { targetName: 'Test Ranger', rawDamage: 15, damageType: 'fire', timestamp: freshTimestamp }, abilityEvent: null, saveEvent: null },
+            });
             runtimeState.getRuntimeValue
-                .mockReturnValueOnce({
-                    targetName: 'Test Ranger',
-                    rawDamage: 15,
-                    damageType: 'fire',
-                    timestamp: freshTimestamp,
-                });
-            runtimeState.getRuntimeValue
+                .mockReturnValueOnce({ targetName: 'Test Ranger', rawDamage: 15, damageType: 'fire', timestamp: freshTimestamp })
                 .mockReturnValueOnce([]); // activeBuffs
             runtimeState.setRuntimeValue.mockResolvedValue(undefined);
 
@@ -128,14 +123,11 @@ describe('superiorHunterDefenseHandler', () => {
 
         it('applies resistance for cold damage type', async () => {
             const freshTimestamp = Date.now();
+            damageRollback.findRollsByCreature.mockResolvedValue({
+                'Orc': { attackEvent: { targetName: 'Test Ranger', rawDamage: 8, damageType: 'cold', timestamp: freshTimestamp }, abilityEvent: null, saveEvent: null },
+            });
             runtimeState.getRuntimeValue
-                .mockReturnValueOnce({
-                    targetName: 'Test Ranger',
-                    rawDamage: 8,
-                    damageType: 'cold',
-                    timestamp: freshTimestamp,
-                });
-            runtimeState.getRuntimeValue
+                .mockReturnValueOnce({ targetName: 'Test Ranger', rawDamage: 8, damageType: 'cold', timestamp: freshTimestamp })
                 .mockReturnValueOnce([]);
             runtimeState.setRuntimeValue.mockResolvedValue(undefined);
 
@@ -160,14 +152,11 @@ describe('superiorHunterDefenseHandler', () => {
 
         it('logs ability use entry', async () => {
             const freshTimestamp = Date.now();
+            damageRollback.findRollsByCreature.mockResolvedValue({
+                'Dragon': { attackEvent: { targetName: 'Test Ranger', rawDamage: 12, damageType: 'lightning', timestamp: freshTimestamp }, abilityEvent: null, saveEvent: null },
+            });
             runtimeState.getRuntimeValue
-                .mockReturnValueOnce({
-                    targetName: 'Test Ranger',
-                    rawDamage: 12,
-                    damageType: 'lightning',
-                    timestamp: freshTimestamp,
-                });
-            runtimeState.getRuntimeValue
+                .mockReturnValueOnce({ targetName: 'Test Ranger', rawDamage: 12, damageType: 'lightning', timestamp: freshTimestamp })
                 .mockReturnValueOnce([]);
             runtimeState.setRuntimeValue.mockResolvedValue(undefined);
 
@@ -186,13 +175,11 @@ describe('superiorHunterDefenseHandler', () => {
 
         it('handles missing damageType defaults to untyped', async () => {
             const freshTimestamp = Date.now();
+            damageRollback.findRollsByCreature.mockResolvedValue({
+                'Skeleton': { attackEvent: { targetName: 'Test Ranger', rawDamage: 5, timestamp: freshTimestamp }, abilityEvent: null, saveEvent: null },
+            });
             runtimeState.getRuntimeValue
-                .mockReturnValueOnce({
-                    targetName: 'Test Ranger',
-                    rawDamage: 5,
-                    timestamp: freshTimestamp,
-                });
-            runtimeState.getRuntimeValue
+                .mockReturnValueOnce({ targetName: 'Test Ranger', rawDamage: 5, timestamp: freshTimestamp })
                 .mockReturnValueOnce([]);
             runtimeState.setRuntimeValue.mockResolvedValue(undefined);
 
@@ -219,6 +206,7 @@ describe('superiorHunterDefenseHandler', () => {
             damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [],
             });
+            damageRollback.findRollsByCreature.mockResolvedValue({});
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
@@ -228,14 +216,9 @@ describe('superiorHunterDefenseHandler', () => {
 
         it('skips damage events targeting other creatures', async () => {
             const freshTimestamp = Date.now();
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce({
-                    targetName: 'Other Character',
-                    rawDamage: 20,
-                    damageType: 'fire',
-                    timestamp: freshTimestamp,
-                });
-            metamagic.getLastDamageEvent.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockResolvedValue({
+                'Goblin': { attackEvent: { targetName: 'Other Character', rawDamage: 20, damageType: 'fire', timestamp: freshTimestamp }, abilityEvent: null, saveEvent: null },
+            });
 
             damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin' }],
@@ -250,19 +233,10 @@ describe('superiorHunterDefenseHandler', () => {
         it('prefers the most recent damage event across multiple attackers', async () => {
             const olderTimestamp = Date.now() - 10000;
             const newerTimestamp = Date.now();
-            runtimeState.getRuntimeValue
-                .mockReturnValueOnce({
-                    targetName: 'Test Ranger',
-                    rawDamage: 10,
-                    damageType: 'cold',
-                    timestamp: olderTimestamp,
-                })
-                .mockReturnValueOnce({
-                    targetName: 'Test Ranger',
-                    rawDamage: 25,
-                    damageType: 'fire',
-                    timestamp: newerTimestamp,
-                });
+            damageRollback.findRollsByCreature.mockResolvedValue({
+                'Goblin': { attackEvent: { targetName: 'Test Ranger', rawDamage: 10, damageType: 'cold', timestamp: olderTimestamp }, abilityEvent: null, saveEvent: null },
+                'Orc': { attackEvent: { targetName: 'Test Ranger', rawDamage: 25, damageType: 'fire', timestamp: newerTimestamp }, abilityEvent: null, saveEvent: null },
+            });
             runtimeState.getRuntimeValue
                 .mockReturnValueOnce([]);
             runtimeState.setRuntimeValue.mockResolvedValue(undefined);

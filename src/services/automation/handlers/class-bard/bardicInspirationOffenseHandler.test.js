@@ -1,7 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports (hoisted by vitest) ─────────────────────
-
 vi.mock('../../../dice/diceRoller.js', () => ({
   rollExpression: vi.fn(),
 }));
@@ -15,30 +13,16 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn().mockImplementation(() => Promise.resolve()),
 }));
 
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-  getLastDamageEvent: vi.fn(),
+vi.mock('../../common/damageRollback.js', () => ({
+  findLastAttack: vi.fn(),
 }));
-
-vi.mock('../../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
-}));
-
-vi.mock('../../../rules/combat/applyHealing.js', () => ({
-  applyHealingToTarget: vi.fn(),
-}));
-
-// ── Imports (Vite returns mocked versions) ───────────────────────
 
 import { handle } from './bardicInspirationOffenseHandler.js';
 
 import * as diceRoller from '../../../dice/diceRoller.js';
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
-import * as useMetamagic from '../../../../hooks/combat/useMetamagic.js';
-import * as damageUtils from '../../../rules/combat/damageUtils.js';
-import * as applyHealing from '../../../rules/combat/applyHealing.js';
-
-// ── Helpers ────────────────────────────────────────────────────────
+import * as damageRollback from '../../common/damageRollback.js';
 
 const campaignName = 'TestCampaign';
 
@@ -61,32 +45,36 @@ function makeRollResult(total, rolls = [total]) {
   return { total, rolls };
 }
 
-// ── Tests ───────────────────────────────────────────────────────────
+function makeLastAttack(attackerName, targetName, timestamp, stale = false) {
+  return {
+    attackEvent: stale ? { timestamp: Date.now() - 70000, targetName } : { timestamp: timestamp || Date.now(), targetName },
+    attackerName: attackerName || null,
+    targetName: targetName || null,
+    primaryDamage: 0,
+    secondaryDamage: 0,
+    totalDamage: 0,
+    damageTypes: [],
+  };
+}
 
 describe('bardicInspirationOffenseHandler.handle', () => {
   function resetMocks() {
-    diceRoller.rollExpression.mockClear();
-    useRuntimeState.getRuntimeValue.mockClear();
+    diceRoller.rollExpression.mockClear().mockReturnValue(null);
+    useRuntimeState.getRuntimeValue.mockClear().mockReset();
     useRuntimeState.setRuntimeValue.mockClear();
     logService.addEntry.mockClear();
-    useMetamagic.getLastDamageEvent.mockClear();
-    damageUtils.getCombatContext.mockClear();
-    applyHealing.applyHealingToTarget.mockClear();
+    damageRollback.findLastAttack.mockClear().mockResolvedValue(null);
   }
 
   beforeEach(() => {
     resetMocks();
   });
 
-  // ── Early exit: no die ───────────────────────────────────────────
-
   describe('no bardic inspiration die', () => {
     it('returns popup when bardicInspirationDie is null', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -94,792 +82,415 @@ describe('bardicInspirationOffenseHandler.handle', () => {
     });
 
     it('returns popup when bardicInspirationDie is undefined', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
+      expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('You do not have a Bardic Inspiration die.');
     });
 
     it('returns popup when bardicInspirationDie is 0', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
+      expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('You do not have a Bardic Inspiration die.');
     });
 
     it('does not call rollExpression when there is no die', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await handle(action, ps, campaignName);
-
+      await handle(makeAction(), makePlayerStats(), campaignName);
       expect(diceRoller.rollExpression).not.toHaveBeenCalled();
     });
 
     it('does not call setRuntimeValue or addEntry when there is no die', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await handle(action, ps, campaignName);
-
+      await handle(makeAction(), makePlayerStats(), campaignName);
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
     it('includes correct payload structure on no-die early exit', async () => {
-      const ps = makePlayerStats({});
-      const action = { name: 'My Ability', automation: { type: 'custom' } };
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('My Ability');
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Offensive Inspiration',
+          description: 'You do not have a Bardic Inspiration die.',
+        },
+      });
     });
   });
 
-  // ── Early exit: roll fails ───────────────────────────────────────
-
   describe('roll expression fails', () => {
     it('returns popup when rollExpression returns null', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValue(8);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('Roll failed.');
     });
 
     it('returns popup when rollExpression returns undefined', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValue(8);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8).mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(undefined);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
+      expect(result.type).toBe('popup');
       expect(result.payload.description).toBe('Roll failed.');
     });
 
     it('does not call setRuntimeValue or addEntry when roll fails', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValue(8);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
       expect(logService.addEntry).not.toHaveBeenCalled();
     });
   });
 
-  // ── Success flow: no recent damage event ─────────────────────────
-
   describe('successful invocation without recent damage event', () => {
     it('rolls correct die expression', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(6); // bardicInspirationDie
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined); // bardicInspirationGrantedBy
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8).mockReturnValueOnce(undefined);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d6');
+      expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d8');
     });
 
     it('rolls correct die expression for d12', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(12);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(12).mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(7, [7]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(diceRoller.rollExpression).toHaveBeenCalledWith('1d12');
     });
 
     it('clears bardic inspiration runtime state on success', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'bardicInspirationDie',
-        null,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'bardicInspirationGrantedBy',
-        null,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Bard',
-        'bardicInspirationCombatOptions',
-        null,
-        campaignName,
-      );
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'bardicInspirationDie', null, campaignName);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'bardicInspirationGrantedBy', null, campaignName);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'bardicInspirationCombatOptions', null, campaignName);
     });
 
     it('logs the ability use entry on success', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(3, [3]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(logService.addEntry).toHaveBeenCalled();
-      const callArgs = logService.addEntry.mock.calls[0];
-      expect(callArgs[0]).toBe(campaignName);
-      expect(callArgs[1].type).toBe('ability_use');
-      expect(callArgs[1].characterName).toBe('Bard');
-      expect(callArgs[1].abilityName).toBe('Offensive Inspiration');
-      expect(callArgs[1].biDieRoll).toBe(3);
-      expect(callArgs[1].biDieSize).toBe(8);
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'Bard',
+        abilityName: 'Offensive Inspiration',
+        description: 'Bard used Offensive Inspiration: rolled 1d8 (5). No recent damage event found. Add 5 damage to your last hit manually.',
+        biDieRoll: 5,
+        biDieSize: 8,
+        timestamp: expect.any(Number),
+      });
     });
 
     it('log entry description contains roll total and no-damage-event message', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(6);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
       const logDescription = logService.addEntry.mock.calls[0][1].description;
-      expect(logDescription).toContain('rolled 1d6 (4)');
       expect(logDescription).toContain('No recent damage event found');
+      expect(logDescription).toContain('Add 5 damage');
     });
 
     it('returns popup with roll details on success', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(6, [6]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Bardic Inspiration (1d8)');
-      expect(result.payload.description).toContain('rolled **6**');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('1d8');
+      expect(result.payload.description).toContain('5');
     });
 
     it('includes roll values in success description', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(10);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(7, [2, 5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [3, 2]));
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(result.payload.description).toContain('2, 5');
+      expect(result.payload.description).toContain('**5**');
+      expect(result.payload.description).toContain('3, 2');
     });
 
     it('includes grantedBy in success description', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce('Fellow Bard');
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(3, [3]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce('Goblin');
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(result.payload.description).toContain('Die granted by Fellow Bard');
+      expect(result.payload.description).toContain('Die granted by Goblin');
     });
 
     it('uses "unknown" as grantedBy when not set', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(null);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.payload.description).toContain('Die granted by unknown');
     });
 
     it('includes action.automation in returned payload', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(result.payload.automation).toEqual(action.automation);
+      expect(result.payload.automation).toEqual({ type: 'bardic_inspiration_offense' });
     });
 
-    it('does not call getCombatContext when no damage event', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
-
-      await handle(action, ps, campaignName);
-
-      expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
+    it('does not call findLastAttack when die is missing', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      await handle(makeAction(), makePlayerStats(), campaignName);
+      expect(damageRollback.findLastAttack).not.toHaveBeenCalled();
     });
 
-    it('does not call applyHealingToTarget when no damage event', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
-
-      await handle(action, ps, campaignName);
-
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
+    it('does not call findLastAttack when roll fails', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(8);
+      diceRoller.rollExpression.mockReturnValue(null);
+      await handle(makeAction(), makePlayerStats(), campaignName);
+      expect(damageRollback.findLastAttack).not.toHaveBeenCalled();
     });
 
     it('does not include defender HP in description when no damage event', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.payload.description).not.toContain('HP:');
     });
   });
 
-  // ── Success flow: stale damage event (treated as no event) ───────
-
   describe('stale damage event', () => {
     it('treats a stale damage event as no recent event', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      // Old timestamp — more than 60 seconds ago
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now() - 70000,
-        targetName: 'Goblin',
-      });
+      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Bard', 'Goblin', null, true));
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.payload.description).toContain('No recent damage event found');
     });
 
     it('treats a damage event with no timestamp as stale', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { targetName: 'Goblin' },
+        attackerName: 'Bard',
         targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
       });
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.payload.description).toContain('No recent damage event found');
     });
 
     it('treats a null damage event as stale', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.payload.description).toContain('No recent damage event found');
-    });
-
-    it('does not call getCombatContext for stale events', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now() - 70000,
-        targetName: 'Goblin',
-      });
-
-      await handle(action, ps, campaignName);
-
-      expect(damageUtils.getCombatContext).not.toHaveBeenCalled();
     });
   });
-
-  // ── Success flow: fresh damage event, no combat context ──────────
-
-  describe('fresh damage event but no combat context', () => {
-    it('falls back to manual message when getCombatContext returns null', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-    });
-
-    it('falls back to manual message when getCombatContext returns undefined', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue(undefined);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-    });
-
-    it('does not call applyHealingToTarget when combat context is null', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName);
-
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
-    });
-  });
-
-  // ── Success flow: fresh damage event, no target name ─────────────
-
-  describe('fresh damage event but no target name', () => {
-    it('falls back to manual message when targetName is missing', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: undefined,
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-    });
-
-    it('falls back to manual message when targetName is null', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: null,
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-    });
-
-    it('does not call applyHealingToTarget when targetName is missing', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: undefined,
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-
-      await handle(action, ps, campaignName);
-
-      expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
-    });
-  });
-
-  // ── Success flow: damage applied to target ───────────────────────
 
   describe('successful damage application to target', () => {
-    it('applies healing (negative = damage) to the target', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
+    it('applies bonus damage message when attacker matches player', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 12 });
+      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Bard', 'Goblin', Date.now()));
 
-      await handle(action, ps, campaignName);
-
-      expect(applyHealing.applyHealingToTarget).toHaveBeenCalledWith(
-        {}, // combatSummary (passed through)
-        'Goblin',
-        -5, // negative roll total = damage
-        campaignName,
-      );
-    });
-
-    it('includes target name in bonus description', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 12 });
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('Bonus damage applied to Goblin');
-    });
-
-    it('includes defender HP in description when healResult has newHp', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 12 });
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('Goblin HP: 12');
-    });
-
-    it('includes defender HP when newHp is 0', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 0 });
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('Goblin HP: 0');
-    });
-
-    it('does not include defender HP when healResult is null', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('Bonus damage applied to Goblin');
-      // newHp is null, so the ternary `defenderHp != null` is false
-      expect(result.payload.description).not.toContain('Goblin HP:');
-    });
-
-    it('does not include defender HP when healResult.newHp is undefined', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({});
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('Bonus damage applied to Goblin');
-      // newHp is undefined, so `defenderHp` becomes null via `?? null`
-      expect(result.payload.description).not.toContain('Goblin HP:');
-    });
-
-    it('log entry description includes bonus damage message when applied', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 12 });
-
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
       const logDescription = logService.addEntry.mock.calls[0][1].description;
       expect(logDescription).toContain('Bonus damage applied to Goblin');
     });
 
-    it('does not include HP in log entry description', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
+    it('includes target name in bonus description', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 12 });
+      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Bard', 'Goblin', Date.now()));
 
-      await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+      expect(result.payload.description).toContain('Bonus damage applied to Goblin');
+    });
+
+    it('does not include defender HP in description (HP tracking removed)', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Bard', 'Goblin', Date.now()));
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+      expect(result.payload.description).not.toContain('HP:');
+    });
+
+    it('log entry description includes bonus damage message when applied', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
+      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
+      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
+      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Bard', 'Goblin', Date.now()));
+
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
       const logDescription = logService.addEntry.mock.calls[0][1].description;
-      // The log entry description does NOT include the HP suffix (only the popup does)
-      expect(logDescription).not.toContain('HP:');
+      expect(logDescription).toContain('Bonus damage applied to Goblin');
     });
   });
 
-  // ── Edge cases ───────────────────────────────────────────────────
-
   describe('edge cases', () => {
     it('uses playerStats.name for runtime calls', async () => {
-      const ps = makePlayerStats({ name: 'Valeria' });
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(6);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(2, [2]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats({ name: 'Valeria' }), campaignName);
 
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Valeria',
-        'bardicInspirationDie',
-        null,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Valeria',
-        'bardicInspirationGrantedBy',
-        null,
-        campaignName,
-      );
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Valeria',
-        'bardicInspirationCombatOptions',
-        null,
-        campaignName,
-      );
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Valeria', 'bardicInspirationDie', null, campaignName);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Valeria', 'bardicInspirationGrantedBy', null, campaignName);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Valeria', 'bardicInspirationCombatOptions', null, campaignName);
     });
 
     it('does not propagate addEntry rejection', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue(null);
       logService.addEntry.mockImplementation(() => Promise.reject(new Error('log service failed')).catch(() => {}));
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.type).toBe('popup');
-      // Should still return success popup despite addEntry failure
       expect(result.payload.description).toContain('rolled **5**');
     });
 
     it('calls getRuntimeValue with correct key for bardicInspirationDie', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(3, [3]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(useRuntimeState.getRuntimeValue).toHaveBeenNthCalledWith(
-        1,
-        'Bard',
-        'bardicInspirationDie',
-        campaignName,
-      );
+      expect(useRuntimeState.getRuntimeValue).toHaveBeenNthCalledWith(1, 'Bard', 'bardicInspirationDie', campaignName);
     });
 
     it('calls getRuntimeValue with correct key for bardicInspirationGrantedBy', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(3, [3]));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue(null);
 
-      await handle(action, ps, campaignName);
+      await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(useRuntimeState.getRuntimeValue).toHaveBeenNthCalledWith(
-        2,
-        'Bard',
-        'bardicInspirationGrantedBy',
-        campaignName,
-      );
+      expect(useRuntimeState.getRuntimeValue).toHaveBeenNthCalledWith(2, 'Bard', 'bardicInspirationGrantedBy', campaignName);
     });
 
-    it('does not call getLastDamageEvent when die is missing', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
+    it('does not call findLastAttack when die is missing', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
-      await handle(action, ps, campaignName);
-
-      expect(useMetamagic.getLastDamageEvent).not.toHaveBeenCalled();
+      await handle(makeAction(), makePlayerStats(), campaignName);
+      expect(damageRollback.findLastAttack).not.toHaveBeenCalled();
     });
 
-    it('does not call getLastDamageEvent when roll fails', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
+    it('does not call findLastAttack when roll fails', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(8);
       diceRoller.rollExpression.mockReturnValue(null);
-
-      await handle(action, ps, campaignName);
-
-      expect(useMetamagic.getLastDamageEvent).not.toHaveBeenCalled();
+      await handle(makeAction(), makePlayerStats(), campaignName);
+      expect(damageRollback.findLastAttack).not.toHaveBeenCalled();
     });
 
-    it('handles damage event with empty string targetName as falsy', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
+    it('handles damage event with empty string targetName as no bonus', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { timestamp: Date.now(), targetName: '' },
+        attackerName: 'Bard',
         targetName: '',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
       });
-      damageUtils.getCombatContext.mockResolvedValue({});
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
       expect(result.payload.description).toContain('No recent damage event found');
     });
 
-    it('handles combat context with empty object and valid target', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
+    it('handles attack from different attacker as no bonus', async () => {
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
       useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
       diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Orc',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 20 });
+      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Goblin', 'Bard', Date.now()));
 
-      const result = await handle(action, ps, campaignName);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-      expect(result.payload.description).toContain('Bonus damage applied to Orc');
-      expect(result.payload.description).toContain('Orc HP: 20');
-    });
-
-    it('handles negative newHp from healResult', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(5, [5]));
-      useMetamagic.getLastDamageEvent.mockReturnValue({
-        timestamp: Date.now(),
-        targetName: 'Goblin',
-      });
-      damageUtils.getCombatContext.mockResolvedValue({});
-      applyHealing.applyHealingToTarget.mockReturnValue({ newHp: -3 });
-
-      const result = await handle(action, ps, campaignName);
-
-      expect(result.payload.description).toContain('Goblin HP: -3');
+      expect(result.payload.description).toContain('No recent damage event found');
     });
   });
 });
