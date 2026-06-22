@@ -261,14 +261,14 @@ describe('TravelPathLayer', () => {
         it('should pass hex coordinates to hexToPixel for each hex in behind and ahead segments', () => {
             renderTravelPathLayer();
             const callArgs = hexMapUtils.hexToPixel.mock.calls.map(call => ({ q: call[0], r: call[1] }));
-            // behind: path[0], path[1] -> (0,0), (1,0)
-            // ahead: path[2], path[3], path[4] -> (1,1), (0,1), (-1,1)
             // current: path[2] -> (1,1)
             // destination: path[4] -> (-1,1)
+            // ahead: path[2], path[3], path[4] -> (1,1), (0,1), (-1,1)
+            // behind: path[0], path[1] -> (0,0), (1,0)
             const expectedCoords = [
-                { q: 0, r: 0 }, { q: 1, r: 0 },
-                { q: 1, r: 1 }, { q: 0, r: 1 }, { q: -1, r: 1 },
                 { q: 1, r: 1 }, { q: -1, r: 1 },
+                { q: 1, r: 1 }, { q: 0, r: 1 }, { q: -1, r: 1 },
+                { q: 0, r: 0 }, { q: 1, r: 0 },
             ];
             expect(callArgs).toEqual(expectedCoords);
         });
