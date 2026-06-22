@@ -1,6 +1,6 @@
 import { handle } from './tacticalMindHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import * as damageRollback from '../../common/damageRollback.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -11,12 +11,12 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
 }));
 
-vi.mock('../../common/damageRollback.js', () => ({
-    findRollsByCreature: vi.fn(),
-}));
-
 vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
 }));
 
 const makeAction = (overrides = {}) => ({
@@ -46,8 +46,8 @@ describe('tacticalMindHandler.handle', () => {
         vi.clearAllMocks();
     });
 
-    it('returns popup when no recent ability check', async () => {
-        damageRollback.findRollsByCreature.mockReturnValue(null);
+    it('returns popup when no combat context', async () => {
+        damageUtils.getCombatContext.mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -56,10 +56,34 @@ describe('tacticalMindHandler.handle', () => {
         expect(result.payload.description).toContain('No recent ability check found');
     });
 
+    it('returns popup when last attack is not an ability check', async () => {
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 15, bonus: 3, targetAc: 15, hit: true },
+        });
 
+        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toContain('No recent ability check found');
+    });
+
+    it('returns popup when last ability check is not by this player', async () => {
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'Goblin', d20: 15, bonus: 2, checkName: 'Stealth' },
+        });
+
+        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toContain('No recent ability check found');
+    });
 
     it('returns popup for natural 20', async () => {
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 20, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestFighter', d20: 20, bonus: 3, checkName: 'Insight' },
+        });
 
         const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -68,7 +92,9 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('shows result with 1d10 bonus when ability check exists', async () => {
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestFighter', d20: 8, bonus: 3, checkName: 'Insight' },
+        });
 
         getRuntimeValue.mockReturnValue(2);
 
@@ -81,7 +107,9 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('expend Second Wind when check succeeds', async () => {
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestFighter', d20: 8, bonus: 3, checkName: 'Insight' },
+        });
 
         getRuntimeValue.mockReturnValue(2);
 
@@ -96,7 +124,9 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('does not expend Second Wind when no uses remain', async () => {
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestFighter', d20: 8, bonus: 3, checkName: 'Insight' },
+        });
 
         getRuntimeValue.mockReturnValue(0);
 
@@ -106,7 +136,9 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('logs ability use entry', async () => {
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestFighter', d20: 8, bonus: 3, checkName: 'Insight' },
+        });
 
         getRuntimeValue.mockReturnValue(2);
 

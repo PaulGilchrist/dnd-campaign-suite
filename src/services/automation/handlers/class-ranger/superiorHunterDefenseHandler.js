@@ -1,54 +1,39 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { findRollsByCreature } from '../../common/damageRollback.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
-    const featureName = action.name || 'Superior Hunter\'s Defense';
+    const featureName = action.name || 'Super Hunter\'s Defense';
 
-    // Find the last damage event where the player was the target
-    // Scan all creatures' lastAttack for events targeting the player
-    const rollsByCreature = await findRollsByCreature(campaignName);
-    if (!rollsByCreature) {
+    const lastAttack = await findLastAttack(campaignName);
+    if (!lastAttack.attackEvent) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: featureName,
-                description: `No active combat to find recent damage. ${featureName} can only be used after taking damage in combat.`,
+                description: `No recent attack found. ${featureName} can only be used after taking damage in combat.`,
                 automation: auto,
             },
         };
     }
 
-    let lastDamageEvent = null;
-    let timestamp = 0;
-
-    for (const [, rolls] of Object.entries(rollsByCreature)) {
-        const damageEvent = rolls.attackEvent;
-        if (damageEvent && damageEvent.targetName === playerName) {
-            if (damageEvent.timestamp > timestamp) {
-                timestamp = damageEvent.timestamp;
-                lastDamageEvent = damageEvent;
-            }
-        }
-    }
-
-    if (!lastDamageEvent) {
+    if (lastAttack.targetName !== playerName) {
         return {
             type: 'popup',
             payload: {
                 type: 'automation_info',
                 name: featureName,
-                description: `No recent damage found where you were the target. ${featureName} can only be used shortly after taking damage.`,
+                description: `The last attack did not target you. ${featureName} can only be used shortly after taking damage.`,
                 automation: auto,
             },
         };
     }
 
-    const damageType = lastDamageEvent.damageType || 'untyped';
-    const rawDamage = lastDamageEvent.rawDamage || 0;
+    const damageType = lastAttack.attackEvent.damageType || 'untyped';
+    const rawDamage = lastAttack.totalDamage || 0;
 
     // Add resistance buff for the damage type until end of current turn
     const stored = getRuntimeValue(playerName, 'activeBuffs', campaignName);

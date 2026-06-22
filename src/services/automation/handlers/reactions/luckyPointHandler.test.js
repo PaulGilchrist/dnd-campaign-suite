@@ -1,13 +1,13 @@
 import { handle } from './luckyPointHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../common/damageRollback.js', () => ({
-    findRollsByCreature: vi.fn(),
-}));
 vi.mock('../../../ui/logService.js');
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+}));
 
 describe('luckyPointHandler.handle', () => {
     const mockPlayerStats = { name: 'TestFighter', level: 10, feats: [{ name: 'Lucky' }], _trackedResources: { luckyPoints: { current: 5, max: 5 } } };
@@ -33,7 +33,7 @@ describe('luckyPointHandler.handle', () => {
 
     it('should return error when no recent D20 test found', async () => {
         runtimeState.getRuntimeValue.mockReturnValue(3);
-        damageRollback.findRollsByCreature.mockResolvedValue(null);
+        damageUtils.getCombatContext.mockResolvedValue({ lastAttack: null });
 
         const result = await handle(
             { name: 'Advantage', automation: { type: 'lucky_point', effect: 'advantage', target: 'd20', cost: 1 } },
@@ -51,12 +51,8 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 3;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockResolvedValue({
-            'TestFighter': {
-                attackEvent: { d20: 8, bonus: 5, targetName: 'Goblin', hit: false, timestamp: Date.now() - 30000 },
-                abilityEvent: null,
-                saveEvent: null,
-            },
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 8, bonus: 5, targetName: 'Goblin', hit: false }
         });
         logService.addEntry.mockResolvedValue(undefined);
 
@@ -81,12 +77,8 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 2;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockResolvedValue({
-            'TestFighter': {
-                attackEvent: null,
-                abilityEvent: { d20: 7, bonus: 3, checkName: 'Stealth', timestamp: Date.now() - 10000 },
-                saveEvent: null,
-            },
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestFighter', d20: 7, bonus: 3, checkName: 'Stealth' }
         });
         logService.addEntry.mockResolvedValue(undefined);
 
@@ -106,12 +98,8 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockResolvedValue({
-            'TestFighter': {
-                attackEvent: null,
-                abilityEvent: null,
-                saveEvent: { d20: 5, bonus: 2, saveType: 'CON', timestamp: Date.now() - 10000 },
-            },
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'save', attackerName: 'TestFighter', d20: 5, bonus: 2, saveType: 'CON' }
         });
         logService.addEntry.mockResolvedValue(undefined);
 
@@ -131,12 +119,9 @@ describe('luckyPointHandler.handle', () => {
             if (key === 'luckyPoints') return 5;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockResolvedValue({
-            'TestFighter': {
-                attackEvent: { d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 10000 },
-                abilityEvent: { d20: 8, bonus: 3, checkName: 'Athletics', timestamp: Date.now() - 10000 },
-                saveEvent: { d20: 4, bonus: 2, saveType: 'CON', timestamp: Date.now() - 10000 },
-            },
+        // lastAttack is always an attack, so attack takes priority
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'attack', attackerName: 'TestFighter', d20: 3, bonus: 5, targetName: 'Orc', hit: false }
         });
         logService.addEntry.mockResolvedValue(undefined);
 
@@ -148,6 +133,4 @@ describe('luckyPointHandler.handle', () => {
 
         expect(result.payload.description).toContain('Attack vs AC Orc');
     });
-
-
 });

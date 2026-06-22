@@ -13,12 +13,12 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(async () => {}),
 }));
 
-vi.mock('../../common/damageRollback.js', () => ({
-    findRollsByCreature: vi.fn(),
-}));
-
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => null),
+}));
+
+vi.mock('../../common/damageRollback.js', () => ({
+    findRollsByCreature: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
@@ -51,7 +51,6 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import * as damageRollback from '../../common/damageRollback.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -88,7 +87,8 @@ describe('autoRerollHandler', () => {
 
     describe('handle with basic bonus', () => {
         it('should return info popup when no recent attack roll', async () => {
-            damageRollback.findRollsByCreature.mockResolvedValue(null);
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({ lastAttack: null });
 
             const action = makeAction();
             const result = await handle(action, makePlayerStats(), 'campaign', 'map');
@@ -98,9 +98,9 @@ describe('autoRerollHandler', () => {
         });
 
         it('should handle attack roll reroll', async () => {
-            const attackEvent = { d20: 8, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent, abilityEvent: null, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 8, bonus: 5, targetAc: 15, hit: false }
             });
 
             const action = makeAction();
@@ -112,9 +112,9 @@ describe('autoRerollHandler', () => {
         });
 
         it('should handle ability check reroll', async () => {
-            const abilityEvent = { d20: 12, bonus: 3, checkName: 'Stealth', timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent: null, abilityEvent, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'check', attackerName: 'TestHero', d20: 12, bonus: 3, checkName: 'Stealth' }
             });
 
             const action = makeAction();
@@ -125,15 +125,9 @@ describe('autoRerollHandler', () => {
         });
 
         it('should handle ally missed attack within range', async () => {
-            vi.mocked(await import('../../../rules/combat/damageUtils.js')).getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Ally', hit_points: { current: 10 } }],
-            });
-            damageRollback.findRollsByCreature.mockImplementation((name) => {
-                if (name === 'campaign') return {
-                    'TestHero': { attackEvent: null, abilityEvent: null, saveEvent: null },
-                    'Ally': { attackEvent: { d20: 3, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() }, abilityEvent: null, saveEvent: null },
-                };
-                return null;
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'Ally', d20: 3, bonus: 5, targetAc: 15, hit: false }
             });
 
             const action = makeAction({
@@ -145,17 +139,12 @@ describe('autoRerollHandler', () => {
         });
 
         it('should skip ally attack that is out of range', async () => {
-            vi.mocked(await import('../../../rules/combat/damageUtils.js')).getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Ally', hit_points: { current: 10 } }],
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'Ally', d20: 3, bonus: 5, targetAc: 15, hit: false }
             });
-            vi.mocked(await import('../../../rules/combat/rangeValidation.js')).getDistanceFeet.mockReturnValue(50);
-            damageRollback.findRollsByCreature.mockImplementation((name) => {
-                if (name === 'campaign') return {
-                    'TestHero': { attackEvent: null, abilityEvent: null, saveEvent: null },
-                    'Ally': { attackEvent: { d20: 3, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() }, abilityEvent: null, saveEvent: null },
-                };
-                return null;
-            });
+            const { getDistanceFeet } = await import('../../../rules/combat/rangeValidation.js');
+            getDistanceFeet.mockReturnValue(50);
 
             const action = makeAction({
                 automation: { bonus: 2, range: '30_ft' },
@@ -169,9 +158,9 @@ describe('autoRerollHandler', () => {
     describe('handle with saving_throw target', () => {
         it('should handle override_fail_to_success once per rest', async () => {
             getRuntimeValue.mockReturnValue(null);
-            const saveEvent = { d20: 3, bonus: 2, saveType: 'Wisdom', timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent: null, abilityEvent: null, saveEvent },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Wisdom' }
             });
 
             const action = makeAction({
@@ -189,9 +178,9 @@ describe('autoRerollHandler', () => {
 
         it('should reject override_fail_to_success if already used this rest', async () => {
             getRuntimeValue.mockReturnValue('rest');
-            const saveEvent = { d20: 3, bonus: 2, saveType: 'Wisdom', timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent: null, abilityEvent: null, saveEvent },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Wisdom' }
             });
 
             const action = makeAction({
@@ -208,9 +197,9 @@ describe('autoRerollHandler', () => {
 
         it('should reject override_fail_to_success for invalid save type', async () => {
             getRuntimeValue.mockReturnValue(null);
-            const saveEvent = { d20: 3, bonus: 2, saveType: 'Strength', timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent: null, abilityEvent: null, saveEvent },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Strength' }
             });
 
             const action = makeAction({
@@ -228,9 +217,9 @@ describe('autoRerollHandler', () => {
 
     describe('handle with bardic_inspiration_die', () => {
         it('should roll bardic die and apply to attack', async () => {
-            const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent, abilityEvent: null, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
             });
 
             const stats = makePlayerStats({
@@ -245,9 +234,9 @@ describe('autoRerollHandler', () => {
         });
 
         it('should return info when no recent failed check or attack', async () => {
-            const attackEvent = { d20: 18, bonus: 5, targetAc: 15, hit: true, timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent, abilityEvent: null, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 18, bonus: 5, targetAc: 15, hit: true }
             });
 
             const stats = makePlayerStats({
@@ -264,9 +253,9 @@ describe('autoRerollHandler', () => {
 
     describe('handle with psionic_energy_die', () => {
         it('should use psionic energy die', async () => {
-            const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent, abilityEvent: null, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
             });
 
             const action = makeAction({
@@ -280,9 +269,9 @@ describe('autoRerollHandler', () => {
 
         it('should return info when no psionic energy remaining', async () => {
             getRuntimeValue.mockReturnValue(0);
-            const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent, abilityEvent: null, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
             });
 
             const action = makeAction({
@@ -296,9 +285,9 @@ describe('autoRerollHandler', () => {
 
     describe('handle with convert_miss_to_hit', () => {
         it('should convert a miss to a hit', async () => {
-            const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent, abilityEvent: null, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
             });
 
             const action = makeAction({
@@ -310,9 +299,9 @@ describe('autoRerollHandler', () => {
         });
 
         it('should reject when attack already hit', async () => {
-            const attackEvent = { d20: 18, bonus: 5, targetAc: 15, hit: true, timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent, abilityEvent: null, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 18, bonus: 5, targetAc: 15, hit: true }
             });
 
             const action = makeAction({
@@ -325,9 +314,9 @@ describe('autoRerollHandler', () => {
 
         it('should track once per turn', async () => {
             getRuntimeValue.mockReturnValue(null);
-            const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent, abilityEvent: null, saveEvent: null },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'attack', attackerName: 'TestHero', d20: 5, bonus: 5, targetAc: 15, hit: false }
             });
 
             const action = makeAction({
@@ -344,9 +333,9 @@ describe('autoRerollHandler', () => {
     describe('resource cost handling', () => {
         it('should consume channel divinity charges', async () => {
             getRuntimeValue.mockReturnValue(2);
-            const saveEvent = { d20: 3, bonus: 2, saveType: 'Wisdom', timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent: null, abilityEvent: null, saveEvent },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Wisdom' }
             });
 
             const action = makeAction({
@@ -365,9 +354,9 @@ describe('autoRerollHandler', () => {
 
         it('should reject when no channel divinity charges', async () => {
             getRuntimeValue.mockReturnValue(0);
-            const saveEvent = { d20: 3, bonus: 2, saveType: 'Wisdom', timestamp: Date.now() };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent: null, abilityEvent: null, saveEvent },
+            const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
+            getCombatContext.mockResolvedValue({
+                lastAttack: { rollType: 'save', targetName: 'TestHero', d20: 3, bonus: 2, saveType: 'Wisdom' }
             });
 
             const action = makeAction({

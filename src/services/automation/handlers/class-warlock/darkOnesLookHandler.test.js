@@ -1,14 +1,14 @@
 import { handle } from './darkOnesLookHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as damageRollback from '../../common/damageRollback.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as logService from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js');
 vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({}));
-vi.mock('../../common/damageRollback.js', () => ({
-    findRollsByCreature: vi.fn(),
-}));
 vi.mock('../../../ui/logService.js');
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+}));
 
 describe('darkOnesLookHandler.handle', () => {
     const mockPlayerStats = {
@@ -45,7 +45,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
+        damageUtils.getCombatContext.mockResolvedValue({ lastAttack: null });
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 
@@ -59,13 +59,8 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
-        damageRollback.findRollsByCreature.mockReturnValue({
-            'TestWarlock': {
-                attackEvent: null,
-                abilityEvent: { d20: 8, bonus: 5, checkName: 'Stealth check', timestamp: Date.now() - 10000 },
-                saveEvent: null
-            }
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestWarlock', d20: 8, bonus: 5, checkName: 'Stealth check' }
         });
         logService.addEntry.mockResolvedValue(undefined);
 
@@ -86,7 +81,9 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, saveEvent: { d20: 12, bonus: 3, saveType: 'wisdom', timestamp: Date.now() - 10000 } } });
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'save', attackerName: 'TestWarlock', d20: 12, bonus: 3, saveType: 'wisdom' }
+        });
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -102,7 +99,10 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 5, bonus: 2, checkName: 'Arcana check', timestamp: Date.now() - 10000, }, saveEvent: { d20: 18, bonus: 4, saveType: 'constitution', timestamp: Date.now() - 10000, }, } });
+        // When lastAttack is an ability check, save event won't be considered
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestWarlock', d20: 5, bonus: 2, checkName: 'Arcana check' }
+        });
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -116,7 +116,9 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 3;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 10, bonus: 4, checkName: 'Perception check', timestamp: Date.now() - 10000, }, saveEvent: null, } });
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestWarlock', d20: 10, bonus: 4, checkName: 'Perception check' }
+        });
         logService.addEntry.mockResolvedValue(undefined);
 
         await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -131,7 +133,9 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 15, bonus: 1, checkName: 'Insight check', timestamp: Date.now() - 10000, }, saveEvent: null, } });
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'TestWarlock', d20: 15, bonus: 1, checkName: 'Insight check' }
+        });
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, { ...mockPlayerStats, abilities: [{ name: 'Charisma', bonus: -4 }] }, mockCampaignName);
@@ -140,18 +144,17 @@ describe('darkOnesLookHandler.handle', () => {
         expect(result.payload.description).toContain('Insight check');
     });
 
-    it('should reject stale ability check events', async () => {
+    it('should reject when last attack is not by this player', async () => {
         runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 10, bonus: 2, checkName: 'Athletics', timestamp: Date.now() - 120000, }, saveEvent: null, } });
-        damageRollback.findRollsByCreature.mockReturnValue(null);
+        damageUtils.getCombatContext.mockResolvedValue({
+            lastAttack: { rollType: 'check', attackerName: 'Goblin', d20: 10, bonus: 2, checkName: 'Stealth' }
+        });
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 
         expect(result.payload.description).toContain('No recent ability check or saving throw');
     });
-
-
 });

@@ -5,6 +5,7 @@ import { infoPopup } from '../../common/infoPopup.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import { findMostRecentRollAcrossCreatures } from '../../common/damageRollback.js';
+import storage from '../../../ui/storage.js';
 
 function getPortentDice(playerName, campaignName) {
     const stored = getRuntimeValue(playerName, 'portentDice', campaignName);
@@ -60,13 +61,19 @@ async function findMostRecentEvent(campaignName) {
     const result = await findMostRecentRollAcrossCreatures(campaignName);
     if (!result) return null;
 
-    const context = getRuntimeValue(result.creatureName, '_lastRollContext', campaignName);
+    const lastAttack = result.eventData;
 
     return {
         creatureName: result.creatureName,
         eventType: result.eventType,
-        eventData: result.eventData,
-        context,
+        eventData: lastAttack,
+        context: {
+            damageFormula: lastAttack?.damageFormula || null,
+            damageType: lastAttack?.damageType || null,
+            saveDc: lastAttack?.saveDc || null,
+            oldSuccess: lastAttack?.rollType === 'save' ? (lastAttack?.saveResult === 'success') : null,
+            oldHit: lastAttack?.hit ?? null,
+        },
     };
 }
 
@@ -132,15 +139,19 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
         const newHit = targetAc != null ? (chosenDie + bonus >= targetAc) : eventData.hit;
         outcomeNote = computeHitOutcome(eventData, chosenDie, bonus);
 
-        const eventKey = 'lastAttackRoll';
-        setRuntimeValue(targetName, eventKey, {
-            ...eventData,
-            d20: chosenDie,
-            hit: newHit,
-            portentUsed: true,
-            portentOriginalD20: originalD20,
-            timestamp: Date.now(),
-        }, campaignName);
+        // Update combatSummary.lastAttack with the replaced d20
+        const cs = await getCombatContext(campaignName);
+        if (cs?.lastAttack) {
+            cs.lastAttack = {
+                ...cs.lastAttack,
+                d20: chosenDie,
+                hit: newHit,
+                portentUsed: true,
+                portentOriginalD20: originalD20,
+                timestamp: Date.now(),
+            };
+            storage.set('combatSummary', cs, campaignName);
+        }
 
         // Miss→hit: trigger damage
         if (!eventData.hit && newHit) {
@@ -162,27 +173,21 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
             }
         }
 
-        // Hit→miss: undo damage
+        // Hit→miss: undo damage using lastAttack's rawDamage
         if (eventData.hit && !newHit) {
-            const lastDamage = getRuntimeValue(campaignName, '_lastDamageDealt', campaignName);
-            if (lastDamage && lastDamage.targetName === eventData.targetName && lastDamage.attackerName === targetName) {
+            const rawDamage = eventData.primaryDamage || eventData.rawDamage || 0;
+            if (rawDamage > 0 && eventData.targetName && eventData.attackerName === targetName) {
                 const currentHp = getRuntimeValue(eventData.targetName, 'currentHitPoints', campaignName);
                 const maxHp = getRuntimeValue(eventData.targetName, 'maxHitPoints', campaignName);
                 if (currentHp != null) {
-                    const healedHp = Math.min(currentHp + lastDamage.damage, maxHp != null ? maxHp : 99999);
+                    const healedHp = Math.min(currentHp + rawDamage, maxHp != null ? maxHp : 99999);
                     setRuntimeValue(eventData.targetName, 'currentHitPoints', healedHp, campaignName);
-                    outcomeNote = `${outcomeNote} Undid ${lastDamage.damage} damage.`;
+                    outcomeNote = `${outcomeNote} Undid ${rawDamage} damage.`;
                 }
             }
         }
     } else if (eventType === 'ability') {
-        setRuntimeValue(targetName, 'lastAbilityCheck', {
-            ...eventData,
-            d20: chosenDie,
-            portentUsed: true,
-            portentOriginalD20: originalD20,
-            timestamp: Date.now(),
-        }, campaignName);
+        // Portent on ability check — no runtime key update needed, lastAttack is the source of truth
     } else {
         const saveDc = context?.saveDc || null;
         const newTotal = chosenDie + bonus;
@@ -192,14 +197,6 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
             if (context.oldSuccess && !newSuccess) saveNote = 'The save now fails!';
             else if (!context.oldSuccess && newSuccess) saveNote = 'The save now succeeds!';
         }
-
-        setRuntimeValue(targetName, 'lastSaveRoll', {
-            ...eventData,
-            d20: chosenDie,
-            portentUsed: true,
-            portentOriginalD20: originalD20,
-            timestamp: Date.now(),
-        }, campaignName);
 
         if (saveNote) outcomeNote = saveNote;
     }

@@ -1,20 +1,22 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { findRollsByCreature } from '../../common/damageRollback.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
-    const rollsByCreature = await findRollsByCreature(campaignName);
-    const playerRolls = rollsByCreature?.[playerName] || null;
-    const abilityEvent = playerRolls?.abilityEvent || null;
-    if (!abilityEvent) {
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = cs?.lastAttack || null;
+    const isAbilityCheck = lastAttack?.rollType === 'check' || lastAttack?.rollType === 'skill';
+    const isPlayerRoll = lastAttack?.attackerName === playerName;
+
+    if (!isAbilityCheck || !isPlayerRoll) {
         return infoPopup(action.name, `No recent ability check found for ${playerName}. This feature can only be used shortly after an ability check.`, auto);
     }
 
-    const { d20, bonus: checkBonus, checkName } = abilityEvent;
+    const { d20, bonus: checkBonus, checkName } = lastAttack;
     const originalTotal = d20 + checkBonus;
     const d10Roll = Math.floor(Math.random() * 10) + 1;
     const modifiedTotal = originalTotal + d10Roll;

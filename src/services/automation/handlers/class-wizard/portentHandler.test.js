@@ -44,10 +44,6 @@ function makeFreshTimestamp() {
     return Date.now() - 1000;
 }
 
-function staleTimestamp() {
-    return Date.now() - 120000;
-}
-
 function setupMocks() {
     vi.clearAllMocks();
     getRuntimeValue.mockImplementation((_name, key) => {
@@ -64,19 +60,46 @@ function setupMocks() {
 }
 
 function mockCombatContextEvent(creatureName, eventType, eventData, contextData) {
-    const eventKey = eventType === 'attack' ? 'lastAttackRoll'
-        : eventType === 'ability' ? 'lastAbilityCheck'
-        : 'lastSaveRoll';
+    let rollType = 'attack';
+    if (eventType === 'ability') rollType = 'check';
+    if (eventType === 'save') rollType = 'save';
+
+    const lastAttack = {
+        attackerName: creatureName,
+        targetName: eventData.targetName || null,
+        d20: eventData.d20,
+        bonus: eventData.bonus || 0,
+        rollType,
+        timestamp: eventData.timestamp || makeFreshTimestamp(),
+    };
+
+    if (eventType === 'attack') {
+        Object.assign(lastAttack, {
+            targetAc: eventData.targetAc,
+            hit: eventData.hit,
+            damageFormula: contextData?.damageFormula || null,
+            damageType: contextData?.damageType || null,
+        });
+    } else if (eventType === 'ability') {
+        Object.assign(lastAttack, {
+            checkName: eventData.checkName,
+        });
+    } else if (eventType === 'save') {
+        Object.assign(lastAttack, {
+            saveType: eventData.saveType,
+            saveDc: contextData?.saveDc || null,
+            saveResult: contextData?.oldSuccess ? 'success' : 'failure',
+        });
+    }
 
     getRuntimeValue.mockImplementation((name, key) => {
         if (key === 'portentDice') return '[15, 8]';
         if (key === 'portentUsedThisTurn') return false;
-        if (name === creatureName && key === eventKey) return eventData;
-        if (name === creatureName && key === '_lastRollContext') return contextData || null;
         return null;
     });
 
     getCombatContext.mockResolvedValue({
+        lastAttack,
         creatures: [{ name: creatureName }],
     });
 }
@@ -200,32 +223,30 @@ describe('Portent Handler', () => {
             expect(result.modalName).toBe('portentDiceChoice');
             expect(result.payload.targetName).toBe('TestWizard');
             expect(result.payload.eventType).toBe('attack');
-            expect(result.payload.context).toEqual(contextData);
+            // context is now built from lastAttack fields
+            expect(result.payload.context.damageFormula).toBe('1d8+3');
+            expect(result.payload.context.damageType).toBe('Slashing');
+            expect(result.payload.context.oldHit).toBe(false);
             expect(result.payload.diceOptions).toEqual([15, 8]);
         });
 
         it('picks the most recent event across multiple creatures', async () => {
-            const staleEvent = {
-                d20: 10, bonus: 2, saveType: 'dex',
-                timestamp: staleTimestamp(),
-            };
-            const freshEvent = {
-                d20: 4, bonus: 5, checkName: 'Stealth',
-                timestamp: makeFreshTimestamp(),
-            };
-
+            // Since there's only one lastAttack, the most recent is whatever is in lastAttack
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'portentDice') return '[15, 8]';
                 if (key === 'portentUsedThisTurn') return false;
-                if (name === 'Goblin' && key === 'lastSaveRoll') return staleEvent;
-                if (name === 'RogueGal' && key === 'lastAbilityCheck') return freshEvent;
-                if (name === 'RogueGal' && key === '_lastRollContext') return {
-                    type: 'check', checkName: 'Stealth', oldTotal: 9, timestamp: makeFreshTimestamp(),
-                };
                 return null;
             });
 
             getCombatContext.mockResolvedValue({
+                lastAttack: {
+                    rollType: 'check',
+                    attackerName: 'RogueGal',
+                    d20: 4,
+                    bonus: 5,
+                    checkName: 'Stealth',
+                    timestamp: makeFreshTimestamp(),
+                },
                 creatures: [{ name: 'Goblin' }, { name: 'RogueGal' }, { name: 'TestWizard' }],
             });
 
@@ -280,11 +301,6 @@ describe('Portent Handler', () => {
             );
 
             expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'portentDice', '[8]', 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard', 'lastAttackRoll',
-                expect.objectContaining({ d20: 15, hit: true, portentOriginalD20: 2 }),
-                'test-campaign'
-            );
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Portent d20(15)');
             expect(result.payload.description).toContain('The attack now hits!');
@@ -363,12 +379,7 @@ describe('Portent Handler', () => {
                 'TestWizard', 'save', eventData, context, 15
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard', 'lastSaveRoll',
-                expect.objectContaining({ d20: 15, portentOriginalD20: 3 }),
-                'test-campaign'
-            );
-
+            // No longer sets lastSaveRoll — lastAttack is the source of truth
             expect(result.payload.description).toContain('The save now succeeds!');
         });
 
@@ -436,12 +447,7 @@ describe('Portent Handler', () => {
                 'TestWizard', 'ability', eventData, null, 15
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard', 'lastAbilityCheck',
-                expect.objectContaining({ d20: 15, portentOriginalD20: 4 }),
-                'test-campaign'
-            );
-
+            // No longer sets lastAbilityCheck — lastAttack is the source of truth
             expect(result.payload.description).toContain('Stealth check');
             expect(result.payload.description).toContain('Portent d20(15)');
         });

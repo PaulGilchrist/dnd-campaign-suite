@@ -2,7 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions, resolveTarget } from '../../common/targetResolver.js';
-import { findRollsByCreature } from '../../common/damageRollback.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 
 function getRuntimeUsesKey(featureName) {
@@ -68,15 +68,13 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
-    const rollsByCreature = await findRollsByCreature(campaignName);
-    const targetRolls = rollsByCreature?.[targetName] || null;
-    const attackEvent = targetRolls?.attackEvent || null;
-    const abilityEvent = targetRolls?.abilityEvent || null;
-    const saveEvent = targetRolls?.saveEvent || null;
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = cs?.lastAttack || null;
 
-    const attackFresh = attackEvent;
-    const abilityFresh = abilityEvent;
-    const saveFresh = saveEvent;
+    const isTargetRoll = lastAttack?.attackerName === targetName;
+    const attackFresh = lastAttack?.rollType === 'attack' && isTargetRoll;
+    const abilityFresh = (lastAttack?.rollType === 'check' || lastAttack?.rollType === 'skill') && isTargetRoll;
+    const saveFresh = lastAttack?.rollType === 'save' && isTargetRoll;
 
     if (!attackFresh && !abilityFresh && !saveFresh) {
         return {
@@ -93,14 +91,14 @@ export async function handle(action, playerStats, campaignName, mapName) {
     let rollDescription;
 
     if (attackFresh) {
-        const { d20, bonus, targetAc, hit } = attackEvent;
+        const { d20, bonus, targetAc, hit } = lastAttack;
         const ac = targetAc;
         rollDescription = `Attack roll: d20(${d20}) + ${bonus} = ${d20 + bonus} vs AC ${ac != null ? ac : '—'} → ${hit ? 'HIT' : 'MISS'}`;
     } else if (abilityFresh) {
-        const { d20, bonus, checkName } = abilityEvent;
+        const { d20, bonus, checkName } = lastAttack;
         rollDescription = `${checkName}: d20(${d20}) + ${bonus} = ${d20 + bonus}`;
     } else {
-        const { d20, bonus, saveType } = saveEvent;
+        const { d20, bonus, saveType } = lastAttack;
         const saveLabel = saveType ? saveType.toUpperCase() : 'Save';
         rollDescription = `${saveLabel}: d20(${d20}) + ${bonus} = ${d20 + bonus}`;
     }

@@ -92,6 +92,7 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     ...existingAttack,
     attackerName: attackerName || existingAttack?.attackerName || null,
     targetName,
+    rawDamage,
     ...(isSecondary ? {} : { primaryDamage: rawDamage }),
     secondaryDamage: isSecondary ? rawDamage : null,
     damageTypes,
@@ -173,18 +174,6 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         }
     }
 
-    // Save unified damage event under target's key for all reaction features
-    if (isPlayer) {
-        setRuntimeValue(creature.name, 'lastDamageEvent', {
-            targetName: creature.name,
-            attackerName: attackerName || null,
-            rawDamage,
-            damageTypes,
-            attackType: 'toHit',
-            timestamp: Date.now(),
-        }, campaignName);
-    }
-
     let oldHp, newHp;
    if (isPlayer) {
       const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
@@ -199,17 +188,6 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       oldHp = creature.currentHp;
       newHp = Math.max(0, oldHp - wardDamage);
       creature.currentHp = newHp;
-     }
-
-     if (wardDamage > 0) {
-         setRuntimeValue(campaignName, '_lastDamageDealt', {
-             targetName,
-             damage: wardDamage,
-             attackerName,
-             damageTypes,
-             isPlayer,
-             timestamp: Date.now(),
-         }, campaignName);
      }
 
      // Tasha's Hideous Laughter: damage-triggered repeat WIS save with Advantage

@@ -34,11 +34,15 @@ vi.mock('../../common/damageRollback.js', () => ({
   findRollsByCreature: vi.fn(),
 }));
 
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+  getCombatContext: vi.fn(),
+}));
+
 import { handle } from './restoreBalanceHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveTarget, resolveMapPositions } from '../../common/targetResolver.js';
-import * as damageRollback from '../../common/damageRollback.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 
 const campaignName = 'TestCampaign';
@@ -172,12 +176,8 @@ describe('restoreBalanceHandler.handle', () => {
         if (key === 'restorebalanceUses') return 1;
         return null;
       });
-      damageRollback.findRollsByCreature.mockReturnValue({
-        'TargetAlly': {
-          attackEvent: {"d20":15,"bonus":5,"targetAc":16,"hit":true,"timestamp":Date.now()},
-          abilityEvent: null,
-          saveEvent: null
-        }
+      damageUtils.getCombatContext.mockResolvedValue({
+        lastAttack: {"d20":15,"bonus":5,"targetAc":16,"hit":true,"attackerName":"TargetAlly","rollType":"attack","timestamp":Date.now()}
       });
     }
 
@@ -198,12 +198,8 @@ describe('restoreBalanceHandler.handle', () => {
         if (key === 'restorebalanceUses') return 1;
         return null;
       });
-      damageRollback.findRollsByCreature.mockReturnValue({
-        'TargetAlly': {
-          attackEvent: null,
-          abilityEvent: {"d20":12,"bonus":4,"checkName":"Stealth","timestamp":Date.now()},
-          saveEvent: null
-        }
+      damageUtils.getCombatContext.mockResolvedValue({
+        lastAttack: {"d20":12,"bonus":4,"checkName":"Stealth","attackerName":"TargetAlly","rollType":"check","timestamp":Date.now()}
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -219,12 +215,8 @@ describe('restoreBalanceHandler.handle', () => {
         if (key === 'restorebalanceUses') return 1;
         return null;
       });
-      damageRollback.findRollsByCreature.mockReturnValue({
-        'TargetAlly': {
-          attackEvent: null,
-          abilityEvent: null,
-          saveEvent: {"d20":18,"bonus":3,"saveType":"DEX","timestamp":Date.now()}
-        }
+      damageUtils.getCombatContext.mockResolvedValue({
+        lastAttack: {"d20":18,"bonus":3,"saveType":"DEX","attackerName":"TargetAlly","rollType":"save","timestamp":Date.now()}
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -236,12 +228,8 @@ describe('restoreBalanceHandler.handle', () => {
       resolveTarget.mockResolvedValue({ target: { name: 'TargetAlly' } });
       resolveMapPositions.mockResolvedValue(null);
       getAbilityModifier.mockReturnValue(3);
-      damageRollback.findRollsByCreature.mockReturnValue({
-        'TargetAlly': {
-          attackEvent: null,
-          abilityEvent: null,
-          saveEvent: null
-        }
+      damageUtils.getCombatContext.mockResolvedValue({
+        lastAttack: null
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -253,12 +241,8 @@ describe('restoreBalanceHandler.handle', () => {
       resolveTarget.mockResolvedValue({ target: { name: 'TargetAlly' } });
       resolveMapPositions.mockResolvedValue(null);
       getAbilityModifier.mockReturnValue(3);
-      damageRollback.findRollsByCreature.mockReturnValue({
-        'TargetAlly': {
-          attackEvent: {"d20":15,"bonus":5,"targetAc":16,"hit":false,"timestamp":Date.now()},
-          abilityEvent: null,
-          saveEvent: null
-        }
+      damageUtils.getCombatContext.mockResolvedValue({
+        lastAttack: {"d20":15,"bonus":5,"targetAc":16,"hit":false,"attackerName":"TargetAlly","rollType":"attack","timestamp":Date.now()}
       });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
@@ -272,12 +256,12 @@ describe('restoreBalanceHandler.handle', () => {
       resolveTarget.mockResolvedValue({ target: { name: 'TargetAlly' } });
       resolveMapPositions.mockResolvedValue(null);
       getAbilityModifier.mockReturnValue(3);
-      damageRollback.findRollsByCreature.mockReturnValue({
-        'TargetAlly': {
-          attackEvent: {"d20":15,"bonus":5,"targetAc":16,"hit":true,"timestamp":Date.now()},
-          abilityEvent: null,
-          saveEvent: null
-        }
+      getRuntimeValue.mockImplementation((caster, key) => {
+        if (key === 'restorebalanceUses') return 1;
+        return null;
+      });
+      damageUtils.getCombatContext.mockResolvedValue({
+        lastAttack: {"d20":15,"bonus":5,"targetAc":16,"hit":true,"attackerName":"TargetAlly","rollType":"attack","timestamp":Date.now()}
       });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);

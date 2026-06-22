@@ -701,8 +701,8 @@ export function createLogDamageAndShow(deps) {
 
         let applyResult = null;
         if (target) {
-            const lastAttack = getRuntimeValue(characterName, 'lastAttackRoll', campaignName);
-            const attackHit = context?.isOpportunityAttack && lastAttack?.hit === true;
+            const lastAttack = combatSummary?.lastAttack || null;
+            const attackHit = context?.isOpportunityAttack && lastAttack?.hit === true && lastAttack?.attackerName === characterName;
             if (attackHit) {
                 const playerCharacter = (characters || []).find(c => c.name === characterName || c.name.startsWith(characterName + ' '));
                 const computed = playerCharacter?.computedStats || playerCharacter;

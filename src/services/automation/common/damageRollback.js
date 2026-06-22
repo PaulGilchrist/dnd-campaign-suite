@@ -1,6 +1,5 @@
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
-import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 /**
  * Get the last attack from combatSummary.lastAttack.
@@ -81,21 +80,25 @@ export async function rollbackDamage(attackerName, targetName, campaignName, fea
 
 /**
  * Find the most recent roll (attack, ability check, or save) for each creature.
- * Used by handlers that need per-creature data (autoReroll, portent, etc.).
+ * Reads from combatSummary.lastAttack — the single source of truth for the most recent roll.
+ * Since reactions can only target the most recent roll, this returns the same lastAttack
+ * data for all creatures. Handlers should check attackerName/targetName to determine relevance.
  *
- * @returns {Promise<Object|null>} Map of { creatureName: { attackEvent, abilityEvent, saveEvent } } or null
+ * @returns {Promise<Object|null>} Map of { creatureName: { attackEvent, abilityEvent, saveEvent, rollType } } or null
  */
 export async function findRollsByCreature(campaignName) {
     const cs = await getCombatContext(campaignName);
     if (!cs?.creatures) return null;
 
+    const lastAttack = cs.lastAttack;
     const result = {};
     for (const creature of cs.creatures) {
         const name = creature.name;
         result[name] = {
-            attackEvent: getRuntimeValue(name, 'lastAttackRoll', campaignName),
-            abilityEvent: getRuntimeValue(name, 'lastAbilityCheck', campaignName),
-            saveEvent: getRuntimeValue(name, 'lastSaveRoll', campaignName),
+            attackEvent: lastAttack?.rollType === 'attack' ? lastAttack : null,
+            abilityEvent: lastAttack?.rollType === 'check' || lastAttack?.rollType === 'skill' ? lastAttack : null,
+            saveEvent: lastAttack?.rollType === 'save' ? lastAttack : null,
+            rollType: lastAttack?.rollType || null,
         };
     }
     return result;
@@ -108,38 +111,21 @@ export async function findRollsByCreature(campaignName) {
  * @returns {Promise<{ creatureName: string, eventType: string, eventData: Object, isStale: boolean }|null>}
  */
 export async function findMostRecentRollAcrossCreatures(campaignName) {
-    const rollsByCreature = await findRollsByCreature(campaignName);
-    if (!rollsByCreature) return null;
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.lastAttack) return null;
 
-    let bestTimestamp = 0;
-    let bestCreature = null;
-    let bestEventType = null;
-    let bestEventData = null;
-
-    for (const [creatureName, rolls] of Object.entries(rollsByCreature)) {
-        const checks = [
-            { key: 'attackEvent', type: 'attack' },
-            { key: 'abilityEvent', type: 'ability' },
-            { key: 'saveEvent', type: 'save' },
-        ];
-
-        for (const check of checks) {
-            const event = rolls[check.key];
-            if (event && event.timestamp > bestTimestamp) {
-                bestTimestamp = event.timestamp;
-                bestCreature = creatureName;
-                bestEventType = check.type;
-                bestEventData = event;
-            }
-        }
+    const lastAttack = cs.lastAttack;
+    let eventType = 'attack';
+    if (lastAttack.rollType === 'check' || lastAttack.rollType === 'skill') {
+        eventType = 'ability';
+    } else if (lastAttack.rollType === 'save') {
+        eventType = 'save';
     }
 
-    if (!bestCreature) return null;
-
     return {
-        creatureName: bestCreature,
-        eventType: bestEventType,
-        eventData: bestEventData,
+        creatureName: lastAttack.attackerName || lastAttack.targetName || null,
+        eventType,
+        eventData: lastAttack,
         isStale: false,
     };
 }

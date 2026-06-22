@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { findRollsByCreature } from '../../common/damageRollback.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
@@ -28,14 +28,12 @@ export async function handle(action, playerStats, campaignName) {
         return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on a Long Rest.`, auto);
     }
 
-    // Find the most recent ability check or saving throw
-    const rollsByCreature = await findRollsByCreature(campaignName);
-    const playerRolls = rollsByCreature?.[playerName] || null;
-    const abilityEvent = playerRolls?.abilityEvent || null;
-    const saveEvent = playerRolls?.saveEvent || null;
-
-    const abilityFresh = abilityEvent;
-    const saveFresh = saveEvent;
+    // Find the most recent ability check or saving throw by this player
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = cs?.lastAttack || null;
+    const isPlayerRoll = lastAttack?.attackerName === playerName;
+    const abilityFresh = isPlayerRoll && (lastAttack?.rollType === 'check' || lastAttack?.rollType === 'skill');
+    const saveFresh = isPlayerRoll && lastAttack?.rollType === 'save';
 
     if (!abilityFresh && !saveFresh) {
         return infoPopup(action.name, `No recent ability check or saving throw found for ${playerName}. This feature can only be used shortly after an ability check or saving throw.`, auto);
@@ -47,10 +45,10 @@ export async function handle(action, playerStats, campaignName) {
     let description;
 
     if (abilityFresh) {
-        const { d20, bonus, checkName } = abilityEvent;
+        const { d20, bonus, checkName } = lastAttack;
         description = buildDescription(action, d20, bonus, checkName, dieRoll);
     } else {
-        const { d20, bonus, saveType } = saveEvent;
+        const { d20, bonus, saveType } = lastAttack;
         const saveLabel = saveType ? saveType.toUpperCase() : 'Save';
         description = buildDescription(action, d20, bonus, saveLabel, dieRoll);
     }

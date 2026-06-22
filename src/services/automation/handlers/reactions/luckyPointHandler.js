@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { findRollsByCreature } from '../../common/damageRollback.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 function buildLuckyDescription(action, d20, bonus, label, effectType) {
@@ -23,15 +23,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return infoPopup(action.name, `${action.name} requires at least 1 Lucid Point. You have ${currentLP} remaining.`, auto);
     }
 
-    const rollsByCreature = await findRollsByCreature(campaignName);
-    const playerRolls = rollsByCreature?.[playerName] || null;
-    const attackEvent = playerRolls?.attackEvent || null;
-    const abilityEvent = playerRolls?.abilityEvent || null;
-    const saveEvent = playerRolls?.saveEvent || null;
+    const cs = await getCombatContext(campaignName);
+    const lastAttack = cs?.lastAttack || null;
 
-    const attackFresh = attackEvent;
-    const abilityFresh = abilityEvent;
-    const saveFresh = saveEvent;
+    const isPlayerRoll = lastAttack?.attackerName === playerName;
+    const attackFresh = lastAttack?.rollType === 'attack' && isPlayerRoll;
+    const abilityFresh = (lastAttack?.rollType === 'check' || lastAttack?.rollType === 'skill') && isPlayerRoll;
+    const saveFresh = lastAttack?.rollType === 'save' && isPlayerRoll;
 
     if (!attackFresh && !abilityFresh && !saveFresh) {
         return infoPopup(action.name, `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);
@@ -40,13 +38,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     let description;
 
     if (attackFresh) {
-        const { d20, bonus, targetName } = attackEvent;
+        const { d20, bonus, targetName } = lastAttack;
         description = buildLuckyDescription(action, d20, bonus, `Attack vs AC ${targetName || 'unknown'}`, effectType);
     } else if (abilityFresh) {
-        const { d20, bonus, checkName } = abilityEvent;
+        const { d20, bonus, checkName } = lastAttack;
         description = buildLuckyDescription(action, d20, bonus, checkName || 'Ability check', effectType);
     } else {
-        const { d20, bonus, saveType } = saveEvent;
+        const { d20, bonus, saveType } = lastAttack;
         const saveLabel = saveType ? `${saveType.toUpperCase()} save` : 'Saving throw';
         description = buildLuckyDescription(action, d20, bonus, saveLabel, effectType);
     }

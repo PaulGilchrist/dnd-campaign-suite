@@ -216,7 +216,7 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
 
         it('handles ram active condition', async () => {
             loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13, size: 'Small' }] });
-            getRuntimeValue.mockReturnValueOnce({ hit: false }).mockReturnValueOnce([]);
+            getRuntimeValue.mockReturnValueOnce([]).mockReturnValueOnce([]);
             const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
             const fn = createFn();
             await fn('Ram', '1d8+3', 8, [5, 3], 3, {
