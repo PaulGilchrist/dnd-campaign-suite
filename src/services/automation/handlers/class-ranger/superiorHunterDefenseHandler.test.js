@@ -2,6 +2,7 @@ import { handle } from './superiorHunterDefenseHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
+import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -14,6 +15,10 @@ vi.mock('../../../ui/logService.js', () => ({
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
+}));
+
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
+    getLastDamageEvent: vi.fn(),
 }));
 
 const makePlayerStats = (overrides = {}) => ({
@@ -68,6 +73,7 @@ describe('superiorHunterDefenseHandler', () => {
                     damageType: 'fire',
                     timestamp: staleTimestamp,
                 });
+            metamagic.getLastDamageEvent.mockReturnValue(null);
 
             damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin' }],
@@ -229,6 +235,7 @@ describe('superiorHunterDefenseHandler', () => {
                     damageType: 'fire',
                     timestamp: freshTimestamp,
                 });
+            metamagic.getLastDamageEvent.mockReturnValue(null);
 
             damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Goblin' }],

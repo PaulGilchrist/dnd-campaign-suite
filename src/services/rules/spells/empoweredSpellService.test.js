@@ -6,9 +6,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../hooks/combat/useMetamagic.js', () => ({
   getMaxSorceryPoints: vi.fn(),
   getCurrentSorceryPoints: vi.fn(),
-  getLastDamageEvent: vi.fn(),
   spendSorceryPoints: vi.fn(),
-  saveLastDamageEvent: vi.fn(),
+}));
+
+vi.mock('../../automation/common/damageRollback.js', () => ({
+  findLastAttack: vi.fn().mockResolvedValue({
+    attackEvent: null,
+    attackerName: null,
+    targetName: null,
+    primaryDamage: 0,
+    secondaryDamage: 0,
+    totalDamage: 0,
+    damageTypes: [],
+  }),
 }));
 
 vi.mock('./metamagicRules.js', () => ({
@@ -42,10 +52,9 @@ import {
 import {
   getMaxSorceryPoints,
   getCurrentSorceryPoints,
-  getLastDamageEvent,
   spendSorceryPoints,
-  saveLastDamageEvent,
 } from '../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../automation/common/damageRollback.js';
 import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
@@ -64,18 +73,6 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
-function makeLastEvent(extra = {}) {
-  return {
-    damageFormula: '3d6+2',
-    rolls: [4, 6, 3],
-    rawDamage: 15,
-    damageType: 'Fire',
-    spellName: 'Burning Hands',
-    targetName: 'Goblin',
-    ...extra,
-  };
-}
-
 function makeCombatSummary(creatures) {
   return { round: 1, creatures };
 }
@@ -85,14 +82,22 @@ function makeCombatSummary(creatures) {
 describe('buildEmpoweredSpellState', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('returns base state with error when no last event', () => {
+  it('returns base state with error when no last event', async () => {
     const playerStats = makePlayerStats();
     getMaxSorceryPoints.mockReturnValue(5);
     getCurrentSorceryPoints.mockReturnValue(3);
-    getLastDamageEvent.mockReturnValue(null);
+    findLastAttack.mockResolvedValue({
+      attackEvent: null,
+      attackerName: null,
+      targetName: null,
+      primaryDamage: 0,
+      secondaryDamage: 0,
+      totalDamage: 0,
+      damageTypes: [],
+    });
     getChaModifier.mockReturnValue(3);
 
-    const result = buildEmpoweredSpellState(playerStats);
+    const result = await buildEmpoweredSpellState(playerStats);
 
     expect(result).toEqual({
       type: 'empowered_spell',
@@ -105,17 +110,33 @@ describe('buildEmpoweredSpellState', () => {
     });
   });
 
-  it('includes lastEvent and formulaParsed when damage event exists', () => {
+  it('includes lastEvent and formulaParsed when damage event exists', async () => {
     const playerStats = makePlayerStats();
-    const lastEvent = makeLastEvent();
+    const lastEvent = {
+      damageFormula: '3d6+2',
+      rolls: [4, 6, 3],
+      rawDamage: 15,
+      damageType: 'Fire',
+      spellName: 'Burning Hands',
+      targetName: 'Goblin',
+      damageTypes: ['Fire'],
+    };
     const parsed = { count: 3, sides: 6, modifier: 2 };
     getMaxSorceryPoints.mockReturnValue(4);
     getCurrentSorceryPoints.mockReturnValue(2);
-    getLastDamageEvent.mockReturnValue(lastEvent);
+    findLastAttack.mockResolvedValue({
+      attackEvent: lastEvent,
+      attackerName: 'Xander',
+      targetName: 'Goblin',
+      primaryDamage: 15,
+      secondaryDamage: 0,
+      totalDamage: 15,
+      damageTypes: ['Fire'],
+    });
     getChaModifier.mockReturnValue(3);
     parseExpression.mockReturnValue(parsed);
 
-    const result = buildEmpoweredSpellState(playerStats);
+    const result = await buildEmpoweredSpellState(playerStats);
 
     expect(result.type).toBe('empowered_spell');
     expect(result.lastEvent).toBe(lastEvent);
@@ -125,91 +146,126 @@ describe('buildEmpoweredSpellState', () => {
     expect(result.chaMod).toBe(3);
   });
 
-  it('caps chaMod to parsed dice count when chaMod exceeds it', () => {
+  it('caps chaMod to parsed dice count when chaMod exceeds it', async () => {
     const playerStats = makePlayerStats();
-    const lastEvent = makeLastEvent();
+    const lastEvent = {
+      damageFormula: '3d6+2',
+      rolls: [4, 6, 3],
+      rawDamage: 15,
+      damageType: 'Fire',
+      spellName: 'Burning Hands',
+      targetName: 'Goblin',
+      damageTypes: ['Fire'],
+    };
     const parsed = { count: 3, sides: 6, modifier: 2 };
     getMaxSorceryPoints.mockReturnValue(3);
     getCurrentSorceryPoints.mockReturnValue(1);
-    getLastDamageEvent.mockReturnValue(lastEvent);
+    findLastAttack.mockResolvedValue({
+      attackEvent: lastEvent,
+      attackerName: 'Xander',
+      targetName: 'Goblin',
+      primaryDamage: 15,
+      secondaryDamage: 0,
+      totalDamage: 15,
+      damageTypes: ['Fire'],
+    });
     getChaModifier.mockReturnValue(5);
     parseExpression.mockReturnValue(parsed);
 
-    const result = buildEmpoweredSpellState(playerStats);
+    const result = await buildEmpoweredSpellState(playerStats);
 
     expect(result.chaMod).toBe(3);
   });
 
-  it('returns error when damage formula cannot be parsed', () => {
+  it('returns error when damage formula cannot be parsed', async () => {
     const playerStats = makePlayerStats();
-    const lastEvent = { damageFormula: 'invalid', rolls: [1, 2], rawDamage: 3 };
+    const lastEvent = { damageFormula: 'invalid', rolls: [1, 2], rawDamage: 3, damageTypes: ['Fire'] };
     getMaxSorceryPoints.mockReturnValue(5);
     getCurrentSorceryPoints.mockReturnValue(5);
-    getLastDamageEvent.mockReturnValue(lastEvent);
+    findLastAttack.mockResolvedValue({
+      attackEvent: lastEvent,
+      attackerName: 'Xander',
+      targetName: 'Goblin',
+      primaryDamage: 3,
+      secondaryDamage: 0,
+      totalDamage: 3,
+      damageTypes: ['Fire'],
+    });
     getChaModifier.mockReturnValue(2);
     parseExpression.mockReturnValue(null);
 
-    const result = buildEmpoweredSpellState(playerStats);
+    const result = await buildEmpoweredSpellState(playerStats);
 
     expect(result.type).toBe('empowered_spell');
     expect(result.lastEvent).toBeNull();
     expect(result.error).toBe('Could not parse damage formula');
   });
 
-  it('returns error when lastEvent exists but rolls are missing', () => {
+  it('returns error when lastEvent exists but rolls are missing', async () => {
     const playerStats = makePlayerStats();
     const lastEvent = { damageFormula: '3d6', rawDamage: 10 };
     getMaxSorceryPoints.mockReturnValue(5);
     getCurrentSorceryPoints.mockReturnValue(5);
-    getLastDamageEvent.mockReturnValue(lastEvent);
+    findLastAttack.mockResolvedValue({
+      attackEvent: lastEvent,
+      attackerName: 'Xander',
+      targetName: 'Goblin',
+      primaryDamage: 10,
+      secondaryDamage: 0,
+      totalDamage: 10,
+      damageTypes: [],
+    });
     getChaModifier.mockReturnValue(2);
     parseExpression.mockReturnValue({ count: 3, sides: 6, modifier: 0 });
 
-    const result = buildEmpoweredSpellState(playerStats);
+    const result = await buildEmpoweredSpellState(playerStats);
 
     expect(result.lastEvent).toBeNull();
     expect(result.error).toBe('No dice roll data available');
   });
 
-  it('returns error when lastEvent exists but damageFormula is missing', () => {
+  it('returns error when lastEvent exists but damageFormula is missing', async () => {
     const playerStats = makePlayerStats();
-    const lastEvent = { rolls: [3, 4, 5], rawDamage: 12 };
+    const lastEvent = { rolls: [3, 4, 5], rawDamage: 12, damageTypes: ['Fire'] };
     getMaxSorceryPoints.mockReturnValue(5);
     getCurrentSorceryPoints.mockReturnValue(5);
-    getLastDamageEvent.mockReturnValue(lastEvent);
+    findLastAttack.mockResolvedValue({
+      attackEvent: lastEvent,
+      attackerName: 'Xander',
+      targetName: 'Goblin',
+      primaryDamage: 12,
+      secondaryDamage: 0,
+      totalDamage: 12,
+      damageTypes: ['Fire'],
+    });
     getChaModifier.mockReturnValue(2);
 
-    const result = buildEmpoweredSpellState(playerStats);
+    const result = await buildEmpoweredSpellState(playerStats);
 
     expect(result.lastEvent).toBeNull();
     expect(result.error).toBe('No dice roll data available');
   });
 
-  it('passes through player stats name into SP values', () => {
+  it('passes through player stats name into SP values', async () => {
     const playerStats = { name: 'Lyra', abilities: [{ name: 'Charisma', bonus: 4 }] };
     getMaxSorceryPoints.mockReturnValue(6);
     getCurrentSorceryPoints.mockReturnValue(6);
-    getLastDamageEvent.mockReturnValue(null);
+    findLastAttack.mockResolvedValue({
+      attackEvent: null,
+      attackerName: null,
+      targetName: null,
+      primaryDamage: 0,
+      secondaryDamage: 0,
+      totalDamage: 0,
+      damageTypes: [],
+    });
     getChaModifier.mockReturnValue(4);
 
-    const result = buildEmpoweredSpellState(playerStats);
+    const result = await buildEmpoweredSpellState(playerStats);
 
     expect(result.currentSP).toBe(6);
     expect(result.maxSP).toBe(6);
     expect(result.chaMod).toBe(4);
-  });
-
-  it('uses playerStats name for getCurrentSorceryPoints and getLastDamageEvent calls', () => {
-    const playerStats = { name: 'Zara', abilities: [{ name: 'Charisma', bonus: 2 }] };
-    getMaxSorceryPoints.mockReturnValue(4);
-    getCurrentSorceryPoints.mockReturnValue(2);
-    getLastDamageEvent.mockReturnValue(null);
-    getChaModifier.mockReturnValue(2);
-
-    buildEmpoweredSpellState(playerStats);
-
-    expect(getCurrentSorceryPoints).toHaveBeenCalledWith('Zara', 4);
-    expect(getLastDamageEvent).toHaveBeenCalledWith('Zara');
   });
 });
 
@@ -240,7 +296,15 @@ describe('executeEmpoweredReroll', () => {
     const result = await executeEmpoweredReroll({
       campaignName: CAMPAIGN,
       playerStats: makePlayerStats(),
-      lastEvent: makeLastEvent(),
+      lastEvent: {
+        damageFormula: '3d6+2',
+        rolls: [4, 6, 3],
+        rawDamage: 15,
+        damageType: 'Fire',
+        spellName: 'Burning Hands',
+        targetName: 'Goblin',
+        damageTypes: ['Fire'],
+      },
       chaMod: 3,
     });
 
@@ -262,7 +326,15 @@ describe('executeEmpoweredReroll', () => {
     const result = await executeEmpoweredReroll({
       campaignName: CAMPAIGN,
       playerStats: makePlayerStats(),
-      lastEvent: makeLastEvent(),
+      lastEvent: {
+        damageFormula: '3d6+2',
+        rolls: [4, 6, 3],
+        rawDamage: 15,
+        damageType: 'Fire',
+        spellName: 'Burning Hands',
+        targetName: 'Goblin',
+        damageTypes: ['Fire'],
+      },
       chaMod: 3,
     });
 
@@ -277,7 +349,14 @@ describe('executeEmpoweredReroll', () => {
     getCurrentSorceryPoints.mockReturnValue(3);
     getMaxSorceryPoints.mockReturnValue(5);
     getCombatContext.mockResolvedValue(makeCombatSummary([]));
-    const lastEvent = makeLastEvent();
+    const lastEvent = {
+      damageFormula: '3d6+2',
+      rolls: [4, 6, 3],
+      rawDamage: 15,
+      damageType: 'Fire',
+      spellName: 'Burning Hands',
+      damageTypes: ['Fire'],
+    };
     delete lastEvent.targetName;
 
     const result = await executeEmpoweredReroll({
@@ -445,7 +524,6 @@ describe('executeEmpoweredReroll', () => {
     expect(result.popupState.result.oldTotal).toBe(12);
     expect(result.popupState.result.newTotal).toBe(12);
     expect(spendSorceryPoints).toHaveBeenCalledTimes(1);
-    expect(saveLastDamageEvent).toHaveBeenCalledWith('Xander', expect.objectContaining({ rawDamage: 12 }), CAMPAIGN);
   });
 
   it('handles more rolls than chaMod — only rerolls chaMod dice', async () => {
@@ -631,48 +709,6 @@ describe('executeEmpoweredReroll', () => {
     expect(result.logEntries[0].characterName).toBe('Xander');
     expect(result.logEntries[0].targetName).toBe('Goblin');
     expect(result.logEntries[0].rerolledDiceCount).toBe(1);
-
-    vi.restoreAllMocks();
-  });
-
-  it('calls saveLastDamageEvent with updated event after reroll', async () => {
-    const parsed = { count: 2, sides: 6, modifier: 0 };
-    parseExpression.mockReturnValue(parsed);
-    getCurrentSorceryPoints.mockReturnValue(1);
-    getMaxSorceryPoints.mockReturnValue(5);
-    getCombatContext.mockResolvedValue(makeCombatSummary([
-      { name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10, resistances: [], immunities: [], conditions: [], concentration: null, saveBonuses: {} },
-    ]));
-    applyDamageToTarget.mockReturnValue({ newHp: 10, finalDamage: 0 });
-
-    const lastEvent = {
-      damageFormula: '2d6',
-      rolls: [1, 2],
-      rawDamage: 3,
-      targetName: 'Goblin',
-      spellName: 'Firebolt',
-    };
-
-    const randomValues = [0.5, 0.5];
-    let randomIndex = 0;
-    vi.spyOn(Math, 'random').mockImplementation(() => randomValues[randomIndex++]);
-
-    await executeEmpoweredReroll({
-      campaignName: CAMPAIGN,
-      playerStats: makePlayerStats(),
-      lastEvent,
-      chaMod: 2,
-    });
-
-    expect(saveLastDamageEvent).toHaveBeenCalledWith(
-      'Xander',
-      expect.objectContaining({
-        rawDamage: expect.any(Number),
-        rolls: expect.any(Array),
-        timestamp: expect.any(Number),
-      }),
-      CAMPAIGN,
-    );
 
     vi.restoreAllMocks();
   });

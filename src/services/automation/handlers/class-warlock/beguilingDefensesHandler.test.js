@@ -6,8 +6,16 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(async () => {}),
 }));
 
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-    getLastAttackRoll: vi.fn(),
+vi.mock('../../common/damageRollback.js', () => ({
+    findLastAttack: vi.fn().mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+    }),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -24,7 +32,7 @@ vi.mock('../../common/savePrompt.js', () => ({
 }));
 
 const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
-const { getLastAttackRoll } = await import('../../../../hooks/combat/useMetamagic.js');
+const { findLastAttack } = await import('../../common/damageRollback.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
 const { buildSaveDc, createSaveListener } = await import('../../common/savePrompt.js');
@@ -62,7 +70,15 @@ function makeAction(overrides = {}) {
 describe('beguilingDefensesHandler', () => {
     describe('no recent attack', () => {
         it('returns popup when no attack event exists', async () => {
-            getLastAttackRoll.mockReturnValue(null);
+            findLastAttack.mockResolvedValue({
+                attackEvent: null,
+                attackerName: null,
+                targetName: null,
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -73,7 +89,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('returns popup when attack event is stale (> 60 seconds)', async () => {
             const oldTimestamp = Date.now() - 120000;
-            getLastAttackRoll.mockReturnValue({ timestamp: oldTimestamp });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: oldTimestamp },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -83,7 +107,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('accepts non-stale attack event', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 5,
+                secondaryDamage: 0,
+                totalDamage: 5,
+                damageTypes: ['Piercing'],
+            });
 
             getCombatContext.mockResolvedValue(null);
             buildSaveDc.mockReturnValue(15);
@@ -99,7 +131,15 @@ describe('beguilingDefensesHandler', () => {
     describe('uses remaining', () => {
         it('returns popup when uses exhausted and no pact magic recharge', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             // Uses counter at max (1 used of 1 max)
             getRuntimeValue.mockReturnValue(1);
 
@@ -112,7 +152,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('returns popup when uses exhausted and no pact slots available', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             // Uses counter at max
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'beguilingDefensesUses') return 1;
@@ -129,7 +177,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('spends a pact magic slot to restore a use when available', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockImplementation((name, key) => {
                 if (key === 'beguilingDefensesUses') return 1;
                 if (key === 'warlockPactMagic') return 1;
@@ -149,7 +205,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('increments use counter on activation', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockReturnValue(0);
 
             getCombatContext.mockResolvedValue(null);
@@ -165,7 +229,15 @@ describe('beguilingDefensesHandler', () => {
     describe('save prompt', () => {
         it('creates save listener with correct parameters', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockReturnValue(0);
 
             getCombatContext.mockResolvedValue(null);
@@ -183,7 +255,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('uses custom saveType from automation', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockReturnValue(0);
 
             getCombatContext.mockResolvedValue(null);
@@ -200,7 +280,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('looks up attacker from combat context', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockReturnValue(0);
 
             getCombatContext.mockResolvedValue({
@@ -218,7 +306,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('falls back to attackerName from attack event when combat context lookup fails', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockReturnValue(0);
 
             getCombatContext.mockResolvedValue({
@@ -238,7 +334,15 @@ describe('beguilingDefensesHandler', () => {
     describe('popup result', () => {
         it('returns popup with feature name and description', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockReturnValue(0);
 
             getCombatContext.mockResolvedValue(null);
@@ -258,7 +362,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('uses custom feature name when provided', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockReturnValue(0);
 
             getCombatContext.mockResolvedValue(null);
@@ -273,7 +385,15 @@ describe('beguilingDefensesHandler', () => {
 
         it('logs ability use with save prompt details', async () => {
             const recentTimestamp = Date.now() - 30000;
-            getLastAttackRoll.mockReturnValue({ timestamp: recentTimestamp, targetName: 'Goblin' });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: recentTimestamp, targetName: 'Goblin' },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
             getRuntimeValue.mockReturnValue(0);
 
             getCombatContext.mockResolvedValue(null);
@@ -293,7 +413,15 @@ describe('beguilingDefensesHandler', () => {
 
     describe('event staleness', () => {
         it('treats event without timestamp as stale', async () => {
-            getLastAttackRoll.mockReturnValue({});
+            findLastAttack.mockResolvedValue({
+                attackEvent: {},
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -302,7 +430,15 @@ describe('beguilingDefensesHandler', () => {
         });
 
         it('treats event with null timestamp as stale', async () => {
-            getLastAttackRoll.mockReturnValue({ timestamp: null });
+            findLastAttack.mockResolvedValue({
+                attackEvent: { timestamp: null },
+                attackerName: 'Goblin',
+                targetName: 'WarlockGirl',
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 

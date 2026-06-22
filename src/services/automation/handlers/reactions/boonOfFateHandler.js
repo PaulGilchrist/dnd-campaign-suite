@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
@@ -32,33 +32,18 @@ export async function handle(action, playerStats, campaignName) {
         return infoPopup(action.name, `${action.name} has no uses remaining. Recharges on Initiative or Short or Long Rest.`, auto);
     }
 
-    const attackEvent = getLastAttackRoll(playerName);
-    const abilityEvent = getLastAbilityCheck(playerName);
-    const saveEvent = getLastSaveRoll(playerName);
+    const attackResult = await findLastAttack();
+    const attackEvent = attackResult.attackEvent;
+    const attackFresh = attackEvent && !isStale(attackEvent) && attackResult.targetName === playerName;
 
-    const attackFresh = attackEvent && !isStale(attackEvent);
-    const abilityFresh = abilityEvent && !isStale(abilityEvent);
-    const saveFresh = saveEvent && !isStale(saveEvent);
-
-    if (!attackFresh && !abilityFresh && !saveFresh) {
+    if (!attackFresh) {
         return infoPopup(action.name, `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);
     }
 
     const modifier = Math.floor(Math.random() * 4) + Math.floor(Math.random() * 4) + 1;
 
-    let description;
-
-    if (attackFresh) {
-        const { d20, bonus, targetName } = attackEvent;
-        description = buildBoonOfFateDescription(action, d20, bonus, `Attack vs AC ${targetName || 'unknown'}`, modifier);
-    } else if (abilityFresh) {
-        const { d20, bonus, checkName } = abilityEvent;
-        description = buildBoonOfFateDescription(action, d20, bonus, checkName || 'Ability check', modifier);
-    } else {
-        const { d20, bonus, saveType } = saveEvent;
-        const saveLabel = saveType ? `${saveType.toUpperCase()} save` : 'Saving throw';
-        description = buildBoonOfFateDescription(action, d20, bonus, saveLabel, modifier);
-    }
+    const { d20, bonus, targetName } = attackEvent;
+    const description = buildBoonOfFateDescription(action, d20, bonus, `Attack vs AC ${targetName || 'unknown'}`, modifier);
 
     await setRuntimeValue(playerName, boonKey, true, campaignName);
 

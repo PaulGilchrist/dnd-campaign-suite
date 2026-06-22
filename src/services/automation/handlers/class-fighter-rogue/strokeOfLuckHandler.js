@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
@@ -37,32 +37,18 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     // Find the most recent failed D20 test (attack, ability check, or save)
-    const attackEvent = getLastAttackRoll(playerName);
-    const abilityEvent = getLastAbilityCheck(playerName);
-    const saveEvent = getLastSaveRoll(playerName);
+    const attackResult = await findLastAttack();
+    const attackEvent = attackResult.attackEvent;
 
-    const attackFresh = attackEvent && !isStale(attackEvent);
-    const abilityFresh = abilityEvent && !isStale(abilityEvent);
-    const saveFresh = saveEvent && !isStale(saveEvent);
+    const attackFresh = attackEvent && !isStale(attackEvent) && attackResult.targetName === playerName;
 
-    if (!attackFresh && !abilityFresh && !saveFresh) {
+    if (!attackFresh) {
         return infoPopup(action.name, `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);
     }
 
-    let description;
-
-    if (attackFresh) {
-        const { d20, bonus, targetName, hit } = attackEvent;
-        const wasFailure = !hit;
-        description = buildStrokeOfLuckDescription(action, d20, bonus, `Attack vs AC ${targetName || 'unknown'}`, wasFailure);
-    } else if (abilityFresh) {
-        const { d20, bonus, checkName } = abilityEvent;
-        description = buildStrokeOfLuckDescription(action, d20, bonus, checkName, false);
-    } else {
-        const { d20, bonus, saveType } = saveEvent;
-        const saveLabel = saveType ? saveType.toUpperCase() : 'Save';
-        description = buildStrokeOfLuckDescription(action, d20, bonus, saveLabel, false);
-    }
+    const { d20, bonus, targetName, hit } = attackEvent;
+    const wasFailure = !hit;
+    const description = buildStrokeOfLuckDescription(action, d20, bonus, `Attack vs AC ${targetName || 'unknown'}`, wasFailure);
 
     // Mark as used
     await setRuntimeValue(playerName, 'strokeOfLuckUsed', true, campaignName);

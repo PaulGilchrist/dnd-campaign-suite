@@ -28,9 +28,6 @@ vi.mock('../../../hooks/combat/useMetamagic.js', () => {
     maxSP: 10,
     spendSorceryPoints: vi.fn(),
     logMetamagic: vi.fn(),
-    saveLastDamageEvent: vi.fn(),
-    getLastDamageEvent: vi.fn(() => null),
-    clearLastDamageEvent: vi.fn(),
   });
   mockFn.getCurrentSorceryPoints = vi.fn(() => 10);
   mockFn.getMaxSorceryPoints = vi.fn(() => 10);

@@ -7,7 +7,6 @@ import {
 import { sendSaveResult } from '../../services/combat/conditions/savePromptService.js';
 import { getTargetFromAttacker, getCombatContext } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
-import { saveLastDamageEvent } from './useMetamagic.js';
 import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { hasPotentCantrip } from './useLoggedDiceRollUtils.js';
@@ -148,21 +147,6 @@ export function createSaves(deps) {
             total: saveResult.total,
             saveBonus: saveResult.bonus,
         });
-
-        saveLastDamageEvent(characterName, {
-            targetName: target.name,
-            spellName: pending.name,
-            damageFormula: pending.formula,
-            rawDamage: finalDamage,
-            damageType: pending.damageType,
-            saveDc,
-            saveType,
-            saveResult: saveResult.success ? 'success' : 'failure',
-            context: pending.context,
-            rolls: pending.rolls,
-            modifier: pending.modifier,
-            timestamp: Date.now(),
-        }, campaignName);
 
         setPopupHtml({
             type: 'save-damage',

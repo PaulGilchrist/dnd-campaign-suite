@@ -11,9 +11,16 @@ vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-  getLastAttackRoll: vi.fn(),
-  getLastAbilityCheck: vi.fn(),
+vi.mock('../../common/damageRollback.js', () => ({
+  findLastAttack: vi.fn().mockResolvedValue({
+    attackEvent: null,
+    attackerName: null,
+    targetName: null,
+    primaryDamage: 0,
+    secondaryDamage: 0,
+    totalDamage: 0,
+    damageTypes: [],
+  }),
 }));
 
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
@@ -34,7 +41,7 @@ vi.mock('../../common/targetResolver.js', () => ({
 import { handle } from './countercharmHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
@@ -79,8 +86,15 @@ describe('countercharmHandler.handle', () => {
     vi.clearAllMocks();
     getRuntimeValue.mockReturnValue(undefined);
     setRuntimeValue.mockReset();
-    getLastAttackRoll.mockReturnValue(null);
-    getLastAbilityCheck.mockReturnValue(null);
+    findLastAttack.mockResolvedValue({
+      attackEvent: null,
+      attackerName: null,
+      targetName: null,
+      primaryDamage: 0,
+      secondaryDamage: 0,
+      totalDamage: 0,
+      damageTypes: [],
+    });
     rangeToFeet.mockReturnValue(30);
     getCombatContext.mockResolvedValue(null);
     resolveMapPositions.mockResolvedValue(null);
@@ -118,13 +132,15 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 0 });
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: { d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp() },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -139,13 +155,15 @@ describe('countercharmHandler.handle', () => {
 
       getRuntimeValue.mockReturnValue(1);
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: { d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp() },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -155,12 +173,19 @@ describe('countercharmHandler.handle', () => {
   });
 
   describe('target resolution - no recent save', () => {
-    it('should return no-save popup when player has no recent attack roll or ability check', async () => {
+    it('should return no-save popup when player has no recent attack roll', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -176,8 +201,15 @@ describe('countercharmHandler.handle', () => {
       const action = makeAction();
 
       const staleEvent = { d20: 8, bonus: 2, timestamp: makeStaleTimestamp() };
-      getLastAttackRoll.mockReturnValue(staleEvent);
-      getLastAbilityCheck.mockReturnValue(staleEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: staleEvent,
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -191,7 +223,15 @@ describe('countercharmHandler.handle', () => {
       const action = makeAction();
 
       const eventWithoutTimestamp = { d20: 8, bonus: 2 };
-      getLastAttackRoll.mockReturnValue(eventWithoutTimestamp);
+      findLastAttack.mockResolvedValue({
+        attackEvent: eventWithoutTimestamp,
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -206,14 +246,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -223,46 +270,25 @@ describe('countercharmHandler.handle', () => {
       expect(result.payload.description).toContain('Original save');
     });
 
-    it('should find player\'s own ability check when no attack roll exists', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const abilityEvent = {
-        d20: 7,
-        bonus: 3,
-        checkName: 'Stealth',
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(abilityEvent);
-      rangeToFeet.mockReturnValue(30);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Target: TestHero');
-      expect(result.payload.description).toContain('Stealth');
-    });
-
     it('should prefer attack roll over ability check for self', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const attackEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      const abilityEvent = {
-        d20: 7,
-        bonus: 3,
-        checkName: 'Stealth',
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(attackEvent);
-      getLastAbilityCheck.mockReturnValue(abilityEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -277,14 +303,34 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getLastAttackRoll.mockImplementation((name) => {
-        if (name === 'TestHero') return null;
-        if (name === 'Ally1') {
-          return { d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp() };
+      let callCount = 0;
+      findLastAttack.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          // Self check - no attack
+          return {
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+          };
         }
-        return null;
+        // Ally check
+        return {
+          attackEvent: {
+            d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp()
+          },
+          attackerName: 'Ally1',
+          targetName: 'Ally1',
+          primaryDamage: 5,
+          secondaryDamage: 0,
+          totalDamage: 5,
+          damageTypes: ['Piercing'],
+        };
       });
-      getLastAbilityCheck.mockReturnValue(null);
       rangeToFeet.mockReturnValue(30);
       getCombatContext.mockResolvedValue({
         creatures: [
@@ -299,46 +345,24 @@ describe('countercharmHandler.handle', () => {
       expect(result.payload.description).toContain('Target: Ally1');
     });
 
-    it('should find an ally with a recent ability check', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockImplementation((name) => {
-        if (name === 'TestHero') return null;
-        if (name === 'Ally2') {
-          return { d20: 7, bonus: 3, checkName: 'Perception', timestamp: makeFreshTimestamp() };
-        }
-        return null;
-      });
-      rangeToFeet.mockReturnValue(30);
-      getCombatContext.mockResolvedValue({
-        creatures: [
-          { name: 'TestHero' },
-          { name: 'Ally2' },
-        ],
-      });
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Target: Ally2');
-      expect(result.payload.description).toContain('Perception');
-    });
-
     it('should skip the player themselves when searching allies', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const selfAttackEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockImplementation((name) => {
-        if (name === 'TestHero') return selfAttackEvent;
-        return null;
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
       });
       rangeToFeet.mockReturnValue(30);
       getCombatContext.mockResolvedValue({
@@ -358,8 +382,15 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
       getCombatContext.mockResolvedValue({
         creatures: [
@@ -378,8 +409,15 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: null });
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(null);
 
       const result = await handle(action, ps, campaignName, null);
@@ -394,19 +432,32 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: '30 ft' });
 
-      const allyAttackEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockImplementation((name) => {
-        if (name === 'TestHero') return null;
-        if (name === 'Ally1') return allyAttackEvent;
-        return null;
+      let callCount = 0;
+      findLastAttack.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+          };
+        }
+        return {
+          attackEvent: {
+            d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp()
+          },
+          attackerName: 'Ally1',
+          targetName: 'Ally1',
+          primaryDamage: 5,
+          secondaryDamage: 0,
+          totalDamage: 5,
+          damageTypes: ['Piercing'],
+        };
       });
-      getLastAbilityCheck.mockReturnValue(null);
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({
         attackerPos: { gridX: 1, gridY: 1 },
@@ -429,36 +480,54 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: '30 ft' });
 
-      // Ally1 is too far, Ally2 is within range
-      const ally1AttackEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      const ally2AttackEvent = {
-        d20: 10,
-        bonus: 2,
-        targetAc: 15,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockImplementation((name) => {
-        if (name === 'TestHero') return null;
-        if (name === 'Ally1') return ally1AttackEvent;
-        if (name === 'Ally2') return ally2AttackEvent;
-        return null;
+      let callCount = 0;
+      findLastAttack.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+          };
+        }
+        if (callCount === 2) {
+          // Ally1 is too far
+          return {
+            attackEvent: {
+              d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp()
+            },
+            attackerName: 'Ally1',
+            targetName: 'Ally1',
+            primaryDamage: 5,
+            secondaryDamage: 0,
+            totalDamage: 5,
+            damageTypes: ['Piercing'],
+          };
+        }
+        // Ally2 is within range
+        return {
+          attackEvent: {
+            d20: 10, bonus: 2, targetAc: 15, hit: false, timestamp: makeFreshTimestamp()
+          },
+          attackerName: 'Ally2',
+          targetName: 'Ally2',
+          primaryDamage: 5,
+          secondaryDamage: 0,
+          totalDamage: 5,
+          damageTypes: ['Piercing'],
+        };
       });
-      getLastAbilityCheck.mockReturnValue(null);
       rangeToFeet.mockReturnValue(30);
 
       // Mock resolveMapPositions to return different positions per call
-      // First call for Ally1 (far), second call for Ally2 (close)
-      let callCount = 0;
+      let resolveCallCount = 0;
       resolveMapPositions.mockImplementation(async () => {
-        callCount++;
-        if (callCount === 1) {
+        resolveCallCount++;
+        if (resolveCallCount === 1) {
           // Ally1 is 40ft away
           return {
             attackerPos: { gridX: 1, gridY: 1 },
@@ -494,27 +563,45 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: '30 ft' });
 
-      const allyAttackEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      const ally2AttackEvent = {
-        d20: 10,
-        bonus: 2,
-        targetAc: 15,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockImplementation((name) => {
-        if (name === 'TestHero') return null;
-        if (name === 'Ally1') return allyAttackEvent;
-        if (name === 'Ally2') return ally2AttackEvent;
-        return null;
+      let callCount = 0;
+      findLastAttack.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+          };
+        }
+        if (callCount === 2) {
+          return {
+            attackEvent: {
+              d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp()
+            },
+            attackerName: 'Ally1',
+            targetName: 'Ally1',
+            primaryDamage: 5,
+            secondaryDamage: 0,
+            totalDamage: 5,
+            damageTypes: ['Piercing'],
+          };
+        }
+        return {
+          attackEvent: {
+            d20: 10, bonus: 2, targetAc: 15, hit: false, timestamp: makeFreshTimestamp()
+          },
+          attackerName: 'Ally2',
+          targetName: 'Ally2',
+          primaryDamage: 5,
+          secondaryDamage: 0,
+          totalDamage: 5,
+          damageTypes: ['Piercing'],
+        };
       });
-      getLastAbilityCheck.mockReturnValue(null);
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
       getCombatContext.mockResolvedValue({
@@ -535,27 +622,45 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: '30 ft' });
 
-      const allyAttackEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      const ally2AttackEvent = {
-        d20: 10,
-        bonus: 2,
-        targetAc: 15,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockImplementation((name) => {
-        if (name === 'TestHero') return null;
-        if (name === 'Ally1') return allyAttackEvent;
-        if (name === 'Ally2') return ally2AttackEvent;
-        return null;
+      let callCount = 0;
+      findLastAttack.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+          };
+        }
+        if (callCount === 2) {
+          return {
+            attackEvent: {
+              d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp()
+            },
+            attackerName: 'Ally1',
+            targetName: 'Ally1',
+            primaryDamage: 5,
+            secondaryDamage: 0,
+            totalDamage: 5,
+            damageTypes: ['Piercing'],
+          };
+        }
+        return {
+          attackEvent: {
+            d20: 10, bonus: 2, targetAc: 15, hit: false, timestamp: makeFreshTimestamp()
+          },
+          attackerName: 'Ally2',
+          targetName: 'Ally2',
+          primaryDamage: 5,
+          secondaryDamage: 0,
+          totalDamage: 5,
+          damageTypes: ['Piercing'],
+        };
       });
-      getLastAbilityCheck.mockReturnValue(null);
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({
         attackerPos: { gridX: 1, gridY: 1 },
@@ -579,19 +684,32 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: '30 ft' });
 
-      const allyAttackEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockImplementation((name) => {
-        if (name === 'TestHero') return null;
-        if (name === 'Ally1') return allyAttackEvent;
-        return null;
+      let callCount = 0;
+      findLastAttack.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+          };
+        }
+        return {
+          attackEvent: {
+            d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp()
+          },
+          attackerName: 'Ally1',
+          targetName: 'Ally1',
+          primaryDamage: 5,
+          secondaryDamage: 0,
+          totalDamage: 5,
+          damageTypes: ['Piercing'],
+        };
       });
-      getLastAbilityCheck.mockReturnValue(null);
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({
         attackerPos: { gridX: 1, gridY: 1 },
@@ -617,14 +735,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       // Mock Math.random to return 20 (max) so reroll always improves
@@ -645,14 +770,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const saveEvent = {
-        d20: 14,
-        bonus: 2,
-        targetAc: 13,
-        hit: true,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 14,
+          bonus: 2,
+          targetAc: 13,
+          hit: true,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -665,14 +797,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -686,14 +825,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: null,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: null,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -705,13 +851,20 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -720,61 +873,26 @@ describe('countercharmHandler.handle', () => {
     });
   });
 
-  describe('ability check reroll display', () => {
-    it('should show ability check reroll with check name', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const saveEvent = {
-        d20: 7,
-        bonus: 3,
-        checkName: 'Stealth',
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(saveEvent);
-      rangeToFeet.mockReturnValue(30);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Stealth');
-      expect(result.payload.description).toContain('Reroll with Advantage');
-      expect(result.payload.description).toContain('<b>');
-    });
-
-    it('should indicate when reroll improved the result', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const saveEvent = {
-        d20: 5,
-        bonus: 3,
-        checkName: 'Athletics',
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(saveEvent);
-      rangeToFeet.mockReturnValue(30);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('Reroll with Advantage');
-    });
-  });
-
   describe('uses decrement', () => {
     it('should decrement uses after successful execution', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 3 });
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
       getRuntimeValue.mockReturnValue(3);
 
@@ -787,14 +905,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 5 });
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
       getRuntimeValue.mockReturnValue(2);
 
@@ -807,14 +932,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 4 });
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
       getRuntimeValue.mockReturnValue(undefined);
 
@@ -828,14 +960,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 0 });
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
       getRuntimeValue.mockReturnValue(1);
 
@@ -857,14 +996,21 @@ describe('countercharmHandler.handle', () => {
         },
       };
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -900,8 +1046,15 @@ describe('countercharmHandler.handle', () => {
         },
       };
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(60);
       getRuntimeValue.mockReturnValue(1);
 
@@ -922,14 +1075,21 @@ describe('countercharmHandler.handle', () => {
         },
       };
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
       getRuntimeValue.mockReturnValue(1);
 
@@ -944,8 +1104,15 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: '60 ft' });
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(60);
 
       const result = await handle(action, ps, campaignName, null);
@@ -957,8 +1124,15 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ range: null });
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -972,14 +1146,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       await handle(action, ps, campaignName, null);
@@ -998,14 +1179,32 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getLastAttackRoll.mockImplementation((name) => {
-        if (name === 'TestHero') return null;
-        if (name === 'Ally1') {
-          return { d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp() };
+      let callCount = 0;
+      findLastAttack.mockImplementation(async () => {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+          };
         }
-        return null;
+        return {
+          attackEvent: {
+            d20: 8, bonus: 2, targetAc: 13, hit: false, timestamp: makeFreshTimestamp()
+          },
+          attackerName: 'Ally1',
+          targetName: 'Ally1',
+          primaryDamage: 5,
+          secondaryDamage: 0,
+          totalDamage: 5,
+          damageTypes: ['Piercing'],
+        };
       });
-      getLastAbilityCheck.mockReturnValue(null);
       rangeToFeet.mockReturnValue(30);
       getCombatContext.mockResolvedValue({
         creatures: [
@@ -1030,14 +1229,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
       addEntry.mockReturnValue(Promise.reject(new Error('log error')).catch(() => {}));
 
@@ -1053,10 +1259,15 @@ describe('countercharmHandler.handle', () => {
 
       // No timestamp on attack event
       const staleAttackEvent = { d20: 8, bonus: 2, targetAc: 13, hit: false };
-      // No timestamp on ability check event
-      const staleAbilityEvent = { d20: 7, bonus: 3, checkName: 'Stealth' };
-      getLastAttackRoll.mockReturnValue(staleAttackEvent);
-      getLastAbilityCheck.mockReturnValue(staleAbilityEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: staleAttackEvent,
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -1076,8 +1287,15 @@ describe('countercharmHandler.handle', () => {
         hit: false,
         timestamp: Date.now() - 61000,
       };
-      getLastAttackRoll.mockReturnValue(staleEvent);
-      getLastAbilityCheck.mockReturnValue(staleEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: staleEvent,
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -1096,7 +1314,15 @@ describe('countercharmHandler.handle', () => {
         hit: false,
         timestamp: Date.now() - 1000,
       };
-      getLastAttackRoll.mockReturnValue(freshEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: freshEvent,
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(30);
 
       const result = await handle(action, ps, campaignName, null);
@@ -1111,14 +1337,21 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ uses: 2, range: '45 ft' });
 
-      const saveEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: makeFreshTimestamp(),
-      };
-      getLastAttackRoll.mockReturnValue(saveEvent);
+      findLastAttack.mockResolvedValue({
+        attackEvent: {
+          d20: 8,
+          bonus: 2,
+          targetAc: 13,
+          hit: false,
+          timestamp: makeFreshTimestamp(),
+        },
+        attackerName: 'Goblin',
+        targetName: 'TestHero',
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Piercing'],
+      });
       rangeToFeet.mockReturnValue(45);
 
       const result = await handle(action, ps, campaignName, null);
@@ -1149,8 +1382,15 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
       getCombatContext.mockResolvedValue(null);
 
@@ -1164,8 +1404,15 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
       getCombatContext.mockResolvedValue({ creatures: [] });
 
@@ -1179,8 +1426,15 @@ describe('countercharmHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getLastAttackRoll.mockReturnValue(null);
-      getLastAbilityCheck.mockReturnValue(null);
+      findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       rangeToFeet.mockReturnValue(30);
       getCombatContext.mockResolvedValue({
         creatures: [{ name: 'TestHero' }],

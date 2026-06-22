@@ -1,15 +1,17 @@
-import { getMaxSorceryPoints, getCurrentSorceryPoints, getLastDamageEvent, spendSorceryPoints, saveLastDamageEvent } from '../../hooks/combat/useMetamagic.js';
+import { getMaxSorceryPoints, getCurrentSorceryPoints, spendSorceryPoints } from '../../hooks/combat/useMetamagic.js';
 import { getChaModifier } from './metamagicRules.js';
 import { parseExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyDamageToTarget } from '../combat/applyDamage.js';
 import { endInvisibilityOnHostileAction } from '../features/invisibilityService.js';
+import { findLastAttack } from '../../automation/common/damageRollback.js';
 
-export function buildEmpoweredSpellState(playerStats) {
+export async function buildEmpoweredSpellState(playerStats) {
     const name = playerStats.name;
     const maxSP = getMaxSorceryPoints(playerStats);
     const currentSP = getCurrentSorceryPoints(name, maxSP);
-    const lastEvent = getLastDamageEvent(name);
+    const attackResult = await findLastAttack();
+    const lastEvent = attackResult.attackEvent;
     const chaMod = getChaModifier(playerStats);
 
     const base = {
@@ -20,7 +22,7 @@ export function buildEmpoweredSpellState(playerStats) {
         chaMod,
     };
 
-    if (lastEvent && lastEvent.rolls && lastEvent.damageFormula) {
+    if (lastEvent && lastEvent.damageTypes?.length && lastEvent.damageFormula) {
         const parsed = parseExpression(lastEvent.damageFormula);
         if (!parsed) {
             return {
@@ -126,7 +128,7 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
             combatSummary,
             lastEvent.targetName,
             damageDifference,
-            lastEvent.damageType ? [lastEvent.damageType] : [],
+            lastEvent.damageTypes ? lastEvent.damageTypes : [],
             campaignName,
             characters,
             false,
@@ -136,8 +138,6 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
         if (applyResult && applyResult.finalDamage > 0) {
             endInvisibilityOnHostileAction(name, campaignName);
         }
-
-        saveLastDamageEvent(name, updatedLastEvent, campaignName);
 
         return {
             logEntries: [logEntry],
@@ -162,8 +162,6 @@ export async function executeEmpoweredReroll({ campaignName, playerStats, lastEv
             },
         };
     }
-
-    saveLastDamageEvent(name, updatedLastEvent, campaignName);
 
     return {
         logEntries: [logEntry],

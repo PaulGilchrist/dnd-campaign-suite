@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
@@ -17,22 +17,19 @@ function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
 
-function findRecentFailedSave(playerStats, campaignName, mapName, rangeFt) {
+async function findRecentFailedSave(playerStats, campaignName, mapName, rangeFt) {
     const playerName = playerStats.name;
 
-    const checkSelf = () => {
-        const attackEvent = getLastAttackRoll(playerName);
-        if (attackEvent && !isStale(attackEvent)) {
+    const checkSelf = async () => {
+        const attackResult = await findLastAttack();
+        const attackEvent = attackResult.attackEvent;
+        if (attackEvent && !isStale(attackEvent) && attackResult.targetName === playerName) {
             return { name: playerName, event: attackEvent, type: 'attack_roll' };
-        }
-        const abilityEvent = getLastAbilityCheck(playerName);
-        if (abilityEvent && !isStale(abilityEvent)) {
-            return { name: playerName, event: abilityEvent, type: 'ability_check' };
         }
         return null;
     };
 
-    const selfResult = checkSelf();
+    const selfResult = await checkSelf();
     if (selfResult) return selfResult;
 
     if (!rangeFt) return null;
@@ -44,8 +41,9 @@ function findRecentFailedSave(playerStats, campaignName, mapName, rangeFt) {
         for (const creature of combatSummary.creatures) {
             if (creature.name === playerName) continue;
 
-            const attackEvent = getLastAttackRoll(creature.name);
-            if (attackEvent && !isStale(attackEvent)) {
+            const attackResult = await findLastAttack();
+            const attackEvent = attackResult.attackEvent;
+            if (attackEvent && !isStale(attackEvent) && attackResult.attackerName === creature.name) {
                 if (mapName && rangeFt != null) {
                     const positions = await resolveMapPositions(campaignName, mapName, playerName);
                     if (positions?.attackerPos && positions?.targetPos) {
@@ -55,23 +53,11 @@ function findRecentFailedSave(playerStats, campaignName, mapName, rangeFt) {
                 }
                 return { name: creature.name, event: attackEvent, type: 'attack_roll' };
             }
-
-            const abilityEvent = getLastAbilityCheck(creature.name);
-            if (abilityEvent && !isStale(abilityEvent)) {
-                if (mapName && rangeFt != null) {
-                    const positions = await resolveMapPositions(campaignName, mapName, playerName);
-                    if (positions?.attackerPos && positions?.targetPos) {
-                        const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                        if (dist != null && dist > rangeFt) continue;
-                    }
-                }
-                return { name: creature.name, event: abilityEvent, type: 'ability_check' };
-            }
         }
         return null;
     };
 
-    return findAlly();
+    return await findAlly();
 }
 
 export async function handle(action, playerStats, campaignName, mapName) {

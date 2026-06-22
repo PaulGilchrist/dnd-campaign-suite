@@ -9,7 +9,6 @@ import { sendSavePrompt } from '../../services/combat/conditions/savePromptServi
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
-import { saveLastDamageEvent } from './useMetamagic.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import {
@@ -374,22 +373,6 @@ export function createLogDamageAndShow(deps) {
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 
-        if (context?.metamagicHeighten || context?.metamagicCareful || context?.metamagicTwinTarget) {
-            saveLastDamageEvent(characterName, {
-                targetName: target.name,
-                spellName: name,
-                damageFormula: formula,
-                rawDamage: adjustedTotal,
-                damageType,
-                saveDc,
-                saveType,
-                saveResult: saveResult.success ? 'success' : 'failure',
-                context,
-                rolls,
-                modifier,
-                timestamp: Date.now(),
-            }, campaignName);
-        }
 
         if (context?.metamagicTwinTarget) {
             const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
@@ -561,21 +544,6 @@ export function createLogDamageAndShow(deps) {
             if (applyResult && applyResult.finalDamage > 0) {
                 endInvisibilityOnHostileAction(characterName, campaignName);
             }
-            saveLastDamageEvent(characterName, {
-                targetName: target.name,
-                spellName: name,
-                damageFormula: formula,
-                rawDamage: adjustedTotal,
-                damageType,
-                saveDc,
-                saveType,
-                saveResult: 'success',
-                carefulSpell: true,
-                context,
-                rolls,
-                modifier,
-                timestamp: Date.now(),
-            }, campaignName);
             setPopupHtml({
                 type: 'save-damage',
                 name,
@@ -1005,18 +973,6 @@ export function createLogDamageAndShow(deps) {
             }
         }
 
-        saveLastDamageEvent(characterName, {
-            targetName: target?.name,
-            spellName: name,
-            damageFormula: formula,
-            rawDamage: total,
-            damageType,
-            twinTarget: context?.metamagicTwinTarget || null,
-            context,
-            rolls,
-            modifier,
-            timestamp: Date.now(),
-        }, campaignName);
     }
 
     return async function logDamageAndShow(name, formula, total, rolls, modifier, context) {

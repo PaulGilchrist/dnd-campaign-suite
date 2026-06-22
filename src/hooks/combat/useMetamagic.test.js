@@ -3,29 +3,34 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useMetamagic from './useMetamagic.js';
 
-vi.mock('../runtime/useRuntimeState.js', () => {
-  const store = new Map();
-  store.set('TestSorcerer', JSON.stringify({ sorceryPoints: 5 }));
-  return {
-    getRuntimeValue: vi.fn((characterKey, propertyName) => {
-      try {
-        const data = JSON.parse(localStorage.getItem(characterKey));
-        return data ? data[propertyName] : null;
-      } catch {
-        return null;
-      }
-    }),
-    setRuntimeValue: vi.fn((characterKey, propertyName, value) => {
-      try {
-        const data = JSON.parse(localStorage.getItem(characterKey)) || {};
-        data[propertyName] = value;
-        localStorage.setItem(characterKey, JSON.stringify(data));
-      } catch { /* ignore */ }
-    }),
-    useRuntimeValue: vi.fn(() => null),
-    addStorageChangeListener: vi.fn(() => () => {}),
-  };
-});
+const stores = new Map();
+stores.set('TestSorcerer', new Map([['sorceryPoints', 5]]));
+
+function getStore(key) {
+  if (!stores.has(key)) {
+    stores.set(key, new Map());
+  }
+  return stores.get(key);
+}
+
+function clearStores() {
+  stores.clear();
+  stores.set('TestSorcerer', new Map([['sorceryPoints', 5]]));
+}
+
+vi.mock('../runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: (characterKey, propertyName) => {
+    const store = getStore(characterKey);
+    return store.has(propertyName) ? store.get(propertyName) : null;
+  },
+  setRuntimeValue: (characterKey, propertyName, value) => {
+    const store = getStore(characterKey);
+    store.set(propertyName, value);
+  },
+  useRuntimeValue: () => null,
+  addStorageChangeListener: () => () => {},
+  getAllStoreKeys: () => Array.from(stores.keys()),
+}));
 
 vi.mock('../../services/character/classFeatures.js', () => ({
   getClassFeatures: vi.fn(() => ({
@@ -37,18 +42,13 @@ vi.mock('../../services/character/classFeatures.js', () => ({
 
 describe('spendSorceryPoints', () => {
   beforeEach(() => {
-    localStorage.clear();
-    localStorage.setItem('TestSorcerer', JSON.stringify({ sorceryPoints: 5 }));
+    clearStores();
   });
 
   it('deducts sorcery points and returns remaining', async () => {
     const { spendSorceryPoints } = await import('./useMetamagic.js');
     const remaining = spendSorceryPoints('TestSorcerer', 3, 'test-campaign');
     expect(remaining).toBe(2);
-    expect(localStorage.setItem).toHaveBeenLastCalledWith(
-      'TestSorcerer',
-      JSON.stringify({ sorceryPoints: 2 })
-    );
   });
 
   it('does not go below 0', async () => {
@@ -60,12 +60,13 @@ describe('spendSorceryPoints', () => {
 
 describe('getCurrentSorceryPoints', () => {
   beforeEach(() => {
-    localStorage.clear();
+    clearStores();
   });
 
   it('returns stored value', async () => {
-    localStorage.setItem('TestSorcerer', JSON.stringify({ sorceryPoints: 7 }));
     const { getCurrentSorceryPoints } = await import('./useMetamagic.js');
+    const { setRuntimeValue } = await import('../runtime/useRuntimeState.js');
+    setRuntimeValue('TestSorcerer', 'sorceryPoints', 7);
     expect(getCurrentSorceryPoints('TestSorcerer')).toBe(7);
   });
 
@@ -83,30 +84,9 @@ describe('getMaxSorceryPoints', () => {
   });
 });
 
-describe('saveLastDamageEvent / getLastDamageEvent / clearLastDamageEvent', () => {
-  beforeEach(() => {
-    localStorage.clear();
-  });
-
-  it('stores and retrieves last damage event', async () => {
-    const mod = await import('./useMetamagic.js');
-    const event = { targetName: 'Goblin', rawDamage: 20, oldHp: 30 };
-    mod.saveLastDamageEvent('TestSorcerer', event, 'test-campaign');
-    expect(mod.getLastDamageEvent('TestSorcerer')).toEqual(event);
-  });
-
-  it('clears last damage event', async () => {
-    const mod = await import('./useMetamagic.js');
-    mod.saveLastDamageEvent('TestSorcerer', { targetName: 'Goblin' }, 'test-campaign');
-    mod.clearLastDamageEvent('TestSorcerer', 'test-campaign');
-    expect(mod.getLastDamageEvent('TestSorcerer')).toBeNull();
-  });
-});
-
 describe('useMetamagic hook', () => {
   beforeEach(() => {
-    localStorage.clear();
-    localStorage.setItem('TestSorcerer', JSON.stringify({ sorceryPoints: 5 }));
+    clearStores();
   });
 
   it('returns current and max SP', () => {

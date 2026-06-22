@@ -1,10 +1,10 @@
 import { handle } from './strokeOfLuckHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
 import * as logService from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../../../hooks/combat/useMetamagic.js');
+vi.mock('../../../../services/automation/common/damageRollback.js');
 vi.mock('../../../ui/logService.js');
 
 describe('strokeOfLuckHandler.handle', () => {
@@ -37,9 +37,15 @@ describe('strokeOfLuckHandler.handle', () => {
             if (key === 'strokeOfLuckUsed') return false;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+        });
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 
@@ -48,16 +54,20 @@ describe('strokeOfLuckHandler.handle', () => {
         expect(result.payload.description).toContain('No recent D20 test found');
     });
 
-    it('should mark as used and return popup when attack roll is stale', async () => {
+    it('should mark as used and return popup when attack roll is fresh', async () => {
         runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
             if (key === 'strokeOfLuckUsed') return false;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 8, bonus: 5, targetName: 'Goblin', hit: false, timestamp: Date.now() - 30000,
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: { d20: 8, bonus: 5, targetName: 'TestRogue', hit: false, timestamp: Date.now() },
+            attackerName: 'Goblin',
+            targetName: 'TestRogue',
+            primaryDamage: 10,
+            secondaryDamage: 0,
+            totalDamage: 10,
+            damageTypes: ['Slashing'],
         });
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -71,75 +81,20 @@ describe('strokeOfLuckHandler.handle', () => {
         expect(logService.addEntry).toHaveBeenCalled();
     });
 
-    it('should handle ability check', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'strokeOfLuckUsed') return false;
-            return undefined;
-        });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue({
-            d20: 7, bonus: 3, checkName: 'Stealth', timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastSaveRoll.mockReturnValue(null);
-        logService.addEntry.mockResolvedValue(undefined);
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalled();
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Stealth');
-    });
-
-    it('should handle saving throw', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'strokeOfLuckUsed') return false;
-            return undefined;
-        });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue({
-            d20: 5, bonus: 2, saveType: 'DEX', timestamp: Date.now() - 10000,
-        });
-        logService.addEntry.mockResolvedValue(undefined);
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalled();
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('DEX');
-    });
-
-    it('should prefer attack roll over ability check and save', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'strokeOfLuckUsed') return false;
-            return undefined;
-        });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastAbilityCheck.mockReturnValue({
-            d20: 8, bonus: 3, checkName: 'Athletics', timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastSaveRoll.mockReturnValue({
-            d20: 4, bonus: 2, saveType: 'CON', timestamp: Date.now() - 10000,
-        });
-        logService.addEntry.mockResolvedValue(undefined);
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(result.payload.description).toContain('Attack vs AC Orc');
-    });
-
     it('should reject stale events (>60s old)', async () => {
         runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
             if (key === 'strokeOfLuckUsed') return false;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 120000,
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: { d20: 3, bonus: 5, targetName: 'TestRogue', hit: false, timestamp: Date.now() - 120000 },
+            attackerName: 'Orc',
+            targetName: 'TestRogue',
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
         });
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 

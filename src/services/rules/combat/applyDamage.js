@@ -11,31 +11,6 @@ import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js'
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
 import { getDistanceFeet } from './rangeValidation.js';
 
-/**
- * Save the last damage event under the target's key so reaction features
- * (e.g., Superior Hunter's Defense) can find the most recent damage the
- * target received via getLastDamageEvent(targetName).
- *
- * Accumulates primary and secondary damage from a single NPC action into
- * a single event with combined rawDamage and all damageTypes.
- */
-function saveDamageEventForTarget(targetName, rawDamage, damageTypes, campaignName) {
-    if (!targetName || !campaignName) return;
-    const existing = getRuntimeValue(targetName, 'lastMetamagicDamage', campaignName);
-    let combinedDamage = rawDamage;
-    let combinedTypes = [...damageTypes];
-    if (existing && existing.rawDamage) {
-        combinedDamage += existing.rawDamage;
-        combinedTypes = [...(existing.damageTypes || []), ...damageTypes];
-    }
-    setRuntimeValue(targetName, 'lastMetamagicDamage', {
-        targetName,
-        rawDamage: combinedDamage,
-        damageType: combinedTypes[0],
-        damageTypes: combinedTypes,
-    }, campaignName);
-}
-
 export function computeDamageAfterResistances(rawDamage, damageTypes, resistances, immunities, ignoreResistance = false) {
   if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistances: damageTypes is required');
   for (const dt of damageTypes) {
@@ -108,6 +83,21 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
+
+  // Save unified last attack to combat summary — accessible by any creature for reactions
+  // This overwrites the attack roll info with damage results after applyDamageToTarget runs
+  const existingAttack = combatSummary.lastAttack;
+  const isSecondary = existingAttack?.primaryDamage != null;
+  combatSummary.lastAttack = {
+    ...existingAttack,
+    attackerName: attackerName || existingAttack?.attackerName || null,
+    targetName,
+    ...(isSecondary ? {} : { primaryDamage: rawDamage }),
+    secondaryDamage: isSecondary ? rawDamage : null,
+    damageTypes,
+    damageApplied: true,
+    timestamp: Date.now(),
+  };
 
     const isPlayer = creature.type === 'player';
     if (!Array.isArray(characters)) { console.error('[applyDamage] characters is not an array'); throw new Error('characters must be an array'); }
@@ -183,14 +173,14 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
         }
     }
 
-    // Save damage event under target's key for reaction features (including Projected Ward)
+    // Save unified damage event under target's key for all reaction features
     if (isPlayer) {
-        saveDamageEventForTarget(creature.name, rawDamage, damageTypes, campaignName);
-        // Store the latest single hit separately (not accumulated) for Projected Ward
-        setRuntimeValue(creature.name, 'projectedWardDamage', {
+        setRuntimeValue(creature.name, 'lastDamageEvent', {
             targetName: creature.name,
+            attackerName: attackerName || null,
             rawDamage,
             damageTypes,
+            attackType: 'toHit',
             timestamp: Date.now(),
         }, campaignName);
     }

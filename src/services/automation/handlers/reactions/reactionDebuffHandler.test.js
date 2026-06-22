@@ -29,10 +29,16 @@ vi.mock('../../../rules/combat/applyHealing.js', () => ({
   applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-  getLastDamageEvent: vi.fn(),
-  getLastAttackRoll: vi.fn(),
-  getLastAbilityCheck: vi.fn(),
+vi.mock('../../common/damageRollback.js', () => ({
+  findLastAttack: vi.fn().mockResolvedValue({
+    attackEvent: null,
+    attackerName: null,
+    targetName: null,
+    primaryDamage: 0,
+    secondaryDamage: 0,
+    totalDamage: 0,
+    damageTypes: [],
+  }),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
@@ -49,7 +55,7 @@ import * as logService from '../../../ui/logService.js';
 import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as applyHealing from '../../../rules/combat/applyHealing.js';
-import * as useMetamagic from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../common/damageRollback.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
@@ -106,25 +112,6 @@ function freshAttackEvent(options = {}) {
   };
 }
 
-function freshDamageEvent(options = {}) {
-  return {
-    rawDamage: 8,
-    targetName: 'Goblin',
-    timestamp: Date.now(),
-    ...options,
-  };
-}
-
-function freshAbilityCheckEvent(options = {}) {
-  return {
-    d20: 12,
-    bonus: 3,
-    checkName: 'Stealth check',
-    timestamp: Date.now(),
-    ...options,
-  };
-}
-
 function staleTimestamp() {
   return Date.now() - 70000; // 70 seconds old > 60s threshold
 }
@@ -136,9 +123,7 @@ const mapName = 'DungeonMap';
 
 describe('reactionDebuffHandler.handle', () => {
   function resetMocks() {
-    useMetamagic.getLastAttackRoll.mockClear().mockReset();
-    useMetamagic.getLastDamageEvent.mockClear().mockReset();
-    useMetamagic.getLastAbilityCheck.mockClear().mockReset();
+    damageRollback.findLastAttack.mockClear().mockReset();
     useRuntimeState.getRuntimeValue.mockClear().mockReset();
     useRuntimeState.setRuntimeValue.mockClear().mockResolvedValue(undefined);
     targetResolver.resolveTarget.mockClear().mockReset();
@@ -190,7 +175,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent());
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent(),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, mapName);
       expect(targetResolver.resolveTarget).toHaveBeenCalled();
@@ -202,7 +195,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent());
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent(),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, mapName);
       expect(targetResolver.resolveTarget).toHaveBeenCalled();
@@ -275,7 +276,15 @@ describe('reactionDebuffHandler.handle', () => {
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       rangeValidation.rangeToFeet.mockReturnValueOnce(null);
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent());
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent(),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, mapName);
       expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
@@ -287,7 +296,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent());
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent(),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, null);
       expect(targetResolver.resolveMapPositions).not.toHaveBeenCalled();
@@ -297,42 +314,49 @@ describe('reactionDebuffHandler.handle', () => {
   // ── Default path: attack roll debuff ────────────────────────
 
   describe('default path — attack roll debuff', () => {
-    function setupAttackPath(psOverrides, attackEvent, damageEvent) {
+    function setupAttackPath(psOverrides, attackEvent, damageOverride = {}) {
       const ps = makePlayerStats(psOverrides);
       const action = makeAction({});
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(attackEvent);
-      useMetamagic.getLastDamageEvent.mockReturnValue(damageEvent);
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent,
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+        ...damageOverride,
+      });
 
       return handle(action, ps, campaignName, mapName);
     }
 
     it('routes to attack handler when fresh attack event present', async () => {
-      const result = await setupAttackPath({}, freshAttackEvent(), null);
+      const result = await setupAttackPath({}, freshAttackEvent(), { totalDamage: 0, damageTypes: [] });
       expect(result.payload.description).toContain('Attack roll');
       expect(result.payload.description).toContain('Cutting Words');
     });
 
     it('reduces d20 by biDieRoll (capped at 1)', async () => {
-      const result = await setupAttackPath({}, freshAttackEvent({ d20: 3, bonus: 5, hit: true }), null);
+      const result = await setupAttackPath({}, freshAttackEvent({ d20: 3, bonus: 5, hit: true }), { totalDamage: 0, damageTypes: [] });
       expect(result.payload.description).toContain('Reduced');
     });
 
     it('reports "already missed" for original miss', async () => {
-      const result = await setupAttackPath({}, freshAttackEvent({ d20: 3, bonus: 2, hit: false }), null);
+      const result = await setupAttackPath({}, freshAttackEvent({ d20: 3, bonus: 2, hit: false }), { totalDamage: 0, damageTypes: [] });
       expect(result.payload.description).toContain('already missed');
     });
 
     it('has defenderHp property on result', async () => {
-      const result = await setupAttackPath({}, freshAttackEvent(), null);
+      const result = await setupAttackPath({}, freshAttackEvent(), { totalDamage: 0, damageTypes: [] });
       expect(result).toHaveProperty('defenderHp');
     });
 
     it('returns popup type with automation_info payload', async () => {
-      const result = await setupAttackPath({}, freshAttackEvent({ d20: 3, bonus: 2, hit: false }), null);
+      const result = await setupAttackPath({}, freshAttackEvent({ d20: 3, bonus: 2, hit: false }), { totalDamage: 0, damageTypes: [] });
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
     });
@@ -341,7 +365,7 @@ describe('reactionDebuffHandler.handle', () => {
       const result = await setupAttackPath(
         {},
         freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: 20 }),
-        null
+        { totalDamage: 0, damageTypes: [] }
       );
       expect(result.payload.description).toContain('AC 20');
     });
@@ -350,7 +374,7 @@ describe('reactionDebuffHandler.handle', () => {
       const result = await setupAttackPath(
         {},
         freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null, targetAc: 17 }),
-        null
+        { totalDamage: 0, damageTypes: [] }
       );
       expect(result.payload.description).toContain('AC 17');
     });
@@ -359,30 +383,38 @@ describe('reactionDebuffHandler.handle', () => {
       const result = await setupAttackPath(
         {},
         freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null, targetAc: null }),
-        null
+        { totalDamage: 0, damageTypes: [] }
       );
       expect(result.payload.description).toContain('AC \u2014');
     });
 
-    it('attempts healing on hit→miss when damage event is available', async () => {
-      // original total 18+3=21 >= AC 17 (hit=true)
-      // biDieRoll could be 6 → reducedD20 = max(1, 18-6)=12, 12+3=15 < 17 → miss
-      // but random — let's ensure by checking applyHealing was called when conditions line up
+    it('attempts healing on hit→miss when damage is available', async () => {
       const result = await setupAttackPath(
         {},
-        freshAttackEvent({ d20: 15, bonus: 3, hit: true, effectiveAc: null, targetAc: 17, targetName: 'Goblin' }),
-        freshDamageEvent({ rawDamage: 10 })
+        freshAttackEvent({ d20: 15, bonus: 3, hit: true, effectiveAc: null, targetAc: 17, targetName: 'Goblin' })
       );
       // The description mentions whether healing happened or not
       expect(result).toHaveProperty('defenderHp');
     });
 
     it('does NOT attempt healing when no damage event found', async () => {
-      await setupAttackPath(
-        {},
-        freshAttackEvent({ d20: 15, bonus: 3, hit: true, effectiveAc: null }),
-        null // no damage event
-      );
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 15, bonus: 3, hit: true, effectiveAc: null }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
+
+      const ps = makePlayerStats({});
+      const action = makeAction({});
+
+      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
+
+      await handle(action, ps, campaignName, mapName);
       expect(applyHealing.applyHealingToTarget).not.toHaveBeenCalled();
     });
   });
@@ -390,15 +422,21 @@ describe('reactionDebuffHandler.handle', () => {
   // ── Default path: damage debuff ────────────────────────────
 
   describe('default path — damage debuff', () => {
-    it('routes to damage handler when only fresh damage event present', async () => {
+    it('routes to damage handler when attack has damage', async () => {
       const ps = makePlayerStats({});
       const action = makeAction({});
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(freshDamageEvent({ rawDamage: 10, targetName: 'Goblin' }));
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { rawDamage: 10, targetName: 'Goblin', timestamp: Date.now() },
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Fire'],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('Original damage');
@@ -411,9 +449,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(freshDamageEvent({ rawDamage: 10, targetName: 'Goblin' }));
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { rawDamage: 10, targetName: 'Goblin', timestamp: Date.now() },
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Fire'],
+      });
       applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 30 });
 
       await handle(action, ps, campaignName, mapName);
@@ -426,9 +470,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(freshDamageEvent({ rawDamage: 10, targetName: 'Goblin' }));
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { rawDamage: 10, targetName: 'Goblin', timestamp: Date.now() },
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Fire'],
+      });
       applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 30 });
 
       const result = await handle(action, ps, campaignName, mapName);
@@ -441,9 +491,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(freshDamageEvent({ rawDamage: 10, targetName: 'Goblin' }));
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { rawDamage: 10, targetName: 'Goblin', timestamp: Date.now() },
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Fire'],
+      });
       applyHealing.applyHealingToTarget.mockReturnValue({ newHp: 30 });
 
       const result = await handle(action, ps, campaignName, mapName);
@@ -456,9 +512,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(freshDamageEvent({ rawDamage: 10, targetName: 'Goblin' }));
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { rawDamage: 10, targetName: 'Goblin', timestamp: Date.now() },
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Fire'],
+      });
       applyHealing.applyHealingToTarget.mockReturnValue(null);
 
       const result = await handle(action, ps, campaignName, mapName);
@@ -471,45 +533,18 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue({ rawDamage: 5, timestamp: Date.now() });
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { rawDamage: 5, timestamp: Date.now() },
+        attackerName: 'Goblin',
+        targetName: null,
+        primaryDamage: 5,
+        secondaryDamage: 0,
+        totalDamage: 5,
+        damageTypes: ['Fire'],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('Could not determine who');
-    });
-  });
-
-  // ── Default path: ability check debuff ──────────────────────
-
-  describe('default path — ability check debuff', () => {
-    it('routes to ability check handler when only fresh ability check event present', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
-      useMetamagic.getLastAbilityCheck.mockReturnValue(freshAbilityCheckEvent({ d20: 12, bonus: 3 }));
-
-      const result = await handle(action, ps, campaignName, mapName);
-      expect(result.payload.description).toContain('d20(12)');
-      expect(result.payload.description).toContain('+ 3 = 15');
-    });
-
-    it('routes to ability handler when only fresh ability check event (all attack/damage stale)', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
-      useMetamagic.getLastAbilityCheck.mockReturnValue(freshAbilityCheckEvent({ d20: 8, bonus: 4, checkName: 'Athletics check' }));
-
-      const result = await handle(action, ps, campaignName, mapName);
-      expect(result.payload.description).toContain('Athletics check');
     });
   });
 
@@ -522,9 +557,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('No recent roll found');
@@ -536,9 +577,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue({ timestamp: staleTimestamp() });
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { timestamp: staleTimestamp() },
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('No recent roll found');
@@ -550,41 +597,18 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue({ rawDamage: 0, timestamp: Date.now() });
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('No recent roll found');
-    });
-
-    it('prefers attack event over damage when both fresh', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 3, bonus: 2, hit: false }));
-      useMetamagic.getLastDamageEvent.mockReturnValue(freshDamageEvent());
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, mapName);
-      // Attack path takes precedence → "already missed" message
-      expect(result.payload.description).toContain('already missed');
-    });
-
-    it('prefers damage event over ability check when both fresh (no attack)', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
-      useMetamagic.getLastDamageEvent.mockReturnValue(freshDamageEvent());
-      useMetamagic.getLastAbilityCheck.mockReturnValue(freshAbilityCheckEvent());
-
-      const result = await handle(action, ps, campaignName, mapName);
-      expect(result.payload.description).toContain('Original damage');
     });
   });
 
@@ -597,7 +621,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: null,
+        attackerName: null,
+        targetName: null,
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('No recent attack roll found for Goblin');
@@ -609,7 +641,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue({ timestamp: staleTimestamp() });
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { timestamp: staleTimestamp() },
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('No recent attack roll found');
@@ -621,7 +661,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('Disadvantage');
@@ -634,7 +682,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 3, bonus: 2, hit: false, effectiveAc: null }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 3, bonus: 2, hit: false, effectiveAc: null }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('already missed');
@@ -646,7 +702,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result).toHaveProperty('defenderName');
@@ -658,7 +722,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, mapName);
       const tempHpCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'tempHp');
@@ -684,7 +756,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 18, bonus: 3, hit: true, effectiveAc: null }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 18, bonus: 3, hit: true, effectiveAc: null }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -698,9 +778,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
-      useMetamagic.getLastDamageEvent.mockReturnValue(null);
-      useMetamagic.getLastAbilityCheck.mockReturnValue(null);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -714,7 +800,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 18, bonus: 3, hit: true, effectiveAc: null }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 18, bonus: 3, hit: true, effectiveAc: null }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -728,7 +822,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 18, bonus: 3, hit: true, effectiveAc: null, targetName: '' }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 18, bonus: 3, hit: true, effectiveAc: null, targetName: '' }),
+        attackerName: 'Goblin',
+        targetName: '',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -747,7 +849,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -765,7 +875,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
       useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
       await handle(action, ps, campaignName, mapName);
@@ -826,7 +944,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -845,7 +971,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
 
       await handle(action, ps, campaignName, mapName);
@@ -866,7 +1000,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       await handle(action, ps, campaignName, mapName);
       expect(targetResolver.resolveTarget).toHaveBeenCalled();
@@ -882,7 +1024,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -906,7 +1056,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       await handle(action, ps, campaignName, mapName);
 
@@ -946,7 +1104,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       await handle(action, ps, campaignName, mapName);
       expect(damageUtils.getCombatContext).toHaveBeenCalled();
@@ -960,7 +1126,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue(freshAttackEvent({ d20: 5, bonus: 3, hit: false }));
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: freshAttackEvent({ d20: 5, bonus: 3, hit: false }),
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       await handle(action, ps, campaignName, mapName);
       expect(targetResolver.resolveTarget).toHaveBeenCalled();
@@ -972,7 +1146,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue({}); // no timestamp
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: {},
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('No recent attack roll found');
@@ -984,7 +1166,15 @@ describe('reactionDebuffHandler.handle', () => {
 
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      useMetamagic.getLastAttackRoll.mockReturnValue({ timestamp: Date.now() - 60001 });
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: { timestamp: Date.now() - 60001 },
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 0,
+        secondaryDamage: 0,
+        totalDamage: 0,
+        damageTypes: [],
+      });
 
       const result = await handle(action, ps, campaignName, mapName);
       expect(result.payload.description).toContain('No recent attack roll found');
@@ -998,7 +1188,15 @@ describe('reactionDebuffHandler.handle', () => {
       damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
       const event = freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null });
       event.timestamp = Date.now() - 5000; // well under threshold → fresh
-      useMetamagic.getLastAttackRoll.mockReturnValue(event);
+      damageRollback.findLastAttack.mockResolvedValue({
+        attackEvent: event,
+        attackerName: 'Goblin',
+        targetName: 'Goblin',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Piercing'],
+      });
 
       await handle(action, ps, campaignName, mapName);
       // Should proceed past staleness check — uses decrement should fire

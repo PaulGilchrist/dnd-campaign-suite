@@ -1,8 +1,8 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getLastDamageEvent } from '../../../../hooks/combat/useMetamagic.js';
 import { addEntry } from '../../../ui/logService.js';
 import { buildSaveDc } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -17,8 +17,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Misty Escape';
 
     // Check that the player has recently taken damage
-    const damageEvent = getLastDamageEvent(playerName);
-    if (!damageEvent || isStale(damageEvent)) {
+    const attackResult = await findLastAttack();
+    const damageEvent = attackResult.attackEvent;
+    if (!damageEvent || isStale(damageEvent) || attackResult.targetName !== playerName || !attackResult.totalDamage) {
         return {
             type: 'popup',
             payload: {

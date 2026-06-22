@@ -1,10 +1,10 @@
 import { handle } from './boonOfFateHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
 import * as logService from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../../../hooks/combat/useMetamagic.js');
+vi.mock('../../../../services/automation/common/damageRollback.js');
 vi.mock('../../../ui/logService.js');
 
 describe('boonOfFateHandler.handle', () => {
@@ -38,9 +38,15 @@ describe('boonOfFateHandler.handle', () => {
             if (key === 'boonOfFateUsed') return false;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: null,
+            attackerName: null,
+            targetName: null,
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+        });
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 
@@ -54,11 +60,15 @@ describe('boonOfFateHandler.handle', () => {
             if (key === 'boonOfFateUsed') return false;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 8, bonus: 5, targetName: 'Goblin', hit: false, timestamp: Date.now() - 30000,
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: { d20: 8, bonus: 5, targetName: 'TestFighter', hit: false, timestamp: Date.now() - 30000 },
+            attackerName: 'Goblin',
+            targetName: 'TestFighter',
+            primaryDamage: 10,
+            secondaryDamage: 0,
+            totalDamage: 10,
+            damageTypes: ['Slashing'],
         });
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -69,67 +79,8 @@ describe('boonOfFateHandler.handle', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('Improve Fate');
-        expect(result.payload.description).toContain('Attack vs AC Goblin');
+        expect(result.payload.description).toContain('Attack vs AC TestFighter');
         expect(logService.addEntry).toHaveBeenCalled();
-    });
-
-    it('should handle ability check', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'boonOfFateUsed') return false;
-            return undefined;
-        });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue({
-            d20: 7, bonus: 3, checkName: 'Stealth', timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastSaveRoll.mockReturnValue(null);
-        logService.addEntry.mockResolvedValue(undefined);
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalled();
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Stealth');
-    });
-
-    it('should handle saving throw', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'boonOfFateUsed') return false;
-            return undefined;
-        });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue({
-            d20: 5, bonus: 2, saveType: 'DEX', timestamp: Date.now() - 10000,
-        });
-        logService.addEntry.mockResolvedValue(undefined);
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(runtimeState.setRuntimeValue).toHaveBeenCalled();
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('DEX save');
-    });
-
-    it('should prefer attack roll over ability check and save', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'boonOfFateUsed') return false;
-            return undefined;
-        });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastAbilityCheck.mockReturnValue({
-            d20: 8, bonus: 3, checkName: 'Athletics', timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastSaveRoll.mockReturnValue({
-            d20: 4, bonus: 2, saveType: 'CON', timestamp: Date.now() - 10000,
-        });
-        logService.addEntry.mockResolvedValue(undefined);
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(result.payload.description).toContain('Attack vs AC Orc');
     });
 
     it('should reject stale events (>60s old)', async () => {
@@ -137,32 +88,18 @@ describe('boonOfFateHandler.handle', () => {
             if (key === 'boonOfFateUsed') return false;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue({
-            d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 120000,
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: { d20: 3, bonus: 5, targetName: 'TestFighter', hit: false, timestamp: Date.now() - 120000 },
+            attackerName: 'Orc',
+            targetName: 'TestFighter',
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
         });
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 
         expect(result.payload.description).toContain('No recent D20 test found');
-    });
-
-    it('should use empty checkName fallback', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'boonOfFateUsed') return false;
-            return undefined;
-        });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue({
-            d20: 10, bonus: 2, checkName: null, timestamp: Date.now() - 10000,
-        });
-        metamagic.getLastSaveRoll.mockReturnValue(null);
-        logService.addEntry.mockResolvedValue(undefined);
-
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Ability check');
     });
 });

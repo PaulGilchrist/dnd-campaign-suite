@@ -66,8 +66,7 @@
   "race": {
     "name": "Elf",
     "subrace": {
-      "name": "High Elf",
-      "description": ""
+      "name": "High Elf"
     }
   },
   "immunities": [],

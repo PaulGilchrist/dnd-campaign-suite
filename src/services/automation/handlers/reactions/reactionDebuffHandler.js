@@ -4,7 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
-import { getLastAttackRoll, getLastDamageEvent, getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
@@ -22,8 +22,9 @@ function getRuntimeUsesKey(featureName) {
 async function handleAttackRollDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
     const auto = action.automation;
 
-    const attackEvent = getLastAttackRoll(attackerName);
-    if (!attackEvent || isStale(attackEvent)) {
+    const attackResult = await findLastAttack();
+    const attackEvent = attackResult.attackEvent;
+    if (!attackEvent || isStale(attackEvent) || attackResult.attackerName !== attackerName) {
         return {
             type: 'popup',
             payload: {
@@ -44,9 +45,9 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
     let defenderHp = null;
 
     if (hit === true && reducedHit === false && defenderName) {
-        const damageEvent = getLastDamageEvent(attackerName);
-        if (damageEvent && damageEvent.targetName === defenderName && !isStale(damageEvent) && damageEvent.rawDamage > 0) {
-            const healResult = applyHealingToTarget(combatSummary, defenderName, damageEvent.rawDamage, campaignName);
+        const healAmount = attackResult.primaryDamage || attackResult.totalDamage || 0;
+        if (healAmount > 0) {
+            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
             defenderHp = healResult?.newHp ?? null;
         }
     }
@@ -71,29 +72,12 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
     return infoPopup(action.name, description, auto, { defenderHp });
 }
 
-async function handleAbilityCheckDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, _combatSummary) {
-    const auto = action.automation;
-
-    const checkEvent = getLastAbilityCheck(attackerName);
-    if (!checkEvent || isStale(checkEvent)) {
-        return infoPopup(action.name, `No recent ability check found for ${attackerName}. ${action.name} can only be used shortly after an ability check.`, auto);
-    }
-
-    const { d20, bonus, checkName } = checkEvent;
-    const originalTotal = d20 + bonus;
-    const reducedD20 = Math.max(1, d20 - biDieRoll);
-    const reducedTotal = reducedD20 + bonus;
-
-    const description = `<b>${action.name}</b><br/>Creature: ${attackerName}<br/>Bardic Inspiration die: 1d${bardicDieSize} = <b>${biDieRoll}</b><br/>${checkName}: d20(${d20}) + ${bonus} = ${originalTotal} → <b>${reducedTotal}</b>`;
-
-    return infoPopup(action.name, description, auto);
-}
-
 async function handleDamageDebuff(action, _playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary) {
     const auto = action.automation;
 
-    const lastEvent = getLastDamageEvent(attackerName);
-    if (!lastEvent || !lastEvent.rawDamage || isStale(lastEvent)) {
+    const attackResult = await findLastAttack();
+    const lastEvent = attackResult.attackEvent;
+    if (!lastEvent || !attackResult.totalDamage || isStale(lastEvent) || attackResult.attackerName !== attackerName) {
         return infoPopup(action.name, `No recent damage event found for ${attackerName}. ${action.name} can only be used shortly after a damage roll.`, auto);
     }
 
@@ -102,7 +86,7 @@ async function handleDamageDebuff(action, _playerStats, campaignName, attackerNa
         return infoPopup(action.name, `Could not determine who ${attackerName} damaged. Cannot apply ${action.name}.`, auto);
     }
 
-    const originalDamage = lastEvent.rawDamage;
+    const originalDamage = attackResult.totalDamage;
     const reducedDamage = Math.max(0, originalDamage - biDieRoll);
     const healAmount = originalDamage - reducedDamage;
 
@@ -120,8 +104,9 @@ async function handleDamageDebuff(action, _playerStats, campaignName, attackerNa
 async function handleDisadvantageDebuff(action, _playerStats, campaignName, attackerName, combatSummary) {
     const auto = action.automation;
 
-    const attackEvent = getLastAttackRoll(attackerName);
-    if (!attackEvent || isStale(attackEvent)) {
+    const attackResult = await findLastAttack();
+    const attackEvent = attackResult.attackEvent;
+    if (!attackEvent || isStale(attackEvent) || attackResult.attackerName !== attackerName) {
         return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
     }
 
@@ -136,9 +121,9 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
     let defenderHp = null;
 
     if (hit === true && finalHit === false && defenderName) {
-        const damageEvent = getLastDamageEvent(attackerName);
-        if (damageEvent && damageEvent.targetName === defenderName && !isStale(damageEvent) && damageEvent.rawDamage > 0) {
-            const healResult = applyHealingToTarget(combatSummary, defenderName, damageEvent.rawDamage, campaignName);
+        const healAmount = attackResult.primaryDamage || attackResult.totalDamage || 0;
+        if (healAmount > 0) {
+            const healResult = applyHealingToTarget(combatSummary, defenderName, healAmount, campaignName);
             defenderHp = healResult?.newHp ?? null;
         }
     }
@@ -324,8 +309,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
             },
         };
     } else if (effect === 'disadvantage_on_attack_roll') {
-        const attackEvent = getLastAttackRoll(attackerName);
-        if (!attackEvent || isStale(attackEvent)) {
+        const attackResult = await findLastAttack();
+        const attackEvent = attackResult.attackEvent;
+        if (!attackEvent || isStale(attackEvent) || attackResult.attackerName !== attackerName) {
             return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
         }
         result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
@@ -334,15 +320,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const bardicDieSize = classLevel?.bardic_die || 6;
         const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
 
-        const attackEvent = getLastAttackRoll(attackerName);
-        const damageEvent = getLastDamageEvent(attackerName);
-        const abilityEvent = getLastAbilityCheck(attackerName);
+        const attackResult = await findLastAttack();
+        const attackEvent = attackResult.attackEvent;
+        const hasAttack = attackEvent && !isStale(attackEvent) && attackResult.attackerName === attackerName;
 
-        const attackFresh = attackEvent && !isStale(attackEvent);
-        const damageFresh = damageEvent && !isStale(damageEvent) && damageEvent.rawDamage;
-        const abilityFresh = abilityEvent && !isStale(abilityEvent);
-
-        if (!attackFresh && !damageFresh && !abilityFresh) {
+        if (!hasAttack) {
             return {
                 type: 'popup',
                 payload: {
@@ -354,12 +336,10 @@ export async function handle(action, playerStats, campaignName, mapName) {
             };
         }
 
-        if (attackFresh) {
-            result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
-        } else if (damageFresh) {
+        if (attackEvent?.damageTypes?.length || attackResult.totalDamage > 0) {
             result = await handleDamageDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
         } else {
-            result = await handleAbilityCheckDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
+            result = await handleAttackRollDebuff(action, playerStats, campaignName, attackerName, bardicDieSize, biDieRoll, combatSummary);
         }
     }
 

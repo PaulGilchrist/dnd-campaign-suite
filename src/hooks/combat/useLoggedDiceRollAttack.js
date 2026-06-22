@@ -285,6 +285,54 @@ export function createLogAndShow(deps) {
                 timestamp: Date.now(),
             }, campaignName);
 
+            // Save unified last attack to combat summary for all reaction features
+            if (combatSummary && targetName) {
+                combatSummary.lastAttack = {
+                    attackerName: characterName,
+                    targetName,
+                    d20: effectiveD20,
+                    d20Rolls: [r1, r2],
+                    bonus,
+                    total: effectiveD20 + bonus,
+                    targetAc,
+                    effectiveAc,
+                    hit,
+                    isCrit,
+                    isAutoMiss,
+                    isNatural20: r1 === 20,
+                    isNatural1: r1 === 1,
+                    attackName: name,
+                    rollType,
+                    damageType: context?.damageType || null,
+                    damageFormula: context?.autoDamageFormula || null,
+                    damageName: context?.autoDamageName || null,
+                    damageSchool: context?.autoDamageSchool || null,
+                    saveDc: context?.saveDc || null,
+                    saveType: context?.saveType || null,
+                    dcSuccess: context?.dcSuccess || null,
+                    metamagicTwinTarget: context?.metamagicTwinTarget || null,
+                    metamagicHeighten: context?.metamagicHeighten || null,
+                    isCantrip: context?.isCantrip || null,
+                    overchannelActive: context?.overchannelActive || null,
+                    overchannelUseCount: context?.overchannelUseCount || null,
+                    overchannelSpellLevel: context?.overchannelSpellLevel || null,
+                    secondaryFormula: context?.autoDamageSecondaryFormula || null,
+                    secondaryDamageType: context?.autoDamageSecondaryDamageType || null,
+                    rangeReason: context?.rangeReason || null,
+                    coverLevel: context?.coverLevel || null,
+                    coverAcBonus: context?.coverAcBonus || 0,
+                    coverReason: context?.coverReason || null,
+                    resistanceNotice: context?.resistanceNotice || null,
+                    forcedMode: context?.forcedMode || null,
+                    isAutoCrit: context?.isAutoCrit || false,
+                    autoReroll: context?.autoReroll || null,
+                    autoRerollBonus: context?.autoRerollBonus || null,
+                    defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
+                    gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
+                    timestamp: Date.now(),
+                };
+            }
+
             setRuntimeValue(characterName, '_lastRollContext', {
                 type: 'attack',
                 attackName: name,
@@ -573,6 +621,13 @@ export function createLogAndShow(deps) {
         }
 
         if (rollType === 'save') {
+            const saveDc = context?.saveDc;
+            const saveType = context?.saveType;
+            const attackerName = context?.attackerName || characterName;
+            const actionName = context?.actionName || name;
+            const saveTotal = effectiveD20 + bonus;
+            const saveSuccess = saveDc != null ? (saveTotal >= saveDc) : null;
+
             setRuntimeValue(characterName, 'lastSaveRoll', {
                 d20: effectiveD20,
                 bonus,
@@ -592,14 +647,26 @@ export function createLogAndShow(deps) {
                 timestamp: Date.now(),
             }, campaignName);
 
-            const saveDc = context?.saveDc;
-            const saveType = context?.saveType;
-            const attackerName = context?.attackerName || characterName;
-            const actionName = context?.actionName || name;
-            if (saveDc != null) {
-                const saveTotal = effectiveD20 + bonus;
-                const saveSuccess = saveTotal >= saveDc;
-                logEntry({
+            if (saveDc != null && combatSummary) {
+                combatSummary.lastAttack = {
+                    attackerName,
+                    targetName: characterName,
+                    d20: effectiveD20,
+                    d20Rolls: [r1, r2],
+                    bonus,
+                    total: saveTotal,
+                    saveType,
+                    saveDc,
+                    saveResult: saveSuccess ? 'success' : 'failure',
+                    isNatural20: r1 === 20,
+                    isNatural1: r1 === 1,
+                    actionName,
+                    rollType: 'save',
+                    timestamp: Date.now(),
+                };
+            }
+
+            logEntry({
                     type: 'roll',
                     characterName: targetName || characterName,
                     rollType: 'save',
@@ -619,7 +686,6 @@ export function createLogAndShow(deps) {
                     timestamp: Date.now(),
                     id: utils.guid(),
                 });
-            }
         }
 
         if (rollType === 'initiative') {

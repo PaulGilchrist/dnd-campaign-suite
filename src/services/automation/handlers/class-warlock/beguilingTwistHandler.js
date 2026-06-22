@@ -4,7 +4,7 @@ import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidat
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { createSaveListener } from '../../common/savePrompt.js';
-import { getLastAttackRoll, getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
@@ -19,57 +19,42 @@ async function findRecentSuccessfulSave(playerStats, campaignName, mapName, rang
     const playerName = playerStats.name;
 
     if (isSelf) {
-        const attackEvent = getLastAttackRoll(playerName);
-        if (attackEvent && !isStale(attackEvent)) {
+        const attackResult = await findLastAttack();
+        const attackEvent = attackResult.attackEvent;
+        if (attackEvent && !isStale(attackEvent) && attackResult.targetName === playerName) {
             const { hit } = attackEvent;
             if (hit === true) {
                 return { name: playerName, event: attackEvent, type: 'attack_roll', success: true };
             }
-        }
-        const abilityEvent = getLastAbilityCheck(playerName);
-        if (abilityEvent && !isStale(abilityEvent)) {
-            return { name: playerName, event: abilityEvent, type: 'ability_check', success: true };
         }
         return null;
     }
 
     if (!rangeFt) return null;
 
-    const findAlly = async () => {
-        const combatSummary = await getCombatContext(campaignName);
-        if (!combatSummary?.creatures) return null;
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary?.creatures) return null;
 
-        for (const creature of combatSummary.creatures) {
-            if (creature.name === playerName) continue;
+    const attackResult = await findLastAttack();
+    const attackEvent = attackResult.attackEvent;
+    if (!attackEvent || isStale(attackEvent)) return null;
 
-            const attackEvent = getLastAttackRoll(creature.name);
-            if (attackEvent && !isStale(attackEvent)) {
-                if (mapName && rangeFt != null) {
-                    const positions = await resolveMapPositions(campaignName, mapName, playerName);
-                    if (positions?.attackerPos && positions?.targetPos) {
-                        const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                        if (dist != null && dist > rangeFt) continue;
-                    }
+    // Check if the last attack was from an ally (not the player)
+    if (attackResult.attackerName && attackResult.attackerName !== playerName) {
+        const attackerCreature = combatSummary.creatures.find(c => c.name === attackResult.attackerName);
+        if (attackerCreature && attackerCreature.name !== playerName) {
+            if (mapName && rangeFt != null) {
+                const positions = await resolveMapPositions(campaignName, mapName, playerName);
+                if (positions?.attackerPos && positions?.targetPos) {
+                    const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
+                    if (dist != null && dist > rangeFt) return null;
                 }
-                return { name: creature.name, event: attackEvent, type: 'attack_roll', success: true };
             }
-
-            const abilityEvent = getLastAbilityCheck(creature.name);
-            if (abilityEvent && !isStale(abilityEvent)) {
-                if (mapName && rangeFt != null) {
-                    const positions = await resolveMapPositions(campaignName, mapName, playerName);
-                    if (positions?.attackerPos && positions?.targetPos) {
-                        const dist = getDistanceFeet(positions.attackerPos, positions.targetPos);
-                        if (dist != null && dist > rangeFt) continue;
-                    }
-                }
-                return { name: creature.name, event: abilityEvent, type: 'ability_check', success: true };
-            }
+            return { name: attackResult.attackerName, event: attackEvent, type: 'attack_roll', success: true };
         }
-        return null;
-    };
+    }
 
-    return findAlly();
+    return null;
 }
 
 export async function handle(action, playerStats, campaignName, mapName) {

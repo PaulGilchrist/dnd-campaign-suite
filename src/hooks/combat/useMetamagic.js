@@ -21,36 +21,10 @@ export function getMaxSorceryPoints(playerStats) {
   return features?.maxSorceryPoints || 0;
 }
 
-/**
- * Save the last damage event for a character.
- * Used by reaction features (e.g., Cutting Words) and metamagic (e.g., Empowered Spell)
- * to retrieve the most recent damage roll for rollback / modification.
- * Stored under runtime key 'lastMetamagicDamage' (legacy name — used for all damage events).
- */
-export function saveLastDamageEvent(characterName, event, campaignName) {
-  setRuntimeValue(characterName, 'lastMetamagicDamage', event, campaignName);
-}
-
-/**
- * Retrieve the last damage event for a character.
- * Used by reaction features (e.g., Cutting Words) and metamagic (e.g., Empowered Spell)
- * to retrieve the most recent damage roll for rollback / modification.
- */
-export function getLastDamageEvent(characterName) {
-  return getRuntimeValue(characterName, 'lastMetamagicDamage');
-}
-
-export function clearLastDamageEvent(characterName, campaignName) {
-  setRuntimeValue(characterName, 'lastMetamagicDamage', null, campaignName);
-}
-
 export function saveLastAttackRoll(characterName, event, campaignName) {
   setRuntimeValue(characterName, 'lastAttackRoll', event, campaignName);
 }
 
-export function getLastAttackRoll(characterName) {
-  return getRuntimeValue(characterName, 'lastAttackRoll');
-}
 
 export function saveLastAbilityCheck(characterName, event, campaignName) {
   setRuntimeValue(characterName, 'lastAbilityCheck', event, campaignName);
@@ -136,25 +110,10 @@ export default function useMetamagic(playerStats, campaignName) {
     logMetamagicUse(campaignName, characterName, spellName, options, spCost);
   }, [campaignName, characterName]);
 
-  const saveDamage = useCallback((event) => {
-    saveLastDamageEvent(characterName, event, campaignName);
-  }, [characterName, campaignName]);
-
-  const getLastDamage = useCallback(() => {
-    return getLastDamageEvent(characterName);
-  }, [characterName]);
-
-  const clearDamage = useCallback(() => {
-    clearLastDamageEvent(characterName, campaignName);
-  }, [characterName, campaignName]);
-
   return {
     currentSP,
     maxSP,
     spendSorceryPoints: spend,
     logMetamagic: logUse,
-    saveLastDamageEvent: saveDamage,
-    getLastDamageEvent: getLastDamage,
-    clearLastDamageEvent: clearDamage,
   };
 }

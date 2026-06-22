@@ -1,6 +1,6 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getLastAttackRoll } from '../../../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
@@ -18,8 +18,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Beguiling Defenses';
 
     // 1. Get the last attack roll against the player
-    const attackEvent = getLastAttackRoll(playerName);
-    if (!attackEvent || isStale(attackEvent)) {
+    const attackResult = await findLastAttack();
+    const attackEvent = attackResult.attackEvent;
+    if (!attackEvent || isStale(attackEvent) || attackResult.targetName !== playerName) {
         return {
             type: 'popup',
             payload: {
@@ -31,7 +32,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const attackerName = attackEvent.targetName || 'Attacker';
+    const attackerName = attackResult.attackerName || 'Attacker';
 
     // 2. Check uses remaining (1 per Long Rest)
     let currentUses = Number(getRuntimeValue(playerName, USES_KEY, campaignName) ?? 0);

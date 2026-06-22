@@ -1,13 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getLastAttackRoll } from '../../../../hooks/combat/useMetamagic.js';
 import { addEntry } from '../../../ui/logService.js';
-
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
+import { rollbackDamage, findAttackRollAgainstTarget } from '../../common/damageRollback.js';
 
 const USES_KEY = 'illusorySelfUses';
 
@@ -16,9 +9,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const playerName = playerStats.name;
     const featureName = action.name || 'Illusory Self';
 
-    // 1. Get the last attack roll against the player
-    const attackEvent = getLastAttackRoll(playerName);
-    if (!attackEvent || isStale(attackEvent)) {
+    // 1. Get the last attack roll against the player and the attacker name
+    const { attackEvent, attackerName: storedAttackerName } = await findAttackRollAgainstTarget(playerName);
+
+    if (!attackEvent) {
         return {
             type: 'popup',
             payload: {
@@ -43,7 +37,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const attackerName = attackEvent.targetName || 'Unknown creature';
+    const attackerName = storedAttackerName || 'Unknown creature';
 
     // 2. Check uses remaining (1 per Short or Long Rest)
     const maxUses = auto.uses || 1;
@@ -93,28 +87,26 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // 3. Increment use counter
     await setRuntimeValue(playerName, USES_KEY, currentUses + 1, campaignName);
 
-    // 4. Mark the attack as a miss
-    const newAttackEvent = {
-        ...attackEvent,
-        hit: false,
-        illusorySelfMiss: true,
-        timestamp: Date.now(),
-    };
-    await setRuntimeValue(playerName, 'lastAttackRoll', newAttackEvent, campaignName);
+    // 4. Rollback damage using shared utility
+    const healedAmount = await rollbackDamage(attackerName, playerName, campaignName, featureName);
 
-    await addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerName,
-        abilityName: featureName,
-        description: `${playerName} used ${featureName} — ${attackerName}'s attack misses due to illusory duplicate.`,
-        targetName: attackerName,
-        timestamp: Date.now(),
-    }).catch((e) => { console.error("[illusorySelf] Error:", e); throw e; });
+    if (healedAmount === 0) {
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: featureName,
+            description: `${playerName} used ${featureName} — ${attackerName}'s attack misses due to illusory duplicate.`,
+            targetName: attackerName,
+            timestamp: Date.now(),
+        }).catch((e) => { console.error("[illusorySelf] Error:", e); throw e; });
+    }
 
-    let description = `<b>${featureName}</b><br/><br/>`;
-    description += `Attacker: <b>${attackerName}</b><br/><br/>`;
+    let description = `Attacker: <b>${attackerName}</b><br/><br/>`;
     description += `You use your Reaction to interpose an illusory duplicate between yourself and the attacker.<br/><br/>`;
     description += `<b>Result:</b> The attack automatically misses.<br/><br/>`;
+    if (healedAmount > 0) {
+        description += `<b>Damage Negated:</b> ${healedAmount} HP restored.<br/><br/>`;
+    }
     description += `<em>The illusion dissipates. Uses remaining: ${maxUses - currentUses - 1} / ${maxUses} (Short or Long Rest).</em>`;
 
     return {
@@ -124,7 +116,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             name: featureName,
             description,
             automation: auto,
-            forceMiss: true,
         },
     };
 }
