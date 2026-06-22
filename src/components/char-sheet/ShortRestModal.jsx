@@ -164,6 +164,15 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
             setRuntimeValue(playerStats.name, key, null, campaignName);
             });
 
+        if (playerStats.class?.name === 'Fighter') {
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            const maxSW = classLevel?.second_wind || 0;
+            const currentSW = Number(getRuntimeValue(playerStats.name, 'secondWindUses', campaignName) ?? 0);
+            if (currentSW < maxSW) {
+                setRuntimeValue(playerStats.name, 'secondWindUses', Math.min(maxSW, currentSW + 1), campaignName);
+            }
+        }
+
         if (sorcRestoration && restorationAvailable && restorationRequested) {
             let curSorcery = getRuntimeValue(playerStats.name, 'sorceryPoints');
             const maxSp = getClassFeatures(playerStats)?.maxSorceryPoints || 0;

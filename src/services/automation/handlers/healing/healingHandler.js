@@ -103,8 +103,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             }
         }
 
-        const maxUses = auto.usesMax ?? auto.uses ?? 1;
         const usesKey = auto.resourceKey || (action.name.toLowerCase().replace(/\s+/g, '') + 'Uses');
+        const maxFromTracked = playerStats?._trackedResources?.[usesKey]?.max;
+        const maxUses = maxFromTracked ?? auto.usesMax ?? auto.uses ?? 1;
         const currentUses = Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? maxUses);
 
         if (currentUses <= 0) {
@@ -160,9 +161,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName, true);
 
         const remainingUses = currentUses - 1;
+        const healDesc = actualHeal > 0
+            ? `Regained ${actualHeal} HP`
+            : 'Already at full HP';
         const description = remainingUses > 0
-            ? `${action.name}: Regained ${actualHeal} HP (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining).`
-            : `${action.name}: Regained ${actualHeal} HP (no uses remaining).`;
+            ? `${action.name}: ${healDesc} (${remainingUses} use${remainingUses > 1 ? 's' : ''} remaining).`
+            : `${action.name}: ${healDesc} (no uses remaining).`;
 
         return {
             type: 'popup',

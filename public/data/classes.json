@@ -5373,6 +5373,7 @@
                             "healExpression": "1d10 + fighter level",
                             "action": "bonus_action",
                             "uses": 1,
+                            "resourceKey": "secondWindUses",
                             "recharge": "short_rest",
                             "casting_time": "1 bonus action"
                         }

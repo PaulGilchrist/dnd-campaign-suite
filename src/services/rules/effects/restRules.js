@@ -70,6 +70,7 @@ export const LONG_REST_RESOURCES = [
       'channelDivinityCharges',
       'wildShapeUses',
       'secondwindUses',
+      'secondWindUses',
       'psionicEnergy',
       'focusPoints',
       'uncannymetabolismUses',
