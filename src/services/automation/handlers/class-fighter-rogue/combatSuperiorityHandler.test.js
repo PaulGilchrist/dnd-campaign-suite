@@ -1,4 +1,4 @@
-import { handle } from './combatSuperiorityHandler.js';
+import { onCombatSuperioritySelected } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
@@ -20,6 +20,14 @@ vi.mock('../../common/targetResolver.js', () => ({
     resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
 }));
 
+vi.mock('../../../../services/ui/dataLoader.js', () => ({
+    loadManeuvers: vi.fn(async () => [
+        { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
+        { name: 'Relentless', effect: 'relentless', saveType: 'CON' },
+        { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
+    ]),
+}));
+
 const makePlayerStats = (overrides = {}) => ({
     name: 'TestFighter',
     proficiency: 3,
@@ -37,7 +45,7 @@ const makePlayerStats = (overrides = {}) => ({
 });
 
 const makeAction = (auto = {}) => ({
-    name: 'Test Maneuver',
+    name: 'Combat Superiority',
     automation: {
         type: 'combat_superiority',
         saveType: 'WIS',
@@ -60,7 +68,7 @@ describe('combatSuperiorityHandler – Relentless', () => {
         rollExpression.mockReturnValue({ total: 5 });
     });
 
-    it('should detect relentless passive', async () => {
+    it('should detect relentless passive and use 1d8 instead of superiority die', async () => {
         const playerStats = makePlayerStats({
             automation: {
                 passives: [
@@ -70,7 +78,13 @@ describe('combatSuperiorityHandler – Relentless', () => {
         });
         const action = makeAction();
 
-        const result = await handle(action, playerStats, 'test-campaign', 'test-map');
+        const result = await onCombatSuperioritySelected(
+            action,
+            playerStats,
+            'test-campaign',
+            null,
+            'Relentless'
+        );
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('Relentless');
@@ -78,12 +92,6 @@ describe('combatSuperiorityHandler – Relentless', () => {
     });
 
     it('should not expend a superiority die when relentless is used', async () => {
-        getRuntimeValue.mockImplementation((playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === 'relentlessUsedRound') return undefined;
-            return undefined;
-        });
-
         const playerStats = makePlayerStats({
             automation: {
                 passives: [
@@ -93,7 +101,13 @@ describe('combatSuperiorityHandler – Relentless', () => {
         });
         const action = makeAction();
 
-        await handle(action, playerStats, 'test-campaign', 'test-map');
+        await onCombatSuperioritySelected(
+            action,
+            playerStats,
+            'test-campaign',
+            null,
+            'Relentless'
+        );
 
         expect(setRuntimeValue).not.toHaveBeenCalledWith(
             'TestFighter',
@@ -104,12 +118,7 @@ describe('combatSuperiorityHandler – Relentless', () => {
     });
 
     it('should roll 1d8 instead of superiority die when relentless is used', async () => {
-        getRuntimeValue.mockImplementation((playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === 'relentlessUsedRound') return undefined;
-            return undefined;
-        });
-        rollExpression.mockReturnValueOnce({ total: 7 }).mockReturnValue({ total: 5 });
+        rollExpression.mockReturnValueOnce({ total: 7 });
 
         const playerStats = makePlayerStats({
             automation: {
@@ -120,7 +129,13 @@ describe('combatSuperiorityHandler – Relentless', () => {
         });
         const action = makeAction();
 
-        const result = await handle(action, playerStats, 'test-campaign', 'test-map');
+        const result = await onCombatSuperioritySelected(
+            action,
+            playerStats,
+            'test-campaign',
+            null,
+            'Relentless'
+        );
 
         expect(rollExpression).toHaveBeenCalledWith('1d8');
         expect(result.payload.description).toContain('7');
@@ -133,6 +148,7 @@ describe('combatSuperiorityHandler – Relentless', () => {
             if (key === 'relentlessUsedRound') return 1;
             return undefined;
         });
+        rollExpression.mockReturnValue({ total: 10 });
 
         const playerStats = makePlayerStats({
             automation: {
@@ -143,7 +159,13 @@ describe('combatSuperiorityHandler – Relentless', () => {
         });
         const action = makeAction();
 
-        const result = await handle(action, playerStats, 'test-campaign', 'test-map');
+        const result = await onCombatSuperioritySelected(
+            action,
+            playerStats,
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
 
         expect(result.payload.description).toContain('10');
         expect(result.payload.description).not.toContain('Relentless');
@@ -156,7 +178,7 @@ describe('combatSuperiorityHandler – Relentless', () => {
             if (key === 'relentlessUsedRound') return 1;
             return undefined;
         });
-        rollExpression.mockReturnValueOnce({ total: 3 }).mockReturnValue({ total: 5 });
+        rollExpression.mockReturnValueOnce({ total: 3 });
 
         const playerStats = makePlayerStats({
             automation: {
@@ -167,7 +189,13 @@ describe('combatSuperiorityHandler – Relentless', () => {
         });
         const action = makeAction();
 
-        const result = await handle(action, playerStats, 'test-campaign', 'test-map');
+        const result = await onCombatSuperioritySelected(
+            action,
+            playerStats,
+            'test-campaign',
+            null,
+            'Relentless'
+        );
 
         expect(result.payload.description).toContain('3');
         expect(result.payload.description).toContain('Relentless');
@@ -182,7 +210,13 @@ describe('combatSuperiorityHandler – Relentless', () => {
         const playerStats = makePlayerStats();
         const action = makeAction();
 
-        const result = await handle(action, playerStats, 'test-campaign', 'test-map');
+        const result = await onCombatSuperioritySelected(
+            action,
+            playerStats,
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toContain('No Superiority Dice remaining');
@@ -198,7 +232,13 @@ describe('combatSuperiorityHandler – Relentless', () => {
         const playerStats = makePlayerStats();
         const action = makeAction();
 
-        await handle(action, playerStats, 'test-campaign', 'test-map');
+        await onCombatSuperioritySelected(
+            action,
+            playerStats,
+            'test-campaign',
+            ['Trip Attack'],
+            'Trip Attack'
+        );
 
         expect(setRuntimeValue).not.toHaveBeenCalledWith(
             'TestFighter',

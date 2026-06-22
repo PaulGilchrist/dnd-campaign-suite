@@ -6,22 +6,24 @@
 
 // Single shared cache for all data types across all rulesets
    const dataCache = {
-      '5e': {
-         classes: null,
-      races: null,
-         backgrounds: null,
-       feats: null,
-        'rules-validation': null,
-       spells: null
-       },
-      '2024': {
-         classes: null,
-      races: null,
-       backgrounds: null,
-       feats: null,
-        'rules-validation': null,
-       spells: null
-       }
+       '5e': {
+          classes: null,
+       races: null,
+          backgrounds: null,
+        feats: null,
+         'rules-validation': null,
+        spells: null,
+        maneuvers: null
+        },
+       '2024': {
+          classes: null,
+       races: null,
+        backgrounds: null,
+        feats: null,
+         'rules-validation': null,
+        spells: null,
+        maneuvers: null
+        }
     };
 
    // Shared cache for version-agnostic data (files in /data/ not /data/2024/)
@@ -328,10 +330,37 @@ export async function loadSpellData(_spellListKey, playerStats) {
 }
 
 /**
-  * Fetches spells data (with caching)
-  * @param {string} version - '5e' or '2024'
-  * @returns {Promise<object[]>} - Array of spells data
-  */
+ * Fetches maneuvers data (with caching)
+ * @param {string} version - '5e' or '2024'
+ * @returns {Promise<object[]>} - Array of maneuver data
+ */
+export async function loadManeuvers(version = '5e') {
+    const cacheKey = 'maneuvers';
+    const versionCache = dataCache[version];
+
+    if (versionCache[cacheKey]) {
+        return versionCache[cacheKey];
+    }
+
+    try {
+        const path = getDataPath('maneuvers', version);
+        const response = await fetch(path);
+        if (response.ok) {
+            const data = await response.json();
+            versionCache[cacheKey] = data;
+            return data;
+        }
+    } catch (error) {
+        console.error(`Error loading ${version} maneuvers.json:`, error);
+    }
+    return [];
+}
+
+/**
+ * Fetches spells data (with caching)
+ * @param {string} version - '5e' or '2024'
+ * @returns {Promise<object[]>} - Array of spells data
+ */
 export async function loadSpells(version = '5e') {
     const cacheKey = 'spells';
     const versionCache = dataCache[version];
@@ -428,18 +457,20 @@ export function clearDataCache() {
       classes: null,
         races: null,
        backgrounds: null,
-         feats: null,
-         'rules-validation': null,
-         spells: null
+          feats: null,
+          'rules-validation': null,
+          spells: null,
+          maneuvers: null
         };
       dataCache['2024'] = {
          classes: null,
-          races: null,
-           backgrounds: null,
-         feats: null,
-        'rules-validation': null,
-        spells: null
-       };
+           races: null,
+            backgrounds: null,
+          feats: null,
+         'rules-validation': null,
+         spells: null,
+         maneuvers: null
+        };
    sharedDataCache.skills = null;
      sharedDataCache.abilityScores = null;
    sharedDataCache.passiveSkills = null;

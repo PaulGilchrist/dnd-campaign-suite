@@ -1,0 +1,193 @@
+[
+  {
+    "name": "Ambush",
+    "description": "When you make a Dexterity (Stealth) check or an Initiative roll, you can expend one Superiority Die and add the die to the roll, unless you are Incapacitated.",
+    "actionType": "skill_check",
+    "skills": ["Stealth"],
+    "initiativeBonus": true,
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Bait and Switch",
+    "description": "When you're within 5 feet of a creature on your turn, you can expend one Superiority Die and switch places with that creature, provided you spend at least 5 feet of movement and the creature is willing and not Incapacitated. This movement doesn't provoke Opportunity Attacks. Roll the Superiority Die. Until the start of your next turn, you or the other creature (your choice) gains a bonus to AC equal to the number rolled.",
+    "actionType": "movement",
+    "effect": "ac_bonus_and_swap",
+    "dieExpression": "superiority_die",
+    "range": "5_ft"
+  },
+  {
+    "name": "Commander's Strike",
+    "description": "When you take the Attack action on your turn, you can replace one of your attacks to direct one of your companions to strike. Choose a willing creature who can see or hear you and expend one Superiority Die. That creature can immediately use its Reaction to make one attack with a weapon or an Unarmed Strike, adding the Superiority Die to the attack's damage roll on a hit.",
+    "actionType": "grant_attack",
+    "trigger": "replace_attack",
+    "dieExpression": "superiority_die",
+    "range": "30_ft"
+  },
+  {
+    "name": "Commanding Presence",
+    "description": "When you make a Charisma (Intimidation, Performance, or Persuasion) check, you can expend one Superiority Die and add the die to the roll.",
+    "actionType": "skill_check",
+    "skills": ["Intimidation", "Performance", "Persuasion"],
+    "ability": "Charisma",
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Disarming Attack",
+    "description": "When you hit a creature with an attack roll, you can expend one Superiority Die to attempt to disarm the target. Add the Superiority Die to the attack's damage roll. The target must succeed on a Strength saving throw or drop one object of your choice that it's holding, with the object landing in its space.",
+    "actionType": "attack_rider",
+    "trigger": "weapon_attack_hit",
+    "saveType": "STR",
+    "saveAbility": "STR",
+    "effect": "disarm",
+    "damageBonus": true,
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Distracting Strike",
+    "description": "When you hit a creature with an attack roll, you can expend one Superiority Die to distract the target. Add the Superiority Die to the attack's damage roll. The next attack roll against the target by a creature other than you has Advantage if the attack is made before the start of your next turn.",
+    "actionType": "attack_rider",
+    "trigger": "weapon_attack_hit",
+    "effect": "next_attack_advantage",
+    "damageBonus": true,
+    "dieExpression": "superiority_die",
+    "duration": "until_start_of_next_turn"
+  },
+  {
+    "name": "Evasive Footwork",
+    "description": "As a Bonus Action, you can expend one Superiority Die and take the Disengage action. Roll the die and add the number rolled to your AC until the start of your next turn.",
+    "actionType": "bonus_action",
+    "effect": "ac_bonus_disengage",
+    "dieExpression": "superiority_die",
+    "duration": "until_start_of_next_turn"
+  },
+  {
+    "name": "Feinting Attack",
+    "description": "As a Bonus Action, you can expend one Superiority Die to feint, choosing one creature within 5 feet of you as your target. You have Advantage on your next attack roll against that target this turn. If the attack hits, add the Superiority Die to the attack's damage roll.",
+    "actionType": "bonus_action",
+    "effect": "advantage_and_damage",
+    "range": "5_ft",
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Goading Attack",
+    "description": "When you hit a creature with an attack roll, you can expend one Superiority Die to attempt to goad the target into attacking you. Add the Superiority Die to the attack's damage roll. The target must succeed on a Wisdom saving throw or have Disadvantage on attack rolls against targets other than you until the end of your next turn.",
+    "actionType": "attack_rider",
+    "trigger": "weapon_attack_hit",
+    "saveType": "WIS",
+    "saveAbility": "WIS",
+    "effect": "goad",
+    "conditionInflicted": "goaded",
+    "damageBonus": true,
+    "dieExpression": "superiority_die",
+    "duration": "until_end_of_next_turn"
+  },
+  {
+    "name": "Lunging Attack",
+    "description": "As a Bonus Action, you can expend one Superiority Die and take the Dash action. If you move at least 5 feet in a straight line immediately before hitting with a melee attack as part of the Attack action this turn, add the Superiority Die to the attack's damage roll.",
+    "actionType": "bonus_action",
+    "effect": "dash_and_damage",
+    "dieExpression": "superiority_die",
+    "trigger": "melee_attack_straight_line"
+  },
+  {
+    "name": "Maneuvering Attack",
+    "description": "When you hit a creature with an attack roll, you can expend one Superiority Die to maneuver one of your comrades into a better position. Add the Superiority Die to the attack's damage roll, and choose a willing creature who can see or hear you. That creature can use its Reaction to move up to half its Speed without provoking Opportunity Attacks from the target of your attack.",
+    "actionType": "attack_rider",
+    "trigger": "weapon_attack_hit",
+    "effect": "ally_movement",
+    "damageBonus": true,
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Menacing Attack",
+    "description": "When you hit a creature with an attack roll, you can expend one Superiority Die to attempt to frighten the target. Add the Superiority Die to the attack's damage roll. The target must succeed on a Wisdom saving throw or be Frightened until the end of your next turn.",
+    "actionType": "attack_rider",
+    "trigger": "weapon_attack_hit",
+    "saveType": "WIS",
+    "saveAbility": "WIS",
+    "effect": "frightened",
+    "conditionInflicted": "Frightened",
+    "damageBonus": true,
+    "dieExpression": "superiority_die",
+    "duration": "until_end_of_next_turn"
+  },
+  {
+    "name": "Parry",
+    "description": "When another creature damages you with a melee attack roll, you can use your Reaction and expend one Superiority Die to reduce the damage by the number rolled on the die + your Strength or Dexterity modifier (your choice).",
+    "actionType": "reaction",
+    "trigger": "melee_damage_taken",
+    "effect": "damage_reduction",
+    "dieExpression": "superiority_die",
+    "modifierAbility": ["STR", "DEX"]
+  },
+  {
+    "name": "Precision Attack",
+    "description": "When you miss with an attack roll, you can expend one Superiority Die, roll the die, and add it to the attack roll, potentially turning the miss into a hit.",
+    "actionType": "attack_rider",
+    "trigger": "attack_roll_miss",
+    "effect": "attack_roll_bonus",
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Pushing Attack",
+    "description": "When you hit a creature with an attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die to attempt to push the target. Add the Superiority Die to the attack's damage roll. If the target is Large or smaller, it must succeed on a Strength saving throw or be pushed up to 15 feet directly away from you.",
+    "actionType": "attack_rider",
+    "trigger": "weapon_attack_hit",
+    "saveType": "STR",
+    "saveAbility": "STR",
+    "effect": "push",
+    "value": 15,
+    "damageBonus": true,
+    "sizeLimit": "large_or_smaller",
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Rally",
+    "description": "As a Bonus Action, you can expend one Superiority Die to bolster the resolve of a companion. Choose an ally within 30 feet who can see or hear you. That creature gains Temporary Hit Points equal to the Superiority Die roll + half your Fighter level (rounded down).",
+    "actionType": "bonus_action",
+    "effect": "temp_hp",
+    "dieExpression": "superiority_die",
+    "range": "30_ft",
+    "extraHpExpression": "fighter_level / 2"
+  },
+  {
+    "name": "Riposte",
+    "description": "When a creature misses you with a melee attack roll, you can use your Reaction and expend one Superiority Die to make a melee attack with a weapon or an Unarmed Strike against the creature. If you hit, add the Superiority Die to the attack's damage roll.",
+    "actionType": "reaction",
+    "trigger": "melee_attack_miss",
+    "effect": "melee_attack_reaction",
+    "damageBonus": true,
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Sweeping Attack",
+    "description": "When you hit a creature with a melee attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die to attempt to damage another creature. Choose another creature within 5 feet of the original target and within your reach. If the original attack roll would hit the second creature, it takes damage equal to the number rolled on your Superiority Die. The damage type is the same as the original attack.",
+    "actionType": "attack_rider",
+    "trigger": "melee_weapon_attack_hit",
+    "effect": "secondary_damage",
+    "damageBonus": false,
+    "dieExpression": "superiority_die",
+    "range": "5_ft"
+  },
+  {
+    "name": "Tactical Assessment",
+    "description": "When you make an Intelligence (History or Investigation) check or a Wisdom (Insight) check, you can expend one Superiority Die and add the die to the ability check.",
+    "actionType": "skill_check",
+    "skills": ["History", "Investigation", "Insight"],
+    "ability": "Intelligence",
+    "dieExpression": "superiority_die"
+  },
+  {
+    "name": "Trip Attack",
+    "description": "When you hit a creature with an attack roll using a weapon or an Unarmed Strike, you can expend one Superiority Die and add the die to the attack's damage roll. If the target is Large or smaller, it must succeed on a Strength saving throw or fall Prone.",
+    "actionType": "attack_rider",
+    "trigger": "weapon_attack_hit",
+    "saveType": "STR",
+    "saveAbility": "STR",
+    "effect": "prone",
+    "conditionInflicted": "Prone",
+    "damageBonus": true,
+    "sizeLimit": "large_or_smaller",
+    "dieExpression": "superiority_die"
+  }
+]

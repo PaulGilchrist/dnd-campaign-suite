@@ -44,6 +44,7 @@ import HypnoticPatternShakeModal from './modals/shared/HypnoticPatternShakeModal
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
 import MoonlightStepResourceModal from './modals/MoonlightStepResourceModal.jsx'
 import ConstellationSelectionModal from './modals/ConstellationSelectionModal.jsx'
+import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 
 export default function CharActionModals({
@@ -98,6 +99,7 @@ export default function CharActionModals({
     breathWeaponShapeModal, setBreathWeaponShapeModal,
     hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
     arcaneWardRestoreModal, setArcaneWardRestoreModal,
+    combatSuperiorityModal, setCombatSuperiorityModal,
     divineFuryChoice,
     damageTypeChoice,
     featureChoice,
@@ -118,6 +120,7 @@ export default function CharActionModals({
     handleFeatureChoiceSkip,
     handleConstellationSelect,
     handleElderChampionRestore,
+    handleCombatSuperiorityConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -490,6 +493,15 @@ export default function CharActionModals({
                     playerStats={playerStats}
                     campaignName={campaignName}
                     onClose={() => setArcaneWardRestoreModal(null)}
+                />
+            )}
+            {combatSuperiorityModal && (
+                <CombatSuperiorityModal
+                    {...combatSuperiorityModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setCombatSuperiorityModal(null)}
+                    onConfirm={handleCombatSuperiorityConfirm}
                 />
             )}
             {divineFuryChoice && (

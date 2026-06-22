@@ -4760,12 +4760,17 @@
             "automation": {
               "type": "combat_superiority",
               "saveType": "WIS",
-              "saveAbility": "STR",
+              "saveAbility": ["STR", "DEX"],
               "saveDc": "ability",
               "dieExpression": "superiority_die",
               "uses_max": 4,
               "recharge": "short_rest",
-              "casting_time": "passive"
+              "maxOptions": 3,
+              "maxOptionsScaling": {
+                "7": 2,
+                "10": 2,
+                "15": 2
+              }
             }
           },
           {

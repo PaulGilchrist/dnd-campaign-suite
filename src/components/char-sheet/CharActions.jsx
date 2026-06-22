@@ -18,6 +18,7 @@ import CharActionModals from './CharActionModals.jsx'
 import CharActionSpellPopups from './CharActionSpellPopups.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
+import { onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -250,6 +251,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleCleaveSkip,
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
         arcaneWardRestoreModal, setArcaneWardRestoreModal,
+        combatSuperiorityModal, setCombatSuperiorityModal,
     } = useCharActionModals({
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
@@ -521,6 +523,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         setHypnoticPatternShakeModal(shakePayload);
                         break;
                     }
+                    case 'combatSuperiority':
+                        setCombatSuperiorityModal(result.payload);
+                        break;
                     case 'arcaneWardRestore':
                         setArcaneWardRestoreModal(result.payload);
                         break;
@@ -601,6 +606,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             });
         }
     }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction, characters]);
+
+    const handleCombatSuperiorityConfirm = React.useCallback(async (selectedManeuverNames, singleUseManeuverName) => {
+        const action = combatSuperiorityModal?.action;
+        if (!action) return;
+
+        const result = await onCombatSuperioritySelected(action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
+        setCombatSuperiorityModal(null);
+        if (result?.type === 'popup') {
+            setPopupHtml(result.payload);
+        }
+    }, [combatSuperiorityModal, playerStats, campaignName, setCombatSuperiorityModal, setPopupHtml]);
+
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {
             return null;
@@ -845,6 +862,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     breathWeaponShapeModal={breathWeaponShapeModal} setBreathWeaponShapeModal={setBreathWeaponShapeModal}
                     hypnoticPatternShakeModal={hypnoticPatternShakeModal} setHypnoticPatternShakeModal={setHypnoticPatternShakeModal}
                     arcaneWardRestoreModal={arcaneWardRestoreModal} setArcaneWardRestoreModal={setArcaneWardRestoreModal}
+                    combatSuperiorityModal={combatSuperiorityModal} setCombatSuperiorityModal={setCombatSuperiorityModal}
+                    handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     divineFuryChoice={divineFuryChoice}
                     damageTypeChoice={damageTypeChoice}
                     featureChoice={featureChoice}

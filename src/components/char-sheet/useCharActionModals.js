@@ -54,6 +54,7 @@ export default function useCharActionModals({
     const [giantAncestryModal, setGiantAncestryModal] = useState(null);
     const [hypnoticPatternShakeModal, setHypnoticPatternShakeModal] = useState(null);
     const [arcaneWardRestoreModal, setArcaneWardRestoreModal] = useState(null);
+    const [combatSuperiorityModal, setCombatSuperiorityModal] = useState(null);
     const [eyebiteEffectModal, setEyebiteEffectModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
@@ -150,6 +151,7 @@ export default function useCharActionModals({
         giantAncestryModal, setGiantAncestryModal,
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
         arcaneWardRestoreModal, setArcaneWardRestoreModal,
+        combatSuperiorityModal, setCombatSuperiorityModal,
         eyebiteEffectModal, setEyebiteEffectModal,
         divineFuryChoice, setDivineFuryChoice,
         damageTypeChoice, setDamageTypeChoice,
