@@ -318,6 +318,7 @@ export async function applyLongRest(playerStats, campaignName) {
   const charData = {}
 
   charData.currentHitPoints = playerStats.hitPoints
+  charData.tempHp = null
 
   if (playerStats.spellAbilities) {
     for (const level of spellSlotLevels()) {

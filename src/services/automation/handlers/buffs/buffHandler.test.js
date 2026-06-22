@@ -27,6 +27,10 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../../ui/logService.js', () => ({
+  addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './buffHandler.js';
@@ -316,7 +320,7 @@ describe('buffHandler.handle', () => {
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(ps.name, 'tempHp', 4, campaignName);
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 ps.name,
-                'testhero_adrenalineRushUses',
+                'adrenalineRushUses',
                 3,
                 campaignName
             );
@@ -368,7 +372,7 @@ describe('buffHandler.handle', () => {
             expect(result.payload.description).toContain('3 uses remaining');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 ps.name,
-                'testhero_adrenalineRushUses',
+                'adrenalineRushUses',
                 3,
                 campaignName
             );

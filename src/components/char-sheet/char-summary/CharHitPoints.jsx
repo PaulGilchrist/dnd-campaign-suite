@@ -8,6 +8,7 @@ import DeathSavingThrows from './DeathSavingThrows.jsx'
 function CharHitPoints({ playerStats, campaignName }) {
       const storedHp = useRuntimeValue(playerStats.name, 'currentHitPoints', campaignName);
       const aidHpMaxIncrease = useRuntimeValue(playerStats.name, 'aidHpMaxIncrease', campaignName) || 0;
+      const tempHp = useRuntimeValue(playerStats.name, 'tempHp', campaignName);
       const effectiveMaxHp = playerStats.hitPoints + Number(aidHpMaxIncrease);
 
       React.useEffect(() => {
@@ -66,6 +67,11 @@ function CharHitPoints({ playerStats, campaignName }) {
             <div className="clickable" onClick={handleInputToggleCurrentHitPoints} onKeyDown={handleInputToggleCurrentHitPoints} tabIndex={0}>
                 <b>Hit Points: </b><HiddenInput handleInputToggle={handleInputToggleCurrentHitPoints} handleValueChange={(value) => handleValueChangeCurrentHitPoints(value)} showInput={showInputCurrentHitPoints} value={currentHitPoints}></HiddenInput>/{effectiveMaxHp} <span className="text-muted">(cur/max)</span>
             </div>
+            {tempHp > 0 && (
+                <div className="temp-hp-display">
+                    <i className="fa-solid fa-shield"></i> Temp HP: {tempHp}
+                </div>
+            )}
             {currentHitPoints <= 0 && (
                 <DeathSavingThrows playerStats={playerStats} campaignName={campaignName} />
             )}

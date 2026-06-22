@@ -189,8 +189,18 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
            console.error(`[applyDamage] Arcane Ward: currentHitPoints not found for ${creature.name}`);
            throw new Error(`Arcane Ward: currentHitPoints not found for ${creature.name}`);
        }
+
+       // Temp HP absorbs damage first
+       let damageAfterTempHp = wardDamage;
+       const currentTempHp = Number(getRuntimeValue(creature.name, 'tempHp', campaignName) || 0);
+       if (currentTempHp > 0) {
+           const absorbed = Math.min(damageAfterTempHp, currentTempHp);
+           damageAfterTempHp -= absorbed;
+           setRuntimeValue(creature.name, 'tempHp', currentTempHp - absorbed, campaignName);
+       }
+
        oldHp = storedCurrentHp;
-       newHp = Math.max(0, oldHp - wardDamage);
+       newHp = Math.max(0, oldHp - damageAfterTempHp);
        // If RE already fired in this damage sequence, don't let follow-up hits re-kill
        if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
            newHp = 1;

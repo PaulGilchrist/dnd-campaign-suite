@@ -6,6 +6,7 @@ import { getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const ADRENALINE_RUSH_USES_KEY = 'adrenalineRushUses';
 
@@ -183,7 +184,7 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
     const playerName = playerStats.name;
     const featureName = action.name || 'Adrenaline Rush';
 
-    const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_USES_KEY}`;
+    const usesKey = ADRENALINE_RUSH_USES_KEY;
 
     let usesMax;
     if (auto.uses === 'proficiency_bonus') {
@@ -221,9 +222,20 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
     const newUses = usesRemaining - 1;
     await setRuntimeValue(playerName, usesKey, newUses, campaignName);
 
-    const tempHpDesc = auto?.bonusEffect === 'temp_hp' && auto?.bonusExpression
-        ? ` Gained ${evaluateAutoExpression(auto.bonusExpression, playerStats)} temporary hit points.`
+    const tempHpAmount = auto?.bonusEffect === 'temp_hp' && auto?.bonusExpression
+        ? evaluateAutoExpression(auto.bonusExpression, playerStats)
+        : 0;
+
+    const tempHpDesc = tempHpAmount > 0
+        ? ` Gained ${tempHpAmount} temporary hit points.`
         : '';
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerName,
+        abilityName: featureName,
+        description: `${featureName}: Dash as a Bonus Action.${tempHpDesc} (${newUses} use${newUses !== 1 ? 's' : ''} remaining).`,
+    }).catch(() => {});
 
     return {
         type: 'popup',
@@ -238,7 +250,5 @@ async function handleBonusActionDash(action, playerStats, campaignName, _mapName
 }
 
 export function restoreAdrenalineRushUses(playerName, campaignName) {
-    const usesKey = `${playerName.toLowerCase().replace(/\s+/g, '')}_${ADRENALINE_RUSH_USES_KEY}`;
-
-    setRuntimeValue(playerName, usesKey, null, campaignName);
+    setRuntimeValue(playerName, ADRENALINE_RUSH_USES_KEY, null, campaignName);
 }
