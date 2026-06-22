@@ -55,8 +55,9 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     if (auto.oncePerTurn) {
-        const usedThisTurn = getRuntimeValue(playerStats.name, 'actionSurgeUsedThisTurn', campaignName);
-        if (usedThisTurn) {
+        const usedThisRound = getRuntimeValue(playerStats.name, 'actionSurgeUsedThisRound', campaignName);
+        const currentRound = getCurrentCombatRound();
+        if (usedThisRound === currentRound) {
             return {
                 type: 'popup',
                 payload: {
@@ -67,7 +68,7 @@ export async function handle(action, playerStats, campaignName) {
                 },
             };
         }
-        await setRuntimeValue(playerStats.name, 'actionSurgeUsedThisTurn', true, campaignName, true);
+        await setRuntimeValue(playerStats.name, 'actionSurgeUsedThisRound', currentRound, campaignName, true);
     }
 
     if (usesMax > 0) {

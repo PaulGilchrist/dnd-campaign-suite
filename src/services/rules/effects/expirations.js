@@ -170,11 +170,7 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
 }
 
 async function applySuperiorDefenseTurnStart(activeName, playerStats, effect, campaignName) {
-    const conditions = getRuntimeValue(activeName, 'activeConditions');
-    if (!Array.isArray(conditions)) {
-        console.error('expirations: expected activeConditions to be an array, got', typeof conditions, 'for', activeName);
-        throw new Error('Missing array: activeConditions for ' + activeName);
-    }
+    const conditions = Array.isArray(getRuntimeValue(activeName, 'activeConditions')) ? getRuntimeValue(activeName, 'activeConditions') : [];
     const isIncapacitated = conditions.some(c => String(c).toLowerCase() === 'incapacitated');
     if (isIncapacitated) {
         return;
@@ -437,11 +433,7 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
         return parsed
       })()
     
-    const activeBuffs = getRuntimeValue(activeName, 'activeBuffs', campaignName);
-    if (!Array.isArray(activeBuffs)) {
-        console.error('expirations: expected activeBuffs to be an array for', activeName);
-        throw new Error('Missing array: activeBuffs for ' + activeName);
-    }
+    const activeBuffs = Array.isArray(getRuntimeValue(activeName, 'activeBuffs', campaignName)) ? getRuntimeValue(activeName, 'activeBuffs', campaignName) : [];
     const newBuffs = [...activeBuffs, {
         name: "Dread Ambush",
         effect: 'speed_boost',
@@ -452,12 +444,8 @@ async function applyDreadAmbushSpeedTurnStart(activeName, playerStats, effect, c
 }
 
 async function applyHeroismTempHp(activeName, playerStats, effect, campaignName) {
-    const activeBuffs = getRuntimeValue(activeName, 'activeBuffs');
-    if (!Array.isArray(activeBuffs)) {
-        console.error('expirations: expected activeBuffs to be an array for', activeName);
-        throw new Error('Missing array: activeBuffs for ' + activeName);
-    }
-    const heroismBuff = Array.isArray(activeBuffs) ? activeBuffs.find(b => b.name === 'Heroism') : null;
+    const activeBuffs = Array.isArray(getRuntimeValue(activeName, 'activeBuffs')) ? getRuntimeValue(activeName, 'activeBuffs') : [];
+    const heroismBuff = activeBuffs.find(b => b.name === 'Heroism');
     if (!heroismBuff) return;
 
     const tempHpAmount = Number(heroismBuff.tempHpAmount) || 0;
@@ -470,11 +458,7 @@ async function applyHeroismTempHp(activeName, playerStats, effect, campaignName)
 
 async function applyUmbralSightTurnStart(activeName, playerStats, effect, campaignName) {
     const inDarkness = getRuntimeValue(activeName, 'umbralSightDarknessActive', campaignName);
-    const storedConditions = getRuntimeValue(activeName, 'activeConditions');
-    if (!Array.isArray(storedConditions)) {
-        console.error('expirations: expected activeConditions to be an array, got', typeof storedConditions, 'for', activeName);
-        throw new Error('Missing array: activeConditions for ' + activeName);
-    }
+    const storedConditions = Array.isArray(getRuntimeValue(activeName, 'activeConditions')) ? getRuntimeValue(activeName, 'activeConditions') : [];
     const hasInvisible = storedConditions.some(c => String(c).toLowerCase() === 'invisible');
 
     if (inDarkness && !hasInvisible) {
@@ -489,12 +473,9 @@ async function applyUmbralSightTurnStart(activeName, playerStats, effect, campai
 async function applySteadyAimClearTurnStart(activeName, playerStats, effect, campaignName) {
     // Clear speed_zero condition and movement flag at start of next turn
     const storedConds = getRuntimeValue(activeName, 'activeConditions');
-    if (!Array.isArray(storedConds)) {
-        console.error('expirations: expected activeConditions to be an array, got', typeof storedConds, 'for', activeName);
-        throw new Error('Missing array: activeConditions for ' + activeName);
-    }
-    const filtered = storedConds.filter(c => String(c).toLowerCase() !== 'speed_zero');
-    if (filtered.length !== storedConds.length) {
+    const conditions = Array.isArray(storedConds) ? storedConds : [];
+    const filtered = conditions.filter(c => String(c).toLowerCase() !== 'speed_zero');
+    if (filtered.length !== conditions.length) {
         await setRuntimeValue(activeName, 'activeConditions', filtered, campaignName);
     }
     await setRuntimeValue(activeName, 'steadyAimMovedThisTurn', false, campaignName);
@@ -508,11 +489,7 @@ async function applySupremeSneakTurnStart(activeName, playerStats, effect, campa
     const stealthAttackCost = getRuntimeValue(activeName, 'stealthAttackCost', campaignName);
     if (!stealthAttackCost || stealthAttackCost <= 0) return;
 
-    const storedConditions = getRuntimeValue(activeName, 'activeConditions');
-    if (!Array.isArray(storedConditions)) {
-        console.error('expirations: expected activeConditions to be an array, got', typeof storedConditions, 'for', activeName);
-        throw new Error('Missing array: activeConditions for ' + activeName);
-    }
+    const storedConditions = Array.isArray(getRuntimeValue(activeName, 'activeConditions')) ? getRuntimeValue(activeName, 'activeConditions') : [];
     const hasInvisible = storedConditions.some(c => String(c).toLowerCase() === 'invisible');
 
     if (hasInvisible) {
@@ -774,16 +751,8 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 }
 
             case 'fly_speed_equals_walk_speed': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(buffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof buffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
-                const conditions = getRuntimeValue(targetName, 'activeConditions');
-                if (!Array.isArray(conditions)) {
-                    console.error('expirations: expected activeConditions to be an array, got', typeof conditions, 'for', targetName);
-                    throw new Error('Missing array: activeConditions for ' + targetName);
-                }
+                const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
+                const conditions = Array.isArray(getRuntimeValue(targetName, 'activeConditions')) ? getRuntimeValue(targetName, 'activeConditions') : [];
                 const conditionSet = new Set(conditions);
                 if (conditionSet.has('incapacitated')) {
                     addEntry(campaignName, {
@@ -804,11 +773,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'fly_speed_20_hover': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(buffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof buffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -819,11 +784,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'dragon_wings': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(buffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof buffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -834,11 +795,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'ice_walk': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(buffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof buffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -849,11 +806,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'speed_boost': {
-                const buffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(buffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof buffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -864,11 +817,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_active_buff': {
-                const allBuffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(allBuffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof allBuffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const allBuffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 const wasHaste = allBuffs.some(b => b.name === effect.buffName && b.effect === 'haste');
                 setRuntimeValue(
                     targetName,
@@ -877,12 +826,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                     campaignName
                 );
                 if (wasHaste) {
-                    const storedConditions = getRuntimeValue(targetName, 'activeConditions');
-                    if (!Array.isArray(storedConditions)) {
-                        console.error('expirations: expected activeConditions to be an array, got', typeof storedConditions, 'for', targetName);
-                        throw new Error('Missing array: activeConditions for ' + targetName);
-                    }
-                    const conditions = storedConditions;
+                    const conditions = Array.isArray(getRuntimeValue(targetName, 'activeConditions')) ? getRuntimeValue(targetName, 'activeConditions') : [];
                     const hasSpeedZero = conditions.some(c => String(c).toLowerCase() === 'speed_zero');
                     const hasIncapacitated = conditions.some(c => String(c).toLowerCase() === 'incapacitated');
                     const newConditions = [
@@ -903,11 +847,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'peerless_athlete_end': {
                 setRuntimeValue(targetName, 'peerlessAthleteActive', false, campaignName);
-                const buffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(buffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof buffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -919,11 +859,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'large_form_end': {
                 setRuntimeValue(targetName, 'largeFormActive', false, campaignName);
-                const buffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(buffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof buffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const buffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -988,11 +924,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 
             case 'remove_feign_death_buff': {
                 // Custom cleanup for Feign Death: remove the buff and all associated conditions
-                const feignBuffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(feignBuffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof feignBuffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const feignBuffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -1023,11 +955,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_heroes_feast_buff': {
-                const allBuffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(allBuffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof allBuffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const allBuffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -1053,11 +981,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_aid_buff': {
-                const allBuffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(allBuffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof allBuffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const allBuffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -1079,11 +1003,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             }
 
             case 'remove_heroism_buff': {
-                const allBuffs = getRuntimeValue(targetName, 'activeBuffs');
-                if (!Array.isArray(allBuffs)) {
-                    console.error('expirations: expected activeBuffs to be an array, got', typeof allBuffs, 'for', targetName);
-                    throw new Error('Missing array: activeBuffs for ' + targetName);
-                }
+                const allBuffs = Array.isArray(getRuntimeValue(targetName, 'activeBuffs')) ? getRuntimeValue(targetName, 'activeBuffs') : [];
                 setRuntimeValue(
                     targetName,
                     'activeBuffs',
@@ -1134,11 +1054,7 @@ function removeNpcCondition(targetName, conditionName, campaignName) {
 }
 
 function removeActiveCondition(targetName, conditionName, campaignName) {
-    const condList = getRuntimeValue(targetName, 'activeConditions');
-    if (!Array.isArray(condList)) {
-        console.error('expirations: expected activeConditions to be an array, got', typeof condList, 'for', targetName);
-        throw new Error('Missing array: activeConditions for ' + targetName);
-    }
+    const condList = Array.isArray(getRuntimeValue(targetName, 'activeConditions')) ? getRuntimeValue(targetName, 'activeConditions') : [];
     const filtered = condList.filter(c => utils.getName(c) !== utils.getName(conditionName));
     setRuntimeValue(targetName, 'activeConditions', filtered, campaignName);
 }

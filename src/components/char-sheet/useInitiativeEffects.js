@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeBatch, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import utils from '../../services/ui/utils.js'
 import { rollExpression } from '../../services/dice/diceRoller.js';
 
@@ -7,7 +7,14 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
     // Passive: recover Focus Points and Wild Shape uses when anyone rolls initiative
     useEffect(() => {
         const handleInitiativeRolled = (e) => {
-            if (!playerStats || !e.detail || !e.detail.characterName) return;
+            if (!playerStats) return;
+
+            const updates = {};
+
+            // Reset Action Surge once-per-turn flag at the start of each turn
+            updates.actionSurgeUsedThisRound = null;
+
+            if (!e.detail || !e.detail.characterName) return;
             const rollingName = utils.getName(e.detail.characterName);
             const myName = utils.getName(playerStats.name);
             if (rollingName !== myName) return;
@@ -82,6 +89,10 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
                     const newBI = Math.min(maxBI, minTarget);
                     setRuntimeValue(playerStats.name, 'bardicInspirationUses', newBI, campaignName);
                 }
+            }
+
+            if (Object.keys(updates).length > 0) {
+                setRuntimeBatch(playerStats.name, updates, campaignName);
             }
         };
 

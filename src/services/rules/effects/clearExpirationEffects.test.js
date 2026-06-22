@@ -223,7 +223,7 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
     );
   });
 
-  it('throws when activeConditions is not an array', () => {
+  it('gracefully handles non-array activeConditions', () => {
     const myList = [
       { target: 'Human', effects: [{ type: 'stunned', condition: 'stunned' }], appliedRound: 1 },
     ];
@@ -235,7 +235,7 @@ describe('removeActiveCondition (via clearExpirationEffects)', () => {
       return null;
     });
 
-    expect(() => clearAllExpirationEffects('Goblin', 'MyCampaign')).toThrow('Missing array: activeConditions for Human');
+    expect(() => clearAllExpirationEffects('Goblin', 'MyCampaign')).not.toThrow();
   });
 
   it('uses utils.getName for condition comparison in removeActiveCondition', () => {

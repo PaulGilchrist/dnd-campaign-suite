@@ -15,6 +15,7 @@ export const ALL_TRACKED_RESOURCES = [
   'secondwindUses',
   'actionSurgeUses',
   'actionsurgeUses',
+  'actionSurgeUsedThisRound',
   'ragePoints',
   'layOnHandsPool',
   'superiorityDice',

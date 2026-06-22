@@ -54,6 +54,8 @@ export const SHORT_REST_RESOURCES = [
   'superiorityDice',
   'kiPoints',
     'actionsurgeUses',
+    'actionSurgeUses',
+    'actionSurgeUsedThisRound',
     'luckyPoints',
     'adrenalineRushUses'
 ]
@@ -75,7 +77,9 @@ export const LONG_REST_RESOURCES = [
       'arcaneRecoveryLevels',
       'superiorityDice',
       'kiPoints',
-      'actionsurgeUses',
+       'actionsurgeUses',
+       'actionSurgeUses',
+        'actionSurgeUsedThisRound',
       'layOnHandsPool',
       'warlockPactMagic',
       'luckyPoints',

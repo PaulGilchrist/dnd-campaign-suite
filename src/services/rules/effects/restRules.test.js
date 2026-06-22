@@ -228,6 +228,8 @@ describe('restRules', () => {
       expect(updates.focusPoints).toBeNull()
       expect(updates.kiPoints).toBeNull()
       expect(updates.actionsurgeUses).toBeNull()
+      expect(updates.actionSurgeUses).toBeNull()
+      expect(updates.actionSurgeUsedThisRound).toBeNull()
       expect(updates.activeBuffs).toEqual([])
       expect(updates.activeConditions).toEqual([])
     })

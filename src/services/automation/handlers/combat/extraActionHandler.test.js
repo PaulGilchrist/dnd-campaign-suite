@@ -159,7 +159,8 @@ describe('extraActionHandler.handle', () => {
 
       getRuntimeValue
         .mockReturnValueOnce(undefined)  // First call: usesUsed (undefined -> usesMax=2, passes check)
-        .mockReturnValue(true);          // Second call: actionSurgeUsedThisTurn
+        .mockReturnValueOnce(1);         // Second call: actionSurgeUsedThisRound (matches current round)
+      vi.mocked(getCurrentCombatRound).mockReturnValue(1);
 
       const result = await handle(action, ps, campaignName);
 
@@ -174,12 +175,13 @@ describe('extraActionHandler.handle', () => {
 
       getRuntimeValue
         .mockReturnValueOnce(2)   // First call: usesUsed
-        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisTurn (falsy)
+        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisRound (falsy)
+      vi.mocked(getCurrentCombatRound).mockReturnValue(1);
 
       const result = await handle(action, ps, campaignName);
 
       expect(result.type).toBe('popup');
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisTurn', true, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisRound', 1, campaignName, true);
       expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 1, campaignName, true);
     });
 
@@ -192,7 +194,7 @@ describe('extraActionHandler.handle', () => {
       const result = await handle(action, ps, campaignName);
 
       expect(result.type).toBe('popup');
-      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisTurn', true, campaignName, true);
+      expect(setRuntimeValue).not.toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisRound', 1, campaignName, true);
     });
 
     it('should still decrement uses when oncePerTurn is true and first use', async () => {
@@ -201,11 +203,12 @@ describe('extraActionHandler.handle', () => {
 
       getRuntimeValue
         .mockReturnValueOnce(3)   // First call: usesUsed
-        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisTurn (falsy)
+        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisRound (falsy)
+      vi.mocked(getCurrentCombatRound).mockReturnValue(1);
 
       await handle(action, ps, campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisTurn', true, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisRound', 1, campaignName, true);
       expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUses', 2, campaignName, true);
     });
   });
@@ -283,11 +286,12 @@ describe('extraActionHandler.handle', () => {
 
       getRuntimeValue
         .mockReturnValueOnce(2)   // First call: usesUsed
-        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisTurn (falsy)
+        .mockReturnValue(undefined); // Second call: actionSurgeUsedThisRound (falsy)
+      vi.mocked(getCurrentCombatRound).mockReturnValue(1);
 
       await handle(action, ps, campaignName);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisTurn', true, campaignName, true);
+      expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', 'actionSurgeUsedThisRound', 1, campaignName, true);
     });
   });
 
