@@ -43,7 +43,7 @@ export const MockWizard = vi.fn(({ onComplete, onCancel, characterData, isEditin
 export const MockSidebar = vi.fn(({
   campaignName, characters, activeCharacter, onBackToCampaigns, onAddCharacter, onCharacterClick,
   onInitiativeClick, onEncounterClick, onFactionsClick, onMapsClick, onNotesClick, onQuestsClick,
-  onNPCsClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost,
+  onNPCsClick, onSettlementsClick, onLogClick, onRenameCampaign, onDeleteCampaign, theme, toggleTheme, isLocalhost,
 }) => (
   <div data-testid="sidebar">
     <div data-testid="sidebar-campaign">{campaignName}</div>
@@ -85,6 +85,12 @@ export const MockSidebar = vi.fn(({
     </button>
     <button data-testid="quests-btn" onClick={onQuestsClick}>
       Quests
+    </button>
+    <button data-testid="settlements-btn" onClick={onSettlementsClick}>
+      Settlements
+    </button>
+    <button data-testid="log-btn" onClick={onLogClick}>
+      Log
     </button>
     <button data-testid="rename-campaign-btn" onClick={onRenameCampaign} disabled={!isLocalhost}>
       Rename
@@ -147,6 +153,20 @@ export const MockNPCs = vi.fn(({ campaignName, characters, onBack }) => (
     <span data-testid="npcs-campaign">{campaignName}</span>
     <span data-testid="npcs-char-count">{characters?.length || 0}</span>
     <button data-testid="npcs-back-btn" onClick={onBack}>Back from NPCs</button>
+  </div>
+));
+
+export const MockSettlements = vi.fn(({ campaignName, onBack }) => (
+  <div data-testid="settlements-view">
+    <span data-testid="settlements-campaign">{campaignName}</span>
+    <button data-testid="settlements-back-btn" onClick={onBack}>Back from Settlements</button>
+  </div>
+));
+
+export const MockLog = vi.fn(({ campaignName, characters }) => (
+  <div data-testid="campaign-log-view">
+    <span data-testid="log-campaign">{campaignName}</span>
+    <span data-testid="log-char-count">{characters?.length || 0}</span>
   </div>
 ));
 

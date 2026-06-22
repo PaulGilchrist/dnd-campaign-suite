@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import FiendishLegacyModal from './FiendishLegacyModal.jsx';
 import { confirmFiendishLegacy } from '../../../services/automation/handlers/class-other/fiendishLegacyHandler.js';
@@ -178,7 +178,9 @@ describe('FiendishLegacyModal', () => {
   describe('apply flow', () => {
     it('does not call confirmFiendishLegacy when apply is clicked without a selection', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       expect(confirmFiendishLegacy).not.toHaveBeenCalled();
     });
 
@@ -195,7 +197,9 @@ describe('FiendishLegacyModal', () => {
         });
         render(<FiendishLegacyModal {...baseProps} />);
         fireEvent.click(getLegacyLabel(legacyName));
-        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+        await act(async () => {
+          fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+        });
         expect(confirmFiendishLegacy).toHaveBeenCalledWith(
           basePlayerStats,
           legacyName,
@@ -216,7 +220,9 @@ describe('FiendishLegacyModal', () => {
       });
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       expect(confirmFiendishLegacy).toHaveBeenCalledTimes(1);
     });
 
@@ -232,7 +238,9 @@ describe('FiendishLegacyModal', () => {
       });
       render(<FiendishLegacyModal {...makeProps({ campaignName: 'my-campaign' })} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       expect(confirmFiendishLegacy).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(String),
@@ -253,7 +261,9 @@ describe('FiendishLegacyModal', () => {
       const customStats = { name: 'Warlock2', level: 5, hitPoints: 60 };
       render(<FiendishLegacyModal {...makeProps({ playerStats: customStats })} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       expect(confirmFiendishLegacy).toHaveBeenCalledWith(
         customStats,
         expect.any(String),
@@ -280,7 +290,9 @@ describe('FiendishLegacyModal', () => {
     it('shows result view after successful apply', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.queryByText(/Choose a fiendish legacy/)).not.toBeInTheDocument();
       });
@@ -289,7 +301,9 @@ describe('FiendishLegacyModal', () => {
     it('renders the dragon icon in the result header', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(document.querySelector('.sp-header .fa-solid.fa-dragon')).toBeInTheDocument();
       });
@@ -298,7 +312,9 @@ describe('FiendishLegacyModal', () => {
     it('renders the action name in the result header', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.getByText('Fiendish Legacy')).toBeInTheDocument();
       });
@@ -307,7 +323,9 @@ describe('FiendishLegacyModal', () => {
     it('renders result description from payload in the sp-body', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.getByText('Selected Abyssal legacy. Spellcasting ability: Charisma.')).toBeInTheDocument();
       });
@@ -316,7 +334,9 @@ describe('FiendishLegacyModal', () => {
     it('renders result with proper CSS classes', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
         expect(document.querySelector('.sp-modal')).toBeInTheDocument();
@@ -329,7 +349,9 @@ describe('FiendishLegacyModal', () => {
     it('renders Done button in result view', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
       });
@@ -338,7 +360,9 @@ describe('FiendishLegacyModal', () => {
     it('hides radio buttons after apply', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.queryByText('Abyssal')).not.toBeInTheDocument();
       });
@@ -347,7 +371,9 @@ describe('FiendishLegacyModal', () => {
     it('hides Cancel button after apply', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
       });
@@ -356,7 +382,9 @@ describe('FiendishLegacyModal', () => {
     it('hides the selection prompt after apply', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.queryByText(/Choose a fiendish legacy/)).not.toBeInTheDocument();
       });
@@ -365,7 +393,9 @@ describe('FiendishLegacyModal', () => {
     it('hides the Select Legacy button after apply', async () => {
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.queryByRole('button', { name: /Select Legacy/ })).not.toBeInTheDocument();
       });
@@ -384,7 +414,9 @@ describe('FiendishLegacyModal', () => {
       });
       render(<FiendishLegacyModal {...makeProps({ action: customAction })} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.getByText('Fiendish Legacy')).toBeInTheDocument();
       });
@@ -410,7 +442,9 @@ describe('FiendishLegacyModal', () => {
       const onClose = vi.fn();
       render(<FiendishLegacyModal {...makeProps({ onClose })} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         fireEvent.click(screen.getByRole('button', { name: 'Done' }));
       });
@@ -421,7 +455,9 @@ describe('FiendishLegacyModal', () => {
       const onClose = vi.fn();
       render(<FiendishLegacyModal {...makeProps({ onClose })} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         fireEvent.click(document.querySelector('.sp-overlay'));
       });
@@ -432,7 +468,9 @@ describe('FiendishLegacyModal', () => {
       const onClose = vi.fn();
       render(<FiendishLegacyModal {...makeProps({ onClose })} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         fireEvent.click(document.querySelector('.sp-modal'));
       });
@@ -447,7 +485,9 @@ describe('FiendishLegacyModal', () => {
       confirmFiendishLegacy.mockResolvedValue(null);
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /Select Legacy/ })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
@@ -458,7 +498,9 @@ describe('FiendishLegacyModal', () => {
       confirmFiendishLegacy.mockResolvedValue(undefined);
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         expect(screen.getByRole('button', { name: /Select Legacy/ })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
@@ -481,7 +523,9 @@ describe('FiendishLegacyModal', () => {
       });
       render(<FiendishLegacyModal {...baseProps} />);
       fireEvent.click(getLegacyLabel('Abyssal'));
-      fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Select Legacy/ }));
+      });
       await waitFor(() => {
         const body = document.querySelector('.sp-body');
         expect(body.querySelector('strong')).toBeInTheDocument();

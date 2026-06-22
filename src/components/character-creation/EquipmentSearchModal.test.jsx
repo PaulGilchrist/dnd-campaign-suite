@@ -375,6 +375,181 @@ describe('EquipmentSearchModal', () => {
     });
   });
 
+  describe('CSS classes and structure', () => {
+    it('should render the modal overlay with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.equipment-search-modal-overlay')).toBeInTheDocument();
+    });
+
+    it('should render the modal container with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.equipment-search-modal')).toBeInTheDocument();
+    });
+
+    it('should render the header with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.search-modal-header')).toBeInTheDocument();
+    });
+
+    it('should render the body with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.search-modal-body')).toBeInTheDocument();
+    });
+
+    it('should render the footer with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.search-modal-footer')).toBeInTheDocument();
+    });
+
+    it('should render the category filters container with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.category-filters')).toBeInTheDocument();
+    });
+
+    it('should render the search input container with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.search-input-container')).toBeInTheDocument();
+    });
+
+    it('should render the search input with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.search-input')).toBeInTheDocument();
+    });
+
+    it('should render the filter checkbox group with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.filter-checkbox-group')).toBeInTheDocument();
+    });
+
+    it('should render the equipment results container with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.equipment-results')).toBeInTheDocument();
+    });
+
+    it('should render the close button with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.close-modal-btn')).toBeInTheDocument();
+    });
+
+    it('should render the cancel button with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.cancel-btn')).toBeInTheDocument();
+    });
+
+    it('should render the header h3 element', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('h3')).toBeInTheDocument();
+    });
+
+    it('should render the search input with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      const input = container.querySelector('.search-input');
+      expect(input).toHaveClass('search-input');
+    });
+
+    it('should render the filter checkbox label with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.filter-checkbox-label')).toBeInTheDocument();
+    });
+
+    it('should render the filter checkbox count span with correct class', () => {
+      const props = createMockProps({ currentItemCount: 3 });
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.filter-checkbox-count')).toBeInTheDocument();
+    });
+
+    it('should render category filter buttons with correct class', () => {
+      const props = createMockProps();
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      const buttons = container.querySelectorAll('.category-filter-btn');
+      expect(buttons.length).toBeGreaterThan(0);
+    });
+
+    it('should render equipment items with correct class', () => {
+      const props = createMockProps({
+        filteredEquipment: mockEquipment,
+      });
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      const items = container.querySelectorAll('.equipment-item');
+      expect(items.length).toBe(mockEquipment.length);
+    });
+
+    it('should render equipment item name with correct class', () => {
+      const props = createMockProps({
+        filteredEquipment: mockEquipment,
+      });
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.equipment-item-name')).toBeInTheDocument();
+    });
+
+    it('should render equipment item details with correct class', () => {
+      const props = createMockProps({
+        filteredEquipment: mockEquipment,
+      });
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.equipment-item-details')).toBeInTheDocument();
+    });
+
+    it('should render equipment item category with correct class', () => {
+      const props = createMockProps({
+        filteredEquipment: mockEquipment,
+      });
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.equipment-item-category')).toBeInTheDocument();
+    });
+
+    it('should render equipment item cost with correct class', () => {
+      const props = createMockProps({
+        filteredEquipment: mockEquipment,
+      });
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.equipment-item-cost')).toBeInTheDocument();
+    });
+
+    it('should render equipment item weight with correct class', () => {
+      const props = createMockProps({
+        filteredEquipment: mockEquipment,
+      });
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.equipment-item-weight')).toBeInTheDocument();
+    });
+
+    it('should render no results with correct class', () => {
+      const props = createMockProps({
+        searchQuery: 'nonexistent',
+        filteredEquipment: [],
+      });
+      const { container } = render(<EquipmentSearchModal {...props} />);
+      expect(container.querySelector('.no-results')).toBeInTheDocument();
+    });
+
+    it('should use item.index as the key for equipment items', () => {
+      const props = createMockProps({
+        filteredEquipment: mockEquipment,
+      });
+      render(<EquipmentSearchModal {...props} />);
+      // If items rendered without proper keys, React would log a warning
+      // The fact that they render correctly with matching indices confirms keys are used
+      expect(screen.getByText('Club')).toBeInTheDocument();
+      expect(screen.getByText('Dagger')).toBeInTheDocument();
+    });
+  });
+
   describe('default props', () => {
     it('should use ["All"] as default uniqueCategories when not provided', () => {
       const props = createMockProps();

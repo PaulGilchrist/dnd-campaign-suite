@@ -466,6 +466,53 @@ describe('WildCompanionModal', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  // ── Expend button disabled when selected level has zero slots ──
+
+  it('disables expend button when a zero-slot level is selected (other levels have slots)', () => {
+    render(<WildCompanionModal {...makeProps()} />);
+    const radios = getSpellSlotRadios();
+    fireEvent.click(radios[5]);
+    expect(radios[5]).toBeChecked();
+    const button = screen.getByRole('button', { name: /Expend Level 6 Slot/i });
+    expect(button).toBeDisabled();
+  });
+
+  it('updates button text when selecting a zero-slot level', () => {
+    render(<WildCompanionModal {...makeProps()} />);
+    const radios = getSpellSlotRadios();
+    expect(screen.getByRole('button', { name: /Expend Level 1 Slot/i })).toBeInTheDocument();
+    fireEvent.click(radios[5]);
+    expect(screen.getByRole('button', { name: /Expend Level 6 Slot/i })).toBeInTheDocument();
+  });
+
+  // ── Font Awesome icons ──
+
+  it('renders leaf icon in the title', () => {
+    render(<WildCompanionModal {...makeProps()} />);
+    expect(document.querySelector('.resource-pool-modal .fas.fa-leaf')).toBeInTheDocument();
+  });
+
+  it('renders check icon on the expend spell slot button', () => {
+    render(<WildCompanionModal {...makeProps()} />);
+    expect(
+      document.querySelector('.resource-pool-modal .fa-solid.fa-check')
+    ).toBeInTheDocument();
+  });
+
+  it('renders times icon on the cancel button', () => {
+    render(<WildCompanionModal {...makeProps()} />);
+    expect(
+      document.querySelector('.resource-pool-modal .fa-solid.fa-times')
+    ).toBeInTheDocument();
+  });
+
+  // ── CSS classes ──
+
+  it('applies no-print class to the overlay', () => {
+    render(<WildCompanionModal {...makeProps()} />);
+    expect(document.querySelector('.resource-pool-overlay').classList.contains('no-print')).toBe(true);
+  });
+
   // ── Edge cases ──
 
   it('handles playerStats with no spellAbilities property', () => {

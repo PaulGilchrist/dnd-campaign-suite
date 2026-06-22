@@ -222,8 +222,10 @@ describe('GiantAncestryModal', () => {
   it('does not call confirmGiantAncestry when no option is selected', async () => {
     confirmGiantAncestry.mockResolvedValue(true);
     render(<GiantAncestryModal {...makeProps()} />);
+    const btn = screen.getByRole('button', { name: 'Select Ancestry' });
+    expect(btn).toBeDisabled();
     await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Select Ancestry' }));
+      fireEvent.click(btn);
     });
     expect(confirmGiantAncestry).not.toHaveBeenCalled();
   });

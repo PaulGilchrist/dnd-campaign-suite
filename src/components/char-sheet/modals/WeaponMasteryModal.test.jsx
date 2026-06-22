@@ -40,7 +40,7 @@ function makeProps(overrides) {
     extraMasteries: ['Push'],
     playerStats: mockPlayerStats,
     campaignName: mockCampaignName,
-    targetNameProp: 'Goblin',
+    targetName: 'Goblin',
     onClose: vi.fn(),
     ...(overrides || {}),
   };
@@ -486,6 +486,62 @@ describe('WeaponMasteryModal', () => {
       renderModal();
       const btn = screen.getByRole('button', { name: 'Skip' });
       expect(btn.classList.contains('sp-dismiss-btn')).toBe(true);
+    });
+  });
+
+  // ── Target name display ──
+
+  describe('target name display', () => {
+    it('shows target name in instruction when targetName is provided', async () => {
+      renderModal();
+      await waitFor(() => {
+        const bodyDiv = document.querySelector('.sp-body');
+        expect(bodyDiv.textContent).toContain('against');
+        expect(bodyDiv.textContent).toContain('Goblin');
+      });
+    });
+
+    it('shows target name from auto-detection when targetName is not provided', async () => {
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'Throg', targetName: 'Ogre' },
+          { name: 'Ogre' },
+        ],
+      });
+      damageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Ogre' });
+
+      render(<WeaponMasteryModal
+        attackName='Longsword Attack'
+        baseMastery='Vex'
+        extraMasteries={[]}
+        playerStats={mockPlayerStats}
+        campaignName={mockCampaignName}
+        onClose={vi.fn()}
+      />);
+
+      await waitFor(() => {
+        const bodyDiv = document.querySelector('.sp-body');
+        expect(bodyDiv.textContent).toContain('Ogre');
+      });
+    });
+
+    it('shows no target name when targetName is not provided and auto-detection returns null', async () => {
+      damageUtils.getCombatContext.mockResolvedValue(null);
+
+      render(<WeaponMasteryModal
+        attackName='Longsword Attack'
+        baseMastery='Vex'
+        extraMasteries={[]}
+        playerStats={mockPlayerStats}
+        campaignName={mockCampaignName}
+        onClose={vi.fn()}
+      />);
+
+      await waitFor(() => {
+        const bodyDiv = document.querySelector('.sp-body');
+        expect(bodyDiv.textContent).toContain('Choose a mastery property to activate');
+        expect(bodyDiv.textContent).not.toContain('against');
+      });
     });
   });
 

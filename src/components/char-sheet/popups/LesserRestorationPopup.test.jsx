@@ -31,8 +31,6 @@ function renderPopup(overrides = {}) {
     const onConfirm = vi.fn();
     const onSkip = vi.fn();
 
-    // The renderPopup default onConfirm/onSkip are always created;
-    // overrides let tests replace them.
     const props = {
         spell: mockSpell,
         playerStats: {},
@@ -44,8 +42,6 @@ function renderPopup(overrides = {}) {
         ...overrides,
     };
 
-    // If the caller passed a custom onConfirm/onSkip via overrides,
-    // we need to use those instead of the defaults.
     if (overrides.onConfirm !== undefined) {
         props.onConfirm = overrides.onConfirm;
     }
@@ -93,6 +89,38 @@ describe('LesserRestorationPopup', () => {
         expect(screen.getByText('Player Character')).toBeInTheDocument();
     });
 
+    it('renders with the expected structural CSS classes', () => {
+        renderPopup();
+        expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
+        expect(document.querySelector('.popup-modal')).toBeInTheDocument();
+        expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
+        expect(document.querySelector('.metamagic-popup-inner')).toBeInTheDocument();
+        expect(document.querySelector('.metamagic-actions')).toBeInTheDocument();
+    });
+
+    it('renders the spell name and level from the spell prop', () => {
+        const spellNameEl = document.querySelector('.metamagic-spell-name strong');
+        renderPopup({ spell: { name: 'Test Spell', level: 3 } });
+        expect(spellNameEl?.textContent || screen.getByText(/Test Spell/)).toBeInTheDocument();
+        expect(screen.getByText(/Level 3/)).toBeInTheDocument();
+    });
+
+    it('renders the range in the description text', () => {
+        renderPopup({ range: '60 ft' });
+        expect(screen.getByText(/60 ft/)).toBeInTheDocument();
+    });
+
+    it('displays the spell description mentioning the four conditions', () => {
+        renderPopup();
+        expect(screen.getByText(/Blinded, Deafened, Paralyzed, or Poisoned/)).toBeInTheDocument();
+    });
+
+    it('renders Cancel and Cast buttons', () => {
+        renderPopup();
+        expect(screen.getByText('Cancel')).toBeInTheDocument();
+        expect(screen.getByText('Cast Lesser Restoration')).toBeInTheDocument();
+    });
+
     // ── Target selection ──
 
     it('selects a target and loads its conditions when clicked', async () => {
@@ -115,12 +143,49 @@ describe('LesserRestorationPopup', () => {
         await selectTarget('Goblin');
 
         await waitFor(() => {
-            // Check that the selected target shows a checkmark in its text
             expect(screen.getByText(/\u2713\s+Goblin/)).toBeInTheDocument();
         });
     });
 
-    // ── Condition selection ──
+    it('switches target selection when clicking a different target', async () => {
+        getRuntimeValue.mockReturnValue(['blinded']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText(/\u2713\s+Goblin/)).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByText('Orc'));
+
+        await waitFor(() => {
+            expect(screen.getByText(/\u2713\s+Orc/)).toBeInTheDocument();
+        });
+        expect(screen.queryByText(/\u2713\s+Goblin/)).not.toBeInTheDocument();
+    });
+
+    it('loads conditions for a different target after switching', async () => {
+        getRuntimeValue.mockReturnValue(['blinded']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions');
+        });
+
+        vi.clearAllMocks();
+        getRuntimeValue.mockReturnValue(['deafened']);
+
+        fireEvent.click(screen.getByText('Orc'));
+
+        await waitFor(() => {
+            expect(getRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions');
+        });
+    });
 
     it('shows condition selection section when a target is selected', async () => {
         getRuntimeValue.mockReturnValue(['blinded']);
@@ -155,6 +220,21 @@ describe('LesserRestorationPopup', () => {
 
         await waitFor(() => {
             expect(screen.getByText('Blinded condition')).toBeInTheDocument();
+            expect(screen.getByText('Poisoned condition')).toBeInTheDocument();
+        });
+    });
+
+    it('shows all four condition types when target has them', async () => {
+        getRuntimeValue.mockReturnValue(['blinded', 'deafened', 'paralyzed', 'poisoned']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('Blinded condition')).toBeInTheDocument();
+            expect(screen.getByText('Deafened condition')).toBeInTheDocument();
+            expect(screen.getByText('Paralyzed condition')).toBeInTheDocument();
             expect(screen.getByText('Poisoned condition')).toBeInTheDocument();
         });
     });
@@ -279,6 +359,22 @@ describe('LesserRestorationPopup', () => {
         expect(onConfirm).not.toHaveBeenCalled();
     });
 
+    it('does not call onConfirm when target has no applicable conditions', async () => {
+        const onConfirm = vi.fn();
+        getRuntimeValue.mockReturnValue([]);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup({ onConfirm });
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('No applicable conditions found on this target')).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByText('Cast Lesser Restoration'));
+        expect(onConfirm).not.toHaveBeenCalled();
+    });
+
     // ── Skip / Cancel ──
 
     it('calls onSkip when Cancel button is clicked', () => {
@@ -352,12 +448,47 @@ describe('LesserRestorationPopup', () => {
         expect(screen.getByText(/Level 2/)).toBeInTheDocument();
     });
 
+    it('handles spell missing name property with fallback', () => {
+        render(
+            <LesserRestorationPopup
+                spell={{ level: 3 }}
+                playerStats={{}}
+                campaignName="test-campaign"
+                creatureTargets={mockCreatureTargets}
+                range={mockRange}
+                onConfirm={vi.fn()}
+                onSkip={vi.fn()}
+            />
+        );
+        expect(screen.getByText(/Spell/)).toBeInTheDocument();
+    });
+
+    it('handles spell missing level property with fallback', () => {
+        render(
+            <LesserRestorationPopup
+                spell={{ name: 'Test Spell' }}
+                playerStats={{}}
+                campaignName="test-campaign"
+                creatureTargets={mockCreatureTargets}
+                range={mockRange}
+                onConfirm={vi.fn()}
+                onSkip={vi.fn()}
+            />
+        );
+        expect(screen.getByText(/Level 2/)).toBeInTheDocument();
+    });
+
     // ── Empty creature targets ──
 
     it('renders no target options when creatureTargets is empty', () => {
         renderPopup({ creatureTargets: [] });
         expect(screen.getByText('Target:')).toBeInTheDocument();
         expect(screen.queryByText('Goblin')).not.toBeInTheDocument();
+    });
+
+    it('keeps cast button disabled when creatureTargets is empty', () => {
+        renderPopup({ creatureTargets: [] });
+        expect(screen.getByText('Cast Lesser Restoration')).toBeDisabled();
     });
 
     // ── Combat summary integration ──
@@ -419,10 +550,74 @@ describe('LesserRestorationPopup', () => {
         });
     });
 
+    it('handles combat summary with null creatures array', async () => {
+        getRuntimeValue.mockReturnValue(['blinded']);
+        getCombatSummary.mockResolvedValue({ creatures: null });
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('Blinded condition')).toBeInTheDocument();
+        });
+    });
+
+    it('handles combat summary creature without conditions array', async () => {
+        getRuntimeValue.mockReturnValue(['blinded']);
+        getCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin' }],
+        });
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('Blinded condition')).toBeInTheDocument();
+        });
+    });
+
+    it('passes campaignName to getCombatSummary', async () => {
+        getRuntimeValue.mockReturnValue([]);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup({ campaignName: 'my-campaign' });
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(getCombatSummary).toHaveBeenCalledWith('my-campaign');
+        });
+    });
+
     // ── Condition matching (case-insensitive) ──
 
     it('matches conditions case-insensitively', async () => {
         getRuntimeValue.mockReturnValue(['BLINDED']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('Blinded condition')).toBeInTheDocument();
+        });
+    });
+
+    it('matches conditions from combat summary case-insensitively', async () => {
+        getRuntimeValue.mockReturnValue([]);
+        getCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin', conditions: [{ key: 'DEAFENED' }] }],
+        });
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('Deafened condition')).toBeInTheDocument();
+        });
+    });
+
+    it('matches conditions with leading/trailing whitespace', async () => {
+        getRuntimeValue.mockReturnValue(['  blinded  ']);
         getCombatSummary.mockResolvedValue(null);
 
         renderPopup();
@@ -449,6 +644,34 @@ describe('LesserRestorationPopup', () => {
         });
     });
 
+    it('filters combat summary conditions to only allowed types', async () => {
+        getRuntimeValue.mockReturnValue([]);
+        getCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin', conditions: [{ key: 'exhaustion' }, { key: 'poisoned' }, { key: 'restrained' }] }],
+        });
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('Poisoned condition')).toBeInTheDocument();
+            expect(screen.queryByText('Exhaustion condition')).not.toBeInTheDocument();
+            expect(screen.queryByText('Restrained condition')).not.toBeInTheDocument();
+        });
+    });
+
+    it('shows no applicable message when all conditions are filtered out', async () => {
+        getRuntimeValue.mockReturnValue(['exhaustion', 'frightened', 'restrained']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('No applicable conditions found on this target')).toBeInTheDocument();
+        });
+    });
+
     // ── Name matching via utils.getName ──
 
     it('matches creature names via utils.getName for combat summary lookup', async () => {
@@ -463,5 +686,114 @@ describe('LesserRestorationPopup', () => {
         await waitFor(() => {
             expect(getCombatSummary).toHaveBeenCalled();
         });
+    });
+
+    it('does not match combat summary conditions for a different creature', async () => {
+        getRuntimeValue.mockReturnValue([]);
+        getCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Orc', conditions: [{ key: 'blinded' }] }],
+        });
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('No applicable conditions found on this target')).toBeInTheDocument();
+        });
+    });
+
+    // ── getRuntimeValue integration ──
+
+    it('calls getRuntimeValue with target name and activeConditions property', async () => {
+        getRuntimeValue.mockReturnValue(['blinded']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Orc');
+
+        await waitFor(() => {
+            expect(getRuntimeValue).toHaveBeenCalledWith('Orc', 'activeConditions');
+        });
+    });
+
+    it('handles getRuntimeValue returning undefined', async () => {
+        getRuntimeValue.mockReturnValue(undefined);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText('No applicable conditions found on this target')).toBeInTheDocument();
+        });
+    });
+
+    // ── Target switching clears previous state ──
+
+    it('clears target and conditions when switching from one target to another', async () => {
+        getRuntimeValue.mockReturnValue(['blinded']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup();
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText(/Condition to remove from/)).toBeInTheDocument();
+        });
+        expect(screen.getByText('Blinded condition')).toBeInTheDocument();
+
+        getRuntimeValue.mockReturnValue(['deafened']);
+
+        fireEvent.click(screen.getByText('Orc'));
+
+        await waitFor(() => {
+            expect(screen.getByText(/Condition to remove from Orc/)).toBeInTheDocument();
+            expect(screen.queryByText('Blinded condition')).not.toBeInTheDocument();
+            expect(screen.getByText('Deafened condition')).toBeInTheDocument();
+        });
+    });
+
+    // ── Creature targets with null values ──
+
+    it('handles creatureTargets with null values gracefully', () => {
+        renderPopup({ creatureTargets: ['Goblin', null, 'Orc'] });
+        expect(screen.getByText('Goblin')).toBeInTheDocument();
+        expect(screen.getByText('Orc')).toBeInTheDocument();
+    });
+
+    // ── Multiple conditions selected and confirmed ──
+
+    it('calls onConfirm with the first selected condition when multiple are selected', async () => {
+        const onConfirm = vi.fn();
+        getRuntimeValue.mockReturnValue(['blinded', 'deafened', 'paralyzed']);
+        getCombatSummary.mockResolvedValue(null);
+
+        renderPopup({ onConfirm });
+        await selectTarget('Goblin');
+
+        await waitFor(() => {
+            expect(screen.getByText(/Blinded condition/)).toBeInTheDocument();
+        });
+
+        // Select all three conditions
+        fireEvent.click(screen.getByText(/Blinded condition/));
+        fireEvent.click(screen.getByText(/Deafened condition/));
+        fireEvent.click(screen.getByText(/Paralyzed condition/));
+
+        fireEvent.click(screen.getByText('Cast Lesser Restoration'));
+        expect(onConfirm).toHaveBeenCalledTimes(1);
+        expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Goblin', condition: 'blinded' });
+    });
+
+    // ── Range display ──
+
+    it('renders the provided range in the description', () => {
+        renderPopup({ range: '60 ft' });
+        expect(screen.getByText('60 ft')).toBeInTheDocument();
+    });
+
+    it('renders the default range from prop', () => {
+        renderPopup();
+        expect(screen.getByText('30 ft')).toBeInTheDocument();
     });
 });

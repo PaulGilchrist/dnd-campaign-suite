@@ -251,5 +251,50 @@ describe('ArcaneChargeModal', () => {
     });
   });
 
+  // ── Edge cases ──
+
+  describe('edge cases', () => {
+    it('renders with undefined onClose without throwing at render time', () => {
+      render(<ArcaneChargeModal {...makeProps({ onClose: undefined })} />);
+      expect(screen.getByText('Arcane Charge')).toBeInTheDocument();
+    });
+
+    it('renders without throwing when action prop is null', () => {
+      expect(() => render(<ArcaneChargeModal {...makeProps({ action: null })} />)).not.toThrow();
+    });
+
+    it('renders with undefined playerStats without throwing at render time', () => {
+      render(<ArcaneChargeModal {...makeProps({ playerStats: undefined })} />);
+      expect(screen.getByText('Arcane Charge')).toBeInTheDocument();
+    });
+
+    it('renders with undefined campaignName without throwing at render time', () => {
+      render(<ArcaneChargeModal {...makeProps({ campaignName: undefined })} />);
+      expect(screen.getByText('Arcane Charge')).toBeInTheDocument();
+    });
+
+    it('renders description with distance 0', () => {
+      render(<ArcaneChargeModal {...makeProps({ distance: 0 })} />);
+      expect(screen.getByText(/Teleport up to 0 to an unoccupied space you can see/)).toBeInTheDocument();
+    });
+
+    it('renders description with distance null (null falls back to default via ??)', () => {
+      render(<ArcaneChargeModal {...makeProps({ distance: null })} />);
+      expect(screen.getByText(/Teleport up to 30 ft to an unoccupied space you can see/)).toBeInTheDocument();
+    });
+
+    it('calls confirmArcaneCharge with default playerStats and campaignName even when undefined override passed', async () => {
+      confirmArcaneCharge.mockResolvedValue(defaultConfirmResponse());
+      render(<ArcaneChargeModal {...makeProps({ playerStats: undefined, campaignName: undefined })} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Teleport/ }));
+      });
+      expect(confirmArcaneCharge).toHaveBeenCalledWith(
+        defaultAction,
+        defaultPlayerStats,
+        defaultCampaignName
+      );
+    });
+  });
 
 });

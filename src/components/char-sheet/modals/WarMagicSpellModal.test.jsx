@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import WarMagicSpellModal from './WarMagicSpellModal.jsx'
 
 vi.mock('../../../services/automation/handlers/class-fighter-rogue/warMagicSpellHandler.js', () => ({
@@ -150,12 +150,14 @@ describe('WarMagicSpellModal', () => {
             fireEvent.click(screen.getByText('Web'))
             fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
 
-            await expect(confirmWarMagicSpell).toHaveBeenCalledWith(
-                mockAction,
-                mockPlayerStats,
-                mockCampaignName,
-                'Web'
-            )
+            await waitFor(() => {
+                expect(confirmWarMagicSpell).toHaveBeenCalledWith(
+                    mockAction,
+                    mockPlayerStats,
+                    mockCampaignName,
+                    'Web'
+                )
+            })
         })
 
         it('shows Done button after confirmation', async () => {
@@ -173,7 +175,9 @@ describe('WarMagicSpellModal', () => {
             fireEvent.click(screen.getByText('Web'))
             fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
 
-            await expect(screen.findByText('Done')).resolves.toBeInTheDocument()
+            await waitFor(() => {
+                expect(screen.getByText('Done')).toBeInTheDocument()
+            })
         })
 
         it('displays the result description from the handler', async () => {
@@ -191,7 +195,9 @@ describe('WarMagicSpellModal', () => {
             fireEvent.click(screen.getByText('Web'))
             fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
 
-            await expect(screen.findByText('Custom result message.')).resolves.toBeInTheDocument()
+            await waitFor(() => {
+                expect(screen.getByText('Custom result message.')).toBeInTheDocument()
+            })
         })
 
         it('calls onClose when Done button is clicked after confirmation', async () => {
@@ -209,7 +215,9 @@ describe('WarMagicSpellModal', () => {
             fireEvent.click(screen.getByText('Web'))
             fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
 
-            await screen.findByText('Done')
+            await waitFor(() => {
+                expect(screen.getByText('Done')).toBeInTheDocument()
+            })
             fireEvent.click(screen.getByText('Done'))
             expect(mockOnClose).toHaveBeenCalledOnce()
         })
@@ -229,7 +237,9 @@ describe('WarMagicSpellModal', () => {
             fireEvent.click(screen.getByText('Web'))
             fireEvent.click(screen.getByRole('button', { name: /replace attack/i }))
 
-            await screen.findByText('Done')
+            await waitFor(() => {
+                expect(screen.getByText('Done')).toBeInTheDocument()
+            })
             const icon = document.querySelector('.sp-header i.fa-solid.fa-hat-wizard')
             expect(icon).toBeInTheDocument()
         })

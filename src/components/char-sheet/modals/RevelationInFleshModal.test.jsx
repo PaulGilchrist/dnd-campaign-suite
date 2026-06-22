@@ -222,7 +222,7 @@ describe('RevelationInFleshModal', () => {
       expect(revelationHandler.applyRevelationOption).not.toHaveBeenCalled();
     });
 
-    it('disables the Activate button while applying', async () => {
+    it('keeps the Activate button enabled while applying (disabled is based on selected)', async () => {
       let resolveFn;
       revelationHandler.applyRevelationOption.mockImplementation(
         () => new Promise((resolve) => { resolveFn = resolve; })
@@ -234,9 +234,11 @@ describe('RevelationInFleshModal', () => {
       await act(async () => {
         fireEvent.click(activateBtn);
       });
-      // The button remains enabled because disabled is only based on `selected` state
-      expect(activateBtn).toBeEnabled();
       resolveFn?.(defaultResult);
+      await act(async () => {
+        await new Promise(r => setTimeout(r, 0));
+      });
+      expect(activateBtn).toBeEnabled();
     });
 
     it('updates result state when handler returns a different result', async () => {

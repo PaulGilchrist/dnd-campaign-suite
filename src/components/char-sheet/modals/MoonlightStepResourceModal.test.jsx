@@ -305,9 +305,15 @@ describe('MoonlightStepResourceModal', () => {
       expect(screen.getByText(/Current uses: 0\/0/)).toBeInTheDocument();
     });
 
-    it('handles undefined automation, defaulting conversionRate to level_2_plus', () => {
-      render(<MoonlightStepResourceModal {...makeProps({ automation: undefined })} />);
+    it('handles undefined automation.conversionRate, defaulting to level_2_plus', () => {
+      render(<MoonlightStepResourceModal {...makeProps({ automation: {} })} />);
       expect(screen.getByText('Moonlight Step — Restore Uses')).toBeInTheDocument();
+    });
+
+    it('handles automation with empty conversionRate, defaulting to level_2_plus', () => {
+      render(<MoonlightStepResourceModal {...makeProps({ automation: makeAutomation('') })} />);
+      const radios = getRadios();
+      expect(radios[0]).toBeChecked();
     });
 
     it('disables all radios and the convert button when no slots exist at any level', () => {

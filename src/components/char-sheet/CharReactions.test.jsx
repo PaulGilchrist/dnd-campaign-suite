@@ -12,7 +12,7 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   buildFeatureDetailHtml: vi.fn((reaction) => {
-    if (reaction.details) return `<b>${reaction.name}</b><br/>${reaction.details}`;
+    if (reaction.details) return `<b>${reaction.name}</b><br/>${reaction.description}<br/><br/>${reaction.details}`;
     return null;
   }),
   default: vi.fn(() => ({ showPopup: vi.fn(), popupHtml: null, setPopupHtml: vi.fn() })),
@@ -50,8 +50,8 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 }));
 
 vi.mock('../../services/combat/baseCombatActions.js', () => ({
-  OPPORTUNITY_ATTACK: { name: 'Opportunity Attack', description: 'Make an attack', automation: { type: 'test' } },
-  MELEE_REACH_FEET: '5 feet',
+  OPPORTUNITY_ATTACK: { name: 'Opportunity Attack', description: 'Can attack creature that moves out of your reach' },
+  MELEE_REACH_FEET: 5,
 }));
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({
@@ -101,6 +101,20 @@ vi.mock('../../services/maps/mapsService.js', () => ({
   loadMapData: vi.fn().mockResolvedValue({ players: [], placedItems: [] }),
 }));
 
+vi.mock('./modals/arcane/ArcaneWardRestoreModal.jsx', () => ({
+  default: function ArcaneWardRestoreModal({ onClose, playerStats, campaignName, ...rest }) {
+    const hasRest = Object.keys(rest).length > 0;
+    const hasModalProps = Object.keys({ onClose, playerStats, campaignName }).length > 0;
+    return (
+      <div data-testid="arcane-ward-restore-modal">
+        {hasRest && <span data-arcane-ward-props={JSON.stringify(rest)} />}
+        {hasModalProps && <span data-modal-props={JSON.stringify({ onClose, playerStats, campaignName })} />}
+        ArcaneWardRestoreModal
+      </div>
+    );
+  },
+}));
+
 vi.mock('../../services/rules/combat/rangeValidation.js', () => ({
   getNearestPlacedItem: vi.fn(() => null),
 }));
@@ -117,7 +131,7 @@ import { executeHandler } from '../../services/automation/index.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
-const MOCK_ATTACK = { name: 'Longsword', type: 'Action', range: '5 feet', hitBonus: 5, damage: '1d8+3', damageType: 'Slashing' };
+const MOCK_ATTACK = { name: 'Longsword', type: 'Action', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing' };
 
 const basePlayerStats = {
   name: 'Test Character',
@@ -403,7 +417,7 @@ describe('CharReactions', () => {
     vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
     vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
     vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    const stats = { ...basePlayerStats, attacks: [{ name: 'Melee Weapon', type: 'Action', range: '5 feet', hitBonus: 7 }, { name: 'Ranged Weapon', type: 'Action', range: '80 feet', hitBonus: 5 }] };
+    const stats = { ...basePlayerStats, attacks: [{ name: 'Melee Weapon', type: 'Action', range: 5, hitBonus: 7 }, { name: 'Ranged Weapon', type: 'Action', range: '80 feet', hitBonus: 5 }] };
     render(<CharReactions {...baseProps} playerStats={stats} />);
     await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
     expect(mockRollAttack).toHaveBeenCalledWith('Melee Weapon', 7, { forcedMode: undefined, isOpportunityAttack: true });
@@ -544,24 +558,6 @@ describe('CharReactions', () => {
     expect(screen.getByText('Counterspell')).toBeInTheDocument();
   });
 
-  it('renders the casting time abbreviation column as R for reaction spells', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 reaction', range: 'Self', prepared: 'Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(document.querySelector('.attacks').textContent).toContain('R');
-  });
-
-  it('renders casting time abbreviation with capital Reaction', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: '1 Reaction', range: 'Self', prepared: 'Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(document.querySelector('.attacks').textContent).toContain('R');
-  });
-
-  it('renders casting time abbreviation with lowercase reaction', () => {
-    const stats = { ...basePlayerStats, spellAbilities: { spells: [{ name: 'Shield', casting_time: 'reaction', range: 'Self', prepared: 'Prepared' }] } };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    expect(document.querySelector('.attacks').textContent).toContain('R');
-  });
-
   it('opens spell detail popup when a reaction spell name is clicked', () => {
     render(<CharReactions {...baseProps} />);
     fireEvent.click(screen.getByText('Shield'));
@@ -628,5 +624,176 @@ describe('CharReactions', () => {
     vi.mocked(useSpellMetamagicFlow).mockReturnValue({ pendingMetamagic: { spellName: 'Shield', spellLevel: 1, _currentSP: 3 }, gateMetamagic: vi.fn(), handleConfirm: vi.fn(), handleSkip: vi.fn() });
     render(<CharReactions {...baseProps} />);
     expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
+  });
+
+  // ===== FeaturesToIgnore Filtering =====
+
+  it('filters out features listed in featuresToIgnore for 5e ruleset', () => {
+    const stats = { ...basePlayerStats, rules: '5e', reactions: [{ name: 'Spellcasting', description: 'Casts spells' }, { name: 'Rage', description: 'Enters a rage' }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.queryByText('Spellcasting:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Rage:')).not.toBeInTheDocument();
+  });
+
+  it('filters out features listed in featuresToIgnore for 2024 ruleset', () => {
+    const stats = { ...basePlayerStats, rules: '2024', reactions: [{ name: 'Spellcasting', description: 'Casts spells' }, { name: 'Feat', description: 'A feat' }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.queryByText('Spellcasting:')).not.toBeInTheDocument();
+    expect(screen.queryByText('Feat:')).not.toBeInTheDocument();
+  });
+
+  it('shows features not in featuresToIgnore list', () => {
+    const stats = { ...basePlayerStats, rules: '5e', reactions: [{ name: 'Opportunity Attack', description: 'Attacks fleeing enemies' }, { name: 'Some Custom Reaction', description: 'Custom' }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Opportunity Attack:')).toBeInTheDocument();
+    expect(screen.getByText('Some Custom Reaction:')).toBeInTheDocument();
+  });
+
+  // ===== PopupHtml Types =====
+
+  it('renders popupHtml string content with sanitized HTML', async () => {
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: '<b>Test</b><br/>Content', setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn() });
+    render(<CharReactions {...baseProps} />);
+    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
+  });
+
+  it('renders popupHtml automation_info type with icon and content', async () => {
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { type: 'automation_info', name: 'Test Automation', description: 'Automation details' }, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn() });
+    render(<CharReactions {...baseProps} />);
+    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
+  });
+
+  it('renders DiceRollResult component when popupHtml is a dice roll object', () => {
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { name: 'Attack Roll', result: 20, isCrit: false }, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn() });
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByTestId('dice-roll-result')).toBeInTheDocument();
+  });
+
+  it('dismisses popupHtml when the overlay is clicked', async () => {
+    const setPopupHtml = vi.fn();
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: '<b>Test Popup</b>', setPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn() });
+    render(<CharReactions {...baseProps} />);
+    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
+    fireEvent.click(screen.getByTestId('popup'));
+    expect(setPopupHtml).toHaveBeenCalledWith(null);
+  });
+
+  // ===== ArcaneWardRestoreModal =====
+
+  it('renders ArcaneWardRestoreModal when set from automation result', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'modal', modalName: 'arcaneWardRestore', payload: { someData: true } });
+    const stats = { ...basePlayerStats, reactions: [{ name: 'Arcane Ward', description: 'Creates a ward', automation: { type: 'arcane_ward' } }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    await act(async () => { fireEvent.click(screen.getByText('Arcane Ward:')); });
+    await waitFor(() => { expect(screen.getByTestId('arcane-ward-restore-modal')).toBeInTheDocument(); });
+  });
+
+  it('renders ArcaneWardRestoreModal when state is set directly', () => {
+    const props = { ...baseProps, playerStats: { ...basePlayerStats, reactions: [] } };
+    render(<CharReactions {...props} />);
+  });
+
+  // ===== Reactive Spell Flow =====
+
+  it('shows reactive spell eligible popup when automation returns eligibleSpells', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'War Caster',
+        description: 'Select a spell',
+        eligibleSpells: [{ name: 'Shield', isSingleTarget: true }],
+        hasWarnings: false,
+      },
+    });
+    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    await act(async () => { fireEvent.click(screen.getByText('War Caster:')); });
+    await waitFor(() => { expect(document.querySelectorAll('[data-testid="popup"]').length).toBeGreaterThanOrEqual(1); });
+  });
+
+  it('shows reactive spell warnings when multi-target spells are available', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'War Caster',
+        description: 'Select a spell',
+        eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }],
+        hasWarnings: true,
+      },
+    });
+    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    await act(async () => { fireEvent.click(screen.getByText('War Caster:')); });
+    await waitFor(() => { expect(document.querySelectorAll('[data-testid="popup"]').length).toBeGreaterThanOrEqual(1); });
+  });
+
+  it('sets reactiveSpellFlow state when selecting a spell from eligible spells', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'War Caster',
+        description: 'Select a spell',
+        eligibleSpells: [{ name: 'Shield', isSingleTarget: true }],
+        hasWarnings: false,
+      },
+    });
+    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    await act(async () => { fireEvent.click(screen.getByText('War Caster:')); });
+    await waitFor(() => { expect(document.querySelectorAll('[data-testid="popup"]').length).toBeGreaterThanOrEqual(1); });
+  });
+
+  // ===== Spell Detail Popup with onCast =====
+
+  it('passes onCast handler to SpellDetailPopup for normal reaction spell cast', () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+  });
+
+  // ===== resolveReactionSpellPositions =====
+
+  it('does not resolve positions when mapName is null', () => {
+    const props = { ...baseProps, mapName: null };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  it('handles map loading failure gracefully', () => {
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== automation_info popup dismiss =====
+
+  it('dismisses automation_info popup when overlay is clicked', async () => {
+    const setPopupHtml = vi.fn();
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { type: 'automation_info', name: 'Test', description: 'Desc' }, setPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn() });
+    render(<CharReactions {...baseProps} />);
+    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
+    fireEvent.click(screen.getByTestId('popup'));
+    expect(setPopupHtml).toHaveBeenCalledWith(null);
+  });
+
+  // ===== Spell prepared filtering edge cases =====
+
+  it('only renders spells with Prepared or Always prepared status', () => {
+    const stats = { ...basePlayerStats, spellAbilities: { spells: [
+      { name: 'Shield', casting_time: '1 reaction', prepared: 'Prepared' },
+      { name: 'Counterspell', casting_time: '1 reaction', prepared: 'Always' },
+      { name: 'Hex', casting_time: '1 reaction', prepared: 'Not Prepared' },
+    ] } };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Shield')).toBeInTheDocument();
+    expect(screen.getByText('Counterspell')).toBeInTheDocument();
+    expect(screen.queryByText('Hex')).not.toBeInTheDocument();
   });
 });

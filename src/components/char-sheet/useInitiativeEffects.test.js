@@ -90,6 +90,28 @@ describe('useInitiativeEffects', () => {
 
     describe('initiative-rolled event', () => {
         describe('guard clauses', () => {
+            it('does nothing when playerStats is null', () => {
+                renderHook(() =>
+                    useInitiativeEffects(null, campaignName, vi.fn())
+                );
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when playerStats is undefined', () => {
+                renderHook(() =>
+                    useInitiativeEffects(undefined, campaignName, vi.fn())
+                );
+                dispatchInitiativeRoll({
+                    characterName: 'TestMonk',
+                    roll: 15,
+                });
+                expect(setRuntimeValue).not.toHaveBeenCalled();
+            });
+
             it('does nothing when event detail is null', () => {
                 renderHookWithStats();
                 dispatchInitiativeRoll(null);
@@ -954,6 +976,32 @@ describe('useInitiativeEffects', () => {
         }
 
         describe('guard clauses', () => {
+            it('does nothing when playerStats is null', () => {
+                const rollDamage = vi.fn();
+                renderHook(() =>
+                    useInitiativeEffects(null, campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'Cleric',
+                    campaignName,
+                    failedTargets: ['Goblin'],
+                });
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
+            it('does nothing when playerStats is undefined', () => {
+                const rollDamage = vi.fn();
+                renderHook(() =>
+                    useInitiativeEffects(undefined, campaignName, rollDamage)
+                );
+                dispatchTurnUndeadResult({
+                    attackerName: 'Cleric',
+                    campaignName,
+                    failedTargets: ['Goblin'],
+                });
+                expect(rollDamage).not.toHaveBeenCalled();
+            });
+
             it('does nothing when event detail is null', () => {
                 const rollDamage = vi.fn();
                 renderHook(() =>

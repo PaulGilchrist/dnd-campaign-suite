@@ -376,5 +376,40 @@ describe('CombatStanceModal', () => {
       expect(screen.getByText(/Enemies within 5 ft have Disadvantage on attacks against targets other than you/)).toBeInTheDocument();
       expect(screen.getByText(/Melee hits cause Large or smaller creatures to have the Prone condition/)).toBeInTheDocument();
     });
+
+    it('shows Cold elemental movement effects for non-Rage actions', () => {
+      render(<CombatStanceModal {...makeProps({ action: makeAction({ name: 'ElementalStride', automation: { type: 'stance', options: [{ name: 'Cold' }] } }) })} />);
+      expect(screen.getByText(/Ice Walk: Walk across icy\/water surfaces without checks; ignore ice\/snow difficult terrain/)).toBeInTheDocument();
+    });
+
+    it('shows Fire elemental movement effects with speed bonus', () => {
+      render(<CombatStanceModal {...makeProps({ action: makeAction({ name: 'ElementalStride', automation: { type: 'stance', options: [{ name: 'Fire', speedBonus: 15 }] } }) })} />);
+      expect(screen.getByText(/Speed Boost: \+15 feet to Speed/)).toBeInTheDocument();
+    });
+
+    it('shows Fire elemental movement effects with default speed bonus', () => {
+      render(<CombatStanceModal {...makeProps({ action: makeAction({ name: 'ElementalStride', automation: { type: 'stance', options: [{ name: 'Fire' }] } }) })} />);
+      expect(screen.getByText(/Speed Boost: \+10 feet to Speed/)).toBeInTheDocument();
+    });
+
+    it('shows Lightning elemental movement effects', () => {
+      render(<CombatStanceModal {...makeProps({ action: makeAction({ name: 'ElementalStride', automation: { type: 'stance', options: [{ name: 'Lightning' }] } }) })} />);
+      expect(screen.getByText(/Fly Speed equal to your Speed for 1 round/)).toBeInTheDocument();
+    });
+
+    it('shows Thunder elemental movement effects with teleport distance', () => {
+      render(<CombatStanceModal {...makeProps({ action: makeAction({ name: 'ElementalStride', automation: { type: 'stance', options: [{ name: 'Thunder', teleportDistance: '60 ft' }] } }) })} />);
+      expect(screen.getByText(/Teleport up to 60 ft to an unoccupied space you can see/)).toBeInTheDocument();
+    });
+
+    it('shows Thunder elemental movement effects with default teleport distance', () => {
+      render(<CombatStanceModal {...makeProps({ action: makeAction({ name: 'ElementalStride', automation: { type: 'stance', options: [{ name: 'Thunder' }] } }) })} />);
+      expect(screen.getByText(/Teleport up to 30 ft to an unoccupied space you can see/)).toBeInTheDocument();
+    });
+
+    it('renders options with no effects cleanly', () => {
+      render(<CombatStanceModal {...makeProps({ action: makeAction({ name: 'ElementalStride', automation: { type: 'stance', options: [{ name: 'Lightning' }] } }) })} />);
+      expect(screen.getByText('Lightning')).toBeInTheDocument();
+    });
   });
 });

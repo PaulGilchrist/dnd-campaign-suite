@@ -705,4 +705,177 @@ describe('FontOfMagicModal', () => {
     render(<FontOfMagicModal {...props} />);
     expect(screen.getByText('Font of Magic')).toBeInTheDocument();
   });
+
+  it('handles undefined playerStats.class gracefully', () => {
+    const props = makeProps({
+      playerStats: {
+        name: 'Throg',
+        level: 15,
+        rules: '5e',
+        spellAbilities: {
+          spell_slots_level_1: 4,
+          spell_slots_level_2: 3,
+          spell_slots_level_3: 3,
+          spell_slots_level_4: 3,
+          spell_slots_level_5: 1,
+        },
+      },
+      campaignName: 'test-campaign',
+      onClose: mockOnClose,
+    });
+    render(<FontOfMagicModal {...props} />);
+    expect(screen.getByText('Font of Magic')).toBeInTheDocument();
+  });
+
+  it('handles class_levels with no matching level gracefully', () => {
+    const props = makeProps({
+      playerStats: {
+        name: 'Throg',
+        level: 20,
+        rules: '5e',
+        class: {
+          name: 'Sorcerer',
+          class_levels: [
+            { level: 15, class_specific: { creating_spell_slots: [] } },
+          ],
+        },
+        spellAbilities: {
+          spell_slots_level_1: 4,
+          spell_slots_level_2: 3,
+          spell_slots_level_3: 3,
+          spell_slots_level_4: 3,
+          spell_slots_level_5: 1,
+        },
+      },
+      campaignName: 'test-campaign',
+      onClose: mockOnClose,
+    });
+    render(<FontOfMagicModal {...props} />);
+    expect(screen.getByText('Font of Magic')).toBeInTheDocument();
+  });
+
+  it('filters out creating_spell_slots entries with spell_slot_level > 5', () => {
+    const props = makePropsWithCosts([
+      { spell_slot_level: 1, sorcery_point_cost: 2 },
+      { spell_slot_level: 6, sorcery_point_cost: 100 },
+      { spell_slot_level: 7, sorcery_point_cost: 100 },
+    ]);
+    render(<FontOfMagicModal {...props} />);
+    const tables = document.querySelectorAll('.font-of-magic-table');
+    const rows = tables[1].querySelectorAll('tbody tr');
+    expect(rows[0].textContent).toContain('2 SP');
+    expect(rows[1].textContent).toContain('0 SP');
+    expect(rows[2].textContent).toContain('0 SP');
+  });
+
+  it('shows initial SP gained values of +0 for all levels', () => {
+    render(<FontOfMagicModal {...makeProps()} />);
+    const tables = document.querySelectorAll('.font-of-magic-table');
+    const rows = tables[0].querySelectorAll('tbody tr');
+    rows.forEach(row => expect(row.textContent).toContain('+0'));
+  });
+
+  it('shows initial SP cost values of -0 for all levels with 5e default costs', () => {
+    render(<FontOfMagicModal {...makeProps()} />);
+    const tables = document.querySelectorAll('.font-of-magic-table');
+    const rows = tables[1].querySelectorAll('tbody tr');
+    rows.forEach(row => expect(row.textContent).toContain('-0'));
+  });
+
+  it('canApply prevents apply when converting all slots and creating more than remaining', () => {
+    vi.mocked(getRuntimeValue).mockImplementation((name, prop) =>
+      prop === 'sorceryPoints' ? '10' : null
+    );
+    const props = makePropsWithCosts([
+      { spell_slot_level: 1, sorcery_point_cost: 2 },
+    ]);
+    render(<FontOfMagicModal {...props} />);
+    const tables = document.querySelectorAll('.font-of-magic-table');
+    const firstRows = tables[0].querySelectorAll('tbody tr');
+    const secondRows = tables[1].querySelectorAll('tbody tr');
+    // Convert 2 level-1 slots → +2 SP, then try to create 3 level-1 slots → -6 SP
+    // netSP = 2 - 6 = -4, finalSP = 10 - 4 = 6 >= 0, but finalSlots[1] = 4 - 2 + 3 = 5 > maxSlots[1] = 4
+    fireEvent.change(firstRows[0].querySelector('input'), { target: { value: '2' } });
+    fireEvent.change(secondRows[0].querySelector('input'), { target: { value: '3' } });
+    expect(screen.getByText('Apply Conversion')).toBeDisabled();
+  });
+
+  it('canApply prevents apply when creating slots that would go negative (should not happen but guard exists)', () => {
+    vi.mocked(getRuntimeValue).mockImplementation((name, prop) =>
+      prop === 'sorceryPoints' ? '10' : null
+    );
+    const props = makeProps({
+      playerStats: {
+        ...makeProps().playerStats,
+        class: {
+          name: 'Sorcerer',
+          class_levels: [
+            { level: 15, class_specific: { creating_spell_slots: [{ spell_slot_level: 1, sorcery_point_cost: 1 }] } },
+          ],
+        },
+        spellAbilities: {
+          spell_slots_level_1: 1,
+          spell_slots_level_2: 0,
+          spell_slots_level_3: 0,
+          spell_slots_level_4: 0,
+          spell_slots_level_5: 0,
+        },
+      },
+      campaignName: 'test-campaign',
+      onClose: mockOnClose,
+    });
+    render(<FontOfMagicModal {...props} />);
+    const tables = document.querySelectorAll('.font-of-magic-table');
+    const firstRows = tables[0].querySelectorAll('tbody tr');
+    const secondRows = tables[1].querySelectorAll('tbody tr');
+    // Convert 1 slot → +1 SP, create 2 slots → -2 SP, net = -1, finalSP = 10 - 1 = 9 >= 0
+    // But finalSlots[1] = 1 - 1 + 2 = 2 > maxSlots[1] = 1, so disabled
+    fireEvent.change(firstRows[0].querySelector('input'), { target: { value: '1' } });
+    fireEvent.change(secondRows[0].querySelector('input'), { target: { value: '2' } });
+    expect(screen.getByText('Apply Conversion')).toBeDisabled();
+  });
+
+  it('disables Apply when converting slots at one level and creating at same level exceeds max', () => {
+    vi.mocked(getRuntimeValue).mockImplementation((name, prop) =>
+      prop === 'sorceryPoints' ? '10' : null
+    );
+    const props = makePropsWithCosts([
+      { spell_slot_level: 2, sorcery_point_cost: 1 },
+    ]);
+    render(<FontOfMagicModal {...props} />);
+    const tables = document.querySelectorAll('.font-of-magic-table');
+    const secondRows = tables[1].querySelectorAll('tbody tr');
+    // Don't convert any level-2 slots, try to create 4 level-2 slots (max is 3)
+    fireEvent.change(secondRows[1].querySelector('input'), { target: { value: '4' } });
+    expect(screen.getByText('Apply Conversion')).toBeDisabled();
+  });
+
+  it('correctly computes netSPChange when only converting slots (no creation)', () => {
+    vi.mocked(getRuntimeValue).mockImplementation((name, prop) =>
+      prop === 'sorceryPoints' ? '5' : null
+    );
+    render(<FontOfMagicModal {...makeProps()} />);
+    const tables = document.querySelectorAll('.font-of-magic-table');
+    const firstRows = tables[0].querySelectorAll('tbody tr');
+    // Convert 1 level-3 slot → +3 SP
+    fireEvent.change(firstRows[2].querySelector('input'), { target: { value: '1' } });
+    // finalSP = 5 + 3 = 8
+    expect(document.querySelector('.font-of-magic-summary').textContent).toContain('8');
+  });
+
+  it('correctly computes netSPChange when only creating slots (no conversion)', () => {
+    vi.mocked(getRuntimeValue).mockImplementation((name, prop) =>
+      prop === 'sorceryPoints' ? '20' : null
+    );
+    const props = makePropsWithCosts([
+      { spell_slot_level: 3, sorcery_point_cost: 4 },
+    ]);
+    render(<FontOfMagicModal {...props} />);
+    const tables = document.querySelectorAll('.font-of-magic-table');
+    const secondRows = tables[1].querySelectorAll('tbody tr');
+    // Create 2 level-3 slots → -8 SP
+    fireEvent.change(secondRows[2].querySelector('input'), { target: { value: '2' } });
+    // finalSP = 20 - 8 = 12
+    expect(document.querySelector('.font-of-magic-summary').textContent).toContain('12');
+  });
 });

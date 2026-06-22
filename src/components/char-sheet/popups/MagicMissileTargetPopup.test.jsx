@@ -343,4 +343,70 @@ describe('MagicMissileTargetPopup', () => {
     render(<MagicMissileTargetPopup {...makeProps({ spell: {} })} />);
     expect(screen.getByText(/Spell/)).toBeInTheDocument();
   });
+
+  // ── Keyboard listener cleanup ──
+
+  it('removes keydown listener on unmount', () => {
+    const removeListenerSpy = vi.spyOn(document, 'removeEventListener');
+    const { unmount } = render(<MagicMissileTargetPopup {...makeProps()} />);
+    unmount();
+    expect(removeListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+  });
+
+  // ── currentTargetName re-render behavior ──
+
+  it('does not override existing distribution when currentTargetName already has missiles', () => {
+    const { container, rerender } = render(<MagicMissileTargetPopup {...makeProps()} />);
+    const inputs = screen.getAllByRole('spinbutton');
+    fireEvent.change(inputs[0], { target: { value: '2' } });
+    rerender(<MagicMissileTargetPopup {...makeProps({ currentTargetName: 'Goblin' })} />);
+    const summary = container.querySelector('.magic-missile-summary');
+    expect(summary.textContent).toContain('2');
+  });
+
+  it('assigns missiles to new currentTargetName when it was at 0 and previous target already had missiles from auto-assign', () => {
+    const { container, rerender } = render(<MagicMissileTargetPopup {...makeProps({ currentTargetName: 'Goblin' })} />);
+    const inputs = screen.getAllByRole('spinbutton');
+    const goblinIndex = creatureTargets.indexOf('Goblin');
+    expect(inputs[goblinIndex]).toHaveValue(3);
+    rerender(<MagicMissileTargetPopup {...makeProps({ currentTargetName: 'Bugbear', totalMissiles: 5 })} />);
+    const bugbearIndex = creatureTargets.indexOf('Bugbear');
+    expect(inputs[bugbearIndex]).toHaveValue(5);
+    const summary = container.querySelector('.magic-missile-summary');
+    expect(summary.textContent).toContain('5');
+  });
+
+  it('does not clear previous target when currentTargetName changes to a different target', () => {
+    const { container, rerender } = render(<MagicMissileTargetPopup {...makeProps({ currentTargetName: 'Goblin' })} />);
+    const inputs = screen.getAllByRole('spinbutton');
+    const goblinIndex = creatureTargets.indexOf('Goblin');
+    expect(inputs[goblinIndex]).toHaveValue(3);
+    rerender(<MagicMissileTargetPopup {...makeProps({ currentTargetName: 'Orc', totalMissiles: 4 })} />);
+    const orcIndex = creatureTargets.indexOf('Orc');
+    expect(inputs[orcIndex]).toHaveValue(4);
+    const summary = container.querySelector('.magic-missile-summary');
+    expect(summary.textContent).toContain('7');
+  });
+
+  it('does not re-assign when currentTargetName changes to a target that already has missiles from user input', () => {
+    const { container, rerender } = render(<MagicMissileTargetPopup {...makeProps()} />);
+    const inputs = screen.getAllByRole('spinbutton');
+    fireEvent.change(inputs[1], { target: { value: '2' } });
+    rerender(<MagicMissileTargetPopup {...makeProps({ currentTargetName: 'Orc', totalMissiles: 5 })} />);
+    const orcIndex = creatureTargets.indexOf('Orc');
+    expect(inputs[orcIndex]).toHaveValue(2);
+    const summary = container.querySelector('.magic-missile-summary');
+    expect(summary.textContent).toContain('2');
+  });
+
+  it('does not assign missiles when currentTargetName changes to a value not in creatureTargets list on re-render', () => {
+    const { container, rerender } = render(<MagicMissileTargetPopup {...makeProps({ currentTargetName: 'Goblin' })} />);
+    const inputs = screen.getAllByRole('spinbutton');
+    const goblinIndex = creatureTargets.indexOf('Goblin');
+    expect(inputs[goblinIndex]).toHaveValue(3);
+    rerender(<MagicMissileTargetPopup {...makeProps({ currentTargetName: 'Unknown Creature' })} />);
+    expect(inputs[goblinIndex]).toHaveValue(3);
+    const summary = container.querySelector('.magic-missile-summary');
+    expect(summary.textContent).toContain('3');
+  });
 });

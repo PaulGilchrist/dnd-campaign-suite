@@ -649,4 +649,73 @@ describe('SpellDetailPopup', () => {
       expect(screen.getByText('Magic Missile')).toBeInTheDocument();
     });
   });
+
+  describe('area of effect rendering', () => {
+    it('renders area of effect with type and size', () => {
+      const spell = {
+        ...baseMockSpell,
+        area_of_effect: { type: 'Circle', size: '20 ft. radius' },
+      };
+      renderPopup(spell);
+      expect(screen.getByText(/Area:/)).toBeInTheDocument();
+      expect(screen.getByText('Circle - 20 ft. radius')).toBeInTheDocument();
+    });
+
+    it('renders area of effect with only type when size is missing', () => {
+      const spell = {
+        ...baseMockSpell,
+        area_of_effect: { type: 'Sphere' },
+      };
+      renderPopup(spell);
+      expect(screen.getByText('Sphere')).toBeInTheDocument();
+    });
+
+    it('does not render area field when area_of_effect is missing', () => {
+      renderPopup(baseMockSpell);
+      expect(screen.queryByText(/Area:/)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('missing metadata fields', () => {
+    it('renders dash for missing casting_time', () => {
+      const spell = {
+        ...baseMockSpell,
+        casting_time: undefined,
+      };
+      renderPopup(spell);
+      expect(screen.getByText('—')).toBeInTheDocument();
+    });
+
+    it('renders dash for missing range', () => {
+      const spell = {
+        ...baseMockSpell,
+        range: undefined,
+      };
+      renderPopup(spell);
+      const rangeTexts = screen.getAllByText(/—/);
+      expect(rangeTexts.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('renders dash for missing duration', () => {
+      const spell = {
+        ...baseMockSpell,
+        duration: undefined,
+      };
+      renderPopup(spell);
+      const dashTexts = screen.getAllByText('—');
+      expect(dashTexts.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('does not render school span when school is missing', () => {
+      const spell = {
+        ...baseMockSpell,
+        school: undefined,
+      };
+      renderPopup(spell);
+      expect(screen.getByText(/Level:/)).toBeInTheDocument();
+      expect(screen.getByText(/Casting Time:/)).toBeInTheDocument();
+      expect(screen.getByText(/Range:/)).toBeInTheDocument();
+      expect(screen.getByText(/Duration:/)).toBeInTheDocument();
+    });
+  });
 });

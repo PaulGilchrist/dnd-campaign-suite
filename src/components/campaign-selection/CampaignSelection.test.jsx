@@ -58,6 +58,16 @@ describe('CampaignSelection', () => {
       expect(screen.queryByText('Select a Campaign')).not.toBeInTheDocument();
     });
 
+    it('should show loading message when campaigns array is empty but still loading', async () => {
+      getCharacterFolders.mockReturnValue(new Promise((resolve) => {
+        setTimeout(() => resolve([]), 100);
+      }));
+
+      render(<CampaignSelection />);
+
+      expect(screen.getByText('Loading campaigns...')).toBeInTheDocument();
+    });
+
     it('should show success message after creating a campaign', async () => {
       getCharacterFolders.mockResolvedValue(['ExistingCampaign']);
       global.fetch = vi.fn().mockResolvedValue({
@@ -534,7 +544,7 @@ describe('CampaignSelection', () => {
       });
     });
 
-    it('should show loading state while loading characters for a campaign', async () => {
+    it('should show loading overlay while loading characters for a campaign', async () => {
       getCharacterFolders.mockResolvedValue(['Campaign1']);
       getCharacterFiles.mockReturnValue(new Promise((resolve) => {
         setTimeout(() => resolve(['char1.json']), 100);
@@ -553,7 +563,7 @@ describe('CampaignSelection', () => {
       expect(screen.getByText('Creating campaign...')).toBeInTheDocument();
     });
 
-    it('should disable campaign buttons while a campaign is being loaded', async () => {
+    it('should show loading overlay when selecting a campaign with existing campaigns loaded', async () => {
       getCharacterFolders.mockResolvedValue(['Campaign1', 'Campaign2']);
       getCharacterFiles.mockReturnValue(new Promise((resolve) => {
         setTimeout(() => resolve(['char1.json']), 100);
@@ -570,15 +580,59 @@ describe('CampaignSelection', () => {
         fireEvent.click(screen.getByText('Campaign1'));
       });
 
-      // The component renders a full-screen loading overlay when loading with existing campaigns,
-      // so the campaign buttons are hidden behind the loading screen
       expect(screen.getByText('Creating campaign...')).toBeInTheDocument();
     });
 
-    it('should show success message and reload after campaign creation', async () => {
+    it('should clear loading state after campaign selection succeeds', async () => {
+      getCharacterFolders.mockResolvedValue(['Campaign1']);
+      getCharacterFiles.mockResolvedValue(['char1.json']);
+      loadCharacters.mockResolvedValue([{ name: 'Character1' }]);
+
+      render(<CampaignSelection />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Campaign1')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Campaign1'));
+      });
+
+      await waitFor(() => {
+        expect(screen.queryByText('Creating campaign...')).not.toBeInTheDocument();
+        expect(screen.getByText('Campaign1')).toBeInTheDocument();
+      });
+    });
+
+    it('should clear loading state after campaign selection fails', async () => {
+      getCharacterFolders.mockResolvedValue(['Bad Campaign']);
+      getCharacterFiles.mockRejectedValue(new Error('File not found'));
+
+      render(<CampaignSelection />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Bad Campaign')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Bad Campaign'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Failed to load campaign Bad Campaign/)).toBeInTheDocument();
+        expect(screen.queryByText('Creating campaign...')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should call window.location.reload after 2 seconds on successful campaign creation', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({}),
+      });
+      const mockReload = vi.fn();
+      Object.defineProperty(window, 'location', {
+        value: { reload: mockReload },
+        writable: true,
       });
 
       await renderWithCampaigns(['Campaign1']);
@@ -597,6 +651,67 @@ describe('CampaignSelection', () => {
       await waitFor(() => {
         expect(screen.getByText(/Campaign created successfully/)).toBeInTheDocument();
       });
+
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 2100));
+      });
+
+      expect(mockReload).toHaveBeenCalled();
     });
+
+    it('should call onCampaignSelect when campaign is selected with empty character files', async () => {
+      const mockOnCampaignSelect = vi.fn();
+      getCharacterFolders.mockResolvedValue(['Campaign1']);
+      getCharacterFiles.mockResolvedValue([]);
+      loadCharacters.mockResolvedValue([]);
+
+      render(<CampaignSelection onCampaignSelect={mockOnCampaignSelect} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Campaign1')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Campaign1'));
+      });
+
+      await waitFor(() => {
+        expect(mockOnCampaignSelect).toHaveBeenCalledWith('Campaign1', []);
+      });
+    });
+
+    it('should call onCampaignSelect with multiple characters', async () => {
+      const mockOnCampaignSelect = vi.fn();
+      getCharacterFolders.mockResolvedValue(['Campaign1']);
+      getCharacterFiles.mockResolvedValue(['char1.json', 'char2.json', 'char3.json']);
+      loadCharacters.mockResolvedValue([
+        { name: 'Character1', class: 'Fighter' },
+        { name: 'Character2', class: 'Wizard' },
+        { name: 'Character3', class: 'Rogue' },
+      ]);
+
+      render(<CampaignSelection onCampaignSelect={mockOnCampaignSelect} />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Campaign1')).toBeInTheDocument();
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByText('Campaign1'));
+      });
+
+      await waitFor(() => {
+        expect(mockOnCampaignSelect).toHaveBeenCalledWith(
+          'Campaign1',
+          [
+            { name: 'Character1', class: 'Fighter' },
+            { name: 'Character2', class: 'Wizard' },
+            { name: 'Character3', class: 'Rogue' },
+          ]
+        );
+      });
+    });
+
+
   });
 });

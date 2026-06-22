@@ -73,6 +73,16 @@ vi.mock('./components/common/Subscriber.jsx', () => ({
   default: function MockSubscriber() { return null; },
 }));
 
+vi.mock('./components/settlements/Settlements.jsx', async () => {
+  const { MockSettlements } = await import('./test/mockComponents.jsx');
+  return { default: MockSettlements };
+});
+
+vi.mock('./components/log/Log.jsx', async () => {
+  const { MockLog } = await import('./test/mockComponents.jsx');
+  return { default: MockLog };
+});
+
 const originalLocation = window.location;
 
 describe('App', () => {

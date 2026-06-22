@@ -209,4 +209,82 @@ describe('MageArmorTargetPopup', () => {
             expect(onConfirm).toHaveBeenCalledWith(['Orc']);
         });
     });
+
+    // ── CSS classes ──
+
+    describe('CSS classes', () => {
+        it('renders with popup-overlay class', () => {
+            renderPopup();
+            expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
+        });
+
+        it('renders with popup-modal class', () => {
+            renderPopup();
+            expect(document.querySelector('.popup-modal')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-popup class', () => {
+            renderPopup();
+            expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-popup-inner class', () => {
+            renderPopup();
+            expect(document.querySelector('.metamagic-popup-inner')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-spell-name class', () => {
+            renderPopup();
+            expect(document.querySelector('.metamagic-spell-name')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-twin-target class', () => {
+            renderPopup();
+            expect(document.querySelector('.metamagic-twin-target')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-actions class', () => {
+            renderPopup();
+            expect(document.querySelector('.metamagic-actions')).toBeInTheDocument();
+        });
+
+        it('renders btn-secondary class on Cancel button', () => {
+            renderPopup();
+            expect(screen.getByText('Cancel')).toHaveClass('btn-secondary');
+        });
+
+        it('renders btn class on Cast Mage Armor button', () => {
+            renderPopup();
+            expect(screen.getByText('Cast Mage Armor')).toHaveClass('btn');
+        });
+
+        it('renders shield-halved icon in heading', () => {
+            renderPopup();
+            const icon = document.querySelector('.fa-solid.fa-shield-halved');
+            expect(icon).toBeInTheDocument();
+        });
+    });
+
+    // ── Keyboard listener cleanup ──
+
+    describe('keyboard listener cleanup', () => {
+        it('removes keydown listener on unmount', () => {
+            const removeListenerSpy = vi.spyOn(document, 'removeEventListener');
+            const { unmount } = renderPopup();
+            unmount();
+            expect(removeListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
+        });
+    });
+
+    // ── Defensive guard coverage ──
+
+    describe('defensive guard', () => {
+        it('returns early from handleConfirm when needsTarget is true (no selection)', () => {
+            const onConfirm = vi.fn();
+            renderPopup({ onConfirm });
+            // Click the disabled button - the onClick handler still fires
+            fireEvent.click(screen.getByText('Cast Mage Armor'));
+            expect(onConfirm).not.toHaveBeenCalled();
+        });
+    });
 });

@@ -604,4 +604,66 @@ describe('DivineInterventionModal', () => {
     render(<DivineInterventionModal {...makeProps({ featureName: 'Divine Strike' })} />);
     expect(screen.getByText('Divine Strike')).toBeInTheDocument();
   });
+
+  // ── Edge cases: missing spell properties ──
+
+  it('handles a spell with undefined level by treating it as level 0', () => {
+    const noLevelSpell = [
+      {
+        index: 'test-spell',
+        name: 'Test Spell',
+        school: 'Evocation',
+        casting_time: '1 action',
+        range: 'Self',
+        components: 'V',
+        duration: 'Instantaneous',
+        description: ['A spell without a level.'],
+      },
+    ];
+    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noLevelSpell })} />);
+    expect(screen.getByText('Cantrip')).toBeInTheDocument();
+    expect(screen.getByText('Test Spell')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('Test Spell'));
+    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
+    expect(selectedSpellDiv.textContent).toMatch(/Cantrip/);
+  });
+
+  it('handles a spell with undefined description by rendering no paragraphs', () => {
+    const noDescriptionSpell = [
+      {
+        index: 'test-spell',
+        name: 'Test Spell',
+        level: 1,
+        school: 'Evocation',
+        casting_time: '1 action',
+        range: 'Self',
+        components: 'V',
+        duration: 'Instantaneous',
+        description: null,
+      },
+    ];
+    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noDescriptionSpell })} />);
+    fireEvent.click(screen.getByText('Test Spell'));
+    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
+    expect(selectedSpellDiv.querySelectorAll('p').length).toBe(0);
+  });
+
+  it('handles a spell with undefined school in the detail view', () => {
+    const noSchoolSpell = [
+      {
+        index: 'test-spell',
+        name: 'Test Spell',
+        level: 1,
+        casting_time: '1 action',
+        range: 'Self',
+        components: 'V',
+        duration: 'Instantaneous',
+        description: ['A spell without a school.'],
+      },
+    ];
+    render(<DivineInterventionModal {...makeProps({ eligibleSpells: noSchoolSpell })} />);
+    fireEvent.click(screen.getByText('Test Spell'));
+    const selectedSpellDiv = document.querySelector('.divine-intervention-selected-spell');
+    expect(selectedSpellDiv.textContent).toMatch(/Level 1 — /);
+  });
 });

@@ -32,7 +32,7 @@ function CharInventory({ playerStats }) {
                 return equipmentData.find(f => {
                     const normalizedName = (f.name || '').toLowerCase().replace(/\s+/g, '-');
                     const normalizedIndex = (f.index || '').toLowerCase().replace(/\s+/g, '-');
-                    return normalizedName === normalizedInput || normalizedIndex === normalizedIndex;
+                    return normalizedName === normalizedInput || normalizedIndex === normalizedInput;
                 });
             };
             

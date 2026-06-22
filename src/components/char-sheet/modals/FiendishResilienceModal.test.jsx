@@ -482,6 +482,32 @@ describe('FiendishResilienceModal', () => {
     });
   });
 
+  // ── Null result handling ──
+
+  describe('null result handling', () => {
+    it('does not show result view when applyTypeChoice returns null', async () => {
+      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(null);
+      render(<FiendishResilienceModal {...defaultProps} />);
+      selectDamageType('Acid');
+      await clickApplyButton('Choose Damage Type');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Choose Damage Type' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not show result view when applyTypeChoice returns undefined', async () => {
+      fiendishResilienceHandler.applyTypeChoice.mockResolvedValue(undefined);
+      render(<FiendishResilienceModal {...defaultProps} />);
+      selectDamageType('Cold');
+      await clickApplyButton('Choose Damage Type');
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: 'Choose Damage Type' })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
+      });
+    });
+  });
+
   // ── Edge cases / null safety ──
 
   describe('edge cases', () => {

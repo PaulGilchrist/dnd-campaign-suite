@@ -487,11 +487,291 @@ describe('HandOfHealingModal', () => {
       await waitFor(() => {
         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
           'Goblin',
-          'activeConditions',
-          expect.any(Array),
-          'test-campaign'
-        );
-      });
-    });
-  });
+           'activeConditions',
+           expect.any(Array),
+           'test-campaign'
+         );
+       });
+     });
+   });
+
+   describe('conditionMatches edge cases', () => {
+     it('does not auto-cure when conditions contain undefined values', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue([undefined]);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.queryByText(/Physician/)).not.toBeInTheDocument();
+     });
+
+     it('does not crash when conditions contain object values', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue([{ name: 'blinded' }]);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.queryByText(/Physician/)).not.toBeInTheDocument();
+     });
+
+     it('auto-cures when conditions contain a mix of valid cureable and invalid values', async () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['stunned', null, undefined, '  ']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       await waitFor(() => {
+         expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+       });
+     });
+   });
+
+   describe('combat summary edge cases', () => {
+     it('does not crash when combat summary creature.conditions is null', () => {
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [{ name: 'Goblin', conditions: null }],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+     });
+
+     it('does not crash when combat summary creature.conditions is undefined', () => {
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [{ name: 'Goblin', conditions: undefined }],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+     });
+
+     it('does not crash when combat summary creature.conditions is a non-array value', () => {
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [{ name: 'Goblin', conditions: 'stunned' }],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+     });
+
+     it('does not crash when combat summary creature is null', () => {
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [null],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+     });
+
+     it('does not crash when combat summary creatures is null', () => {
+       combatData.getCombatSummary.mockReturnValue({ creatures: null });
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+     });
+
+     it('uses utils.getName to match creature by normalized name', async () => {
+       const { default: utils } = await import('../../../../services/ui/utils.js');
+       utils.getName.mockImplementation((n) => (typeof n === 'string' ? n.trim() : ''));
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [{ name: '  Goblin  ', conditions: [{ key: 'blinded' }] }],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue([]);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       await waitFor(() => {
+         expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+       });
+     });
+   });
+
+   describe('runtime state edge cases', () => {
+     it('handles when getRuntimeValue returns a non-array (string)', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue('blinded');
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.queryByText(/Physician/)).not.toBeInTheDocument();
+     });
+
+     it('handles when getRuntimeValue returns a non-array (number)', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(42);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.queryByText(/Physician/)).not.toBeInTheDocument();
+     });
+
+     it('handles when getRuntimeValue returns null (default mock)', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(null);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.queryByText(/Physician/)).not.toBeInTheDocument();
+     });
+   });
+
+   describe('manual condition removal - detailed behavior', () => {
+     it('shows the removed condition name with the canonical name from CUREABLE_CONDITIONS', async () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['BLINDED', 'deafened']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       fireEvent.click(screen.getByRole('button', { name: /Remove Blinded/ }));
+       await waitFor(() => {
+         expect(screen.getByText(/Blinded removed from Goblin \(Physician/)).toBeInTheDocument();
+       });
+     });
+
+     it('does not auto-cure again after manual removal due to curedOnMount guard', async () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       await waitFor(() => {
+         expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+       });
+       expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledTimes(1);
+     });
+
+     it('calls setRuntimeValue with filtered array excluding the removed condition', async () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded', 'deafened', 'poisoned']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       fireEvent.click(screen.getByRole('button', { name: /Remove Deafened/ }));
+       await waitFor(() => {
+         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+           'Goblin',
+           'activeConditions',
+           expect.arrayContaining(['blinded', 'poisoned']),
+           'test-campaign'
+         );
+       });
+     });
+
+     it('removes condition case-insensitively from runtime state', async () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['Blinded', 'DEAFENED']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       fireEvent.click(screen.getByRole('button', { name: /Remove Blinded/ }));
+       await waitFor(() => {
+         expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+           'Goblin',
+           'activeConditions',
+           expect.arrayContaining(['DEAFENED']),
+           'test-campaign'
+         );
+       });
+     });
+   });
+
+   describe('fetch log entry - detailed verification', () => {
+     it('includes the correct action type "broken" in the log entry', async () => {
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [{ name: 'Goblin', conditions: [{ key: 'blinded' }] }],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue([]);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       await waitFor(() => {
+         const logCalls = global.fetch.mock.calls.filter(
+           (call) => call[0] === '/api/campaigns/test-campaign/log'
+         );
+         const body = JSON.parse(logCalls[0][1].body);
+         expect(body.type).toBe('condition');
+         expect(body.action).toBe('broken');
+         expect(body.timestamp).toBeTypeOf('number');
+       });
+     });
+
+     it('posts the log fetch as a promise that is not awaited (fire and forget)', async () => {
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [{ name: 'Goblin', conditions: [{ key: 'blinded' }] }],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue([]);
+       const fetchSpy = vi.fn().mockReturnValue(Promise.resolve({ ok: true }));
+       global.fetch = fetchSpy;
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       await waitFor(() => {
+         expect(fetchSpy).toHaveBeenCalled();
+       });
+     });
+   });
+
+   describe('UI structure and CSS classes', () => {
+     it('applies no-print class to the overlay', () => {
+       render(<HandOfHealingModal {...makeProps()} />);
+       expect(document.querySelector('.no-print')).toBeInTheDocument();
+     });
+
+     it('applies short-rest-section class to healing section', () => {
+       render(<HandOfHealingModal {...makeProps()} />);
+       expect(document.querySelectorAll('.short-rest-section').length).toBeGreaterThanOrEqual(1);
+     });
+
+     it('applies short-rest-actions class to the action buttons container', () => {
+       render(<HandOfHealingModal {...makeProps()} />);
+       expect(document.querySelector('.short-rest-actions')).toBeInTheDocument();
+     });
+
+     it('applies char-btn class to action buttons', () => {
+       render(<HandOfHealingModal {...makeProps()} />);
+       const buttons = document.querySelectorAll('.char-btn');
+       expect(buttons.length).toBeGreaterThanOrEqual(1);
+     });
+
+     it('applies healing-cured-condition class to the cured condition section', async () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       await waitFor(() => {
+         expect(document.querySelector('.healing-cured-condition')).toBeInTheDocument();
+       });
+     });
+
+     it('applies healing-cure-options class to the cure options container', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded', 'poisoned']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(document.querySelector('.healing-cure-options')).toBeInTheDocument();
+     });
+
+     it('renders the formula text with a trailing colon', () => {
+       render(<HandOfHealingModal {...makeProps({ formula: '1d8 + 3' })} />);
+       expect(screen.getByText('1d8 + 3:')).toBeInTheDocument();
+     });
+
+     it('renders the healing total with an equals sign', () => {
+       render(<HandOfHealingModal {...makeProps({ healAmount: 7 })} />);
+       const totalEl = document.querySelector('.healing-total');
+       expect(totalEl.textContent).toContain('=');
+     });
+
+     it('wraps the healing amount in a strong tag', () => {
+       render(<HandOfHealingModal {...makeProps({ healAmount: 7 })} />);
+       const strong = document.querySelector('.healing-total strong');
+       expect(strong).toBeInTheDocument();
+       expect(strong.textContent).toBe('7');
+     });
+   });
+
+   describe('multiple cureable conditions with combat summary merge', () => {
+     it('shows cure options when conditions come from both runtime and combat summary', () => {
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [{ name: 'Goblin', conditions: [{ key: 'stunned' }] }],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue(['deafened']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       expect(screen.getByRole('button', { name: /Remove Deafened/ })).toBeInTheDocument();
+       expect(screen.getByRole('button', { name: /Remove Stunned/ })).toBeInTheDocument();
+     });
+
+     it('auto-cures when only one condition exists across both sources via combat summary', () => {
+       combatData.getCombatSummary.mockReturnValue({
+         creatures: [{ name: 'Goblin', conditions: [{ key: 'stunned' }] }],
+       });
+       useRuntimeState.getRuntimeValue.mockReturnValue([]);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: true })} />);
+       waitFor(() => {
+         expect(screen.getByText(/Condition Cleared/)).toBeInTheDocument();
+       });
+     });
+   });
+
+   describe('hasPhysiciansTouch false with single condition', () => {
+     it('renders without the Physician Touch section', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: false })} />);
+       expect(screen.queryByText(/Physician/)).not.toBeInTheDocument();
+     });
+
+     it('does not call setRuntimeValue on mount', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: false })} />);
+       expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+     });
+
+     it('does not dispatch any events on mount', () => {
+       useRuntimeState.getRuntimeValue.mockReturnValue(['blinded']);
+       const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+       render(<HandOfHealingModal {...makeProps({ hasPhysiciansTouch: false })} />);
+       expect(dispatchSpy).not.toHaveBeenCalled();
+       dispatchSpy.mockRestore();
+     });
+   });
 });

@@ -3,36 +3,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
-const { mockShowPopup, mockSetPopupHtml, mockHasAutomation } = vi.hoisted(() => ({
-  mockShowPopup: vi.fn(),
-  mockSetPopupHtml: vi.fn(),
-  mockHasAutomation: vi.fn(),
-}));
-
-vi.mock('../../hooks/combat/useActionPopup.js', () => ({
-  default: vi.fn(() => ({
-    showPopup: mockShowPopup,
-    popupHtml: null,
-    setPopupHtml: mockSetPopupHtml,
-  })),
-}));
-
-vi.mock('../common/Popup.jsx', () => ({
-  default: function Popup({ html, onClickOrKeyDown }) {
-    return (
-      <div data-testid="popup" onClick={onClickOrKeyDown}>
-        <div dangerouslySetInnerHTML={{ __html: html }} />
-      </div>
-    );
-  },
-}));
-
 vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
-}));
-
-vi.mock('../../services/combat/automation/automationService.js', () => ({
-  hasAutomation: mockHasAutomation,
 }));
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -64,7 +36,6 @@ const renderComponent = (playerStatsOverrides = {}) => {
 describe('CharCharacterAdvancement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockHasAutomation.mockReturnValue(false);
   });
 
   describe('section header', () => {

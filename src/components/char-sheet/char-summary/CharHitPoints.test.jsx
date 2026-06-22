@@ -506,4 +506,108 @@ describe('CharHitPoints', () => {
       expect(clickable.textContent).toContain('10');
     });
   });
+
+  describe('death-save-result event edge cases', () => {
+    it('ignores death-save-result event when detail is null', async () => {
+      renderCharHitPoints();
+
+      const initCallCount = setRuntimeValue.mock.calls.filter(
+        (call) => call[1] === 'currentHitPoints'
+      ).length;
+
+      const event = new CustomEvent('death-save-result', {
+        detail: null,
+      });
+      window.dispatchEvent(event);
+
+      await waitFor(() => {
+        const afterCallCount = setRuntimeValue.mock.calls.filter(
+          (call) => call[1] === 'currentHitPoints'
+        ).length;
+        expect(afterCallCount).toBe(initCallCount);
+      });
+    });
+
+    it('ignores death-save-result event when detail has no targetName', async () => {
+      renderCharHitPoints();
+
+      const initCallCount = setRuntimeValue.mock.calls.filter(
+        (call) => call[1] === 'currentHitPoints'
+      ).length;
+
+      const event = new CustomEvent('death-save-result', {
+        detail: { restoredToHp: 8 },
+      });
+      window.dispatchEvent(event);
+
+      await waitFor(() => {
+        const afterCallCount = setRuntimeValue.mock.calls.filter(
+          (call) => call[1] === 'currentHitPoints'
+        ).length;
+        expect(afterCallCount).toBe(initCallCount);
+      });
+    });
+  });
+
+  describe('stored HP of zero', () => {
+    it('treats stored HP of 0 as valid (not null)', () => {
+      useRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === 'currentHitPoints') return 0;
+        if (prop === 'aidHpMaxIncrease') return 0;
+        return null;
+      });
+
+      renderCharHitPoints();
+
+      expect(screen.getByTestId('hp-display')).toHaveTextContent('0');
+    });
+
+    it('renders DeathSavingThrows when stored HP is 0', () => {
+      useRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === 'currentHitPoints') return 0;
+        if (prop === 'aidHpMaxIncrease') return 0;
+        return null;
+      });
+
+      renderCharHitPoints();
+
+      expect(screen.getByTestId('death-saving-throws')).toBeInTheDocument();
+    });
+  });
+
+  describe('initialization with null/undefined', () => {
+    it('initializes stored HP when stored value is null', () => {
+      useRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === 'currentHitPoints') return null;
+        if (prop === 'aidHpMaxIncrease') return 0;
+        return null;
+      });
+
+      renderCharHitPoints();
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'currentHitPoints',
+        10,
+        'test-campaign'
+      );
+    });
+
+    it('initializes stored HP when stored value is undefined', () => {
+      useRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === 'currentHitPoints') return undefined;
+        if (prop === 'aidHpMaxIncrease') return 0;
+        return null;
+      });
+
+      renderCharHitPoints();
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'currentHitPoints',
+        10,
+        'test-campaign'
+      );
+    });
+  });
 });

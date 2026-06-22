@@ -93,7 +93,7 @@ describe('OpenHandTechniqueModal', () => {
       expect(boldEl.textContent).toBe('Goblin');
     });
 
-    it('renders target name in bold when targetName is null', () => {
+    it('does not render target name in bold when targetName is null', () => {
       renderModal({ targetName: null });
       expect(document.querySelector('.sp-body p b')).not.toBeInTheDocument();
     });
@@ -192,7 +192,7 @@ describe('OpenHandTechniqueModal', () => {
       expect(screen.getByRole('button', { name: /Apply Effect/ })).not.toBeDisabled();
     });
 
-    it('is disabled again after deselecting (clicking the same radio off is not possible, but selecting another then deselecting via unchecking is tested)', () => {
+    it('stays enabled after switching selection to a different option', () => {
       renderModal();
       const radios = document.querySelectorAll('input[type="radio"]');
       fireEvent.click(radios[0]);
@@ -231,9 +231,11 @@ describe('OpenHandTechniqueModal', () => {
   });
 
   describe('apply action', () => {
-    it('does not call applyOpenHandTechnique when Apply is clicked without selection', () => {
+    it('does not call applyOpenHandTechnique when Apply is clicked without selection', async () => {
       renderModal();
-      fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: /Apply Effect/ }));
+      });
       expect(openHandHandler.applyOpenHandTechnique).not.toHaveBeenCalled();
     });
 

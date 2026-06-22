@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import ResistanceTargetPopup from './ResistanceTargetPopup.jsx';
 
 // ── Test fixtures ──
@@ -30,6 +30,10 @@ function makeProps(overrides = {}) {
 // ── Tests ──
 
 describe('ResistanceTargetPopup', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
     // ── Rendering ──
 
     describe('rendering', () => {
@@ -78,6 +82,72 @@ describe('ResistanceTargetPopup', () => {
             render(<ResistanceTargetPopup {...makeProps({ spell: undefined })} />);
             expect(screen.getByText('Spell')).toBeInTheDocument();
             expect(screen.getByText(/Level 0 Abjuration/)).toBeInTheDocument();
+        });
+
+        it('renders with popup-overlay class', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
+        });
+
+        it('renders with popup-modal class', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(document.querySelector('.popup-modal')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-popup class', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-popup-inner class', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(document.querySelector('.metamagic-popup-inner')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-spell-name class', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(document.querySelector('.metamagic-spell-name')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-twin-target class', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(document.querySelector('.metamagic-twin-target')).toBeInTheDocument();
+        });
+
+        it('renders with metamagic-actions class', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(document.querySelector('.metamagic-actions')).toBeInTheDocument();
+        });
+
+        it('renders btn-secondary class on Cancel button', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(screen.getByText('Cancel')).toHaveClass('btn-secondary');
+        });
+
+        it('renders btn class on Cast Resistance button', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            expect(screen.getByText('Cast Resistance')).toHaveClass('btn');
+        });
+
+        it('renders shield-halved icon in the title', () => {
+            render(<ResistanceTargetPopup {...makeProps()} />);
+            const icon = document.querySelector('.fa-solid.fa-shield-halved');
+            expect(icon).toBeInTheDocument();
+        });
+    });
+
+    // ── Spell prop edge cases ──
+
+    describe('spell prop edge cases', () => {
+        it('shows fallback text when spell has no name', () => {
+            render(<ResistanceTargetPopup {...makeProps({ spell: {} })} />);
+            const spellNameEl = document.querySelector('.metamagic-spell-name strong');
+            expect(spellNameEl.textContent).toBe('Spell');
+        });
+
+        it('shows default level 0 when spell has no level', () => {
+            render(<ResistanceTargetPopup {...makeProps({ spell: { name: 'Test' } })} />);
+            expect(screen.getByText(/Level 0/)).toBeInTheDocument();
         });
     });
 
@@ -207,6 +277,38 @@ describe('ResistanceTargetPopup', () => {
             render(<ResistanceTargetPopup {...makeProps({ onSkip })} />);
             fireEvent.keyDown(document, { key: 'Enter' });
             expect(onSkip).not.toHaveBeenCalled();
+        });
+
+        it('does not call onSkip when modal inner content is clicked', () => {
+            const onSkip = vi.fn();
+            render(<ResistanceTargetPopup {...makeProps({ onSkip })} />);
+            const inner = document.querySelector('.metamagic-popup-inner');
+            fireEvent.click(inner);
+            expect(onSkip).not.toHaveBeenCalled();
+        });
+
+        it('calls onSkip without calling onConfirm when skipped after selections', () => {
+            const onConfirm = vi.fn();
+            const onSkip = vi.fn();
+            render(<ResistanceTargetPopup {...makeProps({ onConfirm, onSkip })} />);
+
+            fireEvent.click(screen.getByText('Alric'));
+            fireEvent.click(screen.getByText('Fire'));
+            fireEvent.click(screen.getByText('Cancel'));
+
+            expect(onSkip).toHaveBeenCalledTimes(1);
+            expect(onConfirm).not.toHaveBeenCalled();
+        });
+    });
+
+    // ── Keyboard listener cleanup ──
+
+    describe('keyboard listener cleanup', () => {
+        it('removes keydown listener on unmount', () => {
+            const removeListenerSpy = vi.spyOn(document, 'removeEventListener');
+            const { unmount } = render(<ResistanceTargetPopup {...makeProps()} />);
+            unmount();
+            expect(removeListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
         });
     });
 

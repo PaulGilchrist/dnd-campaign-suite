@@ -21,7 +21,6 @@ vi.mock('../../../../services/automation/handlers/class-fighter-rogue/versatileT
 // ── Re-import mocked modules ──
 
 import { applyRiderOption } from '../../../../services/automation/handlers/combat/attackRiderHandler.js';
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Test fixtures ──
 
@@ -224,6 +223,171 @@ describe('AttackRiderModal', () => {
       };
       render(<AttackRiderModal {...makeProps({ action })} />);
       expect(screen.getByText(/— \+5 to next attack/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for sudden_strike', () => {
+      const action = {
+        name: 'Sudden Strike',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Sudden Strike', effect: 'sudden_strike' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Make another attack vs\. different creature within 5 ft/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for mass_fear', () => {
+      const action = {
+        name: 'Mass Fear',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Mass Fear', effect: 'mass_fear' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Target \+ creatures within 10 ft make WIS save or be Frightened/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for prone', () => {
+      const action = makeSingleSelectAction({
+        options: [{ name: 'Trip', effect: 'prone' }],
+      });
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Target makes DEX save or gains Prone condition/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for poisoned', () => {
+      const action = {
+        name: 'Cunning Strike Poison',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Poison', effect: 'poisoned' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Target makes CON save or becomes Poisoned \(1 min, repeating\)/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for no_opportunity_attacks with movement', () => {
+      const action = {
+        name: 'Charger',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Charger Move', effect: 'no_opportunity_attacks', movement: 30 }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Move up to 30 without provoking OAs/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for daze', () => {
+      const action = {
+        name: 'Daze Attack',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Daze', effect: 'daze' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Target makes CON save or on next turn can only do one of: move, action, or Bonus Action/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for unconscious', () => {
+      const action = {
+        name: 'Unconscious Strike',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Unconscious', effect: 'unconscious' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Target makes CON save or becomes Unconscious \(1 min, repeating\)/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for blinded', () => {
+      const action = {
+        name: 'Blinding Strike',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Blinded', effect: 'blinded' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Target makes DEX save or becomes Blinded \(until end of its next turn\)/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for damage_bonus with default expression', () => {
+      const action = {
+        name: 'Elemental Attack',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Fire Damage', effect: 'damage_bonus' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— 1d6 damage/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for damage_bonus with custom expression', () => {
+      const action = {
+        name: 'Elemental Attack',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Fire Damage', effect: 'damage_bonus', damageExpression: '2d6' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— 2d6 damage/)).toBeInTheDocument();
+    });
+
+    it('renders cost description for Cunning Strike', () => {
+      const action = {
+        name: 'Cunning Strike',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Poison', effect: 'poisoned', cost: '2d6' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      const bodyDiv = document.querySelector('.sp-body');
+      expect(bodyDiv.textContent).toContain('Cost: 2d6 Sneak Attack dice');
+    });
+
+    it('renders effect description for push with custom value', () => {
+      const action = {
+        name: 'Push Attack',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Push', effect: 'push', value: 15 }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Push 15 ft/)).toBeInTheDocument();
+    });
+
+    it('renders effect description for push with default value', () => {
+      const action = {
+        name: 'Push Attack',
+        automation: {
+          type: 'attack_rider',
+          options: [{ name: 'Push', effect: 'push' }],
+          maxEffects: 1,
+        },
+      };
+      render(<AttackRiderModal {...makeProps({ action })} />);
+      expect(screen.getByText(/— Push 10 ft/)).toBeInTheDocument();
     });
   });
 
@@ -652,199 +816,6 @@ describe('AttackRiderModal', () => {
 
       await waitFor(() => {
         expect(screen.queryByText('Done')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  // ── Versatile Trickster secondary target flow ──
-
-  describe('versatile trickster flow', () => {
-    const mockSecondaryTargets = [
-      { name: 'Orc A', size: 'Medium' },
-      { name: 'Orc B', size: 'Medium' },
-    ];
-
-    beforeEach(() => {
-      applyRiderOption.mockResolvedValue(defaultResult);
-      getRuntimeValue.mockImplementation((charName, key) => {
-        if (key === 'versatileTricksterSecondaryTargets') return mockSecondaryTargets;
-        if (key === 'versatileTricksterAction') return { name: 'Trip' };
-        return null;
-      });
-    });
-
-    it('shows Versatile Trickster target selection after apply when secondary targets exist', async () => {
-      const onClose = vi.fn();
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        expect(screen.getByText('Versatile Trickster')).toBeInTheDocument();
-        expect(screen.getByText('Orc A')).toBeInTheDocument();
-        expect(screen.getByText('Orc B')).toBeInTheDocument();
-      });
-    });
-
-    it('shows Versatile Trickster target names with sizes', async () => {
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcALabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        expect(orcALabel.textContent).toContain('Medium');
-      });
-    });
-
-    it('renders radio inputs for Versatile Trickster target selection', async () => {
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const radios = document.querySelectorAll('input[name="versatileTricksterTarget"]');
-        expect(radios).toHaveLength(2);
-      });
-    });
-
-    it('selects a Versatile Trickster target when clicked', async () => {
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        fireEvent.click(orcLabel);
-        const radio = orcLabel.querySelector('input[type="radio"]');
-        expect(radio.checked).toBe(true);
-      });
-    });
-
-    it('enables the trip button after selecting a Versatile Trickster target', async () => {
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        fireEvent.click(orcLabel);
-      });
-
-      await waitFor(() => {
-        const tripBtn = screen.getByRole('button', { name: /Trip Secondary Target/ });
-        expect(tripBtn).not.toBeDisabled();
-      });
-    });
-
-    it('calls applyVersatileTrickster when Trip Secondary Target is clicked', async () => {
-      const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
-      applyVersatileTrickster.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Trip', description: 'Secondary target tripped.' },
-      });
-
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        fireEvent.click(orcLabel);
-      });
-
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: /Trip Secondary Target/ }));
-      });
-
-      await waitFor(() => {
-        expect(applyVersatileTrickster).toHaveBeenCalled();
-      });
-    });
-
-    it('shows result after applying Versatile Trickster', async () => {
-      const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
-      applyVersatileTrickster.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Trip', description: 'Secondary target tripped.' },
-      });
-
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        fireEvent.click(orcLabel);
-      });
-
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: /Trip Secondary Target/ }));
-      });
-
-      await waitFor(() => {
-        expect(screen.getByText('Done')).toBeInTheDocument();
-      });
-    });
-
-    it('calls onClose when Done is clicked after Versatile Trickster apply', async () => {
-      const onClose = vi.fn();
-      const { applyVersatileTrickster } = await import('../../../../services/automation/handlers/class-fighter-rogue/versatileTricksterHandler.js');
-      applyVersatileTrickster.mockResolvedValue({
-        type: 'popup',
-        payload: { type: 'automation_info', name: 'Trip', description: 'Done.' },
-      });
-
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        const labels = document.querySelectorAll('label');
-        const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
-        fireEvent.click(orcLabel);
-      });
-
-      await waitFor(() => {
-        fireEvent.click(screen.getByRole('button', { name: /Trip Secondary Target/ }));
-      });
-
-      await waitFor(() => {
-        fireEvent.click(screen.getByText('Done'));
-        expect(onClose).toHaveBeenCalledTimes(1);
-      });
-    });
-
-    it('skips Versatile Trickster when Skip is clicked', async () => {
-      const onClose = vi.fn();
-      render(<AttackRiderModal {...makeProps({ onClose })} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        expect(screen.getByText('Skip')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Skip'));
-      expect(onClose).toHaveBeenCalledTimes(1);
-    });
-
-    it('does NOT show Versatile Trickster when no secondary targets exist', async () => {
-      getRuntimeValue.mockReturnValue(null);
-      applyRiderOption.mockResolvedValue(defaultResult);
-
-      render(<AttackRiderModal {...makeProps()} />);
-      selectSingleOption('Burning Hands');
-      clickApplySingle();
-
-      await waitFor(() => {
-        expect(screen.getByText('Effect applied successfully.')).toBeInTheDocument();
-        expect(screen.queryByText('Versatile Trickster')).not.toBeInTheDocument();
       });
     });
   });

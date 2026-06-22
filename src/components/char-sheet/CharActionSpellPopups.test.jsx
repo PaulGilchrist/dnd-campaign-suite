@@ -91,6 +91,38 @@ vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
   },
 }));
 
+vi.mock('./popups/MagicMissileTargetPopup.jsx', () => ({
+  default: function TestMagicMissileTargetPopup({ spell, totalMissiles, missileDamage, creatureTargets, currentTargetName, onConfirm, onSkip }) {
+    return (
+      <div data-testid="magic-missile-popup">
+        <span data-testid="mm-spell-name">{spell?.name}</span>
+        <span data-testid="mm-spell-level">{spell?.level}</span>
+        <span data-testid="mm-total-missiles">{totalMissiles}</span>
+        <span data-testid="mm-missile-damage">{missileDamage}</span>
+        <span data-testid="mm-creature-count">{creatureTargets?.length}</span>
+        <span data-testid="mm-current-target">{currentTargetName || 'none'}</span>
+        {creatureTargets?.map(name => (
+          <span key={name} data-testid="mm-creature-name">{name}</span>
+        ))}
+        {onConfirm && <button data-testid="mm-confirm" onClick={() => onConfirm({ distribution: {} })}>Confirm</button>}
+        {onSkip && <button data-testid="mm-skip" onClick={onSkip}>Skip</button>}
+      </div>
+    );
+  },
+}));
+
+const mockedDamageUtils = vi.hoisted(() => ({
+  getTargetFromAttacker: vi.fn(() => null),
+}));
+
+const mockedCombatData = vi.hoisted(() => ({
+  getCombatSummary: vi.fn(() => null),
+}));
+
+vi.mock('../../services/rules/combat/damageUtils.js', () => mockedDamageUtils);
+
+vi.mock('../../services/encounters/combatData.js', () => mockedCombatData);
+
 function createBaseProps(overrides) {
   return {
     playerStats: { name: 'Test Character', level: 5 },
@@ -114,6 +146,9 @@ function createBaseProps(overrides) {
     pendingActionMetamagic: null,
     handleActionMetamagicConfirm: vi.fn(),
     handleActionMetamagicSkip: vi.fn(),
+    actionPendingMagicMissile: null,
+    actionHandleMagicMissileConfirm: vi.fn(),
+    actionHandleMagicMissileSkip: vi.fn(),
     ...overrides,
   };
 }
@@ -730,6 +765,258 @@ describe('CharActionSpellPopups', () => {
       );
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
+    });
+  });
+
+  describe('MagicMissileTargetPopup rendering', () => {
+    it('renders MagicMissileTargetPopup when actionPendingMagicMissile is truthy', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin', 'Skeleton'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
+    });
+
+    it('does not render MagicMissileTargetPopup when actionPendingMagicMissile is null', () => {
+      render(<CharActionSpellPopups {...createBaseProps()} actionPendingMagicMissile={null} />);
+      expect(screen.queryByTestId('magic-missile-popup')).not.toBeInTheDocument();
+    });
+
+    it('does not render MagicMissileTargetPopup when actionPendingMagicMissile is undefined', () => {
+      render(<CharActionSpellPopups {...createBaseProps()} actionPendingMagicMissile={undefined} />);
+      expect(screen.queryByTestId('magic-missile-popup')).not.toBeInTheDocument();
+    });
+
+    it('passes spell name and level to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('mm-spell-name')).toHaveTextContent('Magic Missile');
+      expect(screen.getByTestId('mm-spell-level')).toHaveTextContent('1');
+    });
+
+    it('passes totalMissiles to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 5,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('mm-total-missiles')).toHaveTextContent('5');
+    });
+
+    it('passes missileDamage to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '2d4+2',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('mm-missile-damage')).toHaveTextContent('2d4+2');
+    });
+
+    it('passes creatureTargets to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin', 'Skeleton', 'Orc'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('mm-creature-count')).toHaveTextContent('3');
+    });
+
+    it('passes creature names to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin', 'Skeleton'],
+          }}
+        />
+      );
+      const creatureNames = screen.getAllByTestId('mm-creature-name');
+      expect(creatureNames).toHaveLength(2);
+      expect(creatureNames[0]).toHaveTextContent('Goblin');
+      expect(creatureNames[1]).toHaveTextContent('Skeleton');
+    });
+
+    it('passes onConfirm handler from actionHandleMagicMissileConfirm', () => {
+      const actionHandleMagicMissileConfirm = vi.fn();
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps({ actionHandleMagicMissileConfirm })}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      screen.getByTestId('mm-confirm').click();
+      expect(actionHandleMagicMissileConfirm).toHaveBeenCalled();
+    });
+
+    it('passes onSkip handler from actionHandleMagicMissileSkip', () => {
+      const actionHandleMagicMissileSkip = vi.fn();
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps({ actionHandleMagicMissileSkip })}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      screen.getByTestId('mm-skip').click();
+      expect(actionHandleMagicMissileSkip).toHaveBeenCalled();
+    });
+
+    it('passes campaignName to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps({ campaignName: 'mm-test' })}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
+    });
+
+    it('passes playerStats to MagicMissileTargetPopup', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps({ playerStats: { name: 'Vizzard', level: 7 } })}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
+    });
+
+    it('renders MagicMissileTargetPopup without a Popup wrapper', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
+      expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
+    });
+
+    it('renders MagicMissileTargetPopup when spell has no level property', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile' },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
+    });
+
+    it('renders MagicMissileTargetPopup when creatureTargets is empty array', () => {
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 0,
+            missileDamage: '1d4+1',
+            creatureTargets: [],
+          }}
+        />
+      );
+      expect(screen.getByTestId('magic-missile-popup')).toBeInTheDocument();
+    });
+
+    it('renders MagicMissileTargetPopup when currentTargetName is derived from getTargetFromAttacker', () => {
+      mockedCombatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }, { name: 'Orc' }] });
+      mockedDamageUtils.getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin', 'Orc'],
+          }}
+        />
+      );
+      expect(mockedCombatData.getCombatSummary).toHaveBeenCalledWith('test-campaign');
+      expect(mockedDamageUtils.getTargetFromAttacker).toHaveBeenCalledWith({ creatures: [{ name: 'Goblin' }, { name: 'Orc' }] }, 'Test Character');
+      expect(screen.getByTestId('mm-current-target')).toHaveTextContent('Orc');
+    });
+
+    it('passes currentTargetName "none" when getTargetFromAttacker returns null', () => {
+      mockedCombatData.getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin' }] });
+      mockedDamageUtils.getTargetFromAttacker.mockReturnValue(null);
+      render(
+        <CharActionSpellPopups
+          {...createBaseProps()}
+          actionPendingMagicMissile={{
+            spell: { name: 'Magic Missile', level: 1 },
+            totalMissiles: 3,
+            missileDamage: '1d4+1',
+            creatureTargets: ['Goblin'],
+          }}
+        />
+      );
+      expect(screen.getByTestId('mm-current-target')).toHaveTextContent('none');
     });
   });
 });

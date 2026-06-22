@@ -80,6 +80,11 @@ describe('ConstellationSelectionModal', () => {
   });
 
   describe('constellation option descriptions', () => {
+    it('renders the star icon in the header', () => {
+      render(<ConstellationSelectionModal {...makeProps()} />);
+      expect(document.querySelector('.sp-header .fa-solid.fa-star')).toBeInTheDocument();
+    });
+
     it('shows Archer ranged spell attack description with correct dice', () => {
       render(<ConstellationSelectionModal {...makeProps({ isTwinkled: false })} />);
       const archerBtn = screen.getByRole('button', { name: /Archer/ });
@@ -358,6 +363,67 @@ describe('ConstellationSelectionModal', () => {
         const body = document.querySelector('.sp-body');
         expect(body.textContent).toContain('Dragon constellation chosen');
       });
+    });
+
+    it('renders the star icon in the result header', async () => {
+      render(<ConstellationSelectionModal {...makeProps()} />);
+      fireEvent.click(screen.getByRole('button', { name: /Archer/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose' }));
+      });
+      await waitFor(() => {
+        expect(document.querySelector('.sp-header .fa-solid.fa-star')).toBeInTheDocument();
+      });
+    });
+
+    it('renders result description with HTML tags from handler', async () => {
+      starryFormHandler.applyConstellationOption.mockResolvedValue({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Starry Form',
+          automationType: 'constellation_selection',
+          description: '<strong>Archer</strong> constellation chosen. <em>1d8</em> damage.',
+          automation: { type: 'constellation_selection' },
+        },
+      });
+      render(<ConstellationSelectionModal {...makeProps()} />);
+      fireEvent.click(screen.getByRole('button', { name: /Archer/ }));
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Choose' }));
+      });
+      await waitFor(() => {
+        const body = document.querySelector('.sp-body');
+        expect(body.querySelector('strong')).toBeInTheDocument();
+        expect(body.querySelector('em')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('edge cases', () => {
+    it('renders without crashing when onClose is undefined', () => {
+      render(<ConstellationSelectionModal {...makeProps({ onClose: undefined })} />);
+      expect(screen.getByText('Choose a constellation:')).toBeInTheDocument();
+    });
+
+    it('renders without crashing when onConfirm is undefined', () => {
+      render(<ConstellationSelectionModal {...makeProps({ onConfirm: undefined })} />);
+      expect(screen.getByText('Choose a constellation:')).toBeInTheDocument();
+    });
+
+    it('renders without crashing when playerStats is minimal', () => {
+      render(<ConstellationSelectionModal {...makeProps({ playerStats: {} })} />);
+      expect(screen.getByText('Choose a constellation:')).toBeInTheDocument();
+    });
+
+    it('renders without crashing when action name is empty string', () => {
+      render(<ConstellationSelectionModal {...makeProps({ action: { name: '', automation: { type: 'constellation_selection' } } })} />);
+      expect(screen.getByText('Choose a constellation:')).toBeInTheDocument();
+    });
+
+    it('renders without crashing when campaignName is empty string', () => {
+      render(<ConstellationSelectionModal {...makeProps({ campaignName: '' })} />);
+      expect(screen.getByText('Choose a constellation:')).toBeInTheDocument();
     });
   });
 });

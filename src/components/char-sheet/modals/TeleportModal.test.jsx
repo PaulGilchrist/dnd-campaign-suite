@@ -136,6 +136,17 @@ describe('TeleportModal', () => {
       expect(radios[0]).not.toBeChecked();
     });
 
+    it('switches back to standard distance radio when clicked after selecting extended', () => {
+      const action = makeAction();
+      render(<TeleportModal action={action} {...makeProps()} />);
+      const radios = getRadios(document);
+      fireEvent.click(radios[1]);
+      expect(radios[1]).toBeChecked();
+      fireEvent.click(radios[0]);
+      expect(radios[0]).toBeChecked();
+      expect(radios[1]).not.toBeChecked();
+    });
+
     it('renders Teleport button with tree icon', () => {
       const action = makeAction();
       render(<TeleportModal action={action} {...makeProps()} />);

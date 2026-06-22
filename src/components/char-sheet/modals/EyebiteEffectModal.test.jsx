@@ -773,18 +773,18 @@ describe('EyebiteEffectModal', () => {
     // ── Immunity handling ──
 
     describe('immunity handling', () => {
-        it('does not apply condition when target is immune', async () => {
+        it('does not apply condition when player target is immune', async () => {
+            rangeValidation.getDistanceFeet.mockReturnValue(30);
             diceRoller.rollD20.mockReturnValue(5);
             automationService.playerIsImmuneToCondition.mockReturnValue(true);
-            selectEffectAndTarget('Asleep', 'Goblin1');
+            runtimeState.getRuntimeValue.mockReturnValue([]);
+            render(<EyebiteEffectModal {...makeProps()} />);
+            fireEvent.click(screen.getByRole('button', { name: /Asleep/ }));
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            fireEvent.click(checkboxes[2]);
             fireEvent.click(applyEffect());
             await waitFor(() => {
-                expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-                    'Goblin1',
-                    'activeConditions',
-                    expect.any(Array),
-                    'test-campaign'
-                );
+                expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
             });
         });
     });

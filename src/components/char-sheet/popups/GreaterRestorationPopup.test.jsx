@@ -15,6 +15,12 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
     getCombatSummary: vi.fn(),
 }));
 
+vi.mock('../../../services/ui/utils.js', () => ({
+    default: {
+        getName: (name) => name || 'Unknown',
+    },
+}));
+
 // ── Test fixtures ──
 
 const baseSpell = { name: 'Greater Restoration', level: 5 };
@@ -707,5 +713,308 @@ describe('GreaterRestorationPopup', () => {
     it('renders the provided range in the description', () => {
         render(<GreaterRestorationPopup {...makeProps({ range: '30 ft' })} />);
         expect(screen.getByText('30 ft')).toBeInTheDocument();
+    });
+
+    // ── Utils / name matching ──
+
+    it('uses utils.getName for combat summary creature matching', async () => {
+        applyRuntimeState(defaultRuntimeState());
+
+        getCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin', conditions: [{ key: 'charmed' }] }],
+        });
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+
+        await waitFor(() => {
+            expect(getCombatSummary).toHaveBeenCalled();
+        });
+    });
+
+    it('falls back correctly when combat summary creature has no conditions array', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
+        getCombatSummary.mockResolvedValue({
+            creatures: [{ name: 'Goblin' }],
+        });
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+
+        await waitFor(() => {
+            expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
+        });
+    });
+
+    it('handles combat summary with null creatures', async () => {
+        applyRuntimeState(defaultRuntimeState());
+        getCombatSummary.mockResolvedValue({ creatures: null });
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+
+        await waitFor(() => {
+            expect(screen.getByText(/No removable effects found on this target/)).toBeInTheDocument();
+        });
+    });
+
+    // ── Condition toggle dedup ──
+
+    it('does not add duplicate condition selections', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed', 'petrified'] }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
+        });
+
+        const charmedEl = screen.getByText(/Charmed condition/);
+        fireEvent.click(charmedEl);
+        fireEvent.click(charmedEl);
+        fireEvent.click(charmedEl);
+
+        expect(screen.getByText(/\u2713 Charmed condition/)).toBeInTheDocument();
+
+        fireEvent.click(charmedEl);
+        expect(screen.queryByText(/\u2713 Charmed condition/)).not.toBeInTheDocument();
+    });
+
+    // ── Campaign name passed to getCombatSummary ──
+
+    it('passes campaignName to getCombatSummary', async () => {
+        applyRuntimeState(defaultRuntimeState());
+        getCombatSummary.mockResolvedValue(null);
+
+        const props = makeProps();
+        props.campaignName = 'my-campaign';
+        render(<GreaterRestorationPopup {...props} />);
+        fireEvent.click(screen.getByText('Goblin'));
+
+        await waitFor(() => {
+            expect(getCombatSummary).toHaveBeenCalledWith('my-campaign');
+        });
+    });
+
+    // ── Spell prop null ──
+
+    it('shows fallback values when spell is null', () => {
+        render(<GreaterRestorationPopup {...makeProps({ spell: null })} />);
+        expect(screen.getByText(/Spell/)).toBeInTheDocument();
+        expect(screen.getByText(/Level 5/)).toBeInTheDocument();
+    });
+
+    // ── Multiple conditions selected and confirmed ──
+
+    it('calls onConfirm with multiple condition selections', async () => {
+        const onConfirm = vi.fn();
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed', 'petrified'] }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
+        });
+
+        const charmedEl = document.querySelectorAll(
+            '[style*="padding: 6px 10px"]:not([style*="font-style: italic"])'
+        );
+        const petrifiedEl = Array.from(charmedEl).find(el =>
+            el.textContent.trim().startsWith('Petrified')
+        );
+        expect(petrifiedEl).toBeTruthy();
+
+        fireEvent.click(screen.getByText(/Charmed condition/));
+        fireEvent.click(petrifiedEl);
+
+        fireEvent.click(screen.getByText('Cast Greater Restoration'));
+        expect(onConfirm).toHaveBeenCalledWith({
+            targetName: 'Goblin',
+            selections: [
+                { type: 'condition', condition: 'charmed' },
+                { type: 'condition', condition: 'petrified' },
+            ],
+        });
+    });
+
+    // ── All five effect types selected together ──
+
+    it('calls onConfirm with all five effect types selected', async () => {
+        const onConfirm = vi.fn();
+        applyRuntimeState(defaultRuntimeState({
+            activeConditions: ['charmed'],
+            exhaustionLevel: 1,
+            activeBuffs: [{ type: 'cursed' }],
+            abilityReductions: { STR: -2 },
+            hpMaxReduction: 5,
+        }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
+        });
+
+        fireEvent.click(screen.getByText(/Exhaustion level \(current: 1\)/));
+        fireEvent.click(screen.getByText(/Charmed condition/));
+        fireEvent.click(screen.getByText(/Curse/));
+        fireEvent.click(screen.getByText(/Ability score reduction/));
+        fireEvent.click(screen.getByText(/Hit Point maximum reduction/));
+
+        fireEvent.click(screen.getByText('Cast Greater Restoration'));
+        expect(onConfirm).toHaveBeenCalledWith({
+            targetName: 'Goblin',
+            selections: [
+                { type: 'exhaustion' },
+                { type: 'condition', condition: 'charmed' },
+                { type: 'curse' },
+                { type: 'ability_reduction' },
+                { type: 'hp_max_reduction' },
+            ],
+        });
+    });
+
+    // ── ToggleSelection behavior for non-condition types ──
+
+    it('allows multiple non-condition selections simultaneously', async () => {
+        applyRuntimeState(defaultRuntimeState({
+            exhaustionLevel: 1,
+            abilityReductions: { STR: -2 },
+            hpMaxReduction: 5,
+        }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
+        });
+
+        const exhaustionEl = screen.getByText(/Exhaustion level \(current: 1\)/);
+        const abilityEl = screen.getByText(/Ability score reduction/);
+        const hpEl = screen.getByText(/Hit Point maximum reduction/);
+
+        fireEvent.click(exhaustionEl);
+        fireEvent.click(abilityEl);
+        fireEvent.click(hpEl);
+
+        expect(exhaustionEl.textContent).toContain('\u2713');
+        expect(abilityEl.textContent).toContain('\u2713');
+        expect(hpEl.textContent).toContain('\u2713');
+    });
+
+    it('toggles a non-condition type off when clicked again', async () => {
+        applyRuntimeState(defaultRuntimeState({
+            exhaustionLevel: 1,
+        }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
+        });
+
+        const exhaustionEl = screen.getByText(/Exhaustion level \(current: 1\)/);
+
+        fireEvent.click(exhaustionEl);
+        expect(exhaustionEl.textContent).toContain('\u2713');
+
+        fireEvent.click(exhaustionEl);
+        expect(exhaustionEl.textContent).not.toContain('\u2713');
+    });
+
+    // ── creatureTargets edge cases ──
+
+    it('handles creatureTargets with null values gracefully', () => {
+        applyRuntimeState(defaultRuntimeState());
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps({ creatureTargets: ['Goblin', null, 'Orc'] })} />);
+        expect(screen.getByText('Goblin')).toBeInTheDocument();
+        expect(screen.getByText('Orc')).toBeInTheDocument();
+    });
+
+    // ── Load target data calls correct runtime values ──
+
+    it('calls getRuntimeValue with correct property keys for target data', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+
+        await waitFor(() => {
+            expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeConditions');
+            expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'exhaustionLevel');
+            expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'activeBuffs');
+            expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'abilityReductions');
+            expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', 'hpMaxReduction');
+        });
+    });
+
+    // ── Both conditions shown when target has both ──
+
+    it('shows both charmed and petrified when target has both conditions', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed', 'petrified'] }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
+        });
+
+        const selectableItems = document.querySelectorAll(
+            '[style*="padding: 6px 10px"]:not([style*="font-style: italic"])'
+        );
+        const conditionItems = Array.from(selectableItems).filter(el =>
+            el.textContent.trim().includes('condition')
+        );
+        expect(conditionItems).toHaveLength(2);
+    });
+
+    // ── Description content ──
+
+    it('displays the full spell description text', () => {
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        expect(screen.getByText(/This spell can remove one or more of the following/)).toBeInTheDocument();
+        expect(screen.getByText(/exhaustion level/)).toBeInTheDocument();
+        expect(screen.getByText(/Charmed or Petrified condition/)).toBeInTheDocument();
+        expect(screen.getByText(/curse/)).toBeInTheDocument();
+        expect(screen.getByText(/ability score/)).toBeInTheDocument();
+        expect(screen.getByText(/Hit Point maximum/)).toBeInTheDocument();
+    });
+
+    // ── Target selection loads data before showing effects ──
+
+    it('clears previous target data when switching targets', async () => {
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
+        getCombatSummary.mockReturnValue(null);
+
+        render(<GreaterRestorationPopup {...makeProps()} />);
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
+        });
+
+        applyRuntimeState(defaultRuntimeState({ activeConditions: ['petrified'] }));
+        fireEvent.click(screen.getByText('Orc'));
+
+        await waitFor(() => {
+            expect(screen.getByText(/Effects to remove from Orc/)).toBeInTheDocument();
+        });
+
+        const selectableItems = document.querySelectorAll(
+            '[style*="padding: 6px 10px"]:not([style*="font-style: italic"])'
+        );
+        const conditionItems = Array.from(selectableItems).filter(el =>
+            el.textContent.trim().includes('condition')
+        );
+        expect(conditionItems).toHaveLength(1);
+        expect(conditionItems[0].textContent).toContain('Petrified');
     });
 });

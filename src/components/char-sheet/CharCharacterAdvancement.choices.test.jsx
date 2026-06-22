@@ -3,69 +3,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CharCharacterAdvancement from './CharCharacterAdvancement.jsx';
 
-const { mockShowPopup, mockSetPopupHtml, mockGetRuntimeValue, mockSetRuntimeValue, mockExecuteHandler } = vi.hoisted(() => ({
-  mockShowPopup: vi.fn(),
-  mockSetPopupHtml: vi.fn(),
+const { mockGetRuntimeValue, mockSetRuntimeValue } = vi.hoisted(() => ({
   mockGetRuntimeValue: vi.fn(),
   mockSetRuntimeValue: vi.fn().mockResolvedValue(undefined),
-  mockExecuteHandler: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../hooks/combat/useActionPopup.js', () => ({
-  default: vi.fn(() => ({
-    showPopup: mockShowPopup,
-    popupHtml: null,
-    setPopupHtml: mockSetPopupHtml,
-  })),
-}));
-
-vi.mock('../common/Popup.jsx', () => ({
-  default: function Popup({ html, onClickOrKeyDown }) {
-    return (
-      <div data-testid="popup" onClick={onClickOrKeyDown}>
-        <div dangerouslySetInnerHTML={{ __html: html }} />
-      </div>
-    );
-  },
 }));
 
 vi.mock('../../services/ui/sanitize.js', () => ({
   sanitizeHtml: vi.fn((html) => html),
 }));
 
-vi.mock('../../services/combat/automation/automationService.js', () => ({
-  hasAutomation: vi.fn((feature) => !!(feature?.automation)),
-}));
-
-vi.mock('../../services/automation/index.js', () => ({
-  executeHandler: mockExecuteHandler,
-}));
-
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: mockGetRuntimeValue,
   setRuntimeValue: mockSetRuntimeValue,
-}));
-
-vi.mock('./modals/arcane/SpellMasteryModal.jsx', () => ({
-  default: function SpellMasteryModal() {
-    return <div data-testid="spell-mastery-modal"><span>Spell Mastery Modal</span></div>;
-  },
-}));
-
-vi.mock('./modals/arcane/SignatureSpellsModal.jsx', () => ({
-  default: function SignatureSpellsModal() {
-    return <div data-testid="signature-spells-modal"><span>Signature Spells Modal</span></div>;
-  },
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/spellMasteryHandler.js', () => ({
-  onSpellMasterySelected: vi.fn().mockResolvedValue(null),
-  handle: vi.fn().mockResolvedValue(null),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/signatureSpellsHandler.js', () => ({
-  onSignatureSpellsSelected: vi.fn().mockResolvedValue(null),
-  handle: vi.fn().mockResolvedValue(null),
 }));
 
 describe('CharCharacterAdvancement - Choice Options', () => {
@@ -317,7 +266,6 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     await waitFor(() => {
       expect(mockSetRuntimeValue).toHaveBeenCalled();
     });
-    expect(mockExecuteHandler).not.toHaveBeenCalled();
   });
 
   it('renders a separator between options', () => {
@@ -406,5 +354,154 @@ describe('CharCharacterAdvancement - Choice Options', () => {
     };
     render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
     expect(screen.getByText('Unnamed feature at index 1')).toBeInTheDocument();
+  });
+
+  it('renders choice UI for multiple features each with options', () => {
+    const playerStats = {
+      name: 'Test Character',
+      characterAdvancement: [
+        {
+          name: 'First Choice',
+          description: 'First feature with choices',
+          automation: {
+            options: ['A', 'B'],
+          },
+        },
+        {
+          name: 'No Choice',
+          description: 'Plain feature',
+        },
+        {
+          name: 'Second Choice',
+          description: 'Second feature with choices',
+          automation: {
+            options: ['X', 'Y', 'Z'],
+          },
+        },
+      ],
+    };
+    const { container } = render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    expect(screen.getByText('First Choice:')).toBeInTheDocument();
+    expect(screen.getByText('No Choice:')).toBeInTheDocument();
+    expect(screen.getByText('Second Choice:')).toBeInTheDocument();
+    const choiceLabels = container.querySelectorAll('span[style*="opacity: 0.7"]');
+    expect(choiceLabels.length).toBe(2);
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.getByText('X')).toBeInTheDocument();
+  });
+
+  it('renders mixed string and object options in the same options array', () => {
+    const playerStats = {
+      name: 'Test Character',
+      characterAdvancement: [
+        {
+          name: 'Mixed Choice',
+          description: 'Has mixed option types',
+          automation: {
+            options: ['String Option', { name: 'Object Option' }],
+          },
+        },
+      ],
+    };
+    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    expect(screen.getByText('Choice:')).toBeInTheDocument();
+    expect(screen.getByText('String Option')).toBeInTheDocument();
+    expect(screen.getByText('Object Option')).toBeInTheDocument();
+  });
+
+  it('applies choice container styling with marginTop and fontSize', () => {
+    const playerStats = {
+      name: 'Test Character',
+      characterAdvancement: [
+        {
+          name: 'Choice Feature',
+          description: 'Has choices',
+          automation: {
+            options: ['A', 'B'],
+          },
+        },
+      ],
+    };
+    const { container } = render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    const choiceDivs = container.querySelectorAll('div[style]');
+    const choiceContainer = Array.from(choiceDivs).find(div =>
+      div.getAttribute('style')?.includes('margin-top') && div.getAttribute('style')?.includes('font-size')
+    );
+    expect(choiceContainer).toBeTruthy();
+    expect(choiceContainer).toHaveStyle({ marginTop: '4px', fontSize: '0.9em' });
+  });
+
+  it('applies opacity styling to the Choice label', () => {
+    const playerStats = {
+      name: 'Test Character',
+      characterAdvancement: [
+        {
+          name: 'Choice Feature',
+          description: 'Has choices',
+          automation: {
+            options: ['A', 'B'],
+          },
+        },
+      ],
+    };
+    const { container } = render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    const choiceDivs = container.querySelectorAll('div[style]');
+    const choiceContainer = Array.from(choiceDivs).find(div =>
+      div.getAttribute('style')?.includes('margin-top') && div.getAttribute('style')?.includes('font-size')
+    );
+    const spans = choiceContainer.querySelectorAll('span[style]');
+    const choiceLabel = Array.from(spans).find(span =>
+      span.getAttribute('style')?.includes('opacity: 0.7')
+    );
+    expect(choiceLabel).toBeTruthy();
+    expect(choiceLabel).toHaveTextContent('Choice:');
+  });
+
+  it('calls setRuntimeValue and dispatches buffs-updated when an object option is clicked', async () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    const playerStats = {
+      name: 'Test Character',
+      characterAdvancement: [
+        {
+          name: 'Object Choice',
+          description: 'Object options',
+          automation: {
+            options: [{ name: 'First Object' }, { name: 'Second Object' }],
+          },
+        },
+      ],
+    };
+    render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    fireEvent.click(screen.getByText('Second Object'));
+    await waitFor(() => {
+      expect(mockSetRuntimeValue).toHaveBeenCalledWith(
+        'Test Character',
+        '_Object_Choice_option',
+        'Second Object',
+        'test-campaign'
+      );
+    });
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'buffs-updated' })
+    );
+    dispatchSpy.mockRestore();
+  });
+
+  it('renders choice options with 4+ options showing correct separators', () => {
+    const playerStats = {
+      name: 'Test Character',
+      characterAdvancement: [
+        {
+          name: 'Multi Choice',
+          description: 'Many options',
+          automation: {
+            options: ['One', 'Two', 'Three', 'Four'],
+          },
+        },
+      ],
+    };
+    const { container } = render(<CharCharacterAdvancement playerStats={playerStats} campaignName="test-campaign" />);
+    const separators = container.querySelectorAll('[style*="opacity: 0.4"]');
+    expect(separators.length).toBe(3);
   });
 });

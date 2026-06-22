@@ -75,25 +75,19 @@ describe('AidTargetPopup', () => {
 
     // ── Spell prop edge cases ──
 
-    it('throws when spell prop is null', () => {
+    it('throws when spell prop is null (missing null check on spell.level)', () => {
         expect(() => render(<AidTargetPopup {...makeProps({ spell: null })} />)).toThrow();
     });
 
     it('shows "Spell" fallback when spell has no name', () => {
         render(<AidTargetPopup {...makeProps({ spell: {} })} />);
-        expect(screen.getByText(/— Level/)).toBeInTheDocument();
+        const spellNameEl = document.querySelector('.metamagic-spell-name strong');
+        expect(spellNameEl.textContent).toBe('Spell');
     });
 
     it('shows default level 2 when spell has no level', () => {
         render(<AidTargetPopup {...makeProps({ spell: { name: 'Test' } })} />);
         expect(screen.getByText(/Level 2/)).toBeInTheDocument();
-    });
-
-    it('shows "Spell" and default level when spell is missing both name and level', () => {
-        render(<AidTargetPopup {...makeProps({ spell: {} })} />);
-        const spellNameEl = document.querySelector('.metamagic-spell-name strong');
-        expect(spellNameEl.textContent).toBe('Spell');
-        expect(screen.getByText(/— Level 2/)).toBeInTheDocument();
     });
 
     // ── Slot level affects HP increase ──
@@ -237,7 +231,7 @@ describe('AidTargetPopup', () => {
         expect(mockOnConfirm).not.toHaveBeenCalled();
     });
 
-    it('does not call onConfirm when maxTargets limit blocks additional selection', () => {
+    it('confirms with maxTargets reached and extra creature unselected', () => {
         render(<AidTargetPopup {...makeProps({ creatureTargets: ['Goblin', 'Skeleton', 'Orc', 'Zombie'] })} />);
         fireEvent.click(screen.getByText('Goblin'));
         fireEvent.click(screen.getByText('Skeleton'));
