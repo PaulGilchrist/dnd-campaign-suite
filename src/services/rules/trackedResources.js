@@ -31,6 +31,7 @@ export const ALL_TRACKED_RESOURCES = [
   'luckyPoints',
   'divineInterventionUses',
   'wholenessofbodyUses',
+  'adrenalineRushUses',
   'shortRestHitDice',
   'spell_slots_level_1',
   'spell_slots_level_2',
@@ -174,6 +175,11 @@ export function computeTrackedResources(playerStats) {
   const wis = playerStats.abilities?.find(a => a.name === 'Wisdom')
   const maxWP = wis ? Math.max(wis.bonus, 1) : 1
   resources.warPriestUses = { current: maxWP, max: maxWP }
+
+  const hasAdrenalineRush = (playerStats.automation?.specialActions ?? [])
+    .some(a => a.effect === 'bonus_action_dash')
+  const adrenalineRushMax = hasAdrenalineRush ? (playerStats.proficiency || 0) : 0
+  resources.adrenalineRushUses = { current: adrenalineRushMax, max: adrenalineRushMax }
 
   return resources
 }

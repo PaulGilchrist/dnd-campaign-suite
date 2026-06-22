@@ -13,6 +13,7 @@ import Popup from '../../common/Popup.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
 import AvatarModal from '../../common/AvatarModal.jsx';
 import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js'
+
 import { showBackgroundPopup } from '../../../hooks/combat/useActionPopup.js';
 import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
@@ -298,13 +299,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                     <b>Proficiency: </b>+{playerStats.proficiency}<br />
                     <span className={'clickable' + (exhaustionLevel > 0 ? ' stat--penalized' : '')} onClick={() => rollInitiative(effectiveInitiative, playerStats.initiativeAdvantage ? { forcedMode: 'advantage' } : undefined)}><b>Initiative: </b>{signFormatter.format(effectiveInitiative)}</span><br />
                     <b>Inspiration: </b><input tabIndex={0} type="checkbox" checked={hasInspiration} onChange={handleToggleInspiration} /><br />
-                    {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
-                    {seeInvisibleRange && <span className="automation-badge">See Invisible {seeInvisibleRange} ft</span>}
-                    {thirdEyeEffect === 'darkvision_120' && <span className="automation-badge">Darkvision 120 ft</span>}
-                    {thirdEyeEffect === 'greater_comprehension' && <span className="automation-badge">Greater Comprehension (read any language)</span>}
-                    {narrowSpaceActive && <span className="automation-badge">Narrow Space</span>}
-                </div>
-                <div>
+                    {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml, playerStats.rules || '5e')}>{playerStats.background}</span></div>}
                     <CharFeats playerStats={playerStats} showPopup={(feat) => {
                                              if (feat.desc || feat.description) {
                             // Handle both array (5e) and string (2024) description formats
@@ -341,7 +336,13 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
                             setPopupHtml(html);
                         }
                     }} />
-                      {playerStats.background && <div><b>Background: </b><span className="clickable" onClick={() => showBackgroundPopup(playerStats.background, setPopupHtml, playerStats.rules || '5e')}>{playerStats.background}</span></div>}
+                    {flyBuffActive && <span className="automation-badge">{flyBuffName} Active</span>}
+                    {seeInvisibleRange && <span className="automation-badge">See Invisible {seeInvisibleRange} ft</span>}
+                    {thirdEyeEffect === 'darkvision_120' && <span className="automation-badge">Darkvision 120 ft</span>}
+                    {thirdEyeEffect === 'greater_comprehension' && <span className="automation-badge">Greater Comprehension (read any language)</span>}
+                    {narrowSpaceActive && <span className="automation-badge">Narrow Space</span>}
+                </div>
+                <div>
                       <CharClassFeatures playerStats={playerStats} campaignName={campaignName} />
                 </div>
       </div>

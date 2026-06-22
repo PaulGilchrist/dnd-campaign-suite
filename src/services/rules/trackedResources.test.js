@@ -55,9 +55,9 @@ describe('ALL_TRACKED_RESOURCES', () => {
       expect(ALL_TRACKED_RESOURCES).toContain(key);
     }
   });
-  it('contains 39 tracked resources', () => {
+  it('contains 40 tracked resources', () => {
 
-    expect(ALL_TRACKED_RESOURCES).toHaveLength(39);
+    expect(ALL_TRACKED_RESOURCES).toHaveLength(40);
   });
 
   it('contains both casing variants for second wind', () => {
