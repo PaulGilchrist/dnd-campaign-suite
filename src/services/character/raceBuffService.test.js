@@ -592,7 +592,7 @@ describe('raceBuffService', () => {
   });
 
   describe('applyRaceBuffsToPlayerData', () => {
-    it('applies ability score increases to playerData abilities', () => {
+    it('does not apply ability score increases to playerData abilities', () => {
       const playerData = {
         abilities: [
           { name: 'Strength', featIncrease: 0 },
@@ -608,25 +608,8 @@ describe('raceBuffService', () => {
         languages: ['Common', 'Elvish'],
       };
       applyRaceBuffsToPlayerData(playerData, buffs);
-      expect(playerData.abilities[0].featIncrease).toBe(2);
-      expect(playerData.abilities[1].featIncrease).toBe(1);
-    });
-
-    it('accumulates ability score increases on existing featIncrease values', () => {
-      const playerData = {
-        abilities: [
-          { name: 'Strength', featIncrease: 3 },
-        ],
-        languages: [],
-      };
-      const buffs = {
-        abilityScoreIncreases: [
-          { name: 'Strength', amount: 2 },
-        ],
-        languages: [],
-      };
-      applyRaceBuffsToPlayerData(playerData, buffs);
-      expect(playerData.abilities[0].featIncrease).toBe(5);
+      expect(playerData.abilities[0].featIncrease).toBe(0);
+      expect(playerData.abilities[1].featIncrease).toBe(0);
     });
 
     it('merges languages with deduplication', () => {
@@ -666,40 +649,6 @@ describe('raceBuffService', () => {
       };
       applyRaceBuffsToPlayerData(playerData, buffs);
       expect(playerData.abilities[0].featIncrease).toBe(0);
-    });
-
-    it('skips ability increases for abilities not in playerData', () => {
-      const playerData = {
-        abilities: [
-          { name: 'Strength', featIncrease: 0 },
-        ],
-        languages: [],
-      };
-      const buffs = {
-        abilityScoreIncreases: [
-          { name: 'Dexterity', amount: 2 },
-        ],
-        languages: [],
-      };
-      applyRaceBuffsToPlayerData(playerData, buffs);
-      expect(playerData.abilities[0].featIncrease).toBe(0);
-    });
-
-    it('performs case-insensitive ability matching', () => {
-      const playerData = {
-        abilities: [
-          { name: 'strength', featIncrease: 0 },
-        ],
-        languages: [],
-      };
-      const buffs = {
-        abilityScoreIncreases: [
-          { name: 'Strength', amount: 2 },
-        ],
-        languages: [],
-      };
-      applyRaceBuffsToPlayerData(playerData, buffs);
-      expect(playerData.abilities[0].featIncrease).toBe(2);
     });
 
     it('handles undefined playerData abilities gracefully without crashing', () => {
@@ -766,23 +715,6 @@ describe('raceBuffService', () => {
         languages: ['Common'],
       };
       expect(() => applyRaceBuffsToPlayerData(playerData, undefined)).toThrow(TypeError);
-    });
-
-    it('skips ability increases for "any" ability type', () => {
-      const playerData = {
-        abilities: [
-          { name: 'Strength', featIncrease: 0 },
-        ],
-        languages: [],
-      };
-      const buffs = {
-        abilityScoreIncreases: [
-          { name: 'any', amount: 2 },
-        ],
-        languages: [],
-      };
-      applyRaceBuffsToPlayerData(playerData, buffs);
-      expect(playerData.abilities[0].featIncrease).toBe(0);
     });
   });
 });

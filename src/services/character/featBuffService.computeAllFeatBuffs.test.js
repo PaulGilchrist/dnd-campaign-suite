@@ -22,7 +22,6 @@ vi.mock('../../services/shared/buffApplier.js', () => ({
 
 import {
   resetFeatIncreases,
-  applyAbilityScoreIncreases,
   mergeDeduplicated,
 } from '../../services/shared/buffApplier.js';
 
@@ -985,11 +984,7 @@ describe('applyFeatBuffsToFormData', () => {
 
     applyFeatBuffsToFormData(formData, []);
 
-    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
-    expect(applyAbilityScoreIncreases).toHaveBeenCalledWith(
-      formData.abilities,
-      [{ name: 'Strength', amount: 2, isChoice: false }]
-    );
+    expect(formData.abilities[0].featIncrease).toBe(2);
     expect(mergeDeduplicated).toHaveBeenCalledWith(
       formData,
       'resistances',

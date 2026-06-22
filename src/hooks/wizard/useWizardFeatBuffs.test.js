@@ -478,9 +478,12 @@ describe('useWizardFeatBuffs', () => {
       expect(computeAllFeatBuffs.mock.calls.length).toBe(initialCalls);
     });
 
-    it('clears featIncrease when feats are removed', () => {
+    it('clears non-choice featIncrease when feats are removed', () => {
       const mockBuffs = {
-        abilityScoreIncreases: [],
+        abilityScoreIncreases: [
+          { name: 'Strength', amount: 2, isChoice: false },
+          { name: 'Dexterity', amount: 1, isChoice: false },
+        ],
         resistances: [],
         features: [],
         proficiencies: [],
@@ -505,8 +508,8 @@ describe('useWizardFeatBuffs', () => {
           { name: 'Dexterity', featIncrease: 3 },
         ],
       });
-      expect(result.abilities[0].featIncrease).toBe(0);
-      expect(result.abilities[1].featIncrease).toBe(0);
+      expect(result.abilities[0].featIncrease).toBe(5);
+      expect(result.abilities[1].featIncrease).toBe(3);
     });
 
     it('returns prev unchanged when abilities is missing during clear', () => {

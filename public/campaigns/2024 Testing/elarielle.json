@@ -27,7 +27,7 @@
     {
       "name": "Intelligence",
       "baseScore": 15,
-      "featIncrease": 0,
+      "featIncrease": 4,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
@@ -127,5 +127,10 @@
   "xp": 0,
   "xpMode": "milestone",
   "originalFileName": "Elarielle.json",
-  "imagePath": "campaigns/2024 Testing/images/Elarielle.png"
+  "imagePath": "campaigns/2024 Testing/images/Elarielle.png",
+  "featAbilityChoices": {
+    "0": "Intelligence",
+    "1": "Intelligence",
+    "2": "Intelligence"
+  }
 }

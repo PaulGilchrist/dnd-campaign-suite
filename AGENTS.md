@@ -41,18 +41,25 @@
 ## Commands
 
 ```bash
-npm install && npm run build && node server.js   # Production (full start)
+npm install && npm run build && node server.js   # Production (full start — installs, builds, runs)
 npm run dev                                       # Dev mode (Vite + Express concurrently)
 npm run api                                       # API server only (port 80)
 npm run dev:react                                 # Vite dev server only
 npm run build                                     # Production build to dist/
-npm run lint                                      # ESLint (zero warnings enforced)
+npm run prod                                      # Production server only (no build)
+npm run lint                                      # ESLint (zero warnings enforced, flat config)
 npm test                                          # Vitest (watch mode)
 npm run test:run                                  # Vitest single run
-npm run test:coverage                             # Vitest with coverage
+npm run test:coverage                             # Vitest with coverage (v8, outputs to ./coverage)
 ```
 
 **Always run `npm run lint` and `npm run test:run` after changes.** Lint enforces zero warnings.
+
+## Repo Tooling
+
+- `.opencode/agents/` and `.opencode/commands/` — custom OpenCode agents and slash commands (e.g. `dnd-create-campaign`, `dnd-create-one-shot`, `dnd-update-campaign`)
+- `eslint.config.js` — flat config (ESM), not `.eslintrc.cjs`
+- `vitest.config.js` — jsdom environment, globals enabled, setup in `src/test/setup.js`
 
 ## Code Conventions
 
@@ -78,6 +85,7 @@ npm run test:coverage                             # Vitest with coverage
 
 ## Key Gotchas
 
+- **Application is server first:** All Players see the same data through SSE.  Do not use localStorage.
 - **SSE re-render loop:** Always use `skipSync=true` in `setRuntimeObject` when applying SSE-echoed data. The server already has the data; re-POSTing causes loops.
 - **PlayerStats computed stats** is the single source of truth. Don't derive character state from elsewhere.
 - **Null safety:** Don't assume a variable is allowed to be null or undefined. Ask the user if unsure.

@@ -7,14 +7,11 @@ vi.mock('../shared/featFinder.js', () => ({
 
 vi.mock('../shared/buffApplier.js', () => ({
   resetFeatIncreases: vi.fn(),
-  applyAbilityScoreIncreases: vi.fn(),
   mergeDeduplicated: vi.fn(),
 }));
 
 import { findFeat } from '../shared/featFinder.js';
 import {
-  resetFeatIncreases,
-  applyAbilityScoreIncreases,
   mergeDeduplicated,
 } from '../shared/buffApplier.js';
 
@@ -33,13 +30,13 @@ describe('applyFeatBuffsToFormData', () => {
   });
 
   describe('side effects on formData', () => {
-    it('should reset feat increases on all abilities before applying new ones', () => {
+    it('should apply non-choice ability score increases to formData abilities', () => {
       const formData = {
         rules: '5e',
         feats: ['Tough'],
         abilities: [
-          { name: 'Strength', featIncrease: 5 },
-          { name: 'Dexterity', featIncrease: 3 },
+          { name: 'Strength', featIncrease: 0 },
+          { name: 'Dexterity', featIncrease: 0 },
         ],
       };
 
@@ -47,22 +44,8 @@ describe('applyFeatBuffsToFormData', () => {
 
       applyFeatBuffsToFormData(formData, []);
 
-      expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
-    });
-
-    it('should apply ability score increases from feat parsing', () => {
-      const formData = baseFormData();
-
-      findFeat.mockReturnValue({
-        benefits: ['Increase your Strength score by 2'],
-      });
-
-      applyFeatBuffsToFormData(formData, []);
-
-      expect(applyAbilityScoreIncreases).toHaveBeenCalledWith(
-        formData.abilities,
-        [{ name: 'Strength', amount: 2, isChoice: false }]
-      );
+      expect(formData.abilities[0].featIncrease).toBe(2);
+      expect(formData.abilities[1].featIncrease).toBe(0);
     });
 
     it('should merge resistances from feat parsing into formData', () => {
@@ -369,7 +352,6 @@ describe('applyFeatBuffsToFormData', () => {
 
       const result = applyFeatBuffsToFormData(formData, []);
 
-      expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
       expect(result.abilityScoreIncreases).toEqual([]);
     });
 
@@ -378,11 +360,6 @@ describe('applyFeatBuffsToFormData', () => {
 
       const result = applyFeatBuffsToFormData(formData, []);
 
-      expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
-      expect(applyAbilityScoreIncreases).toHaveBeenCalledWith(
-        formData.abilities,
-        []
-      );
       expect(result.abilityScoreIncreases).toEqual([]);
     });
 

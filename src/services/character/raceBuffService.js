@@ -1,4 +1,4 @@
-import { applyAbilityScoreIncreases, mergeDeduplicated } from '../shared/buffApplier.js';
+import { mergeDeduplicated } from '../shared/buffApplier.js';
 
 /**
  * Race Buff Service
@@ -212,6 +212,5 @@ export function computeRaceBuffs(race, playerData, ruleset = '5e') {
  * @param {object} buffs - Buff result from computeRaceBuffs
  */
 export function applyRaceBuffsToPlayerData(playerData, buffs) {
-  applyAbilityScoreIncreases(playerData.abilities, buffs.abilityScoreIncreases);
   mergeDeduplicated(playerData, 'languages', buffs.languages);
 }

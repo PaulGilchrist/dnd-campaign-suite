@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import './CharacterCreationWizard.css';
 import { validateStep, validateFinalFormData } from '../../config/utils.js';
 import WizardHeader from './WizardHeader.jsx';
@@ -234,11 +234,12 @@ function CharacterCreationWizard({ onComplete, onCancel, allSpells, allClasses, 
    } = useWizardAbilities(formData, currentStep, setErrors, updateAbility);
 
    // Feat ability score choices (ASI from feats)
-   const {
-     featAbilityChoices,
-     featAbilityAssignments,
-     handleFeatAbilityChoice,
-   } = useWizardFeatAbilityChoices(formData, feats, setFormData);
+    const {
+      featAbilityChoices,
+      handleFeatAbilityChoice,
+    } = useWizardFeatAbilityChoices(formData, feats, setFormData);
+
+    const featAbilityAssignments = useMemo(() => formData.featAbilityChoices || {}, [formData.featAbilityChoices]);
 
    // Handlers
   const handleRulesetChange = useCallback(async (newRuleset) => {

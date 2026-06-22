@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { computeAllFeatBuffs } from '../../services/character/featBuffService.js';
-import { applyAbilityScoreIncreases, mergeDeduplicated } from '../../services/shared/buffApplier.js';
+import { mergeDeduplicated } from '../../services/shared/buffApplier.js';
 
 function buildFormDataWithBuffs(prev, buffs) {
   const next = { ...prev };
-  next.abilities = (prev.abilities || []).map(a => ({ ...a, featIncrease: 0 }));
+  next.abilities = (prev.abilities || []).map(a => ({ ...a }));
 
-  applyAbilityScoreIncreases(next.abilities, buffs.abilityScoreIncreases);
+  const nonChoiceIncreases = buffs.abilityScoreIncreases.filter(inc => inc.name && inc.name !== 'any');
+  nonChoiceIncreases.forEach(inc => {
+    const ability = next.abilities.find(
+      a => a.name.toLowerCase() === inc.name.toLowerCase()
+    );
+    if (ability) {
+      ability.featIncrease = (ability.featIncrease || 0) + inc.amount;
+    }
+  });
 
   if (buffs.resistances.length > 0) {
     mergeDeduplicated(next, 'resistances', buffs.resistances);
@@ -53,12 +61,21 @@ function useWizardFeatBuffs(formData, allFeats, setFormData) {
   const clearBuffs = useCallback(() => {
     setFormData(prev => {
       if (!prev.abilities) return prev;
+      const nonChoiceIncreases = (computedBuffs?.abilityScoreIncreases || []).filter(inc => inc.name && inc.name !== 'any');
       return {
         ...prev,
-        abilities: prev.abilities.map(a => ({ ...a, featIncrease: 0 })),
+        abilities: prev.abilities.map(a => {
+          const ability = { ...a };
+          nonChoiceIncreases.forEach(inc => {
+            if (ability.name.toLowerCase() === inc.name.toLowerCase()) {
+              ability.featIncrease = (ability.featIncrease || 0) - inc.amount;
+            }
+          });
+          return ability;
+        }),
       };
     });
-  }, [setFormData]);
+  }, [setFormData, computedBuffs]);
 
   useEffect(() => {
     const currentFeats = formData.feats || [];
