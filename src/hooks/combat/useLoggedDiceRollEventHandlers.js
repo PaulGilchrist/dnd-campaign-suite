@@ -1,5 +1,5 @@
 import { addExpiration } from '../../services/rules/effects/expirations.js';
-import { rollExpression } from '../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import {
@@ -7,6 +7,7 @@ import {
   applyDamageToTarget,
 } from '../../services/rules/combat/applyDamage.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { postLogEntry } from '../../services/shared/logPoster.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { hasSoulstitchProtection } from './useLoggedDiceRollUtils.js';
 import utils from '../../services/ui/utils.js';
@@ -62,14 +63,76 @@ export function setupEventListeners(deps) {
             }
             const ignoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, pending.damageType)) || false;
             const applyResult = applyDamageToTarget(
-                combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, pending.attackerName || characterName
+                combatSummary, pendingTargetName, finalDamage, [pending.damageType], pending.campaignName, charactersRef.current, ignoreResistance, pending.attackerName || characterName, true
             );
 
             if (applyResult && applyResult.finalDamage > 0) {
                 endInvisibilityOnHostileAction(pending.attackerName || characterName, pending.campaignName);
             }
 
-            logEntry({
+            let secondaryResult = null;
+            let secondaryFinalDamage = 0;
+            if (pending.autoDamageSecondaryFormula) {
+                const secondaryFormula = pending.autoDamageSecondaryFormula;
+                const secondaryName = pending.autoDamageSecondaryName || pending.name;
+                const secondaryDamageType = pending.autoDamageSecondaryDamageType;
+                const isAutoCrit = pending.isAutoCrit || false;
+                const secondaryRollResult = isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
+                if (secondaryRollResult) {
+                    const secondaryTotal = secondaryRollResult.total;
+                    let secondaryRawDamage = secondaryTotal;
+                    const secondaryIgnoreResistance = (pending.playerStats && hasIgnoreResistance(pending.playerStats, secondaryDamageType)) || false;
+                    const secondaryApplyResult = applyDamageToTarget(combatSummary, pendingTargetName, secondaryRawDamage, [secondaryDamageType], pending.campaignName, charactersRef.current, secondaryIgnoreResistance, pending.attackerName || characterName, true);
+                    secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
+                    if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
+                        endInvisibilityOnHostileAction(pending.attackerName || characterName, pending.campaignName);
+                    }
+                    secondaryResult = {
+                        name: secondaryName,
+                        formula: secondaryFormula,
+                        rolls: secondaryRollResult.rolls,
+                        total: secondaryTotal,
+                        modifier: secondaryRollResult.modifier,
+                        damageType: secondaryDamageType,
+                        finalDamage: secondaryFinalDamage,
+                    };
+                }
+            }
+
+            const totalDamageDealt = (applyResult?.finalDamage ?? 0) + secondaryFinalDamage;
+            const newHp = applyResult?.newHp ?? (combatSummary?.creatures?.find(c => c.name === pendingTargetName)?.currentHp ?? 0);
+            const maxHp = targetMaxHp;
+            const oldHp = newHp + totalDamageDealt;
+            const isDead = newHp <= 0;
+            const wasAlive = oldHp > 0;
+            const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
+            const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
+            let threshold;
+            if (!wasAlive && isDead) threshold = 'dead';
+            else if (!wasBloodied && isBloodied) threshold = 'bloodied';
+            else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
+
+            const hpEntry = {
+                type: 'hp_change',
+                targetName: pendingTargetName,
+                delta: -(totalDamageDealt),
+                currentHp: newHp,
+                maxHp,
+                isHealing: false,
+                isUnconscious: isDead,
+            };
+            if (threshold) hpEntry.threshold = threshold;
+            postLogEntry(pending.campaignName, hpEntry);
+
+            if (pendingTargetName.startsWith('player-')) {
+                setRuntimeValue(pendingTargetName, 'currentHitPoints', newHp, pending.campaignName);
+                if (oldHp > 0 && isDead) {
+                    setRuntimeValue(pendingTargetName, 'deathSaves', [false, false, false], pending.campaignName);
+                    setRuntimeValue(pendingTargetName, 'deathFailures', [false, false, false], pending.campaignName);
+                }
+            }
+
+            const logEntryData = {
                 type: 'roll',
                 characterName: pending.attackerName || characterName,
                 rollType: 'save-damage',
@@ -93,7 +156,18 @@ export function setupEventListeners(deps) {
                 isAoe: pending.isAoe || false,
                 aoeAffectedCount: pending.isAoe ? (e.detail.aoeAffectedCount || null) : null,
                 soulstitchProtected: isSoulstitchProtected,
-            });
+                note: 'combined_save_damage_roll',
+            };
+            if (secondaryResult) {
+                logEntryData.secondaryName = secondaryResult.name;
+                logEntryData.secondaryFormula = secondaryResult.formula;
+                logEntryData.secondaryRolls = secondaryResult.rolls;
+                logEntryData.secondaryTotal = secondaryResult.total;
+                logEntryData.secondaryModifier = secondaryResult.modifier;
+                logEntryData.secondaryDamageType = secondaryResult.damageType;
+                logEntryData.secondaryFinalDamage = secondaryResult.finalDamage;
+            }
+            logEntry(logEntryData);
 
             if (pending.overchannelActive && pending.overchannelUseCount > 1) {
                 const overchannelSpellLevel = pending.overchannelSpellLevel || 1;
@@ -165,7 +239,7 @@ export function setupEventListeners(deps) {
                 }
             }
 
-            pending.setPopupHtml({
+            const popupData = {
                 type: 'save-damage',
                 name: pending.name,
                 formula: pending.formula,
@@ -174,16 +248,26 @@ export function setupEventListeners(deps) {
                 modifier: pending.modifier,
                 damageType: pending.damageType,
                 targetName: e.detail.targetName,
-                targetCurrentHp: applyResult?.newHp,
+                targetCurrentHp: applyResult?.newHp ?? newHp,
                 targetMaxHp,
                 saveDc: e.detail.saveDc,
                 saveType: e.detail.saveType,
                 dcSuccess: e.detail.dcSuccess,
                 saveResult: { roll: e.detail.roll, total: e.detail.total, bonus: e.detail.saveBonus, success: e.detail.success },
-                finalDamage: applyResult?.finalDamage,
+                finalDamage: applyResult?.finalDamage ?? finalDamage,
                 damageApplied: true,
                 damageReduced: applyResult?.damageReduced,
-            });
+            };
+            if (secondaryResult) {
+                popupData.secondaryName = secondaryResult.name;
+                popupData.secondaryFormula = secondaryResult.formula;
+                popupData.secondaryRolls = secondaryResult.rolls;
+                popupData.secondaryTotal = secondaryResult.total;
+                popupData.secondaryModifier = secondaryResult.modifier;
+                popupData.secondaryDamageType = secondaryResult.damageType;
+                popupData.secondaryFinalDamage = secondaryResult.finalDamage;
+            }
+            pending.setPopupHtml(popupData);
         });
 
         window.addEventListener('death-save-result', (e) => {

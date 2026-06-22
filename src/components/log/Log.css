@@ -561,6 +561,24 @@
     font-weight: 600;
 }
 
+/* Secondary damage section */
+.log-secondary-damage {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding-left: 28px;
+    margin-top: 4px;
+}
+
+.log-secondary-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
 /* Spell entry */
 .log-spell {
     border-left: 3px solid #7c3aed;

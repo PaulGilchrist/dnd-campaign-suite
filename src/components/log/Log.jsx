@@ -26,6 +26,7 @@ function RollEntry({ entry }) {
   const isSaveDamage = entry.rollType === 'save-damage';
   const isAoeDamage = entry.rollType === 'aoe-damage';
   const isOverchannelDamage = entry.rollType === 'overchannel-damage';
+  const hasSecondary = entry.secondaryFormula != null;
   const showBothDice = !isDamage && !isSaveDamage && !isAoeDamage && entry.rolls?.length === 2 && entry.mode && entry.mode !== 'normal';
 
   return (
@@ -106,6 +107,26 @@ function RollEntry({ entry }) {
           <span className="log-total"><b>{entry.total}{(isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage) ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}{entry.bonusDetail ? ' ' + entry.bonusDetail : ''}</b></span>
         </div>
         {(isSaveDamage || isOverchannelDamage) && entry.finalDamage != null && entry.damageType && (
+          <span className="log-final-damage">→ {entry.finalDamage} {entry.damageType} damage</span>
+        )}
+        {hasSecondary && (
+          <div className="log-secondary-damage">
+            <span className="log-secondary-label">Secondary:</span>
+            {entry.secondaryFormula && <span className="log-dice-formula">{entry.secondaryFormula}</span>}
+            <span className="log-total"><b>{entry.secondaryTotal}</b></span>
+            {entry.secondaryDamageType && <span className="log-damage-type">{entry.secondaryDamageType}</span>}
+            {entry.secondaryFinalDamage != null && entry.secondaryDamageType && (
+              <span className="log-final-damage">→ {entry.secondaryFinalDamage} {entry.secondaryDamageType} damage</span>
+            )}
+            {entry.secondarySaveResult && (
+              <span className={`log-save-result ${entry.secondarySaveResult === 'success' ? 'log-condition-success' : 'log-condition-failure'}`}>
+                {entry.secondarySaveResult === 'success' ? 'SAVE SUCCESS' : 'SAVE FAILURE'}
+                {entry.secondarySaveRoll != null && ` (d20 ${entry.secondarySaveRoll}${entry.secondarySaveBonus != null ? `+${entry.secondarySaveBonus}` : ''})`}
+              </span>
+            )}
+          </div>
+        )}
+        {(isSaveDamage || isSaveDamage || isOverchannelDamage) && entry.finalDamage != null && entry.damageType && (
           <span className="log-final-damage">→ {entry.finalDamage} {entry.damageType} damage</span>
         )}
         {(isDamage || isSaveDamage) && entry.resistanceDetails && entry.resistanceDetails.length > 0 && (

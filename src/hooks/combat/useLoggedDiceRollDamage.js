@@ -1,4 +1,5 @@
-import { rollExpression } from '../../services/dice/diceRoller.js';
+import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
+import { postLogEntry } from '../../services/shared/logPoster.js';
 import utils from '../../services/ui/utils.js';
 import {
   computeDamageAfterSave,
@@ -50,7 +51,7 @@ function handleOverchannelSelfDamage(characterName, campaignName, context, logEn
 }
 
 export function createLogDamageAndShow(deps) {
-    const { characterName, campaignName, characters, setPopupHtml, logEntry, pendingSaves, pendingSecondaryDamageRef } = deps;
+    const { characterName, campaignName, characters, setPopupHtml, logEntry, pendingSaves } = deps;
 
     async function applyMagicMissileShieldImmunity(name, formula, total, rolls, modifier, context) {
         const combatSummary = await loadCombatSummary(campaignName);
@@ -274,7 +275,55 @@ export function createLogDamageAndShow(deps) {
             finalDamage = Math.floor(adjustedTotal / 2);
         }
         const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
-        logEntry({
+
+        let secondaryResult = null;
+        let secondaryFinalDamage = 0;
+        if (context?.autoDamageSecondaryFormula) {
+            const secondaryFormula = context.autoDamageSecondaryFormula;
+            const secondaryName = context.autoDamageSecondaryName || name;
+            const secondaryDamageType = context.autoDamageSecondaryDamageType;
+            const secondaryRollResult = context?.isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
+            if (secondaryRollResult) {
+                const secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
+                let secondarySaveResult = saveResult;
+                if (context.saveDc && context.saveType) {
+                    const secondaryDisadvantage = context.metamagicHeighten || false;
+                    secondarySaveResult = rollSaveForCreature(target, context.saveType, context.saveDc, secondaryDisadvantage, advantage);
+                }
+                let secondaryRawDamage = isSoulstitchProtected ? 0 : computeDamageAfterSave(secondaryTotal, secondarySaveResult.success, context.dcSuccess);
+                if (!isSoulstitchProtected && hasPotentFlag && isCantripFlag && secondarySaveResult.success && context.dcSuccess === 'none') {
+                    secondaryRawDamage = Math.floor(secondaryTotal / 2);
+                }
+                const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
+                const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true);
+                secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
+                if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
+                    endInvisibilityOnHostileAction(characterName, campaignName);
+                }
+                secondaryResult = {
+                    name: secondaryName,
+                    formula: secondaryFormula,
+                    rolls: secondaryRollResult.rolls,
+                    total: secondaryTotal,
+                    modifier: secondaryRollResult.modifier,
+                    damageType: secondaryDamageType,
+                    finalDamage: secondaryFinalDamage,
+                    saveResult: isSoulstitchProtected ? 'soulstitch_auto_success' : (secondarySaveResult.success ? 'success' : 'failure'),
+                    saveRoll: secondarySaveResult.roll,
+                    saveBonus: secondarySaveResult.bonus,
+                    saveRawRolls: secondarySaveResult.rawRolls,
+                    dcSuccess: context.dcSuccess,
+                };
+            }
+        }
+
+        const primaryApplyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, ignoreResistance, characterName, true);
+
+        if (primaryApplyResult && primaryApplyResult.finalDamage > 0) {
+            endInvisibilityOnHostileAction(characterName, campaignName);
+        }
+
+        const logEntryData = {
             type: 'roll',
             characterName,
             rollType: 'save-damage',
@@ -292,16 +341,60 @@ export function createLogDamageAndShow(deps) {
             saveBonus: saveResult.bonus,
             saveRawRolls: saveResult.rawRolls,
             mode: disadvantage ? 'disadvantage' : 'normal',
-            finalDamage: null,
-            note: 'save_damage_roll_before_apply',
-        });
+            finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
+            note: 'combined_save_damage_roll',
+        };
+        if (secondaryResult) {
+            logEntryData.secondaryName = secondaryResult.name;
+            logEntryData.secondaryFormula = secondaryResult.formula;
+            logEntryData.secondaryRolls = secondaryResult.rolls;
+            logEntryData.secondaryTotal = secondaryResult.total;
+            logEntryData.secondaryModifier = secondaryResult.modifier;
+            logEntryData.secondaryDamageType = secondaryResult.damageType;
+            logEntryData.secondaryFinalDamage = secondaryResult.finalDamage;
+            logEntryData.secondarySaveResult = secondaryResult.saveResult;
+            logEntryData.secondarySaveRoll = secondaryResult.saveRoll;
+            logEntryData.secondarySaveBonus = secondaryResult.saveBonus;
+            logEntryData.secondarySaveRawRolls = secondaryResult.saveRawRolls;
+            logEntryData.secondaryDcSuccess = secondaryResult.dcSuccess;
+        }
+        logEntry(logEntryData);
 
         await new Promise(resolve => setTimeout(resolve, 500));
 
-        const applyResult = applyDamageToTarget(combatSummary, target.name, finalDamage, [damageType], campaignName, characters, ignoreResistance, characterName);
+        const totalDamageDealt = (primaryApplyResult?.finalDamage ?? 0) + secondaryFinalDamage;
+        const newHp = primaryApplyResult?.newHp ?? target.currentHp;
+        const oldHp = newHp + totalDamageDealt;
+        const isDead = newHp <= 0;
+        const maxHp = target.type === 'player'
+            ? (getRuntimeValue(target.name, 'hitPoints') ?? newHp)
+            : target.maxHp;
+        const wasAlive = oldHp > 0;
+        const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
+        const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
+        let threshold;
+        if (!wasAlive && isDead) threshold = 'dead';
+        else if (!wasBloodied && isBloodied) threshold = 'bloodied';
+        else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
 
-        if (applyResult && applyResult.finalDamage > 0) {
-            endInvisibilityOnHostileAction(characterName, campaignName);
+        const hpEntry = {
+            type: 'hp_change',
+            targetName: target.name,
+            delta: -(totalDamageDealt),
+            currentHp: newHp,
+            maxHp,
+            isHealing: false,
+            isUnconscious: isDead,
+        };
+        if (threshold) hpEntry.threshold = threshold;
+        postLogEntry(campaignName, hpEntry);
+
+        if (target.type === 'player') {
+            setRuntimeValue(target.name, 'currentHitPoints', newHp, campaignName);
+            if (oldHp > 0 && isDead) {
+                setRuntimeValue(target.name, 'deathSaves', [false, false, false], campaignName);
+                setRuntimeValue(target.name, 'deathFailures', [false, false, false], campaignName);
+            }
         }
 
         if (!saveResult.success && context?.statusEffects?.length > 0) {
@@ -337,7 +430,7 @@ export function createLogDamageAndShow(deps) {
             }
         }
 
-        setPopupHtml({
+        const popupData = {
             type: 'save-damage',
             name,
             formula,
@@ -346,30 +439,29 @@ export function createLogDamageAndShow(deps) {
             modifier,
             damageType,
             targetName: target.name,
-            targetCurrentHp: applyResult?.newHp,
+            targetCurrentHp: newHp,
             targetMaxHp,
             saveDc,
             saveType,
             dcSuccess,
             saveResult: isSoulstitchProtected ? { success: true, roll: 1, total: 0, bonus: 0 } : saveResult,
-            finalDamage: applyResult?.finalDamage,
+            finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
             damageApplied: true,
-            damageReduced: applyResult?.damageReduced,
-        });
-
-        if (context?.autoDamageSecondaryFormula) {
-            pendingSecondaryDamageRef.current = {
-                name: context.autoDamageSecondaryName || name,
-                formula: context.autoDamageSecondaryFormula,
-                damageType: context.autoDamageSecondaryDamageType,
-                targetName: target.name,
-                attackerName: context.attackerName || characterName,
-                saveDc: context.saveDc,
-                saveType: context.saveType,
-                dcSuccess: context.dcSuccess,
-                isCritSecondary: context?.isAutoCrit || false,
-            };
+            damageReduced: primaryApplyResult?.damageReduced,
+        };
+        if (secondaryResult) {
+            popupData.secondaryName = secondaryResult.name;
+            popupData.secondaryFormula = secondaryResult.formula;
+            popupData.secondaryRolls = secondaryResult.rolls;
+            popupData.secondaryTotal = secondaryResult.total;
+            popupData.secondaryModifier = secondaryResult.modifier;
+            popupData.secondaryDamageType = secondaryResult.damageType;
+            popupData.secondaryFinalDamage = secondaryResult.finalDamage;
+            popupData.secondarySaveResult = secondaryResult.saveResult;
+            popupData.secondarySaveRoll = secondaryResult.saveRoll;
+            popupData.secondarySaveBonus = secondaryResult.saveBonus;
         }
+        setPopupHtml(popupData);
 
         handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters);
 
@@ -635,6 +727,9 @@ export function createLogDamageAndShow(deps) {
             overchannelSpellLevel: context?.overchannelSpellLevel || 1,
             statusEffects: context?.statusEffects || [],
             playerStats: context?.playerStats,
+            autoDamageSecondaryFormula: context?.autoDamageSecondaryFormula || null,
+            autoDamageSecondaryName: context?.autoDamageSecondaryName || null,
+            autoDamageSecondaryDamageType: context?.autoDamageSecondaryDamageType || null,
         };
 
         sendSavePrompt(campaignName, {
@@ -700,6 +795,10 @@ export function createLogDamageAndShow(deps) {
             : target?.maxHp ?? 0;
 
         let applyResult = null;
+        let secondaryResult = null;
+        let secondaryFinalDamage = 0;
+        let reducedTotal = 0;
+
         if (target) {
             const lastAttack = combatSummary?.lastAttack || null;
             const attackHit = context?.isOpportunityAttack && lastAttack?.hit === true && lastAttack?.attackerName === characterName;
@@ -729,34 +828,103 @@ export function createLogDamageAndShow(deps) {
                 const rayRoll = rollExpression('1d8');
                 rayReduction = rayRoll?.total || 0;
             }
-            const reducedTotal = Math.max(0, adjustedTotal - rayReduction);
+            reducedTotal = Math.max(0, adjustedTotal - rayReduction);
             const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, damageType)) || false;
 
-            logEntry({
-                type: 'roll',
-                characterName,
-                rollType: 'damage',
-                name,
-                formula,
-                rolls,
-                total,
-                modifier,
-                damageType,
-                targetName: target?.name,
-                finalDamage: null,
-                note: 'plain_damage_roll_before_apply',
-            });
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            applyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName);
-            if (rayReduction > 0) {
-                applyResult = { ...applyResult, rayOfEnfeebleReduction: rayReduction };
+            if (context?.autoDamageSecondaryFormula) {
+                const secondaryFormula = context.autoDamageSecondaryFormula;
+                const secondaryName = context.autoDamageSecondaryName || name;
+                const secondaryDamageType = context.autoDamageSecondaryDamageType;
+                const secondaryRollResult = context?.isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
+                if (secondaryRollResult) {
+                    const secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
+                    let secondaryRawDamage = secondaryTotal;
+                    const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
+                    const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true);
+                    secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
+                    if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
+                        endInvisibilityOnHostileAction(characterName, campaignName);
+                    }
+                    secondaryResult = {
+                        name: secondaryName,
+                        formula: secondaryFormula,
+                        rolls: secondaryRollResult.rolls,
+                        total: secondaryTotal,
+                        modifier: secondaryRollResult.modifier,
+                        damageType: secondaryDamageType,
+                        finalDamage: secondaryFinalDamage,
+                    };
+                }
             }
+
+            const primaryApplyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName, true);
+            applyResult = rayReduction > 0 ? { ...primaryApplyResult, rayOfEnfeebleReduction: rayReduction } : primaryApplyResult;
         }
 
         if (applyResult && applyResult.finalDamage > 0) {
             endInvisibilityOnHostileAction(characterName, campaignName);
+        }
+
+        const totalDamageDealt = (applyResult?.finalDamage ?? 0) + secondaryFinalDamage;
+        const newHp = applyResult?.newHp ?? (target ? (target.type === 'player' ? getRuntimeValue(target.name, 'currentHitPoints') ?? target.currentHp : target.currentHp) : 0);
+        const oldHp = newHp + totalDamageDealt;
+        const isDead = newHp <= 0;
+        const maxHp = target?.type === 'player'
+            ? (getRuntimeValue(target.name, 'hitPoints') ?? newHp)
+            : target?.maxHp;
+        const wasAlive = oldHp > 0;
+        const wasBloodied = oldHp > 0 && oldHp <= Math.floor(maxHp / 2);
+        const isBloodied = newHp > 0 && newHp <= Math.floor(maxHp / 2);
+        let threshold;
+        if (!wasAlive && isDead) threshold = 'dead';
+        else if (!wasBloodied && isBloodied) threshold = 'bloodied';
+        else if (wasBloodied && !isBloodied && newHp > 0) threshold = 'recovering';
+
+        const logEntryData = {
+            type: 'roll',
+            characterName,
+            rollType: 'damage',
+            name,
+            formula,
+            rolls,
+            total,
+            modifier,
+            damageType,
+            targetName: target?.name,
+            finalDamage: applyResult?.finalDamage ?? reducedTotal,
+            note: 'combined_damage_roll',
+        };
+        if (secondaryResult) {
+            logEntryData.secondaryName = secondaryResult.name;
+            logEntryData.secondaryFormula = secondaryResult.formula;
+            logEntryData.secondaryRolls = secondaryResult.rolls;
+            logEntryData.secondaryTotal = secondaryResult.total;
+            logEntryData.secondaryModifier = secondaryResult.modifier;
+            logEntryData.secondaryDamageType = secondaryResult.damageType;
+            logEntryData.secondaryFinalDamage = secondaryResult.finalDamage;
+        }
+        logEntry(logEntryData);
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        const hpEntry = {
+            type: 'hp_change',
+            targetName: target?.name,
+            delta: -(totalDamageDealt),
+            currentHp: newHp,
+            maxHp,
+            isHealing: false,
+            isUnconscious: isDead,
+        };
+        if (threshold) hpEntry.threshold = threshold;
+        postLogEntry(campaignName, hpEntry);
+
+        if (target?.type === 'player') {
+            setRuntimeValue(target.name, 'currentHitPoints', newHp, campaignName);
+            if (oldHp > 0 && isDead) {
+                setRuntimeValue(target.name, 'deathSaves', [false, false, false], campaignName);
+                setRuntimeValue(target.name, 'deathFailures', [false, false, false], campaignName);
+            }
         }
 
         const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
@@ -878,18 +1046,14 @@ export function createLogDamageAndShow(deps) {
             elementalAdeptBonus: adjustedTotal > total ? adjustedTotal - total : 0,
         };
 
-        if (context?.autoDamageSecondaryFormula) {
-            pendingSecondaryDamageRef.current = {
-                name: context.autoDamageSecondaryName || name,
-                formula: context.autoDamageSecondaryFormula,
-                damageType: context.autoDamageSecondaryDamageType,
-                targetName: target?.name,
-                attackerName: context.attackerName || characterName,
-                saveDc: context.saveDc,
-                saveType: context.saveType,
-                dcSuccess: context.dcSuccess,
-                isCritSecondary: context?.isAutoCrit || false,
-            };
+        if (secondaryResult) {
+            popupData.secondaryName = secondaryResult.name;
+            popupData.secondaryFormula = secondaryResult.formula;
+            popupData.secondaryRolls = secondaryResult.rolls;
+            popupData.secondaryTotal = secondaryResult.total;
+            popupData.secondaryModifier = secondaryResult.modifier;
+            popupData.secondaryDamageType = secondaryResult.damageType;
+            popupData.secondaryFinalDamage = secondaryResult.finalDamage;
         }
 
         if (applyResult) {

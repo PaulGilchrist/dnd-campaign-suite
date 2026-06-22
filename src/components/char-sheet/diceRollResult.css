@@ -207,3 +207,50 @@
 .dice-roll-reroll-result i {
     margin-right: 6px;
 }
+
+.dice-roll-secondary-damage {
+    margin: 12px 0;
+    padding: 10px;
+    border: 1px solid var(--border-color, #666);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.dice-roll-secondary-label {
+    font-size: 0.85em;
+    font-weight: bold;
+    color: #a855f7;
+    margin-bottom: 6px;
+}
+
+.dice-roll-secondary-formula {
+    font-size: 0.95em;
+    margin: 4px 0;
+}
+
+.dice-roll-secondary-save-result {
+    text-align: center;
+    font-size: 1em;
+    font-weight: bold;
+    margin: 6px 0;
+    padding: 3px 8px;
+    border-radius: 4px;
+}
+
+.dice-roll-secondary-save-result.save-success {
+    color: #4CAF50;
+    background: rgba(76, 175, 80, 0.15);
+}
+
+.dice-roll-secondary-save-result.save-failure {
+    color: #f44336;
+    background: rgba(244, 67, 54, 0.15);
+}
+
+.dice-roll-secondary-total {
+    text-align: center;
+    font-size: 0.95em;
+    font-weight: bold;
+    color: #ff9800;
+    margin: 6px 0;
+}

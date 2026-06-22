@@ -79,7 +79,7 @@ export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = f
   return { roll: finalRoll, total, bonus, success, rawRolls: [roll1, roll2] };
 }
 
-export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null) {
+export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false) {
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
@@ -440,7 +440,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       }
     }
 
-   logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
+    if (!suppressHpLog) {
+        logDamageApplication(creature, finalDamage, oldHp, newHp, campaignName);
+    }
 
   let npcConcentrationBroken = false;
   let combatSummaryChanged = false;

@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
     rollExpression: vi.fn(),
+    rollExpressionDoubled: vi.fn(),
 }));
 
 vi.mock('../../services/ui/utils.js', () => ({
@@ -49,6 +50,10 @@ vi.mock('./useLoggedDiceRollUtils.js', () => ({
     applyMinDamageAdjustment: vi.fn((d) => d),
 }));
 
+vi.mock('../../services/shared/logPoster.js', () => ({
+    postLogEntry: vi.fn(),
+}));
+
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total),
     rollSaveForCreature: vi.fn(),
@@ -78,7 +83,6 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
         setPopupHtml: vi.fn(),
         logEntry: vi.fn(),
         pendingSaves: {},
-        pendingSecondaryDamageRef: { current: null },
     };
 
     beforeEach(() => {
@@ -163,6 +167,25 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
                 rollType: 'save-damage',
             }));
         });
+
+        it('applies both primary and secondary for NPC save damage', async () => {
+            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }] });
+            const fn = createFn();
+            await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, {
+                targetName: 'Goblin',
+                damageType: 'force',
+                saveDc: 15,
+                saveType: 'DEX',
+                dcSuccess: 'half',
+                autoDamageSecondaryFormula: '1d10',
+                autoDamageSecondaryName: 'Eldritch Blast',
+                autoDamageSecondaryDamageType: 'force',
+            });
+            expect(applyDamageToTarget.mock.calls.length).toBeGreaterThanOrEqual(2);
+            const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
+            const combinedEntry = logCalls.find(entry => entry.note === 'combined_save_damage_roll');
+            expect(combinedEntry).toBeDefined();
+        });
     });
 
     describe('player save damage', () => {
@@ -178,7 +201,8 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
                 metamagicCareful: true,
             });
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                note: 'careful_spell_damage_roll_before_apply',
+                rollType: 'save-damage',
+                saveResult: 'success',
             }));
         });
 
@@ -195,7 +219,8 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
                 playerStats,
             });
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                note: 'contact_patron_damage_roll_before_apply',
+                rollType: 'save-damage',
+                saveResult: 'success',
             }));
         });
     });
@@ -216,7 +241,11 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
 
         it('handles ram active condition', async () => {
             loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13, size: 'Small' }] });
-            getRuntimeValue.mockReturnValueOnce([]).mockReturnValueOnce([]);
+            getRuntimeValue.mockImplementation((key) => {
+                if (key === 'Goblin:hitPoints') return 13;
+                if (key === 'targetEffects') return [];
+                return null;
+            });
             const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
             const fn = createFn();
             await fn('Ram', '1d8+3', 8, [5, 3], 3, {
@@ -265,17 +294,20 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
     });
 
     describe('secondary damage', () => {
-        it('stores secondary damage in pendingSecondaryDamageRef', async () => {
+        it('applies both primary and secondary damage', async () => {
             loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }] });
             const fn = createFn();
             await fn('Eldritch Blast (Agonizing)', '2d10+4', 14, [5, 9], 4, {
                 targetName: 'Goblin',
                 damageType: 'force',
                 autoDamageSecondaryFormula: '1d10',
+                autoDamageSecondaryName: 'Eldritch Blast',
+                autoDamageSecondaryDamageType: 'force',
             });
-            expect(deps.pendingSecondaryDamageRef.current).toEqual(expect.objectContaining({
-                formula: '1d10',
-            }));
+            expect(applyDamageToTarget.mock.calls.length).toBeGreaterThanOrEqual(2);
+            const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
+            const combinedEntry = logCalls.find(entry => entry.note === 'combined_damage_roll');
+            expect(combinedEntry).toBeDefined();
         });
     });
 

@@ -1,6 +1,5 @@
 import { useRef, useEffect } from 'react';
 import useDiceRoll from './useDiceRoll.js';
-import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
@@ -14,7 +13,6 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
   autoDamageRollRef.current = autoDamageRoll || null;
   const charactersRef = useRef(characters);
   charactersRef.current = characters || [];
-  const pendingSecondaryDamageRef = useRef(null);
 
   if (!window.__pendingSaves) window.__pendingSaves = {};
   const pendingSaves = window.__pendingSaves;
@@ -41,33 +39,12 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
     }
   }, [popupHtml]);
 
-  useEffect(() => {
-    if (popupHtml === null && pendingSecondaryDamageRef.current) {
-      const secondary = pendingSecondaryDamageRef.current;
-      pendingSecondaryDamageRef.current = null;
-      const result = secondary.isCritSecondary ? rollExpressionDoubled(secondary.formula) : rollExpression(secondary.formula);
-      if (result) {
-        const context = {
-          damageType: secondary.damageType,
-          targetName: secondary.targetName,
-          attackerName: secondary.attackerName,
-        };
-        if (secondary.saveDc) {
-          context.saveDc = secondary.saveDc;
-          context.saveType = secondary.saveType;
-          context.dcSuccess = secondary.dcSuccess;
-        }
-        logDamageAndShow(secondary.name, secondary.formula, result.total, result.rolls, result.modifier, context);
-      }
-    }
-  }, [popupHtml]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const logAndShow = createLogAndShow({
     characterName, campaignName, characters, setPopupHtml, logEntry,
   });
 
   const logDamageAndShow = createLogDamageAndShow({
-    characterName, campaignName, characters, setPopupHtml, logEntry, pendingSaves, pendingSecondaryDamageRef, charactersRef,
+    characterName, campaignName, characters, setPopupHtml, logEntry, pendingSaves, charactersRef,
   });
 
   const { quickRollPlayerSave, triggerGloriousDefenseCounterAttack } = createSaves({
