@@ -5,7 +5,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/combat/useMetamagic.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/combat/useMetamagic.js';
+import { findRollsByCreature } from '../../common/damageRollback.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 
 const EVENT_STALENESS_MS = 60000;
@@ -107,9 +107,11 @@ async function handleBendFate(action, playerStats, campaignName, mapName) {
         }
     }
 
-    const attackEvent = getLastAttackRoll(targetName);
-    const abilityEvent = getLastAbilityCheck(targetName);
-    const saveEvent = getLastSaveRoll(targetName);
+    const rollsByCreature = await findRollsByCreature(campaignName);
+    const targetRolls = rollsByCreature?.[targetName] || null;
+    const attackEvent = targetRolls?.attackEvent || null;
+    const abilityEvent = targetRolls?.abilityEvent || null;
+    const saveEvent = targetRolls?.saveEvent || null;
 
     const attackFresh = attackEvent && !isStale(attackEvent);
     const abilityFresh = abilityEvent && !isStale(abilityEvent);

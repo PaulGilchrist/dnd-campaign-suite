@@ -1,13 +1,12 @@
 import { handle } from './darkOnesLookHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../common/damageRollback.js';
 import * as logService from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js');
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-    getLastAttackRoll: vi.fn(),
-    getLastAbilityCheck: vi.fn(),
-    getLastSaveRoll: vi.fn(),
+vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({}));
+vi.mock('../../common/damageRollback.js', () => ({
+    findRollsByCreature: vi.fn(),
 }));
 vi.mock('../../../ui/logService.js');
 
@@ -46,9 +45,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        metamagic.getLastAttackRoll.mockReturnValue(null);
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue(null);
+        damageRollback.findRollsByCreature.mockReturnValue(null);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 
@@ -62,10 +59,14 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        metamagic.getLastAbilityCheck.mockReturnValue({
-            d20: 8, bonus: 5, checkName: 'Stealth check', timestamp: Date.now() - 10000,
+        damageRollback.findRollsByCreature.mockReturnValue(null);
+        damageRollback.findRollsByCreature.mockReturnValue({
+            'TestWarlock': {
+                attackEvent: null,
+                abilityEvent: { d20: 8, bonus: 5, checkName: 'Stealth check', timestamp: Date.now() - 10000 },
+                saveEvent: null
+            }
         });
-        metamagic.getLastSaveRoll.mockReturnValue(null);
         logService.addEntry.mockResolvedValue(undefined);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
@@ -85,8 +86,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue({
+        damageRollback.findRollsByCreature.mockReturnValue(null);
             d20: 12, bonus: 3, saveType: 'wisdom', timestamp: Date.now() - 10000,
         });
         logService.addEntry.mockResolvedValue(undefined);
@@ -104,10 +104,10 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        metamagic.getLastAbilityCheck.mockReturnValue({
+        damageRollback.findRollsByCreature.mockReturnValue(null);
             d20: 5, bonus: 2, checkName: 'Arcana check', timestamp: Date.now() - 10000,
         });
-        metamagic.getLastSaveRoll.mockReturnValue({
+        damageRollback.findRollsByCreature.mockReturnValue(null);
             d20: 18, bonus: 4, saveType: 'constitution', timestamp: Date.now() - 10000,
         });
         logService.addEntry.mockResolvedValue(undefined);
@@ -123,7 +123,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 3;
             return undefined;
         });
-        metamagic.getLastAbilityCheck.mockReturnValue({
+        damageRollback.findRollsByCreature.mockReturnValue(null);
             d20: 10, bonus: 4, checkName: 'Perception check', timestamp: Date.now() - 10000,
         });
         logService.addEntry.mockResolvedValue(undefined);
@@ -140,7 +140,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        metamagic.getLastAbilityCheck.mockReturnValue({
+        damageRollback.findRollsByCreature.mockReturnValue(null);
             d20: 15, bonus: 1, checkName: 'Insight check', timestamp: Date.now() - 10000,
         });
         logService.addEntry.mockResolvedValue(undefined);
@@ -156,10 +156,10 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        metamagic.getLastAbilityCheck.mockReturnValue({
+        damageRollback.findRollsByCreature.mockReturnValue(null);
             d20: 10, bonus: 2, checkName: 'Athletics', timestamp: Date.now() - 120000,
         });
-        metamagic.getLastSaveRoll.mockReturnValue(null);
+        damageRollback.findRollsByCreature.mockReturnValue(null);
 
         const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
 
@@ -171,8 +171,7 @@ describe('darkOnesLookHandler.handle', () => {
             if (key === 'darkOnesLookUses') return 1;
             return undefined;
         });
-        metamagic.getLastAbilityCheck.mockReturnValue(null);
-        metamagic.getLastSaveRoll.mockReturnValue({
+        damageRollback.findRollsByCreature.mockReturnValue(null);
             d20: 8, bonus: 3, saveType: 'dexterity', timestamp: Date.now() - 120000,
         });
 

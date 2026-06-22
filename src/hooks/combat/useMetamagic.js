@@ -21,27 +21,6 @@ export function getMaxSorceryPoints(playerStats) {
   return features?.maxSorceryPoints || 0;
 }
 
-export function saveLastAttackRoll(characterName, event, campaignName) {
-  setRuntimeValue(characterName, 'lastAttackRoll', event, campaignName);
-}
-
-
-export function saveLastAbilityCheck(characterName, event, campaignName) {
-  setRuntimeValue(characterName, 'lastAbilityCheck', event, campaignName);
-}
-
-export function getLastAbilityCheck(characterName) {
-  return getRuntimeValue(characterName, 'lastAbilityCheck');
-}
-
-export function saveLastSaveRoll(characterName, event, campaignName) {
-  setRuntimeValue(characterName, 'lastSaveRoll', event, campaignName);
-}
-
-export function getLastSaveRoll(characterName) {
-  return getRuntimeValue(characterName, 'lastSaveRoll');
-}
-
 export function logMetamagicUse(campaignName, characterName, spellName, options, spCost) {
   const remaining = getCurrentSorceryPoints(characterName);
   const entry = {

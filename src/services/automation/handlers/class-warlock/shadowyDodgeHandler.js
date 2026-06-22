@@ -1,5 +1,5 @@
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll } from '../../../../hooks/combat/useMetamagic.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
@@ -15,14 +15,15 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const featureName = action.name || 'Shadowy Dodge';
 
     // Get the last attack roll against the player
-    const attackEvent = getLastAttackRoll(playerName);
-    if (!attackEvent || isStale(attackEvent)) {
+    const lastAttack = await findLastAttack();
+    const attackEvent = lastAttack?.attackEvent;
+    if (!attackEvent || isStale(attackEvent) || lastAttack?.targetName !== playerName) {
         return infoPopup(featureName, `No recent attack roll against you found. ${featureName} can only be used shortly after an attack roll.`, auto);
     }
 
-    const { d20, bonus, targetName, targetAc, hit, effectiveAc } = attackEvent;
+    const { d20, bonus, targetAc, hit, effectiveAc } = attackEvent;
     const ac = effectiveAc ?? targetAc;
-    const attackerName = targetName || 'Unknown creature';
+    const attackerName = lastAttack.attackerName || 'Unknown creature';
 
     // Simulate disadvantage: roll second d20, take lower
     const secondD20 = Math.floor(Math.random() * 20) + 1;

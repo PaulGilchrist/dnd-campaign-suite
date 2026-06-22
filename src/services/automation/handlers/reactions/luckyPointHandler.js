@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../hooks/combat/useMetamagic.js';
+import { findRollsByCreature } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
@@ -30,9 +30,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         return infoPopup(action.name, `${action.name} requires at least 1 Lucid Point. You have ${currentLP} remaining.`, auto);
     }
 
-    const attackEvent = getLastAttackRoll(playerName);
-    const abilityEvent = getLastAbilityCheck(playerName);
-    const saveEvent = getLastSaveRoll(playerName);
+    const rollsByCreature = await findRollsByCreature(campaignName);
+    const playerRolls = rollsByCreature?.[playerName] || null;
+    const attackEvent = playerRolls?.attackEvent || null;
+    const abilityEvent = playerRolls?.abilityEvent || null;
+    const saveEvent = playerRolls?.saveEvent || null;
 
     const attackFresh = attackEvent && !isStale(attackEvent);
     const abilityFresh = abilityEvent && !isStale(abilityEvent);

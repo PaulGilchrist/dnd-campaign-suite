@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions, resolveTarget } from '../../common/targetResolver.js';
+import { findRollsByCreature } from '../../common/damageRollback.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 
 const EVENT_STALENESS_MS = 60000;
@@ -74,9 +75,11 @@ export async function handle(action, playerStats, campaignName, mapName) {
         };
     }
 
-    const attackEvent = getRuntimeValue(targetName, 'lastAttackRoll', campaignName);
-    const abilityEvent = getRuntimeValue(targetName, 'lastAbilityCheck', campaignName);
-    const saveEvent = getRuntimeValue(targetName, 'lastSaveRoll', campaignName);
+    const rollsByCreature = await findRollsByCreature(campaignName);
+    const targetRolls = rollsByCreature?.[targetName] || null;
+    const attackEvent = targetRolls?.attackEvent || null;
+    const abilityEvent = targetRolls?.abilityEvent || null;
+    const saveEvent = targetRolls?.saveEvent || null;
 
     const attackFresh = attackEvent && !isStale(attackEvent);
     const abilityFresh = abilityEvent && !isStale(abilityEvent);

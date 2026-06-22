@@ -1,7 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { getLastDamageEvent } from '../../../../hooks/combat/useMetamagic.js';
+import { findRollsByCreature } from '../../common/damageRollback.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -16,9 +15,9 @@ export async function handle(action, playerStats, campaignName) {
     const featureName = action.name || 'Superior Hunter\'s Defense';
 
     // Find the last damage event where the player was the target
-    // Scan all creatures' lastMetamagicDamage for events targeting the player
-    const cs = await getCombatContext(campaignName);
-    if (!cs) {
+    // Scan all creatures' lastAttack for events targeting the player
+    const rollsByCreature = await findRollsByCreature(campaignName);
+    if (!rollsByCreature) {
         return {
             type: 'popup',
             payload: {
@@ -33,22 +32,13 @@ export async function handle(action, playerStats, campaignName) {
     let lastDamageEvent = null;
     let timestamp = 0;
 
-    const creatures = cs.creatures || [];
-    for (const creature of creatures) {
-        const damageEvent = getRuntimeValue(creature.name, 'lastMetamagicDamage');
+    for (const [, rolls] of Object.entries(rollsByCreature)) {
+        const damageEvent = rolls.attackEvent;
         if (damageEvent && damageEvent.targetName === playerName && !isStale(damageEvent)) {
             if (damageEvent.timestamp > timestamp) {
                 timestamp = damageEvent.timestamp;
                 lastDamageEvent = damageEvent;
             }
-        }
-    }
-
-    // Also check the player's own key (in case damage was saved there directly)
-    const playerDamageEvent = getLastDamageEvent(playerName);
-    if (playerDamageEvent && playerDamageEvent.targetName === playerName && !isStale(playerDamageEvent)) {
-        if (playerDamageEvent.timestamp > timestamp) {
-            lastDamageEvent = playerDamageEvent;
         }
     }
 

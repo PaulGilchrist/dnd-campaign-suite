@@ -48,9 +48,10 @@ vi.mock('../../../dice/diceRoller.js', () => ({
 vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     spendSorceryPoints: vi.fn(),
     getCurrentSorceryPoints: vi.fn(() => 3),
-    getLastAttackRoll: vi.fn(() => null),
-    getLastAbilityCheck: vi.fn(() => null),
-    getLastSaveRoll: vi.fn(() => null),
+}));
+
+vi.mock('../../common/damageRollback.js', () => ({
+    findRollsByCreature: vi.fn(() => null),
 }));
 
 vi.mock('../../../../services/character/classFeatures.js', () => ({
@@ -61,6 +62,7 @@ vi.mock('../../../../services/character/classFeatures.js', () => ({
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import * as damageRollback from '../../common/damageRollback.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 

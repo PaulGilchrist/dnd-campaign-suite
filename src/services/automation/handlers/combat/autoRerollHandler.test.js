@@ -19,6 +19,10 @@ vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
     getLastSaveRoll: vi.fn(() => null),
 }));
 
+vi.mock('../../common/damageRollback.js', () => ({
+    findRollsByCreature: vi.fn(() => null),
+}));
+
 vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(async () => null),
 }));
@@ -53,7 +57,7 @@ vi.mock('../../../../services/encounters/combatData.js', () => ({
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../common/damageRollback.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -90,9 +94,9 @@ describe('autoRerollHandler', () => {
 
     describe('handle with basic bonus', () => {
         it('should return info popup when no recent attack roll', async () => {
-            getLastAttackRoll.mockReturnValue(null);
-            getLastAbilityCheck.mockReturnValue(null);
-            getLastSaveRoll.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
 
             const action = makeAction();
             const result = await handle(action, makePlayerStats(), 'campaign', 'map');
@@ -103,9 +107,9 @@ describe('autoRerollHandler', () => {
 
         it('should handle attack roll reroll', async () => {
             const attackEvent = { d20: 8, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            getLastAttackRoll.mockReturnValue(attackEvent);
-            getLastAbilityCheck.mockReturnValue(null);
-            getLastSaveRoll.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(attackEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
 
             const action = makeAction();
             const result = await handle(action, makePlayerStats(), 'campaign', 'map');
@@ -116,10 +120,10 @@ describe('autoRerollHandler', () => {
         });
 
         it('should handle ability check reroll', async () => {
-            getLastAttackRoll.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
             const abilityEvent = { d20: 12, bonus: 3, checkName: 'Stealth', timestamp: Date.now() };
-            getLastAbilityCheck.mockReturnValue(abilityEvent);
-            getLastSaveRoll.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(abilityEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
 
             const action = makeAction();
             const result = await handle(action, makePlayerStats(), 'campaign', 'map');
@@ -132,7 +136,7 @@ describe('autoRerollHandler', () => {
             vi.mocked(await import('../../../rules/combat/damageUtils.js')).getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Ally', hit_points: { current: 10 } }],
             });
-            getLastAttackRoll.mockImplementation((name) => {
+            damageRollback.findRollsByCreature.mockImplementation((name) => {
                 if (name === 'TestHero') return null;
                 return { d20: 3, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
             });
@@ -150,7 +154,7 @@ describe('autoRerollHandler', () => {
                 creatures: [{ name: 'Ally', hit_points: { current: 10 } }],
             });
             vi.mocked(await import('../../../rules/combat/rangeValidation.js')).getDistanceFeet.mockReturnValue(50);
-            getLastAttackRoll.mockImplementation((name) => {
+            damageRollback.findRollsByCreature.mockImplementation((name) => {
                 if (name === 'TestHero') return null;
                 return { d20: 3, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
             });
@@ -168,7 +172,7 @@ describe('autoRerollHandler', () => {
         it('should handle override_fail_to_success once per rest', async () => {
             getRuntimeValue.mockReturnValue(null);
             const saveEvent = { d20: 3, bonus: 2, saveType: 'Wisdom', timestamp: Date.now() };
-            getLastSaveRoll.mockReturnValue(saveEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(saveEvent);
 
             const action = makeAction({
                 automation: {
@@ -186,7 +190,7 @@ describe('autoRerollHandler', () => {
         it('should reject override_fail_to_success if already used this rest', async () => {
             getRuntimeValue.mockReturnValue('rest');
             const saveEvent = { d20: 3, bonus: 2, saveType: 'Wisdom', timestamp: Date.now() };
-            getLastSaveRoll.mockReturnValue(saveEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(saveEvent);
 
             const action = makeAction({
                 automation: {
@@ -203,7 +207,7 @@ describe('autoRerollHandler', () => {
         it('should reject override_fail_to_success for invalid save type', async () => {
             getRuntimeValue.mockReturnValue(null);
             const saveEvent = { d20: 3, bonus: 2, saveType: 'Strength', timestamp: Date.now() };
-            getLastSaveRoll.mockReturnValue(saveEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(saveEvent);
 
             const action = makeAction({
                 automation: {
@@ -221,8 +225,8 @@ describe('autoRerollHandler', () => {
     describe('handle with bardic_inspiration_die', () => {
         it('should roll bardic die and apply to attack', async () => {
             const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            getLastAttackRoll.mockReturnValue(attackEvent);
-            getLastAbilityCheck.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(attackEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
 
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, bardic_inspiration_uses: 3, bardic_die: 6 }] },
@@ -237,8 +241,8 @@ describe('autoRerollHandler', () => {
 
         it('should return info when no recent failed check or attack', async () => {
             const attackEvent = { d20: 18, bonus: 5, targetAc: 15, hit: true, timestamp: Date.now() };
-            getLastAttackRoll.mockReturnValue(attackEvent);
-            getLastAbilityCheck.mockReturnValue(null);
+            damageRollback.findRollsByCreature.mockReturnValue(attackEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(null);
 
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, bardic_inspiration_uses: 3, bardic_die: 6 }] },
@@ -255,7 +259,7 @@ describe('autoRerollHandler', () => {
     describe('handle with psionic_energy_die', () => {
         it('should use psionic energy die', async () => {
             const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            getLastAttackRoll.mockReturnValue(attackEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(attackEvent);
 
             const action = makeAction({
                 automation: { bonusExpression: 'psionic_energy_die' },
@@ -269,7 +273,7 @@ describe('autoRerollHandler', () => {
         it('should return info when no psionic energy remaining', async () => {
             getRuntimeValue.mockReturnValue(0);
             const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            getLastAttackRoll.mockReturnValue(attackEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(attackEvent);
 
             const action = makeAction({
                 automation: { bonusExpression: 'psionic_energy_die' },
@@ -283,7 +287,7 @@ describe('autoRerollHandler', () => {
     describe('handle with convert_miss_to_hit', () => {
         it('should convert a miss to a hit', async () => {
             const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            getLastAttackRoll.mockReturnValue(attackEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(attackEvent);
 
             const action = makeAction({
                 automation: { effect: 'convert_miss_to_hit' },
@@ -295,7 +299,7 @@ describe('autoRerollHandler', () => {
 
         it('should reject when attack already hit', async () => {
             const attackEvent = { d20: 18, bonus: 5, targetAc: 15, hit: true, timestamp: Date.now() };
-            getLastAttackRoll.mockReturnValue(attackEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(attackEvent);
 
             const action = makeAction({
                 automation: { effect: 'convert_miss_to_hit' },
@@ -308,7 +312,7 @@ describe('autoRerollHandler', () => {
         it('should track once per turn', async () => {
             getRuntimeValue.mockReturnValue(null);
             const attackEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() };
-            getLastAttackRoll.mockReturnValue(attackEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(attackEvent);
 
             const action = makeAction({
                 automation: { effect: 'convert_miss_to_hit', oncePerTurn: true },
@@ -322,7 +326,7 @@ describe('autoRerollHandler', () => {
     describe('stale detection', () => {
         it('should reject events older than 60 seconds', async () => {
             const staleEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() - 70000 };
-            getLastAttackRoll.mockReturnValue(staleEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(staleEvent);
 
             const action = makeAction();
             const result = await handle(action, makePlayerStats(), 'campaign', 'map');
@@ -335,7 +339,7 @@ describe('autoRerollHandler', () => {
         it('should consume channel divinity charges', async () => {
             getRuntimeValue.mockReturnValue(2);
             const saveEvent = { d20: 3, bonus: 2, saveType: 'Wisdom', timestamp: Date.now() };
-            getLastSaveRoll.mockReturnValue(saveEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(saveEvent);
 
             const action = makeAction({
                 automation: {
@@ -354,7 +358,7 @@ describe('autoRerollHandler', () => {
         it('should reject when no channel divinity charges', async () => {
             getRuntimeValue.mockReturnValue(0);
             const saveEvent = { d20: 3, bonus: 2, saveType: 'Wisdom', timestamp: Date.now() };
-            getLastSaveRoll.mockReturnValue(saveEvent);
+            damageRollback.findRollsByCreature.mockReturnValue(saveEvent);
 
             const action = makeAction({
                 automation: {

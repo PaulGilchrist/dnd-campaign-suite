@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/combat/useMetamagic.js';
+import { findRollsByCreature } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
@@ -36,8 +36,10 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     // Find the most recent ability check or saving throw
-    const abilityEvent = getLastAbilityCheck(playerName);
-    const saveEvent = getLastSaveRoll(playerName);
+    const rollsByCreature = await findRollsByCreature(campaignName);
+    const playerRolls = rollsByCreature?.[playerName] || null;
+    const abilityEvent = playerRolls?.abilityEvent || null;
+    const saveEvent = playerRolls?.saveEvent || null;
 
     const abilityFresh = abilityEvent && !isStale(abilityEvent);
     const saveFresh = saveEvent && !isStale(saveEvent);

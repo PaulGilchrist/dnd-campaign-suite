@@ -4,13 +4,7 @@ import { rollD20, rollExpression } from '../../../../services/dice/diceRoller.js
 import { infoPopup } from '../../common/infoPopup.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
-
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
+import { findMostRecentRollAcrossCreatures } from '../../common/damageRollback.js';
 
 function getPortentDice(playerName, campaignName) {
     const stored = getRuntimeValue(playerName, 'portentDice', campaignName);
@@ -63,54 +57,15 @@ function computeHitOutcome(eventData, chosenDie, bonus) {
 }
 
 async function findMostRecentEvent(campaignName) {
-    const cs = await getCombatContext(campaignName);
-    if (!cs?.creatures) return null;
+    const result = await findMostRecentRollAcrossCreatures(campaignName);
+    if (!result) return null;
 
-    let bestEvent = null;
-    let bestTimestamp = 0;
-    let bestCreature = null;
-    let bestEventType = null;
-    let bestEventKey = null;
-
-    for (const creature of cs.creatures) {
-        const name = creature.name;
-
-        const attack = getRuntimeValue(name, 'lastAttackRoll', campaignName);
-        const ability = getRuntimeValue(name, 'lastAbilityCheck', campaignName);
-        const save = getRuntimeValue(name, 'lastSaveRoll', campaignName);
-
-        if (attack && !isStale(attack) && attack.timestamp > bestTimestamp) {
-            bestTimestamp = attack.timestamp;
-            bestCreature = name;
-            bestEventType = 'attack';
-            bestEventKey = 'lastAttackRoll';
-            bestEvent = attack;
-        }
-        if (ability && !isStale(ability) && ability.timestamp > bestTimestamp) {
-            bestTimestamp = ability.timestamp;
-            bestCreature = name;
-            bestEventType = 'ability';
-            bestEventKey = 'lastAbilityCheck';
-            bestEvent = ability;
-        }
-        if (save && !isStale(save) && save.timestamp > bestTimestamp) {
-            bestTimestamp = save.timestamp;
-            bestCreature = name;
-            bestEventType = 'save';
-            bestEventKey = 'lastSaveRoll';
-            bestEvent = save;
-        }
-    }
-
-    if (!bestCreature) return null;
-
-    const context = getRuntimeValue(bestCreature, '_lastRollContext', campaignName);
+    const context = getRuntimeValue(result.creatureName, '_lastRollContext', campaignName);
 
     return {
-        creatureName: bestCreature,
-        eventType: bestEventType,
-        eventData: bestEvent,
-        eventKey: bestEventKey,
+        creatureName: result.creatureName,
+        eventType: result.eventType,
+        eventData: result.eventData,
         context,
     };
 }

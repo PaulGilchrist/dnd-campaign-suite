@@ -1,9 +1,7 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastDamageEvent } from '../../../../hooks/combat/useMetamagic.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
-import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
+import { findLastAttack } from '../../common/damageRollback.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -39,16 +37,13 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     const grantedBy = getRuntimeValue(playerName, 'bardicInspirationGrantedBy', campaignName) || 'unknown';
-    const damageEvent = getLastDamageEvent(playerName);
+    const lastAttack = await findLastAttack();
     let bonusDescription = '';
     let defenderHp = null;
 
-    if (damageEvent && !isStale(damageEvent)) {
-        const targetName = damageEvent.targetName;
-        const combatSummary = await getCombatContext(campaignName);
-        if (combatSummary && targetName) {
-            const healResult = applyHealingToTarget(combatSummary, targetName, -rollResult.total, campaignName);
-            defenderHp = healResult?.newHp ?? null;
+    if (lastAttack && lastAttack.attackerName === playerName && !isStale(lastAttack.attackEvent)) {
+        const targetName = lastAttack.targetName;
+        if (targetName) {
             bonusDescription = ` Bonus damage applied to ${targetName}.`;
         }
     }
@@ -76,7 +71,7 @@ export async function handle(action, playerStats, campaignName) {
         payload: {
             type: 'automation_info',
             name: action.name,
-            description: `Bardic Inspiration (1d${dieSize}): rolled **${rollResult.total}** (${rollResult.rolls.join(', ')}). Add this to your attack's damage. Die granted by ${grantedBy}.${bonusDescription}${defenderHp != null ? ` ${damageEvent?.targetName} HP: ${defenderHp}` : ''}`,
+            description: `Bardic Inspiration (1d${dieSize}): rolled **${rollResult.total}** (${rollResult.rolls.join(', ')}). Add this to your attack's damage. Die granted by ${grantedBy}.${bonusDescription}${defenderHp != null ? ` ${lastAttack?.targetName} HP: ${defenderHp}` : ''}`,
             automation: action.automation,
         },
     };

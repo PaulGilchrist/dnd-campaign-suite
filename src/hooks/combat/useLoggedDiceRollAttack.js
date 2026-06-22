@@ -612,6 +612,21 @@ export function createLogAndShow(deps) {
                 timestamp: Date.now(),
             }, campaignName);
 
+            // Save unified last attack to combat summary for all reaction features
+            if (combatSummary) {
+                combatSummary.lastAttack = {
+                    attackerName: characterName,
+                    targetName,
+                    d20: effectiveD20,
+                    d20Rolls: [r1, r2],
+                    bonus,
+                    total: effectiveD20 + bonus,
+                    checkName: name,
+                    rollType,
+                    timestamp: Date.now(),
+                };
+            }
+
             setRuntimeValue(characterName, '_lastRollContext', {
                 type: 'check',
                 checkName: name,

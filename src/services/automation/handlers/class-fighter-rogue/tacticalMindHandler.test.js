@@ -1,6 +1,6 @@
 import { handle } from './tacticalMindHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../common/damageRollback.js';
 import { addEntry } from '../../../ui/logService.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -9,7 +9,10 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-    getLastAbilityCheck: vi.fn(),
+}));
+
+vi.mock('../../common/damageRollback.js', () => ({
+    findRollsByCreature: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -44,7 +47,7 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('returns popup when no recent ability check', async () => {
-        getLastAbilityCheck.mockReturnValue(null);
+        damageRollback.findRollsByCreature.mockReturnValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -54,12 +57,7 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('returns popup when ability check is stale', async () => {
-        getLastAbilityCheck.mockReturnValue({
-            d20: 8,
-            bonus: 3,
-            checkName: 'Insight',
-            timestamp: Date.now() - 120000,
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() - 120000 }, saveEvent: null, } });
 
         const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -68,12 +66,7 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('returns popup for natural 20', async () => {
-        getLastAbilityCheck.mockReturnValue({
-            d20: 20,
-            bonus: 3,
-            checkName: 'Insight',
-            timestamp: Date.now(),
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 20, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
 
         const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -82,12 +75,7 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('shows result with 1d10 bonus when ability check exists', async () => {
-        getLastAbilityCheck.mockReturnValue({
-            d20: 8,
-            bonus: 3,
-            checkName: 'Insight',
-            timestamp: Date.now(),
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
 
         getRuntimeValue.mockReturnValue(2);
 
@@ -100,12 +88,7 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('expend Second Wind when check succeeds', async () => {
-        getLastAbilityCheck.mockReturnValue({
-            d20: 8,
-            bonus: 3,
-            checkName: 'Insight',
-            timestamp: Date.now(),
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
 
         getRuntimeValue.mockReturnValue(2);
 
@@ -120,12 +103,7 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('does not expend Second Wind when no uses remain', async () => {
-        getLastAbilityCheck.mockReturnValue({
-            d20: 8,
-            bonus: 3,
-            checkName: 'Insight',
-            timestamp: Date.now(),
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
 
         getRuntimeValue.mockReturnValue(0);
 
@@ -135,12 +113,7 @@ describe('tacticalMindHandler.handle', () => {
     });
 
     it('logs ability use entry', async () => {
-        getLastAbilityCheck.mockReturnValue({
-            d20: 8,
-            bonus: 3,
-            checkName: 'Insight',
-            timestamp: Date.now(),
-        });
+        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });
 
         getRuntimeValue.mockReturnValue(2);
 

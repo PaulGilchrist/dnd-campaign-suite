@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAbilityCheck } from '../../../../hooks/combat/useMetamagic.js';
+import { findRollsByCreature } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
 const EVENT_STALENESS_MS = 60000;
@@ -14,7 +14,9 @@ async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
-    const abilityEvent = getLastAbilityCheck(playerName);
+    const rollsByCreature = await findRollsByCreature(campaignName);
+    const playerRolls = rollsByCreature?.[playerName] || null;
+    const abilityEvent = playerRolls?.abilityEvent || null;
     if (!abilityEvent || isStale(abilityEvent)) {
         return infoPopup(action.name, `No recent ability check found for ${playerName}. This feature can only be used shortly after an ability check.`, auto);
     }

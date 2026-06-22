@@ -1,6 +1,6 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
-import { getLastAttackRoll, getLastAbilityCheck, getLastSaveRoll } from '../../../../hooks/combat/useMetamagic.js';
+import { findRollsByCreature } from '../../common/damageRollback.js';
 import { automationInfoPopup } from '../../../shared/popupResponse.js';
 import { infoPopup } from '../../common/infoPopup.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
@@ -43,11 +43,12 @@ function buildAttackRollDescription(action, attackerName, bonus, attackEvent) {
     return description;
 }
 
-function handleAttackRoll(action, playerStats, campaignName, bonus, attackerName) {
+function handleAttackRoll(action, playerStats, campaignName, bonus, attackerName, rollsByCreature) {
     const auto = action.automation;
 
     const targetName = attackerName || playerStats.name;
-    const attackEvent = getLastAttackRoll(targetName);
+    const targetRolls = rollsByCreature?.[targetName] || null;
+    const attackEvent = targetRolls?.attackEvent || null;
     if (!attackEvent || isStale(attackEvent)) {
         return infoPopup(action.name, `No recent attack roll found for ${targetName}. This feature can only be used shortly after an attack roll.`, auto);
     }
@@ -57,11 +58,12 @@ function handleAttackRoll(action, playerStats, campaignName, bonus, attackerName
     return infoPopup(action.name, description, auto);
 }
 
-function handleAbilityCheck(action, playerStats, _campaignName, bonus, creatureName) {
+function handleAbilityCheck(action, playerStats, campaignName, bonus, creatureName, rollsByCreature) {
     const auto = action.automation;
 
     const targetName = creatureName || playerStats.name;
-    const checkEvent = getLastAbilityCheck(targetName);
+    const targetRolls = rollsByCreature?.[targetName] || null;
+    const checkEvent = targetRolls?.abilityEvent || null;
     if (!checkEvent || isStale(checkEvent)) {
         return infoPopup(action.name, `No recent ability check found for ${targetName}. This feature can only be used shortly after an ability check.`, auto);
     }
@@ -79,10 +81,11 @@ function handleAbilityCheck(action, playerStats, _campaignName, bonus, creatureN
     return infoPopup(action.name, description, auto);
 }
 
-function handleSaveRoll(action, playerStats, campaignName, bonus) {
+function handleSaveRoll(action, playerStats, campaignName, bonus, rollsByCreature) {
     const auto = action.automation;
     const targetName = playerStats.name;
-    const saveEvent = getLastSaveRoll(targetName);
+    const targetRolls = rollsByCreature?.[targetName] || null;
+    const saveEvent = targetRolls?.saveEvent || null;
     if (!saveEvent || isStale(saveEvent)) {
         return infoPopup(action.name, `No recent saving throw found for ${targetName}. This feature can only be used shortly after a saving throw.`, auto);
     }
@@ -128,14 +131,15 @@ async function consumeResourceCost(auto, playerStats, campaignName) {
     return null;
 }
 
-async function findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt) {
+async function findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt, rollsByCreature) {
     const combatSummary = await getCombatContext(campaignName);
     if (!combatSummary?.creatures) return null;
 
     const playerName = playerStats.name;
     for (const creature of combatSummary.creatures) {
         if (creature.name === playerName) continue;
-        const attackEvent = getLastAttackRoll(creature.name);
+        const targetRolls = rollsByCreature?.[creature.name] || null;
+        const attackEvent = targetRolls?.attackEvent || null;
         if (!attackEvent || isStale(attackEvent) || attackEvent.hit !== false) continue;
 
         if (mapName && rangeFt != null) {
@@ -161,6 +165,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
 
+    const rollsByCreature = await findRollsByCreature(campaignName);
+
     if (auto.target === 'saving_throw') {
         if (auto.effect === 'override_fail_to_success' && auto.oncePer) {
             const trackingKey = `_guardedMind_usedRest`;
@@ -169,7 +175,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 return infoPopup(action.name, `${action.name} can only be used once per Short or Long Rest.`, auto);
             }
 
-            const saveEvent = getLastSaveRoll(playerName);
+            const playerRolls = rollsByCreature?.[playerName] || null;
+            const saveEvent = playerRolls?.saveEvent || null;
             const saveFresh = saveEvent && !isStale(saveEvent);
 
             if (!saveFresh) {
@@ -207,14 +214,15 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const costError = await consumeResourceCost(auto, playerStats, campaignName);
         if (costError) return costError;
 
-        const saveEvent = getLastSaveRoll(playerName);
+        const playerRolls = rollsByCreature?.[playerName] || null;
+        const saveEvent = playerRolls?.saveEvent || null;
         const saveFresh = saveEvent && !isStale(saveEvent);
 
         if (!saveFresh) {
             return infoPopup(action.name, `No recent saving throw found for ${playerName}. This feature can only be used shortly after a saving throw.`, auto);
         }
 
-        const result = handleSaveRoll(action, playerStats, campaignName, 0);
+        const result = handleSaveRoll(action, playerStats, campaignName, 0, rollsByCreature);
 
         addEntry(campaignName, {
             type: 'ability_use',
@@ -242,8 +250,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         const biDieRoll = Math.floor(Math.random() * bardicDieSize) + 1;
 
-        const attackEvent = getLastAttackRoll(playerName);
-        const abilityEvent = getLastAbilityCheck(playerName);
+        const playerRolls = rollsByCreature?.[playerName] || null;
+        const attackEvent = playerRolls?.attackEvent || null;
+        const abilityEvent = playerRolls?.abilityEvent || null;
 
         const attackFresh = attackEvent && !isStale(attackEvent) && attackEvent.hit === false;
         const abilityFresh = abilityEvent && !isStale(abilityEvent);
@@ -254,9 +263,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         let result;
         if (attackFresh) {
-            result = handleAttackRoll(action, playerStats, campaignName, biDieRoll);
+            result = handleAttackRoll(action, playerStats, campaignName, biDieRoll, null, rollsByCreature);
         } else {
-            result = handleAbilityCheck(action, playerStats, campaignName, biDieRoll);
+            result = handleAbilityCheck(action, playerStats, campaignName, biDieRoll, null, rollsByCreature);
         }
 
         if (usesMax > 0) {
@@ -289,8 +298,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const psionicDieSize = evaluateAutoExpression('psionic_energy_die', playerStats);
         const dieRoll = Math.floor(Math.random() * psionicDieSize) + 1;
 
-        const attackEvent = getLastAttackRoll(playerName);
-        const abilityEvent = getLastAbilityCheck(playerName);
+        const playerRolls = rollsByCreature?.[playerName] || null;
+        const attackEvent = playerRolls?.attackEvent || null;
+        const abilityEvent = playerRolls?.abilityEvent || null;
 
         const attackFresh = attackEvent && !isStale(attackEvent) && attackEvent.hit === false;
         const abilityFresh = abilityEvent && !isStale(abilityEvent);
@@ -301,9 +311,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         let result;
         if (attackFresh) {
-            result = handleAttackRoll(action, playerStats, campaignName, dieRoll);
+            result = handleAttackRoll(action, playerStats, campaignName, dieRoll, null, rollsByCreature);
         } else {
-            result = handleAbilityCheck(action, playerStats, campaignName, dieRoll);
+            result = handleAbilityCheck(action, playerStats, campaignName, dieRoll, null, rollsByCreature);
         }
 
         await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
@@ -329,7 +339,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
             }
         }
 
-        const attackEvent = getLastAttackRoll(playerName);
+        const playerRolls = rollsByCreature?.[playerName] || null;
+        const attackEvent = playerRolls?.attackEvent || null;
         if (!attackEvent || isStale(attackEvent)) {
             return infoPopup(action.name, `No recent attack roll found for ${playerName}. This feature can only be used shortly after an attack roll.`, auto);
         }
@@ -363,14 +374,15 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const costError = await consumeResourceCost(auto, playerStats, campaignName);
         if (costError) return costError;
 
-        const attackEvent = getLastAttackRoll(playerName);
-        const abilityEvent = getLastAbilityCheck(playerName);
+        const playerRolls = rollsByCreature?.[playerName] || null;
+        const attackEvent = playerRolls?.attackEvent || null;
+        const abilityEvent = playerRolls?.abilityEvent || null;
 
         const attackFresh = attackEvent && !isStale(attackEvent) && attackEvent.hit === false;
         const abilityFresh = abilityEvent && !isStale(abilityEvent);
 
         if (attackFresh) {
-            const result = handleAttackRoll(action, playerStats, campaignName, bonus);
+            const result = handleAttackRoll(action, playerStats, campaignName, bonus, null, rollsByCreature);
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,
@@ -381,7 +393,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             return result;
         }
         if (abilityFresh) {
-            const result = handleAbilityCheck(action, playerStats, campaignName, bonus);
+            const result = handleAbilityCheck(action, playerStats, campaignName, bonus, null, rollsByCreature);
             addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerName,
@@ -394,9 +406,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         if (auto.range) {
             const rangeFt = rangeToFeet(auto.range);
-            const ally = await findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt);
+            const ally = await findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt, rollsByCreature);
             if (ally) {
-                const result = handleAttackRoll(action, playerStats, campaignName, bonus, ally.name);
+                const result = handleAttackRoll(action, playerStats, campaignName, bonus, ally.name, rollsByCreature);
                 addEntry(campaignName, {
                     type: 'ability_use',
                     characterName: playerName,

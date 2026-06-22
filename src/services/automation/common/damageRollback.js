@@ -1,5 +1,6 @@
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const EVENT_STALENESS_MS = 60000;
 
@@ -80,4 +81,69 @@ export async function rollbackDamage(attackerName, targetName, campaignName, fea
     }
 
     return 0;
+}
+
+/**
+ * Find the most recent roll (attack, ability check, or save) for each creature.
+ * Used by handlers that need per-creature data (autoReroll, portent, etc.).
+ *
+ * @returns {Promise<Object|null>} Map of { creatureName: { attackEvent, abilityEvent, saveEvent } } or null
+ */
+export async function findRollsByCreature(campaignName) {
+    const cs = await getCombatContext(campaignName);
+    if (!cs?.creatures) return null;
+
+    const result = {};
+    for (const creature of cs.creatures) {
+        const name = creature.name;
+        result[name] = {
+            attackEvent: getRuntimeValue(name, 'lastAttackRoll', campaignName),
+            abilityEvent: getRuntimeValue(name, 'lastAbilityCheck', campaignName),
+            saveEvent: getRuntimeValue(name, 'lastSaveRoll', campaignName),
+        };
+    }
+    return result;
+}
+
+/**
+ * Find the most recent roll across all creatures (used by Portent).
+ * Returns the single most recent event regardless of creature type.
+ *
+ * @returns {Promise<{ creatureName: string, eventType: string, eventData: Object, isStale: boolean }|null>}
+ */
+export async function findMostRecentRollAcrossCreatures(campaignName) {
+    const rollsByCreature = await findRollsByCreature(campaignName);
+    if (!rollsByCreature) return null;
+
+    let bestTimestamp = 0;
+    let bestCreature = null;
+    let bestEventType = null;
+    let bestEventData = null;
+
+    for (const [creatureName, rolls] of Object.entries(rollsByCreature)) {
+        const checks = [
+            { key: 'attackEvent', type: 'attack' },
+            { key: 'abilityEvent', type: 'ability' },
+            { key: 'saveEvent', type: 'save' },
+        ];
+
+        for (const check of checks) {
+            const event = rolls[check.key];
+            if (event && !isStale(event) && event.timestamp > bestTimestamp) {
+                bestTimestamp = event.timestamp;
+                bestCreature = creatureName;
+                bestEventType = check.type;
+                bestEventData = event;
+            }
+        }
+    }
+
+    if (!bestCreature) return null;
+
+    return {
+        creatureName: bestCreature,
+        eventType: bestEventType,
+        eventData: bestEventData,
+        isStale: isStale(bestEventData),
+    };
 }

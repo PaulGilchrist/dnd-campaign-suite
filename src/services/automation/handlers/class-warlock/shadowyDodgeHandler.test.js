@@ -1,9 +1,9 @@
 import { handle } from './shadowyDodgeHandler.js';
-import * as metamagic from '../../../../hooks/combat/useMetamagic.js';
+import * as damageRollback from '../../common/damageRollback.js';
 import * as logService from '../../../ui/logService.js';
 
-vi.mock('../../../../hooks/combat/useMetamagic.js', () => ({
-    getLastAttackRoll: vi.fn(),
+vi.mock('../../common/damageRollback.js', () => ({
+    findLastAttack: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -35,7 +35,7 @@ describe('shadowyDodgeHandler', () => {
 
     describe('handle', () => {
         it('should return popup when no recent attack roll exists', async () => {
-            metamagic.getLastAttackRoll.mockReturnValue(null);
+            damageRollback.findLastAttack.mockReturnValue(null);
 
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -48,7 +48,7 @@ describe('shadowyDodgeHandler', () => {
 
         it('should return popup when attack roll is stale', async () => {
             const staleTimestamp = Date.now() - 70000;
-            metamagic.getLastAttackRoll.mockReturnValue({ timestamp: staleTimestamp });
+            damageRollback.findLastAttack.mockReturnValue({ attackEvent: { timestamp: staleTimestamp }, attackerName: 'Goblin' });
 
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -60,15 +60,7 @@ describe('shadowyDodgeHandler', () => {
 
         it('should simulate disadvantage and show result on successful use', async () => {
             const freshTimestamp = Date.now();
-            metamagic.getLastAttackRoll.mockReturnValue({
-                d20: 15,
-                bonus: 7,
-                targetName: 'Goblin',
-                targetAc: 14,
-                hit: true,
-                effectiveAc: 14,
-                timestamp: freshTimestamp,
-            });
+            damageRollback.findLastAttack.mockReturnValue({ attackEvent: { timestamp: freshTimestamp, d20: 15, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 }, attackerName: 'Goblin', targetName: 'Test Rogue' });
 
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -90,15 +82,7 @@ describe('shadowyDodgeHandler', () => {
 
         it('should show "still hits" when disadvantage attack also hits', async () => {
             const freshTimestamp = Date.now();
-            metamagic.getLastAttackRoll.mockReturnValue({
-                d20: 18,
-                bonus: 7,
-                targetName: 'Orc',
-                targetAc: 14,
-                hit: true,
-                effectiveAc: 14,
-                timestamp: freshTimestamp,
-            });
+            damageRollback.findLastAttack.mockReturnValue({ attackEvent: { timestamp: freshTimestamp, d20: 18, bonus: 7, targetAc: 14, hit: true, effectiveAc: 14 }, attackerName: 'Orc', targetName: 'Test Rogue' });
 
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -114,15 +98,7 @@ describe('shadowyDodgeHandler', () => {
 
         it('should show "already missed" when original attack already missed', async () => {
             const freshTimestamp = Date.now();
-            metamagic.getLastAttackRoll.mockReturnValue({
-                d20: 3,
-                bonus: 2,
-                targetName: 'Skeleton',
-                targetAc: 14,
-                hit: false,
-                effectiveAc: 14,
-                timestamp: freshTimestamp,
-            });
+            damageRollback.findLastAttack.mockReturnValue({ attackEvent: { timestamp: freshTimestamp, d20: 3, bonus: 2, targetAc: 14, hit: false, effectiveAc: 14 }, attackerName: 'Goblin', targetName: 'Test Rogue' });
 
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -134,15 +110,7 @@ describe('shadowyDodgeHandler', () => {
 
         it('should handle missing targetName gracefully', async () => {
             const freshTimestamp = Date.now();
-            metamagic.getLastAttackRoll.mockReturnValue({
-                d20: 10,
-                bonus: 5,
-                targetName: null,
-                targetAc: 13,
-                hit: true,
-                effectiveAc: 13,
-                timestamp: freshTimestamp,
-            });
+            damageRollback.findLastAttack.mockReturnValue({ attackEvent: { timestamp: freshTimestamp, d20: 10, bonus: 5, targetAc: 13, hit: true, effectiveAc: 13 }, targetName: 'Test Rogue' });
 
             const action = makeAction();
             const playerStats = makePlayerStats();
@@ -155,15 +123,7 @@ describe('shadowyDodgeHandler', () => {
 
         it('should use automation range for teleport distance', async () => {
             const freshTimestamp = Date.now();
-            metamagic.getLastAttackRoll.mockReturnValue({
-                d20: 10,
-                bonus: 5,
-                targetName: 'Bandit',
-                targetAc: 13,
-                hit: true,
-                effectiveAc: 13,
-                timestamp: freshTimestamp,
-            });
+            damageRollback.findLastAttack.mockReturnValue({ attackEvent: { timestamp: freshTimestamp, d20: 10, bonus: 5, targetAc: 13, hit: true, effectiveAc: 13 }, attackerName: 'Goblin', targetName: 'Test Rogue' });
 
             const action = makeAction({ range: '30_ft' });
             const playerStats = makePlayerStats();
