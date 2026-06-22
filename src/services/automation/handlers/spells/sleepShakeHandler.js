@@ -3,6 +3,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
+import storage from '../../../ui/storage.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 
 export async function handle(action, playerStats, campaignName, mapName) {
@@ -127,6 +128,7 @@ export async function handleConfirm(action, playerStats, campaignName, _mapName,
             const cl = String(c.key).toLowerCase();
             return cl !== 'incapacitated' && cl !== 'unconscious';
         });
+        storage.set('combatSummary', combatSummary, campaignName);
         if (hadIncapacitated) {
             postLogEntry(campaignName, {
                 type: 'condition',

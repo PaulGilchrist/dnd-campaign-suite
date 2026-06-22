@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import storage from '../../../ui/storage.js';
 
 import { rollD20 } from '../../../dice/diceRoller.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
@@ -101,14 +102,14 @@ async function resolveFrightfulAura(action, playerStats, campaignName) {
     const saveDc = buildSaveDc(playerStats);
     const playerName = playerStats.name;
 
-    const cs = await getCombatContext(campaignName);
-    if (!cs || !cs.creatures) return;
+    const combatSummary = await getCombatContext(campaignName);
+    if (!combatSummary || !combatSummary.creatures) return;
 
     const auraTargets = [];
     const npcResults = [];
     const playerPrompts = [];
 
-    for (const creature of cs.creatures) {
+    for (const creature of combatSummary.creatures) {
         if (creature.name === playerName) continue;
 
         // Check if creature is in aura range (no map = all in range)
@@ -211,12 +212,12 @@ export async function removeFrightenedOnDamage(playerName, targetName, campaignN
     if (!auraTargets.includes(targetName)) return;
 
     // Remove frightened condition from the creature in combat context
-    const cs = await getCombatContext(campaignName);
-    if (cs && cs.creatures) {
-        const creature = cs.creatures.find(c => c.name === targetName);
+    const combatSummary = await getCombatContext(campaignName);
+    if (combatSummary && combatSummary.creatures) {
+        const creature = combatSummary.creatures.find(c => c.name === targetName);
         if (creature && creature.conditions) {
             creature.conditions = creature.conditions.filter(c => c.key !== 'frightened');
-            setRuntimeValue(campaignName, 'combatContext', cs, campaignName);
+            storage.set('combatSummary', combatSummary, campaignName);
         }
     }
 

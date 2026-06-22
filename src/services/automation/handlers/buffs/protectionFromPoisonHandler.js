@@ -2,6 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import storage from '../../../ui/storage.js';
 
 function conditionMatches(c, targetCondition) {
     return (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
@@ -75,6 +76,7 @@ export async function applyProtectionFromPoison(action, playerStats, campaignNam
             const creature = combatSummary.creatures?.find(c => c.name === targetName);
             if (creature && Array.isArray(creature.conditions)) {
                 creature.conditions = creature.conditions.filter(c => !conditionMatches(String(c.key), 'poisoned'));
+                storage.set('combatSummary', combatSummary, campaignName);
             }
         }
     }

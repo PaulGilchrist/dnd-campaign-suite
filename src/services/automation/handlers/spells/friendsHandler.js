@@ -4,6 +4,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
+import storage from '../../../ui/storage.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation || {};
@@ -11,8 +12,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const targetName = auto.targetName || 'Unknown';
 
     // Check target is in combat context (player or NPC)
-    const cs = await getCombatContext(campaignName);
-    const targetCreature = cs?.creatures?.find(c => c.name === targetName);
+    const combatSummary = await getCombatContext(campaignName);
+    const targetCreature = combatSummary?.creatures?.find(c => c.name === targetName);
     const isPlayerTarget = targetCreature?.type === 'player';
 
     // Track active Friends for early-end conditions
@@ -79,6 +80,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             ability: 'wis',
             endsOnDamage: true,
         });
+        storage.set('combatSummary', combatSummary, campaignName);
     }
 
     // Apply expiration (2 rounds = 12 seconds minimum; concentration handles the rest)
