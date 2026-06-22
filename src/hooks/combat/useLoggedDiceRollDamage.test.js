@@ -58,6 +58,7 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     computeDamageAfterSave: vi.fn((total, success, _dcSuccess) => success ? Math.floor(total / 2) : total),
     rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
+    clearReTriggeredSequence: vi.fn(),
 }));
 
 import { rollExpression } from '../../services/dice/diceRoller.js';

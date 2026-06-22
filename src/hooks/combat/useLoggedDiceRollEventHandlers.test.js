@@ -24,6 +24,7 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
         return success ? Math.floor(raw / 2) : raw;
     }),
     applyDamageToTarget: vi.fn(),
+    clearReTriggeredSequence: vi.fn(),
 }));
 
 vi.mock('../../services/combat/automation/automationService.js', () => ({

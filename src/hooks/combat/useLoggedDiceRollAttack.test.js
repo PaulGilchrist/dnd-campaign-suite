@@ -28,6 +28,7 @@ vi.mock('../../services/rules/combat/damageUtils.js', () => ({
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     applyDamageToTarget: vi.fn(),
+    clearReTriggeredSequence: vi.fn(),
 }));
 
 vi.mock('../runtime/useRuntimeState.js', () => ({

@@ -11,6 +11,14 @@ import { isCreatureInSilenceZone } from '../../rules/features/silenceService.js'
 import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
 import { getDistanceFeet } from './rangeValidation.js';
 
+// Tracks which multi-attack sequences have already triggered Relentless Endurance.
+// Prevents follow-up hits in the same sequence from re-killing the character.
+const _reTriggeredSequenceIds = new Set();
+
+export function clearReTriggeredSequence(damageSequenceId) {
+    _reTriggeredSequenceIds.delete(damageSequenceId);
+}
+
 export function computeDamageAfterResistances(rawDamage, damageTypes, resistances, immunities, ignoreResistance = false) {
   if (!damageTypes || damageTypes.length === 0) throw new Error('computeDamageAfterResistances: damageTypes is required');
   for (const dt of damageTypes) {
@@ -79,7 +87,7 @@ export function rollSaveForCreature(creature, saveType, saveDc, disadvantage = f
   return { roll: finalRoll, total, bonus, success, rawRolls: [roll1, roll2] };
 }
 
-export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false) {
+export function applyDamageToTarget(combatSummary, targetName, rawDamage, damageTypes, campaignName, characters, ignoreResistance = false, attackerName = null, suppressHpLog = false, options = {}) {
   if (!combatSummary) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
@@ -183,10 +191,17 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
        }
        oldHp = storedCurrentHp;
        newHp = Math.max(0, oldHp - wardDamage);
+       // If RE already fired in this damage sequence, don't let follow-up hits re-kill
+       if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
+           newHp = 1;
+       }
        setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
     } else {
        oldHp = creature.currentHp;
        newHp = Math.max(0, oldHp - wardDamage);
+       if (options?.damageSequenceId && _reTriggeredSequenceIds.has(options.damageSequenceId) && newHp <= 0 && oldHp > 0) {
+           newHp = 1;
+       }
        creature.currentHp = newHp;
       }
 
@@ -463,6 +478,9 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
       // Check for Relentless Endurance (Orc race trait)
       const relentlessEnduranceResult = checkRelentlessEndurance(creature, playerComputed, campaignName);
       if (relentlessEnduranceResult.intercepted) {
+        if (options?.damageSequenceId) {
+          _reTriggeredSequenceIds.add(options.damageSequenceId);
+        }
         return relentlessEnduranceResult;
       }
 

@@ -1079,6 +1079,8 @@ const rules = {
             playerStats.saveModifiers = collectSaveModifiers(allFeatures);
         }
 
+        playerStats.allFeatures = allFeatures;
+
         playerStats.abilities = await rules.getAbilities(playerStats, playerSummary);
         playerStats.hitPoints = rules.getHitPoints(playerStats, playerSummary);
         playerStats.carryingCapacity = rules.getCarryingCapacity(playerStats);

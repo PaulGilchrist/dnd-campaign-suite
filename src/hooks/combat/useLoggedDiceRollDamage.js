@@ -5,6 +5,7 @@ import {
   computeDamageAfterSave,
   rollSaveForCreature,
   applyDamageToTarget,
+  clearReTriggeredSequence,
 } from '../../services/rules/combat/applyDamage.js';
 import { sendSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
@@ -840,7 +841,9 @@ export function createLogDamageAndShow(deps) {
                     const secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
                     let secondaryRawDamage = secondaryTotal;
                     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
-                    const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true);
+                    const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
+                    const multiAttackOptions = { damageSequenceId };
+                    const secondaryApplyResult = applyDamageToTarget(combatSummary, target.name, secondaryRawDamage, [secondaryDamageType], campaignName, characters, secondaryIgnoreResistance, characterName, true, multiAttackOptions);
                     secondaryFinalDamage = secondaryApplyResult?.finalDamage ?? secondaryRawDamage;
                     if (secondaryApplyResult && secondaryApplyResult.finalDamage > 0) {
                         endInvisibilityOnHostileAction(characterName, campaignName);
@@ -854,11 +857,15 @@ export function createLogDamageAndShow(deps) {
                         damageType: secondaryDamageType,
                         finalDamage: secondaryFinalDamage,
                     };
-                }
-            }
 
-            const primaryApplyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName, true);
-            applyResult = rayReduction > 0 ? { ...primaryApplyResult, rayOfEnfeebleReduction: rayReduction } : primaryApplyResult;
+                    const primaryApplyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName, true, multiAttackOptions);
+                    applyResult = rayReduction > 0 ? { ...primaryApplyResult, rayOfEnfeebleReduction: rayReduction } : primaryApplyResult;
+                    clearReTriggeredSequence(damageSequenceId);
+                }
+            } else {
+                const primaryApplyResult = applyDamageToTarget(combatSummary, target.name, reducedTotal, [damageType], campaignName, characters, ignoreResistance, characterName, true);
+                applyResult = rayReduction > 0 ? { ...primaryApplyResult, rayOfEnfeebleReduction: rayReduction } : primaryApplyResult;
+            }
         }
 
         if (applyResult && applyResult.finalDamage > 0) {

@@ -13,6 +13,7 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     }),
     rollSaveForCreature: vi.fn(),
     applyDamageToTarget: vi.fn(),
+    clearReTriggeredSequence: vi.fn(),
 }));
 
 vi.mock('../../services/combat/conditions/savePromptService.js', () => ({

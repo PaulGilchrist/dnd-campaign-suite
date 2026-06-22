@@ -797,7 +797,7 @@
                     "effect": "drop_to_1_hp",
                     "uses": 1,
                     "recharge": "long_rest",
-                    "casting_time": "1 action"
+                    "casting_time": "passive"
                 }
             }
         ],
