@@ -175,22 +175,29 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     }
 
     let oldHp, newHp;
-   if (isPlayer) {
-      const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
-      if (storedCurrentHp == null) {
-          console.error(`[applyDamage] Arcane Ward: currentHitPoints not found for ${creature.name}`);
-          throw new Error(`Arcane Ward: currentHitPoints not found for ${creature.name}`);
+    if (isPlayer) {
+       const storedCurrentHp = getRuntimeValue(creature.name, 'currentHitPoints');
+       if (storedCurrentHp == null) {
+           console.error(`[applyDamage] Arcane Ward: currentHitPoints not found for ${creature.name}`);
+           throw new Error(`Arcane Ward: currentHitPoints not found for ${creature.name}`);
+       }
+       oldHp = storedCurrentHp;
+       newHp = Math.max(0, oldHp - wardDamage);
+       setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
+    } else {
+       oldHp = creature.currentHp;
+       newHp = Math.max(0, oldHp - wardDamage);
+       creature.currentHp = newHp;
       }
-      oldHp = storedCurrentHp;
-      newHp = Math.max(0, oldHp - wardDamage);
-      setRuntimeValue(creature.name, 'currentHitPoints', newHp, campaignName);
-   } else {
-      oldHp = creature.currentHp;
-      newHp = Math.max(0, oldHp - wardDamage);
-      creature.currentHp = newHp;
-     }
 
-     // Tasha's Hideous Laughter: damage-triggered repeat WIS save with Advantage
+    // Update lastAttack with actual HP damage dealt (after resistances, feature reduction, ward absorption)
+    if (isSecondary) {
+        combatSummary.lastAttack.actualDamage = (combatSummary.lastAttack.actualDamage || 0) + wardDamage;
+    } else {
+        combatSummary.lastAttack.actualDamage = wardDamage;
+    }
+
+    // Tasha's Hideous Laughter: damage-triggered repeat WIS save with Advantage
     if (wardDamage > 0 && !isPlayer) {
         // For NPCs, check creature.conditions directly (no getRuntimeValue call needed)
         const rawConditions = creature.conditions || [];

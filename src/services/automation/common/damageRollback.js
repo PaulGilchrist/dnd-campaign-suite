@@ -16,13 +16,14 @@ export async function findLastAttack(campaignName) {
     const a = cs.lastAttack;
     const primary = a.primaryDamage || a.rawDamage || 0;
     const secondary = a.secondaryDamage || 0;
+    const actualDamage = a.actualDamage ?? (primary + secondary);
     return {
         attackEvent: a,
         attackerName: a.attackerName,
         targetName: a.targetName,
         primaryDamage: primary,
         secondaryDamage: secondary,
-        totalDamage: primary + secondary,
+        totalDamage: actualDamage,
         damageTypes: a.damageTypes || [],
     };
 }

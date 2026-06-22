@@ -331,6 +331,7 @@ export function createLogAndShow(deps) {
                     gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
                     timestamp: Date.now(),
                 };
+                storage.set('combatSummary', combatSummary, campaignName);
             }
 
             setRuntimeValue(characterName, '_lastRollContext', {
@@ -625,6 +626,7 @@ export function createLogAndShow(deps) {
                     rollType,
                     timestamp: Date.now(),
                 };
+                storage.set('combatSummary', combatSummary, campaignName);
             }
 
             setRuntimeValue(characterName, '_lastRollContext', {
@@ -679,6 +681,7 @@ export function createLogAndShow(deps) {
                     rollType: 'save',
                     timestamp: Date.now(),
                 };
+                storage.set('combatSummary', combatSummary, campaignName);
             }
 
             logEntry({
