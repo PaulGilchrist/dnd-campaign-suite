@@ -807,14 +807,13 @@ function checkRelentlessEndurance(creature, playerComputed, campaignName) {
 
     // Log the healing
     postLogEntry(campaignName, {
-        type: 'heal',
+        type: 'hp_change',
         targetName: creature.name,
         delta: newHp,
         currentHp: newHp,
         maxHp: maxHp,
-        isHealing: true,
         isUnconscious: false,
-        abilityName: 'Relentless Endurance',
+        sourceName: 'Relentless Endurance',
     });
 
     window.dispatchEvent(new CustomEvent('combat-summary-updated'));

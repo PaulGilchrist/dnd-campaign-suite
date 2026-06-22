@@ -727,10 +727,9 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
       );
 
       expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'heal',
+        type: 'hp_change',
         targetName: 'OrcPlayer6',
-        abilityName: 'Relentless Endurance',
-        isHealing: true,
+        sourceName: 'Relentless Endurance',
       }));
     });
   });
