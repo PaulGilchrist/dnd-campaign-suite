@@ -141,21 +141,7 @@ describe('beguilingTwistHandler.handle', () => {
       expect(result.payload.description).toContain('WIS saving throw');
     });
 
-    it('should skip stale attack rolls', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now() - 120000, targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
 
-      const result = await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      expect(result.payload.description).toContain('No recent successful save found');
-    });
 
     it('should skip failed attack rolls', async () => {
       findLastAttack.mockResolvedValue({

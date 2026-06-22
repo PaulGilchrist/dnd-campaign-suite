@@ -114,7 +114,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
                     p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
                 );
                 if (hasRemarkableAthlete) {
-                    setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', Date.now(), campaignName);
+                    setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', true, campaignName);
                 }
             }
            },

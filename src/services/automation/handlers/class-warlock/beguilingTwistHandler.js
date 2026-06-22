@@ -8,20 +8,13 @@ import { findLastAttack } from '../../common/damageRollback.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 async function findRecentSuccessfulSave(playerStats, campaignName, mapName, rangeFt, isSelf) {
     const playerName = playerStats.name;
 
     if (isSelf) {
         const attackResult = await findLastAttack();
         const attackEvent = attackResult.attackEvent;
-        if (attackEvent && !isStale(attackEvent) && attackResult.targetName === playerName) {
+        if (attackEvent && attackResult.targetName === playerName) {
             const { hit } = attackEvent;
             if (hit === true) {
                 return { name: playerName, event: attackEvent, type: 'attack_roll', success: true };
@@ -37,7 +30,7 @@ async function findRecentSuccessfulSave(playerStats, campaignName, mapName, rang
 
     const attackResult = await findLastAttack();
     const attackEvent = attackResult.attackEvent;
-    if (!attackEvent || isStale(attackEvent)) return null;
+    if (!attackEvent) return null;
 
     // Check if the last attack was from an ally (not the player)
     if (attackResult.attackerName && attackResult.attackerName !== playerName) {

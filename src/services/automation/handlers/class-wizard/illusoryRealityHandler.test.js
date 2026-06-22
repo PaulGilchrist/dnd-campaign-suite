@@ -5,6 +5,10 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../../../services/encounters/combatData.js', () => ({
+  getCurrentCombatRound: vi.fn(() => 1),
+}));
+
 vi.mock('../../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
@@ -17,6 +21,7 @@ import {
 } from './illusoryRealityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
+import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 
 const campaignName = 'TestCampaign';
 
@@ -43,6 +48,7 @@ describe('illusoryRealityHandler.handle', () => {
 
   it('should return popup when object already exists', async () => {
     getRuntimeValue.mockReturnValue('Candle');
+    getCurrentCombatRound.mockReturnValue(1);
 
     const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -53,6 +59,7 @@ describe('illusoryRealityHandler.handle', () => {
 
   it('should return modal when no existing object', async () => {
     getRuntimeValue.mockReturnValue(null);
+    getCurrentCombatRound.mockReturnValue(1);
 
     const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -65,6 +72,7 @@ describe('illusoryRealityHandler.handle', () => {
 
   it('should default featureName when action.name is missing', async () => {
     getRuntimeValue.mockReturnValue(null);
+    getCurrentCombatRound.mockReturnValue(1);
     const noNameAction = { automation: { type: 'illusory_reality' } };
 
     const result = await handle(noNameAction, makePlayerStats(), campaignName, null);
@@ -107,18 +115,19 @@ describe('illusoryRealityHandler.confirmIllusoryReality', () => {
     expect(result.payload.description).toContain('You must specify an inanimate');
   });
 
-  it('should store object name and timestamp on success', async () => {
+  it('should store object name on success', async () => {
     const result = await confirmIllusoryReality(makeAction(), makePlayerStats(), campaignName, 'Ladder');
 
     expect(result.type).toBe('popup');
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'illusoryRealityObject', 'Ladder', campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'illusoryRealityObject_timestamp', expect.any(Number), campaignName);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestWizard', 'illusoryRealityObject', 'Ladder', campaignName, true);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestWizard', 'illusoryRealityUsedRound', 1, campaignName, true);
   });
 
   it('should trim object name before storing', async () => {
     await confirmIllusoryReality(makeAction(), makePlayerStats(), campaignName, '  Ladder  ');
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'illusoryRealityObject', 'Ladder', campaignName);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestWizard', 'illusoryRealityObject', 'Ladder', campaignName, true);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestWizard', 'illusoryRealityUsedRound', 1, campaignName, true);
   });
 
   it('should call addEntry with ability_use', async () => {
@@ -140,7 +149,7 @@ describe('illusoryRealityHandler.confirmIllusoryReality', () => {
 
     expect(result.payload.description).toContain('<b>Illusory Reality</b>');
     expect(result.payload.description).toContain('Ladder');
-    expect(result.payload.description).toContain('1 minute');
+    expect(result.payload.description).toContain('persists until you roll initiative');
     expect(result.payload.description).toContain('cannot deal damage');
   });
 
@@ -170,71 +179,22 @@ describe('illusoryRealityHandler.getActiveObject', () => {
 
   it('should return null when no object stored', async () => {
     getRuntimeValue.mockReturnValue(null);
+    getCurrentCombatRound.mockReturnValue(1);
 
     const result = await getActiveObject('TestWizard', campaignName);
 
     expect(result).toBeNull();
   });
 
-  it('should return null when no timestamp stored', async () => {
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'illusoryRealityObject') return 'Ladder';
-      return null;
-    });
-
-    const result = await getActiveObject('TestWizard', campaignName);
-
-    expect(result).toBeNull();
-  });
-
-  it('should return object when within 1 minute duration', async () => {
-    const now = Date.now();
-    vi.spyOn(Date, 'now').mockReturnValue(now + 30000); // 30 seconds later
-
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'illusoryRealityObject') return 'Ladder';
-      if (key === 'illusoryRealityObject_timestamp') return now;
-      return null;
-    });
+  it('should return object when one exists', async () => {
+    getRuntimeValue.mockReturnValueOnce('Ladder').mockReturnValueOnce(1);
+    getCurrentCombatRound.mockReturnValue(1);
 
     const result = await getActiveObject('TestWizard', campaignName);
 
     expect(result).toEqual({
       name: 'Ladder',
-      remainingMs: 30000,
     });
-  });
-
-  it('should return null and clean up when expired', async () => {
-    const timestamp = Date.now() - 120000; // 2 minutes ago
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now());
-
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'illusoryRealityObject') return 'Ladder';
-      if (key === 'illusoryRealityObject_timestamp') return timestamp;
-      return null;
-    });
-
-    const result = await getActiveObject('TestWizard', campaignName);
-
-    expect(result).toBeNull();
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'illusoryRealityObject', null, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'illusoryRealityObject_timestamp', null, campaignName);
-  });
-
-  it('should return null when elapsed equals duration', async () => {
-    const timestamp = Date.now() - 60000; // exactly 1 minute ago
-    vi.spyOn(Date, 'now').mockReturnValue(Date.now());
-
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'illusoryRealityObject') return 'Ladder';
-      if (key === 'illusoryRealityObject_timestamp') return timestamp;
-      return null;
-    });
-
-    const result = await getActiveObject('TestWizard', campaignName);
-
-    expect(result).toBeNull();
   });
 
 });
@@ -244,10 +204,10 @@ describe('illusoryRealityHandler.clearObject', () => {
     vi.clearAllMocks();
   });
 
-  it('should clear object and timestamp', async () => {
+  it('should clear object', async () => {
     await clearObject('TestWizard', campaignName);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'illusoryRealityObject', null, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'illusoryRealityObject_timestamp', null, campaignName);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(1, 'TestWizard', 'illusoryRealityObject', null, campaignName);
+    expect(setRuntimeValue).toHaveBeenNthCalledWith(2, 'TestWizard', 'illusoryRealityUsedRound', null, campaignName);
   });
 });

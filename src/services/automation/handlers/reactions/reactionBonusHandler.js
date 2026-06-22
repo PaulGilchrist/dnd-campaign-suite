@@ -8,13 +8,6 @@ import { spendSorceryPoints, getCurrentSorceryPoints } from '../../../../hooks/c
 import { findRollsByCreature } from '../../common/damageRollback.js';
 import { getClassFeatures } from '../../../../services/character/classFeatures.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 export async function handle(action, playerStats, campaignName, mapName) {
     const auto = action.automation;
 
@@ -113,9 +106,9 @@ async function handleBendFate(action, playerStats, campaignName, mapName) {
     const abilityEvent = targetRolls?.abilityEvent || null;
     const saveEvent = targetRolls?.saveEvent || null;
 
-    const attackFresh = attackEvent && !isStale(attackEvent);
-    const abilityFresh = abilityEvent && !isStale(abilityEvent);
-    const saveFresh = saveEvent && !isStale(saveEvent);
+    const attackFresh = attackEvent;
+    const abilityFresh = abilityEvent;
+    const saveFresh = saveEvent;
 
     if (!attackFresh && !abilityFresh && !saveFresh) {
         return {

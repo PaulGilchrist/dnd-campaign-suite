@@ -81,23 +81,5 @@ describe('strokeOfLuckHandler.handle', () => {
         expect(logService.addEntry).toHaveBeenCalled();
     });
 
-    it('should reject stale events (>60s old)', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'strokeOfLuckUsed') return false;
-            return undefined;
-        });
-        damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 3, bonus: 5, targetName: 'TestRogue', hit: false, timestamp: Date.now() - 120000 },
-            attackerName: 'Orc',
-            targetName: 'TestRogue',
-            primaryDamage: 0,
-            secondaryDamage: 0,
-            totalDamage: 0,
-            damageTypes: [],
-        });
 
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(result.payload.description).toContain('No recent D20 test found');
-    });
 });

@@ -2,13 +2,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { findRollsByCreature } from '../../common/damageRollback.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 export async function handle(action, playerStats, campaignName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -34,7 +27,7 @@ export async function handle(action, playerStats, campaignName) {
 
     for (const [, rolls] of Object.entries(rollsByCreature)) {
         const damageEvent = rolls.attackEvent;
-        if (damageEvent && damageEvent.targetName === playerName && !isStale(damageEvent)) {
+        if (damageEvent && damageEvent.targetName === playerName) {
             if (damageEvent.timestamp > timestamp) {
                 timestamp = damageEvent.timestamp;
                 lastDamageEvent = damageEvent;

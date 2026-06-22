@@ -4,13 +4,6 @@ import { buildSaveDc } from '../../common/savePrompt.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -19,7 +12,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Check that the player has recently taken damage
     const attackResult = await findLastAttack();
     const damageEvent = attackResult.attackEvent;
-    if (!damageEvent || isStale(damageEvent) || attackResult.targetName !== playerName || !attackResult.totalDamage) {
+    if (!damageEvent || attackResult.targetName !== playerName || !attackResult.totalDamage) {
         return {
             type: 'popup',
             payload: {

@@ -56,14 +56,7 @@ describe('tacticalMindHandler.handle', () => {
         expect(result.payload.description).toContain('No recent ability check found');
     });
 
-    it('returns popup when ability check is stale', async () => {
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, checkName: 'Insight', timestamp: Date.now() - 120000 }, saveEvent: null, } });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No recent ability check found');
-    });
 
     it('returns popup for natural 20', async () => {
         damageRollback.findRollsByCreature.mockReturnValue({ 'TestFighter': { attackEvent: null, abilityEvent: { d20: 20, bonus: 3, checkName: 'Insight', timestamp: Date.now() }, saveEvent: null, } });

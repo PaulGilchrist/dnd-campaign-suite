@@ -35,12 +35,7 @@ describe('protectionBuffUtils', () => {
       expect(result).toBe(true);
     });
 
-    it('returns false when buff timestamp is older than 600 seconds', () => {
-      const oldTimestamp = Date.now() - 601000;
-      getRuntimeValueSpy.mockReturnValue({ timestamp: oldTimestamp, source: 'some source' });
-      const result = hasProtectionBuff('TestTarget', 'testCampaign');
-      expect(result).toBe(false);
-    });
+
 
     it('returns false when buff is undefined', () => {
       getRuntimeValueSpy.mockReturnValue(undefined);
@@ -68,12 +63,7 @@ describe('protectionBuffUtils', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null when buff timestamp is older than 600 seconds', () => {
-      const oldTimestamp = Date.now() - 601000;
-      getRuntimeValueSpy.mockReturnValue({ timestamp: oldTimestamp, source: 'paladin' });
-      const result = getProtectionBuffSource('TestTarget', 'testCampaign');
-      expect(result).toBeNull();
-    });
+
 
     it('returns source for buff without timestamp', () => {
       getRuntimeValueSpy.mockReturnValue({ source: 'warlock' });

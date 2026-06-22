@@ -3,13 +3,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 export async function handle(action, playerStats, campaignName) {
     const playerName = playerStats.name;
     const dieSize = getRuntimeValue(playerName, 'bardicInspirationDie', campaignName);
@@ -41,7 +34,7 @@ export async function handle(action, playerStats, campaignName) {
     let bonusDescription = '';
     let defenderHp = null;
 
-    if (lastAttack && lastAttack.attackerName === playerName && !isStale(lastAttack.attackEvent)) {
+    if (lastAttack && lastAttack.attackerName === playerName) {
         const targetName = lastAttack.targetName;
         if (targetName) {
             bonusDescription = ` Bonus damage applied to ${targetName}.`;

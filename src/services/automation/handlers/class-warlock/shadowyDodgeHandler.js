@@ -2,13 +2,6 @@ import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -17,7 +10,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // Get the last attack roll against the player
     const lastAttack = await findLastAttack();
     const attackEvent = lastAttack?.attackEvent;
-    if (!attackEvent || isStale(attackEvent) || lastAttack?.targetName !== playerName) {
+    if (!attackEvent || lastAttack?.targetName !== playerName) {
         return infoPopup(featureName, `No recent attack roll against you found. ${featureName} can only be used shortly after an attack roll.`, auto);
     }
 

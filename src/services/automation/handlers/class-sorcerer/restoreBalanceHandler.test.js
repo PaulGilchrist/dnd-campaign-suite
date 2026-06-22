@@ -232,15 +232,15 @@ describe('restoreBalanceHandler.handle', () => {
       expect(result.payload.description).toContain('DEX');
     });
 
-    it('should return popup when no fresh rolls found', async () => {
+    it('should return popup when no rolls found', async () => {
       resolveTarget.mockResolvedValue({ target: { name: 'TargetAlly' } });
       resolveMapPositions.mockResolvedValue(null);
       getAbilityModifier.mockReturnValue(3);
       damageRollback.findRollsByCreature.mockReturnValue({
         'TargetAlly': {
-          attackEvent: {"timestamp":Date.now() - 120000},
-          abilityEvent: {"timestamp":Date.now() - 120000},
-          saveEvent: {"timestamp":Date.now() - 120000}
+          attackEvent: null,
+          abilityEvent: null,
+          saveEvent: null
         }
       });
 

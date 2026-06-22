@@ -3,13 +3,6 @@ import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 function buildStrokeOfLuckDescription(action, d20, bonus, label, wasFailure) {
     const originalTotal = d20 + bonus;
     const newTotal = 20 + bonus;
@@ -40,7 +33,7 @@ export async function handle(action, playerStats, campaignName) {
     const attackResult = await findLastAttack();
     const attackEvent = attackResult.attackEvent;
 
-    const attackFresh = attackEvent && !isStale(attackEvent) && attackResult.targetName === playerName;
+    const attackFresh = attackEvent && attackResult.targetName === playerName;
 
     if (!attackFresh) {
         return infoPopup(action.name, `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);

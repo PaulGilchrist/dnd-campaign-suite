@@ -87,23 +87,7 @@ describe('beguilingDefensesHandler', () => {
             expect(result.payload.description).toContain('No recent attack roll against you found');
         });
 
-        it('returns popup when attack event is stale (> 60 seconds)', async () => {
-            const oldTimestamp = Date.now() - 120000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: oldTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent attack roll against you found');
-        });
 
         it('accepts non-stale attack event', async () => {
             const recentTimestamp = Date.now() - 30000;
@@ -411,39 +395,5 @@ describe('beguilingDefensesHandler', () => {
         });
     });
 
-    describe('event staleness', () => {
-        it('treats event without timestamp as stale', async () => {
-            findLastAttack.mockResolvedValue({
-                attackEvent: {},
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent attack roll');
-        });
-
-        it('treats event with null timestamp as stale', async () => {
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: null },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent attack roll');
-        });
-    });
 });

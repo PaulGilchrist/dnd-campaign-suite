@@ -112,9 +112,7 @@ function freshAttackEvent(options = {}) {
   };
 }
 
-function staleTimestamp() {
-  return Date.now() - 70000; // 70 seconds old > 60s threshold
-}
+
 
 const campaignName = 'TestCampaign';
 const mapName = 'DungeonMap';
@@ -571,25 +569,7 @@ describe('reactionDebuffHandler.handle', () => {
       expect(result.payload.description).toContain('No recent roll found');
     });
 
-    it('returns early when attack event is stale', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({});
 
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: { timestamp: staleTimestamp() },
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(action, ps, campaignName, mapName);
-      expect(result.payload.description).toContain('No recent roll found');
-    });
 
     it('returns early when damage event has no rawDamage', async () => {
       const ps = makePlayerStats({});
@@ -635,25 +615,7 @@ describe('reactionDebuffHandler.handle', () => {
       expect(result.payload.description).toContain('No recent attack roll found for Goblin');
     });
 
-    it('returns early when attack event is stale', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ effect: 'disadvantage_on_attack_roll' });
 
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: { timestamp: staleTimestamp() },
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(action, ps, campaignName, mapName);
-      expect(result.payload.description).toContain('No recent attack roll found');
-    });
 
     it('rolls second d20 and takes lower of two', async () => {
       const ps = makePlayerStats({});
@@ -1140,67 +1102,6 @@ describe('reactionDebuffHandler.handle', () => {
       expect(targetResolver.resolveTarget).toHaveBeenCalled();
     });
 
-    it('treats events without timestamp as stale', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ effect: 'disadvantage_on_attack_roll' });
 
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: {},
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(action, ps, campaignName, mapName);
-      expect(result.payload.description).toContain('No recent attack roll found');
-    });
-
-    it('treats events older than 60 seconds as stale', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ effect: 'disadvantage_on_attack_roll' });
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: { timestamp: Date.now() - 60001 },
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(action, ps, campaignName, mapName);
-      expect(result.payload.description).toContain('No recent attack roll found');
-    });
-
-    it('treats events under 60 seconds as fresh', async () => {
-      const ps = makePlayerStats({});
-      const action = makeAction({ effect: 'disadvantage_on_attack_roll' });
-
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatSummary());
-      const event = freshAttackEvent({ d20: 14, bonus: 3, hit: true, effectiveAc: null });
-      event.timestamp = Date.now() - 5000; // well under threshold → fresh
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: event,
-        attackerName: 'Goblin',
-        targetName: 'Goblin',
-        primaryDamage: 10,
-        secondaryDamage: 0,
-        totalDamage: 10,
-        damageTypes: ['Piercing'],
-      });
-
-      await handle(action, ps, campaignName, mapName);
-      // Should proceed past staleness check — uses decrement should fire
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
-    });
   });
 });

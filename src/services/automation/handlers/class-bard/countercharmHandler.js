@@ -6,13 +6,6 @@ import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidat
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
@@ -23,7 +16,7 @@ async function findRecentFailedSave(playerStats, campaignName, mapName, rangeFt)
     const checkSelf = async () => {
         const attackResult = await findLastAttack();
         const attackEvent = attackResult.attackEvent;
-        if (attackEvent && !isStale(attackEvent) && attackResult.targetName === playerName) {
+        if (attackEvent && attackResult.targetName === playerName) {
             return { name: playerName, event: attackEvent, type: 'attack_roll' };
         }
         return null;
@@ -43,7 +36,7 @@ async function findRecentFailedSave(playerStats, campaignName, mapName, rangeFt)
 
             const attackResult = await findLastAttack();
             const attackEvent = attackResult.attackEvent;
-            if (attackEvent && !isStale(attackEvent) && attackResult.attackerName === creature.name) {
+            if (attackEvent && attackResult.attackerName === creature.name) {
                 if (mapName && rangeFt != null) {
                     const positions = await resolveMapPositions(campaignName, mapName, playerName);
                     if (positions?.attackerPos && positions?.targetPos) {

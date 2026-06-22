@@ -149,25 +149,5 @@ describe('luckyPointHandler.handle', () => {
         expect(result.payload.description).toContain('Attack vs AC Orc');
     });
 
-    it('should reject stale events (>60s old)', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'luckyPoints') return 5;
-            return undefined;
-        });
-        damageRollback.findRollsByCreature.mockResolvedValue({
-            'TestFighter': {
-                attackEvent: { d20: 3, bonus: 5, targetName: 'Orc', hit: false, timestamp: Date.now() - 120000 },
-                abilityEvent: null,
-                saveEvent: null,
-            },
-        });
 
-        const result = await handle(
-            { name: 'Advantage', automation: { type: 'lucky_point', effect: 'advantage', target: 'd20', cost: 1 } },
-            mockPlayerStats,
-            mockCampaignName
-        );
-
-        expect(result.payload.description).toContain('No recent D20 test found');
-    });
 });

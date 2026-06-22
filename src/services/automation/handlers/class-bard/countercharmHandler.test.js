@@ -71,10 +71,6 @@ function makeAction(automation = {}) {
   };
 }
 
-function makeStaleTimestamp() {
-  return Date.now() - 65000;
-}
-
 function makeFreshTimestamp() {
   return Date.now();
 }
@@ -196,49 +192,9 @@ describe('countercharmHandler.handle', () => {
       expect(result.payload.description).toContain('30 ft');
     });
 
-    it('should return no-save popup when only stale events exist', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
 
-      const staleEvent = { d20: 8, bonus: 2, timestamp: makeStaleTimestamp() };
-      findLastAttack.mockResolvedValue({
-        attackEvent: staleEvent,
-        attackerName: 'Goblin',
-        targetName: 'TestHero',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-      rangeToFeet.mockReturnValue(30);
 
-      const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent save');
-    });
-
-    it('should return no-save popup when timestamp is missing from event', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const eventWithoutTimestamp = { d20: 8, bonus: 2 };
-      findLastAttack.mockResolvedValue({
-        attackEvent: eventWithoutTimestamp,
-        attackerName: 'Goblin',
-        targetName: 'TestHero',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-      rangeToFeet.mockReturnValue(30);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent save');
-    });
   });
 
   describe('target resolution - player self', () => {
@@ -1252,85 +1208,7 @@ describe('countercharmHandler.handle', () => {
     });
   });
 
-  describe('event staleness', () => {
-    it('should treat events without timestamp as stale', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
 
-      // No timestamp on attack event
-      const staleAttackEvent = { d20: 8, bonus: 2, targetAc: 13, hit: false };
-      findLastAttack.mockResolvedValue({
-        attackEvent: staleAttackEvent,
-        attackerName: 'Goblin',
-        targetName: 'TestHero',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-      rangeToFeet.mockReturnValue(30);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('No recent save');
-    });
-
-    it('should treat events older than 60 seconds as stale', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const staleEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: Date.now() - 61000,
-      };
-      findLastAttack.mockResolvedValue({
-        attackEvent: staleEvent,
-        attackerName: 'Goblin',
-        targetName: 'TestHero',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-      rangeToFeet.mockReturnValue(30);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('No recent save');
-    });
-
-    it('should accept events within 60 seconds as fresh', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      const freshEvent = {
-        d20: 8,
-        bonus: 2,
-        targetAc: 13,
-        hit: false,
-        timestamp: Date.now() - 1000,
-      };
-      findLastAttack.mockResolvedValue({
-        attackEvent: freshEvent,
-        attackerName: 'Goblin',
-        targetName: 'TestHero',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
-      rangeToFeet.mockReturnValue(30);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('Target: TestHero');
-    });
-  });
 
   describe('automation passthrough', () => {
     it('should include automation in popup payload', async () => {

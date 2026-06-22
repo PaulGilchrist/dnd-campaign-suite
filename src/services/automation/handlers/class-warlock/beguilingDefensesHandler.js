@@ -4,13 +4,7 @@ import { findLastAttack } from '../../common/damageRollback.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 
-const EVENT_STALENESS_MS = 60000;
 const USES_KEY = 'beguilingDefensesUses';
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -20,7 +14,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     // 1. Get the last attack roll against the player
     const attackResult = await findLastAttack();
     const attackEvent = attackResult.attackEvent;
-    if (!attackEvent || isStale(attackEvent) || attackResult.targetName !== playerName) {
+    if (!attackEvent || attackResult.targetName !== playerName) {
         return {
             type: 'popup',
             payload: {

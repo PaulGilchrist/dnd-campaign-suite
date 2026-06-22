@@ -2,13 +2,6 @@ import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 /**
  * Get the last attack from combatSummary.lastAttack.
  * Single source of truth — contains attacker, target, d20, hit, damage, save info, spell/weapon info, etc.
@@ -17,7 +10,7 @@ function isStale(event) {
  */
 export async function findLastAttack() {
     const cs = await getCombatContext();
-    if (!cs?.lastAttack || isStale(cs.lastAttack)) {
+    if (!cs?.lastAttack) {
         return { attackEvent: null, attackerName: null, targetName: null, primaryDamage: 0, secondaryDamage: 0, totalDamage: 0, damageTypes: [] };
     }
     const a = cs.lastAttack;
@@ -129,7 +122,7 @@ export async function findMostRecentRollAcrossCreatures(campaignName) {
 
         for (const check of checks) {
             const event = rolls[check.key];
-            if (event && !isStale(event) && event.timestamp > bestTimestamp) {
+            if (event && event.timestamp > bestTimestamp) {
                 bestTimestamp = event.timestamp;
                 bestCreature = creatureName;
                 bestEventType = check.type;
@@ -144,6 +137,6 @@ export async function findMostRecentRollAcrossCreatures(campaignName) {
         creatureName: bestCreature,
         eventType: bestEventType,
         eventData: bestEventData,
-        isStale: isStale(bestEventData),
+        isStale: false,
     };
 }

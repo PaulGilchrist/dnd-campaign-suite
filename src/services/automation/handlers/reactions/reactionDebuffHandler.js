@@ -8,13 +8,6 @@ import { findLastAttack } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
@@ -24,7 +17,7 @@ async function handleAttackRollDebuff(action, _playerStats, campaignName, attack
 
     const attackResult = await findLastAttack();
     const attackEvent = attackResult.attackEvent;
-    if (!attackEvent || isStale(attackEvent) || attackResult.attackerName !== attackerName) {
+    if (!attackEvent || attackResult.attackerName !== attackerName) {
         return {
             type: 'popup',
             payload: {
@@ -77,7 +70,7 @@ async function handleDamageDebuff(action, _playerStats, campaignName, attackerNa
 
     const attackResult = await findLastAttack();
     const lastEvent = attackResult.attackEvent;
-    if (!lastEvent || !attackResult.totalDamage || isStale(lastEvent) || attackResult.attackerName !== attackerName) {
+    if (!lastEvent || !attackResult.totalDamage || attackResult.attackerName !== attackerName) {
         return infoPopup(action.name, `No recent damage event found for ${attackerName}. ${action.name} can only be used shortly after a damage roll.`, auto);
     }
 
@@ -106,7 +99,7 @@ async function handleDisadvantageDebuff(action, _playerStats, campaignName, atta
 
     const attackResult = await findLastAttack();
     const attackEvent = attackResult.attackEvent;
-    if (!attackEvent || isStale(attackEvent) || attackResult.attackerName !== attackerName) {
+    if (!attackEvent || attackResult.attackerName !== attackerName) {
         return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
     }
 
@@ -311,7 +304,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
     } else if (effect === 'disadvantage_on_attack_roll') {
         const attackResult = await findLastAttack();
         const attackEvent = attackResult.attackEvent;
-        if (!attackEvent || isStale(attackEvent) || attackResult.attackerName !== attackerName) {
+    if (!attackEvent || attackResult.attackerName !== attackerName) {
             return infoPopup(action.name, `No recent attack roll found for ${attackerName}. ${action.name} can only be used shortly after an attack roll.`, auto);
         }
         result = await handleDisadvantageDebuff(action, playerStats, campaignName, attackerName, combatSummary);
@@ -322,7 +315,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         const attackResult = await findLastAttack();
         const attackEvent = attackResult.attackEvent;
-        const hasAttack = attackEvent && !isStale(attackEvent) && attackResult.attackerName === attackerName;
+        const hasAttack = attackEvent && attackResult.attackerName === attackerName;
 
         if (!hasAttack) {
             return {

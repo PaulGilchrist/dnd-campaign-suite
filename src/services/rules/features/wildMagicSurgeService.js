@@ -1,4 +1,5 @@
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getCurrentCombatRound } from '../../encounters/combatData.js';
 import { executeHandler } from '../../automation/index.js';
 
 function usesSpellSlot(spell, metaCtx) {
@@ -136,11 +137,9 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
     }
 
     const surgeFeature = surgeFeatures[0];
-    const usesKey = `wildMagicSurgeTriggered`;
-    const lastTrigger = getRuntimeValue(playerStats.name, usesKey, campaignName);
-    const now = Date.now();
-
-    if (lastTrigger && now - lastTrigger < 60000) {
+    const currentRound = getCurrentCombatRound();
+    const usedRound = getRuntimeValue(playerStats.name, 'surgeUsedRound', campaignName);
+    if (usedRound === currentRound) {
         return null;
     }
 
@@ -163,7 +162,7 @@ export async function triggerWildMagicSurge(spell, metaCtx, playerStats, campaig
     try {
         const result = await executeHandler(action, playerStats, campaignName, mapName);
         if (result) {
-            await setRuntimeValue(playerStats.name, usesKey, now, campaignName, true);
+            await setRuntimeValue(playerStats.name, 'surgeUsedRound', currentRound, campaignName, true);
             return result;
         }
     } catch (e) {

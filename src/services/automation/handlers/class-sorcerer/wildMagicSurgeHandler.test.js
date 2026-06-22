@@ -49,14 +49,7 @@ describe('wildMagicSurgeHandler', () => {
     });
 
     describe('handle', () => {
-        it('should block reuse within one turn when oncePerTurn is true', async () => {
-            runtimeState.getRuntimeValue.mockReturnValue(Date.now() - 5000);
 
-            const result = await handle(makeAction({ oncePerTurn: true }), makePlayerStats(), 'campaign', 'map');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('once per turn');
-        });
 
         it('should allow reuse when oncePerTurn is false', async () => {
             runtimeState.getRuntimeValue.mockReturnValue(Date.now() - 5000);

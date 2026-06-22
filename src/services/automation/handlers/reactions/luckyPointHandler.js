@@ -3,13 +3,6 @@ import { addEntry } from '../../../ui/logService.js';
 import { findRollsByCreature } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 function buildLuckyDescription(action, d20, bonus, label, effectType) {
     const originalTotal = d20 + bonus;
     const effectLabel = effectType === 'advantage' ? 'Advantage' : 'Disadvantage';
@@ -36,9 +29,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const abilityEvent = playerRolls?.abilityEvent || null;
     const saveEvent = playerRolls?.saveEvent || null;
 
-    const attackFresh = attackEvent && !isStale(attackEvent);
-    const abilityFresh = abilityEvent && !isStale(abilityEvent);
-    const saveFresh = saveEvent && !isStale(saveEvent);
+    const attackFresh = attackEvent;
+    const abilityFresh = abilityEvent;
+    const saveFresh = saveEvent;
 
     if (!attackFresh && !abilityFresh && !saveFresh) {
         return infoPopup(action.name, `No recent D20 test found for ${playerName}. This feature can only be used shortly after a failed attack roll, ability check, or saving throw.`, auto);

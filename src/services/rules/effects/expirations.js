@@ -893,12 +893,10 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                     if (newConditions.length !== conditions.length || !hasSpeedZero) {
                         setRuntimeValue(targetName, 'activeConditions', newConditions, campaignName);
                     }
-                    const lethargyKey = `_hasteLethargy_${targetName.replace(/\s+/g, '_')}`;
                     addExpiration(attackerName, targetName, [
                         { type: 'speed_zero' },
                         { type: 'condition', condition: 'incapacitated' }
                     ], campaignName, 2);
-                    setRuntimeValue(targetName, lethargyKey, Date.now(), campaignName);
                 }
                 break;
             }
@@ -1105,8 +1103,6 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             case 'remove_regenerate_buff': {
                 setRuntimeValue(targetName, 'regenerateActive', null, campaignName);
                 setRuntimeValue(targetName, 'regenerateSource', null, campaignName);
-                setRuntimeValue(targetName, 'regenerateBodyPartRegrowTime', null, campaignName);
-                setRuntimeValue(targetName, 'regenerateBodyPartsTracked', null, campaignName);
                 break;
             }
 

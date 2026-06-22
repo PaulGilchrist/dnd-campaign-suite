@@ -153,15 +153,5 @@ describe('darkOnesLookHandler.handle', () => {
         expect(result.payload.description).toContain('No recent ability check or saving throw');
     });
 
-    it('should reject stale saving throw events', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
-            if (key === 'darkOnesLookUses') return 1;
-            return undefined;
-        });
-        damageRollback.findRollsByCreature.mockReturnValue({ 'TestWarlock': { attackEvent: null, abilityEvent: { d20: 8, bonus: 3, saveType: 'dexterity', timestamp: Date.now() - 120000, }, saveEvent: null, } });
 
-        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
-
-        expect(result.payload.description).toContain('No recent ability check or saving throw');
-    });
 });

@@ -643,10 +643,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         logConditionEvent(campaignName, 'broken', creatureName, condition.label)
     }
 
-    if (!combatSummary) return null
     return (
         <div className='initiative'>
             <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
+            {combatSummary ? (
+            <>
             <h4>Initiative (round {combatSummary.round})</h4>
             <div className='carousel-container' ref={carouselRef}>
                 {displayCreatures?.map((creature) => {
@@ -745,6 +746,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                     </div>
                 </Popup>
             )}
+            </>
+            ) : null}
         </div>
     )
 }

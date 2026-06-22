@@ -67,22 +67,7 @@ describe('superiorHunterDefenseHandler', () => {
             expect(result.payload.description).toContain('No recent damage found');
         });
 
-        it('returns error popup when damage event is stale', async () => {
-            const staleTimestamp = Date.now() - 70000;
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'Goblin': { attackEvent: { targetName: 'Test Ranger', rawDamage: 10, damageType: 'fire', timestamp: staleTimestamp }, abilityEvent: null, saveEvent: null },
-            });
 
-            damageUtils.getCombatContext.mockResolvedValue({
-                creatures: [{ name: 'Goblin' }],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('No recent damage found');
-        });
 
         it('applies resistance buff for the damage type on successful use', async () => {
             const freshTimestamp = Date.now();

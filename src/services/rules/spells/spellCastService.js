@@ -1071,16 +1071,6 @@ async function applyRegenerateSpell(spell, target, caster, campaignName) {
     await setRuntimeValue(targetName, 'regenerateActive', true, campaignName);
     await setRuntimeValue(targetName, 'regenerateSource', casterName, campaignName);
 
-    // Track body part regrowth timestamp (2 minutes = 120000ms)
-    if (spell.automation?.bodyPartRegrowMinutes == null) {
-        console.error('[spellCast] applyRegenerateSpell: spell.automation.bodyPartRegrowMinutes is missing')
-        throw new Error('spell.automation.bodyPartRegrowMinutes is required for regenerate spell')
-      }
-      const bodyPartRegrowMinutes = spell.automation.bodyPartRegrowMinutes
-    const regrowTimestamp = Date.now() + (bodyPartRegrowMinutes * 60 * 1000);
-    await setRuntimeValue(targetName, 'regenerateBodyPartRegrowTime', regrowTimestamp, campaignName);
-    await setRuntimeValue(targetName, 'regenerateBodyPartsTracked', true, campaignName);
-
     // Add expiration for combat: remove regenerate buff after 1 hour (3600 seconds / 6 = 600 rounds)
     addExpiration(casterName, targetName, [
         { type: 'remove_regenerate_buff' }

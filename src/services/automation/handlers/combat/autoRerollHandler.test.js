@@ -339,19 +339,7 @@ describe('autoRerollHandler', () => {
         });
     });
 
-    describe('stale detection', () => {
-        it('should reject events older than 60 seconds', async () => {
-            const staleEvent = { d20: 5, bonus: 5, targetAc: 15, hit: false, timestamp: Date.now() - 70000 };
-            damageRollback.findRollsByCreature.mockResolvedValue({
-                'TestHero': { attackEvent: staleEvent, abilityEvent: null, saveEvent: null },
-            });
 
-            const action = makeAction();
-            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
-
-            expect(result.payload.description).toContain('No recent failed attack roll');
-        });
-    });
 
     describe('resource cost handling', () => {
         it('should consume channel divinity charges', async () => {

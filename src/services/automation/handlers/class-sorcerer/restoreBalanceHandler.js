@@ -5,13 +5,6 @@ import { resolveMapPositions, resolveTarget } from '../../common/targetResolver.
 import { findRollsByCreature } from '../../common/damageRollback.js';
 import { getAbilityModifier } from '../../../shared/abilityLookup.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 function getRuntimeUsesKey(featureName) {
     return featureName.toLowerCase().replace(/\s+/g, '') + 'Uses';
 }
@@ -81,9 +74,9 @@ export async function handle(action, playerStats, campaignName, mapName) {
     const abilityEvent = targetRolls?.abilityEvent || null;
     const saveEvent = targetRolls?.saveEvent || null;
 
-    const attackFresh = attackEvent && !isStale(attackEvent);
-    const abilityFresh = abilityEvent && !isStale(abilityEvent);
-    const saveFresh = saveEvent && !isStale(saveEvent);
+    const attackFresh = attackEvent;
+    const abilityFresh = abilityEvent;
+    const saveFresh = saveEvent;
 
     if (!attackFresh && !abilityFresh && !saveFresh) {
         return {

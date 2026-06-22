@@ -509,63 +509,7 @@ describe('prayerOfHealingService', () => {
         });
     });
 
-    describe('24-hour cooldown', () => {
-        it('excludes targets healed within the last 24 hours', async () => {
-            getRuntimeValue.mockImplementation((_key, prop) => {
-                if (prop === 'prayerOfHealing_lastCast_Ally1') return Date.now() - 3600000;
-                return null;
-            });
 
-            const result = await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(result.targets.length).toBe(2);
-            expect(result.targets.find(t => t.targetName === 'Ally1')).toBeUndefined();
-        });
-
-        it('allows targets healed more than 24 hours ago', async () => {
-            getRuntimeValue.mockImplementation((_key, prop) => {
-                if (prop === 'prayerOfHealing_lastCast_Ally1') return Date.now() - (25 * 60 * 60 * 1000);
-                return null;
-            });
-
-            const result = await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(result.targets.length).toBe(3);
-            expect(result.targets.find(t => t.targetName === 'Ally1')).toBeDefined();
-        });
-
-        it('returns empty targets when all eligible creatures are on cooldown', async () => {
-            getRuntimeValue.mockImplementation((_key, prop) => {
-                if (prop.startsWith('prayerOfHealing_lastCast_')) return Date.now() - 3600000;
-                if (prop === 'currentHitPoints') return '20';
-                return null;
-            });
-
-            const result = await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
-
-            expect(result.targets).toEqual([]);
-            expect(result.totalHealed).toBe(0);
-            expect(result.formula).toBeDefined();
-        });
-    });
 
     describe('healing application', () => {
         it('clamps healing to target max HP', async () => {
@@ -772,22 +716,7 @@ describe('prayerOfHealingService', () => {
             );
         });
 
-        it('marks each healed target with a cooldown timestamp', async () => {
-            await triggerPrayerOfHealing(
-                buildPrayerSpell(),
-                {},
-                CLERIC_STATS,
-                CAMPAIGN_NAME,
-                MAP_NAME,
-            );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Ally1',
-                'prayerOfHealing_lastCast_Ally1',
-                expect.any(Number),
-                CAMPAIGN_NAME,
-            );
-        });
 
         it('posts hp_change log entry for each healed target', async () => {
             await triggerPrayerOfHealing(

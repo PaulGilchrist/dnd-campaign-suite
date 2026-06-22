@@ -4,6 +4,7 @@ import { applyHealingToTarget } from '../combat/applyHealing.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
+import { getCurrentCombatRound } from '../../encounters/combatData.js';
 
 const PRAYER_OF_HEALING_NAME = 'Prayer of Healing';
 
@@ -31,18 +32,19 @@ function getHealExpression(spell) {
 }
 
 function getAffectedKey(targetName) {
-    return `prayerOfHealing_lastCast_${targetName}`;
+    return `prayerOfHealing_lastUsedRound_${targetName}`;
 }
 
 function isAffectedByPrayerOfHealing(targetName, campaignName) {
-    const lastCast = getRuntimeValue(targetName, getAffectedKey(targetName), campaignName);
-    if (!lastCast) return false;
-    const oneDayMs = 24 * 60 * 60 * 1000;
-    return (Date.now() - lastCast) < oneDayMs;
+    const usedRound = getRuntimeValue(targetName, getAffectedKey(targetName), campaignName);
+    if (!usedRound) return false;
+    const currentRound = getCurrentCombatRound();
+    return usedRound === currentRound;
 }
 
 function markPrayerOfHealingUsed(targetName, campaignName) {
-    setRuntimeValue(targetName, getAffectedKey(targetName), Date.now(), campaignName);
+    const currentRound = getCurrentCombatRound();
+    setRuntimeValue(targetName, getAffectedKey(targetName), currentRound, campaignName);
 }
 
 export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campaignName, _mapName) {
@@ -117,9 +119,8 @@ export async function triggerPrayerOfHealing(spell, metaCtx, playerStats, campai
 
         if (actualHeal > 0) {
             applyHealingToTarget(combatSummary, targetName, actualHeal, campaignName);
+            markPrayerOfHealingUsed(targetName, campaignName);
         }
-
-        markPrayerOfHealingUsed(targetName, campaignName);
 
         const newHp = Math.min(maxHp, currentHp + actualHeal);
 

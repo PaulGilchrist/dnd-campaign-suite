@@ -444,32 +444,32 @@ function EncounterBuilder({ characters, campaignName, onStartCombat }) {
      try { await logService.addEntry(campaignName, entry); } catch { /* ignore */ }
    };
 
-   const handleStartEncounter = () => {
-     if (!selectedMonsters.length) return;
+    const handleStartEncounter = async () => {
+      if (!selectedMonsters.length) return;
 
-     // Write combatStarted=true directly to localStorage before navigation unmounts the component
-     // localStorage-only: transient GM workspace state, no server endpoint for sessions
-     try {
-       localStorage.setItem(`encounterSession-${campaignName}`, JSON.stringify({
-         currentEncounterName, description, lootData, encounterCompleted,
-         combatStarted: true,
-         selectedMonsters: stripMonsters(selectedMonsters),
-         filter: { difficulty: filter.difficulty, playerLevels: filter.playerLevels, environment: filter.environment },
-         encounterTitle,
-       }));
-     } catch { /* ignore */ }
+      // Write combatStarted=true directly to localStorage before navigation unmounts the component
+      // localStorage-only: transient GM workspace state, no server endpoint for sessions
+      try {
+        localStorage.setItem(`encounterSession-${campaignName}`, JSON.stringify({
+          currentEncounterName, description, lootData, encounterCompleted,
+          combatStarted: true,
+          selectedMonsters: stripMonsters(selectedMonsters),
+          filter: { difficulty: filter.difficulty, playerLevels: filter.playerLevels, environment: filter.environment },
+          encounterTitle,
+        }));
+      } catch { /* ignore */ }
 
-     logEntry({
-       type: 'encounter',
-       action: 'started',
-       encounterName: encounterTitle || currentEncounterName || 'Unnamed Encounter',
-       monsters: selectedMonsters.map(m => `${m.qty || 1}x ${m.name}`),
-     });
+      logEntry({
+        type: 'encounter',
+        action: 'started',
+        encounterName: encounterTitle || currentEncounterName || 'Unnamed Encounter',
+        monsters: selectedMonsters.map(m => `${m.qty || 1}x ${m.name}`),
+      });
 
-     setCombatStarted(true);
-     loadEncounterToInitiative(selectedMonsters, characters, campaignName);
-     onStartCombat();
-   };
+      setCombatStarted(true);
+      await loadEncounterToInitiative(selectedMonsters, characters, campaignName);
+      onStartCombat();
+    };
 
    const handleCompleteEncounter = async () => {
      const numChars = characters && characters.length > 0 ? characters.length : filter.playerLevels.length;

@@ -612,57 +612,7 @@ describe('wildMagicSurgeService', () => {
             expect(result).not.toBeNull();
         });
 
-        it('respects 60-second cooldown on standard surge trigger', async () => {
-            const playerStats = { ...basePlayerStats };
-            const spell = { name: 'Fire Bolt', level: 1 };
-            const now = Date.now();
 
-            getRuntimeValue.mockImplementation((charKey, prop) => {
-                if (prop === 'wildMagicSurgeTriggered') return now - 30000; // 30 seconds ago
-                return null;
-            });
-
-            const result = await triggerWildMagicSurge(
-                spell,
-                { slotLevel: 1 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('executes handler when cooldown has passed', async () => {
-            const playerStats = { ...basePlayerStats };
-            const spell = { name: 'Fire Bolt', level: 1 };
-            const now = Date.now();
-
-            getRuntimeValue.mockImplementation((charKey, prop) => {
-                if (prop === 'wildMagicSurgeTriggered') return now - 120000; // 2 minutes ago
-                return null;
-            });
-
-            executeHandler.mockResolvedValue({ type: 'popup', payload: {} });
-
-            const result = await triggerWildMagicSurge(
-                spell,
-                { slotLevel: 1 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toEqual({ type: 'popup', payload: {} });
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                playerStats.name,
-                'wildMagicSurgeTriggered',
-                expect.any(Number),
-                campaignName,
-                true,
-            );
-        });
 
         it('returns null when executeHandler returns null', async () => {
             const playerStats = { ...basePlayerStats };

@@ -4,13 +4,6 @@ import { findRollsByCreature } from '../../common/damageRollback.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 function buildDescription(action, d20, bonus, label, dieRoll) {
     const originalTotal = d20 + bonus;
     const modifiedTotal = d20 + bonus + dieRoll;
@@ -41,8 +34,8 @@ export async function handle(action, playerStats, campaignName) {
     const abilityEvent = playerRolls?.abilityEvent || null;
     const saveEvent = playerRolls?.saveEvent || null;
 
-    const abilityFresh = abilityEvent && !isStale(abilityEvent);
-    const saveFresh = saveEvent && !isStale(saveEvent);
+    const abilityFresh = abilityEvent;
+    const saveFresh = saveEvent;
 
     if (!abilityFresh && !saveFresh) {
         return infoPopup(action.name, `No recent ability check or saving throw found for ${playerName}. This feature can only be used shortly after an ability check or saving throw.`, auto);

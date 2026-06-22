@@ -310,48 +310,7 @@ describe('bardicInspirationOffenseHandler.handle', () => {
     });
   });
 
-  describe('stale damage event', () => {
-    it('treats a stale damage event as no recent event', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      damageRollback.findLastAttack.mockResolvedValue(makeLastAttack('Bard', 'Goblin', null, true));
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-    });
-
-    it('treats a damage event with no timestamp as stale', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      damageRollback.findLastAttack.mockResolvedValue({
-        attackEvent: { targetName: 'Goblin' },
-        attackerName: 'Bard',
-        targetName: 'Goblin',
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-      });
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-    });
-
-    it('treats a null damage event as stale', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(8);
-      useRuntimeState.getRuntimeValue.mockReturnValueOnce(undefined);
-      diceRoller.rollExpression.mockReturnValue(makeRollResult(4, [4]));
-      damageRollback.findLastAttack.mockResolvedValue(null);
-
-      const result = await handle(makeAction(), makePlayerStats(), campaignName);
-
-      expect(result.payload.description).toContain('No recent damage event found');
-    });
-  });
 
   describe('successful damage application to target', () => {
     it('applies bonus damage message when attacker matches player', async () => {

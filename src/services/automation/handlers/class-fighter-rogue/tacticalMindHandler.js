@@ -3,13 +3,6 @@ import { addEntry } from '../../../ui/logService.js';
 import { findRollsByCreature } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const playerName = playerStats.name;
@@ -17,7 +10,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
     const rollsByCreature = await findRollsByCreature(campaignName);
     const playerRolls = rollsByCreature?.[playerName] || null;
     const abilityEvent = playerRolls?.abilityEvent || null;
-    if (!abilityEvent || isStale(abilityEvent)) {
+    if (!abilityEvent) {
         return infoPopup(action.name, `No recent ability check found for ${playerName}. This feature can only be used shortly after an ability check.`, auto);
     }
 

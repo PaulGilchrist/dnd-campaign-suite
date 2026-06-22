@@ -10,13 +10,6 @@ import { getClassFeatures } from '../../../../services/character/classFeatures.j
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 
-const EVENT_STALENESS_MS = 60000;
-
-function isStale(event) {
-    if (!event?.timestamp) return true;
-    return (Date.now() - event.timestamp) > EVENT_STALENESS_MS;
-}
-
 function buildAttackRollDescription(action, attackerName, bonus, attackEvent) {
     const { d20, bonus: atkBonus, targetAc, hit, effectiveAc } = attackEvent;
     const ac = effectiveAc ?? targetAc;
@@ -49,7 +42,7 @@ function handleAttackRoll(action, playerStats, campaignName, bonus, attackerName
     const targetName = attackerName || playerStats.name;
     const targetRolls = rollsByCreature?.[targetName] || null;
     const attackEvent = targetRolls?.attackEvent || null;
-    if (!attackEvent || isStale(attackEvent)) {
+    if (!attackEvent) {
         return infoPopup(action.name, `No recent attack roll found for ${targetName}. This feature can only be used shortly after an attack roll.`, auto);
     }
 
@@ -64,7 +57,7 @@ function handleAbilityCheck(action, playerStats, campaignName, bonus, creatureNa
     const targetName = creatureName || playerStats.name;
     const targetRolls = rollsByCreature?.[targetName] || null;
     const checkEvent = targetRolls?.abilityEvent || null;
-    if (!checkEvent || isStale(checkEvent)) {
+    if (!checkEvent) {
         return infoPopup(action.name, `No recent ability check found for ${targetName}. This feature can only be used shortly after an ability check.`, auto);
     }
 
@@ -86,7 +79,7 @@ function handleSaveRoll(action, playerStats, campaignName, bonus, rollsByCreatur
     const targetName = playerStats.name;
     const targetRolls = rollsByCreature?.[targetName] || null;
     const saveEvent = targetRolls?.saveEvent || null;
-    if (!saveEvent || isStale(saveEvent)) {
+    if (!saveEvent) {
         return infoPopup(action.name, `No recent saving throw found for ${targetName}. This feature can only be used shortly after a saving throw.`, auto);
     }
 
@@ -140,7 +133,7 @@ async function findAllyMissedAttack(playerStats, campaignName, mapName, rangeFt,
         if (creature.name === playerName) continue;
         const targetRolls = rollsByCreature?.[creature.name] || null;
         const attackEvent = targetRolls?.attackEvent || null;
-        if (!attackEvent || isStale(attackEvent) || attackEvent.hit !== false) continue;
+        if (!attackEvent || attackEvent.hit !== false) continue;
 
         if (mapName && rangeFt != null) {
             const positions = await resolveMapPositions(campaignName, mapName, playerName);
@@ -177,7 +170,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
             const playerRolls = rollsByCreature?.[playerName] || null;
             const saveEvent = playerRolls?.saveEvent || null;
-            const saveFresh = saveEvent && !isStale(saveEvent);
+            const saveFresh = saveEvent;
 
             if (!saveFresh) {
                 return infoPopup(action.name, `No recent saving throw found for ${playerName}. This feature can only be used shortly after a saving throw.`, auto);
@@ -216,7 +209,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         const playerRolls = rollsByCreature?.[playerName] || null;
         const saveEvent = playerRolls?.saveEvent || null;
-        const saveFresh = saveEvent && !isStale(saveEvent);
+        const saveFresh = saveEvent;
 
         if (!saveFresh) {
             return infoPopup(action.name, `No recent saving throw found for ${playerName}. This feature can only be used shortly after a saving throw.`, auto);
@@ -254,8 +247,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const attackEvent = playerRolls?.attackEvent || null;
         const abilityEvent = playerRolls?.abilityEvent || null;
 
-        const attackFresh = attackEvent && !isStale(attackEvent) && attackEvent.hit === false;
-        const abilityFresh = abilityEvent && !isStale(abilityEvent);
+        const attackFresh = attackEvent && attackEvent.hit === false;
+        const abilityFresh = abilityEvent;
 
         if (!attackFresh && !abilityFresh) {
             return infoPopup(action.name, `No recent failed ability check or attack roll found. ${action.name} can only be used shortly after a failure.`, auto);
@@ -302,8 +295,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const attackEvent = playerRolls?.attackEvent || null;
         const abilityEvent = playerRolls?.abilityEvent || null;
 
-        const attackFresh = attackEvent && !isStale(attackEvent) && attackEvent.hit === false;
-        const abilityFresh = abilityEvent && !isStale(abilityEvent);
+        const attackFresh = attackEvent && attackEvent.hit === false;
+        const abilityFresh = abilityEvent;
 
         if (!attackFresh && !abilityFresh) {
             return infoPopup(action.name, `No recent failed ability check or attack roll found. ${action.name} can only be used shortly after a failure.`, auto);
@@ -341,7 +334,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
 
         const playerRolls = rollsByCreature?.[playerName] || null;
         const attackEvent = playerRolls?.attackEvent || null;
-        if (!attackEvent || isStale(attackEvent)) {
+        if (!attackEvent) {
             return infoPopup(action.name, `No recent attack roll found for ${playerName}. This feature can only be used shortly after an attack roll.`, auto);
         }
 
@@ -378,8 +371,8 @@ export async function handle(action, playerStats, campaignName, mapName) {
         const attackEvent = playerRolls?.attackEvent || null;
         const abilityEvent = playerRolls?.abilityEvent || null;
 
-        const attackFresh = attackEvent && !isStale(attackEvent) && attackEvent.hit === false;
-        const abilityFresh = abilityEvent && !isStale(abilityEvent);
+        const attackFresh = attackEvent && attackEvent.hit === false;
+        const abilityFresh = abilityEvent;
 
         if (attackFresh) {
             const result = handleAttackRoll(action, playerStats, campaignName, bonus, null, rollsByCreature);
