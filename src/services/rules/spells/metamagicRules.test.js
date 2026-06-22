@@ -14,7 +14,7 @@ import {
   hasPsionicSorcery,
 } from './metamagicRules.js'
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => undefined),
 }))
 
@@ -144,14 +144,14 @@ describe('metamagicRules', () => {
     })
 
     it('returns 1 for 2024 ruleset at level 6 with no Innate Sorcery buff', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(getRuntimeValue).mockReturnValue([])
       expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'player')).toBe(1)
       vi.mocked(getRuntimeValue).mockRestore()
     })
 
     it('returns 2 for 2024 ruleset at level 6 with Innate Sorcery buff', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(getRuntimeValue).mockReturnValue([{ name: 'Innate Sorcery' }])
       expect(getMaxMetamagicPerSpell({ rules: '2024', level: 6 }, 'player')).toBe(2)
       vi.mocked(getRuntimeValue).mockRestore()
@@ -179,7 +179,7 @@ describe('metamagicRules', () => {
     })
 
     it('returns false when Arcane Apotheosis present but no Innate Sorcery buff', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(getRuntimeValue).mockReturnValue([])
       const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } }
       expect(hasArcaneApotheosis(stats, 'player')).toBe(false)
@@ -187,7 +187,7 @@ describe('metamagicRules', () => {
     })
 
     it('returns true when Arcane Apotheosis and Innate Sorcery buff present', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(getRuntimeValue).mockReturnValue([{ name: 'Innate Sorcery' }])
       const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } }
       expect(hasArcaneApotheosis(stats, 'player')).toBe(true)
@@ -209,7 +209,7 @@ describe('metamagicRules', () => {
     })
 
     it('waives highest cost option when Arcane Apotheosis active', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(getRuntimeValue).mockReturnValue([{ name: 'Innate Sorcery' }])
       const options = [{ name: 'Careful Spell', resolvedCost: 1 }, { name: 'Heightened Spell', resolvedCost: 3 }]
       const stats = { automation: { passives: [{ name: 'Arcane Apotheosis' }] } }

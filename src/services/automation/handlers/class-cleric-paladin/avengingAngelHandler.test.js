@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -43,7 +43,7 @@ import {
   removeFrightenedOnDamage,
   handleSaveResult,
 } from './avengingAngelHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';

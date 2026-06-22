@@ -6,7 +6,7 @@ import {
     getShareSpellsFeature,
 } from './primalCompanionSpellShareService.js';
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
@@ -15,7 +15,7 @@ vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../automation/index.js';
 
 describe('primalCompanionSpellShareService', () => {

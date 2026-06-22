@@ -1,7 +1,7 @@
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;

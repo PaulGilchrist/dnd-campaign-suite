@@ -14,7 +14,7 @@ vi.mock('../../rules/combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
 }));
 
@@ -29,7 +29,7 @@ vi.mock('../../rules/combat/rangeValidation.js', () => ({
 const { rollExpression } = await import('../../dice/diceRoller.js');
 const { getCombatContext } = await import('../../rules/combat/damageUtils.js');
 const { applyHealingToTarget } = await import('../../rules/combat/applyHealing.js');
-const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { postLogEntry } = await import('../../shared/logPoster.js');
 const { getDistanceFeet } = await import('../../rules/combat/rangeValidation.js');
 

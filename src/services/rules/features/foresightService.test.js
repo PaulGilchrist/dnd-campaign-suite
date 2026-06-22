@@ -4,7 +4,7 @@ import { triggerForesight } from './foresightService.js';
 const mockGetRuntimeValue = vi.fn();
 const mockSetRuntimeValue = vi.fn();
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: (...args) => mockGetRuntimeValue(...args),
     setRuntimeValue: (...args) => mockSetRuntimeValue(...args),
 }));

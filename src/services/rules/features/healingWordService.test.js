@@ -12,7 +12,7 @@ vi.mock('../combat/applyHealing.js', () => ({
     applyHealingToTarget: vi.fn(),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
@@ -30,7 +30,7 @@ vi.mock('../../dice/diceRoller.js', () => ({
 import { triggerHealingWord } from './healingWordService.js';
 import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { rollExpression } from '../../dice/diceRoller.js';
 

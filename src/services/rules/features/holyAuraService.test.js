@@ -2,13 +2,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerHolyAura } from './holyAuraService.js';
 import { executeHandler } from '../../automation/index.js';
-import { setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 

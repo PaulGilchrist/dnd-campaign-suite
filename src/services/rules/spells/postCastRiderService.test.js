@@ -19,7 +19,7 @@ import {
   triggerBewitchingMagic,
 } from './postCastRiderService.js'
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => 1),
 }))
 
@@ -156,7 +156,7 @@ describe('postCastRiderService', () => {
     })
 
     it('returns null when uses are exhausted', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(getRuntimeValue).mockReturnValue(0)
       const stats = {
         name: 'Player',
@@ -319,7 +319,7 @@ describe('postCastRiderService', () => {
     })
 
     it('returns null when uses exhausted', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(getRuntimeValue).mockReturnValue(false)
       const result = await triggerSpellThief(spell, { slotLevel: 1 }, { automation: { passives: [] } }, 'camp', 'map')
       expect(result).toBeNull()
@@ -327,7 +327,7 @@ describe('postCastRiderService', () => {
     })
 
     it('calls executeHandler for each thief feature', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js')
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js')
       executeHandler.mockResolvedValue({ success: true })
       // Return 1 for uses (the handler calls getRuntimeValue(playerStats.name, usesKey) with no campaignName)
       vi.mocked(getRuntimeValue).mockReturnValue(1)

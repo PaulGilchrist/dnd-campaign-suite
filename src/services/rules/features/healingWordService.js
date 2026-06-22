@@ -1,7 +1,7 @@
 import { rollExpression } from '../../dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 
 const HEALING_WORD_NAME = 'Healing Word';

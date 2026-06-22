@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
   getRuntimeValue: vi.fn((_key1, key2) => {
     if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
@@ -143,7 +143,7 @@ async function resetMocks() {
     }
   }
 
-  await mock('../../hooks/runtime/useRuntimeState.js', {
+  await mock('../../../hooks/runtime/useRuntimeState.js', {
     getRuntimeValue: (key1, key2) => {
       if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
       return undefined
@@ -254,7 +254,7 @@ describe('executeSpellCast - Magic Missile', () => {
   })
 
   it('blocks damage if target has Shield active', async () => {
-    const runtime = await import('../../hooks/runtime/useRuntimeState.js')
+    const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
     const combatData = await import('../../../services/encounters/combatData.js')
     const applyDamage = await import('../../../services/rules/combat/applyDamage.js')
 

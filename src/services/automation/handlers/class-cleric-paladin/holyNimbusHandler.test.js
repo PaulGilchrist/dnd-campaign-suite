@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -10,7 +10,7 @@ vi.mock('../../../ui/logService.js', () => ({
 }));
 
 import { handle } from './holyNimbusHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const campaignName = 'TestCampaign';

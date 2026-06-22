@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
   getRuntimeValue: vi.fn(() => undefined),
 }))
@@ -182,7 +182,7 @@ async function resetMocks() {
     isInnateSorceryActive: () => false,
     getActiveBuffs: () => [],
   })
-  await mock('../../hooks/runtime/useRuntimeState.js', {
+  await mock('../../../hooks/runtime/useRuntimeState.js', {
     getRuntimeValue: (key1, key2) => {
       if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
       return undefined
@@ -253,7 +253,7 @@ describe('executeSpellCast', () => {
     })
 
     it('sets lastActionSpellCast for action spells', async () => {
-      const runtime = await import('../../hooks/runtime/useRuntimeState.js')
+      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
       const services = makeServices()
       await executeSpellCast(makeSpell(), makeMetaCtx(), services)
       expect(runtime.setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'lastActionSpellCast', 1, 'testCampaign')
@@ -406,7 +406,7 @@ describe('executeSpellCast', () => {
 
   describe('Magical Ambush', () => {
     it('enables metamagicHeighten when Invisible', async () => {
-      const runtime = await import('../../hooks/runtime/useRuntimeState.js')
+      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
       vi.mocked(runtime.getRuntimeValue).mockImplementation((char, key) => {
         if (key === 'activeConditions') return ['Invisible']
         return undefined

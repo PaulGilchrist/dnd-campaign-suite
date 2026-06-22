@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerPowerWordFortify } from './powerWordFortifyService.js';
 import { rollExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { rangeToFeet, getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 
@@ -15,7 +15,7 @@ vi.mock('../../rules/combat/damageUtils.js', () => ({
     getCombatContext: vi.fn(),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));

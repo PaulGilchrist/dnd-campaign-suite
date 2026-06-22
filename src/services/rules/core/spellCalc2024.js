@@ -1,5 +1,5 @@
 import classRules from '../../character/classRules2024.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import {
     getElfisLineageSelection,
     getElfisLineageCantrip,

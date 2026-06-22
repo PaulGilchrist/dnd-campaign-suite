@@ -9,7 +9,7 @@ vi.mock('../../ui/utils.js', () => ({
   }
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null)
 }));
 
@@ -238,7 +238,7 @@ describe('raceRules 2024 (direct module)', () => {
     });
 
     it('returns Fiendish Legacy resistance for Abyssal selection', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
       getRuntimeValue.mockReturnValue('Abyssal');
 
       const input = {
@@ -253,7 +253,7 @@ describe('raceRules 2024 (direct module)', () => {
     });
 
     it('returns Fiendish Legacy resistance for Chthonic selection', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
       getRuntimeValue.mockReturnValue('Chthonic');
 
       const input = {
@@ -268,7 +268,7 @@ describe('raceRules 2024 (direct module)', () => {
     });
 
     it('returns Fiendish Legacy resistance for Infernal selection', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
       getRuntimeValue.mockReturnValue('Infernal');
 
       const input = {
@@ -283,7 +283,7 @@ describe('raceRules 2024 (direct module)', () => {
     });
 
     it('falls back to regex extraction when no Fiendish Legacy selected', async () => {
-      const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+      const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
       getRuntimeValue.mockReturnValue(null);
 
       const input = {

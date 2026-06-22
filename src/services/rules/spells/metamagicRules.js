@@ -1,4 +1,4 @@
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getAbilityModifier } from '../../shared/abilityLookup.js';
 
 export const METAMAGIC_EFFECTS = {

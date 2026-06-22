@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const WEAPON_MASTER_KEY = '_Weapon_Master_chosenMastery';

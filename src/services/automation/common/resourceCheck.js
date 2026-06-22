@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getClassFeatures } from '../../character/classFeatures.js';
 
 export function getResourceAmount(playerStats, resourceName) {

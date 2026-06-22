@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { findLastAttack } from '../../common/damageRollback.js';
 import { infoPopup } from '../../common/infoPopup.js';

@@ -1,4 +1,4 @@
-import { setRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 export async function triggerForesight(spell, metaCtx, playerStats, campaignName, _mapName) {
     const isForesight = (spell.name || '').toLowerCase() === 'foresight';

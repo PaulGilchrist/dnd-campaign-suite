@@ -15,7 +15,7 @@ vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
 }));
 
@@ -24,7 +24,7 @@ vi.mock('../combat/rangeValidation.js', () => ({
 }));
 
 const { executeHandler } = await import('../../automation/index.js');
-const { getRuntimeValue } = await import('../../hooks/runtime/useRuntimeState.js');
+const { getRuntimeValue } = await import('../../../hooks/runtime/useRuntimeState.js');
 const { getDistanceFeet } = await import('../combat/rangeValidation.js');
 
 describe('silenceService', () => {

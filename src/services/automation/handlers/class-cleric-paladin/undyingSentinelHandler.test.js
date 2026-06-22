@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn().mockResolvedValue(undefined),
 }));
@@ -21,7 +21,7 @@ vi.mock('../../../ui/storage.js', () => ({
 }));
 
 import { handle, isUndyingSentinelUsed, setUndyingSentinelUsed } from './undyingSentinelHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 import storage from '../../../ui/storage.js';

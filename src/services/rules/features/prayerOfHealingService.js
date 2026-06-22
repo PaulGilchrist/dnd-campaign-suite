@@ -1,7 +1,7 @@
 import { rollExpression } from '../../dice/diceRoller.js';
 import { getCombatContext } from '../combat/damageUtils.js';
 import { applyHealingToTarget } from '../combat/applyHealing.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../shared/logPoster.js';
 import { getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';

@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 /**
  * Generates the runtime key for storing a chosen value by a player.

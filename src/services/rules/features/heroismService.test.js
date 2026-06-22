@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerHeroism, removeHeroismBuff } from './heroismService.js';
 
-vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
     getRuntimeValue: vi.fn(),
 }));
@@ -14,7 +14,7 @@ vi.mock('../../combat/automation/automationExpressions.js', () => ({
     evaluateAutoExpression: vi.fn(),
 }));
 
-import { setRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { addExpiration } from '../effects/expirations.js';
 import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
 
