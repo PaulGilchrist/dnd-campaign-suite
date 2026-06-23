@@ -166,6 +166,22 @@ export const attackHandlers = {
         }
     },
 
+    'weapon_kind_mastery': (feature, playerStats) => {
+        const auto = feature.automation
+        let maxKinds = auto.maxKinds || 2;
+        if (maxKinds === 'class_level_scaling') {
+            const classLevel = (playerStats.class?.class_levels || []).find(cl => cl.level === playerStats.level);
+            maxKinds = classLevel?.weapon_mastery || 2;
+        }
+        return {
+            type: 'weapon_kind_mastery',
+            name: feature.name,
+            meleeOnly: auto.meleeOnly || false,
+            maxKinds,
+            hasAutomation: true
+        }
+    },
+
     'bonus_action_attack': (feature, playerStats) => {
         const auto = feature.automation
         const usesMax = auto.uses_expression

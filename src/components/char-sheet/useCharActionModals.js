@@ -60,6 +60,7 @@ export default function useCharActionModals({
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
     const [attackRiderManeuverPrompt, setAttackRiderManeuverPrompt] = useState(null);
+    const [sweepingAttackTargetModal, setSweepingAttackTargetModal] = useState(null);
 
     const pendingDamageRef = useRef(null);
     const [cleaveAttackPending, setCleaveAttackPending] = useState(null);
@@ -159,6 +160,7 @@ export default function useCharActionModals({
         damageTypeChoice, setDamageTypeChoice,
         featureChoice, setFeatureChoice,
         attackRiderManeuverPrompt, setAttackRiderManeuverPrompt,
+        sweepingAttackTargetModal, setSweepingAttackTargetModal,
         handleDamageClick,
         handleMasteryClose,
         handleWeaponMasteryChoice,

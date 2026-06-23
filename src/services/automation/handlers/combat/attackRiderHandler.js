@@ -177,6 +177,7 @@ export async function applyRiderOption(action, playerStats, campaignName, target
         if (opt.effect === 'unconscious') desc += ' — target has Unconscious condition (1 min, repeating CON save)';
         if (opt.effect === 'blinded') desc += ' — target has Blinded condition (until end of its next turn)';
         if (opt.effect === 'no_opportunity_attacks' && opt.movement) desc += ' — move up to half Speed without provoking Opportunity Attacks';
+        if (opt.effect === 'ally_movement' && opt.movement) desc += ' — ally moves up to half Speed without provoking Opportunity Attacks';
         if (opt.effect === 'damage_bonus') desc += ` — ${opt.damageExpression || '1d6'} extra damage`;
         return desc;
     });
@@ -321,6 +322,8 @@ async function applyRiderEffect(action, playerStats, campaignName, targetName, o
         desc += ' — target must make a Dexterity save or gain the Prone condition';
     } else if (option.effect === 'no_opportunity_attacks' && option.movement) {
         desc += ' — move up to half Speed without provoking Opportunity Attacks';
+    } else if (option.effect === 'ally_movement' && option.movement) {
+        desc += ' — ally moves up to half Speed without provoking Opportunity Attacks';
     } else if (option.effect === 'daze') {
         desc += ' — target must make a Constitution save or on next turn can only do one of: move, action, or Bonus Action';
     } else if (option.effect === 'unconscious') {

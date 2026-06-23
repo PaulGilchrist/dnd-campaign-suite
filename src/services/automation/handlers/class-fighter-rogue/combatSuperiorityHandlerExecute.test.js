@@ -6,10 +6,15 @@ import * as targetResolver from '../../common/targetResolver.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as dataLoader from '../../../../services/ui/dataLoader.js';
+import * as savePrompt from '../../../automation/common/savePrompt.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
+}));
+
+vi.mock('../../../rules/effects/expirations.js', () => ({
+    addExpiration: vi.fn(),
 }));
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({
@@ -30,6 +35,20 @@ vi.mock('../../../combat/automation/automationService.js', () => ({
 
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
     loadManeuvers: vi.fn(),
+}));
+
+vi.mock('../../../automation/common/savePrompt.js', () => ({
+    buildSaveDc: vi.fn(),
+    createSaveListener: vi.fn(),
+}));
+
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+    getTargetFromAttacker: vi.fn(),
 }));
 
 const makeAction = (auto = {}) => ({
@@ -271,6 +290,10 @@ describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () =>
         rollExpression.mockReturnValue({ total: 5 });
         automationService.evaluateAutoExpression.mockReturnValue(10);
         targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
     });
 
     it('includes save DC for push effect', async () => {
@@ -305,7 +328,7 @@ describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () =>
         );
 
         expect(result.payload.description).toContain('WIS save DC');
-        expect(result.payload.description).toContain('goaded');
+        expect(result.payload.description).toContain('Disadvantage on attacks against targets other than you');
     });
 
     it('includes save DC for frightened effect', async () => {
@@ -339,7 +362,7 @@ describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () =>
         );
 
         expect(result.payload.description).toContain('STR save DC');
-        expect(result.payload.description).toContain('drop one object');
+        expect(result.payload.description).toContain('dropped the object');
     });
 });
 
@@ -355,9 +378,9 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
     });
 
-    it('describes next_attack_advantage effect', async () => {
+    it('describes distracting_strike_advantage effect', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Distracting Strike', effect: 'next_attack_advantage', damageBonus: true },
+            { name: 'Distracting Strike', effect: 'distracting_strike_advantage', damageBonus: true },
         ]);
 
         const result = await onCombatSuperioritySelected(
@@ -519,16 +542,20 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
             { name: 'Riposte', effect: 'melee_attack_reaction', damageBonus: true },
         ]);
 
+        const playerStats = makePlayerStats({
+            attacks: [{ name: 'Melee Attack', hitBonus: 5, range: '5 ft', damage: '1d8' }],
+        });
+
         const result = await onCombatSuperioritySelected(
             makeAction(),
-            makePlayerStats(),
+            playerStats,
             'test-campaign',
             null,
             'Riposte'
         );
 
-        expect(result.payload.description).toContain('melee attack');
-        expect(result.payload.description).toContain('5');
+        expect(result.type).toBe('attack_roll');
+        expect(result.payload.attack.name).toBe('Melee Attack');
     });
 
     it('describes secondary_damage effect', async () => {
@@ -722,5 +749,93 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases', () => {
             3,
             'test-campaign'
         );
+    });
+
+    it('heals HP when damage_reduction effect is used', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Parry', effect: 'damage_reduction' },
+        ]);
+
+        rollExpression.mockReturnValue({ total: 5 });
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 2;
+            if (key === 'hitPoints') return 20;
+            if (key === 'currentHitPoints') return 8;
+            return undefined;
+        });
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Parry'
+        );
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'TestFighter',
+            'currentHitPoints',
+            17,
+            'test-campaign'
+        );
+        expect(result.payload.description).toContain('HP restored: 8 → 17');
+    });
+
+    it('caps HP restoration at max HP', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Parry', effect: 'damage_reduction' },
+        ]);
+
+        rollExpression.mockReturnValue({ total: 5 });
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 2;
+            if (key === 'hitPoints') return 20;
+            if (key === 'currentHitPoints') return 18;
+            return undefined;
+        });
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Parry'
+        );
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'TestFighter',
+            'currentHitPoints',
+            20,
+            'test-campaign'
+        );
+        expect(result.payload.description).toContain('HP restored: 18 → 20');
+    });
+
+    it('does not set HP when already at max', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Parry', effect: 'damage_reduction' },
+        ]);
+
+        rollExpression.mockReturnValue({ total: 5 });
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 2;
+            if (key === 'hitPoints') return 20;
+            if (key === 'currentHitPoints') return 20;
+            return undefined;
+        });
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Parry'
+        );
+
+        const chpCalls = setRuntimeValue.mock.calls.filter(
+            call => call[0] === 'TestFighter' && call[1] === 'currentHitPoints'
+        );
+        expect(chpCalls).toHaveLength(0);
+        expect(result.payload.description).toContain('HP restored: 20 → 20');
     });
 });

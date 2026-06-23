@@ -120,8 +120,43 @@ export default function useDamageClick({
             }
         }
 
-        // Apply any melee_weapon_hit damage bonus automations (e.g. Radiant Strikes)
+        // Apply Feinting Attack superiority die damage bonus
+        const feintDieValue = getRuntimeValue(playerStats.name, 'feintingAttackDieValue', campaignName);
+        if (feintDieValue && Number(feintDieValue) > 0) {
+            const feintVal = Number(feintDieValue);
+            const dmgType = attack.damageType || 'same_as_weapon';
+            formula += ` + ${feintVal}[${dmgType}]`;
+            total += feintVal;
+            rolls = [...rolls, feintVal];
+            await setRuntimeValue(playerStats.name, 'feintingAttackDieValue', null, campaignName);
+        }
+
+        // Apply Riposte superiority die damage bonus (reaction attack)
+        const riposteDieValue = getRuntimeValue(playerStats.name, 'pendingRiposteDieValue', campaignName);
+        if (riposteDieValue && Number(riposteDieValue) > 0) {
+            const riposteVal = Number(riposteDieValue);
+            const dmgType = attack.damageType || 'same_as_weapon';
+            formula += ` + ${riposteVal}[${dmgType}]`;
+            total += riposteVal;
+            rolls = [...rolls, riposteVal];
+            await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', null, campaignName);
+        }
+
+        // Apply Lunging Attack superiority die damage bonus (melee hit only)
         const isMeleeOrUnarmed = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
+        if (isMeleeOrUnarmed) {
+            const lungingDieValue = getRuntimeValue(playerStats.name, 'lungingAttackDieValue', campaignName);
+            if (lungingDieValue && Number(lungingDieValue) > 0) {
+                const lungingVal = Number(lungingDieValue);
+                const dmgType = attack.damageType || 'same_as_weapon';
+                formula += ` + ${lungingVal}[${dmgType}]`;
+                total += lungingVal;
+                rolls = [...rolls, lungingVal];
+                await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', null, campaignName);
+            }
+        }
+
+        // Apply any melee_weapon_hit damage bonus automations (e.g. Radiant Strikes)
         if (isMeleeOrUnarmed && playerStats.automation?.actions) {
             const hitBonuses = playerStats.automation.actions.filter(
                 a => a.type === 'damage_bonus' && a.trigger === 'melee_weapon_hit'

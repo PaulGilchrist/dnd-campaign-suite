@@ -54,7 +54,7 @@ export function createLogAndShow(deps) {
             throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
         }
 
-        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;
+        const effectiveAc = target ? targetAc + coverAcBonus + (context?.gloriousDefenseBonus || 0) + (context?.defensiveDuelistBonus || 0) + (context?.baitAndSwitchBonus || 0) + getShieldAcBonus(target.name, campaignName) + getShieldOfFaithAcBonus(target.name, campaignName) : undefined;
         let hit = isAutoMiss ? false : (target ? (effectiveD20 + bonus >= effectiveAc) : undefined);
         const targetName = target?.name || context?.targetName;
         const attackerName = context?.attackerName || characterName;
@@ -269,6 +269,7 @@ export function createLogAndShow(deps) {
             wisCheckMinBonus: context?.wisCheckMinBonus,
             gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
             defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
+            baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
             d20Floor10: context?.d20Floor10,
         });
 
@@ -329,6 +330,7 @@ export function createLogAndShow(deps) {
                     autoRerollBonus: context?.autoRerollBonus || null,
                     defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
                     gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
+                    baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
                     timestamp: Date.now(),
                 };
                 storage.set('combatSummary', combatSummary, campaignName);
@@ -424,6 +426,11 @@ export function createLogAndShow(deps) {
                 const vexEffects = allEffects.filter(te => te.effect === 'next_attack_advantage' && te.target === characterName);
                 if (vexEffects.length > 0) {
                     const clearedEffects = allEffects.filter(te => !(te.effect === 'next_attack_advantage' && te.target === characterName));
+                    setRuntimeValue(campaignName, 'targetEffects', clearedEffects, campaignName);
+                }
+                const distractingEffects = allEffects.filter(te => te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== characterName);
+                if (distractingEffects.length > 0) {
+                    const clearedEffects = allEffects.filter(te => !(te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== characterName));
                     setRuntimeValue(campaignName, 'targetEffects', clearedEffects, campaignName);
                 }
             }

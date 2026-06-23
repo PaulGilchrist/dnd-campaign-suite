@@ -102,6 +102,7 @@ export default function CharActionModals({
     arcaneWardRestoreModal, setArcaneWardRestoreModal,
     combatSuperiorityModal, setCombatSuperiorityModal,
     attackRiderManeuverPrompt,
+    sweepingAttackTargetModal, setSweepingAttackTargetModal,
     divineFuryChoice,
     damageTypeChoice,
     featureChoice,
@@ -125,6 +126,7 @@ export default function CharActionModals({
     handleCombatSuperiorityConfirm,
     handleAttackRiderManeuverUse,
     handleAttackRiderManeuverSkip,
+    handleSweepingAttackConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -517,6 +519,54 @@ export default function CharActionModals({
                     onUse={handleAttackRiderManeuverUse}
                     onSkip={handleAttackRiderManeuverSkip}
                 />
+            )}
+            {sweepingAttackTargetModal && (
+                <div className="sp-overlay" onClick={() => setSweepingAttackTargetModal(null)}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-bolt"></i> Sweeping Attack
+                        </div>
+                        <div className="sp-body">
+                            <p>Choose a creature within 5 feet of {sweepingAttackTargetModal.primaryTarget} to take {sweepingAttackTargetModal.dieValue} damage:</p>
+                            <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                                {sweepingAttackTargetModal.secondaryTargets.map((target, i) => (
+                                    <label
+                                        key={i}
+                                        style={{
+                                            display: 'block', padding: '8px 12px', margin: '4px 0',
+                                            borderRadius: '6px', cursor: 'pointer',
+                                            background: sweepingAttackTargetModal.selectedTarget === target.name ? 'rgba(255,255,255,0.12)' : 'transparent',
+                                            border: sweepingAttackTargetModal.selectedTarget === target.name ? '1px solid var(--color-link)' : '1px solid transparent',
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="sweepingAttackTarget"
+                                            checked={sweepingAttackTargetModal.selectedTarget === target.name}
+                                            onChange={() => {
+                                                const updated = { ...sweepingAttackTargetModal, selectedTarget: target.name };
+                                                setSweepingAttackTargetModal(updated);
+                                            }}
+                                            style={{ marginRight: '8px' }}
+                                        />
+                                        <strong>{target.name}</strong>
+                                        {target.size && <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>({target.size})</span>}
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="sp-actions">
+                            <button
+                                className="sp-roll-btn"
+                                disabled={!sweepingAttackTargetModal.selectedTarget}
+                                onClick={handleSweepingAttackConfirm}
+                            >
+                                <i className="fa-solid fa-bolt"></i> Apply Sweeping Attack
+                            </button>
+                            <button className="sp-dismiss-btn" onClick={() => setSweepingAttackTargetModal(null)}>Skip</button>
+                        </div>
+                    </div>
+                </div>
             )}
             {divineFuryChoice && (
                 <div className="sp-overlay" onClick={handleDivineFurySkip}>

@@ -1179,28 +1179,46 @@ const rules = {
                        playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
                    }
 
-                   const skillCheckManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'skill_check');
-                   if (skillCheckManeuvers.length > 0) {
-                       skillCheckManeuvers.forEach(m => {
-                           allFeatures.push({
-                               name: m.name,
-                               description: m.description || '',
-                               automation: {
-                                   type: 'combat_superiority_skill_check',
-                                   maneuverName: m.name,
-                                   actionType: 'skill_check',
-                                   skills: m.skills || [],
-                                   ability: m.ability || null,
-                                   initiativeBonus: m.initiativeBonus || false,
-                                   damageBonus: m.damageBonus || false,
-                                   dieExpression: m.dieExpression || 'superiority_die',
-                                   hasAutomation: true,
-                               },
-                               hasAutomation: true,
-                           });
-                       });
-                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-                   }
+                    const skillCheckManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'skill_check');
+                    if (skillCheckManeuvers.length > 0) {
+                        skillCheckManeuvers.forEach(m => {
+                            allFeatures.push({
+                                name: m.name,
+                                description: m.description || '',
+                                automation: {
+                                    type: 'combat_superiority_skill_check',
+                                    maneuverName: m.name,
+                                    actionType: 'skill_check',
+                                    skills: m.skills || [],
+                                    ability: m.ability || null,
+                                    initiativeBonus: m.initiativeBonus || false,
+                                    damageBonus: m.damageBonus || false,
+                                    dieExpression: m.dieExpression || 'superiority_die',
+                                    hasAutomation: true,
+                                },
+                                hasAutomation: true,
+                            });
+                            if (m.reactionSaveType) {
+                                allFeatures.push({
+                                    name: m.name + ' (Reaction)',
+                                    description: m.description || '',
+                                    automation: {
+                                        type: 'combat_superiority_commanding_presence_reaction',
+                                        maneuverName: m.name,
+                                        reactionSaveType: m.reactionSaveType,
+                                        reactionEffect: m.reactionEffect || 'disadvantage_next_attack',
+                                        reactionDuration: m.reactionDuration || 'until_end_of_next_turn',
+                                        reactionRange: m.reactionRange || '30_ft',
+                                        saveDc: 'ability',
+                                        saveAbility: 'CHA',
+                                        hasAutomation: true,
+                                    },
+                                    hasAutomation: true,
+                                });
+                            }
+                        });
+                        playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                    }
                }
           } catch (_e) {
              // Maneuver data not available, skip

@@ -25,11 +25,15 @@
   },
   {
     "name": "Commanding Presence",
-    "description": "When you make a Charisma (Intimidation, Performance, or Persuasion) check, you can expend one Superiority Die and add the die to the roll.",
+    "description": "When you make a Charisma (Intimidation, Performance, or Persuasion) check, you can expend one Superiority Die and add the die to the roll. Additionally, if the check succeeds, you can use your Reaction to force one creature that you can see within 30 feet of you to make a Wisdom saving throw against your maneuver save DC. On a failed save, the creature has disadvantage on its next attack roll before the end of your next turn.",
     "actionType": "skill_check",
     "skills": ["Intimidation", "Performance", "Persuasion"],
     "ability": "Charisma",
-    "dieExpression": "superiority_die"
+    "dieExpression": "superiority_die",
+    "reactionSaveType": "WIS",
+    "reactionEffect": "disadvantage_next_attack",
+    "reactionDuration": "until_end_of_next_turn",
+    "reactionRange": "30_ft"
   },
   {
     "name": "Disarming Attack",
@@ -39,6 +43,7 @@
     "saveType": "STR",
     "saveAbility": "STR",
     "effect": "disarm",
+    "conditionInflicted": "disarmed",
     "damageBonus": true,
     "dieExpression": "superiority_die"
   },
@@ -47,7 +52,7 @@
     "description": "When you hit a creature with an attack roll, you can expend one Superiority Die to distract the target. Add the Superiority Die to the attack's damage roll. The next attack roll against the target by a creature other than you has Advantage if the attack is made before the start of your next turn.",
     "actionType": "attack_rider",
     "trigger": "weapon_attack_hit",
-    "effect": "next_attack_advantage",
+    "effect": "distracting_strike_advantage",
     "damageBonus": true,
     "dieExpression": "superiority_die",
     "duration": "until_start_of_next_turn"
@@ -95,8 +100,11 @@
     "actionType": "attack_rider",
     "trigger": "weapon_attack_hit",
     "effect": "ally_movement",
+    "movement": true,
     "damageBonus": true,
-    "dieExpression": "superiority_die"
+    "dieExpression": "superiority_die",
+    "range": "30_ft",
+    "duration": "until_start_of_next_turn"
   },
   {
     "name": "Menacing Attack",

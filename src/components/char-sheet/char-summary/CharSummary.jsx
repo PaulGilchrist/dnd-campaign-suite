@@ -20,7 +20,7 @@ import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
-import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import CharConditions from './CharConditions.jsx'
 
@@ -234,7 +234,17 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
     const totalSpeedWithBuff = totalSpeed + buffSpeedBonus;
 
     const exhaustionPenalty = 2 * exhaustionLevel;
-    const effectiveInitiative = playerStats.initiative - exhaustionPenalty;
+    const ambushInitiativeBonus = () => {
+        const stored = getRuntimeValue(playerStats.name, 'pendingSkillCheckBonus', campaignName);
+        if (!stored) return 0;
+        const bonus = parseInt(stored, 10);
+        if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
+            setRuntimeValue(playerStats.name, 'pendingSkillCheckBonus', null, campaignName);
+            return bonus;
+        }
+        return 0;
+    };
+    const effectiveInitiative = playerStats.initiative - exhaustionPenalty + ambushInitiativeBonus();
     const showArmorClassFormulaPopup = () => {
         const html = `Armor Class (${playerStats.armorClass}) = ${playerStats.armorClassFormula}`
         setPopupHtml(html);

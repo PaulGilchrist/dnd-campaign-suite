@@ -253,6 +253,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         arcaneWardRestoreModal, setArcaneWardRestoreModal,
         combatSuperiorityModal, setCombatSuperiorityModal,
         attackRiderManeuverPrompt, setAttackRiderManeuverPrompt,
+        sweepingAttackTargetModal, setSweepingAttackTargetModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
     } = useCharActionModals({
@@ -333,6 +334,21 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         };
         setPopupHtml({ type: 'automation_info', name: 'Haste', description: descriptions[actionName] || `Haste extra action: ${actionName}.` });
     }
+
+    const handleSweepingAttackConfirm = React.useCallback(async () => {
+        if (!sweepingAttackTargetModal?.selectedTarget) return;
+        const { executeSweepingAttack } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
+        const result = await executeSweepingAttack(
+            { automation: { secondaryTargetName: sweepingAttackTargetModal.selectedTarget } },
+            sweepingAttackTargetModal.playerStats,
+            sweepingAttackTargetModal.campaignName,
+            null
+        );
+        if (result.payload) {
+            setPopupHtml(result.payload);
+        }
+        setSweepingAttackTargetModal(null);
+    }, [sweepingAttackTargetModal, setPopupHtml, setSweepingAttackTargetModal]);
 
     async function handleAutomationAction(action) {
         if (cannotAct) return;
@@ -528,6 +544,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     }
                     case 'combatSuperiority':
                         setCombatSuperiorityModal(result.payload);
+                        break;
+                    case 'sweepingAttackTarget':
+                        setSweepingAttackTargetModal(result.payload);
                         break;
                     case 'arcaneWardRestore':
                         setArcaneWardRestoreModal(result.payload);
@@ -867,6 +886,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     arcaneWardRestoreModal={arcaneWardRestoreModal} setArcaneWardRestoreModal={setArcaneWardRestoreModal}
                     combatSuperiorityModal={combatSuperiorityModal} setCombatSuperiorityModal={setCombatSuperiorityModal}
                     attackRiderManeuverPrompt={attackRiderManeuverPrompt} setAttackRiderManeuverPrompt={setAttackRiderManeuverPrompt}
+                    sweepingAttackTargetModal={sweepingAttackTargetModal} setSweepingAttackTargetModal={setSweepingAttackTargetModal}
+                    handleSweepingAttackConfirm={handleSweepingAttackConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}

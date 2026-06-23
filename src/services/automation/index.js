@@ -25,6 +25,7 @@ import { handle as handleAttackRider } from './handlers/combat/attackRiderHandle
 import { handle as handleTempHpBuff } from './handlers/buffs/tempHpBuffHandler.js';
 import { handle as handleWeaponMastery } from './handlers/combat/weaponMasteryHandler.js';
 import { handle as handleWeaponMasteryChoice, applyMasterySelection as applyWeaponMasteryChoice } from './handlers/combat/weaponMasteryChoiceHandler.js';
+import { handle as handleWeaponKindMastery, applySelections as applyWeaponKindMastery } from './handlers/combat/weaponKindMasteryHandler.js';
 import { handle as handleBuffAlly } from './handlers/buffs/buffAllyHandler.js';
 import { handle as handleEncouragingSong } from './handlers/buffs/encouragingSongHandler.js';
 import { handle as handleRevivification } from './handlers/healing/revivificationHandler.js';
@@ -52,7 +53,7 @@ import { handle as handleCosmicOmen } from './handlers/class-sorcerer/cosmicOmen
 import { handle as handleTwinklingConstellation } from './handlers/class-sorcerer/twinklingConstellationHandler.js';
 import { handle as handleTacticalMind } from './handlers/class-fighter-rogue/tacticalMindHandler.js';
 import { handle as handleCombatSuperiority } from './handlers/class-fighter-rogue/combatSuperiorityHandler.js';
-import { handleCombatSuperiorityBonusAction, handleCombatSuperiorityReaction, handleCombatSuperiorityGrantAttack, handleCombatSuperiorityMovement, handleCombatSuperioritySkillCheck } from './handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { handleCombatSuperiorityBonusAction, handleCombatSuperiorityReaction, handleCombatSuperiorityGrantAttack, handleCombatSuperiorityMovement, handleCombatSuperioritySkillCheck, handleCombatSuperiorityCommandingPresenceReaction, handleCombatSuperioritySweepingAttack } from './handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { handle as handleKnowEnemy } from './handlers/class-fighter-rogue/knowEnemyHandler.js';
 import { handle as handleWarBond } from './handlers/class-fighter-rogue/warBondHandler.js';
 import { handle as handleWarMagicCantrip } from './handlers/class-fighter-rogue/warMagicCantripHandler.js';
@@ -250,6 +251,7 @@ const HANDLER_MAP = {
     reaction_save_heal: handleReactionSaveHeal,
         mastery_rider: handleWeaponMastery,
         weapon_mastery_choice: handleWeaponMasteryChoice,
+        weapon_kind_mastery: handleWeaponKindMastery,
     revivification: handleRevivification,
      bardic_inspiration: handleBardicInspiration,
        bardic_inspiration_use: handleBardicInspirationUse,
@@ -273,8 +275,10 @@ const HANDLER_MAP = {
            combat_superiority_reaction: handleCombatSuperiorityReaction,
             combat_superiority_grant_attack: handleCombatSuperiorityGrantAttack,
             combat_superiority_movement: handleCombatSuperiorityMovement,
-            combat_superiority_skill_check: handleCombatSuperioritySkillCheck,
-          know_enemy: handleKnowEnemy,
+             combat_superiority_skill_check: handleCombatSuperioritySkillCheck,
+              combat_superiority_commanding_presence_reaction: handleCombatSuperiorityCommandingPresenceReaction,
+              combat_superiority_sweeping_attack: handleCombatSuperioritySweepingAttack,
+            know_enemy: handleKnowEnemy,
         war_bond_summon: handleWarBond,
         war_magic_cantrip: handleWarMagicCantrip,
         war_magic_spell: handleWarMagicSpell,
@@ -447,7 +451,7 @@ const HANDLER_MAP = {
 export {
     applyAidEffect, applyGreaterRestorationEffect, applyHeroesFeastEffect, applyLesserRestorationEffect,
     applyLongstriderEffect, applyMageArmorEffect, applyProtectionFromEnergyHandler, applyProtectionFromPoisonHandler,
-    applyRemoveCurseEffect, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, applyResistanceEffect,
+    applyRemoveCurseEffect, applyBoonOfEnergyResistance, applyWeaponMasteryChoice, applyWeaponKindMastery, applyResistanceEffect,
     applyStoneSkinHandler, isProtectionFromEvilAndGoodActive, isCreatureWarded, isProtectionFromPoisonActive,
     isStoneSkinActive, getStoneSkinDamageTypes, isRayOfEnfeeblementActive, getResistanceDamageType,
     isResistanceUsedThisTurn, applyShieldOfFaithEffect, isShieldOfFaithActive, getShieldOfFaithBonus,

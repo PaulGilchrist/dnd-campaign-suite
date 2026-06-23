@@ -1020,6 +1020,17 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                 break;
             }
 
+            case 'remove_target_effect': {
+                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                setRuntimeValue(
+                    campaignName,
+                    'targetEffects',
+                    storedEffects.filter(te => !(te.effect === effect.effectKey && te.source === effect.source)),
+                    campaignName
+                );
+                break;
+            }
+
             case 'remove_regenerate_buff': {
                 setRuntimeValue(targetName, 'regenerateActive', null, campaignName);
                 setRuntimeValue(targetName, 'regenerateSource', null, campaignName);

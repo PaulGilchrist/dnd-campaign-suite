@@ -180,6 +180,21 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             }
         }
         if (forcedMode === undefined && targetName) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const distractingEffect = storedEffects.find(
+                te => te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== playerName
+            );
+            if (distractingEffect) {
+                forcedMode = 'advantage';
+                const cleanedEffects = storedEffects.filter(
+                    te => !(te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== playerName)
+                );
+                if (cleanedEffects.length !== storedEffects.length) {
+                    setRuntimeValue(campaignName, 'targetEffects', cleanedEffects, campaignName);
+                }
+            }
+        }
+        if (forcedMode === undefined && targetName) {
             const noMapCorona = getCoronaSaveDisadvantage({
                 targetName,
                 campaignName,
@@ -212,6 +227,13 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const defensiveDuelistActive = getRuntimeValue(playerName, 'defensiveDuelistActive', campaignName);
         if (defensiveDuelistActive) {
             defensiveDuelistBonus = Number(getRuntimeValue(playerName, 'defensiveDuelistBonus', campaignName) || 0);
+        }
+
+        // Compute Bait and Switch AC bonus (2024 rules)
+        let baitAndSwitchBonus = 0;
+        const baitAndSwitchActive = getRuntimeValue(playerName, 'baitAndSwitchActive', campaignName);
+        if (baitAndSwitchActive) {
+            baitAndSwitchBonus = Number(getRuntimeValue(playerName, 'baitAndSwitchBonus', campaignName) || 0);
         }
 
         // Stroke of Luck: check if the player has the passive available
@@ -262,6 +284,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             sacredWeaponBonus,
             gloriousDefenseBonus,
             defensiveDuelistBonus,
+            baitAndSwitchBonus,
             strokeOfLuck: strokeOfLuckAvailable,
             boonOfFate: boonOfFateAvailable,
             isPsychicBlade: attack.isPsychicBlade === true,
@@ -502,6 +525,15 @@ export function buildAttackContext(attack, playerStats, campaignName, mapName, c
                         const defensiveDuelistBonus = Number(getRuntimeValue(base.targetName, 'defensiveDuelistBonus', campaignName) || 0);
                         if (defensiveDuelistBonus > coverResult.acBonus) {
                             coverResult.acBonus = defensiveDuelistBonus;
+                        }
+                    }
+
+                    // Check Bait and Switch AC bonus (2024 rules)
+                    const baitAndSwitchActive = getRuntimeValue(base.targetName, 'baitAndSwitchActive', campaignName);
+                    if (baitAndSwitchActive) {
+                        const baitAndSwitchBonus = Number(getRuntimeValue(base.targetName, 'baitAndSwitchBonus', campaignName) || 0);
+                        if (baitAndSwitchBonus > coverResult.acBonus) {
+                            coverResult.acBonus = baitAndSwitchBonus;
                         }
                     }
 

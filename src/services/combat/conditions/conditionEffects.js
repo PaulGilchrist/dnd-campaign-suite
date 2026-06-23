@@ -490,10 +490,16 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     if (te.effect === 'next_attack_advantage') {
       effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
     }
+    if (te.effect === 'distracting_strike_advantage') {
+      effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
+    }
     if (te.effect === 'crusher_enhanced_critical') {
       effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
     }
     if (te.effect === 'disadvantage_next_attack') {
+      effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
+    }
+    if (te.effect === 'goad') {
       effects.attackDisadvantageCount = (effects.attackDisadvantageCount || 0) + 1;
     }
     if (te.effect === 'disadvantage_perception_checks') {

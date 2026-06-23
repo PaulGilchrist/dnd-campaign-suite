@@ -5,7 +5,7 @@ import AttackRiderManeuverPrompt from './AttackRiderManeuverPrompt.jsx';
 
 const baseManeuvers = [
     { name: 'Disarming Attack', damageBonus: true, saveType: 'STR', effect: 'disarm' },
-    { name: 'Distracting Strike', damageBonus: true, saveType: null, effect: 'next_attack_advantage' },
+    { name: 'Distracting Strike', damageBonus: true, saveType: null, effect: 'distracting_strike_advantage' },
     { name: 'Goading Attack', damageBonus: true, saveType: 'WIS', effect: 'goad', conditionInflicted: 'goaded' },
     { name: 'Trip Attack', damageBonus: true, saveType: 'STR', effect: 'prone' },
 ];

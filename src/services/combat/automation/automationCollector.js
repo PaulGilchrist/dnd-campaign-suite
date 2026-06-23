@@ -431,6 +431,7 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'evasion':
             case 'conditional_disadvantage':
             case 'mastery_rider':
+            case 'weapon_kind_mastery':
             case 'bewitching_magic':
             case 'post_cast_rider':
             case 'post_cast_self_heal':
@@ -508,6 +509,9 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 break
             case 'combat_superiority_skill_check':
                 result.specialActions.push(info)
+                break
+            case 'combat_superiority_commanding_presence_reaction':
+                result.reactions.push(info)
                 break
             case 'know_enemy':
                 result.bonusActions.push(info)

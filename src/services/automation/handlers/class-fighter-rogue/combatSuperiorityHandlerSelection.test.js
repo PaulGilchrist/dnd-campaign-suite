@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { onCombatSuperioritySelected } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
+import * as savePrompt from '../../../automation/common/savePrompt.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../common/targetResolver.js', () => ({
+vi.mock('../../common/targetResolver.js', () => ({
     resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
 }));
 
@@ -26,6 +27,19 @@ vi.mock('../../../../services/ui/dataLoader.js', () => ({
         { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
         { name: 'Rally', effect: 'temp_hp' },
     ]),
+}));
+
+vi.mock('../../../automation/common/savePrompt.js', () => ({
+    buildSaveDc: vi.fn(),
+    createSaveListener: vi.fn(),
+}));
+
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
 }));
 
 const makeAction = (auto = {}) => ({
@@ -65,6 +79,10 @@ describe('combatSuperiorityHandler.onCombatSuperioritySelected - selection', () 
             return undefined;
         });
         rollExpression.mockReturnValue({ total: 5 });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
     });
 
     it('returns popup when empty array selected', async () => {

@@ -4,7 +4,7 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import { buildAbilityDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
-import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -13,20 +13,31 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
      const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
      const { popupHtml, setPopupHtml, rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
 
-     const getCosmicOmenBonus = () => {
-         const stored = getRuntimeValue(playerStats.name, 'cosmicOmenEffect', campaignName);
-         if (!stored) return 0;
-         try {
-             const effect = JSON.parse(stored);
-             if (effect.type === 'Weal' && effect.isEven) {
-                 return effect.d6Value || 0;
-             }
-             if (effect.type === 'Woe' && !effect.isEven) {
-                 return -(effect.d6Value || 0);
-             }
-          } catch (_e) { /* ignore */ }
-         return 0;
-     };
+      const getCosmicOmenBonus = () => {
+          const stored = getRuntimeValue(playerStats.name, 'cosmicOmenEffect', campaignName);
+          if (!stored) return 0;
+          try {
+              const effect = JSON.parse(stored);
+              if (effect.type === 'Weal' && effect.isEven) {
+                  return effect.d6Value || 0;
+              }
+              if (effect.type === 'Woe' && !effect.isEven) {
+                  return -(effect.d6Value || 0);
+              }
+           } catch (_e) { /* ignore */ }
+          return 0;
+      };
+
+       const getSkillCheckBonus = () => {
+           const stored = getRuntimeValue(playerStats.name, 'pendingSkillCheckBonus', campaignName);
+           if (!stored) return 0;
+           const bonus = parseInt(stored, 10);
+           if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
+               setRuntimeValue(playerStats.name, 'pendingSkillCheckBonus', null, campaignName);
+               return bonus;
+           }
+           return 0;
+       };
 
      const getPrimalKnowledgeSkills = () => {
          const automation = playerStats?.automation;
@@ -199,8 +210,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                       <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => !autoFailSave && rollSavingThrow(ability.name, ability.save - exhaustionPenalty + getCosmicOmenBonus(), saveContext)} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save - exhaustionPenalty + getCosmicOmenBonus())}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
                     <div className='left'>{ability.skills.map((skill) => {
                         const skillBonus = getSkillBonus(skill);
+                        const skillCheckBonus = getSkillCheckBonus();
                         return <span key={skill.name}>
-                            <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skillBonus + getCosmicOmenBonus(), makeCheckContext(skill.name))}>{skill.name} ({signFormatter.format(skillBonus + getCosmicOmenBonus())})</span>
+                            <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skillBonus + getCosmicOmenBonus() + skillCheckBonus, makeCheckContext(skill.name))}>{skill.name} ({signFormatter.format(skillBonus + getCosmicOmenBonus() + skillCheckBonus)})</span>
                             {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
                         </span>;
                     })}</div>
