@@ -130,6 +130,91 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         }
     }
 
+    // Clean up Sap weapon mastery disadvantage at start of attacker's next turn
+    const allTargetEffectsSap = getRuntimeValue(campaignName, 'targetEffects') || [];
+    if (allTargetEffectsSap.length > 0) {
+        const currentRound = getCurrentCombatRound();
+        const cleanedSap = allTargetEffectsSap.filter(te => {
+            if (te.effect !== 'disadvantage_next_attack') return true;
+            if (!te.target) return true;
+            const isSapOnAttacker = te.target === activeName;
+            if (!isSapOnAttacker) return true;
+            const sapAppliedRound = te.appliedRound;
+            if (sapAppliedRound != null && currentRound >= sapAppliedRound + 1) {
+                return false;
+            }
+            return true;
+        });
+        if (cleanedSap.length !== allTargetEffectsSap.length) {
+            setRuntimeValue(campaignName, 'targetEffects', cleanedSap, campaignName);
+        }
+    }
+
+    // Clean up Slow weapon mastery speed reduction at start of each creature's turn
+    const allTargetEffectsSlow = getRuntimeValue(campaignName, 'targetEffects') || [];
+    if (allTargetEffectsSlow.length > 0) {
+        const cleanedSlow = allTargetEffectsSlow.filter(te => te.effect !== 'speed_reduction' || te.source !== 'Slow');
+        if (cleanedSlow.length !== allTargetEffectsSlow.length) {
+            setRuntimeValue(campaignName, 'targetEffects', cleanedSlow, campaignName);
+        }
+    }
+
+    // Clean up Vex weapon mastery advantage at start of each creature's turn (expires at end of attacker's next turn)
+    const allTargetEffectsVex = getRuntimeValue(campaignName, 'targetEffects') || [];
+    if (allTargetEffectsVex.length > 0) {
+        const currentRound = getCurrentCombatRound();
+        const cleanedVex = allTargetEffectsVex.filter(te => {
+            if (te.effect !== 'next_attack_advantage') return true;
+            if (!te.vexTarget) return true;
+            const isVexOnAttacker = te.target === activeName;
+            if (!isVexOnAttacker) return true;
+            const vexAppliedRound = te.appliedRound;
+            if (vexAppliedRound != null && currentRound >= vexAppliedRound + 2) {
+                return false;
+            }
+            return true;
+        });
+        if (cleanedVex.length !== allTargetEffectsVex.length) {
+            setRuntimeValue(campaignName, 'targetEffects', cleanedVex, campaignName);
+        }
+    }
+
+    // Clean up Topple weapon mastery Prone condition at start of target's next turn
+    const allTargetEffectsTopple = getRuntimeValue(campaignName, 'targetEffects') || [];
+    if (allTargetEffectsTopple.length > 0) {
+        const currentRound = getCurrentCombatRound();
+        const toppleTargets = new Set();
+        for (const te of allTargetEffectsTopple) {
+            if (te.effect !== 'topple') continue;
+            if (!te.target) continue;
+            if (te.appliedRound == null) continue;
+            if (currentRound >= te.appliedRound + 1) {
+                toppleTargets.add(te.target);
+            }
+        }
+        if (toppleTargets.size > 0) {
+            for (const toppleTarget of toppleTargets) {
+                const storedConditions = getRuntimeValue(toppleTarget, 'activeConditions') || [];
+                const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+                const filtered = conditions.filter(c => String(c).toLowerCase() !== 'prone');
+                if (filtered.length !== conditions.length) {
+                    setRuntimeValue(toppleTarget, 'activeConditions', filtered, campaignName);
+                }
+            }
+            const cleanedTopple = allTargetEffectsTopple.filter(te => {
+                if (te.effect !== 'topple') return true;
+                if (!te.appliedRound) return true;
+                if (toppleTargets.has(te.target) && currentRound >= te.appliedRound + 1) {
+                    return false;
+                }
+                return true;
+            });
+            if (cleanedTopple.length !== allTargetEffectsTopple.length) {
+                setRuntimeValue(campaignName, 'targetEffects', cleanedTopple, campaignName);
+            }
+        }
+    }
+
     // Process Slow repeat saves for affected creatures at start of their turn
     if (activeName && playerStats) {
         const slowTracking = getRuntimeValue(activeName, `_slow_${activeName.replace(/\s+/g, '_')}`, campaignName);

@@ -586,6 +586,7 @@ describe('useDamageClick', () => {
                 attackName: 'Longsword',
                 baseMastery: { name: 'Mercy' },
                 extraMasteries: [],
+                damageTotal: 5,
             });
             expect(deps.pendingDamageRef.current).toEqual(
                 expect.objectContaining({ attack, formula: '1d8+3' }),
@@ -644,6 +645,7 @@ describe('useDamageClick', () => {
                 attackName: 'Longsword',
                 baseMastery: null,
                 extraMasteries: [{ name: 'Extra' }],
+                damageTotal: 5,
             });
         });
     });

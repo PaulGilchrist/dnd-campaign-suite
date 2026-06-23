@@ -222,6 +222,22 @@ describe('weaponMasteryHandler', () => {
             expect(result.payload.description).toContain('Graze');
         });
 
+        it('should store abilityName and abilityMod for Graze effect', async () => {
+            getRuntimeValue.mockReturnValue([]);
+            const ps = makePlayerStats();
+            await applyMasteryEffect('Graze', ps, 'campaign', 'Goblin');
+
+            expect(setRuntimeValue).toHaveBeenCalled();
+            const callArgs = setRuntimeValue.mock.calls[0];
+            if (callArgs[1] === 'targetEffects') {
+                const grazeEffect = callArgs[2].find(e => e.effect === 'graze');
+                expect(grazeEffect).toBeDefined();
+                expect(grazeEffect.abilityName).toBe('Strength');
+                expect(grazeEffect.abilityMod).toBe(3);
+                expect(grazeEffect.duration).toBe('until_end_of_turn');
+            }
+        });
+
         it('should create save listener for Topple', async () => {
             getRuntimeValue.mockReturnValue([]);
             vi.mocked(await import('../../../automation/common/savePrompt.js')).createSaveListener.mockReturnValue({ promptId: 'test-id' });

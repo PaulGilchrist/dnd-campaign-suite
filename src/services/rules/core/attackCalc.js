@@ -1,3 +1,7 @@
+import { getCurrentCombatRound } from '../../encounters/combatData.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { collectWeaponMastery } from '../../combat/automation/automationPassives.js';
+
 /**
  * Strip magic item prefix (+1, +2, +3) from an item name.
  * @param {string} itemName
@@ -264,13 +268,26 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
             if (offHandWeapon) {
                 const isTwoWeapon = fightingStyles.includes('Two-Weapon Fighting');
+                let actionType = 'Bonus Action';
+                const isLightWeapon = offHandWeapon.properties && offHandWeapon.properties.some(p => p.toLowerCase() === 'light');
+                if (isLightWeapon && playerStats.campaignName) {
+                    const nickAvailable = collectWeaponMastery(offBaseName, playerStats);
+                    const hasNick = nickAvailable.baseMastery === 'Nick' || (nickAvailable.extraMasteries || []).includes('Nick');
+                    if (hasNick) {
+                        const currentRound = getCurrentCombatRound();
+                        const nickUsedRound = getRuntimeValue(playerStats.name, '_Nick_UsedRound', playerStats.campaignName);
+                        if (nickUsedRound === currentRound) {
+                            actionType = 'Action';
+                        }
+                    }
+                }
                 attacks.push(buildWeaponAttack({
                     weapon: offHandWeapon,
                     weaponName: offHandName,
                     abilityBonus: bonus,
                     abilityName,
                     proficiency,
-                    actionType: 'Bonus Action',
+                    actionType,
                     weaponType: 'melee',
                     includeAbilityBonusInDamage: false,
                     extraDamage: isTwoWeapon ? `+${bonus}` : '',

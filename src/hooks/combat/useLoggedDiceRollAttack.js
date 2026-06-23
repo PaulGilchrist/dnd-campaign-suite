@@ -373,64 +373,73 @@ export function createLogAndShow(deps) {
                 }
             }
 
-            if (context?.grazeDamage && !hit && !isAutoMiss && targetName) {
-                const grazeAbilityMod = context?.grazeAbilityMod || 0;
-                const grazeDamageAmount = Math.max(0, grazeAbilityMod);
-                const grazeDamageType = context?.damageType || 'same_as_weapon';
-                const grazeFormula = grazeDamageAmount > 0 ? `${grazeDamageAmount}[Graze]` : '0[Graze]';
-                if (grazeDamageAmount > 0) {
-                    const combatSummary2 = await loadCombatSummary(campaignName);
-                    const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, grazeDamageType)) || false;
-                    const applyResult = applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, ignoreResistance, characterName);
-                    const grazeTargetMaxHp = target?.type === 'player'
-                        ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
-                        : target?.maxHp ?? 0;
-                    logEntry({
-                        type: 'roll',
-                        characterName,
-                        rollType: 'graze-damage',
-                        name,
-                        formula: grazeFormula,
-                        rolls: [grazeDamageAmount],
-                        total: grazeDamageAmount,
-                        modifier: 0,
-                        damageType: grazeDamageType,
-                        targetName: targetName,
-                        finalDamage: applyResult?.finalDamage,
-                        note: 'Graze: ability modifier damage on miss',
-                    });
-                    setPopupHtml({
-                        type: 'graze-damage',
-                        name: `${name} (Graze)`,
-                        formula: grazeFormula,
-                        rolls: [grazeDamageAmount],
-                        bonus: 0,
-                        modifier: 0,
-                        damageType: grazeDamageType,
-                        targetName: targetName,
-                        total: grazeDamageAmount,
-                        targetCurrentHp: applyResult?.newHp,
-                        targetMaxHp: grazeTargetMaxHp,
-                        damageApplied: true,
-                        finalDamage: applyResult?.finalDamage,
-                        damageReduced: applyResult?.damageReduced,
-                    });
-                }
+            if (context?.grazeDamage && targetName) {
                 const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
                 const filteredEffects = storedEffects.filter(te => !(te.effect === 'graze' && te.target === targetName));
-                setRuntimeValue(campaignName, 'targetEffects', filteredEffects, campaignName);
+                if (filteredEffects.length !== storedEffects.length) {
+                    setRuntimeValue(campaignName, 'targetEffects', filteredEffects, campaignName);
+                }
+                if (!hit && !isAutoMiss) {
+                    const grazeAbilityMod = context?.grazeAbilityMod || 0;
+                    const grazeDamageAmount = Math.max(0, grazeAbilityMod);
+                    const grazeDamageType = context?.damageType || 'Slashing';
+                    const grazeFormula = grazeDamageAmount > 0 ? `${grazeDamageAmount}[Graze]` : '0[Graze]';
+                    if (grazeDamageAmount > 0) {
+                        const combatSummary2 = await loadCombatSummary(campaignName);
+                        const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, grazeDamageType)) || false;
+                        const applyResult = applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, ignoreResistance, characterName);
+                        const grazeTargetMaxHp = target?.type === 'player'
+                            ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
+                            : target?.maxHp ?? 0;
+                        logEntry({
+                            type: 'roll',
+                            characterName,
+                            rollType: 'graze-damage',
+                            name,
+                            formula: grazeFormula,
+                            rolls: [grazeDamageAmount],
+                            total: grazeDamageAmount,
+                            modifier: 0,
+                            damageType: grazeDamageType,
+                            targetName: targetName,
+                            finalDamage: applyResult?.finalDamage,
+                            note: 'Graze: ability modifier damage on miss',
+                        });
+                        setPopupHtml({
+                            type: 'graze-damage',
+                            name: `${name} (Graze)`,
+                            formula: grazeFormula,
+                            rolls: [grazeDamageAmount],
+                            bonus: 0,
+                            modifier: 0,
+                            damageType: grazeDamageType,
+                            targetName: targetName,
+                            total: grazeDamageAmount,
+                            targetCurrentHp: applyResult?.newHp,
+                            targetMaxHp: grazeTargetMaxHp,
+                            damageApplied: true,
+                            finalDamage: applyResult?.finalDamage,
+                            damageReduced: applyResult?.damageReduced,
+                        });
+                    }
+                }
             }
 
             if (targetName) {
                 const allEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-                const vexEffects = allEffects.filter(te => te.effect === 'next_attack_advantage' && te.target === characterName);
+                const vexEffects = allEffects.filter(te => te.effect === 'next_attack_advantage' && te.target === characterName && te.vexTarget === targetName);
                 if (vexEffects.length > 0) {
-                    const clearedEffects = allEffects.filter(te => !(te.effect === 'next_attack_advantage' && te.target === characterName));
+                    const clearedEffects = allEffects.filter(te => !(te.effect === 'next_attack_advantage' && te.target === characterName && te.vexTarget === targetName));
                     setRuntimeValue(campaignName, 'targetEffects', clearedEffects, campaignName);
                 }
                 const distractingEffects = allEffects.filter(te => te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== characterName);
                 if (distractingEffects.length > 0) {
                     const clearedEffects = allEffects.filter(te => !(te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== characterName));
+                    setRuntimeValue(campaignName, 'targetEffects', clearedEffects, campaignName);
+                }
+                const sapEffects = allEffects.filter(te => te.effect === 'disadvantage_next_attack' && te.target === characterName);
+                if (sapEffects.length > 0) {
+                    const clearedEffects = allEffects.filter(te => !(te.effect === 'disadvantage_next_attack' && te.target === characterName));
                     setRuntimeValue(campaignName, 'targetEffects', clearedEffects, campaignName);
                 }
             }

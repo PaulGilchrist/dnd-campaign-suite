@@ -11,7 +11,7 @@ import { getAbilitySaveModifier } from '../../services/shared/abilityLookup.js';
 import { computeConditionEffects, combineAttackModes, CONDITIONS_THAT_CANNOT_ACT } from '../../services/combat/conditions/conditionEffects.js';
 import { computeRangeEffect, getDistanceFeet, getNearestPlacedItem, rangeToFeet } from '../../services/rules/combat/rangeValidation.js';
 import * as mapsService from '../../services/maps/mapsService.js';
-import { useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './MonsterCardModal.css';
 
 const ABBR_MAP = { Strength: 'str', Dexterity: 'dex', Constitution: 'con', Intelligence: 'int', Wisdom: 'wis', Charisma: 'cha', str: 'str', dex: 'dex', con: 'con', int: 'int', wis: 'wis', cha: 'cha' };
@@ -121,6 +121,29 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
   const handleAttack = (name, bonus, action) => {
     const target = getTarget();
     const primaryDamageType = action?.damage_type_primary ? [action.damage_type_primary] : [];
+
+    // Auto-apply Graze mastery effect for NPC attacks (melee only)
+    const isMeleeAttack = (action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30)) <= 5;
+    if (target && isMeleeAttack && monsterCharacter?.computedStats) {
+      const weaponMastery = monsterCharacter.computedStats.automation?.passives?.find(p => p.type === 'weapon_mastery_choice');
+      const chosenMastery = weaponMastery?.chosenMastery;
+      if (chosenMastery === 'Graze') {
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || allTargetEffects;
+        const grazeAlreadySet = storedEffects.some(te => te.effect === 'graze' && te.target === target.name);
+        if (!grazeAlreadySet) {
+          const strAbility = monsterCharacter.computedStats.abilities?.find(a => a.name === 'Strength');
+          const grazeEffect = {
+            target: target.name,
+            source: 'Graze',
+            effect: 'graze',
+            abilityName: 'STR',
+            abilityMod: strAbility?.bonus || 0,
+            duration: 'until_end_of_turn',
+          };
+          setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, grazeEffect], campaignName);
+        }
+      }
+    }
     const targetStats = target?.type === 'player'
       ? (creatures || []).find(c => c.name === target.name)
       : null;

@@ -110,8 +110,11 @@ describe('conditionEffects', () => {
           seeInvisibilityActive: false,
           wardingBondAcBonus: 0,
           cleaveAttack: false,
-          grazeDamage: false,
-          nickExtraAttack: false,
+           grazeDamage: false,
+           grazeTarget: null,
+           grazeSource: null,
+           vexAdvantageTargets: null,
+           nickExtraAttack: false,
           toppleEffect: false,
           toppleSaveType: null,
           toppleSaveDc: null,
@@ -576,6 +579,13 @@ describe('conditionEffects', () => {
         expect(result.attackAdvantageCount).toBe(1);
       });
 
+      it('handles next_attack_advantage with vexTarget', () => {
+        const effects = [{ effect: 'next_attack_advantage', target: 'Player', vexTarget: 'Goblin' }];
+        const result = computeConditionEffects([], [], effects);
+        expect(result.attackAdvantageCount).toBe(0);
+        expect(result.vexAdvantageTargets).toEqual(['Goblin']);
+      });
+
       it('handles crusher_enhanced_critical', () => {
         const effects = [{ effect: 'crusher_enhanced_critical' }];
         const result = computeConditionEffects([], [], effects);
@@ -851,6 +861,24 @@ describe('conditionEffects', () => {
       const attacker = { attackAdvantageCount: 3, attackDisadvantageCount: 1, restoreBalance: false };
       const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0, noAdvantageAgainst: true, restoreBalance: true };
       expect(combineAttackModes(attacker, target, 10)).toBe('normal');
+    });
+
+    it('adds advantage when attacking a Vex target that matches', () => {
+      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: false };
+      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0, vexAdvantageTargets: ['Goblin'] };
+      expect(combineAttackModes(attacker, target, 5, 'Goblin')).toBe('advantage');
+    });
+
+    it('does not add advantage when attacking a different creature than the Vex target', () => {
+      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: false };
+      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0, vexAdvantageTargets: ['Goblin'] };
+      expect(combineAttackModes(attacker, target, 5, 'Orc')).toBe('normal');
+    });
+
+    it('does not add advantage when vexAdvantageTargets is null', () => {
+      const attacker = { attackAdvantageCount: 0, attackDisadvantageCount: 0, restoreBalance: false };
+      const target = { targetAdvantageCount: 0, targetDisadvantageCount: 0, vexAdvantageTargets: null };
+      expect(combineAttackModes(attacker, target, 5, 'Goblin')).toBe('normal');
     });
   });
 

@@ -132,6 +132,7 @@ describe('useModalHandlers', () => {
             getRuntimeValue.mockReturnValueOnce([{ effect: 'cleave', target: 'Goblin' }]);
             getCombatContext.mockResolvedValueOnce({
                 creatures: [
+                    { name: 'TestFighter', position: { x: 0, y: 0 } },
                     { name: 'Goblin', position: { x: 1, y: 1 } },
                     { name: 'Orc', position: { x: 2, y: 2 } },
                 ],

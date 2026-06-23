@@ -4,7 +4,7 @@ import { loadWeaponMasteries } from '../../../hooks/combat/useActionPopup.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../services/rules/combat/damageUtils.js';
 import '../CharSheet.css';
 
-function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerStats, campaignName, targetName: targetNameProp, onClose }) {
+function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerStats, campaignName, targetName: targetNameProp, damageTotal, onClose }) {
     const [selected, setSelected] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
@@ -31,14 +31,18 @@ function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerSta
     }, []);
 
     const allMasteries = [];
-    if (baseMastery) {
+    if (baseMastery && baseMastery !== 'Graze') {
         allMasteries.push({ name: baseMastery, source: 'weapon' });
     }
     for (const name of (extraMasteries || [])) {
+        if (name === 'Graze') continue;
         if (!allMasteries.find(m => m.name === name)) {
             allMasteries.push({ name, source: 'feature' });
         }
     }
+
+    const damageDealt = damageTotal != null && damageTotal > 0;
+    const canShowDamageMasteries = damageTotal == null || damageDealt;
 
     const handleActivate = async () => {
         if (!selected) return;
@@ -77,6 +81,8 @@ function WeaponMasteryModal({ attackName, baseMastery, extraMasteries, playerSta
                             const effect = MASTERY_EFFECTS[m.name];
                             const isSelected = selected === m.name;
                             const desc = masteryDescriptions?.[m.name] || effect?.description || '';
+                            const isVexOrSlow = m.name === 'Vex' || m.name === 'Slow';
+                            if (isVexOrSlow && !canShowDamageMasteries) return null;
                             return (
                                 <label key={i} style={{
                                     display: 'block', padding: '8px 12px', margin: '4px 0',

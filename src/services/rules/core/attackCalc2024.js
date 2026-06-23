@@ -1,6 +1,8 @@
 import { parseMagicItemName, findEquippedWeapons, buildWeaponAttack, buildMonkAttacks, buildSpellAttacks } from './attackCalc.js';
 import classRules from '../../character/classRules2024.js';
-import { getCombatSummary } from '../../encounters/combatData.js';
+import { getCombatSummary, getCurrentCombatRound } from '../../encounters/combatData.js';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { collectWeaponMastery } from '../../combat/automation/automationPassives.js';
 
 /**
  * Build all attack entries for a character (2024 rules).
@@ -65,13 +67,30 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 );
                 const isLightCrossbow = !!(offHandWeapon.properties && offHandWeapon.properties.some(p => p.toLowerCase() === 'light') && ['Hand Crossbow', 'Light Crossbow'].includes(offHandWeapon.name));
                 const addAbilityToDamage = isLightCrossbow && hasCrossbowExpertDualWielding;
+
+                // Nick mastery: if off-hand weapon is Light and Nick is available, check if Nick was used this turn
+                // If Nick was used, generate the attack as part of the Attack action instead of Bonus Action
+                const isLightWeapon = offHandWeapon.properties && offHandWeapon.properties.some(p => p.toLowerCase() === 'light');
+                let actionType = 'Bonus Action';
+                if (isLightWeapon && playerStats.campaignName) {
+                    const nickAvailable = collectWeaponMastery(offBaseName, playerStats);
+                    const hasNick = nickAvailable.baseMastery === 'Nick' || (nickAvailable.extraMasteries || []).includes('Nick');
+                    if (hasNick) {
+                        const currentRound = getCurrentCombatRound();
+                        const nickUsedRound = getRuntimeValue(playerStats.name, '_Nick_UsedRound', playerStats.campaignName);
+                        if (nickUsedRound === currentRound) {
+                            actionType = 'Action';
+                        }
+                    }
+                }
+
                 attacks.push(buildWeaponAttack({
                     weapon: offHandWeapon,
                     weaponName: offHandName,
                     abilityBonus: bonus,
                     abilityName,
                     proficiency,
-                    actionType: 'Bonus Action',
+                    actionType,
                     weaponType: 'melee',
                     includeAbilityBonusInDamage: addAbilityToDamage,
                 }));

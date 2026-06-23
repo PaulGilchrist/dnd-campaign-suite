@@ -328,6 +328,9 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     wardingBondAcBonus: 0,
     cleaveAttack: false,
     grazeDamage: false,
+    grazeTarget: null,
+    grazeSource: null,
+    vexAdvantageTargets: null,
     nickExtraAttack: false,
     toppleEffect: false,
     toppleSaveType: null,
@@ -488,7 +491,11 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
       effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
     }
     if (te.effect === 'next_attack_advantage') {
-      effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
+      if (te.vexTarget) {
+        effects.vexAdvantageTargets = [...(effects.vexAdvantageTargets || []), te.vexTarget];
+      } else {
+        effects.attackAdvantageCount = (effects.attackAdvantageCount || 0) + 1;
+      }
     }
     if (te.effect === 'distracting_strike_advantage') {
       effects.targetAdvantageCount = (effects.targetAdvantageCount || 0) + 1;
@@ -701,10 +708,13 @@ function getNetAttackMode(attackAdvantageCount, attackDisadvantageCount, restore
   return 'normal'
 }
 
-function combineAttackModes(attackerEffects, targetEffects, attackRange) {
+function combineAttackModes(attackerEffects, targetEffects, attackRange, targetName = null) {
   let adv = attackerEffects.attackAdvantageCount + targetEffects.targetAdvantageCount
   let dis = attackerEffects.attackDisadvantageCount + targetEffects.targetDisadvantageCount
 
+  if (targetEffects.vexAdvantageTargets && targetName && targetEffects.vexAdvantageTargets.includes(targetName)) {
+    adv++
+  }
   if (targetEffects.targetAdvantageIfWithin5ft && attackRange <= 5) adv++
   if (targetEffects.targetDisadvantageIfBeyond5ft && attackRange > 5) dis++
 

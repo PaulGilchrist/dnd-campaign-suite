@@ -37,14 +37,18 @@ export default function useModalHandlers({
                 // Show cleave target selection
                 const cs = await getCombatContext(campaignName);
                 const firstTarget = cs?.creatures?.find(c => c.name === cleaveEffect.target);
-                if (cs?.creatures && firstTarget?.position) {
+                // Cleave: second target must be within your reach (default 5 ft for melee, 10 ft for reach weapons)
+                const attackerPos = cs?.creatures?.find(c => c.name === playerStats.name)?.position;
+                const reach = attack.range || 8;
+                if (cs?.creatures && firstTarget?.position && attackerPos) {
                     const secondTargets = cs.creatures
                         .filter(c => c.name !== cleaveEffect.target && c.position)
                         .map(c => ({
                             creature: c,
-                            distance: getDistanceFeet(firstTarget.position, c.position),
+                            distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
+                            distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
                         }))
-                        .filter(t => t.distance !== null && t.distance <= 5);
+                        .filter(t => t.distanceFromFirst !== null && t.distanceFromFirst <= 5 && t.distanceFromAttacker !== null && t.distanceFromAttacker <= reach);
                     if (secondTargets.length > 0) {
                         setCleaveAttackPending({
                             attackName: attack.name,

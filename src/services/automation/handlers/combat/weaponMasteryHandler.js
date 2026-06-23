@@ -34,6 +34,7 @@ const MASTERY_EFFECTS = {
         description: 'You have Advantage on your next attack roll against that creature before the end of your next turn.',
         effect: 'next_attack_advantage',
         value: 5,
+        perTarget: true,
     },
     Cleave: {
         label: 'Cleave (Extra Attack)',
@@ -184,10 +185,37 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
         value: mastery.value || null,
         duration: 'until_start_of_next_turn',
     };
+    if (masteryName === 'Graze') {
+        const grazeAbilityName = playerStats.automation?.passives?.find(p => p.type === 'weapon_mastery_choice' && p.name === 'Graze')?.abilityName || 'Strength';
+        const grazeAbility = playerStats.abilities?.find(a => a.name === grazeAbilityName);
+        newEffect = {
+            ...newEffect,
+            abilityName: grazeAbilityName,
+            abilityMod: grazeAbility?.bonus || 0,
+            duration: 'until_end_of_turn',
+        };
+    }
     if (masteryName === 'Vex') {
+        const currentRound = getCurrentCombatRound();
         newEffect = {
             ...newEffect,
             target: playerStats.name,
+            vexTarget: targetName,
+            appliedRound: currentRound,
+        };
+    }
+    if (masteryName === 'Sap') {
+        const currentRound = getCurrentCombatRound();
+        newEffect = {
+            ...newEffect,
+            appliedRound: currentRound,
+        };
+    }
+    if (masteryName === 'Topple') {
+        const currentRound = getCurrentCombatRound();
+        newEffect = {
+            ...newEffect,
+            appliedRound: currentRound,
         };
     }
     if (mastery.requiresSave && mastery.saveAbility) {
