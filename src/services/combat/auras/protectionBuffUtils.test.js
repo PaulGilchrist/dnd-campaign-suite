@@ -12,7 +12,7 @@ describe('protectionBuffUtils', () => {
 
   beforeEach(() => {
     getRuntimeValueSpy = vi.spyOn(runtimeState, 'getRuntimeValue');
-    setRuntimeValueSpy = vi.spyOn(runtimeState, 'setRuntimeValue');
+    setRuntimeValueSpy = vi.spyOn(runtimeState, 'setRuntimeValue').mockImplementation(() => {});
   });
 
   afterEach(() => {

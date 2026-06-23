@@ -942,7 +942,7 @@ describe('spellCalc2024', () => {
       const result = getSpellAbilities(allSpells, playerStats);
 
       const spellNames = result.spells.map(s => s.name);
-      expect(spellNames).not.toContain('Alarm');
+       expect(spellNames).not.toContain('Alarm');
+     });
     });
-   });
 });

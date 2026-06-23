@@ -377,5 +377,173 @@ describe('buffHandler.handle', () => {
                 campaignName
             );
         });
+
+        it('should use numeric uses value when auto.uses is a number', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValueOnce(5);
+
+            const action = {
+                name: 'Adrenaline Rush',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    uses: 5,
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('4 uses remaining');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                ps.name,
+                'adrenalineRushUses',
+                4,
+                campaignName
+            );
+        });
+
+        it('should use usesMax when auto.uses is not proficiency_bonus and not a number', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValueOnce(3);
+
+            const action = {
+                name: 'Adrenaline Rush',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    uses: 'some_string',
+                    usesMax: 3,
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('2 uses remaining');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                ps.name,
+                'adrenalineRushUses',
+                2,
+                campaignName
+            );
+        });
+
+        it('should default to 1 use when usesMax is not provided', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValueOnce(1);
+
+            const action = {
+                name: 'Adrenaline Rush',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    uses: 'some_string',
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('0 uses remaining');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                ps.name,
+                'adrenalineRushUses',
+                0,
+                campaignName
+            );
+        });
+
+        it('should not grant temp HP when bonusEffect is not temp_hp', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValueOnce(3);
+
+            const action = {
+                name: 'Adrenaline Rush',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    uses: 3,
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('2 uses remaining');
+            expect(result.payload.description).not.toContain('temporary hit points');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                ps.name,
+                'adrenalineRushUses',
+                2,
+                campaignName
+            );
+            const tempHpCalls = runtimeState.setRuntimeValue.mock.calls.filter(
+                call => call[1] === 'tempHp'
+            );
+            expect(tempHpCalls.length).toBe(0);
+        });
+
+        it('should use action.name as featureName when provided', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValueOnce(3);
+
+            const action = {
+                name: 'Custom Feature',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    uses: 3,
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.payload.description).toContain('Custom Feature');
+        });
+
+        it('should use "Adrenaline Rush" as default featureName when action.name is missing', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValueOnce(3);
+
+            const action = {
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    uses: 3,
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.payload.description).toContain('Adrenaline Rush');
+        });
+
+        it('should use usesMax default of 1 when auto.uses is not proficiency_bonus and usesMax is null', async () => {
+            const ps = makePlayerStats({ proficiency: 4 });
+            runtimeState.getRuntimeValue.mockReturnValueOnce(1);
+
+            const action = {
+                name: 'Adrenaline Rush',
+                automation: {
+                    type: 'temp_buff',
+                    effect: 'bonus_action_dash',
+                    uses: 'invalid',
+                    usesMax: null,
+                    recharge: 'short_rest',
+                },
+            };
+
+            const result = await handle(action, ps, campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('0 uses remaining');
+        });
     });
 });

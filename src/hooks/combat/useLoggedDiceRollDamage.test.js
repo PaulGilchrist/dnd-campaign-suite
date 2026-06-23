@@ -105,7 +105,7 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
         return createLogDamageAndShow(deps);
     }
 
-    describe('early exits and auto-miss', () => {
+    describe('early exits and routing', () => {
         it('returns early with immunity popup when target is magic missile immune', async () => {
             isMagicMissileImmune.mockReturnValue(true);
             const fn = createFn();

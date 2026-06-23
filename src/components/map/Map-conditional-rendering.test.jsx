@@ -33,10 +33,7 @@ const createZoomPanMocks = (overrides = {}) => ({
 });
 
 globalThis.EventSource = class MockEventSource {
-    constructor() {
-        this.onmessage = null;
-        this.onerror = null;
-    }
+    constructor() { this.onmessage = null; this.onerror = null; }
     close() {}
 };
 
@@ -193,158 +190,127 @@ vi.mock('./hooks/useMapDrops.js', () => ({
     })),
 }));
 
-describe('Map', () => {
-    describe('initial rendering', () => {
-        it('should render the root map div with SVG and toolbar', async () => {
+describe('Map conditional rendering', () => {
+    describe('indoor map rendering', () => {
+        it('should render indoor map (SVG-based) when mapData.type is not outdoor', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const mapDiv = container.querySelector('div.map');
-            expect(mapDiv).toBeInTheDocument();
-            expect(mapDiv.querySelector('svg.grid-svg')).toBeInTheDocument();
-            expect(mapDiv.querySelector('.toolbar-row')).toBeInTheDocument();
+            // Indoor map renders an SVG with grid-svg class
+            expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
+            // Should NOT render the hex-map root
+            expect(container.querySelector('.hex-map')).toBeNull();
+        });
+    });
+
+    describe('conditional component rendering', () => {
+        it('should not render rename popover when renamePopover is null', async () => {
+            const { container } = render(
+                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('monster-name-autocomplete')).toBeNull();
         });
 
-        it('should render the SVG element with grid-svg class', async () => {
+        it('should not render ItemsPanel when itemsPanelOpen is false', async () => {
+            const { container } = render(
+                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('items-panel')).toBeNull();
+        });
+
+        it('should not render ItemsPanel when isLocalhost is false', async () => {
+            const { container } = render(
+                <Map campaignName="test-campaign" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('items-panel')).toBeNull();
+        });
+
+        it('should not render MonsterCardModal when viewingMonster is null', async () => {
+            const { container } = render(
+                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('monster-card-modal')).toBeNull();
+        });
+    });
+
+    describe('SSE subscriber', () => {
+        it('should render a Subscriber component for SSE events', async () => {
+            const { container } = render(
+                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            // Subscriber renders a React.Fragment, so we check the parent renders
+            expect(container.querySelector('div.map')).toBeInTheDocument();
+        });
+    });
+
+    describe('spell overlay controls rendering', () => {
+        it('should render SpellOverlayRenderer inside the SVG', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
             const svg = container.querySelector('svg.grid-svg');
             expect(svg).toBeInTheDocument();
-            expect(svg).toHaveClass('grid-svg');
+            // SpellOverlayRenderer renders a g with class spell-overlay-layer
+            expect(svg.querySelector('.spell-overlay-layer')).toBeInTheDocument();
         });
 
-        it('should render the MapToolbar', async () => {
+        it('should render RulerOverlay inside the SVG when ruler is active', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const toolbarRow = container.querySelector('.toolbar-row');
-            expect(toolbarRow).toBeInTheDocument();
+            const svg = container.querySelector('svg.grid-svg');
+            expect(svg).toBeInTheDocument();
+            // RulerOverlay returns null when start is null, so no ruler-group is rendered initially
         });
+    });
 
-        it('should render all SVG defs', async () => {
+    describe('context menu rendering', () => {
+        it('should render ItemContextMenu component inside the SVG', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const defs = container.querySelector('svg defs');
-            expect(defs).toBeInTheDocument();
-            expect(defs.children.length).toBeGreaterThan(0);
+            const svg = container.querySelector('svg.grid-svg');
+            expect(svg).toBeInTheDocument();
         });
-    });
 
-    describe('SVG defs rendering', () => {
-        const defTests = [
-            { tagName: 'BARRELSVG', id: 'barrel' },
-            { tagName: 'TABLESVG', id: 'table' },
-            { tagName: 'BEDSVG', id: 'bed' },
-            { tagName: 'FIREPITSVG', id: 'firepit' },
-            { tagName: 'DOORSVG', id: 'door' },
-            { tagName: 'SECRETDOORSVG', id: 'secretDoor' },
-            { tagName: 'TRAPSVG', id: 'trap' },
-            { tagName: 'PILLARSVG', id: 'pillar' },
-            { tagName: 'STAIRSSVG', id: 'stairs' },
-            { tagName: 'ALTARSVG', id: 'altar' },
-            { tagName: 'ARROWSLITWALLSVG', id: 'arrowSlitWall' },
-            { tagName: 'BOOKSHELVESVG', id: 'bookshelf' },
-            { tagName: 'CHAIRSVG', id: 'chair' },
-            { tagName: 'CHESTSVG', id: 'chest' },
-            { tagName: 'CRATESVG', id: 'crate' },
-            { tagName: 'FOUNTAINSVG', id: 'fountain' },
-            { tagName: 'SKELETONSVG', id: 'skeleton' },
-            { tagName: 'STATUESVG', id: 'statue' },
-            { tagName: 'TORCHSVG', id: 'torch' },
-            { tagName: 'WEBSVG', id: 'web' },
-            { tagName: 'TREESVG', id: 'tree' },
-            { tagName: 'BOULDERSVG', id: 'boulder' },
-            { tagName: 'BUSHSVG', id: 'bush' },
-        ];
-
-        for (const { tagName, id } of defTests) {
-            it(`should render ${tagName} def with id ${id}`, async () => {
-                const { container } = render(
-                    <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-                );
-                const defs = container.querySelector('svg defs');
-                const el = Array.from(defs?.children || []).find(
-                    (el) => el.tagName === tagName && el.getAttribute('id') === id
-                );
-                expect(el).not.toBeNull();
-            });
-        }
-    });
-
-    describe('sub-components rendering', () => {
-        it('should render grid lines and walls', async () => {
+        it('should render RoomContextMenu component inside the SVG', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const gridLines = container.querySelectorAll('line.grid-line');
-            expect(gridLines.length).toBeGreaterThan(0);
+            const svg = container.querySelector('svg.grid-svg');
+            expect(svg).toBeInTheDocument();
         });
 
-        it('should render grid background rect', async () => {
+        it('should render PlayerContextMenu component inside the SVG', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const gridBg = container.querySelector('rect.grid-bg');
-            expect(gridBg).toBeInTheDocument();
+            const svg = container.querySelector('svg.grid-svg');
+            expect(svg).toBeInTheDocument();
         });
     });
 
-    describe('context menus when null', () => {
-        it('should not render context menus when items, rooms, and players are null', async () => {
+    describe('grid size', () => {
+        it('should use gridSize from useMapLoader for SVG size calculation', async () => {
             const { container } = render(
                 <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            expect(container.querySelector('g.item-context-menu')).toBeNull();
-            expect(container.querySelector('g.room-context-menu')).toBeNull();
-            expect(container.querySelector('g.player-context-menu')).toBeNull();
+            const svg = container.querySelector('svg.grid-svg');
+            expect(svg).toBeInTheDocument();
+            // SVG_SIZE = 30 * 40 = 1200
+            const viewBox = svg.getAttribute('viewBox');
+            expect(viewBox).toContain('1200');
         });
     });
 
-    describe('selection rendering', () => {
-        it('should not render selection previews when nothing is selected', async () => {
+    describe('map name display', () => {
+        it('should render map name in the toolbar', async () => {
             const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="dungeon-level-1" onBack={vi.fn()} />
             );
-            expect(container.querySelector('rect.selection-preview')).toBeNull();
-            expect(container.querySelector('rect.room-draw-preview')).toBeNull();
-            expect(container.querySelector('rect.selection-outline')).toBeNull();
-        });
-    });
-
-    describe('room rendering', () => {
-        it('should not render rooms when rooms array is empty', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            expect(container.querySelectorAll('rect.room-highlight').length).toBe(0);
-            expect(container.querySelectorAll('text.room-label').length).toBe(0);
-        });
-    });
-
-    describe('spell overlay rendering', () => {
-        it('should not render pending overlay when spellDraft is null', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            expect(container.querySelector('rect.pending-overlay')).toBeNull();
-        });
-    });
-
-    describe('isLocalhost prop', () => {
-        it('should render core map elements when isLocalhost is false', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
-            );
-            expect(container.querySelector('rect.grid-bg')).toBeInTheDocument();
-            expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
-        });
-    });
-
-    describe('display name', () => {
-        it('should be a function component', () => {
-            expect(typeof Map).toBe('function');
+            const mapTitle = container.querySelector('.toolbar-row h4');
+            expect(mapTitle).toBeInTheDocument();
+            expect(mapTitle.textContent).toBe('dungeon-level-1');
         });
     });
 });

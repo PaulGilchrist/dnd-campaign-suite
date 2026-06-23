@@ -1,7 +1,11 @@
 vi.mock('../../rules/attackCalc.js', () => ({
   parseMagicItemName: vi.fn((itemName) => {
     if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
-      return { baseName: itemName.substring(3), magicBonus: Number(itemName.charAt(1)) }
+      const magicBonus = Number(itemName.charAt(1))
+      return {
+        baseName: itemName.substring(3),
+        magicBonus: isNaN(magicBonus) ? 0 : magicBonus,
+      }
     }
     return { baseName: itemName, magicBonus: 0 }
   }),
@@ -12,11 +16,16 @@ vi.mock('../../shared/abilityLookup.js', () => ({
     if (!abilities || !abilityName) return 0
     const lower = abilityName.toLowerCase().replace(/\s+/g, '')
     const canonicalMap = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' }
-    const canonical = canonicalMap[lower] || abilityName.charAt(0).toUpperCase() + abilityName.slice(1)
+    let canonical = canonicalMap[lower]
+    if (!canonical) {
+      const ABILITY_NAMES = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+      canonical = ABILITY_NAMES.find(n => n.toLowerCase() === lower)
+      if (!canonical) return 0
+    }
      // resolveDiceExpression passes playerStats.abilities which defaults to {} not []
     if (!Array.isArray(abilities)) return 0
     return abilities.find(a => a.name === canonical)?.bonus ?? 0
-   }),
+  }),
 }))
 
 export function makePlayerStats(overrides = {}) {

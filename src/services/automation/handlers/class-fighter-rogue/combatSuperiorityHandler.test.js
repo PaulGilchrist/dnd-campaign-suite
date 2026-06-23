@@ -1,32 +1,27 @@
-import { onCombatSuperioritySelected } from './combatSuperiorityHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { rollExpression } from '../../../dice/diceRoller.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { handle } from './combatSuperiorityHandler.js';
+import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import * as dataLoader from '../../../../services/ui/dataLoader.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../../dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-}));
-
-vi.mock('../../../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
-}));
-
-vi.mock('../../common/targetResolver.js', () => ({
-    resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
-}));
-
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
-    loadManeuvers: vi.fn(async () => [
-        { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
-        { name: 'Relentless', effect: 'relentless', saveType: 'CON' },
-        { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
-    ]),
+    loadManeuvers: vi.fn(),
 }));
+
+const makeAction = (auto = {}) => ({
+    name: 'Combat Superiority',
+    automation: {
+        type: 'combat_superiority',
+        saveType: 'WIS',
+        saveDc: 'ability',
+        dieExpression: 'superiority_die',
+        ...auto,
+    },
+});
 
 const makePlayerStats = (overrides = {}) => ({
     name: 'TestFighter',
@@ -39,212 +34,198 @@ const makePlayerStats = (overrides = {}) => ({
         { name: 'WIS', bonus: 0 },
         { name: 'CHA', bonus: 0 },
     ],
-    level: 15,
+    level: 5,
+    rules: '2024',
     automation: { passives: [], actions: [], bonusActions: [], reactions: [], specialActions: [] },
     ...overrides,
 });
 
-const makeAction = (auto = {}) => ({
-    name: 'Combat Superiority',
-    automation: {
-        type: 'combat_superiority',
-        saveType: 'WIS',
-        saveAbility: 'STR',
-        saveDc: 'ability',
-        dieExpression: 'superiority_die',
-        uses_max: 4,
-        ...auto,
-    },
-});
-
-describe('combatSuperiorityHandler – Relentless', () => {
+describe('combatSuperiorityHandler.handle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === 'relentlessUsedRound') return undefined;
-            return undefined;
-        });
-        rollExpression.mockReturnValue({ total: 5 });
     });
 
-    it('should detect relentless passive and use 1d8 instead of superiority die', async () => {
-        const playerStats = makePlayerStats({
-            automation: {
-                passives: [
-                    { type: 'passive_rule', effect: 'relentless', name: 'Relentless' },
-                ],
-            },
-        });
-        const action = makeAction();
+    it('returns popup when no maneuvers available', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([]);
 
-        const result = await onCombatSuperioritySelected(
-            action,
-            playerStats,
+        const result = await handle(
+            makeAction(),
+            makePlayerStats(),
             'test-campaign',
-            null,
-            'Relentless'
+            null
         );
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Relentless');
-        expect(result.payload.description).toContain('1d8');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toBe('No maneuver data available.');
     });
 
-    it('should not expend a superiority die when relentless is used', async () => {
-        const playerStats = makePlayerStats({
-            automation: {
-                passives: [
-                    { type: 'passive_rule', effect: 'relentless', name: 'Relentless' },
-                ],
-            },
-        });
-        const action = makeAction();
+    it('returns modal with all maneuvers when none known', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
+            { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
+        ]);
+        getRuntimeValue.mockReturnValue(undefined);
 
-        await onCombatSuperioritySelected(
+        const result = await handle(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('combatSuperiority');
+        expect(result.payload.allManeuvers).toHaveLength(2);
+        expect(result.payload.knownManeuvers).toEqual([]);
+        expect(result.payload.maxOptions).toBe(3);
+        expect(result.payload.selectionMode).toBe(true);
+        expect(result.payload.saveDc).toBe('ability');
+        expect(result.payload.saveType).toBe('WIS');
+        expect(result.payload.dieExpression).toBe('superiority_die');
+    });
+
+    it('returns modal with selectionMode false when all maneuvers known', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
+            { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
+        ]);
+        getRuntimeValue.mockReturnValue(['Trip Attack', 'Pushing Attack']);
+
+        const result = await handle(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.type).toBe('modal');
+        expect(result.payload.selectionMode).toBe(false);
+        expect(result.payload.knownManeuvers).toEqual(['Trip Attack', 'Pushing Attack']);
+    });
+
+    it('returns modal with selectionMode true when some but not all known', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
+            { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
+            { name: 'Rally', effect: 'temp_hp' },
+        ]);
+        getRuntimeValue.mockReturnValue(['Trip Attack']);
+
+        const result = await handle(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.type).toBe('modal');
+        expect(result.payload.selectionMode).toBe(true);
+        expect(result.payload.knownManeuvers).toEqual(['Trip Attack']);
+    });
+
+    it('respects maxOptions from automation', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+            { name: 'Pushing Attack', effect: 'push' },
+            { name: 'Rally', effect: 'temp_hp' },
+            { name: 'Riposte', effect: 'melee_attack_reaction' },
+        ]);
+        getRuntimeValue.mockReturnValue(['Trip Attack']);
+
+        const result = await handle(
+            makeAction({ maxOptions: 2 }),
+            makePlayerStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.payload.maxOptions).toBe(2);
+        expect(result.payload.selectionMode).toBe(true);
+    });
+
+    it('returns modal without selectionMode when no unknown maneuvers', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+            { name: 'Pushing Attack', effect: 'push' },
+        ]);
+        getRuntimeValue.mockReturnValue(['Trip Attack', 'Pushing Attack']);
+
+        const result = await handle(
+            makeAction({ maxOptions: 3 }),
+            makePlayerStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.type).toBe('modal');
+        expect(result.payload.selectionMode).toBe(false);
+    });
+
+    it('uses default saveType WIS when not specified', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+        ]);
+        getRuntimeValue.mockReturnValue([]);
+
+        const result = await handle(
+            makeAction({ saveType: undefined }),
+            makePlayerStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.payload.saveType).toBe('WIS');
+    });
+
+    it('includes action and playerStats in modal payload', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+        ]);
+        getRuntimeValue.mockReturnValue([]);
+
+        const action = makeAction();
+        const playerStats = makePlayerStats();
+
+        const result = await handle(
             action,
             playerStats,
             'test-campaign',
-            null,
-            'Relentless'
+            null
         );
 
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'TestFighter',
-            'superiorityDice',
-            expect.any(Number),
-            'test-campaign'
-        );
+        expect(result.payload.action).toBe(action);
+        expect(result.payload.playerStats).toBe(playerStats);
     });
 
-    it('should roll 1d8 instead of superiority die when relentless is used', async () => {
-        rollExpression.mockReturnValueOnce({ total: 7 });
+    it('loads maneuvers with correct ruleset', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([]);
+        getRuntimeValue.mockReturnValue([]);
 
-        const playerStats = makePlayerStats({
-            automation: {
-                passives: [
-                    { type: 'passive_rule', effect: 'relentless', name: 'Relentless' },
-                ],
-            },
-        });
-        const action = makeAction();
-
-        const result = await onCombatSuperioritySelected(
-            action,
-            playerStats,
+        await handle(
+            makeAction(),
+            makePlayerStats({ rules: '5e' }),
             'test-campaign',
-            null,
-            'Relentless'
+            null
         );
 
-        expect(rollExpression).toHaveBeenCalledWith('1d8');
-        expect(result.payload.description).toContain('7');
-        expect(result.payload.description).toContain('Relentless');
+        expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('5e');
     });
 
-    it('should track relentless used this turn', async () => {
-        getRuntimeValue.mockImplementation((playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === 'relentlessUsedRound') return 1;
-            return undefined;
-        });
-        rollExpression.mockReturnValue({ total: 10 });
-
-        const playerStats = makePlayerStats({
-            automation: {
-                passives: [
-                    { type: 'passive_rule', effect: 'relentless', name: 'Relentless' },
-                ],
-            },
-        });
-        const action = makeAction();
-
-        const result = await onCombatSuperioritySelected(
-            action,
-            playerStats,
-            'test-campaign',
-            null,
-            'Trip Attack'
-        );
-
-        expect(result.payload.description).toContain('10');
-        expect(result.payload.description).not.toContain('Relentless');
-    });
-
-    it('should allow relentless again on a new round', async () => {
-        getCurrentCombatRound.mockReturnValue(2);
-        getRuntimeValue.mockImplementation((playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === 'relentlessUsedRound') return 1;
-            return undefined;
-        });
-        rollExpression.mockReturnValueOnce({ total: 3 });
-
-        const playerStats = makePlayerStats({
-            automation: {
-                passives: [
-                    { type: 'passive_rule', effect: 'relentless', name: 'Relentless' },
-                ],
-            },
-        });
-        const action = makeAction();
-
-        const result = await onCombatSuperioritySelected(
-            action,
-            playerStats,
-            'test-campaign',
-            null,
-            'Relentless'
-        );
-
-        expect(result.payload.description).toContain('3');
-        expect(result.payload.description).toContain('Relentless');
-    });
-
-    it('should not use relentless when passive is not present', async () => {
-        getRuntimeValue.mockImplementation((playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            return undefined;
-        });
+    it('defaults to 2024 rules when playerStats has no rules field', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([]);
+        getRuntimeValue.mockReturnValue([]);
 
         const playerStats = makePlayerStats();
-        const action = makeAction();
+        delete playerStats.rules;
 
-        const result = await onCombatSuperioritySelected(
-            action,
+        await handle(
+            makeAction(),
             playerStats,
             'test-campaign',
-            null,
-            'Trip Attack'
+            null
         );
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No Superiority Dice remaining');
-    });
-
-    it('should not set relentlessUsedRound when relentless is not active', async () => {
-        getRuntimeValue.mockImplementation((playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
-            return undefined;
-        });
-        rollExpression.mockReturnValue({ total: 6 });
-
-        const playerStats = makePlayerStats();
-        const action = makeAction();
-
-        await onCombatSuperioritySelected(
-            action,
-            playerStats,
-            'test-campaign',
-            ['Trip Attack'],
-            'Trip Attack'
-        );
-
-        expect(setRuntimeValue).not.toHaveBeenCalledWith(
-            'TestFighter',
-            'relentlessUsedRound',
-            expect.any(Number),
-            'test-campaign'
-        );
+        expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
     });
 });

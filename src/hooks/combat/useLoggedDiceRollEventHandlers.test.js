@@ -1,57 +1,23 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-vi.mock('../../services/rules/effects/expirations.js', () => ({
-    addExpiration: vi.fn(),
-}));
-
-vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-}));
-
-vi.mock('../../services/encounters/combatData.js', () => ({
-    getCombatSummary: vi.fn(),
-}));
-
-vi.mock('../runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(),
-}));
-
+vi.mock('../../services/rules/effects/expirations.js', () => ({ addExpiration: vi.fn() }));
+vi.mock('../../services/dice/diceRoller.js', () => ({ rollExpression: vi.fn(), rollExpressionDoubled: vi.fn() }));
+vi.mock('../../services/encounters/combatData.js', () => ({ getCombatSummary: vi.fn() }));
+vi.mock('../runtime/useRuntimeState.js', () => ({ getRuntimeValue: vi.fn(), setRuntimeValue: vi.fn() }));
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({
     computeDamageAfterEvasion: vi.fn((raw, success, dcSuccess, evasion) => {
         if (evasion && !success) return Math.floor(raw / 2);
         return success ? Math.floor(raw / 2) : raw;
     }),
-    applyDamageToTarget: vi.fn(),
-    clearReTriggeredSequence: vi.fn(),
+    applyDamageToTarget: vi.fn(), clearReTriggeredSequence: vi.fn(),
 }));
-
-vi.mock('../../services/combat/automation/automationService.js', () => ({
-    hasIgnoreResistance: vi.fn(),
-    playerIsImmuneToCondition: vi.fn(),
-}));
-
-vi.mock('../../services/rules/features/invisibilityService.js', () => ({
-    endInvisibilityOnHostileAction: vi.fn(),
-}));
-
-vi.mock('../../services/ui/utils.js', () => ({
-    default: {
-        getName: vi.fn((n) => n || 'Unknown'),
-        guid: vi.fn(() => 'test-guid-1234'),
-    },
-}));
-
-vi.mock('../../services/ui/storage.js', () => ({
-    default: {
-        set: vi.fn(),
-    },
-}));
-
-vi.mock('./useLoggedDiceRollUtils.js', () => ({
-    hasSoulstitchProtection: vi.fn(),
-}));
+vi.mock('../../services/combat/automation/automationService.js', () => ({ hasIgnoreResistance: vi.fn(), playerIsImmuneToCondition: vi.fn() }));
+vi.mock('../../services/rules/features/invisibilityService.js', () => ({ endInvisibilityOnHostileAction: vi.fn() }));
+vi.mock('../../services/ui/utils.js', () => ({ default: { getName: vi.fn((n) => n || 'Unknown'), guid: vi.fn(() => 'test-guid-1234') } }));
+vi.mock('../../services/ui/storage.js', () => ({ default: { set: vi.fn() } }));
+vi.mock('./useLoggedDiceRollUtils.js', () => ({ hasSoulstitchProtection: vi.fn() }));
+vi.mock('../../services/shared/logPoster.js', () => ({ postLogEntry: vi.fn() }));
 
 import { addExpiration } from '../../services/rules/effects/expirations.js';
 import { getCombatSummary } from '../../services/encounters/combatData.js';
@@ -62,21 +28,20 @@ import { endInvisibilityOnHostileAction } from '../../services/rules/features/in
 import { hasSoulstitchProtection } from './useLoggedDiceRollUtils.js';
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
+import { postLogEntry } from '../../services/shared/logPoster.js';
+import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
 
 describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
-    const deps = {
-        characterName: 'TestWizard',
-        campaignName: 'test-campaign',
-        logEntry: vi.fn(),
-        charactersRef: { current: [] },
-    };
+    const deps = { characterName: 'TestWizard', campaignName: 'test-campaign', logEntry: vi.fn(), charactersRef: { current: [] } };
 
     beforeEach(() => {
         delete window.__pendingSaves;
+        delete window.__pendingResultHandlersInstalled;
         getCombatSummary.mockReturnValue(null);
         getRuntimeValue.mockReturnValue(null);
         setRuntimeValue.mockReturnValue(undefined);
+        setRuntimeValue.mockClear();
         hasSoulstitchProtection.mockReturnValue(false);
         computeDamageAfterEvasion.mockReturnValue(10);
         applyDamageToTarget.mockReset();
@@ -86,310 +51,446 @@ describe('setupEventListeners (useLoggedDiceRollEventHandlers)', () => {
         addExpiration.mockReset();
         addExpiration.mockReturnValue(undefined);
         storage.set.mockReset();
-        storage.set.mockReturnValue(Promise.resolve());
+        storage.set.mockReturnValue(undefined);
         hasIgnoreResistance.mockReset();
         hasIgnoreResistance.mockReturnValue(false);
         playerIsImmuneToCondition.mockReset();
         playerIsImmuneToCondition.mockReturnValue(false);
         utils.getName.mockImplementation((n) => n);
+        postLogEntry.mockReset();
+        postLogEntry.mockReturnValue(undefined);
+        deps.logEntry.mockClear();
+        rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
+        rollExpressionDoubled.mockReturnValue({ total: 20, rolls: [5, 5, 5, 5], modifier: 0 });
     });
 
-    function setup() {
-        setupEventListeners(deps);
-    }
+    function setup() { setupEventListeners(deps); }
 
     function createSavePrompt(promptId, overrides = {}) {
-        return {
-            promptId,
-            targetName: 'Goblin',
-            rawDamage: 15,
-            saveDc: 15,
-            saveType: 'DEX',
-            dcSuccess: 'half',
-            damageType: 'fire',
-            attackerName: 'TestWizard',
-            name: 'Fireball',
-            formula: '8d6',
-            rolls: [3, 4, 5, 2, 3, 3],
-            modifier: 0,
-            campaignName: 'test-campaign',
-            setPopupHtml: vi.fn(),
-            ...overrides,
-        };
+        return { promptId, targetName: 'Goblin', rawDamage: 15, saveDc: 15, saveType: 'DEX', dcSuccess: 'half',
+            damageType: 'fire', attackerName: 'TestWizard', name: 'Fireball', formula: '8d6',
+            rolls: [3, 4, 5, 2, 3, 3], modifier: 0, campaignName: 'test-campaign', setPopupHtml: vi.fn(), ...overrides };
     }
 
+    // --- save-result: basic ---
     describe('save-result event', () => {
         it('handles save-result event with pending save', () => {
             setup();
-            const promptId = 'test-prompt-1';
-            window.__pendingSaves = {
-                [promptId]: createSavePrompt(promptId),
-            };
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: {
-                    promptId,
-                    targetName: 'Goblin',
-                    success: false,
-                    roll: 8,
-                    total: 11,
-                    saveBonus: 3,
-                },
-            }));
-
+            const pid = 'p1';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
             expect(applyDamageToTarget).toHaveBeenCalled();
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'roll',
-                rollType: 'save-damage',
-                name: 'Fireball',
-            }));
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ type: 'roll', rollType: 'save-damage', name: 'Fireball' }));
         });
 
         it('does nothing when no pending save for promptId', () => {
             setup();
             window.__pendingSaves = {};
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: { promptId: 'nonexistent' },
-            }));
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: 'nonexistent' } }));
             expect(applyDamageToTarget).not.toHaveBeenCalled();
         });
 
         it('handles soulstitch protection', () => {
             setup();
             hasSoulstitchProtection.mockReturnValue(true);
-            const promptId = 'test-prompt-2';
-            window.__pendingSaves = {
-                [promptId]: createSavePrompt(promptId, {
-                    targetName: 'Ally',
-                }),
-            };
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: {
-                    promptId,
-                    targetName: 'Ally',
-                    success: true,
-                    roll: 18,
-                    total: 21,
-                    saveBonus: 3,
-                },
-            }));
-
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                saveResult: 'soulstitch_auto_success',
-                soulstitchProtected: true,
-            }));
+            const pid = 'p2';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: true, roll: 18, total: 21, saveBonus: 3 } }));
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ saveResult: 'soulstitch_auto_success', soulstitchProtected: true }));
         });
 
-        it('handles evasion', () => {
+        it('removes pending save from window.__pendingSaves', () => {
             setup();
-            deps.charactersRef.current = [
-                { name: 'Ally', computedStats: { evasionEffects: [{ saveType: 'DEX', shareable: true, shareRange: 5 }] } },
-            ];
-            const promptId = 'test-prompt-3';
-            window.__pendingSaves = {
-                [promptId]: createSavePrompt(promptId, {
-                    targetName: 'Ally',
-                }),
-            };
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: {
-                    promptId,
-                    targetName: 'Ally',
-                    success: false,
-                    roll: 5,
-                    total: 8,
-                    saveBonus: 3,
-                },
-            }));
-
-            expect(computeDamageAfterEvasion).toHaveBeenCalled();
+            const pid = 'p3';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(window.__pendingSaves[pid]).toBeUndefined();
         });
 
         it('sets popupHtml after processing', () => {
             setup();
             const setPopupHtml = vi.fn();
-            const promptId = 'test-prompt-7';
-            window.__pendingSaves = {
-                [promptId]: createSavePrompt(promptId, { setPopupHtml }),
-            };
-
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: {
-                    promptId,
-                    targetName: 'Goblin',
-                    success: false,
-                    roll: 8,
-                    total: 11,
-                    saveBonus: 3,
-                },
-            }));
-
-            expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'save-damage',
-                name: 'Fireball',
-            }));
+            const pid = 'p4';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { setPopupHtml }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({ type: 'save-damage', name: 'Fireball' }));
         });
 
-        it('removes pending save from window.__pendingSaves', () => {
+        // --- save-result: evasion ---
+        it('handles evasion with own evasion effect', () => {
             setup();
-            const promptId = 'test-prompt-8';
-            window.__pendingSaves = {
-                [promptId]: createSavePrompt(promptId),
-            };
+            deps.charactersRef.current = [{ name: 'Ally', computedStats: { evasionEffects: [{ saveType: 'DEX' }] } }];
+            const pid = 'p5';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15 } }));
+            expect(computeDamageAfterEvasion).toHaveBeenCalled();
+        });
 
-            window.dispatchEvent(new CustomEvent('save-result', {
-                detail: {
-                    promptId,
-                    targetName: 'Goblin',
-                    success: false,
-                    roll: 8,
-                    total: 11,
-                    saveBonus: 3,
-                },
-            }));
+        it('handles shared evasion from another character', () => {
+            setup();
+            deps.charactersRef.current = [{ name: 'Ally', computedStats: { evasionEffects: [{ saveType: 'DEX', shareable: true, shareRange: 5 }] } }];
+            const pid = 'p6';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15 } }));
+            expect(computeDamageAfterEvasion).toHaveBeenCalled();
+        });
 
-            expect(window.__pendingSaves[promptId]).toBeUndefined();
+        it('does not apply shared evasion when shareRange < 5', () => {
+            setup();
+            computeDamageAfterEvasion.mockReset();
+            computeDamageAfterEvasion.mockImplementation((raw, success, dcSuccess, evasion) => {
+                if (evasion && !success) return Math.floor(raw / 2);
+                return success ? Math.floor(raw / 2) : raw;
+            });
+            deps.charactersRef.current = [{ name: 'Ally', computedStats: { evasionEffects: [{ saveType: 'DEX', shareable: true, shareRange: 3 }] } }];
+            const pid = 'p7';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15, dcSuccess: 'half' } }));
+            expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, expect.anything(), 'half', false);
+        });
+
+        it('does not apply evasion when target is incapacitated', () => {
+            setup();
+            computeDamageAfterEvasion.mockReset();
+            computeDamageAfterEvasion.mockImplementation((raw, success, dcSuccess, evasion) => {
+                if (evasion && !success) return Math.floor(raw / 2);
+                return success ? Math.floor(raw / 2) : raw;
+            });
+            getRuntimeValue.mockImplementation((charName, prop, camp) => { if (prop === 'activeConditions' && !camp) return ['incapacitated']; return null; });
+            deps.charactersRef.current = [{ name: 'Ally', computedStats: { evasionEffects: [{ saveType: 'DEX' }] } }];
+            const pid = 'p8';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: false, roll: 5, total: 8, saveBonus: 3, rawDamage: 15, dcSuccess: 'half' } }));
+            expect(computeDamageAfterEvasion).toHaveBeenCalledWith(15, expect.anything(), 'half', false);
+        });
+
+        // --- save-result: shield / intervene ---
+        it('handles shield immunity for magic missile', () => {
+            setup();
+            deps.charactersRef.current = [];
+            getRuntimeValue.mockImplementation((charName, prop, camp) => { if (prop === 'activeBuffs' && camp === 'test-campaign') return [{ effect: 'shield' }]; return null; });
+            const pid = 'p9';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'ShieldedAlly', name: 'Magic Missile', damageType: 'force' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'ShieldedAlly', success: true, roll: 18, total: 21, saveBonus: 3 } }));
+            expect(applyDamageToTarget).toHaveBeenCalledWith(null, 'ShieldedAlly', 0, ['force'], 'test-campaign', expect.any(Array), false, 'TestWizard', true);
+        });
+
+        it('does not apply shield immunity for non-magic missile spells', () => {
+            setup();
+            getRuntimeValue.mockImplementation((charName, prop, camp) => { if (prop === 'activeBuffs' && camp === 'test-campaign') return [{ effect: 'shield' }]; return null; });
+            const pid = 'p10';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'ShieldedAlly', name: 'Fireball' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'ShieldedAlly', success: true, roll: 18, total: 21, saveBonus: 3 } }));
+            expect(applyDamageToTarget).not.toHaveBeenCalledWith(null, 'ShieldedAlly', 0, expect.any(Array), 'test-campaign', expect.any(Array), false, 'TestWizard', true);
+        });
+
+        it('handles intervene shield for DEX half saves', () => {
+            setup();
+            getRuntimeValue.mockImplementation((charName, prop, camp) => { if (prop === 'interveneShieldActive' && camp === 'test-campaign') return true; return null; });
+            const pid = 'p11';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'ProtectedAlly' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'ProtectedAlly', success: true, roll: 18, total: 21, saveBonus: 3, saveType: 'DEX', dcSuccess: 'half' } }));
+            expect(setRuntimeValue).toHaveBeenCalledWith('ProtectedAlly', 'interveneShieldActive', null, 'test-campaign');
+        });
+
+        it('does not clear intervene shield for non-DEX saves', () => {
+            setup();
+            getRuntimeValue.mockImplementation((charName, prop, camp) => { if (prop === 'interveneShieldActive' && camp === 'test-campaign') return true; return null; });
+            const pid = 'p12';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'ProtectedAlly', saveType: 'CON' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'ProtectedAlly', success: true, roll: 18, total: 21, saveBonus: 3, saveType: 'CON', dcSuccess: 'half' } }));
+            expect(setRuntimeValue).not.toHaveBeenCalledWith('ProtectedAlly', 'interveneShieldActive', null, 'test-campaign');
+        });
+
+        // --- save-result: HP thresholds ---
+        it('logs hp_change with isUnconscious when target dies', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin', type: 'npc', currentHp: 15, maxHp: 15 }] });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 15, newHp: 0, damageReduced: false });
+            const pid = 'p13';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { rawDamage: 15 }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(postLogEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'hp_change', targetName: 'Goblin', isUnconscious: true }));
+        });
+
+        it('logs hp_change with bloodied threshold', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin', type: 'npc', currentHp: 30, maxHp: 30 }] });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 18, newHp: 12, damageReduced: false });
+            const pid = 'p14';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { rawDamage: 18 }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(postLogEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({ type: 'hp_change', targetName: 'Goblin', threshold: 'bloodied' }));
+        });
+
+        // --- save-result: death saves / invisibility ---
+        it('resets death saves when player dies', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'player-TestWizard', type: 'player', currentHp: 10, maxHp: 20 }] });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 0, damageReduced: false });
+            const pid = 'p15';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { rawDamage: 10, targetName: 'player-TestWizard' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'player-TestWizard', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(setRuntimeValue).toHaveBeenCalledWith('player-TestWizard', 'deathSaves', [false, false, false], 'test-campaign');
+            expect(setRuntimeValue).toHaveBeenCalledWith('player-TestWizard', 'deathFailures', [false, false, false], 'test-campaign');
+        });
+
+        it('does not reset death saves when player was already dead (oldHp computed > 0)', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'player-TestWizard', type: 'player', currentHp: 0, maxHp: 20 }] });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 0, damageReduced: false });
+            const pid = 'p16';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { rawDamage: 5, targetName: 'player-TestWizard' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'player-TestWizard', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(setRuntimeValue).toHaveBeenCalledWith('player-TestWizard', 'deathSaves', [false, false, false], 'test-campaign');
+        });
+
+        it('calls endInvisibilityOnHostileAction when damage dealt > 0', () => {
+            setup();
+            const pid = 'p17';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith('TestWizard', 'test-campaign');
+        });
+
+        it('does not call endInvisibilityOnHostileAction when no damage dealt', () => {
+            setup();
+            hasSoulstitchProtection.mockReturnValue(true);
+            applyDamageToTarget.mockReturnValue({ finalDamage: 0, newHp: 10, damageReduced: true });
+            const pid = 'p18';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { targetName: 'Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Ally', success: true, roll: 18, total: 21, saveBonus: 3 } }));
+            expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
+        });
+
+        // --- save-result: secondary / overchannel ---
+        it('handles secondary damage formula', () => {
+            setup();
+            rollExpressionDoubled.mockReturnValue({ total: 20, rolls: [5, 5, 5, 5], modifier: 0 });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 5, damageReduced: false });
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin', type: 'npc', currentHp: 15, maxHp: 15 }] });
+            const pid = 'p19';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { autoDamageSecondaryFormula: '1d10', autoDamageSecondaryName: 'Secondary', autoDamageSecondaryDamageType: 'necrotic', isAutoCrit: true }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(rollExpressionDoubled).toHaveBeenCalledWith('1d10');
+            const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
+            const combinedEntry = logCalls.find(entry => entry.note === 'combined_save_damage_roll');
+            expect(combinedEntry).toBeDefined();
+            expect(combinedEntry.secondaryName).toBe('Secondary');
+            expect(combinedEntry.secondaryDamageType).toBe('necrotic');
+        });
+
+        it('handles overchannel self-damage', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestWizard', type: 'player', currentHp: 20, maxHp: 20 }] });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 10, newHp: 10, damageReduced: false });
+            const pid = 'p20';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { overchannelActive: true, overchannelUseCount: 3, overchannelSpellLevel: 2 }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(rollExpression).toHaveBeenCalledWith('8d12');
+        });
+
+        // --- save-result: status effects ---
+        it('handles status effects on failed save', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }] });
+            const pid = 'p21';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { statusEffects: ['poisoned', 'frightened'], saveDc: 15, saveType: 'CON' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 5, total: 8, saveBonus: 3 } }));
+            expect(addExpiration).toHaveBeenCalledWith('TestWizard', 'Goblin', expect.any(Array), 'test-campaign', 2);
+        });
+
+        it('skips status effects when target is immune', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }] });
+            deps.charactersRef.current = [{ name: 'Goblin', computedStats: { characterAdvancement: [] } }];
+            playerIsImmuneToCondition.mockReturnValue(true);
+            const pid = 'p22';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { statusEffects: ['poisoned'], saveDc: 15, saveType: 'CON' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 5, total: 8, saveBonus: 3 } }));
+            expect(addExpiration).not.toHaveBeenCalled();
+        });
+
+        it('does not apply status effects on successful save', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }] });
+            const pid = 'p23';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { statusEffects: ['poisoned'], saveDc: 15, saveType: 'CON' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: true, roll: 18, total: 21, saveBonus: 3 } }));
+            expect(addExpiration).not.toHaveBeenCalled();
+        });
+
+        // --- save-result: log entry details ---
+        it('handles player target with currentHitPoints runtime value', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'player-Ally', type: 'player', currentHp: 10, maxHp: 20 }] });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 5, damageReduced: false });
+            const pid = 'p24';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { rawDamage: 5, targetName: 'player-Ally' }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'player-Ally', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            expect(setRuntimeValue).toHaveBeenCalledWith('player-Ally', 'currentHitPoints', 5, 'test-campaign');
+        });
+
+        it('handles unknown attackerName fallback', () => {
+            setup();
+            const pid = 'p25';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { attackerName: undefined }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
+            const rollEntry = logCalls.find(entry => entry.note === 'combined_save_damage_roll');
+            expect(rollEntry.characterName).toBe('TestWizard');
+        });
+
+        it('includes aoeAffectedCount when isAoe is true', () => {
+            setup();
+            const pid = 'p26';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { isAoe: true }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3, aoeAffectedCount: 3 } }));
+            const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
+            const rollEntry = logCalls.find(entry => entry.note === 'combined_save_damage_roll');
+            expect(rollEntry.aoeAffectedCount).toBe(3);
+        });
+
+        it('sets saveResult based on save success value', () => {
+            setup();
+            const pid = 'p27';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
+            const rollEntry = logCalls.find(entry => entry.note === 'combined_save_damage_roll');
+            expect(rollEntry.saveResult).toBe('failure');
+        });
+
+        it('includes mode based on metamagicHeighten', () => {
+            setup();
+            const pid = 'p28';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid, { metamagicHeighten: true }) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
+            const rollEntry = logCalls.find(entry => entry.note === 'combined_save_damage_roll');
+            expect(rollEntry.mode).toBe('disadvantage');
+        });
+
+        it('includes mode as normal when not metamagicHeighten', () => {
+            setup();
+            const pid = 'p29';
+            window.__pendingSaves = { [pid]: createSavePrompt(pid) };
+            window.dispatchEvent(new CustomEvent('save-result', { detail: { promptId: pid, targetName: 'Goblin', success: false, roll: 8, total: 11, saveBonus: 3 } }));
+            const logCalls = deps.logEntry.mock.calls.map(c => c[0]);
+            const rollEntry = logCalls.find(entry => entry.note === 'combined_save_damage_roll');
+            expect(rollEntry.mode).toBe('normal');
         });
     });
 
+    // --- death-save-result event ---
     describe('death-save-result event', () => {
         it('logs death save entry with basic fields', () => {
             setup();
-            window.dispatchEvent(new CustomEvent('death-save-result', {
-                detail: {
-                    targetName: 'InjuredAlly',
-                    roll: 15,
-                    isNat20: false,
-                    isNat1: false,
-                    success: true,
-                },
-            }));
-
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'death_save',
-                characterName: 'InjuredAlly',
-                roll: 15,
-                success: true,
-            }));
+            window.dispatchEvent(new CustomEvent('death-save-result', { detail: { targetName: 'InjuredAlly', roll: 15, isNat20: false, isNat1: false, success: true } }));
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ type: 'death_save', characterName: 'InjuredAlly', roll: 15, success: true }));
         });
 
         it('handles natural 20 death save', () => {
             setup();
-            window.dispatchEvent(new CustomEvent('death-save-result', {
-                detail: {
-                    targetName: 'InjuredAlly',
-                    roll: 20,
-                    isNat20: true,
-                    isNat1: false,
-                    success: true,
-                },
-            }));
-
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                isNatural20: true,
-            }));
+            window.dispatchEvent(new CustomEvent('death-save-result', { detail: { targetName: 'InjuredAlly', roll: 20, isNat20: true, isNat1: false, success: true } }));
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ isNatural20: true }));
         });
 
         it('handles natural 1 death save', () => {
             setup();
-            window.dispatchEvent(new CustomEvent('death-save-result', {
-                detail: {
-                    targetName: 'InjuredAlly',
-                    roll: 1,
-                    isNat20: false,
-                    isNat1: true,
-                    success: false,
-                },
-            }));
-
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                isNatural1: true,
-            }));
+            window.dispatchEvent(new CustomEvent('death-save-result', { detail: { targetName: 'InjuredAlly', roll: 1, isNat20: false, isNat1: true, success: false } }));
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ isNatural1: true }));
         });
     });
 
+    // --- concentration-result event ---
     describe('concentration-result event', () => {
         it('logs concentration save entry', () => {
             setup();
-            window.dispatchEvent(new CustomEvent('concentration-result', {
-                detail: {
-                    targetName: 'TestWizard',
-                    roll: 15,
-                    total: 18,
-                    saveBonus: 3,
-                    bonusDetail: '+3',
-                    spellName: 'Fireball',
-                    dc: 15,
-                    success: true,
-                },
-            }));
-
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'roll',
-                rollType: 'concentration-save',
-                name: 'Constitution',
-                condition: 'Concentration: Fireball',
-            }));
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'TestWizard', roll: 15, total: 18, saveBonus: 3, bonusDetail: '+3', spellName: 'Fireball', dc: 15, success: true } }));
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({ type: 'roll', rollType: 'concentration-save', name: 'Constitution', condition: 'Concentration: Fireball' }));
         });
 
         it('clears concentration on combat summary when failed', () => {
             setup();
-            getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'TestWizard', concentration: 'Fireball' }],
-            });
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestWizard', concentration: 'Fireball' }] });
             storage.set.mockReturnValue(undefined);
-
-            window.dispatchEvent(new CustomEvent('concentration-result', {
-                detail: {
-                    targetName: 'TestWizard',
-                    roll: 5,
-                    total: 8,
-                    saveBonus: 3,
-                    bonusDetail: '+3',
-                    spellName: 'Fireball',
-                    dc: 15,
-                    success: false,
-                },
-            }));
-
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'TestWizard', roll: 5, total: 8, saveBonus: 3, bonusDetail: '+3', spellName: 'Fireball', dc: 15, success: false } }));
             expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
         });
 
         it('dispatches combat-summary-updated event on concentration break', () => {
             setup();
-            getCombatSummary.mockReturnValue({
-                creatures: [{ name: 'TestWizard', concentration: 'Fireball' }],
-            });
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestWizard', concentration: 'Fireball' }] });
             storage.set.mockReturnValue(undefined);
-
             const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
-            window.dispatchEvent(new CustomEvent('concentration-result', {
-                detail: {
-                    targetName: 'TestWizard',
-                    roll: 5,
-                    total: 8,
-                    saveBonus: 3,
-                    bonusDetail: '+3',
-                    spellName: 'Fireball',
-                    dc: 15,
-                    success: false,
-                },
-            }));
-
-            expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'combat-summary-updated',
-            }));
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'TestWizard', roll: 5, total: 8, saveBonus: 3, bonusDetail: '+3', spellName: 'Fireball', dc: 15, success: false } }));
+            expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
             dispatchEventSpy.mockRestore();
+        });
+
+        it('clears mantleOfMajestyActive on concentration break', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestWizard', concentration: 'Fireball' }] });
+            storage.set.mockReturnValue(undefined);
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'TestWizard', roll: 5, total: 8, saveBonus: 3, bonusDetail: '+3', spellName: 'Fireball', dc: 15, success: false } }));
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'mantleOfMajestyActive', null, 'test-campaign');
+        });
+
+        it('does not clear concentration when save succeeds', () => {
+            setup();
+            const creature = { name: 'TestWizard', concentration: { spell: 'Fireball' } };
+            getCombatSummary.mockReturnValue({ creatures: [creature] });
+            storage.set.mockReturnValue(undefined);
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'TestWizard', roll: 18, total: 21, saveBonus: 3, bonusDetail: '+3', spellName: 'Fireball', dc: 15, success: true } }));
+            expect(creature.concentration).toEqual({ spell: 'Fireball' });
+        });
+
+        it('finds creature by name prefix for concentration', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestWizard Level 5', concentration: 'Fireball' }] });
+            storage.set.mockReturnValue(undefined);
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'TestWizard Level 5', roll: 5, total: 8, saveBonus: 3, bonusDetail: '+3', spellName: 'Fireball', dc: 15, success: false } }));
+            expect(storage.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), 'test-campaign');
+        });
+
+        it('does not dispatch combat-summary-updated when creature not found', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [] });
+            const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'Unknown', roll: 5, total: 8, saveBonus: 3, bonusDetail: '+3', spellName: 'Fireball', dc: 15, success: false } }));
+            const calls = dispatchEventSpy.mock.calls.map(c => c[0]);
+            const combatUpdatedCalls = calls.filter(e => e.type === 'combat-summary-updated');
+            expect(combatUpdatedCalls).toHaveLength(0);
+            dispatchEventSpy.mockRestore();
+        });
+
+        it('does not dispatch event when creature succeeds concentration', () => {
+            setup();
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'TestWizard', concentration: 'Fireball' }] });
+            const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'TestWizard', roll: 18, total: 21, saveBonus: 3, bonusDetail: '+3', spellName: 'Fireball', dc: 15, success: true } }));
+            const calls = dispatchEventSpy.mock.calls.map(c => c[0]);
+            const combatUpdatedCalls = calls.filter(e => e.type === 'combat-summary-updated');
+            expect(combatUpdatedCalls).toHaveLength(0);
+            dispatchEventSpy.mockRestore();
+        });
+
+        it('includes all expected fields in concentration log entry', () => {
+            setup();
+            window.dispatchEvent(new CustomEvent('concentration-result', { detail: { targetName: 'TestWizard', roll: 15, total: 18, saveBonus: 3, bonusDetail: '+3', spellName: 'Shield', dc: 12, success: true } }));
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+                type: 'roll', characterName: 'TestWizard', rollType: 'concentration-save', name: 'Constitution',
+                rolls: [15], mode: 'normal', total: 18, bonus: 3, bonusDetail: '+3', condition: 'Concentration: Shield',
+                dc: 12, success: true, timestamp: expect.any(Number), id: expect.any(String),
+            }));
         });
     });
 
+    // --- one-time setup ---
     describe('one-time setup', () => {
         it('only installs handlers once via window flag', () => {
-            setup();
-            setup();
-            setup();
+            setup(); setup(); setup();
             expect(window.__pendingResultHandlersInstalled).toBe(true);
         });
     });

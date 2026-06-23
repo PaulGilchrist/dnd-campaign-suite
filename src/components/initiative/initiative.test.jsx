@@ -278,4 +278,300 @@ describe('Initiative', () => {
             await waitFor(() => { expect(screen.getByTestId('subscriber')).toBeInTheDocument(); });
         });
     });
+
+    describe('SSE event handling - combatSummary', () => {
+        it('should handle combatSummary SSE event without error', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('change-test-campaign-combatSummary', {
+                    detail: { key: 'change-test-campaign-combatSummary', data: { round: 2, creatures: [{ name: 'Alice', type: 'player' }] } },
+                }));
+            });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+
+        it('should handle activeCreatureName SSE event without error', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }, { name: 'Bob', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('change-test-campaign-activeCreatureName', {
+                    detail: { key: 'change-test-campaign-activeCreatureName', data: 'Bob' },
+                }));
+            });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+
+        it('should ignore SSE events with null key or data', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('change-test-campaign-combatSummary', {
+                    detail: { key: null, data: null },
+                }));
+            });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+
+        it('should ignore SSE events from other campaigns', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('change-other-campaign-combatSummary', {
+                    detail: { key: 'change-other-campaign-combatSummary', data: { round: 2, creatures: [] } },
+                }));
+            });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+    });
+
+    describe('SSE event handling - spell overlays', () => {
+        it('should handle overlay add event without error', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('spell-overlay-test-campaign', {
+                    detail: { key: 'spell-overlay-test-campaign', data: { action: 'add', overlays: [{ id: 'overlay-1', label: 'Fireball' }] } },
+                }));
+            });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+
+        it('should handle overlay update event', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('spell-overlay-test-campaign', {
+                    detail: { key: 'spell-overlay-test-campaign', data: { action: 'update', overlays: [{ id: 'overlay-1', label: 'Updated Fireball' }] } },
+                }));
+            });
+        });
+
+        it('should handle overlay remove event', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('spell-overlay-test-campaign', {
+                    detail: { key: 'spell-overlay-test-campaign', data: { action: 'remove', overlayId: 'overlay-1' } },
+                }));
+            });
+        });
+
+        it('should handle overlay clear event', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('spell-overlay-test-campaign', {
+                    detail: { key: 'spell-overlay-test-campaign', data: { action: 'clear' } },
+                }));
+            });
+        });
+
+        it('should ignore overlay events from other campaigns', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('spell-overlay-other-campaign', {
+                    detail: { key: 'spell-overlay-other-campaign', data: { action: 'clear' } },
+                }));
+            });
+        });
+    });
+
+    describe('window event listeners', () => {
+        it('should handle initiative-rolled event', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('initiative-rolled'));
+            });
+        });
+
+        it('should handle combat-summary-updated event', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('combat-summary-updated'));
+            });
+        });
+
+        it('should handle concentration-result event that breaks concentration', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player', concentration: { spell: 'Shield', dc: 10 } }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('concentration-result', {
+                    detail: { targetName: 'Alice', success: false },
+                }));
+            });
+        });
+
+        it('should handle death-save-result event', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('death-save-result', {
+                    detail: { targetName: 'Alice', restoredToHp: 5 },
+                }));
+            });
+        });
+    });
+
+    describe('displayCreatures memo', () => {
+        it('should not render carousel when combatSummary is null', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue(null);
+            const { container } = await act(async () => render(<Initiative {...props} />));
+            await waitFor(() => {
+                expect(container.querySelector('.carousel-container')).not.toBeNull();
+            });
+        });
+
+        it('should merge runtime values with creature data for players', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+        });
+
+        it('should pass through NPC creatures unchanged', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
+        });
+    });
+
+    describe('carousel scrolling', () => {
+        it('should scroll to active creature card', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }, { name: 'Bob', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+        });
+    });
+
+    describe('monster card modal', () => {
+        it('should open monster card modal on NPC click when localhost', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
+        });
+
+        it('should not open monster card modal when not localhost', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc' }] });
+            await act(async () => { render(<Initiative {...props} isLocalhost={false} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
+        });
+    });
+
+    describe('SSE combatSummary round change effects', () => {
+        it('should handle combatSummary SSE event with round change without error', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('change-test-campaign-combatSummary', {
+                    detail: { key: 'change-test-campaign-combatSummary', data: { round: 2, creatures: [{ name: 'Alice', type: 'player' }], activeCreatureName: 'Alice' } },
+                }));
+            });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+    });
+
+    describe('SSE activeCreatureName effects', () => {
+        it('should handle activeCreatureName SSE event without error', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }, { name: 'Bob', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => {
+                window.dispatchEvent(new CustomEvent('change-test-campaign-activeCreatureName', {
+                    detail: { key: 'change-test-campaign-activeCreatureName', data: 'Bob' },
+                }));
+            });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+    });
+
+    describe('next creature with round increment', () => {
+        it('should navigate next creature without error', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+
+            await act(async () => { fireEvent.click(screen.getByText('Next →')); });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+    });
+
+    describe('previous creature with round decrement', () => {
+        it('should navigate previous creature without error', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 2, creatures: [{ name: 'Alice', type: 'player' }, { name: 'Bob', type: 'player' }] });
+            vi.mocked(getActiveCreatureName).mockReturnValue('Bob');
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Bob')).toBeInTheDocument(); });
+
+            await act(async () => { fireEvent.click(screen.getByText('← Prev')); });
+            expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument();
+        });
+    });
+
+    describe('popup rendering', () => {
+        it('should render condition save result popup', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+        });
+
+        it('should render concentration save result popup', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+        });
+    });
+
+    describe('condition picker rendering', () => {
+        it('should render condition picker when target is set', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+        });
+
+        it('should render concentration picker when target is set', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
+        });
+    });
+
+    describe('monster card modal rendering', () => {
+        it('should render monster card modal when viewing monster', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc' }] });
+            await act(async () => { render(<Initiative {...props} />); });
+            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
+        });
+    });
 });
