@@ -52,6 +52,7 @@ import { handle as handleCosmicOmen } from './handlers/class-sorcerer/cosmicOmen
 import { handle as handleTwinklingConstellation } from './handlers/class-sorcerer/twinklingConstellationHandler.js';
 import { handle as handleTacticalMind } from './handlers/class-fighter-rogue/tacticalMindHandler.js';
 import { handle as handleCombatSuperiority } from './handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { handleCombatSuperiorityBonusAction, handleCombatSuperiorityReaction, handleCombatSuperiorityGrantAttack, handleCombatSuperiorityMovement, handleCombatSuperioritySkillCheck } from './handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { handle as handleKnowEnemy } from './handlers/class-fighter-rogue/knowEnemyHandler.js';
 import { handle as handleWarBond } from './handlers/class-fighter-rogue/warBondHandler.js';
 import { handle as handleWarMagicCantrip } from './handlers/class-fighter-rogue/warMagicCantripHandler.js';
@@ -267,8 +268,13 @@ const HANDLER_MAP = {
         cosmic_omen: handleCosmicOmen,
         twinkling_constellations: handleTwinklingConstellation,
         tactical_mind: handleTacticalMind,
-        combat_superiority: handleCombatSuperiority,
-        know_enemy: handleKnowEnemy,
+         combat_superiority: handleCombatSuperiority,
+          combat_superiority_bonus_action: handleCombatSuperiorityBonusAction,
+           combat_superiority_reaction: handleCombatSuperiorityReaction,
+            combat_superiority_grant_attack: handleCombatSuperiorityGrantAttack,
+            combat_superiority_movement: handleCombatSuperiorityMovement,
+            combat_superiority_skill_check: handleCombatSuperioritySkillCheck,
+          know_enemy: handleKnowEnemy,
         war_bond_summon: handleWarBond,
         war_magic_cantrip: handleWarMagicCantrip,
         war_magic_spell: handleWarMagicSpell,

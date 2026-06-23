@@ -9,6 +9,7 @@ import * as proficiencyUtils from '../character/proficiencyUtils.js';
 import * as proficiencyUtils2024 from '../character/proficiencyUtils2024.js';
 import { getAbilities as getAbilities5e, getHitPoints as getHitPoints5e, getCarryingCapacity as getCarryingCapacity5e } from './core/abilityCalc.js';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { loadManeuvers } from '../ui/dataLoader.js';
 import { getAbilities as getAbilities2024, getHitPoints as getHitPoints2024, getCarryingCapacity as getCarryingCapacity2024 } from './core/abilityCalc2024.js';
 import { getElfisLineageSelection } from '../automation/handlers/class-other/elfishLineageHandler.js';
 import { getSpellAbilities as getSpellAbilities5e } from './core/spellCalc.js';
@@ -880,8 +881,8 @@ const rules = {
               }
          }
 
-         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-        playerStats.saveModifiers = collectSaveModifiers(allFeatures);
+          playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+         playerStats.saveModifiers = collectSaveModifiers(allFeatures);
         playerStats.evasionEffects = getEvasionEffects(allFeatures);
         playerStats.automationConditionImmunities = getConditionImmunities(allFeatures);
         playerStats.automationConditionalImmunities = getConditionalImmunities(allFeatures);
@@ -1075,7 +1076,135 @@ const rules = {
                 });
             });
             // Re-process automation with feat features included
-            playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+
+         try {
+             const maneuverSelection = getRuntimeValue(playerStats.name, 'BattleMasterManeuvers_selection', playerSummary.campaignName);
+             const knownNames = Array.isArray(maneuverSelection) ? maneuverSelection : [];
+             if (knownNames.length > 0) {
+                 const maneuvers = await loadManeuvers(playerStats.rules || '2024');
+                 const bonusActionManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'bonus_action');
+                  if (bonusActionManeuvers.length > 0) {
+                      bonusActionManeuvers.forEach(m => {
+                          allFeatures.push({
+                              name: m.name,
+                              description: m.description || '',
+                              automation: {
+                                  type: 'combat_superiority_bonus_action',
+                                  maneuverName: m.name,
+                                  actionType: 'bonus_action',
+                                  effect: m.effect,
+                                  saveType: m.saveType || null,
+                                  saveAbility: m.saveAbility || null,
+                                  conditionInflicted: m.conditionInflicted || null,
+                                  value: m.value || null,
+                                  range: m.range || null,
+                                  damageBonus: m.damageBonus || false,
+                                  dieExpression: m.dieExpression || 'superiority_die',
+                                  hasAutomation: true,
+                              },
+                              hasAutomation: true,
+                          });
+                      });
+                      playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                  }
+
+                  const reactionManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'reaction');
+                  if (reactionManeuvers.length > 0) {
+                      reactionManeuvers.forEach(m => {
+                          allFeatures.push({
+                              name: m.name,
+                              description: m.description || '',
+                              automation: {
+                                  type: 'combat_superiority_reaction',
+                                  maneuverName: m.name,
+                                  actionType: 'reaction',
+                                  trigger: m.trigger || null,
+                                  effect: m.effect,
+                                  modifierAbility: m.modifierAbility || null,
+                                  damageBonus: m.damageBonus || false,
+                                  dieExpression: m.dieExpression || 'superiority_die',
+                                  hasAutomation: true,
+                              },
+                              hasAutomation: true,
+                          });
+                      });
+                      playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                  }
+
+                  const grantAttackManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'grant_attack');
+                  if (grantAttackManeuvers.length > 0) {
+                      grantAttackManeuvers.forEach(m => {
+                          allFeatures.push({
+                              name: m.name,
+                              description: m.description || '',
+                              automation: {
+                                  type: 'combat_superiority_grant_attack',
+                                  maneuverName: m.name,
+                                  actionType: 'grant_attack',
+                                  trigger: m.trigger || null,
+                                  effect: m.effect,
+                                  damageBonus: m.damageBonus || false,
+                                  dieExpression: m.dieExpression || 'superiority_die',
+                                  range: m.range || '30_ft',
+                                  oncePerTurn: true,
+                                  hasAutomation: true,
+                              },
+                              hasAutomation: true,
+                          });
+                      });
+                      playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                  }
+
+                   const movementManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'movement');
+                   if (movementManeuvers.length > 0) {
+                       movementManeuvers.forEach(m => {
+                           allFeatures.push({
+                               name: m.name,
+                               description: m.description || '',
+                               automation: {
+                                   type: 'combat_superiority_movement',
+                                   maneuverName: m.name,
+                                   actionType: 'movement',
+                                   trigger: m.trigger || null,
+                                   effect: m.effect,
+                                   damageBonus: m.damageBonus || false,
+                                   dieExpression: m.dieExpression || 'superiority_die',
+                                   range: m.range || '5_ft',
+                                   hasAutomation: true,
+                               },
+                               hasAutomation: true,
+                           });
+                       });
+                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                   }
+
+                   const skillCheckManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'skill_check');
+                   if (skillCheckManeuvers.length > 0) {
+                       skillCheckManeuvers.forEach(m => {
+                           allFeatures.push({
+                               name: m.name,
+                               description: m.description || '',
+                               automation: {
+                                   type: 'combat_superiority_skill_check',
+                                   maneuverName: m.name,
+                                   actionType: 'skill_check',
+                                   skills: m.skills || [],
+                                   ability: m.ability || null,
+                                   initiativeBonus: m.initiativeBonus || false,
+                                   damageBonus: m.damageBonus || false,
+                                   dieExpression: m.dieExpression || 'superiority_die',
+                                   hasAutomation: true,
+                               },
+                               hasAutomation: true,
+                           });
+                       });
+                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                   }
+               }
+          } catch (_e) {
+             // Maneuver data not available, skip
+         }
             playerStats.saveModifiers = collectSaveModifiers(allFeatures);
         }
 

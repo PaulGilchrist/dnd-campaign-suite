@@ -45,6 +45,7 @@ import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
 import MoonlightStepResourceModal from './modals/MoonlightStepResourceModal.jsx'
 import ConstellationSelectionModal from './modals/ConstellationSelectionModal.jsx'
 import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx'
+import AttackRiderManeuverPrompt from './modals/AttackRiderManeuverPrompt.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 
 export default function CharActionModals({
@@ -100,6 +101,7 @@ export default function CharActionModals({
     hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
     arcaneWardRestoreModal, setArcaneWardRestoreModal,
     combatSuperiorityModal, setCombatSuperiorityModal,
+    attackRiderManeuverPrompt,
     divineFuryChoice,
     damageTypeChoice,
     featureChoice,
@@ -121,6 +123,8 @@ export default function CharActionModals({
     handleConstellationSelect,
     handleElderChampionRestore,
     handleCombatSuperiorityConfirm,
+    handleAttackRiderManeuverUse,
+    handleAttackRiderManeuverSkip,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -502,6 +506,16 @@ export default function CharActionModals({
                     campaignName={campaignName}
                     onClose={() => setCombatSuperiorityModal(null)}
                     onConfirm={handleCombatSuperiorityConfirm}
+                />
+            )}
+            {attackRiderManeuverPrompt && (
+                <AttackRiderManeuverPrompt
+                    maneuvers={attackRiderManeuverPrompt.maneuvers}
+                    attack={attackRiderManeuverPrompt.attack}
+                    popupHtml={attackRiderManeuverPrompt.popupHtml}
+                    isMiss={attackRiderManeuverPrompt.isMiss}
+                    onUse={handleAttackRiderManeuverUse}
+                    onSkip={handleAttackRiderManeuverSkip}
                 />
             )}
             {divineFuryChoice && (

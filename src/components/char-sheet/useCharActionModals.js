@@ -59,6 +59,7 @@ export default function useCharActionModals({
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
     const [featureChoice, setFeatureChoice] = useState(null);
+    const [attackRiderManeuverPrompt, setAttackRiderManeuverPrompt] = useState(null);
 
     const pendingDamageRef = useRef(null);
     const [cleaveAttackPending, setCleaveAttackPending] = useState(null);
@@ -67,6 +68,7 @@ export default function useCharActionModals({
         playerStats, campaignName, mapName,
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
         setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal, setAttackRiderModal,
+        setAttackRiderManeuverPrompt,
         pendingDamageRef,
     });
 
@@ -156,6 +158,7 @@ export default function useCharActionModals({
         divineFuryChoice, setDivineFuryChoice,
         damageTypeChoice, setDamageTypeChoice,
         featureChoice, setFeatureChoice,
+        attackRiderManeuverPrompt, setAttackRiderManeuverPrompt,
         handleDamageClick,
         handleMasteryClose,
         handleWeaponMasteryChoice,

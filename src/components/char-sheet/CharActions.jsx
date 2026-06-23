@@ -252,6 +252,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
         arcaneWardRestoreModal, setArcaneWardRestoreModal,
         combatSuperiorityModal, setCombatSuperiorityModal,
+        attackRiderManeuverPrompt, setAttackRiderManeuverPrompt,
+        handleAttackRiderManeuverUse,
+        handleAttackRiderManeuverSkip,
     } = useCharActionModals({
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
@@ -863,7 +866,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     hypnoticPatternShakeModal={hypnoticPatternShakeModal} setHypnoticPatternShakeModal={setHypnoticPatternShakeModal}
                     arcaneWardRestoreModal={arcaneWardRestoreModal} setArcaneWardRestoreModal={setArcaneWardRestoreModal}
                     combatSuperiorityModal={combatSuperiorityModal} setCombatSuperiorityModal={setCombatSuperiorityModal}
+                    attackRiderManeuverPrompt={attackRiderManeuverPrompt} setAttackRiderManeuverPrompt={setAttackRiderManeuverPrompt}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
+                    handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
+                    handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
                     divineFuryChoice={divineFuryChoice}
                     damageTypeChoice={damageTypeChoice}
                     featureChoice={featureChoice}

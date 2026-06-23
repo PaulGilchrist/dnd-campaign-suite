@@ -490,6 +490,24 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 } else {
                     result.specialActions.push(info)
                 }
+                if (info.bonusActionManeuvers) {
+                    result.bonusActions.push(...info.bonusActionManeuvers)
+                }
+                break
+            case 'combat_superiority_bonus_action':
+                result.bonusActions.push(info)
+                break
+            case 'combat_superiority_reaction':
+                result.reactions.push(info)
+                break
+            case 'combat_superiority_grant_attack':
+                result.actions.push(info)
+                break
+            case 'combat_superiority_movement':
+                result.specialActions.push(info)
+                break
+            case 'combat_superiority_skill_check':
+                result.specialActions.push(info)
                 break
             case 'know_enemy':
                 result.bonusActions.push(info)

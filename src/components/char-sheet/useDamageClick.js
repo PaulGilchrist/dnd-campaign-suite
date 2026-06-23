@@ -7,11 +7,13 @@ import { collectWeaponMastery, evaluateAutoExpression, hasTwoWeaponFighting } fr
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';
+import { getAttackRiderOptions, getAttackRiderOptionsByContext, executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
 export default function useDamageClick({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
     setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal, setAttackRiderModal,
+    setAttackRiderManeuverPrompt,
     pendingDamageRef,
 }) {
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
@@ -37,6 +39,45 @@ export default function useDamageClick({
                 const usedKey = '_Hunters_Prey_HordeBreaker_UsedRound';
                 const currentRound = getCurrentCombatRound();
                 setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+            }
+        }
+
+        // Battle Master Attack Rider Maneuvers: prompt for maneuver selection on hit
+        const isHit = popupHtml?.hit === true || popupHtml?.isCrit === true;
+        if (isHit && setAttackRiderManeuverPrompt) {
+            const attackInfo = {
+                weaponType: attack.weaponType,
+                isUnarmedStrike: attack.weaponType === 'unarmed',
+                targetName: popupHtml?.targetName || null,
+            };
+            const availableManeuvers = await getAttackRiderOptions(playerStats, campaignName, attackInfo);
+            if (availableManeuvers.length > 0) {
+                setAttackRiderManeuverPrompt({
+                    maneuvers: availableManeuvers,
+                    attack,
+                    popupHtml,
+                });
+                return;
+            }
+        }
+
+        // Precision Attack: if attack missed, offer to add superiority die to the attack roll
+        const isMiss = popupHtml?.hit === false && popupHtml?.isCrit !== true;
+        if (isMiss && setAttackRiderManeuverPrompt) {
+            const attackInfo = {
+                weaponType: attack.weaponType,
+                isUnarmedStrike: attack.weaponType === 'unarmed',
+                targetName: popupHtml?.targetName || null,
+            };
+            const availableManeuvers = await getAttackRiderOptionsByContext(playerStats, campaignName, attackInfo, 'miss');
+            if (availableManeuvers.length > 0) {
+                setAttackRiderManeuverPrompt({
+                    maneuvers: availableManeuvers,
+                    attack,
+                    popupHtml,
+                    isMiss: true,
+                });
+                return;
             }
         }
 
@@ -1132,5 +1173,85 @@ export default function useDamageClick({
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
-    return { handleDamageClick, proceedWithDamage };
+    const handleAttackRiderManeuverUse = async (maneuverName, attack, popupHtmlData, currentFormula, currentTotal, currentRolls) => {
+        const attackInfo = {
+            weaponType: attack.weaponType,
+            isUnarmedStrike: attack.weaponType === 'unarmed',
+            targetName: popupHtmlData?.targetName || null,
+        };
+        const action = { automation: {} };
+        const result = await executeAttackRiderManeuverService(action, playerStats, campaignName, maneuverName, attackInfo);
+
+        let updatedFormula = currentFormula;
+        let updatedTotal = currentTotal;
+        let updatedRolls = [...currentRolls];
+
+        if (popupHtmlData?.isMiss && popupHtml) {
+            const maneuver = popupHtmlData?.maneuvers?.find(m => m.name === maneuverName);
+            if (maneuver) {
+                const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
+                const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
+                const origTotal = popupHtml.total || 0;
+                const origD20 = popupHtml.d20Roll || 0;
+                const newD20 = origD20 + dieValue;
+                const hitBonus = popupHtml.hitBonus || 0;
+                const newTotal = newD20 + hitBonus;
+                const targetAC = popupHtml.targetAC || 10;
+                const newHit = newTotal >= targetAC;
+                const isNatural20 = newD20 === 20;
+                const wasCrit = popupHtml.isCrit;
+
+                const updatedPopup = {
+                    ...popupHtml,
+                    total: newTotal,
+                    d20Roll: newD20,
+                    hit: newHit,
+                    isCrit: isNatural20 || wasCrit,
+                    isNatural20: isNatural20,
+                    superiorityDieAdded: dieValue,
+                    originalTotal: origTotal,
+                    originalD20: origD20,
+                };
+
+                const dieDesc = `Precision Attack: Added ${dieValue} to the attack roll (${origD20} + ${dieValue} = ${newD20}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
+
+                setAttackRiderManeuverPrompt(null);
+                setPopupHtml(updatedPopup);
+
+                return {
+                    formula: updatedFormula,
+                    total: updatedTotal,
+                    rolls: updatedRolls,
+                    isMissResult: true,
+                    hit: newHit,
+                    description: dieDesc,
+                };
+            }
+        } else {
+            if (result?.type === 'popup') {
+                const maneuver = popupHtmlData?.maneuvers?.find(m => m.name === maneuverName);
+                if (maneuver?.damageBonus) {
+                    const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
+                    const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
+                    const dmgType = attack.damageType || 'same_as_weapon';
+                    updatedFormula += ` + ${dieValue}[${dmgType}]`;
+                    updatedTotal += dieValue;
+                    updatedRolls = [...updatedRolls, dieValue];
+                }
+            }
+
+            setAttackRiderManeuverPrompt(null);
+            if (result?.type === 'popup') {
+                setPopupHtml(result.payload);
+            }
+        }
+
+        return { formula: updatedFormula, total: updatedTotal, rolls: updatedRolls };
+    };
+
+    const handleAttackRiderManeuverSkip = () => {
+        setAttackRiderManeuverPrompt(null);
+    };
+
+    return { handleDamageClick, proceedWithDamage, handleAttackRiderManeuverUse, handleAttackRiderManeuverSkip };
 }
