@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Popup from '../common/Popup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
@@ -15,7 +15,8 @@ import { onSpellMasterySelected } from '../../services/automation/handlers/class
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
 import { onCombatSuperioritySelected, executeAttackRiderManeuver } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { addEntry } from '../../services/ui/logService.js';
-import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const [popupHtml, setPopupHtml] = useState(null);
@@ -136,11 +137,25 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
         }
     }, [combatSuperiorityModal, playerStats, campaignName]);
 
+    const popupHtmlRef = useRef(null);
+    useEffect(() => {
+        /* global MutationObserver */
+        const parent = document.querySelector('.char-actions');
+        if (!parent) return;
+        const observer = new MutationObserver(() => {
+            const popup = parent.querySelector('[class*="Popup"]') || parent.querySelector('.popup');
+            popupHtmlRef.current = !!popup;
+        });
+        observer.observe(parent, { childList: true, subtree: true });
+        return () => observer.disconnect();
+    }, []);
+
     useEffect(() => {
         let handledPending = false;
         const checkAndHandlePending = () => {
+            if (combatSuperiorityModal) return;
             const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt');
-            if (!pending || !pending.attackContext && !pending.skillContext) {
+            if (!pending || (!pending.attackContext && !pending.skillContext)) {
                 if (handledPending) handledPending = false;
                 return;
             }
@@ -162,22 +177,30 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 name: 'Combat Superiority',
             };
 
-            executeHandler(handlerAction, playerStats, campaignName, null).then(result => {
-                if (result && result.type === 'modal' && result.modalName === 'combatSuperiority') {
-                    setCombatSuperiorityModal(result.payload);
-                    setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+            const checkPopupVisible = () => {
+                if (popupHtmlRef.current) {
+                    setTimeout(checkPopupVisible, 200);
+                    return;
                 }
-            }).catch(e => {
-                console.error('[CharSpecialActions] Error checking pending Combat Superiority prompt:', e);
-                setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
-            });
+                executeHandler(handlerAction, playerStats, campaignName, null).then(result => {
+                    if (result && result.type === 'modal' && result.modalName === 'combatSuperiority') {
+                        setCombatSuperiorityModal(result.payload);
+                        setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+                    }
+                }).catch(e => {
+                    console.error('[CharSpecialActions] Error checking pending Combat Superiority prompt:', e);
+                    setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+                });
+            };
+
+            setTimeout(checkPopupVisible, SHOW_DICE_ROLL_DELAY);
         };
 
-        const removeListener = addStorageChangeListener(playerStats.name, checkAndHandlePending);
-        return () => {
-            removeListener();
-        };
-    }, [playerStats, campaignName]);
+        const intervalId = setInterval(checkAndHandlePending, 500);
+        return () => clearInterval(intervalId);
+    }, [combatSuperiorityModal, playerStats, campaignName]);
+
+
 
     // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];
