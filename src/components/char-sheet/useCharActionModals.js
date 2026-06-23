@@ -16,6 +16,7 @@ export default function useCharActionModals({
     const [openHandTechniqueModal, setOpenHandTechniqueModal] = useState(null);
     const [weaponMasteryModal, setWeaponMasteryModal] = useState(null);
     const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
+    const [weaponKindMasteryModal, setWeaponKindMasteryModal] = useState(null);
     const [combatStanceModal, setCombatStanceModal] = useState(null);
     const [teleportModal, setTeleportModal] = useState(null);
     const [healingIllusionModal, setHealingIllusionModal] = useState(null);
@@ -116,6 +117,7 @@ export default function useCharActionModals({
         openHandTechniqueModal, setOpenHandTechniqueModal,
         weaponMasteryModal, setWeaponMasteryModal,
         weaponMasteryChoiceModal, setWeaponMasteryChoiceModal,
+        weaponKindMasteryModal, setWeaponKindMasteryModal,
         combatStanceModal, setCombatStanceModal,
         teleportModal, setTeleportModal,
         healingIllusionModal, setHealingIllusionModal,

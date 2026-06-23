@@ -486,11 +486,11 @@ describe('useModalHandlers - features & constellation', () => {
             expect(typeof handlers.handleElderChampionRestore).toBe('function');
         });
 
-        it('returns exactly 16 handler functions', () => {
+        it('returns exactly 17 handler functions', () => {
             const deps = createDeps();
             const handlers = useModalHandlers(deps);
             const handlerKeys = Object.keys(handlers);
-            expect(handlerKeys).toHaveLength(16);
+            expect(handlerKeys).toHaveLength(17);
             expect(handlerKeys).toEqual([
                 'handleMasteryClose',
                 'handleWeaponMasteryChoice',
@@ -508,6 +508,7 @@ describe('useModalHandlers - features & constellation', () => {
                 'handleFeatureChoiceSkip',
                 'handleConstellationSelect',
                 'handleElderChampionRestore',
+                'handleWeaponKindMasteryClose',
             ]);
         });
     });

@@ -3,8 +3,8 @@ import Popup from '../common/Popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import EmpoweredSpellPopup from './popups/EmpoweredSpellPopup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
+import { collectWeaponMastery } from '../../services/combat/automation/automationService.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
-import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
@@ -192,6 +192,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         openHandTechniqueModal, setOpenHandTechniqueModal,
         weaponMasteryModal,
         weaponMasteryChoiceModal, setWeaponMasteryChoiceModal,
+        weaponKindMasteryModal, setWeaponKindMasteryModal,
         combatStanceModal, setCombatStanceModal,
         teleportModal, setTeleportModal,
         healingIllusionModal, setHealingIllusionModal,
@@ -234,6 +235,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleDamageClick,
         handleMasteryClose,
         handleWeaponMasteryChoice,
+        handleWeaponKindMasteryClose,
         handleDivineFuryDamageType,
         handleDivineFurySkip,
         handleGenericDamageTypeChoice,
@@ -505,6 +507,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     case 'weaponMasteryChoice':
                         setWeaponMasteryChoiceModal(result.payload);
                         break;
+                    case 'weaponKindMastery':
+                        setWeaponKindMasteryModal(result.payload);
+                        break;
                     case 'wildMagicTamed':
                         setWildMagicTamedModal(result.payload);
                         break;
@@ -645,15 +650,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             return null;
         }
 
-        // Remove magic prefix if present
-        const nonMagicalName = parseMagicItemName(weaponName).baseName;
-
-        // Find the weapon in equipment
-        const weapon = playerStats.equipment?.find(item => item.name === nonMagicalName);
-        if (weapon && weapon.equipment_category === 'Weapon') {
-            return weapon.mastery;
-        }
-        return null;
+        const available = collectWeaponMastery(weaponName, playerStats);
+        return available.baseMastery || null;
     };
 
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
@@ -846,6 +844,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     openHandTechniqueModal={openHandTechniqueModal} setOpenHandTechniqueModal={setOpenHandTechniqueModal}
                     weaponMasteryModal={weaponMasteryModal}
                     weaponMasteryChoiceModal={weaponMasteryChoiceModal} setWeaponMasteryChoiceModal={setWeaponMasteryChoiceModal}
+                    weaponKindMasteryModal={weaponKindMasteryModal} setWeaponKindMasteryModal={setWeaponKindMasteryModal}
                     combatStanceModal={combatStanceModal} setCombatStanceModal={setCombatStanceModal}
                     teleportModal={teleportModal} setTeleportModal={setTeleportModal}
                     healingIllusionModal={healingIllusionModal} setHealingIllusionModal={setHealingIllusionModal}
@@ -897,6 +896,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     cleaveAttackPending={cleaveAttackPending}
                     handleMasteryClose={handleMasteryClose}
                     handleWeaponMasteryChoice={handleWeaponMasteryChoice}
+                    handleWeaponKindMasteryClose={handleWeaponKindMasteryClose}
                     handleCleaveAttack={handleCleaveAttack}
                     handleCleaveSkip={handleCleaveSkip}
                     handleDivineFuryDamageType={handleDivineFuryDamageType}

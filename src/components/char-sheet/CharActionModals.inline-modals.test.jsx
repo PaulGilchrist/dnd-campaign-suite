@@ -53,6 +53,11 @@ vi.mock('./modals/WeaponMasteryChoiceModal.jsx', () => ({
     );
   },
 }));
+vi.mock('./modals/WeaponKindMasteryModal.jsx', () => ({
+  default: function TestModal({ onClose }) {
+    return <div data-testid="weapon-kind-mastery-modal"><button data-testid="weapon-kind-mastery-close" onClick={onClose}>Close</button></div>;
+  },
+}));
 vi.mock('./modals/shared/CombatStanceModal.jsx', () => ({
   default: function TestModal({ onClose }) {
     return <div data-testid="combat-stance-modal"><button data-testid="combat-stance-close" onClick={onClose}>Close</button></div>;

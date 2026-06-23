@@ -14,7 +14,7 @@ export default function useModalHandlers({
     cleaveAttackPending,
     featureChoice,
     setDamageTypeChoice, setDivineFuryChoice,
-    setWeaponMasteryModal, setWeaponMasteryChoiceModal,
+    setWeaponMasteryModal, setWeaponMasteryChoiceModal, setWeaponKindMasteryModal,
     setCleaveAttackPending,
     setFeatureChoice,
     setStarryFormConstellationModal, setTwinklingConstellationModal,
@@ -311,6 +311,10 @@ export default function useModalHandlers({
         }
     };
 
+    const handleWeaponKindMasteryClose = () => {
+        setWeaponKindMasteryModal(null);
+    };
+
     return {
         handleMasteryClose,
         handleWeaponMasteryChoice,
@@ -328,5 +332,6 @@ export default function useModalHandlers({
         handleFeatureChoiceSkip,
         handleConstellationSelect,
         handleElderChampionRestore,
+        handleWeaponKindMasteryClose,
     };
 }

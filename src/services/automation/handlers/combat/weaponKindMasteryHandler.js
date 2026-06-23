@@ -51,7 +51,7 @@ export async function applySelections(weaponNames, playerStats, campaignName) {
     };
 }
 
-async function handleExistingSelection(action, playerStats, campaignName, existingWeapons, meleeOnly) {
+async function handleExistingSelection(action, playerStats, campaignName, existingWeapons) {
     await setRuntimeValue(playerStats.name, WEAPON_KIND_KEY, existingWeapons, campaignName);
 
     addEntry(campaignName, {

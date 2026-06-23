@@ -9,6 +9,7 @@ import AttackRiderModal from './modals/shared/AttackRiderModal.jsx'
 import OpenHandTechniqueModal from './modals/OpenHandTechniqueModal.jsx'
 import WeaponMasteryModal from './modals/WeaponMasteryModal.jsx'
 import WeaponMasteryChoiceModal from './modals/WeaponMasteryChoiceModal.jsx'
+import WeaponKindMasteryModal from './modals/WeaponKindMasteryModal.jsx'
 import BastionOfLawModal from './modals/divine/BastionOfLawModal.jsx'
 import CombatStanceModal from './modals/shared/CombatStanceModal.jsx'
 import TeleportModal from './modals/TeleportModal.jsx'
@@ -62,6 +63,7 @@ export default function CharActionModals({
     openHandTechniqueModal, setOpenHandTechniqueModal,
     weaponMasteryModal,
     weaponMasteryChoiceModal, setWeaponMasteryChoiceModal,
+    weaponKindMasteryModal,
     combatStanceModal, setCombatStanceModal,
     teleportModal, setTeleportModal,
     healingIllusionModal, setHealingIllusionModal,
@@ -109,6 +111,7 @@ export default function CharActionModals({
     cleaveAttackPending,
     handleMasteryClose,
     handleWeaponMasteryChoice,
+    handleWeaponKindMasteryClose,
     handleCleaveAttack,
     handleCleaveSkip,
     handleDivineFuryDamageType,
@@ -229,6 +232,14 @@ export default function CharActionModals({
                     campaignName={campaignName}
                     onClose={() => { setWeaponMasteryChoiceModal(null); }}
                     onConfirm={handleWeaponMasteryChoice}
+                />
+            )}
+            {weaponKindMasteryModal && (
+                <WeaponKindMasteryModal
+                    {...weaponKindMasteryModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={handleWeaponKindMasteryClose}
                 />
             )}
             {cleaveAttackPending && (

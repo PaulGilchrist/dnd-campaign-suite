@@ -4090,7 +4090,13 @@
             "name": "Weapon Mastery",
             "description": "Your training with weapons allows you to use the mastery properties of three kinds of Simple or Martial weapons of your choice. Whenever you finish a Long Rest, you can practice weapon drills and change one of those weapon choices. When you reach certain Fighter levels, you gain the ability to use the mastery properties of more kinds of weapons.",
             "level": 1,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+                "type": "weapon_kind_mastery",
+                "meleeOnly": false,
+                "maxKinds": "class_level_scaling",
+                "casting_time": "passive"
+            }
           }
         ],
         "feature_specific": {
@@ -6259,7 +6265,13 @@
             "name": "Weapon Mastery",
             "description": "Your training with weapons allows you to use the mastery properties of two kinds of weapons of your choice with which you have proficiency. Whenever you finish a Long Rest, you can change the kinds of weapons you chose.",
             "level": 1,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+                "type": "weapon_kind_mastery",
+                "meleeOnly": false,
+                "maxKinds": "class_level_scaling",
+                "casting_time": "passive"
+            }
           }
         ],
         "spellcasting": {
@@ -7322,7 +7334,13 @@
             "name": "Weapon Mastery",
             "description": "Your training with weapons allows you to use the mastery properties of two kinds of weapons of your choice with which you have proficiency. Whenever you finish a Long Rest, you can change the kinds of weapons you chose.",
             "level": 1,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+                "type": "weapon_kind_mastery",
+                "meleeOnly": false,
+                "maxKinds": "class_level_scaling",
+                "casting_time": "passive"
+            }
           }
         ],
         "spellcasting": {
@@ -8339,7 +8357,13 @@
             "name": "Weapon Mastery",
             "description": "Your training with weapons allows you to use the mastery properties of two kinds of weapons of your choice with which you have proficiency. Whenever you finish a Long Rest, you can change the kinds of weapons you chose.",
             "level": 1,
-            "type": "class_feature"
+            "type": "class_feature",
+            "automation": {
+                "type": "weapon_kind_mastery",
+                "meleeOnly": false,
+                "maxKinds": "class_level_scaling",
+                "casting_time": "passive"
+            }
           }
         ],
         "spellcasting": {

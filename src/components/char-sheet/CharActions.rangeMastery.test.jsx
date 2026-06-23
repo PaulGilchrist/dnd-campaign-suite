@@ -3,6 +3,7 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { showWeaponMasteryPopup } from '../../hooks/combat/useActionPopup.js';
+import * as automationService from '../../services/combat/automation/automationService.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
@@ -23,6 +24,10 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
   hasAutomation: vi.fn(() => false),
   collectWeaponMastery: vi.fn(() => ({ baseMastery: null, extraMasteries: [] })),
   evaluateAutoExpression: vi.fn(() => null),
+}));
+
+vi.mock('../../automation/common/choiceStorage.js', () => ({
+  getChosenRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
@@ -315,8 +320,13 @@ describe('CharActions range formatting', () => {
     });
   });
 
+  beforeEach(() => {
+    automationService.collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
+  });
+
   describe('weapon mastery with 2024 rules', () => {
     it('displays mastery text from equipment for a 2024 weapon', async () => {
+      automationService.collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap', extraMasteries: [] });
       const stats = createStats({
         rules: '2024',
         attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
@@ -347,6 +357,7 @@ describe('CharActions range formatting', () => {
     });
 
     it('strips magic prefix from attack name when looking up weapon mastery', async () => {
+      automationService.collectWeaponMastery.mockReturnValue({ baseMastery: 'Topple', extraMasteries: [] });
       const stats = createStats({
         rules: '2024',
         attacks: [{ name: '+1 Longsword', range: 5, hitBonus: 6, damage: '1d8+4', damageType: 'Slashing', type: 'Action' }],
@@ -357,6 +368,7 @@ describe('CharActions range formatting', () => {
     });
 
     it('invokes showWeaponMasteryPopup when mastery text is clicked', async () => {
+      automationService.collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap', extraMasteries: [] });
       const stats = createStats({
         rules: '2024',
         attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
