@@ -1,43 +1,54 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { generateHexTerrain, generateRiversFromTerrain } from './hexTerrainGenerator.js';
 import { TERRAIN_TYPES } from '../../config/outdoorConfig.js';
 
-const VALID_TERRAIN_IDS = new Set(TERRAIN_TYPES.map(t => t.id));
+const VALID_TERRAIN_IDS = new Set(TERRAIN_TYPES.map((t) => t.id));
+
+function terrainDistribution(terrain) {
+  const dist = {};
+  for (const t of Object.values(terrain)) {
+    dist[t] = (dist[t] || 0) + 1;
+  }
+  return dist;
+}
+
+function allRiversAreValidHexKeys(rivers) {
+  return rivers.every((r) => /^\d+,\d+$/.test(r));
+}
 
 describe('hexTerrainGenerator', () => {
   describe('generateHexTerrain', () => {
-    it('should return terrain and rivers', () => {
-      const result = generateHexTerrain({ gridSize: 10, seed: 42 });
+    it('should return object with terrain map and rivers array', () => {
+      const result = generateHexTerrain({ gridSize: 5, seed: 42 });
       expect(result).toHaveProperty('terrain');
       expect(result).toHaveProperty('rivers');
+      expect(typeof result.terrain).toBe('object');
+      expect(Array.isArray(result.rivers)).toBe(true);
     });
 
-    it('should return empty result for invalid gridSize', () => {
-      expect(generateHexTerrain({ gridSize: 0 })).toEqual({ terrain: {}, rivers: [] });
-      expect(generateHexTerrain({ gridSize: -1 })).toEqual({ terrain: {}, rivers: [] });
-    });
-
-    it('should return empty result for non-integer gridSize', () => {
-      expect(generateHexTerrain({ gridSize: 3.5 })).toEqual({ terrain: {}, rivers: [] });
-    });
-
-    it('should generate terrain for all hexes in grid', () => {
-      const result = generateHexTerrain({ gridSize: 5, seed: 42 });
-      expect(Object.keys(result.terrain).length).toBe(50);
-    });
-
-    it('should only produce valid terrain types', () => {
-      const result = generateHexTerrain({ gridSize: 10, seed: 42 });
-      for (const key of Object.keys(result.terrain)) {
-        expect(VALID_TERRAIN_IDS.has(result.terrain[key])).toBe(true);
+    it('should return empty terrain and rivers for invalid gridSize values', () => {
+      const invalidValues = [0, -1, -100, 3.5, NaN, Infinity];
+      for (const gs of invalidValues) {
+        expect(generateHexTerrain({ gridSize: gs })).toEqual({ terrain: {}, rivers: [] });
       }
+    });
+
+    it('should return empty result when seed is provided but gridSize is invalid', () => {
+      expect(generateHexTerrain({ gridSize: 0, seed: 42 })).toEqual({ terrain: {}, rivers: [] });
+    });
+
+    it('should not omit seed parameter when gridSize is valid', () => {
+      const result = generateHexTerrain({ seed: 42 });
+      expect(result).toHaveProperty('terrain');
+      expect(result).toHaveProperty('rivers');
     });
 
     it('should be deterministic with same seed', () => {
       const r1 = generateHexTerrain({ gridSize: 10, seed: 42 });
       const r2 = generateHexTerrain({ gridSize: 10, seed: 42 });
       expect(r1.terrain).toEqual(r2.terrain);
-      expect(r2.rivers).toEqual(r1.rivers);
+      expect(r1.rivers).toEqual(r2.rivers);
     });
 
     it('should produce different results with different seeds', () => {
@@ -46,46 +57,49 @@ describe('hexTerrainGenerator', () => {
       expect(r1.terrain).not.toEqual(r2.terrain);
     });
 
-    it('should frame edges with water', () => {
-      const result = generateHexTerrain({ gridSize: 10, seed: 42 });
-      expect(result.terrain['0,0']).toBe('water');
-      expect(result.terrain['9,9']).toBe('water');
-      expect(result.terrain['0,9']).toBe('water');
-      expect(result.terrain['9,0']).toBe('water');
+    it('should produce different results when no seed is provided', () => {
+      const r1 = generateHexTerrain({ gridSize: 5 });
+      const r2 = generateHexTerrain({ gridSize: 5 });
+      // Without a seed, two calls should almost certainly differ
+      expect(r1.terrain).not.toEqual(r2.terrain);
     });
 
-    it('should generate rivers as array of hex keys', () => {
-      const result = generateHexTerrain({ gridSize: 20, seed: 42 });
-      expect(Array.isArray(result.rivers)).toBe(true);
-      for (const river of result.rivers) {
-        expect(river).toMatch(/^\d+,\d+$/);
+    it('should generate terrain keys for all hexes in the grid', () => {
+      const result = generateHexTerrain({ gridSize: 5, seed: 42 });
+      const hexCols = 5 * 2;
+      const hexRows = 5;
+      let expectedCount = 0;
+      for (let r = 0; r < hexRows; r++) {
+        for (let q = 0; q < hexCols; q++) {
+          expectedCount++;
+          const key = `${q},${r}`;
+          expect(result.terrain).toHaveProperty(key);
+        }
+      }
+      expect(Object.keys(result.terrain).length).toBe(expectedCount);
+    });
+
+    it('should only produce valid terrain types from config', () => {
+      const result = generateHexTerrain({ gridSize: 10, seed: 42 });
+      for (const type of Object.values(result.terrain)) {
+        expect(VALID_TERRAIN_IDS.has(type)).toBe(true);
       }
     });
 
-    it('should work with gridSize 1', () => {
-      const result = generateHexTerrain({ gridSize: 1, seed: 42 });
-      expect(Object.keys(result.terrain).length).toBe(2);
-      expect(result.terrain['0,0']).toBe('water');
+    it('should frame all edge hexes with water', () => {
+      const result = generateHexTerrain({ gridSize: 8, seed: 42 });
+      const hexCols = 8 * 2;
+      const hexRows = 8;
+      for (let r = 0; r < hexRows; r++) {
+        for (let q = 0; q < hexCols; q++) {
+          if (q === 0 || q === hexCols - 1 || r === 0 || r === hexRows - 1) {
+            expect(result.terrain[`${q},${r}`]).toBe('water');
+          }
+        }
+      }
     });
 
-    it('should work without explicit seed', () => {
-      const result = generateHexTerrain({ gridSize: 10 });
-      expect(Object.keys(result.terrain).length).toBe(200);
-    });
-
-    it('should apply weights when provided', () => {
-      const weights = { water: 0.1, plains: 2.0 };
-      const result = generateHexTerrain({ gridSize: 10, seed: 42, weights });
-      expect(Object.keys(result.terrain).length).toBe(200);
-    });
-
-    it('should ignore empty weights object', () => {
-      const r1 = generateHexTerrain({ gridSize: 10, seed: 42 });
-      const r2 = generateHexTerrain({ gridSize: 10, seed: 42, weights: {} });
-      expect(r1.terrain).toEqual(r2.terrain);
-    });
-
-    it('should produce beaches adjacent to water', () => {
+    it('should generate beaches adjacent to water on larger grids', () => {
       const result = generateHexTerrain({ gridSize: 20, seed: 42 });
       const beachHexes = Object.entries(result.terrain)
         .filter(([, v]) => v === 'beach')
@@ -93,10 +107,112 @@ describe('hexTerrainGenerator', () => {
       expect(beachHexes.length).toBeGreaterThan(0);
     });
 
-    it('should have at least some non-water hexes in larger grids', () => {
+    it('should have non-water hexes in the interior of larger grids', () => {
       const result = generateHexTerrain({ gridSize: 20, seed: 42 });
-      const nonWater = Object.values(result.terrain).filter(t => t !== 'water');
-      expect(nonWater.length).toBeGreaterThan(0);
+      const hexCols = 20 * 2;
+      const hexRows = 20;
+      let hasNonWaterInterior = false;
+      for (let r = 1; r < hexRows - 1; r++) {
+        for (let q = 1; q < hexCols - 1; q++) {
+          const key = `${q},${r}`;
+          if (result.terrain[key] !== 'water') {
+            hasNonWaterInterior = true;
+            break;
+          }
+        }
+        if (hasNonWaterInterior) break;
+      }
+      expect(hasNonWaterInterior).toBe(true);
+    });
+
+    it('should produce varied terrain distribution on larger grids', () => {
+      const result = generateHexTerrain({ gridSize: 20, seed: 42 });
+      const dist = terrainDistribution(result.terrain);
+      const terrainTypes = Object.keys(dist);
+      // Should have at least 4 different terrain types in a 20-grid map
+      expect(terrainTypes.length).toBeGreaterThanOrEqual(4);
+    });
+
+    it('should generate rivers as array of hex key strings', () => {
+      const result = generateHexTerrain({ gridSize: 20, seed: 42 });
+      expect(Array.isArray(result.rivers)).toBe(true);
+      expect(allRiversAreValidHexKeys(result.rivers)).toBe(true);
+    });
+
+    it('should produce at least some rivers on larger grids', () => {
+      const result = generateHexTerrain({ gridSize: 20, seed: 42 });
+      expect(result.rivers.length).toBeGreaterThan(0);
+    });
+
+    it('should work with minimum valid gridSize of 1', () => {
+      const result = generateHexTerrain({ gridSize: 1, seed: 42 });
+      const hexCols = 1 * 2;
+      const hexRows = 1;
+      let expectedCount = 0;
+      for (let r = 0; r < hexRows; r++) {
+        for (let q = 0; q < hexCols; q++) {
+          expectedCount++;
+          expect(result.terrain).toHaveProperty(`${q},${r}`);
+        }
+      }
+      expect(Object.keys(result.terrain).length).toBe(expectedCount);
+    });
+
+    it('should work with minimum valid gridSize of 2', () => {
+      const result = generateHexTerrain({ gridSize: 2, seed: 42 });
+      const hexCols = 2 * 2;
+      const hexRows = 2;
+      let expectedCount = 0;
+      for (let r = 0; r < hexRows; r++) {
+        for (let q = 0; q < hexCols; q++) {
+          expectedCount++;
+          expect(result.terrain).toHaveProperty(`${q},${r}`);
+        }
+      }
+      expect(Object.keys(result.terrain).length).toBe(expectedCount);
+    });
+
+    it('should change terrain distribution when weights are provided', () => {
+      const result = generateHexTerrain({ gridSize: 10, seed: 42 });
+      // Use weights targeting terrain types that seed 42 actually produces
+      const weights = { water: 0.5, hills: 0.3 };
+      const resultWithWeights = generateHexTerrain({ gridSize: 10, seed: 42, weights });
+      const dist = terrainDistribution(result.terrain);
+      const distWithWeights = terrainDistribution(resultWithWeights.terrain);
+      // The weighted version should differ in at least one terrain count
+      const allTypes = new Set([...Object.keys(dist), ...Object.keys(distWithWeights)]);
+      let changed = false;
+      for (const type of allTypes) {
+        if ((dist[type] || 0) !== (distWithWeights[type] || 0)) {
+          changed = true;
+          break;
+        }
+      }
+      expect(changed).toBe(true);
+    });
+
+    it('should produce identical results with empty weights object', () => {
+      const r1 = generateHexTerrain({ gridSize: 10, seed: 42 });
+      const r2 = generateHexTerrain({ gridSize: 10, seed: 42, weights: {} });
+      expect(r1.terrain).toEqual(r2.terrain);
+      expect(r1.rivers).toEqual(r2.rivers);
+    });
+
+    it('should ignore non-object weights values', () => {
+      const r1 = generateHexTerrain({ gridSize: 10, seed: 42 });
+      const r2 = generateHexTerrain({ gridSize: 10, seed: 42, weights: null });
+      const r3 = generateHexTerrain({ gridSize: 10, seed: 42, weights: [] });
+      const r4 = generateHexTerrain({ gridSize: 10, seed: 42, weights: 'plains' });
+      expect(r2.terrain).toEqual(r1.terrain);
+      expect(r3.terrain).toEqual(r1.terrain);
+      expect(r4.terrain).toEqual(r1.terrain);
+    });
+
+    it('should only reference terrain hexes in rivers', () => {
+      const result = generateHexTerrain({ gridSize: 20, seed: 42 });
+      for (const riverHex of result.rivers) {
+        expect(result.terrain).toHaveProperty(riverHex);
+      }
     });
   });
 
@@ -105,21 +221,29 @@ describe('hexTerrainGenerator', () => {
       expect(generateRiversFromTerrain(null, 10)).toEqual([]);
     });
 
-    it('should return empty array for missing gridSize', () => {
-      expect(generateRiversFromTerrain({}, null)).toEqual([]);
+    it('should return empty array for undefined terrain', () => {
+      expect(generateRiversFromTerrain(undefined, 10)).toEqual([]);
     });
 
-    it('should generate rivers from existing terrain', () => {
+    it('should return empty array for missing gridSize', () => {
+      expect(generateRiversFromTerrain({}, null)).toEqual([]);
+      expect(generateRiversFromTerrain({}, undefined)).toEqual([]);
+      expect(generateRiversFromTerrain({}, 0)).toEqual([]);
+      expect(generateRiversFromTerrain({}, -1)).toEqual([]);
+    });
+
+    it('should generate rivers as array of valid hex key strings', () => {
       const { terrain } = generateHexTerrain({ gridSize: 20, seed: 42 });
       const rivers = generateRiversFromTerrain(terrain, 20);
       expect(Array.isArray(rivers)).toBe(true);
+      expect(allRiversAreValidHexKeys(rivers)).toBe(true);
     });
 
-    it('should return rivers as hex key strings', () => {
+    it('should produce rivers that exist in the terrain map', () => {
       const { terrain } = generateHexTerrain({ gridSize: 20, seed: 42 });
       const rivers = generateRiversFromTerrain(terrain, 20);
-      for (const river of rivers) {
-        expect(river).toMatch(/^\d+,\d+$/);
+      for (const riverHex of rivers) {
+        expect(terrain).toHaveProperty(riverHex);
       }
     });
 
@@ -132,6 +256,19 @@ describe('hexTerrainGenerator', () => {
       }
       const rivers = generateRiversFromTerrain(terrain, 5);
       expect(Array.isArray(rivers)).toBe(true);
+    });
+
+    it('should handle completely empty terrain object', () => {
+      const rivers = generateRiversFromTerrain({}, 5);
+      expect(Array.isArray(rivers)).toBe(true);
+      expect(rivers.length).toBe(0);
+    });
+
+    it('should produce consistent results from existing terrain data', () => {
+      const { terrain } = generateHexTerrain({ gridSize: 15, seed: 99 });
+      const riversA = generateRiversFromTerrain(terrain, 15);
+      const riversB = generateRiversFromTerrain(terrain, 15);
+      expect(riversA).toEqual(riversB);
     });
   });
 });

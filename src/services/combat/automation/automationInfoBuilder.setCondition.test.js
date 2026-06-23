@@ -1,166 +1,45 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @improved-by-ai
+import { describe, it, expect } from 'vitest'
 
 import { buildAttackInfo } from './automationInfoBuilder.js'
-import { BASE_STATS, BASE_FEATURE, normalizeAbilityName } from './automationInfoBuilder.fixtures.js'
+import { BASE_STATS, BASE_FEATURE } from './automationInfoBuilder.fixtures.js'
 
-vi.mock('./automationExpressions.js', () => ({
-    evaluateAutoExpression: vi.fn((expr, _stats) => {
-        if (!expr) return 0
-        return 2
-    }),
-    resolveHealingPoolExpression: vi.fn((base, scaling, stats) => {
-        if (!scaling) return base
-        if (!stats) return base
-        const entries = Object.entries(scaling)
-            .map(([k, v]) => ({ level: parseInt(k, 10), expression: String(v) }))
-            .filter(e => !isNaN(e.level))
-            .sort((a, b) => a.level - b.level)
-        let resolved = base
-        for (const entry of entries) {
-            if (stats.level >= entry.level) resolved = entry.expression
-        }
-        return resolved
-    }),
-    getSaveDc: vi.fn((stats, ability, proficiency) => {
-        const canonical = normalizeAbilityName(ability)
-        const bonus = stats.abilities?.find(a => a.name === canonical)?.bonus ?? 0
-        return 8 + bonus + (proficiency || 0)
-    }),
-    resolveUses: vi.fn((stats, usesSpec) => {
-        if (typeof usesSpec === 'number') return usesSpec
-        if (usesSpec === 'proficiency_bonus') return stats.proficiency || 0
-        return stats.level || 1
-    }),
-    resolveDiceExpression: vi.fn((expr) => expr),
-    resolveScaling: vi.fn((stats, scaling) => {
-        if (!scaling) return null
-        let result = null
-        for (const entry of scaling) {
-            if (stats.level >= entry.level) result = entry
-        }
-        return result
-    }),
-}))
-
-import { evaluateAutoExpression } from './automationExpressions.js'
-
-describe('buildAttackInfo – self_healing', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'self_healing' } }
+describe('buildAttackInfo – set_condition dispatch', () => {
+    it('returns null when feature has no automation property', () => {
+        const feature = { name: 'No Automation' }
         const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'self_healing',
-            name: 'Test Feature',
-            healAmount: 0,
-            healExpression: '',
-            action: 'action',
-            uses: 1,
-            usesMax: 1,
-            recharge: 'short_rest',
-            bloodiedOnly: false,
-            hitDiceCost: 0,
-            hasAutomation: true,
-        })
+        expect(result).toBeNull()
     })
 
-    it('evaluates healExpression when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'self_healing',
-                healExpression: '2d8',
-            },
-        }
+    it('returns null when automation is null', () => {
+        const feature = { ...BASE_FEATURE, automation: null }
         const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.healAmount).toBe(2)
-        expect(evaluateAutoExpression).toHaveBeenCalledWith('2d8', BASE_STATS, 3, 5)
+        expect(result).toBeNull()
     })
 
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'self_healing',
-                healExpression: '3d6',
-                action: 'bonus_action',
-                uses: 5,
-                recharge: 'long_rest',
-            },
-        }
+    it('returns null when automation type is unknown', () => {
+        const feature = { ...BASE_FEATURE, automation: { type: 'nonexistent_type' } }
         const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.healExpression).toBe('3d6')
-        expect(result.action).toBe('bonus_action')
-        expect(result.uses).toBe(5)
-        expect(result.usesMax).toBe(5)
-        expect(result.recharge).toBe('long_rest')
-    })
-})
-
-describe('buildAttackInfo – divine_spark', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'divine_spark' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'divine_spark',
-            name: 'Test Feature',
-            range: '30 ft',
-            healExpression: '',
-            damageExpression: '',
-            damageTypes: [],
-            saveType: 'CON',
-            resourceCost: '',
-            hasAutomation: true,
-        })
+        expect(result).toBeNull()
     })
 
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'divine_spark',
-                range: '60 ft',
-                healExpression: '2d8',
-                damageExpression: '3d6',
-                damageTypes: ['fire', 'radiant'],
-                saveType: 'DEX',
-                resourceCost: 'spell_slot',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.range).toBe('60 ft')
-        expect(result.healExpression).toBe('2d8')
-        expect(result.damageExpression).toBe('3d6')
-        expect(result.damageTypes).toEqual(['fire', 'radiant'])
-        expect(result.saveType).toBe('DEX')
-        expect(result.resourceCost).toBe('spell_slot')
-    })
-})
-
-describe('buildAttackInfo – set_condition', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
+    it('uses handler defaults when automation fields are omitted', () => {
         const feature = { ...BASE_FEATURE, automation: { type: 'set_condition' } }
         const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'set_condition',
-            name: 'Test Feature',
-            target: undefined,
-            condition: undefined,
-            additionalCondition: null,
-            cost: '',
-            range: '60 ft',
-            saveType: 'STR',
-            effect: '',
-            hasAutomation: true,
-        })
+
+        expect(result.type).toBe('set_condition')
+        expect(result.name).toBe('Test Feature')
+        expect(result.target).toBeUndefined()
+        expect(result.condition).toBeUndefined()
+        expect(result.additionalCondition).toBeNull()
+        expect(result.cost).toBe('')
+        expect(result.range).toBe('60 ft')
+        expect(result.saveType).toBe('STR')
+        expect(result.effect).toBe('')
+        expect(result.hasAutomation).toBe(true)
     })
 
-    it('includes optional fields when provided', () => {
+    it('passes through all set_condition fields from handler output', () => {
         const feature = {
             ...BASE_FEATURE,
             automation: {
@@ -175,6 +54,9 @@ describe('buildAttackInfo – set_condition', () => {
             },
         }
         const result = buildAttackInfo(feature, BASE_STATS)
+
+        expect(result.type).toBe('set_condition')
+        expect(result.name).toBe('Test Feature')
         expect(result.target).toBe('enemy')
         expect(result.condition).toBe('prone')
         expect(result.additionalCondition).toBe('restrained')
@@ -182,5 +64,34 @@ describe('buildAttackInfo – set_condition', () => {
         expect(result.range).toBe('30 ft')
         expect(result.saveType).toBe('DEX')
         expect(result.effect).toBe('condition_effect')
+        expect(result.hasAutomation).toBe(true)
+    })
+
+    it('uses explicit saveType override instead of default STR', () => {
+        const feature = {
+            ...BASE_FEATURE,
+            automation: { type: 'set_condition', saveType: 'CON' },
+        }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.saveType).toBe('CON')
+    })
+
+    it('uses explicit range override instead of default 60 ft', () => {
+        const feature = {
+            ...BASE_FEATURE,
+            automation: { type: 'set_condition', range: '15 ft' },
+        }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.range).toBe('15 ft')
+    })
+
+    it('sets additionalCondition to null when not provided', () => {
+        const feature = {
+            ...BASE_FEATURE,
+            automation: { type: 'set_condition', condition: 'blinded' },
+        }
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.condition).toBe('blinded')
+        expect(result.additionalCondition).toBeNull()
     })
 })

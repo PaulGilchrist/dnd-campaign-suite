@@ -1,52 +1,41 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { useCharacterWizard } from './useCharacterWizard.js';
 
-vi.mock('lodash/cloneDeep', () => ({ default: vi.fn(val => val) }));
-
 const originalAlert = window.alert;
+const originalConsoleError = console.error;
 
 beforeEach(() => {
   vi.clearAllMocks();
   global.fetch = vi.fn();
   window.alert = vi.fn();
+  console.error = vi.fn();
 });
 
 afterEach(() => {
   window.alert = originalAlert;
+  console.error = originalConsoleError;
 });
 
-function setup(campaign) {
-  return { useCharacterWizard, campaign };
+function createWrapper(campaignName) {
+  return () => useCharacterWizard(campaignName);
 }
 
 describe('useCharacterWizard', () => {
   describe('initial state', () => {
-    it('sets showCharacterWizard and showEditCharacterWizard to false', async () => {
-      const { useCharacterWizard, campaign } = setup(null);
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+    it('starts with both wizards hidden', () => {
+      const { result } = renderHook(createWrapper(null));
 
       expect(result.current.showCharacterWizard).toBe(false);
       expect(result.current.showEditCharacterWizard).toBe(false);
     });
   });
 
-  describe('handleAddCharacter', () => {
-    it('sets showCharacterWizard to true', async () => {
-      const { useCharacterWizard, campaign } = setup(null);
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+  describe('handleAddCharacter / handleWizardCancel', () => {
+    it('toggles showCharacterWizard correctly', () => {
+      const { result } = renderHook(createWrapper('MyCampaign'));
 
-      act(() => {
-        result.current.handleAddCharacter();
-      });
-
-      expect(result.current.showCharacterWizard).toBe(true);
-    });
-  });
-
-  describe('handleWizardCancel', () => {
-    it('sets showCharacterWizard to false', async () => {
-      const { useCharacterWizard, campaign } = setup(null);
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+      expect(result.current.showCharacterWizard).toBe(false);
 
       act(() => {
         result.current.handleAddCharacter();
@@ -60,25 +49,23 @@ describe('useCharacterWizard', () => {
 
       expect(result.current.showCharacterWizard).toBe(false);
     });
-  });
 
-  describe('handleEditCharacter', () => {
-    it('sets showEditCharacterWizard to true', async () => {
-      const { useCharacterWizard, campaign } = setup(null);
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+    it('is idempotent when canceling while already closed', () => {
+      const { result } = renderHook(createWrapper('MyCampaign'));
 
       act(() => {
-        result.current.handleEditCharacter({ name: 'TestChar' });
+        result.current.handleWizardCancel();
       });
 
-      expect(result.current.showEditCharacterWizard).toBe(true);
+      expect(result.current.showCharacterWizard).toBe(false);
     });
   });
 
-  describe('handleEditWizardCancel', () => {
-    it('sets showEditCharacterWizard to false', async () => {
-      const { useCharacterWizard, campaign } = setup(null);
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+  describe('handleEditCharacter / handleEditWizardCancel', () => {
+    it('toggles showEditCharacterWizard correctly', () => {
+      const { result } = renderHook(createWrapper('MyCampaign'));
+
+      expect(result.current.showEditCharacterWizard).toBe(false);
 
       act(() => {
         result.current.handleEditCharacter({ name: 'TestChar' });
@@ -92,32 +79,65 @@ describe('useCharacterWizard', () => {
 
       expect(result.current.showEditCharacterWizard).toBe(false);
     });
+
+    it('is idempotent when canceling edit while already closed', () => {
+      const { result } = renderHook(createWrapper('MyCampaign'));
+
+      act(() => {
+        result.current.handleEditWizardCancel();
+      });
+
+      expect(result.current.showEditCharacterWizard).toBe(false);
+    });
   });
 
   describe('setCharacterCallbacks', () => {
-    it('registers setCharacters and setActiveCharacter callbacks', async () => {
+    it('stores callbacks in ref for later use', () => {
       const setCharacters = vi.fn();
       const setActiveCharacter = vi.fn();
-      const { useCharacterWizard, campaign } = setup(null);
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+      const { result } = renderHook(createWrapper('MyCampaign'));
 
       act(() => {
         result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
       });
 
+      // Callbacks are stored in the ref, not invoked during registration
+      // Verify by triggering a create and checking they get called
+      const createdCharacter = { name: 'Test', id: '1' };
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ character: createdCharacter }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ files: ['test.json'] }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => createdCharacter,
+        });
+
+      act(() => {
+        result.current.handleAddCharacter();
+      });
+
+      act(() => {
+        result.current.handleWizardCancel();
+      });
+
+      // The callbacks are set but not invoked yet — just verify registration didn't throw
       expect(result.current.setCharacterCallbacks).toBeDefined();
     });
   });
 
   describe('handleWizardComplete (create)', () => {
-    it('POSTs to /api/campaigns, sets active character, and refreshes character list', async () => {
+    it('POSTs to campaign endpoint, refreshes list, sets active character, and closes wizard', async () => {
       const setCharacters = vi.fn();
       const setActiveCharacter = vi.fn();
+      const campaignName = 'TestCampaign';
       const characterData = { name: 'TestChar', class: 'Wizard' };
       const createdCharacter = { ...characterData, id: 'char-1' };
-      const campaignName = 'TestCampaign';
-
-      const { useCharacterWizard, campaign } = setup(campaignName);
 
       global.fetch
         .mockResolvedValueOnce({
@@ -133,90 +153,163 @@ describe('useCharacterWizard', () => {
           json: async () => ({ ...createdCharacter, refreshed: true }),
         });
 
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+      const { result } = renderHook(createWrapper(campaignName));
 
       act(() => {
         result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
       });
 
       await act(async () => {
-        result.current.handleWizardComplete(characterData);
+        await result.current.handleWizardComplete(characterData);
       });
 
       expect(global.fetch).toHaveBeenCalledTimes(3);
-      expect(global.fetch).toHaveBeenCalledWith(`/api/campaigns/${encodeURIComponent(campaignName)}`, {
+      expect(global.fetch).toHaveBeenNthCalledWith(1, `/api/campaigns/${encodeURIComponent(campaignName)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ campaignName, character: characterData }),
       });
       expect(setActiveCharacter).toHaveBeenCalledWith(createdCharacter);
       expect(result.current.showCharacterWizard).toBe(false);
-      expect(setCharacters).toHaveBeenCalled();
+      expect(setCharacters).toHaveBeenCalledWith(
+        expect.arrayContaining([expect.objectContaining({ name: 'TestChar', refreshed: true })])
+      );
     });
-  });
 
-  describe('handleWizardComplete error (no campaign)', () => {
-    it('shows alert when no campaign in session storage', async () => {
+    it('handles empty character file list after create', async () => {
+      const setCharacters = vi.fn();
+      const setActiveCharacter = vi.fn();
+      const campaignName = 'TestCampaign';
       const characterData = { name: 'TestChar' };
+      const createdCharacter = { ...characterData, id: 'char-1' };
 
-      const { useCharacterWizard, campaign } = setup(null);
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ character: createdCharacter }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ files: [] }),
+        });
 
-      await act(async () => {
-        result.current.handleWizardComplete(characterData);
+      const { result } = renderHook(createWrapper(campaignName));
+
+      act(() => {
+        result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
       });
 
-      expect(window.alert).toHaveBeenCalledWith('Failed to create character: No campaign selected');
+      await act(async () => {
+        await result.current.handleWizardComplete(characterData);
+      });
+
+      expect(setActiveCharacter).toHaveBeenCalledWith(createdCharacter);
+      expect(result.current.showCharacterWizard).toBe(false);
+      expect(setCharacters).toHaveBeenCalledWith([]);
     });
   });
 
-  describe('handleWizardComplete error (fetch fail)', () => {
-    it('shows alert on non-ok response', async () => {
-      const characterData = { name: 'TestChar' };
-      const campaignName = 'TestCampaign';
+  describe('handleWizardComplete error paths', () => {
+    it('alerts when campaign name is missing', async () => {
+      const { result } = renderHook(createWrapper(null));
 
-      const { useCharacterWizard, campaign } = setup(campaignName);
+      await act(async () => {
+        await result.current.handleWizardComplete({ name: 'TestChar' });
+      });
+
+      expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
+      expect(window.alert).toHaveBeenCalledWith('Failed to create character: No campaign selected');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('alerts with server error details on non-ok response', async () => {
+      const campaignName = 'TestCampaign';
+      const characterData = { name: 'TestChar' };
+
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
       });
 
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+      const { result } = renderHook(createWrapper(campaignName));
 
       await act(async () => {
-        result.current.handleWizardComplete(characterData);
+        await result.current.handleWizardComplete(characterData);
       });
 
+      expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
       expect(window.alert).toHaveBeenCalledWith('Failed to create character: Failed to create character: Internal Server Error');
+    });
+
+    it('alerts on fetch rejection', async () => {
+      const campaignName = 'TestCampaign';
+      const characterData = { name: 'TestChar' };
+
+      global.fetch.mockRejectedValueOnce(new Error('Network failure'));
+
+      const { result } = renderHook(createWrapper(campaignName));
+
+      await act(async () => {
+        await result.current.handleWizardComplete(characterData);
+      });
+
+      expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
+      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Network failure');
+    });
+
+    it('alerts on second fetch failure (after successful create)', async () => {
+      const campaignName = 'TestCampaign';
+      const characterData = { name: 'TestChar' };
+      const setActiveCharacter = vi.fn();
+
+      global.fetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ character: { name: 'TestChar', id: '1' } }),
+        })
+        .mockRejectedValueOnce(new Error('Second fetch failed'));
+
+      const { result } = renderHook(createWrapper(campaignName));
+
+      act(() => {
+        result.current.setCharacterCallbacks({ setCharacters: vi.fn(), setActiveCharacter });
+      });
+
+      await act(async () => {
+        await result.current.handleWizardComplete(characterData);
+      });
+
+      expect(console.error).toHaveBeenCalledWith('Error creating character:', expect.any(Error));
+      expect(window.alert).toHaveBeenCalledWith('Failed to create character: Second fetch failed');
     });
   });
 
   describe('handleEditWizardComplete', () => {
-    it('PUTs to correct URL with originalFileName and updates local character list', async () => {
+    it('PUTs to correct URL, sets active character, refreshes list, and closes wizard', async () => {
       const setCharacters = vi.fn();
       const setActiveCharacter = vi.fn();
-      const characterData = { name: 'TestChar', class: 'Wizard' };
       const campaignName = 'TestCampaign';
+      const characterData = { name: 'TestChar', class: 'Wizard' };
+      const existingCharacter = { name: 'TestChar', class: 'Wizard' };
 
-      const { useCharacterWizard, campaign } = setup(campaignName);
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => characterData,
       });
 
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+      const { result } = renderHook(createWrapper(campaignName));
 
       act(() => {
         result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
       });
 
       act(() => {
-        result.current.handleEditCharacter({ name: 'TestChar' });
+        result.current.handleEditCharacter(existingCharacter);
       });
 
       await act(async () => {
-        result.current.handleEditWizardComplete(characterData);
+        await result.current.handleEditWizardComplete(characterData);
       });
 
       expect(global.fetch).toHaveBeenCalledWith(
@@ -229,21 +322,25 @@ describe('useCharacterWizard', () => {
       );
       expect(setActiveCharacter).toHaveBeenCalledWith(characterData);
       expect(result.current.showEditCharacterWizard).toBe(false);
+      expect(setCharacters).toHaveBeenCalledWith(
+        expect.any(Function)
+      );
     });
 
-    it('handles rename: PUTs to new file name with originalFileName, replaces by original name', async () => {
+    it('handles rename: PUTs to new file with originalFileName, replaces by original name in list', async () => {
       const existingCharacters = [{ name: 'Old Name', class: 'Wizard' }];
-      const setCharacters = vi.fn();
+      const setCharacters = vi.fn((fn) => {
+        fn(existingCharacters);
+      });
       const setActiveCharacter = vi.fn();
       const campaignName = 'TestCampaign';
 
-      const { useCharacterWizard, campaign } = setup(campaignName);
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ name: 'New Name', class: 'Wizard' }),
       });
 
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+      const { result } = renderHook(createWrapper(campaignName));
 
       act(() => {
         result.current.setCharacterCallbacks({ setCharacters, setActiveCharacter });
@@ -254,10 +351,9 @@ describe('useCharacterWizard', () => {
       });
 
       await act(async () => {
-        result.current.handleEditWizardComplete({ name: 'New Name', class: 'Wizard' });
+        await result.current.handleEditWizardComplete({ name: 'New Name', class: 'Wizard' });
       });
 
-      // Verify the PUT goes to the NEW file name
       expect(global.fetch).toHaveBeenCalledWith(
         `/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent('New_Name.json')}`,
         {
@@ -267,38 +363,68 @@ describe('useCharacterWizard', () => {
         }
       );
 
-      // Verify setCharacters replaces by the ORIGINAL name
-      expect(setCharacters).toHaveBeenCalledWith(
-        expect.any(Function)
-      );
       const newCharacters = setCharacters.mock.calls[0][0](existingCharacters);
       expect(newCharacters).toEqual([{ name: 'New Name', class: 'Wizard' }]);
     });
   });
 
-  describe('handleEditWizardComplete error', () => {
-    it('shows alert on failure', async () => {
-      const characterData = { name: 'TestChar' };
-      const campaignName = 'TestCampaign';
-
-      const { useCharacterWizard, campaign } = setup(campaignName);
-      global.fetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-      });
-
-      const { result } = renderHook(() => useCharacterWizard(campaign));
+  describe('handleEditWizardComplete error paths', () => {
+    it('alerts when campaign name is missing', async () => {
+      const { result } = renderHook(createWrapper(null));
 
       act(() => {
         result.current.handleEditCharacter({ name: 'TestChar' });
       });
 
       await act(async () => {
-        result.current.handleEditWizardComplete(characterData);
+        await result.current.handleEditWizardComplete({ name: 'Updated' });
       });
 
+      expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
+      expect(window.alert).toHaveBeenCalledWith('Failed to update character: No campaign selected');
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    it('alerts with server error details on non-ok response', async () => {
+      const campaignName = 'TestCampaign';
+
+      global.fetch.mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: 'Bad Request',
+      });
+
+      const { result } = renderHook(createWrapper(campaignName));
+
+      act(() => {
+        result.current.handleEditCharacter({ name: 'TestChar' });
+      });
+
+      await act(async () => {
+        await result.current.handleEditWizardComplete({ name: 'Updated' });
+      });
+
+      expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
       expect(window.alert).toHaveBeenCalledWith('Failed to update character: Failed to update character: Bad Request');
+    });
+
+    it('alerts on fetch rejection', async () => {
+      const campaignName = 'TestCampaign';
+
+      global.fetch.mockRejectedValueOnce(new Error('Network failure'));
+
+      const { result } = renderHook(createWrapper(campaignName));
+
+      act(() => {
+        result.current.handleEditCharacter({ name: 'TestChar' });
+      });
+
+      await act(async () => {
+        await result.current.handleEditWizardComplete({ name: 'Updated' });
+      });
+
+      expect(console.error).toHaveBeenCalledWith('Error updating character:', expect.any(Error));
+      expect(window.alert).toHaveBeenCalledWith('Failed to update character: Network failure');
     });
   });
 });

@@ -1,231 +1,272 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import { rollDeathSave, rollDeathSaveWithAdvantage, isStable, isDead } from './deathSaveRules.js';
+import * as diceRoller from '../../dice/diceRoller.js';
+
+function mockD20(value) {
+  vi.spyOn(diceRoller, 'rollD20').mockReturnValue(value);
+}
+
+function mockD20Sequence(...values) {
+  let index = 0;
+  vi.spyOn(diceRoller, 'rollD20').mockImplementation(() => values[index++]);
+}
 
 describe('deathSaveRules', () => {
-  beforeEach(() => {
-    vi.resetModules();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   describe('isStable', () => {
-    it('returns true when 3 saves are marked', () => {
-      expect(isStable([true, true, true])).toBe(true);
-    });
-
-    it('returns false when 2 saves are marked', () => {
-      expect(isStable([true, true, false])).toBe(false);
-    });
-
-    it('returns false when 0 saves are marked', () => {
-      expect(isStable([false, false, false])).toBe(false);
-    });
-
     it('returns false for empty array', () => {
       expect(isStable([])).toBe(false);
     });
 
-    it('returns true when any 3 are true', () => {
+    it('returns false when fewer than 3 saves are marked', () => {
+      expect(isStable([true, false, false])).toBe(false);
+      expect(isStable([true, true, false])).toBe(false);
+      expect(isStable([false, false, false])).toBe(false);
+    });
+
+    it('returns true when exactly 3 saves are marked', () => {
+      expect(isStable([true, true, true])).toBe(true);
+    });
+
+    it('returns true when more than 3 saves are marked', () => {
       expect(isStable([true, false, true, true])).toBe(true);
+      expect(isStable([true, true, true, true, true])).toBe(true);
+    });
+
+    it('ignores non-boolean falsy values', () => {
+      expect(isStable([0, null, undefined, false])).toBe(false);
     });
   });
 
   describe('isDead', () => {
-    it('returns true when 3 failures are marked', () => {
-      expect(isDead([true, true, true])).toBe(true);
+    it('returns false for empty array', () => {
+      expect(isDead([])).toBe(false);
     });
 
-    it('returns false when 2 failures are marked', () => {
+    it('returns false when fewer than 3 failures are marked', () => {
+      expect(isDead([true, false, false])).toBe(false);
       expect(isDead([true, true, false])).toBe(false);
-    });
-
-    it('returns false when 0 failures are marked', () => {
       expect(isDead([false, false, false])).toBe(false);
     });
 
-    it('returns false for empty array', () => {
-      expect(isDead([])).toBe(false);
+    it('returns true when exactly 3 failures are marked', () => {
+      expect(isDead([true, true, true])).toBe(true);
+    });
+
+    it('returns true when more than 3 failures are marked', () => {
+      expect(isDead([true, true, true, true])).toBe(true);
+    });
+
+    it('ignores non-boolean falsy values', () => {
+      expect(isDead([0, null, undefined, false])).toBe(false);
     });
   });
 
   describe('rollDeathSave', () => {
-    it('returns nat20 result when roll is 20', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.999);
-      const result = rollDeathSave([false, false, false], [false, false, false]);
-      expect(result.result).toBe('nat20');
+    it('restores 1 HP and resets on natural 20', () => {
+      mockD20(20);
+      const result = rollDeathSave([true, true, true], [true, true, true]);
       expect(result.roll).toBe(20);
+      expect(result.result).toBe('nat20');
       expect(result.isNat20).toBe(true);
       expect(result.restoredToHp).toBe(1);
       expect(result.newSaves).toEqual([false, false, false]);
       expect(result.newFailures).toEqual([false, false, false]);
     });
 
-    it('returns nat20 result when roll is 18 with treat18AsNat20', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.899);
-      const result = rollDeathSave([false, false, false], [false, false, false], true);
-      expect(result.result).toBe('nat20');
+    it('treats 18 as nat20 when treat18AsNat20 is true', () => {
+      mockD20(18);
+      const result = rollDeathSave([], [], true);
       expect(result.roll).toBe(18);
+      expect(result.result).toBe('nat20');
       expect(result.isNat20).toBe(true);
       expect(result.restoredToHp).toBe(1);
     });
 
     it('does not treat 18 as nat20 when treat18AsNat20 is false', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.899);
-      const result = rollDeathSave([false, false, false], [false, false, false], false);
+      mockD20(18);
+      const result = rollDeathSave([], [], false);
       expect(result.result).toBe('success');
       expect(result.isNat20).toBe(false);
       expect(result.restoredToHp).toBeNull();
     });
 
-    it('marks a save when roll is 10 or above', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.499);
+    it('marks a save in the first empty slot on roll >= 10', () => {
+      mockD20(15);
       const result = rollDeathSave([false, false, false], [false, false, false]);
       expect(result.result).toBe('success');
-      expect(result.newSaves[0]).toBe(true);
+      expect(result.roll).toBe(15);
+      expect(result.newSaves).toEqual([true, false, false]);
+      expect(result.newFailures).toEqual([false, false, false]);
     });
 
-    it('marks a save when roll is exactly 10', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.45);
-      const result = rollDeathSave([false, false, false], [false, false, false]);
-      expect(result.result).toBe('success');
+    it('marks a save in the second empty slot when first is filled', () => {
+      mockD20(12);
+      const result = rollDeathSave([true, false, false], [false, false, false]);
+      expect(result.newSaves).toEqual([true, true, false]);
     });
 
-    it('marks a failure when roll is below 10', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.049);
-      const failResult = rollDeathSave([false, false, false], [false, false, false]);
-      expect(failResult.result).toBe('failure');
-      expect(failResult.newFailures[0]).toBe(true);
-    });
-
-    it('marks 2 failures on natural 1', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.0);
-      const result = rollDeathSave([false, false, false], [false, false, false]);
-      expect(result.result).toBe('failure');
-      expect(result.isNat1).toBe(true);
-      expect(result.newFailures.filter(Boolean).length).toBe(2);
-    });
-
-    it('returns stable when 3rd save is filled', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.499);
+    it('marks a save in the third empty slot when first two are filled', () => {
+      mockD20(10);
       const result = rollDeathSave([true, true, false], [false, false, false]);
       expect(result.result).toBe('stable');
       expect(result.newSaves).toEqual([false, false, false]);
       expect(result.newFailures).toEqual([false, false, false]);
     });
 
-    it('returns dead when 3rd failure is filled', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.0);
+    it('marks a failure in the first empty slot on roll < 10', () => {
+      mockD20(5);
+      const result = rollDeathSave([false, false, false], [false, false, false]);
+      expect(result.result).toBe('failure');
+      expect(result.roll).toBe(5);
+      expect(result.newFailures).toEqual([true, false, false]);
+      expect(result.newSaves).toEqual([false, false, false]);
+    });
+
+    it('marks 2 failures on natural 1', () => {
+      mockD20(1);
+      const result = rollDeathSave([false, false, false], [false, false, false]);
+      expect(result.result).toBe('failure');
+      expect(result.isNat1).toBe(true);
+      expect(result.newFailures).toEqual([true, true, false]);
+    });
+
+    it('marks 2 failures on natural 1 even when only 1 slot remains', () => {
+      mockD20(1);
+      const result = rollDeathSave([false, false, false], [true, true, true]);
+      expect(result.result).toBe('dead');
+      expect(result.newFailures).toEqual([false, false, false]);
+    });
+
+    it('marks the 3rd failure and returns dead', () => {
+      mockD20(3);
       const result = rollDeathSave([false, false, false], [true, true, false]);
       expect(result.result).toBe('dead');
       expect(result.newFailures).toEqual([false, false, false]);
       expect(result.newSaves).toEqual([false, false, false]);
     });
 
-    it('does not exceed 3 failures even with nat1', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.0);
-      const result = rollDeathSave([false, false, false], [true, true, true]);
+    it('does not modify saves when failing', () => {
+      mockD20(4);
+      const result = rollDeathSave([true, false, true], [false, false, false]);
+      expect(result.newSaves).toEqual([true, false, true]);
+    });
+
+    it('does not modify failures when succeeding', () => {
+      mockD20(14);
+      const result = rollDeathSave([false, false, false], [true, false, false]);
+      expect(result.newFailures).toEqual([true, false, false]);
+    });
+
+    it('resets saves and failures when reaching stable', () => {
+      mockD20(10);
+      const result = rollDeathSave([true, true, false], [true, false, false]);
+      expect(result.result).toBe('stable');
+      expect(result.newSaves).toEqual([false, false, false]);
+      expect(result.newFailures).toEqual([false, false, false]);
+    });
+
+    it('resets saves and failures when reaching dead', () => {
+      mockD20(2);
+      const result = rollDeathSave([true, false, false], [true, true, false]);
       expect(result.result).toBe('dead');
-      expect(result.newFailures.filter(Boolean).length).toBeLessThanOrEqual(3);
+      expect(result.newSaves).toEqual([false, false, false]);
+      expect(result.newFailures).toEqual([false, false, false]);
     });
-
-    it('returns result object with roll value', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.5);
-      const result = rollDeathSave([false, false, false], [false, false, false]);
-      expect(typeof result.roll).toBe('number');
-      expect(result.roll).toBeGreaterThanOrEqual(1);
-      expect(result.roll).toBeLessThanOrEqual(20);
-    });
-
-    it('marks first empty save slot', () => {
-      vi.spyOn(Math, 'random').mockReturnValue(0.499);
-      const result = rollDeathSave([false, true, false], [false, false, false]);
-      expect(result.newSaves[0]).toBe(true);
-      expect(result.newSaves[2]).toBe(false);
-    });
-
   });
 
   describe('rollDeathSaveWithAdvantage', () => {
     it('uses the higher of two rolls', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.0).mockReturnValueOnce(0.999);
+      mockD20Sequence(3, 17);
       const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
-      expect(result.roll).toBe(20);
-      expect(result.result).toBe('nat20');
+      expect(result.roll).toBe(17);
+      expect(result.result).toBe('success');
+      expect(result.rolls).toEqual([3, 17]);
     });
 
-    it('uses the lower of two rolls for disadvantage-like scenario', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.999).mockReturnValueOnce(0.0);
+    it('uses the higher of two rolls when first is higher', () => {
+      mockD20Sequence(17, 3);
       const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
-      expect(result.roll).toBe(20);
-      expect(result.result).toBe('nat20');
+      expect(result.roll).toBe(17);
+      expect(result.result).toBe('success');
+      expect(result.rolls).toEqual([17, 3]);
     });
 
-    it('marks nat20 when best roll is 20', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.999);
-      const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
-      expect(result.result).toBe('nat20');
+    it('restores 1 HP when best roll is nat20', () => {
+      mockD20Sequence(5, 20);
+      const result = rollDeathSaveWithAdvantage([], []);
       expect(result.roll).toBe(20);
+      expect(result.result).toBe('nat20');
+      expect(result.restoredToHp).toBe(1);
     });
 
-    it('marks nat1 only when best roll is 1', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.0).mockReturnValueOnce(0.0);
-      const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
+    it('marks nat1 only when both rolls are 1', () => {
+      mockD20Sequence(1, 1);
+      const result = rollDeathSaveWithAdvantage([], []);
+      expect(result.roll).toBe(1);
       expect(result.isNat1).toBe(true);
       expect(result.result).toBe('failure');
     });
 
     it('does not mark nat1 when only one roll is 1', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.0).mockReturnValueOnce(0.5);
-      const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
+      mockD20Sequence(1, 15);
+      const result = rollDeathSaveWithAdvantage([], []);
       expect(result.isNat1).toBe(false);
+      expect(result.roll).toBe(15);
     });
 
-    it('includes rolls array', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.75);
-      const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
-      expect(Array.isArray(result.rolls)).toBe(true);
-      expect(result.rolls.length).toBe(2);
-    });
-
-    it('treats 18 as nat20 with treat18AsNat20', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.899).mockReturnValueOnce(0.5);
-      const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false], true);
+    it('treats best roll of 18 as nat20 when treat18AsNat20 is true', () => {
+      mockD20Sequence(5, 18);
+      const result = rollDeathSaveWithAdvantage([], [], true);
+      expect(result.roll).toBe(18);
       expect(result.result).toBe('nat20');
       expect(result.isNat20).toBe(true);
     });
 
+    it('marks 2 failures when best roll is nat1', () => {
+      mockD20Sequence(1, 1);
+      const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
+      expect(result.isNat1).toBe(true);
+      expect(result.newFailures.filter(Boolean).length).toBe(2);
+    });
+
+    it('returns null restoredToHp on non-nat20', () => {
+      mockD20Sequence(8, 12);
+      const result = rollDeathSaveWithAdvantage([], []);
+      expect(result.restoredToHp).toBeNull();
+    });
+
     it('marks success when best roll >= 10', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.3).mockReturnValueOnce(0.6);
+      mockD20Sequence(4, 13);
       const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
       expect(result.result).toBe('success');
       expect(result.roll).toBe(13);
     });
 
     it('marks failure when best roll < 10', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.3).mockReturnValueOnce(0.4);
+      mockD20Sequence(4, 6);
       const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
       expect(result.result).toBe('failure');
+      expect(result.roll).toBe(6);
     });
 
-    it('marks 2 failures on nat1 best roll', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.0).mockReturnValueOnce(0.0);
-      const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
-      expect(result.isNat1).toBe(true);
-      expect(result.newFailures.filter(Boolean).length).toBe(2);
+    it('marks success in the correct slot when best roll >= 10', () => {
+      mockD20Sequence(3, 11);
+      const result = rollDeathSaveWithAdvantage([true, false, false], [false, false, false]);
+      expect(result.newSaves).toEqual([true, true, false]);
     });
 
-    it('restores 1 HP on nat20', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.999).mockReturnValueOnce(0.5);
+    it('marks 2 failures on nat1 with two rolls', () => {
+      mockD20Sequence(1, 1);
       const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
-      expect(result.restoredToHp).toBe(1);
+      expect(result.newFailures).toEqual([true, true, false]);
     });
 
-    it('returns null restoredToHp on non-nat20', () => {
-      vi.spyOn(Math, 'random').mockReturnValueOnce(0.5).mockReturnValueOnce(0.75);
-      const result = rollDeathSaveWithAdvantage([false, false, false], [false, false, false]);
-      expect(result.restoredToHp).toBeNull();
+    it('returns dead when 3rd failure reached with advantage', () => {
+      mockD20Sequence(2, 5);
+      const result = rollDeathSaveWithAdvantage([false, false, false], [true, true, false]);
+      expect(result.result).toBe('dead');
+      expect(result.newFailures).toEqual([false, false, false]);
     });
   });
 });

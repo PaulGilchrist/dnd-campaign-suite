@@ -1,21 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @improved-by-ai
+import { describe, it, expect } from 'vitest'
 
 import { buildAttackInfo } from './automationInfoBuilder.js'
-import { BASE_STATS, BASE_FEATURE } from './automationInfoBuilder.fixtures.js'
+import { BASE_STATS, makeFeature } from './automationInfoBuilder.fixtures.js'
 
 describe('buildAttackInfo – combat_superiority', () => {
-    beforeEach(() => vi.clearAllMocks())
-
     it('returns correct structure with defaults', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'combat_superiority',
-                saveDc: 'ability',
-            },
-        }
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            saveDc: 'ability',
+        })
         const result = buildAttackInfo(feature, BASE_STATS)
-        // BASE_STATS: STR bonus=4, proficiency=3, DC = 8+4+3 = 15
         expect(result).toEqual({
             type: 'combat_superiority',
             name: 'Test Feature',
@@ -35,96 +30,185 @@ describe('buildAttackInfo – combat_superiority', () => {
     })
 
     it('computes save DC from DEX ability + proficiency', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'combat_superiority',
-                saveAbility: 'DEX',
-                saveDc: 'ability',
-            },
-        }
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            saveAbility: 'DEX',
+            saveDc: 'ability',
+        })
         const result = buildAttackInfo(feature, BASE_STATS)
         // BASE_STATS: DEX bonus=2, proficiency=3, DC = 8+2+3 = 13
         expect(result.saveDc).toBe(13)
         expect(result.saveAbility).toBe('DEX')
     })
 
-    it('uses explicit saveDc when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'combat_superiority',
-                saveDc: 15,
-            },
-        }
+    it('uses explicit saveDc when provided as a number', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            saveDc: 15,
+        })
         const result = buildAttackInfo(feature, BASE_STATS)
         expect(result.saveDc).toBe(15)
     })
 
-    it('respects custom die expression', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'combat_superiority',
-                dieExpression: 'superiority_die',
-                uses_max: 5,
-            },
-        }
+    it('defaults to 10 when saveDc is not provided and not "ability"', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+        })
         const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.dieExpression).toBe('superiority_die')
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('respects custom saveType', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            saveType: 'CON',
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.saveType).toBe('CON')
+    })
+
+    it('respects custom die expression', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            dieExpression: '2d6',
+            uses_max: 5,
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.dieExpression).toBe('2d6')
         expect(result.usesMax).toBe(5)
     })
 
     it('includes options when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'combat_superiority',
-                options: ['option1', 'option2'],
-                oncePerTurn: true,
-            },
-        }
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            options: ['option1', 'option2'],
+            oncePerTurn: true,
+        })
         const result = buildAttackInfo(feature, BASE_STATS)
         expect(result.options).toEqual(['option1', 'option2'])
         expect(result.oncePerTurn).toBe(true)
     })
 
-    it('resolves superiority die size at level 3', () => {
-        const level3Stats = { ...BASE_STATS, level: 3 }
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'combat_superiority',
-            },
-        }
-        const result = buildAttackInfo(feature, level3Stats)
-        // At level 3 (below 10), die should be d8
-        expect(result.dieExpression).toBe('superiority_die')
+    it('coerces oncePerTurn and chooseOne to boolean', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            oncePerTurn: 'yes',
+            chooseOne: 'yes',
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.oncePerTurn).toBe(true)
+        expect(result.chooseOne).toBe(true)
     })
 
-    it('resolves superiority die size at level 10 (d10)', () => {
-        const level10Stats = { ...BASE_STATS, level: 10 }
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'combat_superiority',
-            },
-        }
-        const result = buildAttackInfo(feature, level10Stats)
-        // At level 10+, die should be d10
-        expect(result.dieExpression).toBe('superiority_die')
+    it('uses custom recharge value', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            recharge: 'long_rest',
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.usesRecharge).toBe('long_rest')
     })
 
-    it('resolves superiority die size at level 18 (d12)', () => {
-        const level18Stats = { ...BASE_STATS, level: 18 }
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'combat_superiority',
-            },
-        }
-        const result = buildAttackInfo(feature, level18Stats)
-        // At level 18+, die should be d12
-        expect(result.dieExpression).toBe('superiority_die')
+    it('picks the best save ability from an array of saveAbilities', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            saveAbility: ['STR', 'DEX'],
+            saveDc: 'ability',
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        // STR bonus=4 > DEX bonus=2, so STR is picked
+        expect(result.saveAbility).toBe('STR')
+        expect(result.saveAbilities).toEqual(['STR', 'DEX'])
+        expect(result.saveDc).toBe(15) // 8 + 4 + 3
+    })
+
+    it('picks the best save ability from a multi-word array', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            saveAbility: ['Strength', 'Dexterity'],
+            saveDc: 'ability',
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.saveAbility).toBe('Strength')
+        expect(result.saveAbilities).toEqual(['Strength', 'Dexterity'])
+    })
+
+    it('maxOptions uses base value and scaling', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            maxOptions: 2,
+            maxOptionsScaling: { '5': 1, '11': 1, '17': 1 },
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        // level 5: base 2 + 1 (level 5 applies) = 3 (level 11/17 do not apply)
+        expect(result.maxOptions).toBe(3)
+    })
+
+    it('maxOptions skips inapplicable scaling tiers', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            maxOptions: 2,
+            maxOptionsScaling: { '11': 1, '17': 1 },
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        // level 5: base 2, no tiers apply
+        expect(result.maxOptions).toBe(2)
+    })
+
+    it('maxOptions handles invalid scaling keys gracefully', () => {
+        const feature = makeFeature({
+            type: 'combat_superiority',
+            maxOptions: 2,
+            maxOptionsScaling: { 'invalid': 1, '5': 1 },
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.maxOptions).toBe(3)
+    })
+})
+
+describe('buildAttackInfo – tactical_mind', () => {
+    it('returns correct structure with defaults', () => {
+        const feature = makeFeature({ type: 'tactical_mind' })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result).toEqual({
+            type: 'tactical_mind',
+            name: 'Test Feature',
+            bonusExpression: '',
+            hasAutomation: true,
+        })
+    })
+
+    it('passes through provided bonusExpression', () => {
+        const feature = makeFeature({
+            type: 'tactical_mind',
+            bonusExpression: '1d4 + INT modifier',
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.bonusExpression).toBe('1d4 + INT modifier')
+    })
+})
+
+describe('buildAttackInfo – know_enemy', () => {
+    it('returns correct structure with defaults', () => {
+        const feature = makeFeature({ type: 'know_enemy' })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result).toEqual({
+            type: 'know_enemy',
+            name: 'Test Feature',
+            range: '30_ft',
+            usesMax: 4,
+            hasAutomation: true,
+        })
+    })
+
+    it('passes through provided values', () => {
+        const feature = makeFeature({
+            type: 'know_enemy',
+            range: '60_ft',
+            uses_max: 6,
+        })
+        const result = buildAttackInfo(feature, BASE_STATS)
+        expect(result.range).toBe('60_ft')
+        expect(result.usesMax).toBe(6)
     })
 })

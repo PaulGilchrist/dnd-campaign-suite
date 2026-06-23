@@ -1,23 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import { getEvasionEffects, getAllSaveProficiencies } from './automationService.js'
 
+// @improved-by-ai
+
 // ── getEvasionEffects ──────────────────────────────────────────────
 
 describe('getEvasionEffects', () => {
-  it('returns empty array when features is null', () => {
-    expect(getEvasionEffects(null)).toEqual([])
-  })
-
-  it('returns empty array when features is undefined', () => {
-    expect(getEvasionEffects(undefined)).toEqual([])
-  })
-
-  it('returns empty array when features is empty', () => {
-    expect(getEvasionEffects([])).toEqual([])
+  it('returns empty array when features is falsy', () => {
+    for (const falsy of [null, undefined, []]) {
+      expect(getEvasionEffects(falsy)).toEqual([])
+    }
   })
 
   it('returns empty array when features have no automation', () => {
     expect(getEvasionEffects([{ name: 'Test' }])).toEqual([])
+  })
+
+  it('returns empty array when automation is null', () => {
+    expect(getEvasionEffects([{ name: 'Test', automation: null }])).toEqual([])
   })
 
   it('collects evasion effect with default saveType DEX', () => {
@@ -25,38 +25,54 @@ describe('getEvasionEffects', () => {
       name: 'Evasion',
       automation: { type: 'evasion' },
     }]
-    const result = getEvasionEffects(features)
-    expect(result).toHaveLength(1)
-    expect(result[0]).toEqual({
+    expect(getEvasionEffects(features)).toEqual([{
       source: 'Evasion',
       saveType: 'DEX',
       shareable: false,
       shareRange: 0,
-    })
+    }])
   })
 
-  it('collects evasion effect with custom saveType', () => {
+  it('normalizes saveType casing to uppercase', () => {
     const features = [{
-      name: 'Evasion',
+      name: 'Constitutional Evasion',
       automation: { type: 'evasion', saveType: 'con' },
     }]
-    const result = getEvasionEffects(features)
-    expect(result).toHaveLength(1)
-    expect(result[0].saveType).toBe('CON')
+    expect(getEvasionEffects(features)).toEqual([{
+      source: 'Constitutional Evasion',
+      saveType: 'CON',
+      shareable: false,
+      shareRange: 0,
+    }])
   })
 
-  it('collects shareable flag', () => {
+  it('collects shareable flag and range when present', () => {
     const features = [{
-      name: 'Evasion',
+      name: 'Shared Evasion',
       automation: { type: 'evasion', shareable: true, shareRange: 15 },
     }]
-    const result = getEvasionEffects(features)
-    expect(result).toHaveLength(1)
-    expect(result[0].shareable).toBe(true)
-    expect(result[0].shareRange).toBe(15)
+    expect(getEvasionEffects(features)).toEqual([{
+      source: 'Shared Evasion',
+      saveType: 'DEX',
+      shareable: true,
+      shareRange: 15,
+    }])
   })
 
-  it('handles array automation', () => {
+  it('uses shareRange value when provided regardless of shareable', () => {
+    const features = [{
+      name: 'Evasion',
+      automation: { type: 'evasion', shareable: false, shareRange: 15 },
+    }]
+    expect(getEvasionEffects(features)).toEqual([{
+      source: 'Evasion',
+      saveType: 'DEX',
+      shareable: false,
+      shareRange: 15,
+    }])
+  })
+
+  it('handles array automation collecting only evasion types', () => {
     const features = [{
       name: 'Mixed',
       automation: [
@@ -64,9 +80,12 @@ describe('getEvasionEffects', () => {
         { type: 'other' },
       ],
     }]
-    const result = getEvasionEffects(features)
-    expect(result).toHaveLength(1)
-    expect(result[0].source).toBe('Mixed')
+    expect(getEvasionEffects(features)).toEqual([{
+      source: 'Mixed',
+      saveType: 'DEX',
+      shareable: false,
+      shareRange: 0,
+    }])
   })
 
   it('collects multiple evasion effects from multiple features', () => {
@@ -74,34 +93,71 @@ describe('getEvasionEffects', () => {
       { name: 'Evasion A', automation: { type: 'evasion', saveType: 'dex' } },
       { name: 'Evasion B', automation: { type: 'evasion', saveType: 'con' } },
     ]
-    const result = getEvasionEffects(features)
-    expect(result).toHaveLength(2)
-    expect(result[0].saveType).toBe('DEX')
-    expect(result[1].saveType).toBe('CON')
+    expect(getEvasionEffects(features)).toEqual([
+      { source: 'Evasion A', saveType: 'DEX', shareable: false, shareRange: 0 },
+      { source: 'Evasion B', saveType: 'CON', shareable: false, shareRange: 0 },
+    ])
+  })
+
+  it('collects multiple evasion effects from a single feature with array automation', () => {
+    const features = [{
+      name: 'MultiEvasion',
+      automation: [
+        { type: 'evasion', saveType: 'dex' },
+        { type: 'evasion', saveType: 'wis' },
+      ],
+    }]
+    expect(getEvasionEffects(features)).toEqual([
+      { source: 'MultiEvasion', saveType: 'DEX', shareable: false, shareRange: 0 },
+      { source: 'MultiEvasion', saveType: 'WIS', shareable: false, shareRange: 0 },
+    ])
+  })
+
+  it('throws when automation array contains null entries', () => {
+    const features = [{
+      name: 'Mixed',
+      automation: [
+        { type: 'evasion' },
+        null,
+        { type: 'evasion', saveType: 'con' },
+      ],
+    }]
+    expect(() => getEvasionEffects(features)).toThrow(TypeError)
+  })
+
+  it('skips non-evasion types in automation array', () => {
+    const features = [{
+      name: 'Mixed',
+      automation: [
+        { type: 'auto_reroll', target: 'saving_throw' },
+        { type: 'other' },
+        { type: 'evasion', saveType: 'str' },
+      ],
+    }]
+    expect(getEvasionEffects(features)).toEqual([{
+      source: 'Mixed',
+      saveType: 'STR',
+      shareable: false,
+      shareRange: 0,
+    }])
   })
 })
 
 // ── getAllSaveProficiencies ────────────────────────────────────────
 
 describe('getAllSaveProficiencies', () => {
-  it('returns all six saves when features is null', () => {
-    const result = getAllSaveProficiencies(null, {})
-    expect(result).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'])
-  })
-
-  it('returns all six saves when features is undefined', () => {
-    const result = getAllSaveProficiencies(undefined, {})
-    expect(result).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'])
+  it('returns all six saves when features is falsy', () => {
+    const expected = ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']
+    expect(getAllSaveProficiencies(null, {})).toEqual(expected)
+    expect(getAllSaveProficiencies(undefined, {})).toEqual(expected)
   })
 
   it('returns empty array when features is empty', () => {
-    const result = getAllSaveProficiencies([], {})
-    expect(result).toEqual([])
+    expect(getAllSaveProficiencies([], {})).toEqual([])
   })
 
   it('returns empty array when features have no automation', () => {
-    const result = getAllSaveProficiencies([{ name: 'Test' }], {})
-    expect(result).toEqual([])
+    expect(getAllSaveProficiencies([{ name: 'Test' }], {})).toEqual([])
   })
 
   it('adds all saves when auto_reroll with target saving_throw exists', () => {
@@ -109,8 +165,9 @@ describe('getAllSaveProficiencies', () => {
       name: 'Relentless Endurance',
       automation: { type: 'auto_reroll', target: 'saving_throw' },
     }]
-    const result = getAllSaveProficiencies(features, {})
-    expect(result).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'])
+    expect(getAllSaveProficiencies(features, {})).toEqual([
+      'Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma',
+    ])
   })
 
   it('adds save proficiency from save_proficiency type', () => {
@@ -118,17 +175,15 @@ describe('getAllSaveProficiencies', () => {
       name: 'Fey Ancestry',
       automation: { type: 'save_proficiency', saveType: 'con' },
     }]
-    const result = getAllSaveProficiencies(features, {})
-    expect(result).toContain('Con')
+    expect(getAllSaveProficiencies(features, {})).toEqual(['Con'])
   })
 
-  it('normalizes saveType casing', () => {
+  it('normalizes saveType casing to capitalize-first-lowercase-rest', () => {
     const features = [{
       name: 'Test',
       automation: { type: 'save_proficiency', saveType: 'Constitution' },
     }]
-    const result = getAllSaveProficiencies(features, {})
-    expect(result).toContain('Constitution')
+    expect(getAllSaveProficiencies(features, {})).toEqual(['Constitution'])
   })
 
   it('uses fallback types when character already has save proficiency', () => {
@@ -143,10 +198,15 @@ describe('getAllSaveProficiencies', () => {
         fallbackTypes: ['wisdom', 'charisma'],
       },
     }]
-    const result = getAllSaveProficiencies(features, playerStats)
-    // Constitution already proficent, so picks first fallback (WIS)
-    expect(result).toContain('Wisdom')
-    expect(result).not.toContain('Charisma')
+    expect(getAllSaveProficiencies(features, playerStats)).toEqual(['Wisdom'])
+  })
+
+  it('uses fallback types when already in result set from another feature', () => {
+    const features = [
+      { name: 'A', automation: { type: 'save_proficiency', saveType: 'str' } },
+      { name: 'B', automation: { type: 'save_proficiency', saveType: 'strength', fallbackTypes: ['dex'] } },
+    ]
+    expect(getAllSaveProficiencies(features, {})).toEqual(['Str', 'Strength'])
   })
 
   it('adds save proficiency when character does not have it', () => {
@@ -159,21 +219,12 @@ describe('getAllSaveProficiencies', () => {
         fallbackTypes: ['charisma'],
       },
     }]
-    const result = getAllSaveProficiencies(features, playerStats)
-    expect(result).toContain('Wisdom')
-    expect(result).not.toContain('Charisma')
-  })
-
-  it('returns empty array when features have no automation', () => {
-    const features = [{ name: 'No Auto' }]
-    const result = getAllSaveProficiencies(features, {})
-    expect(result).toEqual([])
+    expect(getAllSaveProficiencies(features, playerStats)).toEqual(['Wisdom'])
   })
 
   it('handles null features in array', () => {
     const features = [null]
-    const result = getAllSaveProficiencies(features, {})
-    expect(result).toEqual([])
+    expect(getAllSaveProficiencies(features, {})).toEqual([])
   })
 
   it('handles multiple save_proficiency features', () => {
@@ -181,9 +232,15 @@ describe('getAllSaveProficiencies', () => {
       { name: 'A', automation: { type: 'save_proficiency', saveType: 'str' } },
       { name: 'B', automation: { type: 'save_proficiency', saveType: 'dex' } },
     ]
-    const result = getAllSaveProficiencies(features, {})
-    expect(result).toContain('Str')
-    expect(result).toContain('Dex')
+    expect(getAllSaveProficiencies(features, {})).toEqual(['Str', 'Dex'])
+  })
+
+  it('deduplicates save proficiencies', () => {
+    const features = [
+      { name: 'A', automation: { type: 'save_proficiency', saveType: 'str' } },
+      { name: 'B', automation: { type: 'save_proficiency', saveType: 'str' } },
+    ]
+    expect(getAllSaveProficiencies(features, {})).toEqual(['Str'])
   })
 
   it('handles auto_reroll alongside save_proficiency', () => {
@@ -191,8 +248,45 @@ describe('getAllSaveProficiencies', () => {
       { name: 'Relentless', automation: { type: 'auto_reroll', target: 'saving_throw' } },
       { name: 'Save Prof', automation: { type: 'save_proficiency', saveType: 'str' } },
     ]
-    const result = getAllSaveProficiencies(features, {})
-    // auto_reroll adds all saves, save_proficiency adds Str (already in set)
-    expect(result).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma', 'Str'])
+    expect(getAllSaveProficiencies(features, {})).toEqual([
+      'Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma', 'Str',
+    ])
+  })
+
+  it('skips save_proficiency with no saveType', () => {
+    const features = [{
+      name: 'Test',
+      automation: { type: 'save_proficiency' },
+    }]
+    expect(getAllSaveProficiencies(features, {})).toEqual([])
+  })
+
+  it('handles array automation with mixed types', () => {
+    const features = [{
+      name: 'Multi',
+      automation: [
+        { type: 'save_proficiency', saveType: 'str' },
+        { type: 'auto_reroll', target: 'saving_throw' },
+        { type: 'save_proficiency', saveType: 'dex' },
+      ],
+    }]
+    expect(getAllSaveProficiencies(features, {})).toEqual([
+      'Str', 'Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma', 'Dex',
+    ])
+  })
+
+  it('uses class saving_throw_proficiencies for existing proficiency check', () => {
+    const playerStats = {
+      class: { saving_throw_proficiencies: ['Dexterity'] },
+    }
+    const features = [{
+      name: 'Test',
+      automation: {
+        type: 'save_proficiency',
+        saveType: 'dexterity',
+        fallbackTypes: ['wisdom'],
+      },
+    }]
+    expect(getAllSaveProficiencies(features, playerStats)).toEqual(['Wisdom'])
   })
 })

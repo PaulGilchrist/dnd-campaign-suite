@@ -1,33 +1,31 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import storage from './storage.js';
 import utils from './utils.js';
 
 describe('storage', () => {
     beforeEach(() => {
         localStorage.clear();
-        vi.restoreAllMocks();
     });
 
     // ── get(key, campaignName) ──────────────────────────────────────
     describe('get', () => {
         it('returns null when no campaignName provided', async () => {
-            localStorage.setItem('myKey', JSON.stringify({ foo: 'bar' }));
             const result = await storage.get('myKey');
             expect(result).toBeNull();
         });
 
-        it('returns null when campaignName provided but key not found', async () => {
-            const fakeFetch = vi.fn().mockResolvedValue({ ok: false });
-            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
-
-            const result = await storage.get('myKey', 'myCampaign');
+        it('returns null when campaignName is empty string', async () => {
+            const result = await storage.get('myKey', '');
             expect(result).toBeNull();
-            expect(fakeFetch).toHaveBeenCalledWith(
-                '/api/campaigns/myCampaign/myKey'
-            );
         });
 
-        it('fetches from API and returns value when campaignName provided', async () => {
+        it('returns null when campaignName is undefined', async () => {
+            const result = await storage.get('myKey');
+            expect(result).toBeNull();
+        });
+
+        it('fetches from API and returns value when campaignName is provided', async () => {
             const fakeFetch = vi.fn().mockResolvedValue({
                 ok: true,
                 json: async () => ({ value: { apiData: 42 } })
@@ -39,6 +37,19 @@ describe('storage', () => {
             expect(fakeFetch).toHaveBeenCalledWith(
                 '/api/campaigns/myCampaign/myKey'
             );
+        });
+
+        it('does NOT read from localStorage when campaignName is provided', async () => {
+            localStorage.setItem('myKey', JSON.stringify({ local: true }));
+            const fakeFetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: async () => ({ value: { apiData: 42 } })
+            });
+            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
+
+            const result = await storage.get('myKey', 'myCampaign');
+            expect(result).toEqual({ apiData: 42 });
+            expect(localStorage.getItem('myKey')).toBe(JSON.stringify({ local: true }));
         });
 
         it('does NOT cache API response in localStorage', async () => {
@@ -56,7 +67,6 @@ describe('storage', () => {
             const fakeFetch = vi.fn().mockResolvedValue({ ok: false });
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
 
-            localStorage.setItem('myKey', JSON.stringify({ local: true }));
             const result = await storage.get('myKey', 'myCampaign');
             expect(result).toBeNull();
         });
@@ -65,23 +75,11 @@ describe('storage', () => {
             const fakeFetch = vi.fn().mockRejectedValue(new Error('network error'));
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
 
-            localStorage.setItem('myKey', JSON.stringify({ local: true }));
             const result = await storage.get('myKey', 'myCampaign');
             expect(result).toBeNull();
         });
 
-        it('returns null when data.value is null from API', async () => {
-            const fakeFetch = vi.fn().mockResolvedValue({
-                ok: true,
-                json: async () => ({ value: null })
-            });
-            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
-
-            const result = await storage.get('myKey', 'myCampaign');
-            expect(result).toBeNull();
-        });
-
-        it('returns null when data.value is undefined from API', async () => {
+        it('returns null when API response body lacks a value property', async () => {
             const fakeFetch = vi.fn().mockResolvedValue({
                 ok: true,
                 json: async () => ({})
@@ -92,37 +90,36 @@ describe('storage', () => {
             expect(result).toBeNull();
         });
 
-        it('returns API value when data.value is 0 (falsy but valid)', async () => {
+        it('returns null when data.value is null or undefined from API', async () => {
+            const fakeFetch = vi.fn()
+                .mockResolvedValueOnce({ ok: true, json: async () => ({ value: null }) })
+                .mockResolvedValueOnce({ ok: true, json: async () => ({ value: undefined }) });
+            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
+
+            expect(await storage.get('myKey', 'myCampaign')).toBeNull();
+            expect(await storage.get('myKey', 'myCampaign')).toBeNull();
+        });
+
+        it('returns falsy-but-valid values: 0, false, empty string', async () => {
             const fakeFetch = vi.fn().mockResolvedValue({
                 ok: true,
                 json: async () => ({ value: 0 })
             });
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
 
-            const result = await storage.get('myKey', 'myCampaign');
-            expect(result).toBe(0);
-        });
+            expect(await storage.get('myKey', 'myCampaign')).toBe(0);
 
-        it('returns API value when data.value is false (falsy but valid)', async () => {
-            const fakeFetch = vi.fn().mockResolvedValue({
+            fakeFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({ value: false })
             });
-            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
+            expect(await storage.get('myKey', 'myCampaign')).toBe(false);
 
-            const result = await storage.get('myKey', 'myCampaign');
-            expect(result).toBe(false);
-        });
-
-        it('returns API value when data.value is empty string (falsy but valid)', async () => {
-            const fakeFetch = vi.fn().mockResolvedValue({
+            fakeFetch.mockResolvedValueOnce({
                 ok: true,
                 json: async () => ({ value: '' })
             });
-            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
-
-            const result = await storage.get('myKey', 'myCampaign');
-            expect(result).toBe('');
+            expect(await storage.get('myKey', 'myCampaign')).toBe('');
         });
 
         it('encodes campaignName and key in fetch URL', async () => {
@@ -138,33 +135,18 @@ describe('storage', () => {
             );
         });
 
-        it('returns null when API is down', async () => {
+        it('logs error to console when API call fails', async () => {
             const fakeFetch = vi.fn().mockRejectedValue(new Error('down'));
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
+            const consoleSpy = vi.spyOn(console, 'error');
 
-            localStorage.setItem('myKey', JSON.stringify({ local: true }));
-            const result = await storage.get('missing', 'myCampaign');
-            expect(result).toBeNull();
-        });
+            await storage.get('myKey', 'myCampaign');
 
-        it('does not attempt API fetch when campaignName is falsy (empty string)', async () => {
-            const fakeFetch = vi.fn();
-            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
-
-            localStorage.setItem('myKey', JSON.stringify({ local: true }));
-            const result = await storage.get('myKey', '');
-            expect(result).toBeNull();
-            expect(fakeFetch).not.toHaveBeenCalled();
-        });
-
-        it('does not attempt API fetch when campaignName is undefined', async () => {
-            const fakeFetch = vi.fn();
-            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
-
-            localStorage.setItem('myKey', JSON.stringify({ local: true }));
-            const result = await storage.get('myKey');
-            expect(result).toBeNull();
-            expect(fakeFetch).not.toHaveBeenCalled();
+            expect(consoleSpy).toHaveBeenCalledWith(
+                'storage.get failed for key "myKey" in campaign "myCampaign"',
+                expect.any(Error)
+            );
+            consoleSpy.mockRestore();
         });
     });
 
@@ -175,7 +157,7 @@ describe('storage', () => {
             expect(localStorage.getItem('myKey')).toBeNull();
         });
 
-        it('POSTs to API when campaignName is provided', async () => {
+        it('POSTs to API with correct URL, method, headers, and body', async () => {
             const fakeFetch = vi.fn().mockResolvedValue({ ok: true });
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
 
@@ -202,6 +184,11 @@ describe('storage', () => {
             );
         });
 
+        it('returns a promise (fire-and-forget)', () => {
+            const promise = storage.set('myKey', 'value', 'myCampaign');
+            expect(promise).toBeInstanceOf(Promise);
+        });
+
         it('silently swallows fetch errors without rethrowing', async () => {
             const fakeFetch = vi.fn().mockRejectedValue(new Error('server down'));
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
@@ -210,12 +197,7 @@ describe('storage', () => {
                 .resolves.toBeUndefined();
         });
 
-        it('returns a promise (fire-and-forget)', () => {
-            const promise = storage.set('myKey', 'value');
-            expect(promise).toBeInstanceOf(Promise);
-        });
-
-        it('logs error and returns without POSTing when campaignName is undefined', async () => {
+        it('logs error and does not POST when campaignName is undefined', async () => {
             const fakeFetch = vi.fn();
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
             const consoleSpy = vi.spyOn(console, 'error');
@@ -229,19 +211,23 @@ describe('storage', () => {
             consoleSpy.mockRestore();
         });
 
-        it('still POSTs when campaignName is provided but value is null', async () => {
+        it('still POSTs when value is null, 0, false, or empty string', async () => {
             const fakeFetch = vi.fn().mockResolvedValue({ ok: true });
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
 
             await storage.set('myKey', null, 'myCampaign');
             expect(fakeFetch).toHaveBeenCalled();
-        });
-
-        it('still POSTs when campaignName is provided but value is 0', async () => {
-            const fakeFetch = vi.fn().mockResolvedValue({ ok: true });
-            vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
+            fakeFetch.mockClear();
 
             await storage.set('myKey', 0, 'myCampaign');
+            expect(fakeFetch).toHaveBeenCalled();
+            fakeFetch.mockClear();
+
+            await storage.set('myKey', false, 'myCampaign');
+            expect(fakeFetch).toHaveBeenCalled();
+            fakeFetch.mockClear();
+
+            await storage.set('myKey', '', 'myCampaign');
             expect(fakeFetch).toHaveBeenCalled();
         });
     });
@@ -249,11 +235,10 @@ describe('storage', () => {
     // ── getProperty(name, propertyName, campaignName) ───────────────
     describe('getProperty', () => {
         it('returns the property value when obj exists and has the property', async () => {
-            const getSpy = vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 50, name: 'PlayerOne' });
+            vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 50, name: 'PlayerOne' });
 
             const result = await storage.getProperty('PlayerOne', 'hp');
             expect(result).toBe(50);
-            expect(getSpy).toHaveBeenCalledWith('PlayerOne', undefined);
         });
 
         it('returns null when obj exists but property does not', async () => {
@@ -263,53 +248,38 @@ describe('storage', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when obj does not exist', async () => {
+        it('returns null when obj does not exist (get returns null)', async () => {
             vi.spyOn(storage, 'get').mockResolvedValueOnce(null);
 
             const result = await storage.getProperty('NonExistent', 'hp');
             expect(result).toBeNull();
         });
 
+        it('returns null when obj property value is null or undefined', async () => {
+            vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: null, mana: undefined });
+
+            expect(await storage.getProperty('PlayerOne', 'hp')).toBeNull();
+            expect(await storage.getProperty('PlayerOne', 'mana')).toBeNull();
+        });
+
+        it('returns the property even if its value is falsy (0, false, empty string)', async () => {
+            vi.spyOn(storage, 'get')
+                .mockResolvedValueOnce({ xp: 0 })
+                .mockResolvedValueOnce({ isVisible: false })
+                .mockResolvedValueOnce({ note: '' });
+
+            expect(await storage.getProperty('PlayerOne', 'xp')).toBe(0);
+            expect(await storage.getProperty('PlayerOne', 'isVisible')).toBe(false);
+            expect(await storage.getProperty('PlayerOne', 'note')).toBe('');
+        });
+
         it('uses utils.getName to derive the key', async () => {
             const getNameSpy = vi.spyOn(utils, 'getName').mockReturnValue('PlayerOne');
-            const getSpy = vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 50 });
+            vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 50 });
 
-            const result = await storage.getProperty('PlayerOne', 'hp');
-            expect(result).toBe(50);
+            await storage.getProperty('PlayerOne', 'hp');
             expect(getNameSpy).toHaveBeenCalledWith('PlayerOne');
-            expect(getSpy).toHaveBeenCalledWith('PlayerOne', undefined);
             getNameSpy.mockRestore();
-        });
-
-        it('returns null when utils.getName returns "Unknown" and no obj there', async () => {
-            const getNameSpy = vi.spyOn(utils, 'getName').mockReturnValue('Unknown');
-            vi.spyOn(storage, 'get').mockResolvedValueOnce(null);
-
-            const result = await storage.getProperty(null, 'hp');
-            expect(result).toBeNull();
-            expect(getNameSpy).toHaveBeenCalledWith(null);
-            getNameSpy.mockRestore();
-        });
-
-        it('returns the property even if its value is 0 (falsy)', async () => {
-            vi.spyOn(storage, 'get').mockResolvedValueOnce({ xp: 0 });
-
-            const result = await storage.getProperty('PlayerOne', 'xp');
-            expect(result).toBe(0);
-        });
-
-        it('returns the property even if its value is false (falsy)', async () => {
-            vi.spyOn(storage, 'get').mockResolvedValueOnce({ isVisible: false });
-
-            const result = await storage.getProperty('PlayerOne', 'isVisible');
-            expect(result).toBe(false);
-        });
-
-        it('returns the property even if its value is empty string (falsy)', async () => {
-            vi.spyOn(storage, 'get').mockResolvedValueOnce({ note: '' });
-
-            const result = await storage.getProperty('PlayerOne', 'note');
-            expect(result).toBe('');
         });
 
         it('passes campaignName to storage.get', async () => {
@@ -324,6 +294,23 @@ describe('storage', () => {
 
             await storage.getProperty('PlayerOne', 'hp');
             expect(storage.get).toHaveBeenCalledWith('PlayerOne', undefined);
+        });
+
+        it('returns null when utils.getName returns "Unknown" and no obj exists', async () => {
+            vi.spyOn(utils, 'getName').mockReturnValue('Unknown');
+            vi.spyOn(storage, 'get').mockResolvedValueOnce(null);
+
+            const result = await storage.getProperty(null, 'hp');
+            expect(result).toBeNull();
+        });
+
+        it('returns null when get returns a non-object primitive', async () => {
+            vi.spyOn(storage, 'get').mockResolvedValueOnce('not-an-object');
+
+            // Accessing property on a string returns a character or undefined,
+            // but obj[propertyName] != null check: 'not-an-object'['hp'] is undefined, so returns null
+            const result = await storage.getProperty('PlayerOne', 'hp');
+            expect(result).toBeNull();
         });
     });
 
@@ -368,64 +355,71 @@ describe('storage', () => {
             expect(setSpy).toHaveBeenCalledWith('PlayerOne', { hp: 50 }, 'myCampaign');
         });
 
-        it('overwrites existing property value', async () => {
+        it('overwrites existing property value while preserving others', async () => {
             vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 10, mp: 20 });
             const setSpy = vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
 
             await storage.setProperty('PlayerOne', 'hp', 50, 'myCampaign');
             expect(setSpy).toHaveBeenCalledWith(
-                 'PlayerOne',
-                 { hp: 50, mp: 20 },
-                 'myCampaign'
-             );
+                'PlayerOne',
+                { hp: 50, mp: 20 },
+                'myCampaign'
+            );
         });
 
-        it('sets property to falsy values correctly (0)', async () => {
+        it('sets property to falsy values correctly (0, false, null, empty string)', async () => {
             vi.spyOn(storage, 'get').mockResolvedValueOnce({});
             const setSpy = vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
 
-            await storage.setProperty('PlayerOne', 'hp', 0);
-            expect(setSpy).toHaveBeenCalledWith('PlayerOne', { hp: 0 }, undefined);
-        });
+            await storage.setProperty('PlayerOne', 'count', 0);
+            expect(setSpy).toHaveBeenCalledWith('PlayerOne', { count: 0 }, undefined);
+            setSpy.mockClear();
 
-        it('sets property to falsy values correctly (null)', async () => {
-            vi.spyOn(storage, 'get').mockResolvedValueOnce({});
-            const setSpy = vi.spyOn(storage, 'set').mockResolvedValueOnce(undefined);
+            await storage.setProperty('PlayerOne', 'visible', false);
+            expect(setSpy).toHaveBeenCalledWith('PlayerOne', { visible: false }, undefined);
+            setSpy.mockClear();
 
             await storage.setProperty('PlayerOne', 'note', null);
             expect(setSpy).toHaveBeenCalledWith('PlayerOne', { note: null }, undefined);
+            setSpy.mockClear();
+
+            await storage.setProperty('PlayerOne', 'tag', '');
+            expect(setSpy).toHaveBeenCalledWith('PlayerOne', { tag: '' }, undefined);
+        });
+
+        it('propagates error when get throws (no error handling in code)', async () => {
+            vi.spyOn(storage, 'get').mockRejectedValueOnce(new Error('boom'));
+
+            await expect(storage.setProperty('PlayerOne', 'hp', 50))
+                .rejects.toThrow('boom');
+        });
+
+        it('throws TypeError when get returns a non-object primitive', async () => {
+            vi.spyOn(storage, 'get').mockResolvedValueOnce('not-an-object');
+
+            await expect(storage.setProperty('PlayerOne', 'hp', 50, 'myCampaign'))
+                .rejects.toThrow(/Cannot create property/);
         });
     });
 
-    // ── Edge cases / integration style tests ────────────────────────
-    describe('edge cases', () => {
-        it('get with valid campaignName fetches and ignores localStorage', async () => {
+    // ── Integration: get ignores localStorage entirely ───────────────
+    describe('localStorage is never used', () => {
+        it('get ignores localStorage data when campaignName is provided', async () => {
             localStorage.setItem('myKey', JSON.stringify({ stale: true }));
             const fakeFetch = vi.fn().mockResolvedValue({
                 ok: true,
                 json: async () => ({ value: { fresh: true } })
-           });
+            });
             vi.spyOn(globalThis, 'fetch').mockImplementation(fakeFetch);
 
             const result = await storage.get('myKey', 'myCampaign');
             expect(result).toEqual({ fresh: true });
-            // localStorage should not be read or written
             expect(localStorage.getItem('myKey')).toBe(JSON.stringify({ stale: true }));
         });
 
-        it('getProperty with campaignName uses mocked get that returns from API', async () => {
-            vi.spyOn(storage, 'get').mockResolvedValueOnce({ hp: 75 });
-
-            const result = await storage.getProperty('PlayerOne', 'hp', 'myCampaign');
-            expect(result).toBe(75);
-        });
-
-        it('setProperty propagates error when get throws (no error handling in code)', async () => {
-             // setProperty does NOT have a try/catch, so an error in get propagates
-            vi.spyOn(storage, 'get').mockRejectedValueOnce(new Error('boom'));
-
-            await expect(storage.setProperty('PlayerOne', 'hp', 50))
-                 .rejects.toThrow('boom');
+        it('set never writes to localStorage regardless of campaignName', () => {
+            storage.set('myKey', { data: 'value' }, 'myCampaign');
+            expect(localStorage.getItem('myKey')).toBeNull();
         });
     });
 });

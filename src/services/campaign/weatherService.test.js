@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import {
   getBiome,
@@ -9,293 +10,177 @@ import {
   getWeatherDescription,
 } from './weatherService.js';
 
+const KNOWN_CONDITIONS = [
+  'clear', 'cloudy', 'rain', 'storm', 'fog', 'wind', 'snow', 'mist', 'extreme',
+];
+
 describe('weatherService', () => {
   describe('getBiome', () => {
-    it('should return correct biome for plains', () => {
+    it('maps each terrain type to its expected biome', () => {
       expect(getBiome('plains')).toBe('temperate');
-    });
-
-    it('should return correct biome for forest', () => {
       expect(getBiome('forest')).toBe('temperate');
-    });
-
-    it('should return correct biome for hills', () => {
       expect(getBiome('hills')).toBe('temperate');
-    });
-
-    it('should return correct biome for mountains', () => {
       expect(getBiome('mountains')).toBe('cold');
-    });
-
-    it('should return correct biome for desert', () => {
       expect(getBiome('desert')).toBe('arid');
-    });
-
-    it('should return correct biome for swamp', () => {
       expect(getBiome('swamp')).toBe('wet');
-    });
-
-    it('should return correct biome for tundra', () => {
       expect(getBiome('tundra')).toBe('cold');
-    });
-
-    it('should return correct biome for beach', () => {
       expect(getBiome('beach')).toBe('coastal');
     });
 
-    it('should default to temperate for unknown terrain type', () => {
+    it('defaults to temperate for unknown, null, and undefined terrain types', () => {
       expect(getBiome('jungle')).toBe('temperate');
-    });
-
-    it('should default to temperate for null input', () => {
       expect(getBiome(null)).toBe('temperate');
-    });
-
-    it('should default to temperate for undefined input', () => {
       expect(getBiome(undefined)).toBe('temperate');
     });
   });
 
   describe('getWeatherTable', () => {
-    it('should return temperate table', () => {
-      const table = getWeatherTable('temperate');
-      expect(table).toEqual([
+    it('returns the correct table for each biome', () => {
+      expect(getWeatherTable('temperate')).toEqual([
         'clear', 'cloudy', 'cloudy', 'cloudy', 'rain', 'rain', 'fog', 'storm',
       ]);
-    });
-
-    it('should return arid table', () => {
-      const table = getWeatherTable('arid');
-      expect(table).toEqual([
+      expect(getWeatherTable('arid')).toEqual([
         'clear', 'cloudy', 'cloudy', 'wind', 'wind', 'fog', 'fog', 'extreme',
       ]);
-    });
-
-    it('should return cold table', () => {
-      const table = getWeatherTable('cold');
-      expect(table).toEqual([
+      expect(getWeatherTable('cold')).toEqual([
         'clear', 'cloudy', 'cloudy', 'snow', 'snow', 'storm', 'fog', 'extreme',
       ]);
-    });
-
-    it('should return wet table', () => {
-      const table = getWeatherTable('wet');
-      expect(table).toEqual([
+      expect(getWeatherTable('wet')).toEqual([
         'cloudy', 'cloudy', 'rain', 'rain', 'rain', 'storm', 'fog', 'mist',
       ]);
-    });
-
-    it('should return coastal table', () => {
-      const table = getWeatherTable('coastal');
-      expect(table).toEqual([
+      expect(getWeatherTable('coastal')).toEqual([
         'clear', 'cloudy', 'cloudy', 'rain', 'wind', 'wind', 'storm', 'fog',
       ]);
     });
 
-    it('should default to temperate table for unknown biome', () => {
-      const table = getWeatherTable('tropical');
-      expect(table).toEqual([
-        'clear', 'cloudy', 'cloudy', 'cloudy', 'rain', 'rain', 'fog', 'storm',
-      ]);
+    it('defaults to temperate table for unknown biome', () => {
+      expect(getWeatherTable('tropical')).toEqual(getWeatherTable('temperate'));
     });
 
-    it('should return the same table reference for temperate', () => {
-      const table1 = getWeatherTable('temperate');
-      const table2 = getWeatherTable('temperate');
-      expect(table1).toBe(table2);
+    it('returns stable references for known biomes', () => {
+      const t1 = getWeatherTable('temperate');
+      const t2 = getWeatherTable('temperate');
+      expect(t1).toBe(t2);
+      expect(getWeatherTable('arid')).toBe(getWeatherTable('arid'));
     });
   });
 
   describe('generateWeather', () => {
-    it('should return a weather effect object for plains terrain', () => {
-      const weather = generateWeather('plains');
-      expect(weather).toHaveProperty('condition');
-      expect(weather).toHaveProperty('label');
-      expect(weather).toHaveProperty('icon');
-      expect(weather).toHaveProperty('description');
+    it('returns an object with all expected properties for each terrain type', () => {
+      const terrains = ['plains', 'forest', 'hills', 'mountains', 'desert', 'swamp', 'tundra', 'beach'];
+      for (const terrain of terrains) {
+        const weather = generateWeather(terrain);
+        expect(weather).toHaveProperty('condition');
+        expect(weather).toHaveProperty('label');
+        expect(weather).toHaveProperty('icon');
+        expect(weather).toHaveProperty('description');
+        expect(weather).toHaveProperty('visibility');
+        expect(weather).toHaveProperty('moveCostMod');
+        expect(weather).toHaveProperty('budgetMod');
+        expect(weather).toHaveProperty('encounterMod');
+      }
     });
 
-    it('should return a weather effect object for desert terrain', () => {
-      const weather = generateWeather('desert');
-      expect(weather).toHaveProperty('condition');
-      expect(weather).toHaveProperty('label');
-      expect(weather).toHaveProperty('icon');
-    });
-
-    it('should return a weather effect object for tundra terrain', () => {
-      const weather = generateWeather('tundra');
-      expect(weather).toHaveProperty('condition');
-      expect(weather).toHaveProperty('label');
-      expect(weather).toHaveProperty('icon');
-    });
-
-    it('should return a weather effect object for swamp terrain', () => {
-      const weather = generateWeather('swamp');
-      expect(weather).toHaveProperty('condition');
-      expect(weather).toHaveProperty('label');
-      expect(weather).toHaveProperty('icon');
-    });
-
-    it('should return a weather effect object for beach terrain', () => {
-      const weather = generateWeather('beach');
-      expect(weather).toHaveProperty('condition');
-      expect(weather).toHaveProperty('label');
-      expect(weather).toHaveProperty('icon');
-    });
-
-    it('should return temperate weather for unknown terrain', () => {
+    it('defaults to temperate weather for unknown terrain type', () => {
       const weather = generateWeather('jungle');
       expect(weather).toHaveProperty('condition');
       expect(weather).toHaveProperty('label');
     });
 
-    it('should return random conditions from the table (statistical test)', () => {
-      const conditions = new Set();
-      for (let i = 0; i < 200; i++) {
+    it('defaults to temperate weather for null and undefined terrain type', () => {
+      const w1 = generateWeather(null);
+      const w2 = generateWeather(undefined);
+      expect(w1).toHaveProperty('condition');
+      expect(w2).toHaveProperty('condition');
+    });
+
+    it('only returns conditions valid for the terrain\'s biome', () => {
+      const biomeTables = {
+        plains: ['clear', 'cloudy', 'rain', 'fog', 'storm'],
+        desert: ['clear', 'cloudy', 'wind', 'fog', 'extreme'],
+        tundra: ['clear', 'cloudy', 'snow', 'storm', 'fog', 'extreme'],
+        swamp: ['cloudy', 'rain', 'storm', 'fog', 'mist'],
+        beach: ['clear', 'cloudy', 'rain', 'wind', 'storm', 'fog'],
+      };
+
+      for (const [terrain, validConditions] of Object.entries(biomeTables)) {
+        const validSet = new Set(validConditions);
+        for (let i = 0; i < 50; i++) {
+          const weather = generateWeather(terrain);
+          expect(validSet).toContain(weather.condition,
+            `condition "${weather.condition}" for "${terrain}" is not valid`);
+        }
+      }
+    });
+
+    it('returns all known weather conditions across enough samples', () => {
+      const seen = new Set();
+      for (let i = 0; i < 500; i++) {
         const weather = generateWeather('plains');
-        conditions.add(weather.condition);
+        seen.add(weather.condition);
       }
-      // temperate table has 8 conditions, should see multiple unique ones
-      expect(conditions.size).toBeGreaterThan(2);
-    });
-
-    it('should only return valid conditions for the biome', () => {
-      const temperateConditions = new Set([
-        'clear', 'cloudy', 'rain', 'fog', 'storm',
-      ]);
-      for (let i = 0; i < 100; i++) {
-        const weather = generateWeather('plains');
-        expect(temperateConditions).toContain(weather.condition);
-      }
-    });
-
-    it('should only return valid arid conditions', () => {
-      const aridConditions = new Set(['clear', 'cloudy', 'wind', 'fog', 'extreme']);
-      for (let i = 0; i < 100; i++) {
-        const weather = generateWeather('desert');
-        expect(aridConditions).toContain(weather.condition);
-      }
-    });
-
-    it('should include all weather effect properties', () => {
-      const weather = generateWeather('plains');
-      expect(weather).toHaveProperty('visibility');
-      expect(weather).toHaveProperty('moveCostMod');
-      expect(weather).toHaveProperty('budgetMod');
-      expect(weather).toHaveProperty('encounterMod');
+      const expected = new Set(['clear', 'cloudy', 'rain', 'fog', 'storm']);
+      expect(seen).toEqual(expected);
     });
   });
 
   describe('getWeatherEffects', () => {
-    it('should return full weather object for clear', () => {
-      const effect = getWeatherEffects('clear');
-      expect(effect.condition).toBe('clear');
-      expect(effect.label).toBe('Clear');
-      expect(effect.icon).toBe('sun');
-      expect(effect.visibility).toBeNull();
-      expect(effect.moveCostMod).toBe(1.0);
-      expect(effect.budgetMod).toBe(1.0);
-      expect(effect.encounterMod).toBe(0);
-      expect(effect.description).toBe('Clear skies — no effect on travel');
+    const expectedEffects = {
+      clear: {
+        condition: 'clear', label: 'Clear', icon: 'sun', visibility: null,
+        moveCostMod: 1.0, budgetMod: 1.0, encounterMod: 0,
+        description: 'Clear skies — no effect on travel',
+      },
+      cloudy: {
+        condition: 'cloudy', label: 'Cloudy', icon: 'cloud', visibility: null,
+        moveCostMod: 1.0, budgetMod: 1.0, encounterMod: 0,
+        description: 'Overcast — no effect on travel',
+      },
+      rain: {
+        condition: 'rain', label: 'Rain', icon: 'cloud-rain', visibility: null,
+        moveCostMod: 1.25, budgetMod: 1.0, encounterMod: 10,
+        description: 'Heavy rain — terrain costs +25%',
+      },
+      storm: {
+        condition: 'storm', label: 'Storm', icon: 'bolt', visibility: 3,
+        moveCostMod: 1.5, budgetMod: 0.75, encounterMod: 20,
+        description: 'Thunderstorm — terrain costs +50%, visibility limited, daily budget -25%',
+      },
+      fog: {
+        condition: 'fog', label: 'Fog', icon: 'smog', visibility: 1,
+        moveCostMod: 1.0, budgetMod: 1.0, encounterMod: -10,
+        description: 'Thick fog — visibility limited to adjacent hexes',
+      },
+      wind: {
+        condition: 'wind', label: 'High Wind', icon: 'wind', visibility: null,
+        moveCostMod: 1.0, budgetMod: 0.8, encounterMod: 5,
+        description: 'Strong winds — daily budget -20%',
+      },
+      snow: {
+        condition: 'snow', label: 'Snow', icon: 'snowflake', visibility: null,
+        moveCostMod: 1.5, budgetMod: 1.0, encounterMod: 10,
+        description: 'Snowfall — terrain costs +50%',
+      },
+      mist: {
+        condition: 'mist', label: 'Mist', icon: 'smog', visibility: 2,
+        moveCostMod: 1.0, budgetMod: 1.0, encounterMod: -5,
+        description: 'Heavy mist — visibility reduced',
+      },
+      extreme: {
+        condition: 'extreme', label: 'Extreme', icon: 'triangle-exclamation', visibility: 0,
+        moveCostMod: null, budgetMod: 0, encounterMod: 30,
+        description: 'Blizzard or sandstorm — travel impossible, forced camp',
+      },
+    };
+
+    it('returns the correct effect object for each known condition', () => {
+      for (const [condition, expected] of Object.entries(expectedEffects)) {
+        const effect = getWeatherEffects(condition);
+        expect(effect).toEqual(expected);
+      }
     });
 
-    it('should return full weather object for cloudy', () => {
-      const effect = getWeatherEffects('cloudy');
-      expect(effect.condition).toBe('cloudy');
-      expect(effect.label).toBe('Cloudy');
-      expect(effect.icon).toBe('cloud');
-      expect(effect.visibility).toBeNull();
-      expect(effect.moveCostMod).toBe(1.0);
-      expect(effect.budgetMod).toBe(1.0);
-      expect(effect.encounterMod).toBe(0);
-      expect(effect.description).toBe('Overcast — no effect on travel');
-    });
-
-    it('should return full weather object for rain', () => {
-      const effect = getWeatherEffects('rain');
-      expect(effect.condition).toBe('rain');
-      expect(effect.label).toBe('Rain');
-      expect(effect.icon).toBe('cloud-rain');
-      expect(effect.visibility).toBeNull();
-      expect(effect.moveCostMod).toBe(1.25);
-      expect(effect.budgetMod).toBe(1.0);
-      expect(effect.encounterMod).toBe(10);
-      expect(effect.description).toBe('Heavy rain — terrain costs +25%');
-    });
-
-    it('should return full weather object for storm', () => {
-      const effect = getWeatherEffects('storm');
-      expect(effect.condition).toBe('storm');
-      expect(effect.label).toBe('Storm');
-      expect(effect.icon).toBe('bolt');
-      expect(effect.visibility).toBe(3);
-      expect(effect.moveCostMod).toBe(1.5);
-      expect(effect.budgetMod).toBe(0.75);
-      expect(effect.encounterMod).toBe(20);
-      expect(effect.description).toBe('Thunderstorm — terrain costs +50%, visibility limited, daily budget -25%');
-    });
-
-    it('should return full weather object for fog', () => {
-      const effect = getWeatherEffects('fog');
-      expect(effect.condition).toBe('fog');
-      expect(effect.label).toBe('Fog');
-      expect(effect.icon).toBe('smog');
-      expect(effect.visibility).toBe(1);
-      expect(effect.moveCostMod).toBe(1.0);
-      expect(effect.budgetMod).toBe(1.0);
-      expect(effect.encounterMod).toBe(-10);
-      expect(effect.description).toBe('Thick fog — visibility limited to adjacent hexes');
-    });
-
-    it('should return full weather object for wind', () => {
-      const effect = getWeatherEffects('wind');
-      expect(effect.condition).toBe('wind');
-      expect(effect.label).toBe('High Wind');
-      expect(effect.icon).toBe('wind');
-      expect(effect.visibility).toBeNull();
-      expect(effect.moveCostMod).toBe(1.0);
-      expect(effect.budgetMod).toBe(0.8);
-      expect(effect.encounterMod).toBe(5);
-      expect(effect.description).toBe('Strong winds — daily budget -20%');
-    });
-
-    it('should return full weather object for snow', () => {
-      const effect = getWeatherEffects('snow');
-      expect(effect.condition).toBe('snow');
-      expect(effect.label).toBe('Snow');
-      expect(effect.icon).toBe('snowflake');
-      expect(effect.visibility).toBeNull();
-      expect(effect.moveCostMod).toBe(1.5);
-      expect(effect.budgetMod).toBe(1.0);
-      expect(effect.encounterMod).toBe(10);
-      expect(effect.description).toBe('Snowfall — terrain costs +50%');
-    });
-
-    it('should return full weather object for mist', () => {
-      const effect = getWeatherEffects('mist');
-      expect(effect.condition).toBe('mist');
-      expect(effect.label).toBe('Mist');
-      expect(effect.icon).toBe('smog');
-      expect(effect.visibility).toBe(2);
-      expect(effect.moveCostMod).toBe(1.0);
-      expect(effect.budgetMod).toBe(1.0);
-      expect(effect.encounterMod).toBe(-5);
-      expect(effect.description).toBe('Heavy mist — visibility reduced');
-    });
-
-    it('should return full weather object for extreme', () => {
-      const effect = getWeatherEffects('extreme');
-      expect(effect.condition).toBe('extreme');
-      expect(effect.label).toBe('Extreme');
-      expect(effect.icon).toBe('triangle-exclamation');
-      expect(effect.visibility).toBe(0);
-      expect(effect.moveCostMod).toBeNull();
-      expect(effect.budgetMod).toBe(0);
-      expect(effect.encounterMod).toBe(30);
-      expect(effect.description).toBe('Blizzard or sandstorm — travel impossible, forced camp');
-    });
-
-    it('should fallback to clear for unknown condition', () => {
+    it('returns clear defaults for unknown conditions', () => {
       const effect = getWeatherEffects('hurricane');
       expect(effect.condition).toBe('hurricane');
       expect(effect.label).toBe('Clear');
@@ -307,168 +192,96 @@ describe('weatherService', () => {
       expect(effect.description).toBe('Clear skies — no effect on travel');
     });
 
-    it('should fallback to clear for null condition', () => {
-      const effect = getWeatherEffects(null);
-      expect(effect.condition).toBeNull();
-      expect(effect.label).toBe('Clear');
-      expect(effect.icon).toBe('sun');
-    });
+    it('returns clear defaults for null and undefined conditions', () => {
+      const nullEffect = getWeatherEffects(null);
+      const undefEffect = getWeatherEffects(undefined);
 
-    it('should fallback to clear for undefined condition', () => {
-      const effect = getWeatherEffects(undefined);
-      expect(effect.condition).toBeUndefined();
-      expect(effect.label).toBe('Clear');
-      expect(effect.icon).toBe('sun');
+      expect(nullEffect.condition).toBeNull();
+      expect(nullEffect.label).toBe('Clear');
+      expect(nullEffect.icon).toBe('sun');
+
+      expect(undefEffect.condition).toBeUndefined();
+      expect(undefEffect.label).toBe('Clear');
+      expect(undefEffect.icon).toBe('sun');
     });
   });
 
   describe('getWeatherIcon', () => {
-    it('should return icon for clear', () => {
+    it('returns the correct icon for each known condition', () => {
       expect(getWeatherIcon('clear')).toBe('sun');
-    });
-
-    it('should return icon for cloudy', () => {
       expect(getWeatherIcon('cloudy')).toBe('cloud');
-    });
-
-    it('should return icon for rain', () => {
       expect(getWeatherIcon('rain')).toBe('cloud-rain');
-    });
-
-    it('should return icon for storm', () => {
       expect(getWeatherIcon('storm')).toBe('bolt');
-    });
-
-    it('should return icon for fog', () => {
       expect(getWeatherIcon('fog')).toBe('smog');
-    });
-
-    it('should return icon for wind', () => {
       expect(getWeatherIcon('wind')).toBe('wind');
-    });
-
-    it('should return icon for snow', () => {
       expect(getWeatherIcon('snow')).toBe('snowflake');
-    });
-
-    it('should return icon for mist', () => {
       expect(getWeatherIcon('mist')).toBe('smog');
-    });
-
-    it('should return icon for extreme', () => {
       expect(getWeatherIcon('extreme')).toBe('triangle-exclamation');
     });
 
-    it('should return sun for unknown condition', () => {
+    it('returns sun for unknown, null, and undefined conditions', () => {
       expect(getWeatherIcon('hurricane')).toBe('sun');
-    });
-
-    it('should return sun for null condition', () => {
       expect(getWeatherIcon(null)).toBe('sun');
-    });
-
-    it('should return sun for undefined condition', () => {
       expect(getWeatherIcon(undefined)).toBe('sun');
     });
   });
 
   describe('getWeatherLabel', () => {
-    it('should return label for clear', () => {
+    it('returns the correct label for each known condition', () => {
       expect(getWeatherLabel('clear')).toBe('Clear');
-    });
-
-    it('should return label for cloudy', () => {
       expect(getWeatherLabel('cloudy')).toBe('Cloudy');
-    });
-
-    it('should return label for rain', () => {
       expect(getWeatherLabel('rain')).toBe('Rain');
-    });
-
-    it('should return label for storm', () => {
       expect(getWeatherLabel('storm')).toBe('Storm');
-    });
-
-    it('should return label for fog', () => {
       expect(getWeatherLabel('fog')).toBe('Fog');
-    });
-
-    it('should return label for wind', () => {
       expect(getWeatherLabel('wind')).toBe('High Wind');
-    });
-
-    it('should return label for snow', () => {
       expect(getWeatherLabel('snow')).toBe('Snow');
-    });
-
-    it('should return label for mist', () => {
       expect(getWeatherLabel('mist')).toBe('Mist');
-    });
-
-    it('should return label for extreme', () => {
       expect(getWeatherLabel('extreme')).toBe('Extreme');
     });
 
-    it('should return Unknown for unknown condition', () => {
+    it('returns Unknown for unknown, null, and undefined conditions', () => {
       expect(getWeatherLabel('hurricane')).toBe('Unknown');
-    });
-
-    it('should return Unknown for null condition', () => {
       expect(getWeatherLabel(null)).toBe('Unknown');
-    });
-
-    it('should return Unknown for undefined condition', () => {
       expect(getWeatherLabel(undefined)).toBe('Unknown');
     });
   });
 
   describe('getWeatherDescription', () => {
-    it('should return description for clear', () => {
+    it('returns the correct description for each known condition', () => {
       expect(getWeatherDescription('clear')).toBe('Clear skies — no effect on travel');
-    });
-
-    it('should return description for cloudy', () => {
       expect(getWeatherDescription('cloudy')).toBe('Overcast — no effect on travel');
-    });
-
-    it('should return description for rain', () => {
       expect(getWeatherDescription('rain')).toBe('Heavy rain — terrain costs +25%');
-    });
-
-    it('should return description for storm', () => {
       expect(getWeatherDescription('storm')).toBe('Thunderstorm — terrain costs +50%, visibility limited, daily budget -25%');
-    });
-
-    it('should return description for fog', () => {
       expect(getWeatherDescription('fog')).toBe('Thick fog — visibility limited to adjacent hexes');
-    });
-
-    it('should return description for wind', () => {
       expect(getWeatherDescription('wind')).toBe('Strong winds — daily budget -20%');
-    });
-
-    it('should return description for snow', () => {
       expect(getWeatherDescription('snow')).toBe('Snowfall — terrain costs +50%');
-    });
-
-    it('should return description for mist', () => {
       expect(getWeatherDescription('mist')).toBe('Heavy mist — visibility reduced');
-    });
-
-    it('should return description for extreme', () => {
       expect(getWeatherDescription('extreme')).toBe('Blizzard or sandstorm — travel impossible, forced camp');
     });
 
-    it('should return empty string for unknown condition', () => {
+    it('returns empty string for unknown, null, and undefined conditions', () => {
       expect(getWeatherDescription('hurricane')).toBe('');
-    });
-
-    it('should return empty string for null condition', () => {
       expect(getWeatherDescription(null)).toBe('');
+      expect(getWeatherDescription(undefined)).toBe('');
+    });
+  });
+
+  describe('known conditions completeness', () => {
+    it('every known condition has a corresponding icon, label, and description', () => {
+      for (const condition of KNOWN_CONDITIONS) {
+        expect(getWeatherIcon(condition)).toBeDefined();
+        expect(getWeatherLabel(condition)).toBeDefined();
+        expect(getWeatherDescription(condition)).toBeDefined();
+      }
     });
 
-    it('should return empty string for undefined condition', () => {
-      expect(getWeatherDescription(undefined)).toBe('');
+    it('getWeatherEffects returns the same values as the individual accessor functions for each condition', () => {
+      for (const condition of KNOWN_CONDITIONS) {
+        const effect = getWeatherEffects(condition);
+        expect(effect.icon).toBe(getWeatherIcon(condition));
+        expect(effect.label).toBe(getWeatherLabel(condition));
+        expect(effect.description).toBe(getWeatherDescription(condition));
+      }
     });
   });
 });

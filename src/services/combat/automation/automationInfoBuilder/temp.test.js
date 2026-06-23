@@ -1,48 +1,101 @@
+// @improved-by-ai
+
 import { describe, it, expect } from 'vitest'
 import { tempHandlers } from './temp.js'
 import { BASE_STATS, makeFeature } from '../automationInfoBuilder.fixtures.js'
 
+// ── temp_buff ────────────────────────────────────────────────────────
+
 describe('tempHandlers – temp_buff', () => {
-    it('returns temp_buff info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'temp_buff' })
         const result = tempHandlers.temp_buff(feature, BASE_STATS)
-        expect(result.type).toBe('temp_buff')
-        expect(result.effect).toBe('')
-        expect(result.duration).toBe('1_minute')
-        expect(result.action).toBe('bonus_action')
-        expect(result.recharge).toBe('long_rest')
-        expect(result.distance).toBe('')
-        expect(result.extendedDistance).toBe('')
-        expect(result.oncePerRage).toBe(false)
-        expect(result.bringAllies).toBe(false)
-        expect(result.allyCount).toBe(0)
-        expect(result.teleportRange).toBe('')
-        expect(result.enemiesDisadvantageSaves).toEqual([])
-        expect(result.triggerOnRage).toBe(false)
-        expect(result.distanceExpression).toBe('')
-        expect(result.casting_time).toBe('')
-        expect(result.uses).toBeNull()
-        expect(result.usesMax).toBeNull()
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'temp_buff',
+            name: 'Test Feature',
+            effect: '',
+            duration: '1_minute',
+            action: 'bonus_action',
+            recharge: 'long_rest',
+            distance: '',
+            extendedDistance: '',
+            oncePerRage: false,
+            bringAllies: false,
+            allyCount: 0,
+            teleportRange: '',
+            enemiesDisadvantageSaves: [],
+            triggerOnRage: false,
+            distanceExpression: '',
+            casting_time: '',
+            uses: null,
+            usesMax: null,
+            hasAutomation: true,
+        })
     })
 
     it('resolves uses to proficiency_bonus when string is proficiency_bonus', () => {
         const feature = makeFeature({ type: 'temp_buff', uses: 'proficiency_bonus' })
         const result = tempHandlers.temp_buff(feature, BASE_STATS)
+
+        expect(result.uses).toBe('proficiency_bonus')
         expect(result.usesMax).toBe(3)
     })
 
-    it('resolves uses to class name level when ends with _level and matches', () => {
+    it('resolves uses to class.level when uses ends with _level and class name matches', () => {
+        const stats = { ...BASE_STATS, class: { name: 'barbarian' } }
         const feature = makeFeature({ type: 'temp_buff', uses: 'barbarian_level' })
-        const result = tempHandlers.temp_buff(feature, BASE_STATS)
+        const result = tempHandlers.temp_buff(feature, stats)
+
+        expect(result.uses).toBe('barbarian_level')
         expect(result.usesMax).toBe(5)
     })
 
-    it('resolves uses to class.levels when _level but class name does not match', () => {
+    it('resolves uses to class.levels fallback when class name does not match', () => {
         const stats = { ...BASE_STATS, class: { name: 'Wizard' } }
         const feature = makeFeature({ type: 'temp_buff', uses: 'barbarian_level' })
         const result = tempHandlers.temp_buff(feature, stats)
-        expect(result.usesMax).toBe(5) // BASE_STATS.level = 5
+
+        expect(result.usesMax).toBe(5)
+    })
+
+    it('resolves uses to class.levels when class has levels property and name does not match', () => {
+        const stats = { ...BASE_STATS, class: { name: 'Wizard', levels: 10 } }
+        const feature = makeFeature({ type: 'temp_buff', uses: 'barbarian_level' })
+        const result = tempHandlers.temp_buff(feature, stats)
+
+        expect(result.usesMax).toBe(10)
+    })
+
+    it('coerces boolean fields with !!', () => {
+        const feature = makeFeature({
+            type: 'temp_buff',
+            oncePerRage: 1,
+            bringAllies: 'yes',
+            triggerOnRage: 0,
+        })
+        const result = tempHandlers.temp_buff(feature, BASE_STATS)
+
+        expect(result.oncePerRage).toBe(true)
+        expect(result.bringAllies).toBe(true)
+        expect(result.triggerOnRage).toBe(false)
+    })
+
+    it('coerces allyCount to 0 for falsy values', () => {
+        const feature = makeFeature({ type: 'temp_buff', allyCount: 0 })
+        const result = tempHandlers.temp_buff(feature, BASE_STATS)
+
+        expect(result.allyCount).toBe(0)
+    })
+
+    it('passes through enemies_disadvantage_saves snake_case key', () => {
+        const feature = makeFeature({
+            type: 'temp_buff',
+            enemies_disadvantage_saves: ['goblins', 'undead'],
+        })
+        const result = tempHandlers.temp_buff(feature, BASE_STATS)
+
+        expect(result.enemiesDisadvantageSaves).toEqual(['goblins', 'undead'])
     })
 
     it('passes through custom fields', () => {
@@ -58,9 +111,11 @@ describe('tempHandlers – temp_buff', () => {
             bringAllies: true,
             allyCount: 3,
             teleportRange: '30 ft',
-            triggerOnRage: true
+            triggerOnRage: true,
         })
         const result = tempHandlers.temp_buff(feature, BASE_STATS)
+
+        expect(result.type).toBe('temp_buff')
         expect(result.effect).toBe('haste')
         expect(result.duration).toBe('10_minutes')
         expect(result.action).toBe('action')
@@ -75,26 +130,62 @@ describe('tempHandlers – temp_buff', () => {
     })
 })
 
+// ── temp_hp_buff ─────────────────────────────────────────────────────
+
 describe('tempHandlers – temp_hp_buff', () => {
-    it('returns temp_hp_buff info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'temp_hp_buff' })
         const result = tempHandlers.temp_hp_buff(feature, BASE_STATS)
-        expect(result.type).toBe('temp_hp_buff')
-        expect(result.buffExpression).toBe('')
-        expect(result.range).toBe('60_ft')
-        expect(result.targets).toBe(1)
-        expect(result.targetsExpression).toBe('')
-        expect(result.bonusMovement).toBe(false)
-        expect(result.extraEffect).toBeNull()
-        expect(result.tempHpExpression).toBe('')
-        expect(result.triggerOnRage).toBe(false)
-        expect(result.ongoingHealingExpression).toBe('')
+
+        expect(result).toEqual({
+            type: 'temp_hp_buff',
+            name: 'Test Feature',
+            buffExpression: '',
+            range: '60_ft',
+            targets: 1,
+            targetsExpression: '',
+            bonusMovement: false,
+            extraEffect: null,
+            tempHpExpression: '',
+            triggerOnRage: false,
+            ongoingHealingExpression: '',
+            healingStartOfTurn: false,
+            healingRange: '',
+            casting_time: '1 bonus action',
+            includesSelf: false,
+            multiTargetAlly: false,
+            hasAutomation: true,
+        })
+    })
+
+    it('coerces boolean fields with !!', () => {
+        const feature = makeFeature({
+            type: 'temp_hp_buff',
+            bonusMovement: 'yes',
+            trigger_on_rage: 1,
+            healingStartOfTurn: 0,
+            includesSelf: '',
+        })
+        const result = tempHandlers.temp_hp_buff(feature, BASE_STATS)
+
+        expect(result.bonusMovement).toBe(true)
+        expect(result.triggerOnRage).toBe(true)
         expect(result.healingStartOfTurn).toBe(false)
-        expect(result.healingRange).toBe('')
-        expect(result.casting_time).toBe('1 bonus action')
         expect(result.includesSelf).toBe(false)
-        expect(result.multiTargetAlly).toBe(false)
-        expect(result.hasAutomation).toBe(true)
+    })
+
+    it('coerces extraEffect to null for falsy values', () => {
+        const feature = makeFeature({ type: 'temp_hp_buff', extraEffect: '' })
+        const result = tempHandlers.temp_hp_buff(feature, BASE_STATS)
+
+        expect(result.extraEffect).toBeNull()
+    })
+
+    it('maps trigger_on_rage snake_case to triggerOnRage camelCase', () => {
+        const feature = makeFeature({ type: 'temp_hp_buff', trigger_on_rage: true })
+        const result = tempHandlers.temp_hp_buff(feature, BASE_STATS)
+
+        expect(result.triggerOnRage).toBe(true)
     })
 
     it('passes through custom fields', () => {
@@ -112,9 +203,10 @@ describe('tempHandlers – temp_hp_buff', () => {
             healingStartOfTurn: true,
             healingRange: '10_ft',
             includesSelf: true,
-            multiTargetAlly: true
+            multiTargetAlly: true,
         })
         const result = tempHandlers.temp_hp_buff(feature, BASE_STATS)
+
         expect(result.buffExpression).toBe('2d8')
         expect(result.range).toBe('30_ft')
         expect(result.targets).toBe(5)
@@ -131,17 +223,31 @@ describe('tempHandlers – temp_hp_buff', () => {
     })
 })
 
+// ── sacred_weapon ────────────────────────────────────────────────────
+
 describe('tempHandlers – sacred_weapon', () => {
-    it('returns temp_buff with sacred_weapon effect', () => {
+    it('returns correct defaults with type temp_buff and effect sacred_weapon', () => {
         const feature = makeFeature({ type: 'sacred_weapon' })
         const result = tempHandlers.sacred_weapon(feature, BASE_STATS)
-        expect(result.type).toBe('temp_buff')
-        expect(result.effect).toBe('sacred_weapon')
-        expect(result.duration).toBe('10_minutes')
-        expect(result.resourceCost).toBe('')
-        expect(result.options).toEqual([])
-        expect(result.casting_time).toBe('')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'temp_buff',
+            name: 'Test Feature',
+            effect: 'sacred_weapon',
+            duration: '10_minutes',
+            resourceCost: '',
+            options: [],
+            casting_time: '',
+            hasAutomation: true,
+        })
+    })
+
+    it('does not mutate the options array from the feature', () => {
+        const options = [{ name: 'Option A' }]
+        const feature = makeFeature({ type: 'sacred_weapon', options })
+        const result = tempHandlers.sacred_weapon(feature, BASE_STATS)
+
+        expect(result.options).toBe(options)
     })
 
     it('passes through custom fields', () => {
@@ -149,29 +255,43 @@ describe('tempHandlers – sacred_weapon', () => {
             type: 'sacred_weapon',
             duration: '1_minute',
             resourceCost: 'divine favor',
-            options: [{ name: 'Option A' }]
+            options: [{ name: 'Option A' }],
         })
         const result = tempHandlers.sacred_weapon(feature, BASE_STATS)
+
         expect(result.duration).toBe('1_minute')
         expect(result.resourceCost).toBe('divine favor')
         expect(result.options).toEqual([{ name: 'Option A' }])
     })
 })
 
+// ── avenging_angel ───────────────────────────────────────────────────
+
 describe('tempHandlers – avenging_angel', () => {
-    it('returns temp_buff with avenging_angel effect', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'avenging_angel' })
         const result = tempHandlers.avenging_angel(feature, BASE_STATS)
-        expect(result.type).toBe('temp_buff')
-        expect(result.effect).toBe('avenging_angel')
-        expect(result.duration).toBe('10_minutes')
-        expect(result.action).toBe('bonus_action')
-        expect(result.flySpeed).toBe(60)
-        expect(result.hover).toBe(false)
-        expect(result.auraRange).toBe('aura_of_protection')
-        expect(result.saveType).toBe('WIS')
-        expect(result.saveDc).toBe('ability')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'temp_buff',
+            name: 'Test Feature',
+            effect: 'avenging_angel',
+            duration: '10_minutes',
+            action: 'bonus_action',
+            flySpeed: 60,
+            hover: false,
+            auraRange: 'aura_of_protection',
+            saveType: 'WIS',
+            saveDc: 'ability',
+            hasAutomation: true,
+        })
+    })
+
+    it('coerces hover with !!', () => {
+        const feature = makeFeature({ type: 'avenging_angel', hover: 1 })
+        const result = tempHandlers.avenging_angel(feature, BASE_STATS)
+
+        expect(result.hover).toBe(true)
     })
 
     it('passes through custom fields', () => {
@@ -184,9 +304,10 @@ describe('tempHandlers – avenging_angel', () => {
             hover: true,
             auraRange: '30_ft',
             saveType: 'CON',
-            saveDc: 15
+            saveDc: 15,
         })
         const result = tempHandlers.avenging_angel(feature, BASE_STATS)
+
         expect(result.effect).toBe('custom_angel')
         expect(result.duration).toBe('1_minute')
         expect(result.action).toBe('action')
@@ -198,15 +319,21 @@ describe('tempHandlers – avenging_angel', () => {
     })
 })
 
+// ── holy_nimbus ──────────────────────────────────────────────────────
+
 describe('tempHandlers – holy_nimbus', () => {
-    it('returns holy_nimbus info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'holy_nimbus' })
         const result = tempHandlers.holy_nimbus(feature, BASE_STATS)
-        expect(result.type).toBe('holy_nimbus')
-        expect(result.duration).toBe('10_minutes')
-        expect(result.casting_time).toBe('1_bonus_action')
-        expect(result.resourceCost).toBe('')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'holy_nimbus',
+            name: 'Test Feature',
+            duration: '10_minutes',
+            casting_time: '1_bonus_action',
+            resourceCost: '',
+            hasAutomation: true,
+        })
     })
 
     it('passes through custom fields', () => {
@@ -214,46 +341,60 @@ describe('tempHandlers – holy_nimbus', () => {
             type: 'holy_nimbus',
             duration: '1_minute',
             casting_time: '1 bonus action',
-            resourceCost: 'channel divinity'
+            resourceCost: 'channel divinity',
         })
         const result = tempHandlers.holy_nimbus(feature, BASE_STATS)
+
         expect(result.duration).toBe('1_minute')
         expect(result.casting_time).toBe('1 bonus action')
         expect(result.resourceCost).toBe('channel divinity')
     })
 })
 
+// ── cloak_of_shadows ─────────────────────────────────────────────────
+
 describe('tempHandlers – cloak_of_shadows', () => {
-    it('returns cloak_of_shadows info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'cloak_of_shadows' })
         const result = tempHandlers.cloak_of_shadows(feature, BASE_STATS)
-        expect(result.type).toBe('cloak_of_shadows')
-        expect(result.effect).toBe('')
-        expect(result.duration).toBe('1_minute')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'cloak_of_shadows',
+            name: 'Test Feature',
+            effect: '',
+            duration: '1_minute',
+            hasAutomation: true,
+        })
     })
 
     it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'cloak_of_shadows',
             effect: 'invisibility',
-            duration: '1_round'
+            duration: '1_round',
         })
         const result = tempHandlers.cloak_of_shadows(feature, BASE_STATS)
+
         expect(result.effect).toBe('invisibility')
         expect(result.duration).toBe('1_round')
     })
 })
 
+// ── peerless_athlete ─────────────────────────────────────────────────
+
 describe('tempHandlers – peerless_athlete', () => {
-    it('returns peerless_athlete info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'peerless_athlete' })
         const result = tempHandlers.peerless_athlete(feature, BASE_STATS)
-        expect(result.type).toBe('peerless_athlete')
-        expect(result.duration).toBe('1_hour')
-        expect(result.casting_time).toBe('1_bonus_action')
-        expect(result.resourceCost).toBe('channel_divinity')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'peerless_athlete',
+            name: 'Test Feature',
+            duration: '1_hour',
+            casting_time: '1_bonus_action',
+            resourceCost: 'channel_divinity',
+            hasAutomation: true,
+        })
     })
 
     it('passes through custom fields', () => {
@@ -261,29 +402,50 @@ describe('tempHandlers – peerless_athlete', () => {
             type: 'peerless_athlete',
             duration: '10_minutes',
             casting_time: '1 bonus action',
-            resourceCost: 'sorcery points'
+            resourceCost: 'sorcery points',
         })
         const result = tempHandlers.peerless_athlete(feature, BASE_STATS)
+
         expect(result.duration).toBe('10_minutes')
         expect(result.casting_time).toBe('1 bonus action')
         expect(result.resourceCost).toBe('sorcery points')
     })
 })
 
+// ── dragon_wings ─────────────────────────────────────────────────────
+
 describe('tempHandlers – dragon_wings', () => {
-    it('returns dragon_wings info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'dragon_wings' })
         const result = tempHandlers.dragon_wings(feature, BASE_STATS)
-        expect(result.type).toBe('dragon_wings')
-        expect(result.action).toBe('bonus_action')
-        expect(result.duration).toBe('1_hour')
-        expect(result.flySpeed).toBe(60)
+
+        expect(result).toEqual({
+            type: 'dragon_wings',
+            name: 'Test Feature',
+            action: 'bonus_action',
+            duration: '1_hour',
+            flySpeed: 60,
+            hover: false,
+            uses: 1,
+            recharge: 'long_rest',
+            resourceCost: '',
+            restoreCost: 3,
+            hasAutomation: true,
+        })
+    })
+
+    it('uses nullish coalescing for uses — 0 is preserved', () => {
+        const feature = makeFeature({ type: 'dragon_wings', uses: 0 })
+        const result = tempHandlers.dragon_wings(feature, BASE_STATS)
+
+        expect(result.uses).toBe(0)
+    })
+
+    it('uses || for hover — non-boolean falsy values become false', () => {
+        const feature = makeFeature({ type: 'dragon_wings', hover: '' })
+        const result = tempHandlers.dragon_wings(feature, BASE_STATS)
+
         expect(result.hover).toBe(false)
-        expect(result.uses).toBe(1)
-        expect(result.recharge).toBe('long_rest')
-        expect(result.resourceCost).toBe('')
-        expect(result.restoreCost).toBe(3)
-        expect(result.hasAutomation).toBe(true)
     })
 
     it('passes through custom fields', () => {
@@ -296,9 +458,10 @@ describe('tempHandlers – dragon_wings', () => {
             uses: 2,
             recharge: 'short_rest',
             resourceCost: 'sorcery points',
-            restoreCost: 5
+            restoreCost: 5,
         })
         const result = tempHandlers.dragon_wings(feature, BASE_STATS)
+
         expect(result.action).toBe('action')
         expect(result.duration).toBe('10_minutes')
         expect(result.flySpeed).toBe(90)
@@ -310,16 +473,22 @@ describe('tempHandlers – dragon_wings', () => {
     })
 })
 
+// ── revelation_in_flesh ──────────────────────────────────────────────
+
 describe('tempHandlers – revelation_in_flesh', () => {
-    it('returns revelation_in_flesh info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'revelation_in_flesh' })
         const result = tempHandlers.revelation_in_flesh(feature, BASE_STATS)
-        expect(result.type).toBe('revelation_in_flesh')
-        expect(result.options).toEqual([])
-        expect(result.duration).toBe('10_minutes')
-        expect(result.action).toBe('bonus_action')
-        expect(result.casting_time).toBe('1 bonus action')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'revelation_in_flesh',
+            name: 'Test Feature',
+            options: [],
+            duration: '10_minutes',
+            action: 'bonus_action',
+            casting_time: '1 bonus action',
+            hasAutomation: true,
+        })
     })
 
     it('passes through custom fields', () => {
@@ -327,27 +496,62 @@ describe('tempHandlers – revelation_in_flesh', () => {
             type: 'revelation_in_flesh',
             options: [{ name: 'Option A' }],
             duration: '1_minute',
-            action: 'action'
+            action: 'action',
         })
         const result = tempHandlers.revelation_in_flesh(feature, BASE_STATS)
+
         expect(result.options).toEqual([{ name: 'Option A' }])
         expect(result.duration).toBe('1_minute')
         expect(result.action).toBe('action')
     })
 })
 
+// ── living_legend ────────────────────────────────────────────────────
+
 describe('tempHandlers – living_legend', () => {
-    it('returns living_legend info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'living_legend' })
         const result = tempHandlers.living_legend(feature, BASE_STATS)
-        expect(result.type).toBe('living_legend')
-        expect(result.duration).toBe('10_minutes')
-        expect(result.casting_time).toBe('1 bonus action')
-        expect(result.unerringStrikeTrigger).toBe('attack_miss')
-        expect(result.unerringStrikeOncePerTurn).toBe(false)
-        expect(result.saveRerollTarget).toBe('saving_throw')
+
+        expect(result).toEqual({
+            type: 'living_legend',
+            name: 'Test Feature',
+            duration: '10_minutes',
+            casting_time: '1 bonus action',
+            unerringStrikeTrigger: 'attack_miss',
+            unerringStrikeOncePerTurn: false,
+            saveRerollTarget: 'saving_throw',
+            charismaCheckAdvantage: false,
+            hasAutomation: true,
+        })
+    })
+
+    it('coerces boolean fields with !!', () => {
+        const feature = makeFeature({
+            type: 'living_legend',
+            unerring_strike_once_per_turn: 1,
+            charisma_check_advantage: 0,
+        })
+        const result = tempHandlers.living_legend(feature, BASE_STATS)
+
+        expect(result.unerringStrikeOncePerTurn).toBe(true)
         expect(result.charismaCheckAdvantage).toBe(false)
-        expect(result.hasAutomation).toBe(true)
+    })
+
+    it('maps snake_case keys to camelCase output fields', () => {
+        const feature = makeFeature({
+            type: 'living_legend',
+            unerring_strike_trigger: 'spell_miss',
+            unerring_strike_once_per_turn: true,
+            save_reroll_target: 'ability_check',
+            charisma_check_advantage: true,
+        })
+        const result = tempHandlers.living_legend(feature, BASE_STATS)
+
+        expect(result.unerringStrikeTrigger).toBe('spell_miss')
+        expect(result.unerringStrikeOncePerTurn).toBe(true)
+        expect(result.saveRerollTarget).toBe('ability_check')
+        expect(result.charismaCheckAdvantage).toBe(true)
     })
 
     it('passes through custom fields', () => {
@@ -355,30 +559,29 @@ describe('tempHandlers – living_legend', () => {
             type: 'living_legend',
             duration: '1_minute',
             casting_time: '1 action',
-            unerring_strike_trigger: 'spell_miss',
-            unerring_strike_once_per_turn: true,
-            save_reroll_target: 'ability_check',
-            charisma_check_advantage: true
         })
         const result = tempHandlers.living_legend(feature, BASE_STATS)
+
         expect(result.duration).toBe('1_minute')
         expect(result.casting_time).toBe('1 action')
-        expect(result.unerringStrikeTrigger).toBe('spell_miss')
-        expect(result.unerringStrikeOncePerTurn).toBe(true)
-        expect(result.saveRerollTarget).toBe('ability_check')
-        expect(result.charismaCheckAdvantage).toBe(true)
     })
 })
 
+// ── holy_aura ────────────────────────────────────────────────────────
+
 describe('tempHandlers – holy_aura', () => {
-    it('returns holy_aura info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'holy_aura' })
         const result = tempHandlers.holy_aura(feature, BASE_STATS)
-        expect(result.type).toBe('holy_aura')
-        expect(result.duration).toBe('1_minute')
-        expect(result.auraRange).toBe(30)
-        expect(result.casting_time).toBe('1 action')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'holy_aura',
+            name: 'Test Feature',
+            duration: '1_minute',
+            auraRange: 30,
+            casting_time: '1 action',
+            hasAutomation: true,
+        })
     })
 
     it('passes through custom fields', () => {
@@ -386,68 +589,89 @@ describe('tempHandlers – holy_aura', () => {
             type: 'holy_aura',
             duration: '10_minutes',
             auraRange: 60,
-            casting_time: '1 bonus action'
+            casting_time: '1 bonus action',
         })
         const result = tempHandlers.holy_aura(feature, BASE_STATS)
+
         expect(result.duration).toBe('10_minutes')
         expect(result.auraRange).toBe(60)
         expect(result.casting_time).toBe('1 bonus action')
     })
 })
 
+// ── elder_champion ───────────────────────────────────────────────────
+
 describe('tempHandlers – elder_champion', () => {
-    it('returns elder_champion info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'elder_champion' })
         const result = tempHandlers.elder_champion(feature, BASE_STATS)
-        expect(result.type).toBe('elder_champion')
-        expect(result.duration).toBe('1_minute')
-        expect(result.casting_time).toBe('1 bonus action')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'elder_champion',
+            name: 'Test Feature',
+            duration: '1_minute',
+            casting_time: '1 bonus action',
+            hasAutomation: true,
+        })
     })
 
     it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'elder_champion',
             duration: '10_minutes',
-            casting_time: '1 action'
+            casting_time: '1 action',
         })
         const result = tempHandlers.elder_champion(feature, BASE_STATS)
+
         expect(result.duration).toBe('10_minutes')
         expect(result.casting_time).toBe('1 action')
     })
 })
 
+// ── dark_ones_blessing ───────────────────────────────────────────────
+
 describe('tempHandlers – dark_ones_blessing', () => {
-    it('returns dark_ones_blessing info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'dark_ones_blessing' })
         const result = tempHandlers.dark_ones_blessing(feature, BASE_STATS)
-        expect(result.type).toBe('dark_ones_blessing')
-        expect(result.tempHpExpression).toBe('')
-        expect(result.range).toBe('10_ft')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'dark_ones_blessing',
+            name: 'Test Feature',
+            tempHpExpression: '',
+            range: '10_ft',
+            hasAutomation: true,
+        })
     })
 
     it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'dark_ones_blessing',
             tempHpExpression: '2d8',
-            range: '15_ft'
+            range: '15_ft',
         })
         const result = tempHandlers.dark_ones_blessing(feature, BASE_STATS)
+
         expect(result.tempHpExpression).toBe('2d8')
         expect(result.range).toBe('15_ft')
     })
 })
 
+// ── large_form ───────────────────────────────────────────────────────
+
 describe('tempHandlers – large_form', () => {
-    it('returns large_form info with defaults', () => {
+    it('returns correct defaults', () => {
         const feature = makeFeature({ type: 'large_form' })
         const result = tempHandlers.large_form(feature, BASE_STATS)
-        expect(result.type).toBe('large_form')
-        expect(result.duration).toBe('10_minutes')
-        expect(result.casting_time).toBe('1_bonus_action')
-        expect(result.resourceCost).toBe('long_rest')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toEqual({
+            type: 'large_form',
+            name: 'Test Feature',
+            duration: '10_minutes',
+            casting_time: '1_bonus_action',
+            resourceCost: 'long_rest',
+            hasAutomation: true,
+        })
     })
 
     it('passes through custom fields', () => {
@@ -455,9 +679,10 @@ describe('tempHandlers – large_form', () => {
             type: 'large_form',
             duration: '1_minute',
             casting_time: '1 action',
-            resourceCost: 'wild shape'
+            resourceCost: 'wild shape',
         })
         const result = tempHandlers.large_form(feature, BASE_STATS)
+
         expect(result.duration).toBe('1_minute')
         expect(result.casting_time).toBe('1 action')
         expect(result.resourceCost).toBe('wild shape')

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest'
 
 import {
@@ -14,27 +15,48 @@ describe('getPassiveBuffs', () => {
     expect(getPassiveBuffs(null, makePlayerStats())).toEqual([])
   })
 
-  it('collects passive_buff entries', () => {
+  it('returns empty array when features is undefined', () => {
+    expect(getPassiveBuffs(undefined, makePlayerStats())).toEqual([])
+  })
+
+  it('returns empty array when features is an empty array', () => {
+    expect(getPassiveBuffs([], makePlayerStats())).toEqual([])
+  })
+
+  it('collects passive_buff entries from features', () => {
     const features = [makeFeature({ type: 'passive_buff', effect: '+2 saving throws vs frightened' }, 'Aura')]
     const result = getPassiveBuffs(features, makePlayerStats())
     expect(result).toHaveLength(1)
-    expect(result[0].type).toBe('passive_buff')
+    expect(result[0]).toMatchObject({
+      type: 'passive_buff',
+      effect: '+2 saving throws vs frightened',
+      hasAutomation: true,
+    })
   })
 
-  it('collects passive_rule entries', () => {
-    const features = [makeFeature({ type: 'passive_rule', effect: 'superior_dice' })]
+  it('collects passive_rule entries from features', () => {
+    const features = [makeFeature({ type: 'passive_rule', effect: 'superior_dice' }, 'Epic Boon')]
     const result = getPassiveBuffs(features, makePlayerStats())
     expect(result).toHaveLength(1)
-    expect(result[0].type).toBe('passive_rule')
+    expect(result[0]).toMatchObject({
+      type: 'passive_rule',
+      effect: 'superior_dice',
+      hasAutomation: true,
+    })
   })
 
-  it('collects passive_immunity entries', () => {
-    const features = [makeFeature({ type: 'passive_immunity', conditionImmunity: 'charmed' })]
+  it('collects passive_immunity entries from features', () => {
+    const features = [makeFeature({ type: 'passive_immunity', conditionImmunity: 'charmed' }, 'Immune to Charm')]
     const result = getPassiveBuffs(features, makePlayerStats())
     expect(result).toHaveLength(1)
+    expect(result[0]).toMatchObject({
+      type: 'passive_immunity',
+      conditionImmunity: 'charmed',
+      hasAutomation: true,
+    })
   })
 
-  it('skips non-passive automation types', () => {
+  it('skips features with non-passive automation types', () => {
     const features = [
       makeFeature({ type: 'save_attack' }, 'Spike'),
       makeFeature({ type: 'passive_rule' }, 'Passive'),
@@ -44,10 +66,49 @@ describe('getPassiveBuffs', () => {
     expect(result[0].type).toBe('passive_rule')
   })
 
-  it('includes hasAutomation flag on returned items', () => {
-    const features = [makeFeature({ type: 'passive_rule' })]
+  it('skips features with no automation property', () => {
+    const feature = { name: 'Orphan', automation: undefined }
+    const result = getPassiveBuffs([feature], makePlayerStats())
+    expect(result).toEqual([])
+  })
+
+  it('handles features with array of automations', () => {
+    const feature = makeFeature(
+      [
+        { type: 'passive_rule', effect: 'superior_dice' },
+        { type: 'action', effect: 'damage' },
+        { type: 'passive_buff', effect: 'blindsight' },
+      ],
+      'Multi-Automation',
+    )
+    const result = getPassiveBuffs([feature], makePlayerStats())
+    expect(result).toHaveLength(2)
+    const types = result.map((r) => r.type)
+    expect(types).toContain('passive_rule')
+    expect(types).toContain('passive_buff')
+  })
+
+  it('sets hasAutomation flag on all returned items', () => {
+    const features = [
+      makeFeature({ type: 'passive_rule' }, 'R1'),
+      makeFeature({ type: 'passive_buff' }, 'R2'),
+      makeFeature({ type: 'passive_immunity' }, 'R3'),
+    ]
     const result = getPassiveBuffs(features, makePlayerStats())
-    expect(result[0].hasAutomation).toBe(true)
+    expect(result.every((r) => r.hasAutomation === true)).toBe(true)
+  })
+
+  it('collects all passive types from multiple features', () => {
+    const features = [
+      makeFeature({ type: 'passive_buff', effect: 'blindsight' }, 'A'),
+      makeFeature({ type: 'passive_rule', effect: 'superior_dice' }, 'B'),
+      makeFeature({ type: 'passive_immunity', conditionImmunity: 'frightened' }, 'C'),
+      makeFeature({ type: 'action' }, 'D'),
+    ]
+    const result = getPassiveBuffs(features, makePlayerStats())
+    expect(result).toHaveLength(3)
+    const types = result.map((r) => r.type)
+    expect(types).toEqual(expect.arrayContaining(['passive_buff', 'passive_rule', 'passive_immunity']))
   })
 })
 
@@ -56,8 +117,7 @@ describe('collectWeaponMastery', () => {
   it('returns null baseMastery when weapon not in equipment', () => {
     const ps = makePlayerStats({ equipment: [] })
     const result = collectWeaponMastery('Longsword', ps)
-    expect(result.baseMastery).toBeNull()
-    expect(result.extraMasteries).toEqual([])
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
   })
 
   it('returns base mastery from weapon when found in equipment', () => {
@@ -65,7 +125,7 @@ describe('collectWeaponMastery', () => {
       equipment: [{ name: 'Longsword', mastery: 'trip' }],
     })
     const result = collectWeaponMastery('Longsword', ps)
-    expect(result.baseMastery).toBe('trip')
+    expect(result).toEqual({ baseMastery: 'trip', extraMasteries: [] })
   })
 
   it('strips magic prefix when looking up weapon in equipment', () => {
@@ -73,7 +133,7 @@ describe('collectWeaponMastery', () => {
       equipment: [{ name: 'Greataxe', mastery: 'heave' }],
     })
     const result = collectWeaponMastery('+1 Greataxe', ps)
-    expect(result.baseMastery).toBe('heave')
+    expect(result).toEqual({ baseMastery: 'heave', extraMasteries: [] })
   })
 
   it('collects extra masteries from automation passives', () => {
@@ -86,10 +146,10 @@ describe('collectWeaponMastery', () => {
       },
     })
     const result = collectWeaponMastery('Club', ps)
-    expect(result.extraMasteries).toEqual(['push', 'topple'])
+    expect(result).toEqual({ baseMastery: 'none', extraMasteries: ['push', 'topple'] })
   })
 
-  it('deduplicates extra masteries', () => {
+  it('deduplicates extra masteries across multiple passives', () => {
     const ps = makePlayerStats({
       equipment: [],
       automation: {
@@ -100,27 +160,71 @@ describe('collectWeaponMastery', () => {
       },
     })
     const result = collectWeaponMastery('Club', ps)
-    expect(result.extraMasteries).toEqual(['push', 'topple'])
+    expect(result).toEqual({ baseMastery: null, extraMasteries: ['push', 'topple'] })
   })
 
   it('returns empty extraMasteries when no automation passives exist', () => {
     const ps = makePlayerStats({ equipment: [] })
     const result = collectWeaponMastery('Sword', ps)
-    expect(result.extraMasteries).toEqual([])
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
   })
 
   it('handles missing equipment gracefully', () => {
-    const ps = makePlayerStats() // no equipment property set explicitly
+    const ps = makePlayerStats()
     const result = collectWeaponMastery('Sword', ps)
-    expect(result.baseMastery).toBeNull()
-    expect(result.extraMasteries).toEqual([])
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
   })
 
   it('handles missing automation passives gracefully', () => {
     const ps = makePlayerStats({ equipment: [] })
-    // No .automation property at all
     const result = collectWeaponMastery('Sword', ps)
-    expect(result.extraMasteries).toEqual([])
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+  })
+
+  it('handles missing automation object on playerStats', () => {
+    const ps = makePlayerStats({ equipment: [] })
+    delete ps.automation
+    const result = collectWeaponMastery('Sword', ps)
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+  })
+
+  it('replaces baseMastery with replaceMastery from a passive', () => {
+    const ps = makePlayerStats({
+      equipment: [{ name: 'Club', mastery: 'trip' }],
+      automation: {
+        passives: [
+          { type: 'passive_buff', replaceMastery: ['push', 'heave'] },
+        ],
+      },
+    })
+    const result = collectWeaponMastery('Club', ps)
+    expect(result).toEqual({ baseMastery: null, extraMasteries: ['push', 'heave'] })
+  })
+
+  it('combines replaceMastery with extraMastery from multiple passives', () => {
+    const ps = makePlayerStats({
+      equipment: [{ name: 'Club', mastery: 'trip' }],
+      automation: {
+        passives: [
+          { type: 'passive_buff', replaceMastery: ['push'] },
+          { type: 'passive_buff', extraMastery: ['topple', 'heave'] },
+        ],
+      },
+    })
+    const result = collectWeaponMastery('Club', ps)
+    expect(result).toEqual({ baseMastery: null, extraMasteries: ['topple', 'heave', 'push'] })
+  })
+
+  it('returns null baseMastery when replaceMastery exists but weapon not found', () => {
+    const ps = makePlayerStats({
+      automation: {
+        passives: [
+          { type: 'passive_buff', replaceMastery: ['push'] },
+        ],
+      },
+    })
+    const result = collectWeaponMastery('Club', ps)
+    expect(result).toEqual({ baseMastery: null, extraMasteries: ['push'] })
   })
 })
 
@@ -159,7 +263,7 @@ describe('resolveHealingBonuses', () => {
     const ps = makePlayerStats({
       automation: {
         passives: [
-          { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '1d6' }, // not evaluable → string, skipped
+          { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '1d6' },
           { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '3' },
         ],
       },
@@ -167,9 +271,8 @@ describe('resolveHealingBonuses', () => {
     expect(resolveHealingBonuses(ps)).toBe(3)
   })
 
-  it('uses playerStats abilities in bonus expressions', () => {
-    // "level" resolves to the number via evaluateAutoExpression → resolveDiceExpression
-    const ps2 = makePlayerStats({
+  it('uses playerStats level in bonus expressions', () => {
+    const ps = makePlayerStats({
       level: 5,
       automation: {
         passives: [
@@ -177,11 +280,95 @@ describe('resolveHealingBonuses', () => {
         ],
       },
     })
-    expect(resolveHealingBonuses(ps2)).toBe(5)
+    expect(resolveHealingBonuses(ps)).toBe(5)
+  })
+
+  it('uses playerStats abilities in bonus expressions via ability modifiers', () => {
+    const ps = makePlayerStats({
+      automation: {
+        passives: [
+          { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: 'STR modifier' },
+        ],
+      },
+    })
+    expect(resolveHealingBonuses(ps)).toBe(5)
   })
 
   it('handles missing automation object on playerStats', () => {
     const ps = makePlayerStats()
+    expect(resolveHealingBonuses(ps)).toBe(0)
+  })
+
+  it('handles empty passives array', () => {
+    const ps = makePlayerStats({
+      automation: { passives: [] },
+    })
+    expect(resolveHealingBonuses(ps)).toBe(0)
+  })
+
+  it('skips bonusExpression that is null or undefined', () => {
+    const ps = makePlayerStats({
+      automation: {
+        passives: [
+          { type: 'passive_rule', effect: 'bonus_healing' },
+          { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '4' },
+        ],
+      },
+    })
+    expect(resolveHealingBonuses(ps)).toBe(4)
+  })
+
+  it('adds extra healing from max_hp_increase alsoSelfHealing', () => {
+    const ps = makePlayerStats({
+      automation: {
+        passives: [
+          {
+            type: 'passive_rule',
+            effect: 'max_hp_increase',
+            alsoSelfHealing: { extraHealingExpression: '2' },
+          },
+        ],
+      },
+    })
+    expect(resolveHealingBonuses(ps)).toBe(2)
+  })
+
+  it('combines bonus_healing and max_hp_increase extra healing', () => {
+    const ps = makePlayerStats({
+      automation: {
+        passives: [
+          { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: '3' },
+          {
+            type: 'passive_rule',
+            effect: 'max_hp_increase',
+            alsoSelfHealing: { extraHealingExpression: '7' },
+          },
+        ],
+      },
+    })
+    expect(resolveHealingBonuses(ps)).toBe(10)
+  })
+
+  it('uses playerStats proficiency when expression references proficiency_bonus', () => {
+    const ps = makePlayerStats({
+      proficiency: 6,
+      automation: {
+        passives: [
+          { type: 'passive_rule', effect: 'bonus_healing', bonusExpression: 'proficiency_bonus' },
+        ],
+      },
+    })
+    expect(resolveHealingBonuses(ps)).toBe(6)
+  })
+
+  it('skips non-passive_rule types even with bonus_healing effect', () => {
+    const ps = makePlayerStats({
+      automation: {
+        passives: [
+          { type: 'passive_buff', effect: 'bonus_healing', bonusExpression: '10' },
+        ],
+      },
+    })
     expect(resolveHealingBonuses(ps)).toBe(0)
   })
 })
@@ -219,7 +406,7 @@ describe('hasHealingMaximization', () => {
     const ps = makePlayerStats({
       automation: {
         passives: [
-          { type: 'passive_buff', effect: 'maximize_healing_dice' }, // wrong type
+          { type: 'passive_buff', effect: 'maximize_healing_dice' },
         ],
       },
     })
@@ -227,7 +414,27 @@ describe('hasHealingMaximization', () => {
   })
 
   it('handles missing automation gracefully', () => {
-    const ps = makePlayerStats() // no .automation property
+    const ps = makePlayerStats()
     expect(hasHealingMaximization(ps)).toBe(false)
+  })
+
+  it('returns false when passives array is empty', () => {
+    const ps = makePlayerStats({
+      automation: { passives: [] },
+    })
+    expect(hasHealingMaximization(ps)).toBe(false)
+  })
+
+  it('returns true when multiple passives include maximize_healing_dice', () => {
+    const ps = makePlayerStats({
+      automation: {
+        passives: [
+          { type: 'passive_rule', effect: 'superior_dice' },
+          { type: 'passive_rule', effect: 'maximize_healing_dice' },
+          { type: 'passive_buff', effect: 'blindsight' },
+        ],
+      },
+    })
+    expect(hasHealingMaximization(ps)).toBe(true)
   })
 })

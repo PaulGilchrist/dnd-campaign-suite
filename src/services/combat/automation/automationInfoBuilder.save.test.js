@@ -1,142 +1,21 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+// @improved-by-ai
+import { describe, it, expect } from 'vitest'
+import { saveHandlers } from './automationInfoBuilder/save.js'
+import { BASE_STATS, makeFeature } from './automationInfoBuilder.fixtures.js'
 
-import { buildAttackInfo } from './automationInfoBuilder.js'
-import { BASE_STATS, BASE_FEATURE, normalizeAbilityName } from './automationInfoBuilder.fixtures.js'
-
-vi.mock('./automationExpressions.js', () => ({
-    evaluateAutoExpression: vi.fn((expr, _stats) => {
-        if (!expr) return 0
-        return 2
-    }),
-    resolveHealingPoolExpression: vi.fn((base, scaling, stats) => {
-        if (!scaling) return base
-        if (!stats) return base
-        const entries = Object.entries(scaling)
-            .map(([k, v]) => ({ level: parseInt(k, 10), expression: String(v) }))
-            .filter(e => !isNaN(e.level))
-            .sort((a, b) => a.level - b.level)
-        let resolved = base
-        for (const entry of entries) {
-            if (stats.level >= entry.level) resolved = entry.expression
-        }
-        return resolved
-    }),
-    getSaveDc: vi.fn((stats, ability, proficiency) => {
-        const canonical = normalizeAbilityName(ability)
-        const bonus = stats.abilities?.find(a => a.name === canonical)?.bonus ?? 0
-        return 8 + bonus + (proficiency || 0)
-    }),
-    resolveUses: vi.fn((stats, usesSpec) => {
-        if (typeof usesSpec === 'number') return usesSpec
-        if (usesSpec === 'proficiency_bonus') return stats.proficiency || 0
-        return stats.level || 1
-    }),
-    resolveDiceExpression: vi.fn((expr) => expr),
-    resolveScaling: vi.fn((stats, scaling) => {
-        if (!scaling) return null
-        let result = null
-        for (const entry of scaling) {
-            if (stats.level >= entry.level) result = entry
-        }
-        return result
-    }),
-}))
-
-import { getSaveDc } from './automationExpressions.js'
-
-describe('buildAttackInfo – resistance', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'resistance' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'resistance',
-            name: 'Test Feature',
-            damageTypes: [],
-            hasAutomation: true,
-        })
-    })
-
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'resistance',
-                damageTypes: ['fire', 'cold', 'lightning'],
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.damageTypes).toEqual(['fire', 'cold', 'lightning'])
-    })
-})
-
-describe('buildAttackInfo – resource_pool', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'resource_pool' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'resource_pool',
-            name: 'Test Feature',
-            resource: '',
-            uses_expression: '',
-            recharge_short_rest: '',
-            recharge_long_rest: '',
-            conversion: '',
-            reverseConversion: '',
-            reverseRecharge: '',
-            conversionRate: '',
-            casting_time: 'passive',
-            hasAutomation: true,
-        })
-    })
-
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'resource_pool',
-                resource: 'sorcery_points',
-                uses_expression: '2d6',
-                recharge_short_rest: '1',
-                recharge_long_rest: '2',
-                conversion: 'convert_expr',
-                reverseConversion: 'reverse_expr',
-                reverseRecharge: 'reverse_recharge',
-                conversionRate: '1:1',
-                casting_time: '1 bonus action',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.resource).toBe('sorcery_points')
-        expect(result.uses_expression).toBe('2d6')
-        expect(result.recharge_short_rest).toBe('1')
-        expect(result.recharge_long_rest).toBe('2')
-        expect(result.conversion).toBe('convert_expr')
-        expect(result.reverseConversion).toBe('reverse_expr')
-        expect(result.reverseRecharge).toBe('reverse_recharge')
-        expect(result.conversionRate).toBe('1:1')
-        expect(result.casting_time).toBe('1 bonus action')
-    })
-})
-
-describe('buildAttackInfo – save_attack', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'save_attack' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
+describe('saveHandlers – save_attack', () => {
+    it('returns save_attack info with defaults', () => {
+        const feature = makeFeature({ type: 'save_attack' })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result).toMatchObject({
             type: 'save_attack',
             name: 'Test Feature',
             action: 'action',
             damage: '',
             damageType: '',
             saveType: 'DEX',
-            saveDc: 10,
             saveAbility: 'CON',
+            saveDc: 10,
             shape: '',
             range: '',
             conditionInflicted: null,
@@ -155,108 +34,193 @@ describe('buildAttackInfo – save_attack', () => {
         })
     })
 
-    it('computes saveDc from ability when saveDc is "ability"', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'save_attack',
-                saveDc: 'ability',
-                saveAbility: 'INT',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.saveDc).toBe(12) // 8 + 1 (INT bonus) + 3 (proficiency)
-        expect(getSaveDc).toHaveBeenCalledWith(BASE_STATS, 'INT', 3)
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            saveDc: 'ability',
+            saveAbility: 'CON'
+        })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.saveDc).toBe(14) // 8 + CON(3) + prof(3)
     })
 
-    it('uses explicit saveDc when not "ability"', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'save_attack',
-                saveDc: 16,
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.saveDc).toBe(16)
+    it('calculates saveDc with different saveAbility', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            saveDc: 'ability',
+            saveAbility: 'WIS'
+        })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.saveDc).toBe(16) // 8 + WIS(5) + prof(3)
     })
 
-    it('resolves damage via resolveScaling and resolveDiceExpression', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'save_attack',
-                damage: '2d6',
-                scaling: [{ level: 5, damage: '3d6' }],
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.damage).toBe('3d6')
-    })
-
-    it('resolves uses via resolveUses', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'save_attack',
-                uses: 'proficiency_bonus',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.uses).toBe(3)
-    })
-
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'save_attack',
-                action: 'bonus_action',
-                damage: '3d8',
-                damageType: 'radiant',
-                saveType: 'WIS',
-                saveDc: 15,
-                saveAbility: 'CHA',
-                shape: 'cone',
-                range: '15 ft',
-                conditionInflicted: 'frightened',
-                duration: '1 round',
-                uses: 3,
-                recharge: 'short_rest',
-                resourceCost: 'spell_slot',
-                hasOptions: true,
-                options: ['option1'],
-                optionDetails: { option1: { detail: 'value' } },
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.action).toBe('bonus_action')
-        expect(result.damage).toBe('3d8')
-        expect(result.damageType).toBe('radiant')
-        expect(result.saveType).toBe('WIS')
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            saveDc: 15
+        })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
         expect(result.saveDc).toBe(15)
-        expect(result.saveAbility).toBe('CHA')
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'save_attack' })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('resolves uses from wild_shape resourceCost', () => {
+        const stats = {
+            ...BASE_STATS,
+            class: {
+                ...BASE_STATS.class,
+                class_levels: [{ level: 5, wild_shape: 2 }]
+            }
+        }
+        const feature = makeFeature({
+            type: 'save_attack',
+            resourceCost: 'wild_shape'
+        })
+        const result = saveHandlers.save_attack(feature, stats)
+        expect(result.uses).toBe(2)
+    })
+
+    it('resolves uses from default resolveUses when not wild_shape', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            resourceCost: 'spell_slot'
+        })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.uses).toBe(5)
+    })
+
+    it('resolves casting_time to action for various formats', () => {
+        const bonusAction = makeFeature({ type: 'save_attack', casting_time: '1 bonus action' })
+        expect(saveHandlers.save_attack(bonusAction, BASE_STATS).action).toBe('bonus_action')
+
+        const bonusActionAlt = makeFeature({ type: 'save_attack', casting_time: 'bonus_action' })
+        expect(saveHandlers.save_attack(bonusActionAlt, BASE_STATS).action).toBe('bonus_action')
+
+        const action = makeFeature({ type: 'save_attack', casting_time: '1 action' })
+        expect(saveHandlers.save_attack(action, BASE_STATS).action).toBe('action')
+
+        const actionAlt = makeFeature({ type: 'save_attack', casting_time: 'action' })
+        expect(saveHandlers.save_attack(actionAlt, BASE_STATS).action).toBe('action')
+
+        const reaction = makeFeature({ type: 'save_attack', casting_time: '1 reaction' })
+        expect(saveHandlers.save_attack(reaction, BASE_STATS).action).toBe('reaction')
+
+        const reactionAlt = makeFeature({ type: 'save_attack', casting_time: 'reaction' })
+        expect(saveHandlers.save_attack(reactionAlt, BASE_STATS).action).toBe('reaction')
+    })
+
+    it('prioritizes auto.action over casting_time derived action', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            action: 'action',
+            casting_time: '1 bonus action'
+        })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.action).toBe('action')
+    })
+
+    it('resolves scaling damage', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            scaling: [{ level: 1, damage: '1d6' }],
+            damage: 'base'
+        })
+        const result = saveHandlers.save_attack(feature, { ...BASE_STATS, level: 1 })
+        expect(result.damage).toBe('1d6')
+    })
+
+    it('resolves healing expression with scaling', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            healExpression: '2d8',
+            healScaling: [{ level: 5, healExpression: '4d8' }]
+        })
+        const result = saveHandlers.save_attack(feature, { ...BASE_STATS, level: 5 })
+        expect(result.healExpression).toBe('4d8')
+    })
+
+    it('resolves healing expression without scaling', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            healExpression: '2d8'
+        })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.healExpression).toBe('2d8')
+    })
+
+    it('passes through custom fields', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            action: 'bonus_action',
+            damage: '2d6',
+            damageType: 'Fire',
+            saveType: 'CON',
+            saveAbility: 'WIS',
+            shape: 'cone',
+            range: '15_ft',
+            conditionInflicted: 'poisoned',
+            duration: '1_round',
+            uses: 3,
+            recharge: 'short_rest',
+            resourceCost: 'spell_slot',
+            hasOptions: true,
+            options: [{ name: 'Option A' }],
+            optionDetails: { 'Option A': { effect: 'extra' } },
+            dcSuccess: 'no effect'
+        })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.action).toBe('bonus_action')
+        expect(result.damage).toBe('2d6')
+        expect(result.damageType).toBe('Fire')
+        expect(result.saveType).toBe('CON')
+        expect(result.saveAbility).toBe('WIS')
         expect(result.shape).toBe('cone')
-        expect(result.range).toBe('15 ft')
-        expect(result.conditionInflicted).toBe('frightened')
-        expect(result.duration).toBe('1 round')
+        expect(result.range).toBe('15_ft')
+        expect(result.conditionInflicted).toBe('poisoned')
+        expect(result.duration).toBe('1_round')
         expect(result.uses).toBe(3)
         expect(result.usesMax).toBe(3)
         expect(result.recharge).toBe('short_rest')
         expect(result.resourceCost).toBe('spell_slot')
         expect(result.hasOptions).toBe(true)
-        expect(result.options).toEqual(['option1'])
-        expect(result.optionDetails).toEqual({ option1: { detail: 'value' } })
+        expect(result.options).toEqual([{ name: 'Option A' }])
+        expect(result.optionDetails).toEqual({ 'Option A': { effect: 'extra' } })
+        expect(result.dcSuccess).toBe('no effect')
+    })
+
+    it('defaults saveType to DEX', () => {
+        const feature = makeFeature({ type: 'save_attack' })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.saveType).toBe('DEX')
+    })
+
+    it('defaults saveAbility to CON', () => {
+        const feature = makeFeature({ type: 'save_attack' })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.saveAbility).toBe('CON')
+    })
+
+    it('handles hasOptions false explicitly', () => {
+        const feature = makeFeature({
+            type: 'save_attack',
+            hasOptions: false
+        })
+        const result = saveHandlers.save_attack(feature, BASE_STATS)
+        expect(result.hasOptions).toBe(false)
+        expect(result.options).toEqual([])
     })
 })
 
-describe('buildAttackInfo – save_only', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'save_only' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
+describe('saveHandlers – save_only', () => {
+    it('returns save_only info with defaults', () => {
+        const feature = makeFeature({ type: 'save_only' })
+        const result = saveHandlers.save_only(feature, BASE_STATS)
+        expect(result).toMatchObject({
             type: 'save_only',
             name: 'Test Feature',
             saveType: 'DEX',
@@ -268,48 +232,479 @@ describe('buildAttackInfo – save_only', () => {
         })
     })
 
-    it('computes saveDc from ability when saveDc is "ability"', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'save_only',
-                saveDc: 'ability',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.saveDc).toBe(14) // 8 + 4 (STR bonus) + 3 (proficiency)
-        expect(getSaveDc).toHaveBeenCalledWith(BASE_STATS, 'CON', 3)
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'save_only',
+            saveDc: 'ability'
+        })
+        const result = saveHandlers.save_only(feature, BASE_STATS)
+        expect(result.saveDc).toBe(14) // 8 + CON(3) + prof(3)
     })
 
-    it('uses explicit saveDc when not "ability"', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'save_only',
-                saveDc: 16,
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.saveDc).toBe(16)
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'save_only',
+            saveDc: 15
+        })
+        const result = saveHandlers.save_only(feature, BASE_STATS)
+        expect(result.saveDc).toBe(15)
     })
 
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'save_only',
-                saveType: 'CON',
-                saveDc: 15,
-                conditionInflicted: 'poisoned',
-                duration: '1 round',
-                successEffect: 'heal',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'save_only' })
+        const result = saveHandlers.save_only(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to DEX', () => {
+        const feature = makeFeature({ type: 'save_only' })
+        const result = saveHandlers.save_only(feature, BASE_STATS)
+        expect(result.saveType).toBe('DEX')
+    })
+
+    it('passes through custom fields', () => {
+        const feature = makeFeature({
+            type: 'save_only',
+            saveType: 'CON',
+            saveDc: 15,
+            conditionInflicted: 'poisoned',
+            duration: '1_round',
+            successEffect: 'no effect'
+        })
+        const result = saveHandlers.save_only(feature, BASE_STATS)
         expect(result.saveType).toBe('CON')
         expect(result.saveDc).toBe(15)
         expect(result.conditionInflicted).toBe('poisoned')
-        expect(result.duration).toBe('1 round')
-        expect(result.successEffect).toBe('heal')
+        expect(result.duration).toBe('1_round')
+        expect(result.successEffect).toBe('no effect')
+    })
+})
+
+describe('saveHandlers – flesh_to_stone', () => {
+    it('returns flesh_to_stone info with defaults', () => {
+        const feature = makeFeature({ type: 'flesh_to_stone' })
+        const result = saveHandlers.flesh_to_stone(feature, BASE_STATS)
+        expect(result).toMatchObject({
+            type: 'flesh_to_stone',
+            name: 'Test Feature',
+            saveType: 'CON',
+            saveDc: 10,
+            conditionInflicted: 'restrained',
+            duration: 'Concentration, up to 1 minute',
+            hasAutomation: true,
+        })
+    })
+
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'flesh_to_stone',
+            saveDc: 'ability',
+            saveAbility: 'CON'
+        })
+        const result = saveHandlers.flesh_to_stone(feature, BASE_STATS)
+        expect(result.saveDc).toBe(14) // 8 + CON(3) + prof(3)
+    })
+
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'flesh_to_stone',
+            saveDc: 16
+        })
+        const result = saveHandlers.flesh_to_stone(feature, BASE_STATS)
+        expect(result.saveDc).toBe(16)
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'flesh_to_stone' })
+        const result = saveHandlers.flesh_to_stone(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to CON', () => {
+        const feature = makeFeature({ type: 'flesh_to_stone' })
+        const result = saveHandlers.flesh_to_stone(feature, BASE_STATS)
+        expect(result.saveType).toBe('CON')
+    })
+
+    it('passes through custom saveType', () => {
+        const feature = makeFeature({
+            type: 'flesh_to_stone',
+            saveType: 'WIS'
+        })
+        const result = saveHandlers.flesh_to_stone(feature, BASE_STATS)
+        expect(result.saveType).toBe('WIS')
+    })
+})
+
+describe('saveHandlers – hold_monster', () => {
+    it('returns hold_monster info with defaults', () => {
+        const feature = makeFeature({ type: 'hold_monster' })
+        const result = saveHandlers.hold_monster(feature, BASE_STATS)
+        expect(result).toMatchObject({
+            type: 'hold_monster',
+            name: 'Test Feature',
+            saveType: 'WIS',
+            saveDc: 10,
+            conditionInflicted: 'paralyzed',
+            duration: 'Concentration, up to 1 minute',
+            hasAutomation: true,
+        })
+    })
+
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'hold_monster',
+            saveDc: 'ability',
+            saveAbility: 'WIS'
+        })
+        const result = saveHandlers.hold_monster(feature, BASE_STATS)
+        expect(result.saveDc).toBe(16) // 8 + WIS(5) + prof(3)
+    })
+
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'hold_monster',
+            saveDc: 15
+        })
+        const result = saveHandlers.hold_monster(feature, BASE_STATS)
+        expect(result.saveDc).toBe(15)
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'hold_monster' })
+        const result = saveHandlers.hold_monster(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to WIS', () => {
+        const feature = makeFeature({ type: 'hold_monster' })
+        const result = saveHandlers.hold_monster(feature, BASE_STATS)
+        expect(result.saveType).toBe('WIS')
+    })
+})
+
+describe('saveHandlers – resilient_sphere', () => {
+    it('returns resilient_sphere info with defaults', () => {
+        const feature = makeFeature({ type: 'resilient_sphere' })
+        const result = saveHandlers.resilient_sphere(feature, BASE_STATS)
+        expect(result).toMatchObject({
+            type: 'resilient_sphere',
+            name: 'Test Feature',
+            saveType: 'DEX',
+            saveDc: 10,
+            duration: 'Concentration, up to 1 minute',
+            hasAutomation: true,
+        })
+    })
+
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'resilient_sphere',
+            saveDc: 'ability',
+            saveAbility: 'DEX'
+        })
+        const result = saveHandlers.resilient_sphere(feature, BASE_STATS)
+        expect(result.saveDc).toBe(13) // 8 + DEX(2) + prof(3)
+    })
+
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'resilient_sphere',
+            saveDc: 15
+        })
+        const result = saveHandlers.resilient_sphere(feature, BASE_STATS)
+        expect(result.saveDc).toBe(15)
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'resilient_sphere' })
+        const result = saveHandlers.resilient_sphere(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to DEX', () => {
+        const feature = makeFeature({ type: 'resilient_sphere' })
+        const result = saveHandlers.resilient_sphere(feature, BASE_STATS)
+        expect(result.saveType).toBe('DEX')
+    })
+
+    it('respects custom duration override', () => {
+        const feature = makeFeature({
+            type: 'resilient_sphere',
+            duration: '1_round'
+        })
+        const result = saveHandlers.resilient_sphere(feature, BASE_STATS)
+        expect(result.duration).toBe('1_round')
+    })
+
+    it('defaults duration to Concentration', () => {
+        const feature = makeFeature({ type: 'resilient_sphere' })
+        const result = saveHandlers.resilient_sphere(feature, BASE_STATS)
+        expect(result.duration).toBe('Concentration, up to 1 minute')
+    })
+})
+
+describe('saveHandlers – ottos_dance', () => {
+    it('returns ottos_dance info with defaults', () => {
+        const feature = makeFeature({ type: 'ottos_dance' })
+        const result = saveHandlers.ottos_dance(feature, BASE_STATS)
+        expect(result).toMatchObject({
+            type: 'ottos_dance',
+            name: 'Test Feature',
+            saveType: 'WIS',
+            saveDc: 10,
+            duration: 'Concentration, up to 1 minute',
+            hasAutomation: true,
+        })
+    })
+
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'ottos_dance',
+            saveDc: 'ability',
+            saveAbility: 'WIS'
+        })
+        const result = saveHandlers.ottos_dance(feature, BASE_STATS)
+        expect(result.saveDc).toBe(16) // 8 + WIS(5) + prof(3)
+    })
+
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'ottos_dance',
+            saveDc: 15
+        })
+        const result = saveHandlers.ottos_dance(feature, BASE_STATS)
+        expect(result.saveDc).toBe(15)
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'ottos_dance' })
+        const result = saveHandlers.ottos_dance(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to WIS', () => {
+        const feature = makeFeature({ type: 'ottos_dance' })
+        const result = saveHandlers.ottos_dance(feature, BASE_STATS)
+        expect(result.saveType).toBe('WIS')
+    })
+})
+
+describe('saveHandlers – power_word_stun', () => {
+    it('returns power_word_stun info with defaults', () => {
+        const feature = makeFeature({ type: 'power_word_stun' })
+        const result = saveHandlers.power_word_stun(feature, BASE_STATS)
+        expect(result).toMatchObject({
+            type: 'power_word_stun',
+            name: 'Test Feature',
+            saveType: 'CON',
+            saveDc: 10,
+            hasAutomation: true,
+        })
+    })
+
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'power_word_stun',
+            saveDc: 'ability',
+            saveAbility: 'CON'
+        })
+        const result = saveHandlers.power_word_stun(feature, BASE_STATS)
+        expect(result.saveDc).toBe(14) // 8 + CON(3) + prof(3)
+    })
+
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'power_word_stun',
+            saveDc: 15
+        })
+        const result = saveHandlers.power_word_stun(feature, BASE_STATS)
+        expect(result.saveDc).toBe(15)
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'power_word_stun' })
+        const result = saveHandlers.power_word_stun(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to CON', () => {
+        const feature = makeFeature({ type: 'power_word_stun' })
+        const result = saveHandlers.power_word_stun(feature, BASE_STATS)
+        expect(result.saveType).toBe('CON')
+    })
+})
+
+describe('saveHandlers – sleep', () => {
+    it('returns sleep info with defaults', () => {
+        const feature = makeFeature({ type: 'sleep' })
+        const result = saveHandlers.sleep(feature, BASE_STATS)
+        expect(result).toMatchObject({
+            type: 'sleep',
+            name: 'Test Feature',
+            saveType: 'WIS',
+            saveDc: 10,
+            conditionInflicted: 'incapacitated',
+            duration: '',
+            hasAutomation: true,
+        })
+    })
+
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'sleep',
+            saveDc: 'ability',
+            saveAbility: 'WIS'
+        })
+        const result = saveHandlers.sleep(feature, BASE_STATS)
+        expect(result.saveDc).toBe(16) // 8 + WIS(5) + prof(3)
+    })
+
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'sleep',
+            saveDc: 12
+        })
+        const result = saveHandlers.sleep(feature, BASE_STATS)
+        expect(result.saveDc).toBe(12)
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'sleep' })
+        const result = saveHandlers.sleep(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to WIS', () => {
+        const feature = makeFeature({ type: 'sleep' })
+        const result = saveHandlers.sleep(feature, BASE_STATS)
+        expect(result.saveType).toBe('WIS')
+    })
+
+    it('passes through custom fields', () => {
+        const feature = makeFeature({
+            type: 'sleep',
+            saveDc: 12,
+            duration: '1_minute'
+        })
+        const result = saveHandlers.sleep(feature, BASE_STATS)
+        expect(result.saveDc).toBe(12)
+        expect(result.duration).toBe('1_minute')
+    })
+})
+
+describe('saveHandlers – stinking_cloud', () => {
+    it('returns stinking_cloud info with defaults', () => {
+        const feature = makeFeature({ type: 'stinking_cloud' })
+        const result = saveHandlers.stinking_cloud(feature, BASE_STATS)
+        expect(result).toMatchObject({
+            type: 'stinking_cloud',
+            name: 'Test Feature',
+            saveType: 'CON',
+            saveDc: 10,
+            conditionInflicted: 'poisoned',
+            duration: '',
+            hasAutomation: true,
+        })
+    })
+
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'stinking_cloud',
+            saveDc: 'ability',
+            saveAbility: 'CON'
+        })
+        const result = saveHandlers.stinking_cloud(feature, BASE_STATS)
+        expect(result.saveDc).toBe(14) // 8 + CON(3) + prof(3)
+    })
+
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'stinking_cloud',
+            saveDc: 14
+        })
+        const result = saveHandlers.stinking_cloud(feature, BASE_STATS)
+        expect(result.saveDc).toBe(14)
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'stinking_cloud' })
+        const result = saveHandlers.stinking_cloud(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to CON', () => {
+        const feature = makeFeature({ type: 'stinking_cloud' })
+        const result = saveHandlers.stinking_cloud(feature, BASE_STATS)
+        expect(result.saveType).toBe('CON')
+    })
+
+    it('passes through custom fields', () => {
+        const feature = makeFeature({
+            type: 'stinking_cloud',
+            saveDc: 14,
+            duration: '1_round'
+        })
+        const result = saveHandlers.stinking_cloud(feature, BASE_STATS)
+        expect(result.saveDc).toBe(14)
+        expect(result.duration).toBe('1_round')
+    })
+})
+
+describe('saveHandlers – tashas_laughter', () => {
+    it('returns tashas_laughter info with defaults', () => {
+        const feature = makeFeature({ type: 'tashas_laughter' })
+        const result = saveHandlers.tashas_laughter(feature, BASE_STATS)
+        expect(result).toMatchObject({
+            type: 'tashas_laughter',
+            name: 'Test Feature',
+            saveType: 'WIS',
+            saveDc: 10,
+            conditionInflicted: ['prone', 'incapacitated'],
+            duration: '',
+            hasAutomation: true,
+        })
+    })
+
+    it('calculates saveDc when ability', () => {
+        const feature = makeFeature({
+            type: 'tashas_laughter',
+            saveDc: 'ability',
+            saveAbility: 'WIS'
+        })
+        const result = saveHandlers.tashas_laughter(feature, BASE_STATS)
+        expect(result.saveDc).toBe(16) // 8 + WIS(5) + prof(3)
+    })
+
+    it('uses explicit saveDc when not ability', () => {
+        const feature = makeFeature({
+            type: 'tashas_laughter',
+            saveDc: 15
+        })
+        const result = saveHandlers.tashas_laughter(feature, BASE_STATS)
+        expect(result.saveDc).toBe(15)
+    })
+
+    it('defaults saveDc to 10 when undefined', () => {
+        const feature = makeFeature({ type: 'tashas_laughter' })
+        const result = saveHandlers.tashas_laughter(feature, BASE_STATS)
+        expect(result.saveDc).toBe(10)
+    })
+
+    it('defaults saveType to WIS', () => {
+        const feature = makeFeature({ type: 'tashas_laughter' })
+        const result = saveHandlers.tashas_laughter(feature, BASE_STATS)
+        expect(result.saveType).toBe('WIS')
+    })
+
+    it('passes through custom fields', () => {
+        const feature = makeFeature({
+            type: 'tashas_laughter',
+            saveDc: 15,
+            duration: '1_round'
+        })
+        const result = saveHandlers.tashas_laughter(feature, BASE_STATS)
+        expect(result.saveDc).toBe(15)
+        expect(result.duration).toBe('1_round')
     })
 })

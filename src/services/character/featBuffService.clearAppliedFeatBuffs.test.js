@@ -1,30 +1,33 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
-
-vi.mock('../shared/featFinder.js', () => ({
-  findFeat: vi.fn(),
-}));
 
 vi.mock('../shared/buffApplier.js', () => ({
   resetFeatIncreases: vi.fn(),
-  applyAbilityScoreIncreases: vi.fn(),
-  mergeDeduplicated: vi.fn(),
 }));
 
 import { resetFeatIncreases } from '../shared/buffApplier.js';
 import { clearAppliedFeatBuffs } from './featBuffService.js';
 
 describe('clearAppliedFeatBuffs', () => {
-  it('should call resetFeatIncreases with formData.abilities', () => {
-    const formData = {
-      abilities: [{ name: 'Strength', featIncrease: 5 }],
-    };
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should reset featIncrease on each ability by calling resetFeatIncreases with abilities array', () => {
+    const abilities = [
+      { name: 'Strength', featIncrease: 5 },
+      { name: 'Dexterity', featIncrease: -2 },
+      { name: 'Constitution', featIncrease: 3 },
+    ];
+    const formData = { abilities };
 
     clearAppliedFeatBuffs(formData);
 
-    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
+    expect(resetFeatIncreases).toHaveBeenCalledTimes(1);
+    expect(resetFeatIncreases).toHaveBeenCalledWith(abilities);
   });
 
-  it('should handle formData with no abilities property', () => {
+  it('should pass undefined to resetFeatIncreases when formData has no abilities property', () => {
     const formData = {};
 
     clearAppliedFeatBuffs(formData);
@@ -33,37 +36,32 @@ describe('clearAppliedFeatBuffs', () => {
   });
 
   it('should throw when formData is null', () => {
-    expect(() => clearAppliedFeatBuffs(null)).toThrow();
+    expect(() => clearAppliedFeatBuffs(null)).toThrow(TypeError);
   });
 
-  it('should call resetFeatIncreases with all abilities', () => {
-    const formData = {
-      abilities: [
-        { name: 'Strength', featIncrease: 5 },
-        { name: 'Dexterity', featIncrease: -2 },
-        { name: 'Constitution', featIncrease: 3 },
-      ],
-    };
+  it('should not throw when abilities array is empty', () => {
+    const formData = { abilities: [] };
 
-    clearAppliedFeatBuffs(formData);
-
-    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
+    expect(() => clearAppliedFeatBuffs(formData)).not.toThrow();
+    expect(resetFeatIncreases).toHaveBeenCalledWith([]);
   });
 
-  it('should not modify other properties on formData', () => {
+  it('should not modify other formData properties', () => {
     const formData = {
       abilities: [{ name: 'Strength', featIncrease: 5 }],
       name: 'Test Character',
       level: 5,
+      class: 'Wizard',
     };
 
     clearAppliedFeatBuffs(formData);
 
     expect(formData.name).toBe('Test Character');
     expect(formData.level).toBe(5);
+    expect(formData.class).toBe('Wizard');
   });
 
-  it('should call resetFeatIncreases with abilities that have no featIncrease property', () => {
+  it('should handle abilities without featIncrease property', () => {
     const formData = {
       abilities: [{ name: 'Strength' }],
     };

@@ -2,7 +2,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntime
 import { postLogEntry } from './logPoster.js';
 
 export function modifyHitPoints(combatSummary, targetName, delta, campaignName) {
-  if (!combatSummary) return null;
+  if (!combatSummary || !combatSummary.creatures) return null;
   const creature = combatSummary.creatures.find(c => c.name === targetName);
   if (!creature) return null;
 

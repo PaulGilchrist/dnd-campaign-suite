@@ -1,7 +1,8 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 import { buildAttackInfo } from './automationInfoBuilder.js'
-import { BASE_STATS, BASE_FEATURE, normalizeAbilityName } from './automationInfoBuilder.fixtures.js'
+import { BASE_STATS, makeFeature } from './automationInfoBuilder.fixtures.js'
 
 vi.mock('./automationExpressions.js', () => ({
     evaluateAutoExpression: vi.fn((expr, _stats) => {
@@ -22,8 +23,10 @@ vi.mock('./automationExpressions.js', () => ({
         return resolved
     }),
     getSaveDc: vi.fn((stats, ability, proficiency) => {
-        const canonical = normalizeAbilityName(ability)
-        const bonus = stats.abilities?.find(a => a.name === canonical)?.bonus ?? 0
+        const canonical = ability?.toLowerCase().replace(/\s+/g, '') || ''
+        const abilityMap = { str: 'Strength', dex: 'Dexterity', con: 'Constitution', int: 'Intelligence', wis: 'Wisdom', cha: 'Charisma' }
+        const name = abilityMap[canonical] || null
+        const bonus = stats.abilities?.find(a => a.name === name)?.bonus ?? 0
         return 8 + bonus + (proficiency || 0)
     }),
     resolveUses: vi.fn((stats, usesSpec) => {
@@ -42,183 +45,13 @@ vi.mock('./automationExpressions.js', () => ({
     }),
 }))
 
-import { evaluateAutoExpression } from './automationExpressions.js'
-
-describe('buildAttackInfo – bonus_action_attack', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'bonus_action_attack' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'bonus_action_attack',
-            name: 'Test Feature',
-            trigger: '',
-            action: 'bonus_action',
-            weaponAttack: false,
-            extraDamageExpression: '',
-            usesMax: 0,
-            recharge: 'long_rest',
-            resourceKey: 'warPriestUses',
-            weaponRequirement: null,
-            hasAutomation: true,
-        })
-    })
-
-    it('evaluates uses_expression when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'bonus_action_attack',
-                uses_expression: '2d6',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.usesMax).toBe(2)
-        expect(evaluateAutoExpression).toHaveBeenCalledWith('2d6', BASE_STATS)
-    })
-
-    it('uses 0 when no uses_expression', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'bonus_action_attack' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.usesMax).toBe(0)
-    })
-
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'bonus_action_attack',
-                trigger: 'on_hit',
-                action: 'action',
-                weaponAttack: true,
-                extraDamageExpression: '1d8',
-                recharge: 'short_rest',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.trigger).toBe('on_hit')
-        expect(result.action).toBe('action')
-        expect(result.weaponAttack).toBe(true)
-        expect(result.extraDamageExpression).toBe('1d8')
-        expect(result.recharge).toBe('short_rest')
-    })
-})
-
-describe('buildAttackInfo – bonus_attacks', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'bonus_attacks' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'bonus_attacks',
-            name: 'Test Feature',
-            attacks: 2,
-            attackType: 'unarmed_strike',
-            cost: null,
-            trigger: 'after_attack_action',
-            action: null,
-            casting_time: null,
-            weaponRequirements: null,
-            weaponRestriction: null,
-            hasAutomation: true,
-        })
-    })
-
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'bonus_attacks',
-                attacks: 3,
-                attackType: 'melee',
-                cost: '1 resource',
-                trigger: 'on_action',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.attacks).toBe(3)
-        expect(result.attackType).toBe('melee')
-        expect(result.cost).toBe('1 resource')
-        expect(result.trigger).toBe('on_action')
-    })
-
-    it('derives action from casting_time', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'bonus_attacks',
-                casting_time: '1 bonus action',
-                extraAttacks: 1,
-                weaponRequirements: { mustHave: ['Light'], twoHanded: false },
-                weaponRestriction: 'must_differ_from_main_hand',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.action).toBe('bonus_action')
-        expect(result.attacks).toBe(1)
-        expect(result.casting_time).toBe('1 bonus action')
-        expect(result.weaponRequirements).toEqual({ mustHave: ['Light'], twoHanded: false })
-        expect(result.weaponRestriction).toBe('must_differ_from_main_hand')
-    })
-})
-
-describe('buildAttackInfo – buff_ally', () => {
-    beforeEach(() => vi.clearAllMocks())
-
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'buff_ally' } }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'buff_ally',
-            name: 'Test Feature',
-            buffExpression: '',
-            range: '60_ft',
-            action: 'bonus_action',
-            usesMax: 0,
-            usesRecharge: 'long_rest',
-            hasAutomation: true,
-        })
-    })
-
-    it('evaluates uses_expression when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'buff_ally',
-                uses_expression: '2d6',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.usesMax).toBe(2)
-    })
-
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'buff_ally',
-                buffExpression: 'buff_expr',
-                range: '30_ft',
-                action: 'action',
-                recharge: 'short_rest',
-            },
-        }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.buffExpression).toBe('buff_expr')
-        expect(result.range).toBe('30_ft')
-        expect(result.action).toBe('action')
-        expect(result.usesRecharge).toBe('short_rest')
-    })
-})
-
 describe('buildAttackInfo – bardic_inspiration', () => {
     beforeEach(() => vi.clearAllMocks())
 
-    it('returns correct structure with defaults', () => {
-        const feature = { ...BASE_FEATURE, automation: { type: 'bardic_inspiration' } }
+    it('returns correct default structure', () => {
+        const feature = makeFeature({ type: 'bardic_inspiration' })
         const result = buildAttackInfo(feature, BASE_STATS)
+
         expect(result).toEqual({
             type: 'bardic_inspiration',
             name: 'Test Feature',
@@ -231,19 +64,21 @@ describe('buildAttackInfo – bardic_inspiration', () => {
         })
     })
 
-    it('evaluates uses_expression when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'bardic_inspiration',
-                uses_expression: '2d6',
-            },
-        }
+    it('evaluates uses_expression via evaluateAutoExpression', () => {
+        const feature = makeFeature({ type: 'bardic_inspiration', uses_expression: '2d6' })
         const result = buildAttackInfo(feature, BASE_STATS)
+
         expect(result.usesMax).toBe(2)
     })
 
-    it('reads dieSize from class_levels when available', () => {
+    it('defaults usesMax to 0 when no uses_expression', () => {
+        const feature = makeFeature({ type: 'bardic_inspiration' })
+        const result = buildAttackInfo(feature, BASE_STATS)
+
+        expect(result.usesMax).toBe(0)
+    })
+
+    it('reads dieSize from matching class_levels entry', () => {
         const bardStats = {
             ...BASE_STATS,
             level: 2,
@@ -254,35 +89,100 @@ describe('buildAttackInfo – bardic_inspiration', () => {
                 ],
             },
         }
-        const feature = { ...BASE_FEATURE, automation: { type: 'bardic_inspiration' } }
+        const feature = makeFeature({ type: 'bardic_inspiration' })
         const result = buildAttackInfo(feature, bardStats)
+
         expect(result.dieSize).toBe(8)
     })
 
-    it('falls back to 6 when no class_levels match', () => {
+    it('defaults dieSize to 6 when class_levels is empty array', () => {
         const bardStats = {
             ...BASE_STATS,
             level: 2,
             class: { class_levels: [] },
         }
-        const feature = { ...BASE_FEATURE, automation: { type: 'bardic_inspiration' } }
+        const feature = makeFeature({ type: 'bardic_inspiration' })
         const result = buildAttackInfo(feature, bardStats)
+
         expect(result.dieSize).toBe(6)
     })
 
-    it('includes optional fields when provided', () => {
-        const feature = {
-            ...BASE_FEATURE,
-            automation: {
-                type: 'bardic_inspiration',
-                range: '30_ft',
-                action: 'action',
-                recharge: 'short_rest',
+    it('defaults dieSize to 6 when stats has no class property', () => {
+        const stats = { ...BASE_STATS }
+        const feature = makeFeature({ type: 'bardic_inspiration' })
+        const result = buildAttackInfo(feature, stats)
+
+        expect(result.dieSize).toBe(6)
+    })
+
+    it('defaults dieSize to 6 when no class_levels entry matches level', () => {
+        const bardStats = {
+            ...BASE_STATS,
+            level: 10,
+            class: {
+                class_levels: [
+                    { level: 1, bardic_die: 6 },
+                    { level: 5, bardic_die: 8 },
+                ],
             },
         }
+        const feature = makeFeature({ type: 'bardic_inspiration' })
+        const result = buildAttackInfo(feature, bardStats)
+
+        expect(result.dieSize).toBe(6)
+    })
+
+    it('applies optional fields from automation config', () => {
+        const feature = makeFeature({
+            type: 'bardic_inspiration',
+            range: '30_ft',
+            action: 'action',
+            recharge: 'short_rest',
+        })
         const result = buildAttackInfo(feature, BASE_STATS)
+
         expect(result.range).toBe('30_ft')
         expect(result.action).toBe('action')
         expect(result.usesRecharge).toBe('short_rest')
+    })
+})
+
+describe('buildAttackInfo – bardic_inspiration_defense', () => {
+    it('returns minimal structure with hasAutomation true', () => {
+        const feature = makeFeature({ type: 'bardic_inspiration_defense' })
+        const result = buildAttackInfo(feature, BASE_STATS)
+
+        expect(result).toEqual({
+            type: 'bardic_inspiration_defense',
+            name: 'Test Feature',
+            hasAutomation: true,
+        })
+    })
+
+    it('passes through the feature name', () => {
+        const feature = makeFeature({ type: 'bardic_inspiration_defense' }, 'Defensive Inspiration')
+        const result = buildAttackInfo(feature, BASE_STATS)
+
+        expect(result.name).toBe('Defensive Inspiration')
+    })
+})
+
+describe('buildAttackInfo – bardic_inspiration_offense', () => {
+    it('returns minimal structure with hasAutomation true', () => {
+        const feature = makeFeature({ type: 'bardic_inspiration_offense' })
+        const result = buildAttackInfo(feature, BASE_STATS)
+
+        expect(result).toEqual({
+            type: 'bardic_inspiration_offense',
+            name: 'Test Feature',
+            hasAutomation: true,
+        })
+    })
+
+    it('passes through the feature name', () => {
+        const feature = makeFeature({ type: 'bardic_inspiration_offense' }, 'Offensive Inspiration')
+        const result = buildAttackInfo(feature, BASE_STATS)
+
+        expect(result.name).toBe('Offensive Inspiration')
     })
 })

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import {
   ABILITY_ABBR,
@@ -11,7 +12,7 @@ import {
 
 describe('npcFormUtils', () => {
   describe('constants', () => {
-    it('ABILITY_ABBR should list all six ability score abbreviations in correct order', () => {
+    it('ABILITY_ABBR should list all six ability scores', () => {
       expect(ABILITY_ABBR).toEqual(['str', 'dex', 'con', 'int', 'wis', 'cha']);
     });
 
@@ -30,7 +31,7 @@ describe('npcFormUtils', () => {
       expect(Object.keys(ABILITY_LABELS)).toEqual(ABILITY_ABBR);
     });
 
-    it('ATTITUDE_OPTIONS should have 5 options each with value and label', () => {
+    it('ATTITUDE_OPTIONS should have 5 options with value and label strings', () => {
       expect(ATTITUDE_OPTIONS).toHaveLength(5);
       for (const option of ATTITUDE_OPTIONS) {
         expect(option).toHaveProperty('value');
@@ -46,7 +47,7 @@ describe('npcFormUtils', () => {
       expect(attitudeValues).toEqual(colorKeys);
     });
 
-    it('ATTITUDE_COLORS should have bg, color, and border for each attitude', () => {
+    it('ATTITUDE_COLORS should have bg, color, and border strings for each attitude', () => {
       for (const [, colors] of Object.entries(ATTITUDE_COLORS)) {
         expect(colors).toHaveProperty('bg');
         expect(colors).toHaveProperty('color');
@@ -59,7 +60,7 @@ describe('npcFormUtils', () => {
   });
 
   describe('getDefaultFormData', () => {
-    const defaults = {
+    const expectedDefaults = {
       name: '',
       race: '',
       classRole: '',
@@ -78,6 +79,7 @@ describe('npcFormUtils', () => {
       hitDice: '',
       initiativeBonus: '',
       speed: { walk: '30 ft.' },
+      abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
       savingThrowBonuses: {},
       skillBonuses: {},
       damageResistances: [],
@@ -88,12 +90,10 @@ describe('npcFormUtils', () => {
       reactions: '',
     };
 
-    for (const [key, expectedValue] of Object.entries(defaults)) {
-      it(`should default ${key} to the correct value`, () => {
-        const form = getDefaultFormData();
-        expect(form[key]).toEqual(expectedValue);
-      });
-    }
+    it('should return correct default values for all fields', () => {
+      const form = getDefaultFormData();
+      expect(form).toEqual(expectedDefaults);
+    });
 
     it('should default all ability scores to 10', () => {
       const form = getDefaultFormData();
@@ -126,25 +126,29 @@ describe('npcFormUtils', () => {
       expect(form.actions).toEqual([{ name: 'Longsword' }]);
     });
 
-    it('should return a fresh object each call with independent arrays/objects', () => {
+    it('should preserve non-overridden defaults when partial overrides are given', () => {
+      const form = getDefaultFormData({ name: 'Grog' });
+      expect(form.name).toBe('Grog');
+      expect(form.armorClass).toBe(10);
+      expect(form.abilityScores.str).toBe(10);
+      expect(form.damageResistances).toEqual([]);
+      expect(form.speed).toEqual({ walk: '30 ft.' });
+    });
+
+    it('should return a fresh object each call with independent mutable fields', () => {
       const form1 = getDefaultFormData();
       const form2 = getDefaultFormData();
       form1.abilityScores.str = 20;
       form1.damageResistances.push('fire');
+      form1.speed.walk = '40 ft.';
       expect(form2.abilityScores.str).toBe(10);
       expect(form2.damageResistances).toEqual([]);
-    });
-
-    it('should return a fresh object each call with independent speed objects', () => {
-      const form1 = getDefaultFormData();
-      const form2 = getDefaultFormData();
-      form1.speed.walk = '40 ft.';
       expect(form2.speed.walk).toBe('30 ft.');
     });
   });
 
   describe('cleanNPCData', () => {
-    it('should return data unchanged when AC is a valid number', () => {
+    it('should return a clone with AC unchanged when valid', () => {
       const data = { name: 'Grog', armorClass: 16, race: 'Orc' };
       const cleaned = cleanNPCData(data);
       expect(cleaned).not.toBe(data);
@@ -153,49 +157,43 @@ describe('npcFormUtils', () => {
       expect(cleaned.race).toBe('Orc');
     });
 
-    it('should default AC to 10 when AC is null', () => {
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: null });
-      expect(cleaned.armorClass).toBe(10);
-    });
-
-    it('should default AC to 10 when AC is undefined', () => {
-      const cleaned = cleanNPCData({ name: 'Grog' });
-      expect(cleaned.armorClass).toBe(10);
-    });
-
-    it('should default AC to 10 when AC is an empty string', () => {
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: '' });
-      expect(cleaned.armorClass).toBe(10);
-    });
-
-    it('should default AC to 10 when AC is a numeric string and log an error', () => {
+    it('should default AC to 10 for null, undefined, and empty string without logging', () => {
+      const silentValues = [null, undefined, ''];
       const consoleSpy = vi.spyOn(console, 'error');
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: '16' });
-      expect(cleaned.armorClass).toBe(10);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[AC] NPC "Grog" has invalid AC: 16. Defaulting to 10.',
-      );
+
+      for (const v of silentValues) {
+        const cleaned = cleanNPCData({ name: 'Grog', armorClass: v });
+        expect(cleaned.armorClass).toBe(10);
+      }
+
+      expect(consoleSpy).not.toHaveBeenCalled();
       consoleSpy.mockRestore();
     });
 
-    it('should default AC to 10 when AC is a boolean and log an error', () => {
+    it('should default AC to 10 for non-number types and log an error', () => {
+      const noisyValues = ['16', true, NaN];
       const consoleSpy = vi.spyOn(console, 'error');
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: true });
-      expect(cleaned.armorClass).toBe(10);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[AC] NPC "Grog" has invalid AC: true. Defaulting to 10.',
+      const expectedCalls = noisyValues.map(
+        (v) => '[AC] NPC "Grog" has invalid AC: ' + v + '. Defaulting to 10.',
       );
+
+      for (let i = 0; i < noisyValues.length; i++) {
+        const cleaned = cleanNPCData({ name: 'Grog', armorClass: noisyValues[i] });
+        expect(cleaned.armorClass).toBe(10);
+        expect(consoleSpy).toHaveBeenCalledWith(expectedCalls[i]);
+      }
+
       consoleSpy.mockRestore();
     });
 
-    it('should default AC to 10 when AC is NaN and log an error', () => {
-      const consoleSpy = vi.spyOn(console, 'error');
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: NaN });
-      expect(cleaned.armorClass).toBe(10);
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[AC] NPC "Grog" has invalid AC: NaN. Defaulting to 10.',
-      );
-      consoleSpy.mockRestore();
+    it('should accept AC of 0 as valid', () => {
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: 0 });
+      expect(cleaned.armorClass).toBe(0);
+    });
+
+    it('should accept negative AC values', () => {
+      const cleaned = cleanNPCData({ name: 'Grog', armorClass: -5 });
+      expect(cleaned.armorClass).toBe(-5);
     });
 
     it('should preserve other fields while correcting AC', () => {
@@ -207,20 +205,11 @@ describe('npcFormUtils', () => {
         speed: { walk: '25 ft.' },
       };
       const cleaned = cleanNPCData(data);
+      expect(cleaned).not.toBe(data);
       expect(cleaned.name).toBe('Grog');
       expect(cleaned.race).toBe('Hill Dwarf');
       expect(cleaned.hitPoints).toBe(12);
       expect(cleaned.speed).toEqual({ walk: '25 ft.' });
-    });
-
-    it('should accept AC of 0 as valid', () => {
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: 0 });
-      expect(cleaned.armorClass).toBe(0);
-    });
-
-    it('should accept negative AC values', () => {
-      const cleaned = cleanNPCData({ name: 'Grog', armorClass: -5 });
-      expect(cleaned.armorClass).toBe(-5);
     });
 
     it('should not mutate the original data object', () => {

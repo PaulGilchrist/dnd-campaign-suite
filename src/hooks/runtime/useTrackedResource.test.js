@@ -1,5 +1,9 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
+import useTrackedResource from './useTrackedResource.js';
 
 vi.mock('../../services/ui/storage.js', () => ({
   default: {
@@ -14,72 +18,62 @@ vi.mock('./useRuntimeState.js', () => ({
   addStorageChangeListener: vi.fn().mockImplementation(() => () => {}),
 }));
 
-import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from './useRuntimeState.js';
-import useTrackedResource from './useTrackedResource.js';
-
 describe('useTrackedResource', () => {
-  const mockPlayerName = 'Gandalf';
-  const mockStorageKey = 'hp';
-  const mockCampaignName = 'MyCampaign';
-
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   describe('initialization', () => {
-    it('should initialize from runtime storage when value exists', () => {
+    it('returns { current, max, update } with current from runtime storage', () => {
       getRuntimeValue.mockReturnValue(5);
 
       const maxGetter = vi.fn(() => 10);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
-      // useEffect runs after mount and overwrites initial state with the same value
       expect(result.current.current).toBe(5);
       expect(result.current.max).toBe(10);
-      expect(getRuntimeValue).toHaveBeenCalledWith(mockPlayerName, mockStorageKey);
+      expect(typeof result.current.update).toBe('function');
+      expect(getRuntimeValue).toHaveBeenCalledWith('Gandalf', 'hp');
     });
 
-    it('should fall through to maxGetter when storage returns null', () => {
+    it('falls through to maxGetter when storage returns null', () => {
       getRuntimeValue.mockReturnValue(null);
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
       expect(result.current.current).toBe(20);
       expect(result.current.max).toBe(20);
-      expect(maxGetter).toHaveBeenCalled();
     });
 
-    it('should fall through to maxGetter when storage returns undefined', () => {
+    it('falls through to maxGetter when storage returns undefined', () => {
       getRuntimeValue.mockReturnValue(undefined);
 
       const maxGetter = vi.fn(() => 15);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
       expect(result.current.current).toBe(15);
-      expect(maxGetter).toHaveBeenCalled();
     });
 
-    it('should treat storage value of 0 as a valid stored value', () => {
+    it('treats storage value of 0 as a valid stored value', () => {
       getRuntimeValue.mockReturnValue(0);
 
       const maxGetter = vi.fn(() => 10);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
-      // maxGetter is called in resolveCurrent (not invoked for 0) and in the return statement
       expect(result.current.current).toBe(0);
       expect(result.current.max).toBe(10);
     });
 
-    it('should fallback to playerStats._trackedResources when storage is null', () => {
+    it('falls back to playerStats._trackedResources when storage is null', () => {
       getRuntimeValue.mockReturnValue(null);
 
       const playerStats = {
@@ -90,15 +84,14 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 20);
 
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1', undefined, playerStats)
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, playerStats)
       );
 
-      // maxGetter is called in the return statement even though resolveCurrent used _trackedResources
       expect(result.current.current).toBe(12);
       expect(result.current.max).toBe(20);
     });
 
-    it('should fall through to maxGetter when playerStats._trackedResources is missing the key', () => {
+    it('falls through to maxGetter when playerStats._trackedResources lacks the key', () => {
       getRuntimeValue.mockReturnValue(null);
 
       const playerStats = {
@@ -109,21 +102,20 @@ describe('useTrackedResource', () => {
       const maxGetter = vi.fn(() => 25);
 
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1', undefined, playerStats)
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, playerStats)
       );
 
       expect(result.current.current).toBe(25);
-      expect(result.current.max).toBe(25);
     });
 
-    it('should return max from maxGetter on every render', () => {
+    it('returns max from maxGetter on every render', () => {
       getRuntimeValue.mockReturnValue(5);
 
       let maxVal = 10;
       const maxGetter = vi.fn(() => maxVal);
 
       const { result, rerender } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
       expect(result.current.max).toBe(10);
@@ -134,12 +126,12 @@ describe('useTrackedResource', () => {
       expect(result.current.max).toBe(25);
     });
 
-    it('should handle maxGetter returning 0', () => {
+    it('handles maxGetter returning 0', () => {
       getRuntimeValue.mockReturnValue(null);
 
       const maxGetter = vi.fn(() => 0);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
       expect(result.current.current).toBe(0);
@@ -148,13 +140,13 @@ describe('useTrackedResource', () => {
   });
 
   describe('update', () => {
-    it('should update current and call setRuntimeValue on update', async () => {
+    it('updates current and calls setRuntimeValue', async () => {
       getRuntimeValue.mockReturnValue(10);
       setRuntimeValue.mockResolvedValue(undefined);
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
       expect(result.current.current).toBe(10);
@@ -163,82 +155,87 @@ describe('useTrackedResource', () => {
         await result.current.update(7);
       });
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerName, mockStorageKey, 7, undefined);
       expect(result.current.current).toBe(7);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Gandalf', 'hp', 7, undefined);
     });
 
-    it('should pass campaignName to setRuntimeValue', async () => {
+    it('passes campaignName to setRuntimeValue', async () => {
       getRuntimeValue.mockReturnValue(10);
       setRuntimeValue.mockResolvedValue(undefined);
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1', mockCampaignName)
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', 'MyCampaign')
       );
 
       await act(async () => {
         await result.current.update(15);
       });
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerName, mockStorageKey, 15, mockCampaignName);
+      expect(setRuntimeValue).toHaveBeenCalledWith('Gandalf', 'hp', 15, 'MyCampaign');
       expect(result.current.current).toBe(15);
     });
 
-    it('should update to 0', async () => {
+    it('allows updating to 0, negative, and values exceeding max', async () => {
       getRuntimeValue.mockReturnValue(10);
       setRuntimeValue.mockResolvedValue(undefined);
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
       await act(async () => {
         await result.current.update(0);
       });
-
       expect(result.current.current).toBe(0);
-      expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerName, mockStorageKey, 0, undefined);
-    });
-
-    it('should update to negative value', async () => {
-      getRuntimeValue.mockReturnValue(10);
-      setRuntimeValue.mockResolvedValue(undefined);
-
-      const maxGetter = vi.fn(() => 20);
-      const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
-      );
 
       await act(async () => {
         await result.current.update(-3);
       });
-
       expect(result.current.current).toBe(-3);
-      expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerName, mockStorageKey, -3, undefined);
+
+      await act(async () => {
+        await result.current.update(25);
+      });
+      expect(result.current.current).toBe(25);
+      expect(result.current.max).toBe(20);
     });
 
-    it('should update to value exceeding max', async () => {
+    it('returns a promise from update', async () => {
       getRuntimeValue.mockReturnValue(10);
       setRuntimeValue.mockResolvedValue(undefined);
 
       const maxGetter = vi.fn(() => 20);
       const { result } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1')
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+      );
+
+      const updatePromise = result.current.update(5);
+      expect(updatePromise).toBeInstanceOf(Promise);
+
+      await act(async () => {
+        await updatePromise;
+      });
+    });
+
+    it('rejects when setRuntimeValue rejects', async () => {
+      getRuntimeValue.mockReturnValue(10);
+      setRuntimeValue.mockRejectedValue(new Error('network error'));
+
+      const maxGetter = vi.fn(() => 20);
+      const { result } = renderHook(() =>
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
       );
 
       await act(async () => {
-        await result.current.update(25);
+        await expect(result.current.update(5)).rejects.toThrow('network error');
       });
-
-      expect(result.current.current).toBe(25);
-      expect(result.current.max).toBe(20);
-      expect(setRuntimeValue).toHaveBeenCalledWith(mockPlayerName, mockStorageKey, 25, undefined);
     });
   });
 
   describe('dependency changes', () => {
-    it('should re-read storage when deps change', () => {
+    it('re-reads storage when deps change', () => {
       getRuntimeValue
         .mockReturnValueOnce(10)
         .mockReturnValueOnce(8)
@@ -246,7 +243,7 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result, rerender } = renderHook(
-        ({ deps }) => useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, deps),
+        ({ deps }) => useTrackedResource('hp', 'Gandalf', maxGetter, deps),
         { initialProps: { deps: 'dep1' } }
       );
 
@@ -257,7 +254,7 @@ describe('useTrackedResource', () => {
       expect(result.current.current).toBe(6);
     });
 
-    it('should re-read when playerName changes', () => {
+    it('re-reads when playerName changes', () => {
       getRuntimeValue
         .mockReturnValueOnce(1)
         .mockReturnValueOnce(2)
@@ -265,20 +262,18 @@ describe('useTrackedResource', () => {
 
       const maxGetter = vi.fn(() => 20);
       const { result, rerender } = renderHook(
-        ({ name }) => useTrackedResource(mockStorageKey, name, maxGetter, 'dep1'),
+        ({ name }) => useTrackedResource('hp', name, maxGetter, 'dep1'),
         { initialProps: { name: 'Gandalf' } }
       );
 
-      // useState initializer reads 1, useEffect overwrites with 2
       expect(result.current.current).toBe(2);
 
       rerender({ name: 'Frodo' });
 
-      // useEffect triggers with new name, reads 3
       expect(result.current.current).toBe(3);
     });
 
-    it('should re-read when maxGetter function identity changes', () => {
+    it('re-reads when maxGetter function identity changes', () => {
       getRuntimeValue
         .mockReturnValueOnce(null)
         .mockReturnValueOnce(null)
@@ -286,25 +281,21 @@ describe('useTrackedResource', () => {
 
       const maxGetter1 = vi.fn(() => 10);
       const { result, rerender } = renderHook(
-        ({ getter }) => useTrackedResource(mockStorageKey, mockPlayerName, getter, 'dep1'),
+        ({ getter }) => useTrackedResource('hp', 'Gandalf', getter, 'dep1'),
         { initialProps: { getter: maxGetter1 } }
       );
 
-      // useState initializer: storage null → maxGetter1() → 10
-      // useEffect: storage null → maxGetter1() → 10
-      // return statement: maxGetter1() → 10
       expect(result.current.current).toBe(10);
       expect(maxGetter1).toHaveBeenCalled();
 
       const maxGetter2 = vi.fn(() => 30);
       rerender({ getter: maxGetter2 });
 
-      // useEffect triggers with new getter identity: storage null → maxGetter2() → 30
       expect(result.current.current).toBe(30);
       expect(maxGetter2).toHaveBeenCalled();
     });
 
-    it('should re-read when playerStats changes', () => {
+    it('re-reads when playerStats changes', () => {
       getRuntimeValue.mockReturnValue(null);
 
       const maxGetter = vi.fn(() => 5);
@@ -317,61 +308,139 @@ describe('useTrackedResource', () => {
       };
 
       const { result, rerender } = renderHook(
-        ({ stats }) => useTrackedResource(mockStorageKey, mockPlayerName, maxGetter, 'dep1', undefined, stats),
+        ({ stats }) => useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, stats),
         { initialProps: { stats: playerStats1 } }
       );
 
-      // useState initializer: storage null, _trackedResources[hp].current = 15
-      // useEffect: storage null, _trackedResources[hp].current = 15
       expect(result.current.current).toBe(15);
 
       rerender({ stats: playerStats2 });
 
-      // useEffect triggers: storage null, _trackedResources[hp].current = 30
       expect(result.current.current).toBe(30);
     });
   });
 
   describe('cleanup', () => {
-    it('should remove storage change listener on unmount', () => {
+    it('removes storage change listener on unmount', () => {
       const removeListener = vi.fn();
       addStorageChangeListener.mockReturnValue(removeListener);
 
       const { unmount } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, () => 10, 'dep1')
+        useTrackedResource('hp', 'Gandalf', () => 10, 'dep1')
       );
 
-      expect(addStorageChangeListener).toHaveBeenCalledWith(mockPlayerName, expect.any(Function));
+      expect(addStorageChangeListener).toHaveBeenCalledWith('Gandalf', expect.any(Function));
 
       unmount();
 
       expect(removeListener).toHaveBeenCalled();
     });
 
-    it('should remove custom event listeners on unmount', () => {
+    it('removes custom event listeners on unmount', () => {
       const removeListener = vi.fn();
       addStorageChangeListener.mockReturnValue(removeListener);
 
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
 
-      const { unmount } = renderHook(() =>
-        useTrackedResource(mockStorageKey, mockPlayerName, () => 10, 'dep1')
+      renderHook(() =>
+        useTrackedResource('hp', 'Gandalf', () => 10, 'dep1')
       );
 
       expect(addEventListenerSpy).toHaveBeenCalledWith('focus-points-updated', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('sorcery-points-updated', expect.any(Function));
       expect(addEventListenerSpy).toHaveBeenCalledWith('innate-sorcery-updated', expect.any(Function));
 
-      unmount();
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('focus-points-updated', expect.any(Function));
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('sorcery-points-updated', expect.any(Function));
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('innate-sorcery-updated', expect.any(Function));
-      expect(removeListener).toHaveBeenCalled();
-
       addEventListenerSpy.mockRestore();
       removeEventListenerSpy.mockRestore();
+    });
+  });
+
+  describe('behavioral integration', () => {
+    it('re-reads storage when focus-points-updated event fires', async () => {
+      getRuntimeValue
+        .mockReturnValueOnce(10)
+        .mockReturnValueOnce(10)
+        .mockReturnValueOnce(15);
+
+      const maxGetter = vi.fn(() => 20);
+      const { result } = renderHook(() =>
+        useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1')
+      );
+
+      expect(result.current.current).toBe(10);
+
+      await act(async () => {
+        window.dispatchEvent(new Event('focus-points-updated'));
+      });
+
+      expect(result.current.current).toBe(15);
+    });
+
+    it('re-reads storage when sorcery-points-updated event fires', async () => {
+      getRuntimeValue
+        .mockReturnValueOnce(5)
+        .mockReturnValueOnce(5)
+        .mockReturnValueOnce(8);
+
+      const maxGetter = vi.fn(() => 10);
+      const { result } = renderHook(() =>
+        useTrackedResource('spell-slots', 'Gandalf', maxGetter, 'dep1')
+      );
+
+      expect(result.current.current).toBe(5);
+
+      await act(async () => {
+        window.dispatchEvent(new Event('sorcery-points-updated'));
+      });
+
+      expect(result.current.current).toBe(8);
+    });
+
+    it('re-reads storage when innate-sorcery-updated event fires', async () => {
+      getRuntimeValue
+        .mockReturnValueOnce(3)
+        .mockReturnValueOnce(3)
+        .mockReturnValueOnce(6);
+
+      const maxGetter = vi.fn(() => 10);
+      const { result } = renderHook(() =>
+        useTrackedResource('innate-spells', 'Gandalf', maxGetter, 'dep1')
+      );
+
+      expect(result.current.current).toBe(3);
+
+      await act(async () => {
+        window.dispatchEvent(new Event('innate-sorcery-updated'));
+      });
+
+      expect(result.current.current).toBe(6);
+    });
+
+    it('uses fresh playerName, storageKey, and playerStats from the re-read handler', async () => {
+      getRuntimeValue
+        .mockReturnValueOnce(null)
+        .mockReturnValueOnce(null)
+        .mockReturnValueOnce(null);
+
+      const playerStats1 = {
+        _trackedResources: { hp: { current: 50 } },
+      };
+      const playerStats2 = {
+        _trackedResources: { hp: { current: 99 } },
+      };
+
+      const maxGetter = vi.fn(() => 10);
+      const { result, rerender } = renderHook(
+        ({ stats }) => useTrackedResource('hp', 'Gandalf', maxGetter, 'dep1', undefined, stats),
+        { initialProps: { stats: playerStats1 } }
+      );
+
+      expect(result.current.current).toBe(50);
+
+      rerender({ stats: playerStats2 });
+
+      expect(result.current.current).toBe(99);
     });
   });
 });

@@ -20,153 +20,107 @@ describe('findFeat', () => {
     expect(result).toBeNull();
   });
 
-  it('should throw when allFeats is null', () => {
-    expect(() => findFeat('Great Weapon Master', null)).toThrow(TypeError);
-  });
-
-  it('should throw when allFeats is undefined', () => {
-    expect(() => findFeat('Great Weapon Master', undefined)).toThrow(TypeError);
-  });
-
-  it('should return null when allFeats is an empty array', () => {
+  it('should return null when the search array is empty', () => {
     const result = findFeat('Great Weapon Master', []);
     expect(result).toBeNull();
   });
 
-  it('should find a feat when search name has a parenthetical suffix', () => {
-    const allFeats = [
-      { name: 'Actor', desc: '...' },
-    ];
-    const result = findFeat('Actor (Extra)', allFeats);
-    expect(result).toEqual({ name: 'Actor', desc: '...' });
-  });
-
-  it('should find a feat when search name has a trailing parenthetical with spaces', () => {
-    const allFeats = [
-      { name: 'Alert', desc: '...' },
-    ];
-    const result = findFeat('Alert   (Bonus)', allFeats);
-    expect(result).toEqual({ name: 'Alert', desc: '...' });
-  });
-
-  it('should find a feat via fallback when search has extra parenthetical', () => {
-    const allFeats = [
-      { name: 'Foo Bar Baz (Extra)', desc: '...' },
-    ];
-    // "Foo Bar Baz (Extra) (More)" strips to "Foo Bar Baz (Extra)" which exact matches
-    const result = findFeat('Foo Bar Baz (Extra) (More)', allFeats);
-    expect(result).toEqual({ name: 'Foo Bar Baz (Extra)', desc: '...' });
-  });
-
-  it('should find a feat when search name has nested parentheses stripped', () => {
-    const allFeats = [
-      { name: 'Foo Bar Baz', desc: '...' },
-    ];
-    const result = findFeat('Foo Bar Baz (Extra)', allFeats);
-    expect(result).toEqual({ name: 'Foo Bar Baz', desc: '...' });
-  });
-
-  it('should find an exact match before trying parenthetical stripping', () => {
-    const allFeats = [
-      { name: 'Actor', desc: 'exact' },
-      { name: 'Actor (Extra)', desc: 'extra' },
-    ];
-    // When searching for "Actor (Extra)", exact match should win
-    const result = findFeat('Actor (Extra)', allFeats);
-    expect(result).toEqual({ name: 'Actor (Extra)', desc: 'extra' });
-  });
-
-  it('should return the first matching feat when multiple feats have the same name', () => {
-    const allFeats = [
+  it('should return the first matching feat when multiple feats share the same name', () => {
+    const feats = [
       { name: 'Actor', desc: 'first' },
       { name: 'Actor', desc: 'second' },
     ];
-    const result = findFeat('Actor', allFeats);
+    const result = findFeat('Actor', feats);
     expect(result).toEqual({ name: 'Actor', desc: 'first' });
   });
 
-  it('should match feat name with different casing only via exact match', () => {
-    const allFeats = [
-      { name: 'Great Weapon Master', desc: '...' },
+  it('should prefer exact match over parenthetical-stripped match', () => {
+    const feats = [
+      { name: 'Actor', desc: 'base' },
+      { name: 'Actor (Extra)', desc: 'extra' },
     ];
-    // Case-sensitive exact match should NOT match
-    const result = findFeat('great weapon master', allFeats);
-    expect(result).toBeNull();
+    // Searching for "Actor (Extra)" should match the feat named "Actor (Extra)" exactly,
+    // not fall through to the feat named "Actor"
+    const result = findFeat('Actor (Extra)', feats);
+    expect(result).toEqual({ name: 'Actor (Extra)', desc: 'extra' });
   });
 
-  it('should not strip parentheticals when the stripped version equals the original', () => {
-    const allFeats = [
-      { name: 'No Parentheses', desc: '...' },
-    ];
-    // "No Parentheses" has no parenthetical, so stripped === original,
-    // and no fallback is attempted
-    const result = findFeat('No Parentheses', allFeats);
-    expect(result).toEqual({ name: 'No Parentheses', desc: '...' });
+  it('should find a feat when the search name includes a parenthetical suffix', () => {
+    const feats = [{ name: 'Actor', desc: '...' }];
+    const result = findFeat('Actor (Extra)', feats);
+    expect(result).toEqual({ name: 'Actor', desc: '...' });
   });
 
-  it('should handle feat names with empty parentheses', () => {
-    const allFeats = [
-      { name: 'Feat Name', desc: '...' },
+  it('should find a feat when the search name includes nested parenthetical suffixes', () => {
+    const feats = [
+      { name: 'Foo Bar Baz', desc: 'base' },
+      { name: 'Foo Bar Baz (Extra)', desc: 'extra' },
     ];
-    const result = findFeat('Feat Name ()', allFeats);
-    expect(result).toEqual({ name: 'Feat Name', desc: '...' });
+    // "Foo Bar Baz (Extra) (More)" strips to "Foo Bar Baz (Extra)" first,
+    // which exactly matches the feat with that name
+    const result = findFeat('Foo Bar Baz (Extra) (More)', feats);
+    expect(result).toEqual({ name: 'Foo Bar Baz (Extra)', desc: 'extra' });
   });
 
-  it('should handle feat names with parentheses containing special characters', () => {
-    const allFeats = [
-      { name: 'Skill Expert', desc: '...' },
-    ];
-    const result = findFeat('Skill Expert (1st, 2nd, 3rd)', allFeats);
-    expect(result).toEqual({ name: 'Skill Expert', desc: '...' });
-  });
-
-  it('should handle feat names with multiple words and parentheses', () => {
-    const allFeats = [
-      { name: 'Crusher', desc: '...' },
-    ];
-    const result = findFeat('Crusher (PHB)', allFeats);
-    expect(result).toEqual({ name: 'Crusher', desc: '...' });
-  });
-
-  it('should return undefined when stripped name still does not match any feat', () => {
-    const allFeats = [
-      { name: 'Actor', desc: '...' },
-    ];
-    const result = findFeat('Foo (Bar)', allFeats);
-    expect(result).toBeUndefined();
-  });
-
-  it('should handle feat objects with minimal properties', () => {
-    const allFeats = [
-      { name: 'Minimal' },
-    ];
-    const result = findFeat('Minimal', allFeats);
-    expect(result).toEqual({ name: 'Minimal' });
-  });
-
-  it('should handle feat objects with many properties', () => {
-    const allFeats = [
-      { name: 'Complex', source: 'PHB', page: 167, prereqs: ['STR 13'] },
-    ];
-    const result = findFeat('Complex', allFeats);
-    expect(result.source).toBe('PHB');
-    expect(result.page).toBe(167);
-    expect(result.prereqs).toEqual(['STR 13']);
-  });
-
-  it('should find feat when search name has trailing whitespace after parenthetical', () => {
-    const allFeats = [
-      { name: 'Tough', desc: '...' },
-    ];
-    const result = findFeat('Tough (PHB) ', allFeats);
+  it('should find a feat when the search name has trailing whitespace after parenthetical', () => {
+    const feats = [{ name: 'Tough', desc: '...' }];
+    const result = findFeat('Tough (PHB) ', feats);
     expect(result).toEqual({ name: 'Tough', desc: '...' });
   });
 
-  it('should find feat when search name has parentheses with only whitespace inside', () => {
-    const allFeats = [
-      { name: 'Resilient', desc: '...' },
-    ];
-    const result = findFeat('Resilient (  )', allFeats);
+  it('should find a feat when parentheses contain special characters', () => {
+    const feats = [{ name: 'Skill Expert', desc: '...' }];
+    const result = findFeat('Skill Expert (1st, 2nd, 3rd)', feats);
+    expect(result).toEqual({ name: 'Skill Expert', desc: '...' });
+  });
+
+  it('should find a feat when parentheses contain only whitespace', () => {
+    const feats = [{ name: 'Resilient', desc: '...' }];
+    const result = findFeat('Resilient (  )', feats);
     expect(result).toEqual({ name: 'Resilient', desc: '...' });
+  });
+
+  it('should find a feat when parentheses are empty', () => {
+    const feats = [{ name: 'Feat Name', desc: '...' }];
+    const result = findFeat('Feat Name ()', feats);
+    expect(result).toEqual({ name: 'Feat Name', desc: '...' });
+  });
+
+  it('should return undefined when stripped name still does not match any feat', () => {
+    const feats = [{ name: 'Actor', desc: '...' }];
+    const result = findFeat('Foo (Bar)', feats);
+    expect(result).toBeUndefined();
+  });
+
+  it('should not match across different casing', () => {
+    const feats = [{ name: 'Great Weapon Master', desc: '...' }];
+    const result = findFeat('great weapon master', feats);
+    expect(result).toBeNull();
+  });
+
+  it('should return the full feat object including all properties', () => {
+    const feats = [
+      { name: 'Complex', source: 'PHB', page: 167, prereqs: ['STR 13'] },
+    ];
+    const result = findFeat('Complex', feats);
+    expect(result).toEqual({ name: 'Complex', source: 'PHB', page: 167, prereqs: ['STR 13'] });
+  });
+
+  it('should find a feat object with minimal properties', () => {
+    const feats = [{ name: 'Minimal' }];
+    const result = findFeat('Minimal', feats);
+    expect(result).toEqual({ name: 'Minimal' });
+  });
+
+  it('should throw a TypeError when allFeats is null', () => {
+    expect(() => findFeat('Actor', null)).toThrow(TypeError);
+  });
+
+  it('should throw a TypeError when allFeats is undefined', () => {
+    expect(() => findFeat('Actor', undefined)).toThrow(TypeError);
+  });
+
+  it('should throw when allFeats is not an array', () => {
+    expect(() => findFeat('Actor', { name: 'Actor' })).toThrow(TypeError);
   });
 });

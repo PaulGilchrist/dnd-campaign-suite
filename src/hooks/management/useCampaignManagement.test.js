@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useCampaignManagement from './useCampaignManagement.js';
@@ -5,252 +6,294 @@ import useCampaignManagement from './useCampaignManagement.js';
 describe('useCampaignManagement', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
-  it('should initialize with showCampaignSelection true and campaignName null', () => {
-    const { result } = renderHook(() => useCampaignManagement());
-    expect(result.current.showCampaignSelection).toBe(true);
-    expect(result.current.campaignName).toBeNull();
-    expect(typeof result.current.isLocalhost).toBe('boolean');
+  describe('initialization', () => {
+    it('should initialize with showCampaignSelection true and campaignName null', () => {
+      const { result } = renderHook(() => useCampaignManagement());
+      expect(result.current.showCampaignSelection).toBe(true);
+      expect(result.current.campaignName).toBeNull();
+      expect(typeof result.current.isLocalhost).toBe('boolean');
+    });
   });
 
-  it('should set campaign name and hide selection on handleCampaignSelect', () => {
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('MyCampaign', [{ name: 'Character 1' }]);
-    });
-    expect(result.current.campaignName).toBe('MyCampaign');
-    expect(result.current.showCampaignSelection).toBe(false);
-  });
-
-  it('should call onCampaignSelectRef callback when set', () => {
-    const callback = vi.fn();
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.setCampaignSelectCallback(callback);
-    });
-    act(() => {
-      result.current.handleCampaignSelect('TestCampaign', []);
-    });
-    expect(callback).toHaveBeenCalledWith('TestCampaign', []);
-  });
-
-  it('should set onDeleteCampaignRef callback when set', () => {
-    const callback = vi.fn();
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.setDeleteCampaignCallback(callback);
-    });
-    expect(true).toBe(true); // callback set without error
-  });
-
-  it('should call onDeleteCampaignRef callback on delete', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
-    window.confirm = vi.fn(() => true);
-    const callback = vi.fn();
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.setDeleteCampaignCallback(callback);
-      result.current.handleCampaignSelect('TestCampaign', []);
-    });
-    await act(async () => {
-      result.current.handleDeleteCampaign();
-    });
-    expect(callback).toHaveBeenCalled();
-  });
-
-  it('should not delete campaign when user cancels', async () => {
-    global.fetch = vi.fn();
-    window.confirm = vi.fn(() => false);
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('TestCampaign', []);
-    });
-    await act(async () => {
-      result.current.handleDeleteCampaign();
-    });
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it('should throw error on failed delete', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      json: async () => ({ error: 'Delete failed' }),
-    });
-    window.confirm = vi.fn(() => true);
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('TestCampaign', []);
-    });
-    await expect(async () => {
-      await act(async () => {
-        await result.current.handleDeleteCampaign();
+  describe('handleCampaignSelect', () => {
+    it('should set campaign name and hide selection', () => {
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('MyCampaign', [{ name: 'Character 1' }]);
       });
-    }).rejects.toThrow('Delete failed');
-  });
+      expect(result.current.campaignName).toBe('MyCampaign');
+      expect(result.current.showCampaignSelection).toBe(false);
+    });
 
-  it('should handle rename with new name', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
-    window.prompt = vi.fn(() => 'NewCampaignName');
-    window.location = { reload: vi.fn() };
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('OldCampaign', []);
-    });
-    await act(async () => {
-      result.current.handleRenameCampaign();
-    });
-    expect(global.fetch).toHaveBeenCalledWith(
-      '/api/campaigns/OldCampaign',
-      expect.objectContaining({
-        method: 'PUT',
-      })
-    );
-    expect(result.current.campaignName).toBe('NewCampaignName');
-  });
-
-  it('should not rename when prompt returns null', async () => {
-    global.fetch = vi.fn();
-    window.prompt = vi.fn(() => null);
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('TestCampaign', []);
-    });
-    await act(async () => {
-      result.current.handleRenameCampaign();
-    });
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it('should not rename when prompt returns empty string', async () => {
-    global.fetch = vi.fn();
-    window.prompt = vi.fn(() => '');
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('TestCampaign', []);
-    });
-    await act(async () => {
-      result.current.handleRenameCampaign();
-    });
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
-  it('should trim whitespace from new campaign name', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
-    window.prompt = vi.fn(() => '  TrimmedCampaign  ');
-    window.location = { reload: vi.fn() };
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('OldCampaign', []);
-    });
-    await act(async () => {
-      result.current.handleRenameCampaign();
-    });
-    expect(result.current.campaignName).toBe('TrimmedCampaign');
-  });
-
-  it('should show campaign selection on handleBackToCampaigns', () => {
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('TestCampaign', []);
-    });
-    act(() => {
-      result.current.handleBackToCampaigns();
-    });
-    expect(result.current.showCampaignSelection).toBe(true);
-    expect(result.current.campaignName).toBe('TestCampaign');
-  });
-
-  it('should return isLocalhost as boolean', () => {
-    const { result } = renderHook(() => useCampaignManagement());
-    expect(typeof result.current.isLocalhost).toBe('boolean');
-  });
-
-  it('should handle rename with error response', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      json: async () => ({ error: 'Rename failed' }),
-    });
-    window.prompt = vi.fn(() => 'NewName');
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('OldCampaign', []);
-    });
-    await expect(async () => {
-      await act(async () => {
-        await result.current.handleRenameCampaign();
+    it('should call onCampaignSelectRef callback when set', () => {
+      const callback = vi.fn();
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.setCampaignSelectCallback(callback);
       });
-    }).rejects.toThrow('Rename failed');
-  });
-
-  it('should handle rename with generic error response', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      json: async () => ({}),
-    });
-    window.prompt = vi.fn(() => 'NewName');
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('OldCampaign', []);
-    });
-    await expect(async () => {
-      await act(async () => {
-        await result.current.handleRenameCampaign();
-      });
-    }).rejects.toThrow('Failed to rename campaign');
-  });
-
-  it('should handle delete with error response', async () => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      json: async () => ({ error: 'Delete failed' }),
-    });
-    window.confirm = vi.fn(() => true);
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('TestCampaign', []);
-    });
-    await expect(async () => {
-      await act(async () => {
-        await result.current.handleDeleteCampaign();
-      });
-    }).rejects.toThrow('Delete failed');
-  });
-
-  it('should handle campaign select with callback that throws', () => {
-    const callback = vi.fn(() => { throw new Error('Callback error'); });
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.setCampaignSelectCallback(callback);
-    });
-    expect(() => {
       act(() => {
         result.current.handleCampaignSelect('TestCampaign', []);
       });
-    }).toThrow('Callback error');
+      expect(callback).toHaveBeenCalledWith('TestCampaign', []);
+    });
+
+    it('should not throw when no callback is set', () => {
+      const { result } = renderHook(() => useCampaignManagement());
+      expect(() => {
+        act(() => {
+          result.current.handleCampaignSelect('TestCampaign', []);
+        });
+      }).not.toThrow();
+      expect(result.current.campaignName).toBe('TestCampaign');
+    });
+
+    it('should propagate callback errors', () => {
+      const callback = vi.fn(() => { throw new Error('Callback error'); });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.setCampaignSelectCallback(callback);
+      });
+      expect(() => {
+        act(() => {
+          result.current.handleCampaignSelect('TestCampaign', []);
+        });
+      }).toThrow('Callback error');
+    });
   });
 
-  it('should handle campaign select without callback set', () => {
-    const { result } = renderHook(() => useCampaignManagement());
-    expect(() => {
+  describe('handleDeleteCampaign', () => {
+    it('should not delete when user cancels confirmation', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true });
+      const { result } = renderHook(() => useCampaignManagement());
       act(() => {
         result.current.handleCampaignSelect('TestCampaign', []);
       });
-    }).not.toThrow();
-    expect(result.current.campaignName).toBe('TestCampaign');
+      await act(async () => {
+        result.current.handleDeleteCampaign();
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('should not delete when campaignName is null', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.spyOn(global, 'fetch').mockResolvedValue({ ok: true });
+      const { result } = renderHook(() => useCampaignManagement());
+      await act(async () => {
+        result.current.handleDeleteCampaign();
+      });
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('should call onDeleteCampaignRef callback on successful delete', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.spyOn(window, 'location', 'get').mockReturnValue({ reload: vi.fn() });
+      const callback = vi.fn();
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.setDeleteCampaignCallback(callback);
+        result.current.handleCampaignSelect('TestCampaign', []);
+      });
+      await act(async () => {
+        result.current.handleDeleteCampaign();
+      });
+      expect(callback).toHaveBeenCalled();
+    });
+
+    it('should throw with error message on failed delete', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'Delete failed' }),
+      });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('TestCampaign', []);
+      });
+      await expect(
+        act(async () => {
+          await result.current.handleDeleteCampaign();
+        })
+      ).rejects.toThrow('Delete failed');
+    });
+
+    it('should throw generic message when delete fails without error field', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({}),
+      });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('TestCampaign', []);
+      });
+      await expect(
+        act(async () => {
+          await result.current.handleDeleteCampaign();
+        })
+      ).rejects.toThrow('Failed to delete campaign');
+    });
+
+    it('should send DELETE request with encoded campaign name', async () => {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('My Campaign!', []);
+      });
+      await act(async () => {
+        result.current.handleDeleteCampaign();
+      });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/My%20Campaign!',
+        { method: 'DELETE' }
+      );
+    });
   });
 
-  it('should handle delete without callback set', async () => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
-    window.confirm = vi.fn(() => true);
-    window.location = { reload: vi.fn() };
-    const { result } = renderHook(() => useCampaignManagement());
-    act(() => {
-      result.current.handleCampaignSelect('TestCampaign', []);
+  describe('handleRenameCampaign', () => {
+    it('should not rename when prompt returns null', async () => {
+      vi.spyOn(window, 'prompt').mockReturnValue(null);
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('TestCampaign', []);
+      });
+      await act(async () => {
+        result.current.handleRenameCampaign();
+      });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(result.current.campaignName).toBe('TestCampaign');
     });
-    await act(async () => {
-      await result.current.handleDeleteCampaign();
+
+    it('should not rename when prompt returns empty string', async () => {
+      vi.spyOn(window, 'prompt').mockReturnValue('');
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('TestCampaign', []);
+      });
+      await act(async () => {
+        result.current.handleRenameCampaign();
+      });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(result.current.campaignName).toBe('TestCampaign');
     });
-    expect(fetch).toHaveBeenCalled();
+
+    it('should not rename when prompt returns whitespace-only string', async () => {
+      vi.spyOn(window, 'prompt').mockReturnValue('   ');
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('TestCampaign', []);
+      });
+      await act(async () => {
+        result.current.handleRenameCampaign();
+      });
+      expect(fetch).not.toHaveBeenCalled();
+      expect(result.current.campaignName).toBe('TestCampaign');
+    });
+
+    it('should trim whitespace from new campaign name', async () => {
+      vi.spyOn(window, 'prompt').mockReturnValue('  TrimmedCampaign  ');
+      vi.spyOn(window, 'location', 'get').mockReturnValue({ reload: vi.fn() });
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('OldCampaign', []);
+      });
+      await act(async () => {
+        result.current.handleRenameCampaign();
+      });
+      expect(result.current.campaignName).toBe('TrimmedCampaign');
+    });
+
+    it('should send PUT request with encoded campaign name and new name in body', async () => {
+      vi.spyOn(window, 'prompt').mockReturnValue('New Campaign!');
+      vi.spyOn(window, 'location', 'get').mockReturnValue({ reload: vi.fn() });
+      global.fetch = vi.fn().mockResolvedValue({ ok: true });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('Old Campaign', []);
+      });
+      await act(async () => {
+        result.current.handleRenameCampaign();
+      });
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaigns/Old%20Campaign',
+        expect.objectContaining({
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newName: 'New Campaign!' }),
+        })
+      );
+    });
+
+    it('should throw with error message on failed rename', async () => {
+      vi.spyOn(window, 'prompt').mockReturnValue('NewName');
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({ error: 'Rename failed' }),
+      });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('OldCampaign', []);
+      });
+      await expect(
+        act(async () => {
+          await result.current.handleRenameCampaign();
+        })
+      ).rejects.toThrow('Rename failed');
+    });
+
+    it('should throw generic message when rename fails without error field', async () => {
+      vi.spyOn(window, 'prompt').mockReturnValue('NewName');
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        json: async () => ({}),
+      });
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('OldCampaign', []);
+      });
+      await expect(
+        act(async () => {
+          await result.current.handleRenameCampaign();
+        })
+      ).rejects.toThrow('Failed to rename campaign');
+    });
+  });
+
+  describe('handleBackToCampaigns', () => {
+    it('should show campaign selection and preserve campaignName', () => {
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.handleCampaignSelect('TestCampaign', []);
+      });
+      act(() => {
+        result.current.handleBackToCampaigns();
+      });
+      expect(result.current.showCampaignSelection).toBe(true);
+      expect(result.current.campaignName).toBe('TestCampaign');
+    });
+  });
+
+  describe('setDeleteCampaignCallback', () => {
+    it('should store the callback without throwing', () => {
+      const callback = vi.fn();
+      const { result } = renderHook(() => useCampaignManagement());
+      act(() => {
+        result.current.setDeleteCampaignCallback(callback);
+      });
+      expect(result.current.handleDeleteCampaign).toBeDefined();
+    });
+  });
+
+  describe('isLocalhost', () => {
+    it('should return a boolean', () => {
+      const { result } = renderHook(() => useCampaignManagement());
+      expect(typeof result.current.isLocalhost).toBe('boolean');
+    });
   });
 });

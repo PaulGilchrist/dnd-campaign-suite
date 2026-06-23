@@ -1,1141 +1,1129 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as dataLoader from '../ui/dataLoader.js';
 
-// Mock the dataLoader module
 vi.mock('../ui/dataLoader.js', () => ({
-    fetchClassData: vi.fn(),
-    fetchRaceData: vi.fn(),
-    fetchBackgroundData: vi.fn(),
+  fetchClassData: vi.fn(),
+  fetchRaceData: vi.fn(),
 }));
 
-// Import after mocking
-import { 
-    getResistanceLimits, 
-    getPreSelectedResistances,
-    validateResistances,
-    getResistanceInfo
+import {
+  getResistanceLimits,
+  getPreSelectedResistances,
+  validateResistances,
+  getResistanceInfo,
 } from './resistancesValidation.js';
 
+// ── Factories ────────────────────────────────────────────────────────────────
+
+const emptyRaceData = () => ({ name: 'Human', traits: [] });
+const emptyClassData = () => ({ class_levels: [] });
+
+const baseArgs = (overrides = {}) => ({
+  rules: '5e',
+  race: { name: 'Human' },
+  class: { name: 'Wizard' },
+  level: 1,
+  ...overrides,
+});
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Assert that `result.resistances` contains exactly the given types.
+ * Also asserts that `result.immunities` is empty (race-only test).
+ */
+function expectResistances(result, expected) {
+  expect(result.resistances.sort()).toEqual(expected.sort());
+  expect(result.immunities).toEqual([]);
+}
+
+/**
+ * Assert that `result.immunities` contains exactly the given types.
+ * Also asserts that `result.resistances` is empty (class-only test).
+ */
+function expectImmunities(result, expected) {
+  expect(result.resistances).toEqual([]);
+  expect(result.immunities.sort()).toEqual(expected.sort());
+}
+
+/**
+ * Assert that `warnings` contains at least one warning of the given type
+ * whose message includes the given substring.
+ */
+function expectWarning(warnings, type, substring) {
+  const match = warnings.find(
+    (w) => w.type === type && w.message.includes(substring),
+  );
+  expect(match).toBeDefined();
+}
+
+/**
+ * Assert that `warnings` does NOT contain a warning of the given type with
+ * the given substring (negative assertion).
+ */
+function expectNoWarning(warnings, type, substring) {
+  const match = warnings.find(
+    (w) => w.type === type && w.message.includes(substring),
+  );
+  expect(match).toBeUndefined();
+}
+
+// ── Tests ─────────────────────────────────────────────────────────────────────
+
 describe('resistancesValidation', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // ── extract5eRaceResistances ─────────────────────────────────────────────
+
+  describe('extract5eRaceResistances (via getResistanceLimits)', () => {
+    it('extracts fire resistance from Tiefling Hellish Resistance', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Tiefling',
+        traits: [
+          {
+            name: 'Hellish Resistance',
+            description: ['You have resistance to fire damage.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(baseArgs({ rules: '5e', race: { name: 'Tiefling' } }));
+
+      expectResistances(result, ['Fire']);
     });
 
-    describe('extract5eRaceResistances (via getResistanceLimits)', () => {
-        it('should extract fire resistance from Tiefling Hellish Resistance', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Tiefling',
-                traits: [
-                    { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
+    it('extracts poison resistance from Dwarf Dwarven Resilience', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Dwarf',
+        traits: [
+          {
+            name: 'Dwarven Resilience',
+            description: ['You have resistance against poison damage.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Tiefling' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
+      const result = await getResistanceLimits(baseArgs({ rules: '5e', race: { name: 'Dwarf' } }));
 
-            expect(result.resistances).toContain('Fire');
-          });
-
-        it('should extract poison resistance from Dwarf Dwarven Resilience', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Dwarf',
-                traits: [
-                     { name: 'Dwarven Resilience', description: ['You have resistance against poison damage.'] }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Dwarf' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
-
-            expect(result.resistances).toContain('Poison');
-          });
-
-        it('should return empty array when race has no resistances', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Human',
-                traits: []
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
-
-            expect(result.resistances).toEqual([]);
-          });
-
-        it('should handle null race data', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
-
-            expect(result.resistances).toEqual([]);
-          });
-
-        it('should handle race data with null traits', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'MysteryRace'
-                // no traits property
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'MysteryRace' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.resistances).toEqual([]);
-        });
-
-        it('should detect Dragonborn Damage Resistance trait as a no-op', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Dragonborn',
-                traits: [
-                    { name: 'Damage Resistance', description: ['You have resistance to one damage type.'] }
-                ]
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Dragonborn' },
-                class: { name: 'Fighter' },
-                level: 1
-            });
-
-            // Damage Resistance trait is a no-op - no resistance added from trait alone
-            expect(result.resistances).toEqual([]);
-        });
-
-        it('should extract resistance from 5e Dragonborn subrace description', async () => {
-            // Use mockResolvedValueOnce so the first fetchRaceData call (from
-            // extract5eRaceResistances) returns data WITHOUT subraces to avoid
-            // the ReferenceError from the undefined 'subraceStr' variable.
-            // The second fetchRaceData call (from the Dragonborn special case
-            // in getResistanceLimits) returns data WITH subraces.
-            vi.mocked(dataLoader.fetchRaceData)
-                .mockResolvedValueOnce({
-                    name: 'Dragonborn',
-                    traits: [
-                        { name: 'Damage Resistance', description: ['You have resistance to one damage type.'] }
-                    ]
-                    // no subraces in first call to avoid subraceStr bug
-                })
-                .mockResolvedValueOnce({
-                    name: 'Dragonborn',
-                    traits: [
-                        { name: 'Damage Resistance', description: ['You have resistance to one damage type.'] }
-                    ],
-                    subraces: [
-                        { name: 'Gold Dragon', description: 'You have resistance to fire damage.' }
-                    ]
-                });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Dragonborn', subrace: { name: 'Gold Dragon' } },
-                class: { name: 'Fighter' },
-                level: 1
-            });
-
-            // The Dragonborn special case should add Fire resistance from subrace description
-            expect(result.resistances).toContain('Fire');
-        });
-
-        it('should handle non-array trait description as fallback', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Tiefling',
-                traits: [
-                    { name: 'Hellish Resistance', description: 'You have resistance to fire damage.' }
-                ]
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Tiefling' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.resistances).toContain('Fire');
-        });
+      expectResistances(result, ['Poison']);
     });
 
-    describe('extract2024RaceResistances (via getResistanceLimits)', () => {
-        it('should extract necrotic and radiant resistance from Aasimar Celestial Resistance', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Aasimar',
-                traits: [
-                     { name: 'Celestial Resistance', description: 'Resistance to Necrotic and Radiant damage.' }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
+    it('extracts poison resistance from Stout Halfling Scout Resilience', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Halfling',
+        subraces: [
+          {
+            name: 'Stout Halfling',
+            racial_traits: [
+              {
+                name: 'Scout Resilience',
+                description: ['You have resistance against poison damage.'],
+              },
+            ],
+          },
+        ],
+        traits: [],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'Aasimar' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
+      const result = await getResistanceLimits(
+        baseArgs({
+          rules: '5e',
+          race: { name: 'Halfling', subrace: { name: 'Stout Halfling' } },
+        }),
+      );
 
-            expect(result.resistances).toContain('Necrotic');
-            expect(result.resistances).toContain('Radiant');
-          });
-
-        it('should extract poison resistance from 2024 Dwarf Dwarven Resilience', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Dwarf',
-                traits: [
-                     { name: 'Dwarven Resilience', description: 'Resistance to Poison damage.' }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'Dwarf' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
-
-            expect(result.resistances).toContain('Poison');
-          });
-
-        it('should extract resistance from subrace traits in 2024', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Dragonborn',
-                traits: [
-                     { name: 'Damage Resistance', description: 'You have resistance to one damage type.' }
-                 ],
-                subraces: [
-                     { name: 'Draconborn of Tiamat', description: 'Resistance to Acid damage.' }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'Dragonborn', subrace: { name: 'Draconborn of Tiamat' } },
-                class: { name: 'Wizard' },
-                level: 1
-              });
-
-            expect(result.resistances).toContain('Acid');
-          });
-
-        it('should return empty array when raceData has no traits in 2024', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'CustomRace'
-                // no traits property
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'CustomRace' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.resistances).toEqual([]);
-        });
-
-        it('should extract resistance from 2024 subrace traits array', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'CustomRace',
-                traits: [],
-                subraces: [
-                    {
-                        name: 'Frost Subrace',
-                        traits: [
-                            { description: 'You have Resistance to Cold damage.' }
-                        ]
-                    }
-                ]
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'CustomRace', subrace: { name: 'Frost Subrace' } },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.resistances).toContain('Cold');
-        });
-
-        it('should extract resistance from Tiefling subrace in 2024', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Tiefling',
-                traits: [
-                    { name: 'Fiendish Legacy', description: 'Your infernal heritage grants you a legacy.' }
-                ],
-                subraces: [
-                    {
-                        name: 'Abyssal Tiefling',
-                        traits: [
-                            { description: 'Resistance to Poison damage.' }
-                        ]
-                    }
-                ]
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.resistances).toContain('Poison');
-        });
-
-        it('should handle 2024 Dragonborn subrace description path', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Dragonborn',
-                traits: [
-                    { name: 'Damage Resistance', description: 'Resistance to one damage type.' }
-                ],
-                subraces: [
-                    {
-                        name: 'Gold Dragonborn',
-                        description: 'Resistance to Fire damage.'
-                    }
-                ]
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'Dragonborn', subrace: { name: 'Gold Dragonborn' } },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.resistances).toContain('Fire');
-        });
+      expectResistances(result, ['Poison']);
     });
 
-    describe('extractClassImmunities (via getResistanceLimits)', () => {
-        it('should extract immunities from class features', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                 class_levels: [
-                       { level: 1, features: [] },
-                       { level: 10, features: [
-                           { name: 'Damage Immunity', description: 'You gain Immunity to Fire damage.' }
-                       ]}
-                   ]
-                });
+    it('returns empty resistances when race has no traits', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-             const result = await getResistanceLimits({
-                 rules: '5e',
-                 race: { name: 'Human' },
-                 class: { name: 'Fighter' },
-                 level: 10
-                });
+      const result = await getResistanceLimits(baseArgs());
 
-             expect(result.immunities).toContain('Fire');
-            });
-
-         it('should not count immunities above character level', async () => {
-             vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
-             vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                 class_levels: [
-                       { level: 1, features: [] },
-                       { level: 10, features: [
-                           { name: 'Damage Immunity', description: 'You gain Immunity to Fire damage.' }
-                       ]}
-                 ]
-              });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' },
-                level: 5
-              });
-
-            expect(result.immunities).toEqual([]);
-          });
-
-        it('should handle invalid immunity types', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                      { level: 10, features: [
-                          { name: 'Damage Immunity', description: 'You gain Immunity to Psychic damage.' }
-                      ]}
-                  ]
-                 });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' },
-                level: 10
-              });
-
-            expect(result.immunities).toContain('Psychic');
-          });
-
-        it('should return empty immunities when classData is null', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Nonexistent' },
-                level: 1
-            });
-
-            expect(result.immunities).toEqual([]);
-        });
-
-        it('should return empty immunities when classData has no class_levels', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                name: 'WeirdClass'
-                // no class_levels
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'WeirdClass' },
-                level: 1
-            });
-
-            expect(result.immunities).toEqual([]);
-        });
-
-        it('should extract immunities from 2024 subclass majors', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                    { level: 1, features: [] },
-                    { level: 6, features: [
-                        { name: 'Major Feature', description: 'You gain Immunity to Poison damage.' }
-                    ]}
-                ],
-                majors: [
-                    {
-                        name: 'Path of the Test',
-                        features: [
-                            { level: 3, name: 'Test Feature', description: 'You gain Immunity to Fire damage.' }
-                        ]
-                    }
-                ]
-            });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'Human' },
-                class: { name: 'Barbarian' },
-                level: 3
-            });
-
-            expect(result.immunities).toContain('Fire');
-        });
-
-        it('should not extract immunities from 2024 majors above character level', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                    { level: 1, features: [] }
-                ],
-                majors: [
-                    {
-                        name: 'High Level Path',
-                        features: [
-                            { level: 10, name: 'Late Feature', description: 'You gain Immunity to Fire damage.' }
-                        ]
-                    }
-                ]
-            });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: 'Human' },
-                class: { name: 'Barbarian' },
-                level: 5
-            });
-
-            expect(result.immunities).toEqual([]);
-        });
-
-        it('should extract immunities from 5e subclasses', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                    { level: 1, features: [] }
-                ],
-                subclasses: [
-                    {
-                        name: 'Test Subclass',
-                        class_levels: [
-                            { level: 1, features: [] },
-                            { level: 7, features: [
-                                { name: 'Subclass Feature', description: 'You gain Immunity to Lightning damage.' }
-                            ]}
-                        ]
-                    }
-                ]
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' },
-                level: 7
-            });
-
-            expect(result.immunities).toContain('Lightning');
-        });
-
-        it('should not count 5e subclass immunities above character level', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                    { level: 1, features: [] }
-                ],
-                subclasses: [
-                    {
-                        name: 'Test Subclass',
-                        class_levels: [
-                            { level: 1, features: [] },
-                            { level: 14, features: [
-                                { name: 'Late Feature', description: 'You gain Immunity to Fire damage.' }
-                            ]}
-                        ]
-                    }
-                ]
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' },
-                level: 7
-            });
-
-            expect(result.immunities).toEqual([]);
-        });
-
-        it('should filter out non-damage immunity types', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({});
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                    { level: 6, features: [
-                        { name: 'Mystic Immunity', description: 'You gain Immunity to Charmed and Immunity to Fire.' }
-                    ]}
-                ]
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Mystic' },
-                level: 6
-            });
-
-            // 'Charmed' is not a damage type, so it should be filtered out.
-            // But because the regex matches "Immunity to Charmed" -> extracts "Charmed",
-            // and "Immunity to Fire" -> extracts "Fire", and "Charmed" is not in validTypes,
-            // only "Fire" should be in the result.
-            expect(result.immunities).not.toContain('Charmed');
-            expect(result.immunities).toContain('Fire');
-        });
+      expectResistances(result, []);
     });
 
-    describe('getPreSelectedResistances', () => {
-        it('should return pre-selected resistances and immunities', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Tiefling',
-                traits: [
-                     { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
+    it('returns empty resistances when raceData is null', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-            const result = await getPreSelectedResistances({
-                rules: '5e',
-                race: { name: 'Tiefling' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
+      const result = await getResistanceLimits(baseArgs());
 
-            expect(result.resistances).toContain('Fire');
-          });
-
-        it('should return empty arrays when no race or class is provided', async () => {
-            // fetchRaceData and fetchClassData should not be called with empty names
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
-
-            const result = await getPreSelectedResistances({
-                rules: '5e',
-                race: {},
-                class: {},
-                level: 1
-            });
-
-            expect(result.resistances).toEqual([]);
-            expect(result.immunities).toEqual([]);
-        });
+      expectResistances(result, []);
     });
 
-    describe('validateResistances', () => {
-        it('should warn about ungranted resistances', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
+    it('returns empty resistances when raceData has no traits property', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({ name: 'MysteryRace' });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1,
-                resistances: ['Fire'],
-                immunities: []
-              });
+      const result = await getResistanceLimits(baseArgs());
 
-            expect(warnings.some(w => w.message.includes('not granted'))).toBe(true);
-          });
+      expectResistances(result, []);
+    });
 
-        it('should warn about ungranted immunities', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
+    it('returns empty resistances for Dragonborn "Damage Resistance" trait alone', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Dragonborn',
+        traits: [
+          {
+            name: 'Damage Resistance',
+            description: ['You have resistance to one damage type.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1,
-                resistances: [],
-                immunities: ['Fire']
-              });
+      const result = await getResistanceLimits(
+        baseArgs({ rules: '5e', race: { name: 'Dragonborn' } }),
+      );
 
-            expect(warnings.some(w => w.message.includes('immunities are not granted'))).toBe(true);
-          });
+      expectResistances(result, []);
+    });
 
-        it('should warn about duplicate resistances', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: [
-                     { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Tiefling' },
-                class: { name: 'Wizard' },
-                level: 1,
-                resistances: ['Fire', 'Fire'],
-                immunities: []
-              });
-
-            expect(warnings.some(w => w.message.includes('multiple times'))).toBe(true);
-          });
-
-        it('should warn about duplicate immunities', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                     { level: 10, features: [
-                         { name: 'Immunity', description: ['Immunity to Fire'] }
-                     ]}
-                 ]
-              });
-
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' },
-                level: 10,
-                resistances: [],
-                immunities: ['Fire', 'Fire']
-              });
-
-            expect(warnings.some(w => w.message.includes('immunities') && w.message.includes('multiple times'))).toBe(true);
-          });
-
-        it('should return info when no resistances or immunities', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1,
-                resistances: [],
-                immunities: []
-              });
-
-            expect(warnings.some(w => w.type === 'info')).toBe(true);
-          });
-
-        it('should warn about unselected granted resistances', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: [
-                     { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Tiefling' },
-                class: { name: 'Wizard' },
-                level: 1,
-                resistances: [],
-                immunities: []
-              });
-
-            expect(warnings.some(w => w.message.includes('grants these resistances'))).toBe(true);
-          });
-
-        it('should warn about unselected granted immunities', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                    { level: 1, features: [
-                        { name: 'Immunity', description: 'You gain Immunity to Fire damage.' }
-                    ]}
-                ]
-            });
-
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' },
-                level: 1,
-                resistances: [],
-                immunities: []
-            });
-
-            expect(warnings.some(w => w.message.includes('grants these immunities'))).toBe(true);
+    it('extracts Fire resistance from Dragonborn subrace description (5e)', async () => {
+      vi.mocked(dataLoader.fetchRaceData)
+        .mockResolvedValueOnce({
+          name: 'Dragonborn',
+          traits: [
+            {
+              name: 'Damage Resistance',
+              description: ['You have resistance to one damage type.'],
+            },
+          ],
+        })
+        .mockResolvedValueOnce({
+          name: 'Dragonborn',
+          traits: [
+            {
+              name: 'Damage Resistance',
+              description: ['You have resistance to one damage type.'],
+            },
+          ],
+          subraces: [
+            { name: 'Gold Dragon', description: 'You have resistance to fire damage.' },
+          ],
         });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-        it('should use correct info message for 2024 ruleset', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
+      const result = await getResistanceLimits(
+        baseArgs({
+          rules: '5e',
+          race: { name: 'Dragonborn', subrace: { name: 'Gold Dragon' } },
+        }),
+      );
 
-            const warnings = await validateResistances({
-                rules: '2024',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1,
-                resistances: [],
-                immunities: []
-            });
+      expectResistances(result, ['Fire']);
+    });
 
-            expect(warnings.some(w => w.message.includes('2024'))).toBe(true);
-        });
+    it('handles non-array trait description (string fallback)', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Tiefling',
+        traits: [
+          {
+            name: 'Hellish Resistance',
+            description: 'You have resistance to fire damage.',
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-        it('should handle null resistances and immunities fields', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
+      const result = await getResistanceLimits(baseArgs({ race: { name: 'Tiefling' } }));
 
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1
-                // no resistances or immunities fields
-            });
+      expectResistances(result, ['Fire']);
+    });
 
-            // Should not crash, should return info message
-            expect(warnings.some(w => w.type === 'info')).toBe(true);
-        });
+    it('handles undefined subrace gracefully', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
 
-        it('should include race and class in info message when provided', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
+      const result = await getResistanceLimits(
+        baseArgs({ race: { name: 'Human', subrace: undefined } }),
+      );
 
-            const warnings = await validateResistances({
-                rules: '5e',
-                race: { name: 'Elf' },
-                class: { name: 'Ranger' },
+      expectResistances(result, []);
+    });
+  });
+
+  // ── extract2024RaceResistances ───────────────────────────────────────────
+
+  describe('extract2024RaceResistances (via getResistanceLimits)', () => {
+    it('extracts Necrotic and Radiant from Aasimar Celestial Resistance', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Aasimar',
+        traits: [
+          {
+            name: 'Celestial Resistance',
+            description: 'Resistance to Necrotic and Radiant damage.',
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({ rules: '2024', race: { name: 'Aasimar' } }),
+      );
+
+      expectResistances(result, ['Necrotic', 'Radiant']);
+    });
+
+    it('extracts Poison from 2024 Dwarf Dwarven Resilience', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Dwarf',
+        traits: [
+          {
+            name: 'Dwarven Resilience',
+            description: 'Resistance to Poison damage.',
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({ rules: '2024', race: { name: 'Dwarf' } }),
+      );
+
+      expectResistances(result, ['Poison']);
+    });
+
+    it('extracts Acid from 2024 Dragonborn subrace traits array', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Dragonborn',
+        traits: [
+          {
+            name: 'Damage Resistance',
+            description: 'You have resistance to one damage type.',
+          },
+        ],
+        subraces: [
+          {
+            name: 'Draconborn of Tiamat',
+            traits: [{ description: 'Resistance to Acid damage.' }],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({
+          rules: '2024',
+          race: { name: 'Dragonborn', subrace: { name: 'Draconborn of Tiamat' } },
+        }),
+      );
+
+      expectResistances(result, ['Acid']);
+    });
+
+    it('extracts Poison from 2024 Tiefling subrace traits', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Tiefling',
+        traits: [
+          {
+            name: 'Fiendish Legacy',
+            description: 'Your infernal heritage grants you a legacy.',
+          },
+        ],
+        subraces: [
+          {
+            name: 'Abyssal Tiefling',
+            traits: [{ description: 'Resistance to Poison damage.' }],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({
+          rules: '2024',
+          race: { name: 'Tiefling', subrace: { name: 'Abyssal Tiefling' } },
+        }),
+      );
+
+      expectResistances(result, ['Poison']);
+    });
+
+    it('extracts Fire from 2024 Dragonborn subrace description', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Dragonborn',
+        traits: [
+          {
+            name: 'Damage Resistance',
+            description: 'Resistance to one damage type.',
+          },
+        ],
+        subraces: [
+          { name: 'Gold Dragonborn', description: 'Resistance to Fire damage.' },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({
+          rules: '2024',
+          race: { name: 'Dragonborn', subrace: { name: 'Gold Dragonborn' } },
+        }),
+      );
+
+      expectResistances(result, ['Fire']);
+    });
+
+    it('extracts Cold from 2024 subrace with nested traits array', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'CustomRace',
+        traits: [],
+        subraces: [
+          {
+            name: 'Frost Subrace',
+            traits: [{ description: 'You have Resistance to Cold damage.' }],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({
+          rules: '2024',
+          race: { name: 'CustomRace', subrace: { name: 'Frost Subrace' } },
+        }),
+      );
+
+      expectResistances(result, ['Cold']);
+    });
+
+    it('returns empty resistances when raceData has no traits (2024)', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({ name: 'CustomRace' });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({ rules: '2024', race: { name: 'CustomRace' } }),
+      );
+
+      expectResistances(result, []);
+    });
+  });
+
+  // ── extractClassImmunities ───────────────────────────────────────────────
+
+  describe('extractClassImmunities (via getResistanceLimits)', () => {
+    it('extracts Fire immunity from class features at or below level', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          { level: 1, features: [] },
+          {
+            level: 10,
+            features: [
+              {
+                name: 'Damage Immunity',
+                description: 'You gain Immunity to Fire damage.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getResistanceLimits(
+        baseArgs({ level: 10, race: { name: 'Human' }, class: { name: 'Fighter' } }),
+      );
+
+      expectImmunities(result, ['Fire']);
+    });
+
+    it('excludes immunities from levels above character level', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          { level: 1, features: [] },
+          {
+            level: 10,
+            features: [
+              {
+                name: 'Damage Immunity',
+                description: 'You gain Immunity to Fire damage.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getResistanceLimits(
+        baseArgs({ level: 5, race: { name: 'Human' }, class: { name: 'Fighter' } }),
+      );
+
+      expectImmunities(result, []);
+    });
+
+    it('filters out non-damage immunity types (e.g. Charmed)', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          {
+            level: 6,
+            features: [
+              {
+                name: 'Mystic Immunity',
+                description: 'You gain Immunity to Charmed and Immunity to Fire.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getResistanceLimits(
+        baseArgs({ level: 6, race: { name: 'Human' }, class: { name: 'Mystic' } }),
+      );
+
+      expectImmunities(result, ['Fire']);
+    });
+
+    it('extracts Psychic immunity (valid damage type)', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          {
+            level: 10,
+            features: [
+              {
+                name: 'Damage Immunity',
+                description: 'You gain Immunity to Psychic damage.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getResistanceLimits(
+        baseArgs({ level: 10, race: { name: 'Human' }, class: { name: 'Fighter' } }),
+      );
+
+      expectImmunities(result, ['Psychic']);
+    });
+
+    it('returns empty immunities when classData is null', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
+
+      const result = await getResistanceLimits(
+        baseArgs({ race: { name: 'Human' }, class: { name: 'Nonexistent' } }),
+      );
+
+      expectImmunities(result, []);
+    });
+
+    it('returns empty immunities when classData has no class_levels', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({ name: 'WeirdClass' });
+
+      const result = await getResistanceLimits(
+        baseArgs({ race: { name: 'Human' }, class: { name: 'WeirdClass' } }),
+      );
+
+      expectImmunities(result, []);
+    });
+
+    it('extracts immunities from 5e subclass features at or below level', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [{ level: 1, features: [] }],
+        subclasses: [
+          {
+            name: 'Test Subclass',
+            class_levels: [
+              { level: 1, features: [] },
+              {
+                level: 7,
+                features: [
+                  {
+                    name: 'Subclass Feature',
+                    description: 'You gain Immunity to Lightning damage.',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getResistanceLimits(
+        baseArgs({ level: 7, race: { name: 'Human' }, class: { name: 'Fighter' } }),
+      );
+
+      expectImmunities(result, ['Lightning']);
+    });
+
+    it('excludes 5e subclass immunities above character level', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [{ level: 1, features: [] }],
+        subclasses: [
+          {
+            name: 'Test Subclass',
+            class_levels: [
+              { level: 1, features: [] },
+              {
+                level: 14,
+                features: [
+                  {
+                    name: 'Late Feature',
+                    description: 'You gain Immunity to Fire damage.',
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getResistanceLimits(
+        baseArgs({ level: 7, race: { name: 'Human' }, class: { name: 'Fighter' } }),
+      );
+
+      expectImmunities(result, []);
+    });
+
+    it('extracts immunities from 2024 subclass majors at or below level', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [{ level: 1, features: [] }],
+        majors: [
+          {
+            name: 'Path of the Test',
+            features: [
+              {
                 level: 3,
-                resistances: [],
-                immunities: []
-            });
+                name: 'Test Feature',
+                description: 'You gain Immunity to Fire damage.',
+              },
+            ],
+          },
+        ],
+      });
 
-            expect(warnings.some(w => w.message.includes('Elf') && w.message.includes('Ranger'))).toBe(true);
-        });
+      const result = await getResistanceLimits(
+        baseArgs({ rules: '2024', level: 3, race: { name: 'Human' }, class: { name: 'Barbarian' } }),
+      );
+
+      expectImmunities(result, ['Fire']);
     });
 
-    describe('getResistanceInfo', () => {
-        it('should identify resistance source from race', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Tiefling',
-                traits: [
-                     { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
-                 ]
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
+    it('excludes 2024 major immunities above character level', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [{ level: 1, features: [] }],
+        majors: [
+          {
+            name: 'High Level Path',
+            features: [
+              {
+                level: 10,
+                name: 'Late Feature',
+                description: 'You gain Immunity to Fire damage.',
+              },
+            ],
+          },
+        ],
+      });
 
-            const result = await getResistanceInfo('Fire', 'resistance', {
-                rules: '5e',
-                race: { name: 'Tiefling' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
+      const result = await getResistanceLimits(
+        baseArgs({
+          rules: '2024',
+          level: 5,
+          race: { name: 'Human' },
+          class: { name: 'Barbarian' },
+        }),
+      );
 
-            expect(result.isGranted).toBe(true);
-            expect(result.isPreSelected).toBe(true);
-            expect(result.source).toContain('Race');
-          });
-
-        it('should return false when resistance not granted', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-              });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-              });
-
-            const result = await getResistanceInfo('Fire', 'resistance', {
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1
-              });
-
-            expect(result.isGranted).toBe(false);
-            expect(result.isPreSelected).toBe(false);
-          });
-
-        it('should identify immunity source from class', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                    { level: 1, features: [
-                        { name: 'Immunity', description: 'You gain Immunity to Psychic damage.' }
-                    ]}
-                ]
-            });
-
-            const result = await getResistanceInfo('Psychic', 'immunity', {
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' },
-                level: 1
-            });
-
-            expect(result.isGranted).toBe(true);
-            expect(result.source).toContain('Class');
-        });
-
-        it('should handle 2024 ruleset in getResistanceInfo', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Aasimar',
-                traits: [
-                    { name: 'Celestial Resistance', description: 'Resistance to Necrotic and Radiant damage.' }
-                ]
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceInfo('Necrotic', 'resistance', {
-                rules: '2024',
-                race: { name: 'Aasimar' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.isGranted).toBe(true);
-            expect(result.source).toContain('Race');
-        });
-
-        it('should return Unknown source for non-granted type', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceInfo('Fire', 'resistance', {
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.isGranted).toBe(false);
-            expect(result.isPreSelected).toBe(false);
-            expect(result.source).toBe('Unknown');
-        });
-
-        it('should return isGranted false for immunity when class has no immunities', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceInfo('Fire', 'immunity', {
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.isGranted).toBe(false);
-        });
+      expectImmunities(result, []);
     });
 
-    describe('getResistanceLimits (edge cases)', () => {
-        it('should handle empty race name', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
+    it('ignores condition immunities like "Immunity to Charmed" in Mindless Rage', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          {
+            level: 6,
+            features: [
+              {
+                name: 'Mindless Rage',
+                description: 'You gain Immunity to Charmed and Frightened.',
+              },
+            ],
+          },
+        ],
+      });
 
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: '' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
+      const result = await getResistanceLimits(
+        baseArgs({ level: 6, race: { name: 'Human' }, class: { name: 'Barbarian' } }),
+      );
 
-            expect(result.resistances).toEqual([]);
-        });
-
-        it('should handle missing subrace field', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Tiefling',
-                traits: [
-                    { name: 'Hellish Resistance', description: ['You have resistance to fire damage.'] }
-                ]
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Tiefling' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.resistances).toContain('Fire');
-        });
-
-        it('should handle 2024 rules without race', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '2024',
-                race: { name: '' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.resistances).toEqual([]);
-            expect(result.details).toContain('2024');
-        });
-
-        it('should handle missing class name', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Human',
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: '' },
-                level: 1
-            });
-
-            expect(result.immunities).toEqual([]);
-        });
-
-        it('should include details message with race and class info', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            expect(result.details).toContain('5e');
-            expect(result.details).toContain('Human');
-            expect(result.details).toContain('Wizard');
-        });
-
-        it('should handle string subrace in race object', async () => {
-            // Formdata can have subrace as a string (not nested object)
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                name: 'Dwarf',
-                traits: [
-                    { name: 'Dwarven Resilience', description: ['You have resistance against poison damage.'] }
-                ]
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: []
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Dwarf', subrace: 'Hill Dwarf' },
-                class: { name: 'Wizard' },
-                level: 1
-            });
-
-            // Dwarf base race grants poison resistance regardless of subrace
-            expect(result.resistances).toContain('Poison');
-        });
-
-        it('should default to level 1 when level is missing', async () => {
-            vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
-                traits: []
-            });
-            vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
-                class_levels: [
-                    { level: 1, features: [
-                        { name: 'Immunity', description: 'You gain Immunity to Fire damage.' }
-                    ]},
-                    { level: 5, features: [
-                        { name: 'Advanced Immunity', description: 'You gain Immunity to Cold damage.' }
-                    ]}
-                ]
-            });
-
-            const result = await getResistanceLimits({
-                rules: '5e',
-                race: { name: 'Human' },
-                class: { name: 'Fighter' }
-                // no level
-            });
-
-            // Default level 1 means only level 1 features count
-            expect(result.immunities).toContain('Fire');
-            expect(result.immunities).not.toContain('Cold');
-        });
+      // Charmed and Frightened are conditions, not damage types
+      expectImmunities(result, []);
     });
+  });
+
+  // ── getPreSelectedResistances ────────────────────────────────────────────
+
+  describe('getPreSelectedResistances', () => {
+    it('returns pre-selected resistances and immunities from race and class', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Tiefling',
+        traits: [
+          {
+            name: 'Hellish Resistance',
+            description: ['You have resistance to fire damage.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getPreSelectedResistances(
+        baseArgs({ race: { name: 'Tiefling' } }),
+      );
+
+      expect(result.resistances).toContain('Fire');
+      expect(result.immunities).toEqual([]);
+    });
+
+    it('returns empty arrays when race and class are empty objects', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
+
+      const result = await getPreSelectedResistances(
+        baseArgs({ race: {}, class: {} }),
+      );
+
+      expect(result.resistances).toEqual([]);
+      expect(result.immunities).toEqual([]);
+    });
+  });
+
+  // ── validateResistances ──────────────────────────────────────────────────
+
+  describe('validateResistances', () => {
+    const emptyDataArgs = () =>
+      baseArgs({
+        resistances: [],
+        immunities: [],
+      });
+
+    it('warns about ungranted resistances', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({ resistances: ['Fire'], immunities: [] }),
+      );
+
+      expectWarning(warnings, 'warning', 'not granted');
+      expect(warnings.filter((w) => w.type === 'warning').length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('warns about ungranted immunities', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({ resistances: [], immunities: ['Fire'] }),
+      );
+
+      expectWarning(warnings, 'warning', 'immunities are not granted');
+    });
+
+    it('warns about duplicate resistances', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({ resistances: ['Fire', 'Fire'], immunities: [] }),
+      );
+
+      expectWarning(warnings, 'warning', 'multiple times');
+    });
+
+    it('warns about duplicate immunities', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({ resistances: [], immunities: ['Fire', 'Fire'] }),
+      );
+
+      expectWarning(warnings, 'warning', 'immunities') &&
+        expectWarning(warnings, 'warning', 'multiple times');
+    });
+
+    it('returns info when no resistances or immunities selected and none granted', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(emptyDataArgs());
+
+      expectWarning(warnings, 'info', 'does not grant');
+    });
+
+    it('warns about unselected granted resistances', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Tiefling',
+        traits: [
+          {
+            name: 'Hellish Resistance',
+            description: ['You have resistance to fire damage.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({
+          rules: '5e',
+          race: { name: 'Tiefling' },
+          class: { name: 'Wizard' },
+          level: 1,
+          resistances: [],
+          immunities: [],
+        }),
+      );
+
+      expectWarning(warnings, 'info', 'grants these resistances');
+    });
+
+    it('warns about unselected granted immunities', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          {
+            level: 1,
+            features: [
+              {
+                name: 'Immunity',
+                description: 'You gain Immunity to Fire damage.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const warnings = await validateResistances(
+        baseArgs({
+          race: { name: 'Human' },
+          class: { name: 'Fighter' },
+          level: 1,
+          resistances: [],
+          immunities: [],
+        }),
+      );
+
+      expectWarning(warnings, 'info', 'grants these immunities');
+    });
+
+    it('uses "2024" in info message for 2024 ruleset', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({ rules: '2024', resistances: [], immunities: [] }),
+      );
+
+      expectWarning(warnings, 'info', '2024');
+    });
+
+    it('handles null resistances and immunities fields', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({ resistances: null, immunities: null }),
+      );
+
+      expectWarning(warnings, 'info', 'does not grant');
+    });
+
+    it('includes race and class names in info message', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({ race: { name: 'Elf' }, class: { name: 'Ranger' }, resistances: [], immunities: [] }),
+      );
+
+      const infoMsg = warnings.find((w) => w.type === 'info' && w.message.includes('does not grant'));
+      expect(infoMsg.message).toContain('Elf');
+      expect(infoMsg.message).toContain('Ranger');
+    });
+
+    it('does not warn when all selected resistances are granted', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Tiefling',
+        traits: [
+          {
+            name: 'Hellish Resistance',
+            description: ['You have resistance to fire damage.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const warnings = await validateResistances(
+        baseArgs({ race: { name: 'Tiefling' }, resistances: ['Fire'], immunities: [] }),
+      );
+
+      expectNoWarning(warnings, 'warning', 'not granted');
+    });
+
+    it('does not warn when all selected immunities are granted', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          {
+            level: 1,
+            features: [
+              {
+                name: 'Immunity',
+                description: 'You gain Immunity to Fire damage.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const warnings = await validateResistances(
+        baseArgs({ class: { name: 'Fighter' }, resistances: [], immunities: ['Fire'] }),
+      );
+
+      expectNoWarning(warnings, 'warning', 'immunities are not granted');
+    });
+  });
+
+  // ── getResistanceInfo ────────────────────────────────────────────────────
+
+  describe('getResistanceInfo', () => {
+    it('identifies resistance source from race', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Tiefling',
+        traits: [
+          {
+            name: 'Hellish Resistance',
+            description: ['You have resistance to fire damage.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceInfo('Fire', 'resistance', baseArgs({ race: { name: 'Tiefling' } }));
+
+      expect(result.isGranted).toBe(true);
+      expect(result.isPreSelected).toBe(true);
+      expect(result.source).toContain('Race');
+    });
+
+    it('returns isGranted false and Unknown source when resistance not granted', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceInfo('Fire', 'resistance', baseArgs());
+
+      expect(result.isGranted).toBe(false);
+      expect(result.isPreSelected).toBe(false);
+      expect(result.source).toBe('Unknown');
+    });
+
+    it('identifies immunity source from class', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          {
+            level: 1,
+            features: [
+              {
+                name: 'Immunity',
+                description: 'You gain Immunity to Psychic damage.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getResistanceInfo(
+        'Psychic',
+        'immunity',
+        baseArgs({ class: { name: 'Fighter' }, level: 1 }),
+      );
+
+      expect(result.isGranted).toBe(true);
+      expect(result.isPreSelected).toBe(true);
+      expect(result.source).toContain('Class');
+    });
+
+    it('handles 2024 ruleset correctly', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Aasimar',
+        traits: [
+          {
+            name: 'Celestial Resistance',
+            description: 'Resistance to Necrotic and Radiant damage.',
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceInfo(
+        'Necrotic',
+        'resistance',
+        baseArgs({ rules: '2024', race: { name: 'Aasimar' } }),
+      );
+
+      expect(result.isGranted).toBe(true);
+      expect(result.isPreSelected).toBe(true);
+      expect(result.source).toContain('Race');
+    });
+
+    it('returns isGranted false for immunity when class has none', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceInfo('Fire', 'immunity', baseArgs());
+
+      expect(result.isGranted).toBe(false);
+      expect(result.isPreSelected).toBe(false);
+    });
+  });
+
+  // ── Edge cases ───────────────────────────────────────────────────────────
+
+  describe('getResistanceLimits edge cases', () => {
+    it('handles empty race name', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({ race: { name: '' } }),
+      );
+
+      expectResistances(result, []);
+    });
+
+    it('handles missing subrace field', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Tiefling',
+        traits: [
+          {
+            name: 'Hellish Resistance',
+            description: ['You have resistance to fire damage.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({ race: { name: 'Tiefling' } }),
+      );
+
+      expectResistances(result, ['Fire']);
+    });
+
+    it('handles 2024 rules without race', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(null);
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({ rules: '2024', race: { name: '' } }),
+      );
+
+      expectResistances(result, []);
+      expect(result.details).toContain('2024');
+    });
+
+    it('handles missing class name', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(null);
+
+      const result = await getResistanceLimits(
+        baseArgs({ class: { name: '' } }),
+      );
+
+      expectImmunities(result, []);
+    });
+
+    it('includes race and class names in details message', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({ race: { name: 'Human' }, class: { name: 'Wizard' } }),
+      );
+
+      expect(result.details).toContain('5e');
+      expect(result.details).toContain('Human');
+      expect(result.details).toContain('Wizard');
+    });
+
+    it('handles string subrace (not nested object)', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue({
+        name: 'Dwarf',
+        traits: [
+          {
+            name: 'Dwarven Resilience',
+            description: ['You have resistance against poison damage.'],
+          },
+        ],
+      });
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result = await getResistanceLimits(
+        baseArgs({ race: { name: 'Dwarf', subrace: 'Hill Dwarf' } }),
+      );
+
+      expectResistances(result, ['Poison']);
+    });
+
+    it('defaults to level 1 when level is missing', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue({
+        class_levels: [
+          {
+            level: 1,
+            features: [
+              {
+                name: 'Immunity',
+                description: 'You gain Immunity to Fire damage.',
+              },
+            ],
+          },
+          {
+            level: 5,
+            features: [
+              {
+                name: 'Advanced Immunity',
+                description: 'You gain Immunity to Cold damage.',
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await getResistanceLimits(
+        baseArgs({ class: { name: 'Fighter' } }),
+      );
+
+      expectImmunities(result, ['Fire']);
+      expect(result.immunities).not.toContain('Cold');
+    });
+
+    it('returns details string with correct ruleset label', async () => {
+      vi.mocked(dataLoader.fetchRaceData).mockResolvedValue(emptyRaceData());
+      vi.mocked(dataLoader.fetchClassData).mockResolvedValue(emptyClassData());
+
+      const result5e = await getResistanceLimits(baseArgs({ rules: '5e' }));
+      const result2024 = await getResistanceLimits(baseArgs({ rules: '2024' }));
+
+      expect(result5e.details).toContain('5e');
+      expect(result2024.details).toContain('2024');
+    });
+  });
 });

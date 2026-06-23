@@ -1,22 +1,25 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest'
+
 import { conditionalHandlers } from './conditional.js'
-import { BASE_STATS, makeFeature } from '../automationInfoBuilder.fixtures.js'
+import { BASE_STATS } from '../automationInfoBuilder.fixtures.js'
 
-describe('conditionalHandlers – conditional_advantage', () => {
-    it('returns conditional_advantage info with defaults', () => {
-        const feature = makeFeature({ type: 'conditional_advantage' })
-        const result = conditionalHandlers.conditional_advantage(feature, BASE_STATS)
-        expect(result.type).toBe('conditional_advantage')
-        expect(result.name).toBe('Test Feature')
-        expect(result.target).toBe('saving_throw')
-        expect(result.condition).toBe('')
-        expect(result.effect).toBe('advantage')
-        expect(result.abilities).toEqual([])
-        expect(result.hasAutomation).toBe(true)
-    })
+// ── Helpers ──────────────────────────────────────────────────────────
 
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
+/**
+ * Creates a feature with the given automation shape, wrapping it
+ * in the same structure that `makeFeature` produces so the handler
+ * sees a real feature object (even when automation is nullish).
+ */
+function featureWith(automation, name = 'Test Feature') {
+    return { name, automation }
+}
+
+// ── conditional_advantage ────────────────────────────────────────────
+
+describe('conditional_advantage', () => {
+    it('returns correct shape with full automation data', () => {
+        const feature = featureWith({
             type: 'conditional_advantage',
             target: 'ability_check',
             condition: 'adjacent_to_enemy',
@@ -24,174 +27,445 @@ describe('conditionalHandlers – conditional_advantage', () => {
             abilities: ['STR', 'DEX'],
             uses: 3,
             recharge: 'short_rest',
-            casting_time: '1 action'
+            casting_time: '1 action',
+            trigger: 'on_spell_cast'
         })
         const result = conditionalHandlers.conditional_advantage(feature, BASE_STATS)
-        expect(result.target).toBe('ability_check')
-        expect(result.condition).toBe('adjacent_to_enemy')
-        expect(result.abilities).toEqual(['STR', 'DEX'])
-        expect(result.uses).toBe(3)
-        expect(result.recharge).toBe('short_rest')
-    })
-})
 
-describe('conditionalHandlers – conditional_disadvantage', () => {
-    it('returns conditional_disadvantage info with defaults', () => {
-        const feature = makeFeature({ type: 'conditional_disadvantage' })
-        const result = conditionalHandlers.conditional_disadvantage(feature, BASE_STATS)
-        expect(result.type).toBe('conditional_disadvantage')
-        expect(result.target).toBe('attack_roll')
-        expect(result.effect).toBe('disadvantage')
+        expect(result).toMatchObject({
+            type: 'conditional_advantage',
+            name: 'Test Feature',
+            target: 'ability_check',
+            condition: 'adjacent_to_enemy',
+            effect: 'advantage',
+            abilities: ['STR', 'DEX'],
+            uses: 3,
+            recharge: 'short_rest',
+            casting_time: '1 action',
+            trigger: 'on_spell_cast',
+            hasAutomation: true
+        })
+    })
+
+    it('applies defaults when automation is an empty object', () => {
+        const feature = featureWith({})
+        const result = conditionalHandlers.conditional_advantage(feature, BASE_STATS)
+
+        expect(result.target).toBe('saving_throw')
+        expect(result.condition).toBe('')
+        expect(result.effect).toBe('advantage')
+        expect(result.abilities).toEqual([])
+        expect(result.uses).toBeNull()
+        expect(result.recharge).toBe('long_rest')
+        expect(result.casting_time).toBe('passive')
+        expect(result.trigger).toBe('')
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
+    it('throws when feature has no automation property', () => {
+        const feature = { name: 'No Automation Feature' }
+        expect(() => conditionalHandlers.conditional_advantage(feature, BASE_STATS)).toThrow()
+    })
+
+    it('throws when automation is null', () => {
+        const feature = featureWith(null)
+        expect(() => conditionalHandlers.conditional_advantage(feature, BASE_STATS)).toThrow()
+    })
+
+    it('throws when automation is undefined', () => {
+        const feature = featureWith(undefined)
+        expect(() => conditionalHandlers.conditional_advantage(feature, BASE_STATS)).toThrow()
+    })
+
+    it('passes through custom feature name', () => {
+        const feature = featureWith({ condition: 'flanking' }, 'Flanking Strike')
+        const result = conditionalHandlers.conditional_advantage(feature, BASE_STATS)
+        expect(result.name).toBe('Flanking Strike')
+    })
+
+    it('ignores the playerStats parameter', () => {
+        const feature = featureWith({ condition: 'test' })
+        const result = conditionalHandlers.conditional_advantage(feature, BASE_STATS)
+        expect(result.condition).toBe('test')
+    })
+})
+
+// ── conditional_disadvantage ─────────────────────────────────────────
+
+describe('conditional_disadvantage', () => {
+    it('returns correct shape with full automation data', () => {
+        const feature = featureWith({
             type: 'conditional_disadvantage',
             target: 'saving_throw',
             condition: 'below_half_hp',
+            effect: 'disadvantage',
             abilities: ['CON']
         })
         const result = conditionalHandlers.conditional_disadvantage(feature, BASE_STATS)
-        expect(result.target).toBe('saving_throw')
-        expect(result.condition).toBe('below_half_hp')
-        expect(result.abilities).toEqual(['CON'])
-    })
-})
 
-describe('conditionalHandlers – conditional_replacement', () => {
-    it('returns conditional_replacement info with defaults', () => {
-        const feature = makeFeature({ type: 'conditional_replacement' })
-        const result = conditionalHandlers.conditional_replacement(feature, BASE_STATS)
-        expect(result.type).toBe('conditional_replacement')
-        expect(result.target).toBe('saving_throw')
-        expect(result.saveType).toBe('')
+        expect(result).toMatchObject({
+            type: 'conditional_disadvantage',
+            name: 'Test Feature',
+            target: 'saving_throw',
+            condition: 'below_half_hp',
+            effect: 'disadvantage',
+            abilities: ['CON'],
+            hasAutomation: true
+        })
+    })
+
+    it('applies defaults when automation is an empty object', () => {
+        const feature = featureWith({})
+        const result = conditionalHandlers.conditional_disadvantage(feature, BASE_STATS)
+
+        expect(result.target).toBe('attack_roll')
         expect(result.condition).toBe('')
-        expect(result.replacementAbility).toBe('')
+        expect(result.effect).toBe('disadvantage')
+        expect(result.abilities).toEqual([])
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
+    it('throws when feature has no automation property', () => {
+        const feature = { name: 'No Automation Feature' }
+        expect(() => conditionalHandlers.conditional_disadvantage(feature, BASE_STATS)).toThrow()
+    })
+
+    it('throws when automation is null or undefined', () => {
+        expect(() => conditionalHandlers.conditional_disadvantage(featureWith(null), BASE_STATS)).toThrow()
+        expect(() => conditionalHandlers.conditional_disadvantage(featureWith(undefined), BASE_STATS)).toThrow()
+    })
+
+    it('ignores the playerStats parameter', () => {
+        const feature = featureWith({ condition: 'prone' })
+        const result = conditionalHandlers.conditional_disadvantage(feature, BASE_STATS)
+        expect(result.condition).toBe('prone')
+    })
+})
+
+// ── conditional_replacement ──────────────────────────────────────────
+
+describe('conditional_replacement', () => {
+    it('returns correct shape with full automation data', () => {
+        const feature = featureWith({
             type: 'conditional_replacement',
             target: 'ability_check',
             saveType: 'DEX',
             condition: 'stealthed',
+            effect: 'replace_on_stealth',
             replacementAbility: 'DEX'
         })
         const result = conditionalHandlers.conditional_replacement(feature, BASE_STATS)
-        expect(result.target).toBe('ability_check')
-        expect(result.saveType).toBe('DEX')
-        expect(result.condition).toBe('stealthed')
-        expect(result.replacementAbility).toBe('DEX')
-    })
-})
 
-describe('conditionalHandlers – condition_immunity_while_active', () => {
-    it('returns condition_immunity_while_active info with defaults', () => {
-        const feature = makeFeature({ type: 'condition_immunity_while_active' })
-        const result = conditionalHandlers.condition_immunity_while_active(feature, BASE_STATS)
-        expect(result.type).toBe('condition_immunity_while_active')
-        expect(result.target).toBe('self')
-        expect(result.immunities).toEqual([])
-        expect(result.requiresActive).toBe('')
+        expect(result).toMatchObject({
+            type: 'conditional_replacement',
+            name: 'Test Feature',
+            target: 'ability_check',
+            saveType: 'DEX',
+            condition: 'stealthed',
+            effect: 'replace_on_stealth',
+            replacementAbility: 'DEX',
+            hasAutomation: true
+        })
+    })
+
+    it('applies defaults when automation is an empty object', () => {
+        const feature = featureWith({})
+        const result = conditionalHandlers.conditional_replacement(feature, BASE_STATS)
+
+        expect(result.target).toBe('saving_throw')
+        expect(result.saveType).toBe('')
+        expect(result.condition).toBe('')
+        expect(result.effect).toBe('')
+        expect(result.replacementAbility).toBe('')
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
+    it('throws when feature has no automation property', () => {
+        const feature = { name: 'No Automation Feature' }
+        expect(() => conditionalHandlers.conditional_replacement(feature, BASE_STATS)).toThrow()
+    })
+
+    it('throws when automation is null or undefined', () => {
+        expect(() => conditionalHandlers.conditional_replacement(featureWith(null), BASE_STATS)).toThrow()
+        expect(() => conditionalHandlers.conditional_replacement(featureWith(undefined), BASE_STATS)).toThrow()
+    })
+
+    it('ignores the playerStats parameter', () => {
+        const feature = featureWith({ saveType: 'CON' })
+        const result = conditionalHandlers.conditional_replacement(feature, BASE_STATS)
+        expect(result.saveType).toBe('CON')
+    })
+})
+
+// ── condition_immunity_while_active ──────────────────────────────────
+
+describe('condition_immunity_while_active', () => {
+    it('returns correct shape with full automation data', () => {
+        const feature = featureWith({
             type: 'condition_immunity_while_active',
             target: 'allies_in_range',
             immunities: ['charmed', 'frightened'],
             requiresActive: 'aura_of_protection'
         })
         const result = conditionalHandlers.condition_immunity_while_active(feature, BASE_STATS)
-        expect(result.target).toBe('allies_in_range')
-        expect(result.immunities).toEqual(['charmed', 'frightened'])
-        expect(result.requiresActive).toBe('aura_of_protection')
-    })
-})
 
-describe('conditionalHandlers – evasion', () => {
-    it('returns evasion info with defaults', () => {
-        const feature = makeFeature({ type: 'evasion' })
-        const result = conditionalHandlers.evasion(feature, BASE_STATS)
-        expect(result.type).toBe('evasion')
-        expect(result.saveType).toBe('DEX')
-        expect(result.shareable).toBe(false)
-        expect(result.shareRange).toBe(0)
+        expect(result).toMatchObject({
+            type: 'condition_immunity_while_active',
+            name: 'Test Feature',
+            target: 'allies_in_range',
+            immunities: ['charmed', 'frightened'],
+            requiresActive: 'aura_of_protection',
+            hasAutomation: true
+        })
+    })
+
+    it('applies defaults when automation is an empty object', () => {
+        const feature = featureWith({})
+        const result = conditionalHandlers.condition_immunity_while_active(feature, BASE_STATS)
+
+        expect(result.target).toBe('self')
+        expect(result.immunities).toEqual([])
+        expect(result.requiresActive).toBe('')
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
+    it('throws when feature has no automation property', () => {
+        const feature = { name: 'No Automation Feature' }
+        expect(() => conditionalHandlers.condition_immunity_while_active(feature, BASE_STATS)).toThrow()
+    })
+
+    it('throws when automation is null or undefined', () => {
+        expect(() => conditionalHandlers.condition_immunity_while_active(featureWith(null), BASE_STATS)).toThrow()
+        expect(() => conditionalHandlers.condition_immunity_while_active(featureWith(undefined), BASE_STATS)).toThrow()
+    })
+
+    it('ignores the playerStats parameter', () => {
+        const feature = featureWith({ requiresActive: 'paladin_aura' })
+        const result = conditionalHandlers.condition_immunity_while_active(feature, BASE_STATS)
+        expect(result.requiresActive).toBe('paladin_aura')
+    })
+})
+
+// ── evasion ──────────────────────────────────────────────────────────
+
+describe('evasion', () => {
+    it('returns correct shape with full automation data', () => {
+        const feature = featureWith({
             type: 'evasion',
             saveType: 'CON',
             shareable: true,
             shareRange: 30
         })
         const result = conditionalHandlers.evasion(feature, BASE_STATS)
-        expect(result.saveType).toBe('CON')
-        expect(result.shareable).toBe(true)
-        expect(result.shareRange).toBe(30)
-    })
-})
 
-describe('conditionalHandlers – save_proficiency', () => {
-    it('returns save_proficiency info with defaults', () => {
-        const feature = makeFeature({ type: 'save_proficiency' })
-        const result = conditionalHandlers.save_proficiency(feature, BASE_STATS)
-        expect(result.type).toBe('save_proficiency')
-        expect(result.saveType).toBe('')
-        expect(result.fallbackTypes).toEqual([])
+        expect(result).toMatchObject({
+            type: 'evasion',
+            name: 'Test Feature',
+            saveType: 'CON',
+            shareable: true,
+            shareRange: 30,
+            hasAutomation: true
+        })
+    })
+
+    it('applies defaults when automation is an empty object', () => {
+        const feature = featureWith({})
+        const result = conditionalHandlers.evasion(feature, BASE_STATS)
+
+        expect(result.saveType).toBe('DEX')
+        expect(result.shareable).toBe(false)
+        expect(result.shareRange).toBe(0)
         expect(result.hasAutomation).toBe(true)
     })
 
-    it('passes through custom fields', () => {
-        const feature = makeFeature({
+    it('coerces shareable to boolean for truthy values', () => {
+        const feature = featureWith({ shareable: 'yes' })
+        const result = conditionalHandlers.evasion(feature, BASE_STATS)
+        expect(result.shareable).toBe(true)
+    })
+
+    it('coerces shareable to boolean for falsy values', () => {
+        const feature = featureWith({ shareable: 0 })
+        const result = conditionalHandlers.evasion(feature, BASE_STATS)
+        expect(result.shareable).toBe(false)
+    })
+
+    it('throws when feature has no automation property', () => {
+        const feature = { name: 'No Automation Feature' }
+        expect(() => conditionalHandlers.evasion(feature, BASE_STATS)).toThrow()
+    })
+
+    it('throws when automation is null or undefined', () => {
+        expect(() => conditionalHandlers.evasion(featureWith(null), BASE_STATS)).toThrow()
+        expect(() => conditionalHandlers.evasion(featureWith(undefined), BASE_STATS)).toThrow()
+    })
+
+    it('ignores the playerStats parameter', () => {
+        const feature = featureWith({ saveType: 'WIS' })
+        const result = conditionalHandlers.evasion(feature, BASE_STATS)
+        expect(result.saveType).toBe('WIS')
+    })
+})
+
+// ── save_proficiency ─────────────────────────────────────────────────
+
+describe('save_proficiency', () => {
+    it('returns correct shape with full automation data', () => {
+        const feature = featureWith({
             type: 'save_proficiency',
             saveType: 'WIS',
             fallbackTypes: ['INT', 'CHA']
         })
         const result = conditionalHandlers.save_proficiency(feature, BASE_STATS)
-        expect(result.saveType).toBe('WIS')
-        expect(result.fallbackTypes).toEqual(['INT', 'CHA'])
+
+        expect(result).toMatchObject({
+            type: 'save_proficiency',
+            name: 'Test Feature',
+            saveType: 'WIS',
+            fallbackTypes: ['INT', 'CHA'],
+            hasAutomation: true
+        })
+    })
+
+    it('applies defaults when automation is an empty object', () => {
+        const feature = featureWith({})
+        const result = conditionalHandlers.save_proficiency(feature, BASE_STATS)
+
+        expect(result.saveType).toBe('')
+        expect(result.fallbackTypes).toEqual([])
+        expect(result.hasAutomation).toBe(true)
+    })
+
+    it('throws when feature has no automation property', () => {
+        const feature = { name: 'No Automation Feature' }
+        expect(() => conditionalHandlers.save_proficiency(feature, BASE_STATS)).toThrow()
+    })
+
+    it('throws when automation is null or undefined', () => {
+        expect(() => conditionalHandlers.save_proficiency(featureWith(null), BASE_STATS)).toThrow()
+        expect(() => conditionalHandlers.save_proficiency(featureWith(undefined), BASE_STATS)).toThrow()
+    })
+
+    it('ignores the playerStats parameter', () => {
+        const feature = featureWith({ saveType: 'CON' })
+        const result = conditionalHandlers.save_proficiency(feature, BASE_STATS)
+        expect(result.saveType).toBe('CON')
     })
 })
 
-describe('conditionalHandlers – passive_rule', () => {
-    it('returns passive_rule with ignore_resistance effect', () => {
-        const feature = makeFeature({
+// ── passive_rule ─────────────────────────────────────────────────────
+
+describe('passive_rule', () => {
+    it('returns ignore_resistance shape with only relevant fields', () => {
+        const feature = featureWith({
             type: 'passive_rule',
             effect: 'ignore_resistance',
             damageTypes: ['fire', 'cold']
         })
         const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
-        expect(result.type).toBe('passive_rule')
-        expect(result.effect).toBe('ignore_resistance')
-        expect(result.damageTypes).toEqual(['fire', 'cold'])
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toMatchObject({
+            type: 'passive_rule',
+            name: 'Test Feature',
+            effect: 'ignore_resistance',
+            damageTypes: ['fire', 'cold'],
+            hasAutomation: true
+        })
+        // Verify the shape is minimal — no attack-related fields
+        expect(result).not.toHaveProperty('criticalRange')
+        expect(result).not.toHaveProperty('bonusExpression')
+        expect(result).not.toHaveProperty('spells')
+        expect(result).not.toHaveProperty('riderSave')
+        expect(result).not.toHaveProperty('resistanceTypes')
     })
 
-    it('returns generic passive_rule for other effects', () => {
-        const feature = makeFeature({
+    it('defaults damageTypes to empty array for ignore_resistance', () => {
+        const feature = featureWith({ effect: 'ignore_resistance' })
+        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
+        expect(result.damageTypes).toEqual([])
+    })
+
+    it('returns generic shape for non-ignore_resistance effects', () => {
+        const feature = featureWith({
             type: 'passive_rule',
             effect: 'critical_range',
             criticalRange: '18-20',
             bonusExpression: '+2d6',
             spells: ['fire bolt', 'thunderwave'],
+            riderSave: 'DEX',
+            casting_time: '1 action',
             cost: 2,
             resource: 'sorcery_points',
-            duration: '1_minute'
+            resistanceTypes: ['fire', 'cold'],
+            duration: '1_minute',
+            endsOnCondition: 'blinded'
         })
         const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
-        expect(result.type).toBe('passive_rule')
-        expect(result.effect).toBe('critical_range')
-        expect(result.criticalRange).toBe('18-20')
-        expect(result.bonusExpression).toBe('+2d6')
-        expect(result.spells).toEqual(['fire bolt', 'thunderwave'])
-        expect(result.cost).toBe(2)
-        expect(result.duration).toBe('1_minute')
-        expect(result.hasAutomation).toBe(true)
+
+        expect(result).toMatchObject({
+            type: 'passive_rule',
+            name: 'Test Feature',
+            effect: 'critical_range',
+            criticalRange: '18-20',
+            bonusExpression: '+2d6',
+            spells: ['fire bolt', 'thunderwave'],
+            riderSave: 'DEX',
+            primalKnowledge: [],
+            casting_time: '1 action',
+            cost: 2,
+            resource: 'sorcery_points',
+            resistanceTypes: ['fire', 'cold'],
+            duration: '1_minute',
+            endsOnCondition: 'blinded',
+            hasAutomation: true
+        })
+    })
+
+    it('defaults all generic fields to empty string, null, or 0', () => {
+        const feature = featureWith({ effect: 'something_else' })
+        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
+
+        expect(result.bonusExpression).toBe('')
+        expect(result.criticalRange).toBe('')
+        expect(result.spells).toEqual([])
+        expect(result.riderSave).toBeNull()
+        expect(result.primalKnowledge).toEqual([])
+        expect(result.casting_time).toBe('')
+        expect(result.cost).toBe(0)
+        expect(result.resource).toBe('')
+        expect(result.resistanceTypes).toEqual([])
+        expect(result.duration).toBe('')
+        expect(result.endsOnCondition).toBe('')
+    })
+
+    it('defaults effect to empty string when omitted', () => {
+        const feature = featureWith({})
+        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
+        expect(result.effect).toBe('')
+    })
+
+    it('maps skills to primalKnowledge in generic shape', () => {
+        const feature = featureWith({
+            effect: 'critical_range',
+            skills: ['stealth', 'deception']
+        })
+        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
+        expect(result.primalKnowledge).toEqual(['stealth', 'deception'])
+    })
+
+    it('throws when feature has no automation property', () => {
+        const feature = { name: 'No Automation Feature' }
+        expect(() => conditionalHandlers.passive_rule(feature, BASE_STATS)).toThrow()
+    })
+
+    it('throws when automation is null or undefined', () => {
+        expect(() => conditionalHandlers.passive_rule(featureWith(null), BASE_STATS)).toThrow()
+        expect(() => conditionalHandlers.passive_rule(featureWith(undefined), BASE_STATS)).toThrow()
+    })
+
+    it('ignores the playerStats parameter', () => {
+        const feature = featureWith({ effect: 'ignore_resistance', damageTypes: ['lightning'] })
+        const result = conditionalHandlers.passive_rule(feature, BASE_STATS)
+        expect(result.damageTypes).toEqual(['lightning'])
     })
 })
