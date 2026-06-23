@@ -10,6 +10,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext, findCreatureByName } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
+import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';
 
@@ -206,17 +207,28 @@ export function getAvailableSkillCheckManeuvers(playerStats, campaignName, skill
 
 export async function handleAttackRiderPrompt(action, playerStats, campaignName, _mapName) {
     const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', campaignName);
-    if (!pending || !pending.attackContext) return null;
+    if (!pending || !pending.attackContext) { return null; }
 
     const attackContext = pending.attackContext;
     const knownNames = getKnownManeuvers(playerStats, campaignName);
-    if (knownNames.length === 0) return null;
+    if (knownNames.length === 0) {
+        setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+        return null;
+    }
 
     const superiorityDice = getSuperiorityDice(playerStats, campaignName);
-    if (superiorityDice <= 0) return null;
+    if (superiorityDice <= 0) {
+        setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+        return null;
+    }
+
+    await getManeuversForRules(playerStats.rules || '2024');
 
     const available = getAvailableAttackRiderManeuversByTrigger(playerStats, campaignName, attackContext);
-    if (available.length === 0) return null;
+    if (available.length === 0) {
+        setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+        return null;
+    }
 
     return {
         type: 'modal',
@@ -306,6 +318,7 @@ async function getManeuversForRules(rules) {
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
+    const forceSelectionMode = auto?.forceSelectionMode === true;
     const knownManeuvers = getKnownManeuvers(playerStats, campaignName);
     const allManeuvers = await loadManeuvers(playerStats.rules || '2024');
 
@@ -326,7 +339,13 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const unknownManeuvers = allManeuvers.filter(m => !knownManeuvers.includes(m.name));
     const known = allManeuvers.filter(m => knownManeuvers.includes(m.name));
 
-    const needsSelection = known.length < maxOptions && unknownManeuvers.length > 0;
+    const needsSelection = forceSelectionMode || (known.length < maxOptions && unknownManeuvers.length > 0);
+
+    const nonAttackRiderKnown = known.filter(m => m.actionType !== 'attack_rider');
+    const hasNonAttackRiderManeuvers = nonAttackRiderKnown.length > 0;
+
+    const cs = getCombatContext(campaignName);
+    const lastAttack = cs?.lastAttack || null;
 
     const modalPayload = {
         action,
@@ -335,10 +354,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         allManeuvers,
         knownManeuvers: known.map(m => m.name),
         maxOptions,
-        selectionMode: needsSelection,
+        selectionMode: needsSelection || (!hasNonAttackRiderManeuvers && !needsSelection),
         saveDc: auto.saveDc,
         saveType: auto.saveType || 'WIS',
         dieExpression: auto.dieExpression || 'superiority_die',
+        lastAttack,
     };
 
     return {
@@ -461,7 +481,7 @@ export function rollManeuverDie(maneuver, playerStats, campaignName) {
         const superiorityDieSize = evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
-        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
     }
 
     return { dieValue, dieDescription, expendedDie, relentlessUsed };
@@ -520,15 +540,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
         }
     }
 
-    const logEntry = {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: maneuver.name,
-        description: `Used ${maneuver.name}. Superiority die rolled ${dieValue}. ${targetName ? `Target: ${targetName}. ` : ''}${maneuver.description}`,
-    };
-    await addEntry(campaignName, logEntry).catch(() => {});
-
-    let description = `<b>${maneuver.name}</b><br/>${dieDescription}`;
+    let description = dieDescription;
 
     if (targetName) {
         description += ` Target: ${targetName}.`;
@@ -536,6 +548,17 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
 
     if (maneuver.damageBonus) {
         description += ` Added ${dieValue} to the damage roll.`;
+        if (targetName) {
+            const damageType = attackInfo?.damageType || 'force';
+            const combatSummary = await getCombatContext(campaignName);
+            if (combatSummary) {
+                const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+                const result = applyDamageToTarget(combatSummary, targetName, dieValue, [damageType], campaignName, characters, false, playerStats.name);
+                if (result.finalDamage > 0) {
+                    description += ` Dealt ${result.finalDamage} damage to ${targetName}.`;
+                }
+            }
+        }
     }
 
     if (maneuver.saveType && targetName) {
@@ -628,6 +651,13 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     if (maneuver.actionType === 'grant_attack') {
         description += ` An ally can use its Reaction to make an attack, adding ${dieValue} to the damage roll.`;
     }
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description,
+    };
 
     if (maneuver.effect === 'secondary_damage') {
         const cs = getCombatContext(campaignName);
@@ -735,7 +765,7 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
     } else {
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
-        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
     }
 
     if (expendedDie) {
@@ -893,7 +923,7 @@ export async function executeGrantAttackManeuver(action, playerStats, campaignNa
     } else {
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
-        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
     }
 
     if (expendedDie) {
@@ -1065,7 +1095,7 @@ export async function executeMovementManeuver(action, playerStats, campaignName,
     } else {
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
-        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
     }
 
     if (expendedDie) {
@@ -1143,7 +1173,7 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
     } else {
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
-        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
     }
 
     if (expendedDie) {
@@ -1284,7 +1314,7 @@ export async function executeSkillCheckManeuver(action, playerStats, campaignNam
     } else {
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
-        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
     }
 
     if (expendedDie) {
@@ -1391,7 +1421,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
     } else {
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
-        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
     }
 
     if (expendedDie) {
@@ -1530,7 +1560,7 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
     } else {
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
-        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
     }
 
     if (expendedDie) {

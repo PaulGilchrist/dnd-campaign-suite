@@ -258,7 +258,7 @@ describe('combatSuperiorityHandler.executeManeuver - basic execution', () => {
             'Trip Attack'
         );
 
-        expect(result.payload.description).toContain('Rolled 10 for 9');
+        expect(result.payload.description).toContain('Rolled d10 for 9');
     });
 
     it('handles no target from resolveTarget', async () => {

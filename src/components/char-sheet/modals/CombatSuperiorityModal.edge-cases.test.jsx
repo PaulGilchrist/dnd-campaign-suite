@@ -219,10 +219,10 @@ describe('CombatSuperiorityModal - known maneuvers filtering', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Rally'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Rally'],
         }),
       });
-      expect(screen.getByText('Trip Attack')).toBeInTheDocument();
+      expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
       expect(screen.getByText('Rally')).toBeInTheDocument();
       expect(screen.queryByText('Pushing Attack')).not.toBeInTheDocument();
     });
@@ -231,10 +231,10 @@ describe('CombatSuperiorityModal - known maneuvers filtering', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
-      expect(screen.getByText('Attack Riders (on hit)')).toBeInTheDocument();
+      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
       expect(screen.queryByText('Movement')).not.toBeInTheDocument();
       expect(screen.queryByText('Reactions')).not.toBeInTheDocument();
     });
@@ -296,7 +296,7 @@ describe('CombatSuperiorityModal - handleClearSelection', () => {
       renderModal({
         payload: makePayload({
           selectionMode: true,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
         onConfirm,
       });
@@ -315,7 +315,7 @@ describe('CombatSuperiorityModal - handleClearSelection', () => {
       renderModal({
         payload: makePayload({
           selectionMode: true,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm,
         onClose,
@@ -337,7 +337,7 @@ describe('CombatSuperiorityModal - handleUseManeuver', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm,
       });
@@ -346,7 +346,7 @@ describe('CombatSuperiorityModal - handleUseManeuver', () => {
       fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
 
       await waitFor(() => {
-        expect(screen.getByText('Trip Attack')).toBeInTheDocument();
+        expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
       });
     });
 
@@ -355,7 +355,7 @@ describe('CombatSuperiorityModal - handleUseManeuver', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm,
       });
@@ -369,7 +369,7 @@ describe('CombatSuperiorityModal - handleUseManeuver', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm,
       });
@@ -392,7 +392,7 @@ describe('CombatSuperiorityModal - message variants', () => {
       renderModal({
         payload: makePayload({
           selectionMode: true,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack', 'Disarming Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack', 'Disarming Attack'],
         }),
       });
       expect(screen.getByText(/Your known maneuvers: 3/)).toBeInTheDocument();
@@ -402,7 +402,7 @@ describe('CombatSuperiorityModal - message variants', () => {
       renderModal({
         payload: makePayload({
           selectionMode: true,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
           maxOptions: 5,
         }),
       });
@@ -442,7 +442,7 @@ describe('CombatSuperiorityModal - overlay clicks', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onClose,
       });
@@ -477,15 +477,15 @@ describe('CombatSuperiorityModal - handleConfirmSelection', () => {
         payload: makePayload({ selectionMode: true }),
         onConfirm,
       });
-      // Checkbox order: [0]=Trip Attack, [1]=Disarming Attack,
-      // [2]=Ki-Fueled Attack, [3]=Evasive Footwork,
-      // [4]=Kicking Attack, [5]=Pushing Attack,
-      // [6]=Rally, [7]=Grasping Vine
+      // Checkbox order (grouped by actionType): [0]=Trip Attack, [1]=Disarming Attack (attack_rider),
+      // [2]=Ki-Fueled Attack (bonus_action), [3]=Evasive Footwork (reaction),
+      // [4]=Kicking Attack (skill_check), [5]=Pushing Attack, [6]=Rally (movement),
+      // [7]=Grasping Vine (grant_attack)
       const checkboxes = document.querySelectorAll('input[type="checkbox"]');
       fireEvent.click(checkboxes[0]);
-      fireEvent.click(checkboxes[2]);
+      fireEvent.click(checkboxes[3]);
       fireEvent.click(screen.getByRole('button', { name: /Confirm Selection/ }));
-      expect(onConfirm).toHaveBeenCalledWith(['Trip Attack', 'Ki-Fueled Attack'], null);
+      expect(onConfirm).toHaveBeenCalledWith(['Trip Attack', 'Evasive Footwork'], null);
     });
 
     it('does not call onConfirm when confirm is clicked with zero selections', () => {
@@ -571,7 +571,7 @@ describe('CombatSuperiorityModal - visual feedback', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radioInputs = document.querySelectorAll('input[name="combatManeuver"]');
@@ -582,7 +582,7 @@ describe('CombatSuperiorityModal - visual feedback', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       const checkboxInputs = document.querySelectorAll('input[type="checkbox"]');
@@ -595,7 +595,7 @@ describe('CombatSuperiorityModal - visual feedback', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -608,7 +608,7 @@ describe('CombatSuperiorityModal - visual feedback', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -621,7 +621,7 @@ describe('CombatSuperiorityModal - visual feedback', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -641,23 +641,25 @@ describe('CombatSuperiorityModal - same action type', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Disarming Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Evasive Footwork'],
         }),
       });
       const headings = document.querySelectorAll('h4');
-      expect(headings.length).toBe(1);
-      expect(headings[0].textContent).toBe('Attack Riders (on hit)');
+      // attack_rider excluded from use mode, so Ki-Fueled (bonus_action) and Evasive (reaction) are in different groups
+      expect(headings.length).toBe(2);
+      expect(headings[0].textContent).toBe('Bonus Actions');
+      expect(headings[1].textContent).toBe('Reactions');
     });
 
-    it('renders both maneuvers under the same header', () => {
+    it('renders both maneuvers under their respective headers', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Disarming Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Evasive Footwork'],
         }),
       });
-      expect(screen.getByText('Trip Attack')).toBeInTheDocument();
-      expect(screen.getByText('Disarming Attack')).toBeInTheDocument();
+      expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
+      expect(screen.getByText('Evasive Footwork')).toBeInTheDocument();
     });
   });
 
@@ -838,7 +840,7 @@ describe('CombatSuperiorityModal - CSS consistency', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
@@ -864,9 +866,9 @@ describe('CombatSuperiorityModal - CSS consistency', () => {
 
     it('result mode has correct CSS classes', async () => {
       const props = makeProps();
-      props.payload = makePayload({ selectionMode: false, knownManeuvers: ['Trip Attack'] });
+      props.payload = makePayload({ selectionMode: false, knownManeuvers: ['Ki-Fueled Attack'] });
       props.onConfirm.mockResolvedValue({
-        payload: { name: 'Trip Attack', description: 'Desc.' },
+        payload: { name: 'Ki-Fueled Attack', description: 'Desc.' },
       });
       render(<CombatSuperiorityModal {...props} />);
 
@@ -910,14 +912,14 @@ describe('CombatSuperiorityModal - ordering', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Ki-Fueled Attack', 'Evasive Footwork'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Ki-Fueled Attack', 'Evasive Footwork'],
         }),
       });
       const headings = document.querySelectorAll('h4');
       const headingTexts = Array.from(headings).map(h => h.textContent);
-      expect(headingTexts[0]).toBe('Attack Riders (on hit)');
-      expect(headingTexts[1]).toBe('Bonus Actions');
-      expect(headingTexts[2]).toBe('Reactions');
+      // attack_rider excluded from use mode (handled by AttackRiderManeuverPrompt during damage click)
+      expect(headingTexts[0]).toBe('Bonus Actions');
+      expect(headingTexts[1]).toBe('Reactions');
     });
   });
 
@@ -926,10 +928,10 @@ describe('CombatSuperiorityModal - ordering', () => {
       renderModal({ payload: makePayload({ selectionMode: true }) });
       const labels = document.querySelectorAll('label');
       const labelTexts = Array.from(labels).map(l => l.textContent.trim());
-      const tripIndex = labelTexts.indexOf('Trip Attack');
+      const kiIndex = labelTexts.indexOf('Ki-Fueled Attack');
       const disarmingIndex = labelTexts.indexOf('Disarming Attack');
       const pushingIndex = labelTexts.indexOf('Pushing Attack');
-      expect(tripIndex).toBeLessThan(pushingIndex);
+      expect(kiIndex).toBeLessThan(pushingIndex);
       expect(disarmingIndex).toBeLessThan(pushingIndex);
     });
   });

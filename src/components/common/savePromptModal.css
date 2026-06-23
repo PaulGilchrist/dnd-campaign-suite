@@ -25,6 +25,20 @@
 
 .sp-modal--wide {
   max-width: 720px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.sp-modal--wide .sp-body {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.sp-modal--wide .sp-actions {
+  flex-shrink: 0;
 }
 
 .sp-header {

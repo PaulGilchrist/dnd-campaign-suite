@@ -331,7 +331,6 @@ export function createLogAndShow(deps) {
                     defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
                     gloriousDefenseBonus: context?.gloriousDefenseBonus || 0,
                     baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
-                    timestamp: Date.now(),
                 };
                 storage.set('combatSummary', combatSummary, campaignName);
             }
@@ -361,6 +360,7 @@ export function createLogAndShow(deps) {
                 },
                 timestamp: Date.now(),
             }, campaignName);
+            console.log('[useLoggedDiceRollAttack] pendingCombatSuperiorityPrompt set:', { hit, isCrit, weaponType: context?.damageType === 'ranged' ? 'ranged' : 'melee', targetName });
 
             const ps = context?.playerStats;
             const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';

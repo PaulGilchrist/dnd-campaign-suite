@@ -11,7 +11,7 @@ const ACTION_TYPE_LABELS = {
 
 const ACTION_TYPE_ORDER = ['attack_rider', 'bonus_action', 'reaction', 'skill_check', 'movement', 'grant_attack'];
 
-function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
+function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose }) {
     const {
         allManeuvers,
         knownManeuvers,
@@ -20,7 +20,9 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
         availableManeuvers,
         attackContext,
         skillContext,
+        lastAttack,
     } = payload;
+
 
     const [selectedForSelection, setSelectedForSelection] = useState(knownManeuvers || []);
     const [selectedForUse, setSelectedForUse] = useState(null);
@@ -50,17 +52,62 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
     };
 
     const handleReopenSelection = () => {
-        onConfirm(selectedForSelection, null);
+        if (onReopenSelection) {
+            onReopenSelection().catch(e => console.error('[CombatSuperiorityModal] Reopen selection failed:', e));
+        } else {
+            onConfirm(selectedForSelection, null);
+        }
     };
 
     const handleUseManeuver = async () => {
         if (!selectedForUse) return;
-        const res = await onConfirm(null, selectedForUse);
-        setResult(res);
-        setApplied(true);
+        try {
+            const res = await onConfirm(null, selectedForUse);
+            setResult(res);
+            setApplied(true);
+        } catch (e) {
+            console.error('[CombatSuperiorityModal] Use maneuver failed:', e);
+        }
     };
 
-    const maneuverList = availableManeuvers && availableManeuvers.length > 0 ? availableManeuvers : (allManeuvers || []);
+    const maneuverList = availableManeuvers && availableManeuvers.length > 0 ? availableManeuvers : (() => {
+        if (!allManeuvers || allManeuvers.length === 0) return [];
+        if (selectionMode) return allManeuvers;
+        if (!lastAttack) return allManeuvers.filter(m => knownManeuvers.includes(m.name));
+        const attackContext = {
+            hit: lastAttack.hit,
+            isCrit: lastAttack.isCrit || false,
+            weaponType: lastAttack.weaponType || null,
+            isUnarmedStrike: lastAttack.isUnarmedStrike || false,
+            replacingAttack: lastAttack.replacingAttack || false,
+        };
+        return allManeuvers.filter(m => {
+            if (!knownManeuvers.includes(m.name)) return false;
+            if (!m.trigger || m.trigger === 'any') return true;
+            if (m.trigger === 'weapon_attack_hit') {
+                return attackContext.weaponType === 'melee' || attackContext.weaponType === 'ranged' || attackContext.isUnarmedStrike;
+            }
+            if (m.trigger === 'melee_weapon_attack_hit') {
+                return attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike;
+            }
+            if (m.trigger === 'attack_roll_miss') {
+                return attackContext.hit === false;
+            }
+            if (m.trigger === 'melee_attack_miss') {
+                return (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike) && attackContext.hit === false;
+            }
+            if (m.trigger === 'melee_damage_taken') {
+                return attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike;
+            }
+            if (m.trigger === 'melee_attack_straight_line') {
+                return attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike;
+            }
+            if (m.trigger === 'replace_attack') {
+                return attackContext.replacingAttack === true;
+            }
+            return true;
+        });
+    })();
 
     const groupedManeuvers = {};
     for (const m of maneuverList) {
@@ -201,7 +248,7 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
                 </div>
                 <div className="sp-body">
                     <p>{isPrompt ? 'Choose a maneuver to use:' : 'Choose a maneuver to use:'}</p>
-                    {ACTION_TYPE_ORDER.filter(t => groupedManeuvers[t] && groupedManeuvers[t].some(m => knownManeuvers.includes(m.name))).map(type => (
+                    {ACTION_TYPE_ORDER.filter(t => (isPrompt && groupedManeuvers[t]) || (!isPrompt && t !== 'attack_rider') && groupedManeuvers[t] && groupedManeuvers[t].some(m => knownManeuvers.includes(m.name))).map(type => (
                         <div key={type} style={{ marginTop: '12px' }}>
                             <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
                                 {ACTION_TYPE_LABELS[type] || type}

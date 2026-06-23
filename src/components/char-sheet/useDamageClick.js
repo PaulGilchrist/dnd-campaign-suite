@@ -47,6 +47,7 @@ export default function useDamageClick({
     };
 
     const handleDamageClick = async (attack) => {
+        console.log('[useDamageClick] handleDamageClick called:', { attackName: attack.name, weaponType: attack.weaponType, hasPopup: !!popupHtml, hasSetAttackRider: !!setAttackRiderManeuverPrompt });
         // Handle Sudden Strike: clear the pending flag for this attack
         const isBonusActionAttack = attack.type === 'Bonus Action';
         if (isBonusActionAttack) {
@@ -68,6 +69,7 @@ export default function useDamageClick({
 
         // Battle Master Attack Rider Maneuvers: prompt for maneuver selection on hit
         const isHit = popupHtml?.hit === true || popupHtml?.isCrit === true;
+        console.log('[useDamageClick] Hit check:', { isHit, hit: popupHtml?.hit, isCrit: popupHtml?.isCrit, weaponType: attack.weaponType });
         if (isHit && setAttackRiderManeuverPrompt) {
             const attackInfo = {
                 weaponType: attack.weaponType,
@@ -75,6 +77,7 @@ export default function useDamageClick({
                 targetName: popupHtml?.targetName || null,
             };
             const availableManeuvers = await getAttackRiderOptions(playerStats, campaignName, attackInfo);
+            console.log('[useDamageClick] Attack rider options:', { count: availableManeuvers.length, maneuvers: availableManeuvers.map(m => m.name) });
             if (availableManeuvers.length > 0) {
                 setAttackRiderManeuverPrompt({
                     maneuvers: availableManeuvers,

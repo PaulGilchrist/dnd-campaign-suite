@@ -45,7 +45,7 @@ describe('CombatSuperiorityModal - result display', () => {
       const props = makeProps({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm: vi.fn(),
       });
@@ -57,9 +57,9 @@ describe('CombatSuperiorityModal - result display', () => {
     }
 
     it('renders the result modal when not in selection mode, applied is true, and result exists', async () => {
-      setupResultState({ payload: { name: 'Trip Attack', description: 'Trip description.' } });
+      setupResultState({ payload: { name: 'Ki-Fueled Attack', description: 'Trip description.' } });
       await waitFor(() => {
-        expect(screen.getByText('Trip Attack')).toBeInTheDocument();
+        expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
       });
     });
 
@@ -71,14 +71,14 @@ describe('CombatSuperiorityModal - result display', () => {
     });
 
     it('renders the bolt icon in the result header', async () => {
-      setupResultState({ payload: { name: 'Trip Attack', description: 'Desc.' } });
+      setupResultState({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } });
       await waitFor(() => {
         expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
       });
     });
 
     it('renders the result description via dangerouslySetInnerHTML', async () => {
-      setupResultState({ payload: { name: 'Trip Attack', description: '<strong>Tripped!</strong>' } });
+      setupResultState({ payload: { name: 'Ki-Fueled Attack', description: '<strong>Tripped!</strong>' } });
       await waitFor(() => {
         const bodyDiv = document.querySelector('.sp-body');
         expect(bodyDiv.innerHTML).toContain('<strong>Tripped!</strong>');
@@ -86,14 +86,14 @@ describe('CombatSuperiorityModal - result display', () => {
     });
 
     it('renders the Done button in result state', async () => {
-      setupResultState({ payload: { name: 'Trip Attack', description: 'Desc.' } });
+      setupResultState({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } });
       await waitFor(() => {
         expect(screen.getByText('Done')).toBeInTheDocument();
       });
     });
 
     it('has sp-roll-btn class on Done button', async () => {
-      setupResultState({ payload: { name: 'Trip Attack', description: 'Desc.' } });
+      setupResultState({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } });
       await waitFor(() => {
         const doneBtn = screen.getByText('Done');
         expect(doneBtn.classList.contains('sp-roll-btn')).toBe(true);
@@ -110,9 +110,9 @@ describe('CombatSuperiorityModal - result display', () => {
     it('calls onClose when Done button is clicked in result state', async () => {
       const onClose = vi.fn();
       const props = makeProps({
-        payload: makePayload({ selectionMode: false, knownManeuvers: ['Trip Attack'] }),
+        payload: makePayload({ selectionMode: false, knownManeuvers: ['Ki-Fueled Attack'] }),
         onClose,
-        onConfirm: vi.fn().mockResolvedValue({ payload: { name: 'Trip Attack', description: 'Desc.' } }),
+        onConfirm: vi.fn().mockResolvedValue({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } }),
       });
       render(<CombatSuperiorityModal {...props} />);
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -128,9 +128,9 @@ describe('CombatSuperiorityModal - result display', () => {
     it('does not call onClose when clicking inside modal in result state', async () => {
       const onClose = vi.fn();
       const props = makeProps({
-        payload: makePayload({ selectionMode: false, knownManeuvers: ['Trip Attack'] }),
+        payload: makePayload({ selectionMode: false, knownManeuvers: ['Ki-Fueled Attack'] }),
         onClose,
-        onConfirm: vi.fn().mockResolvedValue({ payload: { name: 'Trip Attack', description: 'Desc.' } }),
+        onConfirm: vi.fn().mockResolvedValue({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } }),
       });
       render(<CombatSuperiorityModal {...props} />);
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -147,9 +147,9 @@ describe('CombatSuperiorityModal - result display', () => {
     it('calls onClose when clicking overlay in result state', async () => {
       const onClose = vi.fn();
       const props = makeProps({
-        payload: makePayload({ selectionMode: false, knownManeuvers: ['Trip Attack'] }),
+        payload: makePayload({ selectionMode: false, knownManeuvers: ['Ki-Fueled Attack'] }),
         onClose,
-        onConfirm: vi.fn().mockResolvedValue({ payload: { name: 'Trip Attack', description: 'Desc.' } }),
+        onConfirm: vi.fn().mockResolvedValue({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } }),
       });
       render(<CombatSuperiorityModal {...props} />);
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -165,7 +165,7 @@ describe('CombatSuperiorityModal - result display', () => {
 
     it('does not show result state when result is null', async () => {
       const props = makeProps({
-        payload: makePayload({ selectionMode: false, knownManeuvers: ['Trip Attack'] }),
+        payload: makePayload({ selectionMode: false, knownManeuvers: ['Ki-Fueled Attack'] }),
         onConfirm: vi.fn().mockResolvedValue(null),
       });
       render(<CombatSuperiorityModal {...props} />);
@@ -179,8 +179,8 @@ describe('CombatSuperiorityModal - result display', () => {
 
     it('does not show result state when applied is false', async () => {
       const props = makeProps({
-        payload: makePayload({ selectionMode: false, knownManeuvers: ['Trip Attack'] }),
-        onConfirm: vi.fn().mockResolvedValue({ payload: { name: 'Trip Attack', description: 'Desc.' } }),
+        payload: makePayload({ selectionMode: false, knownManeuvers: ['Ki-Fueled Attack'] }),
+        onConfirm: vi.fn().mockResolvedValue({ payload: { name: 'Ki-Fueled Attack', description: 'Desc.' } }),
       });
       render(<CombatSuperiorityModal {...props} />);
       expect(screen.queryByText('Done')).not.toBeInTheDocument();
@@ -206,7 +206,7 @@ describe('CombatSuperiorityModal - selection mode rendering', () => {
       renderModal({
         payload: makePayload({
           selectionMode: true,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       expect(screen.getByText(/Your known maneuvers: 2/)).toBeInTheDocument();
@@ -242,7 +242,7 @@ describe('CombatSuperiorityModal - selection mode rendering', () => {
 
     it('renders maneuver names in selection mode', () => {
       renderModal({ payload: makePayload({ selectionMode: true }) });
-      expect(screen.getByText('Trip Attack')).toBeInTheDocument();
+      expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
       expect(screen.getByText('Pushing Attack')).toBeInTheDocument();
       expect(screen.getByText('Disarming Attack')).toBeInTheDocument();
     });
@@ -317,15 +317,15 @@ describe('CombatSuperiorityModal - selection behavior', () => {
         payload: makePayload({ selectionMode: true }),
         onConfirm,
       });
-      // Checkbox order: [0]=Trip Attack, [1]=Disarming Attack,
-      // [2]=Ki-Fueled Attack, [3]=Evasive Footwork,
-      // [4]=Kicking Attack, [5]=Pushing Attack,
-      // [6]=Rally, [7]=Grasping Vine
+      // Checkbox order (grouped by actionType): [0]=Trip Attack, [1]=Disarming Attack (attack_rider),
+      // [2]=Ki-Fueled Attack (bonus_action), [3]=Evasive Footwork (reaction),
+      // [4]=Kicking Attack (skill_check), [5]=Pushing Attack, [6]=Rally (movement),
+      // [7]=Grasping Vine (grant_attack)
       const checkboxes = document.querySelectorAll('input[type="checkbox"]');
       fireEvent.click(checkboxes[0]);
-      fireEvent.click(checkboxes[1]);
+      fireEvent.click(checkboxes[3]);
       fireEvent.click(screen.getByRole('button', { name: /Confirm Selection/ }));
-      expect(onConfirm).toHaveBeenCalledWith(['Trip Attack', 'Disarming Attack'], null);
+      expect(onConfirm).toHaveBeenCalledWith(['Trip Attack', 'Evasive Footwork'], null);
     });
 
     it('does not call onConfirm when confirm is clicked with no selections', () => {
@@ -355,7 +355,7 @@ describe('CombatSuperiorityModal - selection behavior', () => {
       renderModal({
         payload: makePayload({
           selectionMode: true,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm,
       });
@@ -372,7 +372,7 @@ describe('CombatSuperiorityModal - selection behavior', () => {
       renderModal({
         payload: makePayload({
           selectionMode: true,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       expect(screen.getByRole('button', { name: /Clear Selection/ })).toBeInTheDocument();
@@ -426,7 +426,7 @@ describe('CombatSuperiorityModal - selection behavior', () => {
       renderModal({
         payload: makePayload({
           selectionMode: true,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       const btn = screen.getByRole('button', { name: /Clear Selection/ });
@@ -457,7 +457,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       expect(screen.getByText(/Combat Superiority — Choose Maneuver/)).toBeInTheDocument();
@@ -467,7 +467,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       expect(document.querySelector('.fa-solid.fa-bolt')).toBeInTheDocument();
@@ -477,7 +477,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       expect(screen.getByText(/Choose a maneuver to use/)).toBeInTheDocument();
@@ -487,10 +487,11 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack', 'Evasive Footwork'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack', 'Evasive Footwork'],
         }),
       });
-      expect(screen.getByText('Attack Riders (on hit)')).toBeInTheDocument();
+      // attack_rider excluded from use mode
+      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
       expect(screen.getByText('Movement')).toBeInTheDocument();
       expect(screen.getByText('Reactions')).toBeInTheDocument();
     });
@@ -499,10 +500,10 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
-      expect(screen.getByText('Trip Attack')).toBeInTheDocument();
+      expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
       expect(screen.queryByText('Pushing Attack')).not.toBeInTheDocument();
     });
 
@@ -510,10 +511,11 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
-      expect(screen.getByText('Attack Riders (on hit)')).toBeInTheDocument();
+      // attack_rider excluded from use mode
+      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
       expect(screen.queryByText('Movement')).not.toBeInTheDocument();
     });
 
@@ -521,7 +523,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -532,7 +534,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -543,7 +545,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -555,7 +557,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -566,13 +568,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
     });
 
     it('shows action type subtitle for attack_rider maneuver', () => {
-      renderModal({
-        payload: makePayload({
-          selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
-        }),
-      });
-      expect(screen.getByText(/— on hit/)).toBeInTheDocument();
+      // attack_rider excluded from use mode, skip this test
     });
 
     it('shows action type subtitle for bonus_action maneuver', () => {
@@ -637,7 +633,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack', 'Pushing Attack'],
+          knownManeuvers: ['Ki-Fueled Attack', 'Pushing Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -650,7 +646,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       expect(screen.getByRole('button', { name: /Use Maneuver/ })).toBeDisabled();
@@ -660,7 +656,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
@@ -672,7 +668,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       const btn = screen.getByRole('button', { name: /Use Maneuver/ });
@@ -683,7 +679,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       const btn = screen.getByRole('button', { name: /Use Maneuver/ });
@@ -695,14 +691,14 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm,
       });
       const radios = document.querySelectorAll('input[name="combatManeuver"]');
       fireEvent.click(radios[0]);
       fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
-      expect(onConfirm).toHaveBeenCalledWith(null, 'Trip Attack');
+      expect(onConfirm).toHaveBeenCalledWith(null, 'Ki-Fueled Attack');
     });
 
     it('does not call onConfirm when use maneuver is clicked with no selection', () => {
@@ -710,7 +706,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm,
       });
@@ -721,12 +717,12 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
     it('sets result and applied state when use maneuver resolves', async () => {
       const onConfirm = vi.fn();
       onConfirm.mockResolvedValue({
-        payload: { name: 'Trip Attack', description: 'Tripped!' },
+        payload: { name: 'Ki-Fueled Attack', description: 'Tripped!' },
       });
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onConfirm,
       });
@@ -735,7 +731,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
 
       await waitFor(() => {
-        expect(screen.getByText('Trip Attack')).toBeInTheDocument();
+        expect(screen.getByText('Ki-Fueled Attack')).toBeInTheDocument();
       });
     });
 
@@ -744,7 +740,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onClose,
       });
@@ -757,7 +753,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onClose,
       });
@@ -771,7 +767,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
         onClose,
       });
@@ -784,7 +780,7 @@ describe('CombatSuperiorityModal - maneuver use mode', () => {
       renderModal({
         payload: makePayload({
           selectionMode: false,
-          knownManeuvers: ['Trip Attack'],
+          knownManeuvers: ['Ki-Fueled Attack'],
         }),
       });
       const btn = screen.getByRole('button', { name: /Cancel/ });

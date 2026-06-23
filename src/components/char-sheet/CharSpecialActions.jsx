@@ -13,8 +13,9 @@ import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
-import { onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { onCombatSuperioritySelected, executeAttackRiderManeuver } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { addEntry } from '../../services/ui/logService.js';
+import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../../hooks/runtime/useRuntimeState.js';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const [popupHtml, setPopupHtml] = useState(null);
@@ -84,8 +85,33 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
 
     const handleCombatSuperiorityConfirm = useCallback(async (selectedManeuverNames, singleUseManeuverName) => {
         if (!combatSuperiorityModal) return;
-        const result = await onCombatSuperioritySelected(combatSuperiorityModal.action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
         setCombatSuperiorityModal(null);
+
+        if (singleUseManeuverName) {
+            const attackContext = combatSuperiorityModal.payload?.attackContext;
+            const action = { automation: {} };
+            const attackInfo = {
+                weaponType: attackContext?.weaponType || null,
+                isUnarmedStrike: attackContext?.isUnarmedStrike || false,
+                targetName: attackContext?.targetName || null,
+            };
+            const result = await executeAttackRiderManeuver(action, playerStats, campaignName, singleUseManeuverName, attackInfo);
+            if (result?.logEntries) {
+                for (const entry of result.logEntries) {
+                    await addEntry(campaignName, entry).catch(() => {});
+                }
+            }
+            if (result?.type === 'popup') {
+                const payload = result.payload;
+                const html = typeof payload === 'string'
+                    ? payload
+                    : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+                setPopupHtml(html);
+            }
+            return;
+        }
+
+        const result = await onCombatSuperioritySelected(combatSuperiorityModal.action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
         if (result?.type === 'popup') {
             const payload = result.payload;
             const html = typeof payload === 'string'
@@ -95,12 +121,30 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
         }
     }, [combatSuperiorityModal, playerStats, campaignName]);
 
+    const handleCombatSuperiorityReopenSelection = useCallback(async () => {
+        if (!combatSuperiorityModal || !combatSuperiorityModal.action) return;
+        const reOpenAction = {
+            ...combatSuperiorityModal.action,
+            automation: {
+                ...combatSuperiorityModal.action.automation,
+                forceSelectionMode: true,
+            },
+        };
+        const result = await executeHandler(reOpenAction, playerStats, campaignName, null);
+        if (result && result.type === 'modal' && result.modalName === 'combatSuperiority') {
+            setCombatSuperiorityModal(result.payload);
+        }
+    }, [combatSuperiorityModal, playerStats, campaignName]);
+
     useEffect(() => {
-        const checkPendingPrompt = () => {
-            if (combatSuperiorityModal) return;
+        let handledPending = false;
+        const checkAndHandlePending = () => {
+            if (handledPending) return;
             const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt');
             if (!pending) return;
             if (!pending.attackContext && !pending.skillContext) return;
+
+            handledPending = true;
 
             const promptType = pending.rollType;
             let handlerType;
@@ -128,9 +172,11 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
             });
         };
 
-        const intervalId = setInterval(checkPendingPrompt, 500);
-        return () => clearInterval(intervalId);
-    }, [combatSuperiorityModal, playerStats, campaignName]);
+        const removeListener = addStorageChangeListener(playerStats.name, checkAndHandlePending);
+        return () => {
+            removeListener();
+        };
+    }, [playerStats, campaignName]);
 
     // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];
@@ -200,6 +246,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 <CombatSuperiorityModal
                     payload={combatSuperiorityModal}
                     onConfirm={handleCombatSuperiorityConfirm}
+                    onReopenSelection={handleCombatSuperiorityReopenSelection}
                     onClose={() => setCombatSuperiorityModal(null)}
                 />
             )}

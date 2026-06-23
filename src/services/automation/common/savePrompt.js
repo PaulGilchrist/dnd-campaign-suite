@@ -4,7 +4,8 @@ import { getAbilityModifier } from '../../shared/abilityLookup.js';
 
 export function buildSaveDc(auto, playerStats) {
     if (auto.saveDc === 'ability') {
-        const ability = auto.saveAbility || 'CON';
+        let ability = auto.saveAbility || 'CON';
+        if (Array.isArray(ability)) ability = ability[0];
         const abilityBonus = getAbilityModifier(playerStats.abilities, ability);
         const prof = playerStats.proficiency || 0;
         return 8 + abilityBonus + prof;
