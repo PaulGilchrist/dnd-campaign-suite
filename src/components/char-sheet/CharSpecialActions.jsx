@@ -139,11 +139,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     useEffect(() => {
         let handledPending = false;
         const checkAndHandlePending = () => {
-            if (handledPending) return;
             const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt');
-            if (!pending) return;
-            if (!pending.attackContext && !pending.skillContext) return;
-
+            if (!pending || !pending.attackContext && !pending.skillContext) {
+                if (handledPending) handledPending = false;
+                return;
+            }
+            if (handledPending) return;
             handledPending = true;
 
             const promptType = pending.rollType;

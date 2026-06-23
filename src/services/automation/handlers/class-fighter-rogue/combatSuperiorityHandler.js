@@ -642,6 +642,17 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
 
     if (maneuver.effect === 'next_attack_advantage' || maneuver.effect === 'distracting_strike_advantage') {
         description += ` The next attack against ${targetName || 'the target'} by an ally has Advantage.`;
+        if (targetName) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const newEffect = {
+                target: targetName,
+                source: playerStats.name,
+                effect: 'distracting_strike_advantage',
+                value: null,
+                duration: 'until_end_of_turn',
+            };
+            await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+        }
     }
 
     if (maneuver.effect === 'ally_movement') {
@@ -1656,6 +1667,17 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
 
     if (maneuver.effect === 'next_attack_advantage' || maneuver.effect === 'distracting_strike_advantage') {
         description += ` The next attack against ${targetName || 'the target'} by an ally has Advantage.`;
+        if (targetName) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const newEffect = {
+                target: targetName,
+                source: playerStats.name,
+                effect: 'distracting_strike_advantage',
+                value: null,
+                duration: 'until_end_of_turn',
+            };
+            await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+        }
     }
 
     if (maneuver.effect === 'ally_movement') {
