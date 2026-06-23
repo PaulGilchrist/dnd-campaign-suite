@@ -58,6 +58,15 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const innateSorceryBonus = getInnateSorceryBonus(playerName, campaignName);
 
         let forcedMode = conditionAttackMode !== 'normal' ? conditionAttackMode : undefined;
+        if (forcedMode === undefined) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const goadEffect = storedEffects.find(
+                te => te.effect === 'goad' && te.target === playerName
+            );
+            if (goadEffect) {
+                forcedMode = 'disadvantage';
+            }
+        }
         if (hasSaveAdvantage && forcedMode === undefined) {
             forcedMode = 'advantage';
           }

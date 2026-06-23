@@ -159,7 +159,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     const attackerConditions = (attacker?.conditions || []).map(c => c.key)
     const targetConditions = (target?.conditions || []).map(c => c.key)
 
-    const attackerEffects = computeConditionEffects(attackerConditions)
+    const attackerEffects = computeConditionEffects(attackerConditions, [], monsterTargetEffects)
     const attackerCannotAct = attackerConditions.some(c => CONDITIONS_THAT_CANNOT_ACT.has(c))
     if (attackerCannotAct) return
 

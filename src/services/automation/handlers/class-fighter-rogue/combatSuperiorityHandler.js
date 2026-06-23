@@ -607,6 +607,15 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
                 setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
             } else if (maneuver.effect === 'goad') {
                 description += ` ${targetName} has Disadvantage on attacks against targets other than you.`;
+                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                const newEffect = {
+                    target: targetName,
+                    source: playerStats.name,
+                    effect: 'goad',
+                    duration: 'until_end_of_user_next_turn',
+                };
+                const updatedEffects = [...storedEffects, newEffect];
+                setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
             } else if (maneuver.effect === 'prone') {
                 description += ` ${targetName} fell Prone.`;
                 const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
@@ -1634,6 +1643,15 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
                 setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
             } else if (maneuver.effect === 'goad') {
                 description += ` ${targetName} has Disadvantage on attacks against targets other than you.`;
+                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                const newEffect = {
+                    target: targetName,
+                    source: playerStats.name,
+                    effect: 'goad',
+                    duration: 'until_end_of_user_next_turn',
+                };
+                const updatedEffects = [...storedEffects, newEffect];
+                setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
             } else if (maneuver.effect === 'prone') {
                 description += ` ${targetName} fell Prone.`;
                 const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
