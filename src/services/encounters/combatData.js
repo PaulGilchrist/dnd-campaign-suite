@@ -1,13 +1,13 @@
 import { getCombatContext } from '../rules/combat/damageUtils.js'
 
-// Global in-memory store for combat data (synced via SSE events)
+// In-memory store for combat data (synced via SSE events)
 let cachedCombatSummary = null
 
 /**
  * Call this when combat summary is updated on the server.
  * Used by initiative.jsx to seed the cache from its SSE handler.
  */
-export function setCombatSummaryCache(summary) {
+export function setCombatSummaryCache(summary, _campaignName) {
   cachedCombatSummary = summary
 }
 
@@ -16,7 +16,7 @@ export async function loadCombatSummary(campaignName) {
     try {
       const fromApi = await getCombatContext(campaignName)
       if (fromApi) {
-        setCombatSummaryCache(fromApi)
+        setCombatSummaryCache(fromApi, campaignName)
         return fromApi
       }
     } catch { /* fall through */ }
@@ -25,7 +25,7 @@ export async function loadCombatSummary(campaignName) {
   return null
 }
 
-export function getCombatSummary() {
+export function getCombatSummary(_campaignName) {
   return cachedCombatSummary
 }
 
@@ -41,8 +41,9 @@ export async function loadActiveCreatureName(campaignName) {
   return null
 }
 
-export function getActiveCreatureName() {
-  return cachedCombatSummary?.activeCreatureName ?? null
+export function getActiveCreatureName(campaignName) {
+  const cs = getCombatSummary(campaignName)
+  return cs?.activeCreatureName ?? null
 }
 
 export async function loadCurrentCombatRound(campaignName) {
@@ -50,6 +51,7 @@ export async function loadCurrentCombatRound(campaignName) {
   return cs?.round ?? 1
 }
 
-export function getCurrentCombatRound() {
-  return cachedCombatSummary?.round ?? 1
+export function getCurrentCombatRound(campaignName) {
+  const cs = getCombatSummary(campaignName)
+  return cs?.round ?? 1
 }

@@ -11,6 +11,19 @@ import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext, findCreatureByName } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import storage from '../../../ui/storage.js';
+
+function applyConditionToTarget(targetName, conditionKey, campaignName, combatSummary) {
+    if (!combatSummary) return;
+    const creature = combatSummary.creatures.find(c => c.name === targetName);
+    if (!creature) return;
+    if (creature.type === 'player') return;
+    const conditions = creature.conditions || [];
+    const existing = conditions.find(c => String(c.key).toLowerCase() === conditionKey.toLowerCase());
+    if (existing) return;
+    creature.conditions = [...conditions, { id: `${Date.now()}-${Math.random()}`, key: conditionKey, label: conditionKey.charAt(0).toUpperCase() + conditionKey.slice(1) }];
+    storage.set('combatSummary', combatSummary, campaignName);
+}
 
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';
 
@@ -102,7 +115,7 @@ async function resolveAllyForRally(campaignName, playerStats, mapName) {
     return allies[0].name;
 }
 
-function validateSizeLimit(maneuver, targetName, campaignName, playerStats) {
+async function validateSizeLimit(maneuver, targetName, campaignName, playerStats) {
     if (!maneuver.sizeLimit || !targetName) return { valid: true };
     const sizeOrder = ['Fine', 'Tiny', 'Small', 'Medium', 'Large', 'Huge', 'Gargantuan'];
     let maxAllowed;
@@ -116,7 +129,7 @@ function validateSizeLimit(maneuver, targetName, campaignName, playerStats) {
         maxAllowed = sizeOrder.indexOf(playerStats?.size || 'Medium') + 1;
     }
     if (maxAllowed == null) return { valid: true };
-    const cs = getCombatContext(campaignName);
+    const cs = await getCombatContext(campaignName);
     if (!cs) return { valid: true };
     const target = cs.creatures?.find(c => c.name === targetName);
     if (!target) return { valid: true };
@@ -344,7 +357,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const nonAttackRiderKnown = known.filter(m => m.actionType !== 'attack_rider');
     const hasNonAttackRiderManeuvers = nonAttackRiderKnown.length > 0;
 
-    const cs = getCombatContext(campaignName);
+    const cs = await getCombatContext(campaignName);
     const lastAttack = cs?.lastAttack || null;
 
     const modalPayload = {
@@ -526,7 +539,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     const targetName = targetInfo?.target?.name || attackInfo?.targetName || null;
 
     if (targetName && maneuver.sizeLimit) {
-        const sizeCheck = validateSizeLimit(maneuver, targetName, campaignName, playerStats);
+        const sizeCheck = await validateSizeLimit(maneuver, targetName, campaignName, playerStats);
         if (!sizeCheck.valid) {
             await setRuntimeValue(playerStats.name, 'superiorityDice', superiorityDice, campaignName);
             return {
@@ -583,6 +596,8 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
                 if (!hasFrightened) {
                     await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'frightened'], campaignName);
                 }
+                const cs = await getCombatContext(campaignName);
+                applyConditionToTarget(targetName, 'frightened', campaignName, cs);
                 await addExpiration(playerStats.name, targetName, [
                     { type: 'condition', condition: 'frightened' },
                 ], campaignName, 2);
@@ -624,6 +639,8 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
                 if (!hasProne) {
                     await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'prone'], campaignName);
                 }
+                const cs = await getCombatContext(campaignName);
+                applyConditionToTarget(targetName, 'prone', campaignName, cs);
             } else if (maneuver.conditionInflicted) {
                 description += ` ${targetName} gained the ${maneuver.conditionInflicted} condition.`;
             } else {
@@ -680,7 +697,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     };
 
     if (maneuver.effect === 'secondary_damage') {
-        const cs = getCombatContext(campaignName);
+        const cs = await getCombatContext(campaignName);
         if (cs && cs.creatures && targetName) {
             const primaryTarget = cs.creatures.find(c => c.name === targetName);
             if (primaryTarget?.position) {
@@ -1477,6 +1494,8 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
             await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'disadvantage'], campaignName);
         }
         if (targetName) {
+            const cs = await getCombatContext(campaignName);
+            applyConditionToTarget(targetName, 'disadvantage', campaignName, cs);
             await addExpiration(playerStats.name, targetName, [
                 { type: 'condition', condition: 'disadvantage' },
             ], campaignName, durationInTurns);
@@ -1490,6 +1509,8 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
             if (!hasDisadvantage) {
                 await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'disadvantage'], campaignName);
             }
+            const cs = await getCombatContext(campaignName);
+            applyConditionToTarget(targetName, 'disadvantage', campaignName, cs);
             await addExpiration(playerStats.name, targetName, [
                 { type: 'condition', condition: 'disadvantage' },
             ], campaignName, 2);
@@ -1553,7 +1574,7 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
     const targetName = targetInfo?.target?.name || null;
 
     if (targetName && maneuver.sizeLimit) {
-        const sizeCheck = validateSizeLimit(maneuver, targetName, campaignName, playerStats);
+        const sizeCheck = await validateSizeLimit(maneuver, targetName, campaignName, playerStats);
         if (!sizeCheck.valid) {
             return {
                 type: 'popup',
@@ -1619,6 +1640,8 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
                 if (!hasFrightened) {
                     await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'frightened'], campaignName);
                 }
+                const cs = await getCombatContext(campaignName);
+                applyConditionToTarget(targetName, 'frightened', campaignName, cs);
                 await addExpiration(playerStats.name, targetName, [
                     { type: 'condition', condition: 'frightened' },
                 ], campaignName, 2);
@@ -1660,6 +1683,8 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
                 if (!hasProne) {
                     await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'prone'], campaignName);
                 }
+                const cs = await getCombatContext(campaignName);
+                applyConditionToTarget(targetName, 'prone', campaignName, cs);
             } else if (maneuver.conditionInflicted) {
                 description += ` ${targetName} gained the ${maneuver.conditionInflicted} condition.`;
             } else {

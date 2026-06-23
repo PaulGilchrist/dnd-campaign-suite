@@ -154,7 +154,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
         let handledPending = false;
         const checkAndHandlePending = () => {
             if (combatSuperiorityModal) return;
-            const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt');
+            const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', campaignName);
             if (!pending || (!pending.attackContext && !pending.skillContext)) {
                 if (handledPending) handledPending = false;
                 return;

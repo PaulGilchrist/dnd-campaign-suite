@@ -27,8 +27,14 @@ function getStore(characterKey) {
 export function seedTrackedResources(characterKey, trackedEntries) {
   if (!trackedEntries || typeof trackedEntries !== 'object') return;
   const store = getStore(characterKey);
+  const entries = Object.entries(trackedEntries);
+  if (entries.length === 0) return;
   let changed = false;
-  for (const [key, value] of Object.entries(trackedEntries)) {
+  if (!store.has('pendingExpirations')) {
+    store.set('pendingExpirations', []);
+    changed = true;
+  }
+  for (const [key, value] of entries) {
     if (store.get(key) !== value) {
       store.set(key, value);
       changed = true;

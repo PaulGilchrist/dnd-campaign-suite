@@ -71,7 +71,8 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     combatSummaryRef.current = combatSummary
 
     React.useEffect(() => {
-        setCombatSummaryCache(combatSummary)
+        setCombatSummaryCache(combatSummary, campaignName)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [combatSummary])
 
     const [conditionPickerTarget, setConditionPickerTarget] = React.useState(null)
@@ -296,7 +297,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 setCombatSummary(merged)
                 combatSummaryRef.current = merged
 
-                const activeName = getActiveCreatureName()
+                const activeName = getActiveCreatureName(campaignName)
                 if (activeName) {
                     setActiveCreatureName(activeName)
                 } else {

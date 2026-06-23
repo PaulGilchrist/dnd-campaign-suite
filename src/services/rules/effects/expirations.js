@@ -133,7 +133,7 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
     // Clean up Sap weapon mastery disadvantage at start of attacker's next turn
     const allTargetEffectsSap = getRuntimeValue(campaignName, 'targetEffects') || [];
     if (allTargetEffectsSap.length > 0) {
-        const currentRound = getCurrentCombatRound();
+        const currentRound = getCurrentCombatRound(campaignName);
         const cleanedSap = allTargetEffectsSap.filter(te => {
             if (te.effect !== 'disadvantage_next_attack') return true;
             if (!te.target) return true;
@@ -162,7 +162,7 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
     // Clean up Vex weapon mastery advantage at start of each creature's turn (expires at end of attacker's next turn)
     const allTargetEffectsVex = getRuntimeValue(campaignName, 'targetEffects') || [];
     if (allTargetEffectsVex.length > 0) {
-        const currentRound = getCurrentCombatRound();
+        const currentRound = getCurrentCombatRound(campaignName);
         const cleanedVex = allTargetEffectsVex.filter(te => {
             if (te.effect !== 'next_attack_advantage') return true;
             if (!te.vexTarget) return true;
@@ -182,7 +182,7 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
     // Clean up Topple weapon mastery Prone condition at start of target's next turn
     const allTargetEffectsTopple = getRuntimeValue(campaignName, 'targetEffects') || [];
     if (allTargetEffectsTopple.length > 0) {
-        const currentRound = getCurrentCombatRound();
+        const currentRound = getCurrentCombatRound(campaignName);
         const toppleTargets = new Set();
         for (const te of allTargetEffectsTopple) {
             if (te.effect !== 'topple') continue;
@@ -696,7 +696,7 @@ export function addExpiration(attackerName, targetName, effects, campaignName, r
         console.error('expirations: expected pendingExpirations to be an array for', attackerName);
         throw new Error('Missing array: pendingExpirations for ' + attackerName);
     }
-    const currentRound = getCurrentCombatRound();
+    const currentRound = getCurrentCombatRound(campaignName);
     setRuntimeValue(attackerName, KEY, [
          ...list,
           { target: targetName, effects, appliedRound: currentRound, expiryRounds: (() => {
@@ -757,21 +757,15 @@ export function clearAllExpirationEffects(characterName, campaignName) {
 }
 
 export function expireStaleEffects(campaignName) {
-    const currentRound = getCurrentCombatRound();
-    const activeName = getActiveCreatureName();
+    const currentRound = getCurrentCombatRound(campaignName);
+    const activeName = getActiveCreatureName(campaignName);
     if (!activeName) return;
 
     try {
         const combatData = getCombatSummary(campaignName);
-        if (combatData == null || typeof combatData !== 'object') {
-            console.error('expirations: expected combatData to be an object for', campaignName);
-            throw new Error('Missing object: combatData for ' + campaignName);
-        }
+        if (!combatData || typeof combatData !== 'object') return;
         const creatures = combatData.creatures;
-        if (!Array.isArray(creatures)) {
-            console.error('expirations: expected creatures to be an array in combatSummary');
-            throw new Error('Missing array: creatures in combatSummary');
-        }
+        if (!Array.isArray(creatures)) return;
 
         for (const attacker of creatures) {
             if (utils.getName(attacker.name) !== utils.getName(activeName)) continue;
@@ -1131,15 +1125,9 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
 function removeNpcCondition(targetName, conditionName, campaignName) {
     try {
         const combatData = getCombatSummary(campaignName);
-        if (combatData == null || typeof combatData !== 'object') {
-            console.error('expirations: expected combatData to be an object for', campaignName);
-            throw new Error('Missing object: combatData for ' + campaignName);
-        }
+        if (!combatData || typeof combatData !== 'object') return;
         const creatures = combatData.creatures;
-        if (!Array.isArray(creatures)) {
-            console.error('expirations: expected creatures to be an array in combatSummary');
-            throw new Error('Missing array: creatures in combatSummary');
-        }
+        if (!Array.isArray(creatures)) return;
         const creature = creatures.find(c => utils.getName(c.name) === utils.getName(targetName));
         if (creature && creature.conditions) {
             creature.conditions = creature.conditions.filter(c => c.key !== conditionName);
