@@ -4,13 +4,31 @@ import { rollExpression } from '../../../dice/diceRoller.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
-import { loadManeuvers, loadMapData } from '../../../ui/dataLoader.js';
+import { loadManeuvers } from '../../../ui/dataLoader.js';
+import { loadMapData } from '../../../maps/mapsService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
 import { getCombatContext, findCreatureByName } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';
+
+function computeMaxOptions(playerStats, auto) {
+    const base = auto.maxOptions || 3;
+    const scaling = auto.maxOptionsScaling || {};
+    let total = base;
+    const level = playerStats.level || 0;
+    const sortedLevels = Object.keys(scaling)
+        .map(Number)
+        .filter(l => !isNaN(l))
+        .sort((a, b) => a - b);
+    for (const scaleLevel of sortedLevels) {
+        if (level >= scaleLevel) {
+            total += scaling[scaleLevel];
+        }
+    }
+    return total;
+}
 
 function getKnownManeuvers(playerStats, campaignName) {
     const stored = getRuntimeValue(playerStats.name, SELECTION_KEY, campaignName);
@@ -139,28 +157,140 @@ export function getAvailableAttackRiderManeuversByTrigger(playerStats, campaignN
     const isMeleeAttack = attackInfo?.weaponType === 'melee' || attackInfo?.isUnarmedStrike;
 
     return allManeuvers.filter(m => {
+        if (!m.trigger || m.trigger === 'any') return true;
         if (m.trigger === 'weapon_attack_hit') {
             return isWeaponAttack;
         }
         if (m.trigger === 'melee_weapon_attack_hit') {
             return isMeleeAttack;
         }
+        if (m.trigger === 'attack_roll_miss') {
+            return attackInfo?.hit === false;
+        }
+        if (m.trigger === 'melee_attack_miss') {
+            return isMeleeAttack && attackInfo?.hit === false;
+        }
+        if (m.trigger === 'melee_damage_taken') {
+            return isMeleeAttack;
+        }
+        if (m.trigger === 'melee_attack_straight_line') {
+            return isMeleeAttack;
+        }
+        if (m.trigger === 'replace_attack') {
+            return attackInfo?.replacingAttack === true;
+        }
         return true;
     });
 }
 
+export function getAvailableSkillCheckManeuvers(playerStats, campaignName, skillName, isInitiative) {
+    const knownNames = getKnownManeuvers(playerStats, campaignName);
+    if (knownNames.length === 0) return [];
+
+    const superiorityDice = getSuperiorityDice(playerStats, campaignName);
+    if (superiorityDice <= 0) return [];
+
+    const allManeuvers = allManeuversCache.get(`${playerStats.rules || '2024'}`) || [];
+
+    return allManeuvers.filter(m => {
+        if (!knownNames.includes(m.name)) return false;
+        if (m.actionType !== 'skill_check') return false;
+        if (m.initiativeBonus && isInitiative) return true;
+        if (m.skills && m.skills.length > 0) {
+            const skillLower = skillName?.toLowerCase() || '';
+            return m.skills.some(s => s.toLowerCase().includes(skillLower) || skillLower.includes(s.toLowerCase()));
+        }
+        return false;
+    });
+}
+
+export async function handleAttackRiderPrompt(action, playerStats, campaignName, _mapName) {
+    const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', campaignName);
+    if (!pending || !pending.attackContext) return null;
+
+    const attackContext = pending.attackContext;
+    const knownNames = getKnownManeuvers(playerStats, campaignName);
+    if (knownNames.length === 0) return null;
+
+    const superiorityDice = getSuperiorityDice(playerStats, campaignName);
+    if (superiorityDice <= 0) return null;
+
+    const available = getAvailableAttackRiderManeuversByTrigger(playerStats, campaignName, attackContext);
+    if (available.length === 0) return null;
+
+    return {
+        type: 'modal',
+        modalName: 'combatSuperiority',
+        payload: {
+            action: {
+                automation: {
+                    type: 'combat_superiority',
+                    dieExpression: 'superiority_die',
+                },
+            },
+            playerStats,
+            campaignName,
+            knownManeuvers: available.map(m => m.name),
+            availableManeuvers: available,
+            maxOptions: available.length,
+            selectionMode: false,
+            attackContext,
+            saveDc: attackContext?.saveDc || null,
+            saveType: attackContext?.saveType || null,
+        },
+    };
+}
+
+export async function handleSkillCheckPrompt(action, playerStats, campaignName, _mapName) {
+    const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', campaignName);
+    if (!pending || !pending.skillContext) return null;
+
+    const skillContext = pending.skillContext;
+    const knownNames = getKnownManeuvers(playerStats, campaignName);
+    if (knownNames.length === 0) return null;
+
+    const superiorityDice = getSuperiorityDice(playerStats, campaignName);
+    if (superiorityDice <= 0) return null;
+
+    const available = getAvailableSkillCheckManeuvers(playerStats, campaignName, skillContext?.skillName, skillContext?.isInitiative);
+    if (available.length === 0) return null;
+
+    return {
+        type: 'modal',
+        modalName: 'combatSuperiority',
+        payload: {
+            action: {
+                automation: {
+                    type: 'combat_superiority',
+                    dieExpression: 'superiority_die',
+                },
+            },
+            playerStats,
+            campaignName,
+            knownManeuvers: available.map(m => m.name),
+            availableManeuvers: available,
+            maxOptions: available.length,
+            selectionMode: false,
+            skillContext,
+            saveDc: null,
+            saveType: null,
+        },
+    };
+}
+
 function getManeuversByType(playerStats, campaignName, knownNames, actionType, attackInfo) {
-    return allManeuversCache.get(`${playerStats.rules || '2024'}_${knownNames.sort().join(',')}`)
-        ?.filter(m => {
-            if (actionType && m.actionType !== actionType) return false;
-            if (attackInfo && m.trigger && m.trigger !== 'any') {
-                const isWeaponAttack = attackInfo.weaponType === 'melee' || attackInfo.weaponType === 'ranged' || attackInfo.isUnarmedStrike;
-                const isMeleeAttack = attackInfo.weaponType === 'melee' || attackInfo.isUnarmedStrike;
-                if (m.trigger === 'weapon_attack_hit' && !isWeaponAttack) return false;
-                if (m.trigger === 'melee_weapon_attack_hit' && !isMeleeAttack) return false;
-            }
-            return true;
-        }) || [];
+    const allManeuvers = allManeuversCache.get(`${playerStats.rules || '2024'}`) || [];
+    return allManeuvers.filter(m => {
+        if (!knownNames.includes(m.name)) return false;
+        if (actionType && m.actionType !== actionType) return false;
+        if (attackInfo && m.trigger && m.trigger !== 'any') {
+            const isWeaponAttack = attackInfo.weaponType === 'melee' || attackInfo.weaponType === 'ranged' || attackInfo.isUnarmedStrike;
+            const isMeleeAttack = attackInfo.weaponType === 'melee' || attackInfo.isUnarmedStrike;
+            if (m.trigger === 'weapon_attack_hit' && !isWeaponAttack) return false;
+            if (m.trigger === 'melee_weapon_attack_hit' && !isMeleeAttack) return false;
+        }
+        return true;
+    });
 }
 
 const allManeuversCache = new Map();
@@ -191,7 +321,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    const maxOptions = auto.maxOptions || 3;
+    const maxOptions = computeMaxOptions(playerStats, auto);
 
     const unknownManeuvers = allManeuvers.filter(m => !knownManeuvers.includes(m.name));
     const known = allManeuvers.filter(m => knownManeuvers.includes(m.name));
@@ -1186,6 +1316,136 @@ export async function executeSkillCheckManeuver(action, playerStats, campaignNam
     } else {
         const ability = maneuver.ability || 'the ability';
         description += ` Add ${dieValue} to your next ${ability} (${skillList || 'skill check'}).`;
+    }
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: maneuver.name,
+            description,
+        },
+        logEntries: [logEntry],
+    };
+}
+
+export async function handleCombatSuperiorityCommandingPresenceReaction(action, playerStats, campaignName, _mapName) {
+    const maneuverName = action.automation?.maneuverName;
+    if (!maneuverName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No maneuver specified.',
+            },
+        };
+    }
+    return executeCommandingPresenceReaction(action, playerStats, campaignName, maneuverName);
+}
+
+export async function executeCommandingPresenceReaction(action, playerStats, campaignName, maneuverName) {
+    const allManeuvers = await getManeuversForRules(playerStats.rules);
+    const maneuver = allManeuvers.find(m => m.name === maneuverName);
+
+    if (!maneuver) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: maneuverName,
+                description: `Maneuver "${maneuverName}" not found.`,
+            },
+        };
+    }
+
+    const superiorityDice = getSuperiorityDice(playerStats, campaignName);
+    const relentless = hasRelentless(playerStats);
+    const storedRound = getRelentlessUsedRound(playerStats, campaignName);
+    const currentRound = getCurrentCombatRound();
+    const relentlessUsed = relentless && storedRound === currentRound;
+
+    if (superiorityDice <= 0 && !relentless) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: maneuver.name,
+                description: `${maneuver.name}: No Superiority Dice remaining. Recharges on a Short or Long Rest.`,
+            },
+        };
+    }
+
+    const superiorityDieSize = evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
+
+    let dieValue;
+    let dieDescription;
+    let expendedDie = true;
+
+    if (relentless && !relentlessUsed) {
+        const relentlessRoll = rollExpression('1d8');
+        dieValue = relentlessRoll?.total || 8;
+        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        setRelentlessUsed(playerStats, campaignName);
+        expendedDie = false;
+    } else {
+        const dieRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = dieRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled ${superiorityDieSize} for ${dieValue}.`;
+    }
+
+    if (expendedDie) {
+        await setRuntimeValue(playerStats.name, 'superiorityDice', superiorityDice - 1, campaignName);
+    }
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description: `Used ${maneuver.name} as a reaction. Superiority die rolled ${dieValue}.`,
+    };
+    await addEntry(campaignName, logEntry).catch(() => {});
+
+    const auto = action.automation || {};
+    const targetName = auto.targetName;
+    const reactionEffect = auto.reactionEffect || 'disadvantage_next_attack';
+    const reactionDuration = auto.reactionDuration || 'until_end_of_next_turn';
+
+    let description = `<b>${maneuver.name}</b> (Reaction)<br/>${dieDescription}`;
+
+    if (targetName) {
+        description += ` Target: ${targetName}.`;
+    }
+
+    if (reactionEffect === 'disadvantage_next_attack') {
+        const durationInTurns = reactionDuration === 'until_end_of_next_turn' ? 2 : 1;
+        description += ` ${targetName || 'The target'} has Disadvantage on their next attack roll.`;
+        const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+        const hasDisadvantage = conditions.some(c => String(c).toLowerCase() === 'disadvantage');
+        if (!hasDisadvantage && targetName) {
+            await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'disadvantage'], campaignName);
+        }
+        if (targetName) {
+            await addExpiration(playerStats.name, targetName, [
+                { type: 'condition', condition: 'disadvantage' },
+            ], campaignName, durationInTurns);
+        }
+    } else if (reactionEffect === 'attack_roll_disadvantage') {
+        description += ` ${targetName || 'The target'} has Disadvantage on their next attack roll.`;
+        if (targetName) {
+            const storedConditions = getRuntimeValue(targetName, 'activeConditions', campaignName) || [];
+            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+            const hasDisadvantage = conditions.some(c => String(c).toLowerCase() === 'disadvantage');
+            if (!hasDisadvantage) {
+                await setRuntimeValue(targetName, 'activeConditions', [...conditions, 'disadvantage'], campaignName);
+            }
+            await addExpiration(playerStats.name, targetName, [
+                { type: 'condition', condition: 'disadvantage' },
+            ], campaignName, 2);
+        }
+    } else if (reactionEffect === 'save_disadvantage') {
+        description += ` ${targetName || 'The target'} has Disadvantage on their next saving throw.`;
     }
 
     return {

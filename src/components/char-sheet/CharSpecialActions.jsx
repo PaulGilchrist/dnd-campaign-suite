@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import Popup from '../common/Popup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
@@ -9,9 +9,12 @@ import TeleportModal from './modals/TeleportModal.jsx';
 import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
 import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
 import SavantModal from './modals/arcane/SavantModal.jsx';
+import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
+import { onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const [popupHtml, setPopupHtml] = useState(null);
@@ -19,6 +22,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
     const [spellMasteryModal, setSpellMasteryModal] = useState(null);
     const [savantModal, setSavantModal] = useState(null);
+    const [combatSuperiorityModal, setCombatSuperiorityModal] = useState(null);
 
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
@@ -33,6 +37,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 setSpellMasteryModal(result.payload);
             } else if (result.modalName?.includes('Savant')) {
                 setSavantModal(result.payload);
+            } else if (result.modalName === 'combatSuperiority') {
+                setCombatSuperiorityModal(result.payload);
             }
         }
     }, [playerStats, campaignName, cannotAct]);
@@ -75,6 +81,56 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
             setPopupHtml(html);
         }
     }, [savantModal, playerStats, campaignName]);
+
+    const handleCombatSuperiorityConfirm = useCallback(async (selectedManeuverNames, singleUseManeuverName) => {
+        if (!combatSuperiorityModal) return;
+        const result = await onCombatSuperioritySelected(combatSuperiorityModal.action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
+        setCombatSuperiorityModal(null);
+        if (result?.type === 'popup') {
+            const payload = result.payload;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+    }, [combatSuperiorityModal, playerStats, campaignName]);
+
+    useEffect(() => {
+        const checkPendingPrompt = () => {
+            if (combatSuperiorityModal) return;
+            const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt');
+            if (!pending) return;
+            if (!pending.attackContext && !pending.skillContext) return;
+
+            const promptType = pending.rollType;
+            let handlerType;
+            if (promptType === 'attack') {
+                handlerType = 'combat_superiority_attack_rider';
+            } else if (promptType === 'skill_check') {
+                handlerType = 'combat_superiority_prompt_skill_check';
+            } else {
+                return;
+            }
+
+            const handlerAction = {
+                automation: { type: handlerType },
+                name: 'Combat Superiority',
+            };
+
+            executeHandler(handlerAction, playerStats, campaignName, null).then(result => {
+                if (result && result.type === 'modal' && result.modalName === 'combatSuperiority') {
+                    setCombatSuperiorityModal(result.payload);
+                    setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+                }
+            }).catch(e => {
+                console.error('[CharSpecialActions] Error checking pending Combat Superiority prompt:', e);
+                setRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', null, campaignName);
+            });
+        };
+
+        const intervalId = setInterval(checkPendingPrompt, 500);
+        return () => clearInterval(intervalId);
+    }, [combatSuperiorityModal, playerStats, campaignName]);
 
     // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];
@@ -138,6 +194,13 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                     payload={savantModal}
                     onConfirm={handleSavantConfirm}
                     onClose={() => setSavantModal(null)}
+                />
+            )}
+            {combatSuperiorityModal && (
+                <CombatSuperiorityModal
+                    payload={combatSuperiorityModal}
+                    onConfirm={handleCombatSuperiorityConfirm}
+                    onClose={() => setCombatSuperiorityModal(null)}
                 />
             )}
             {uniqueActions.map((specialAction, index) => {

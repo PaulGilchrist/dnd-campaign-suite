@@ -17,12 +17,18 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
         knownManeuvers,
         maxOptions,
         selectionMode,
+        availableManeuvers,
+        attackContext,
+        skillContext,
     } = payload;
 
     const [selectedForSelection, setSelectedForSelection] = useState(knownManeuvers || []);
     const [selectedForUse, setSelectedForUse] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+
+    const isPromptMode = !!attackContext || !!skillContext;
+    const isPrompt = isPromptMode;
 
     const toggleSelection = (maneuverName) => {
         setSelectedForSelection(prev => {
@@ -43,6 +49,10 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
         onConfirm([], null);
     };
 
+    const handleReopenSelection = () => {
+        onConfirm(selectedForSelection, null);
+    };
+
     const handleUseManeuver = async () => {
         if (!selectedForUse) return;
         const res = await onConfirm(null, selectedForUse);
@@ -50,17 +60,21 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
         setApplied(true);
     };
 
+    const maneuverList = availableManeuvers && availableManeuvers.length > 0 ? availableManeuvers : (allManeuvers || []);
+
     const groupedManeuvers = {};
-    for (const m of allManeuvers) {
+    for (const m of maneuverList) {
         const type = m.actionType || 'other';
         if (!groupedManeuvers[type]) groupedManeuvers[type] = [];
         groupedManeuvers[type].push(m);
     }
 
+    const knownManeuverObjects = selectionMode ? [] : maneuverList.filter(m => knownManeuvers.includes(m.name));
+
     if (!selectionMode && applied && result) {
         return (
             <div className="sp-overlay" onClick={onClose}>
-                <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                <div className="sp-modal sp-modal--wide" onClick={e => e.stopPropagation()}>
                     <div className="sp-header">
                         <i className="fa-solid fa-bolt"></i> {result.payload.name || 'Maneuver'}
                     </div>
@@ -78,14 +92,14 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
         const isKnown = knownManeuvers.length > 0;
         return (
             <div className="sp-overlay" onClick={onClose}>
-                <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                <div className="sp-modal sp-modal--wide" onClick={e => e.stopPropagation()}>
                     <div className="sp-header">
-                        <i className="fa-solid fa-bolt"></i> Combat Superiority — Select Maneuvers
+                        <i className="fa-solid fa-bolt"></i> {isPrompt ? 'Combat Superiority — Choose Maneuver' : 'Combat Superiority — Select Maneuvers'}
                     </div>
                     <div className="sp-body">
                         <p>
                             {isKnown
-                                ? `Your known maneuvers: ${knownManeuvers.length}. You can know up to ${maxOptions}. Select your maneuvers below.`
+                                ? `Your known maneuvers: ${knownManeuvers.length}. You can know up to ${maxOptions}. Select your maneuvers below. You can change your selection at any time.`
                                 : `Choose up to ${maxOptions} maneuvers. You learn 3 at level 3, and gain more at levels 7, 10, and 15.`
                             }
                         </p>
@@ -101,25 +115,41 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
                                     const isSelected = selectedForSelection.includes(m.name);
                                     const atMax = selectedForSelection.length >= maxOptions && !isSelected;
                                     return (
-                                        <label
-                                            key={m.name}
-                                            style={{
-                                                display: 'block', padding: '6px 10px', margin: '2px 0',
-                                                borderRadius: '4px', cursor: atMax ? 'not-allowed' : 'pointer',
-                                                background: isSelected ? 'rgba(255,255,255,0.12)' : 'transparent',
-                                                border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
-                                                opacity: atMax ? 0.5 : 1,
-                                            }}
-                                        >
-                                            <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={() => toggleSelection(m.name)}
-                                                disabled={atMax}
-                                                style={{ marginRight: '6px' }}
-                                            />
-                                            <strong>{m.name}</strong>
-                                        </label>
+                                        <div key={m.name} style={{ marginBottom: '2px' }}>
+                                            <label
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'flex-start',
+                                                    gap: '8px',
+                                                    padding: '6px 10px',
+                                                    borderRadius: '4px',
+                                                    cursor: atMax ? 'not-allowed' : 'pointer',
+                                                    background: isSelected ? 'rgba(255,255,255,0.12)' : 'transparent',
+                                                    border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
+                                                    opacity: atMax ? 0.5 : 1,
+                                                }}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isSelected}
+                                                    onChange={() => {
+                                                        if (!atMax) toggleSelection(m.name);
+                                                    }}
+                                                    disabled={atMax}
+                                                    style={{ marginTop: '2px', flexShrink: 0 }}
+                                                />
+                                                <div style={{ flex: 1 }}>
+                                                    <div>
+                                                        <strong>{m.name}</strong>
+                                                    </div>
+                                                    {m.description && (
+                                                        <div style={{ fontSize: '0.85em', opacity: 0.7, marginTop: '2px', lineHeight: 1.3 }}>
+                                                            {m.description}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </label>
+                                        </div>
                                     );
                                 })}
                             </div>
@@ -145,12 +175,10 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
         );
     }
 
-    const knownManeuverObjects = allManeuvers.filter(m => knownManeuvers.includes(m.name));
-
     if (knownManeuverObjects.length === 0) {
         return (
             <div className="sp-overlay" onClick={onClose}>
-                <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                <div className="sp-modal sp-modal--wide" onClick={e => e.stopPropagation()}>
                     <div className="sp-header">
                         <i className="fa-solid fa-bolt"></i> Combat Superiority
                     </div>
@@ -167,12 +195,12 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
 
     return (
         <div className="sp-overlay" onClick={onClose}>
-            <div className="sp-modal" onClick={e => e.stopPropagation()}>
+            <div className="sp-modal sp-modal--wide" onClick={e => e.stopPropagation()}>
                 <div className="sp-header">
-                    <i className="fa-solid fa-bolt"></i> Combat Superiority — Choose Maneuver
+                    <i className="fa-solid fa-bolt"></i> {isPrompt ? 'Combat Superiority — Use Maneuver' : 'Combat Superiority — Choose Maneuver'}
                 </div>
                 <div className="sp-body">
-                    <p>Choose a maneuver to use:</p>
+                    <p>{isPrompt ? 'Choose a maneuver to use:' : 'Choose a maneuver to use:'}</p>
                     {ACTION_TYPE_ORDER.filter(t => groupedManeuvers[t] && groupedManeuvers[t].some(m => knownManeuvers.includes(m.name))).map(type => (
                         <div key={type} style={{ marginTop: '12px' }}>
                             <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
@@ -184,8 +212,13 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
                                     <label
                                         key={m.name}
                                         style={{
-                                            display: 'block', padding: '6px 10px', margin: '2px 0',
-                                            borderRadius: '4px', cursor: 'pointer',
+                                            display: 'flex',
+                                            alignItems: 'flex-start',
+                                            gap: '8px',
+                                            padding: '6px 10px',
+                                            marginBottom: '2px',
+                                            borderRadius: '4px',
+                                            cursor: 'pointer',
                                             background: isSelected ? 'rgba(255,255,255,0.12)' : 'transparent',
                                             border: isSelected ? '1px solid var(--color-link)' : '1px solid transparent',
                                         }}
@@ -195,12 +228,21 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
                                             name="combatManeuver"
                                             checked={isSelected}
                                             onChange={() => setSelectedForUse(m.name)}
-                                            style={{ marginRight: '6px' }}
+                                            style={{ marginTop: '2px', flexShrink: 0 }}
                                         />
-                                        <strong>{m.name}</strong>
-                                        <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>
-                                            — {m.actionType === 'attack_rider' ? 'on hit' : m.actionType === 'bonus_action' ? 'bonus action' : m.actionType === 'reaction' ? 'reaction' : m.actionType === 'skill_check' ? 'skill check' : ''}
-                                        </span>
+                                        <div style={{ flex: 1 }}>
+                                            <div>
+                                                <strong>{m.name}</strong>
+                                                <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>
+                                                    — {m.actionType === 'attack_rider' ? 'on hit' : m.actionType === 'bonus_action' ? 'bonus action' : m.actionType === 'reaction' ? 'reaction' : m.actionType === 'skill_check' ? 'skill check' : ''}
+                                                </span>
+                                            </div>
+                                            {m.description && (
+                                                <div style={{ fontSize: '0.85em', opacity: 0.7, marginTop: '2px', lineHeight: 1.3 }}>
+                                                    {m.description}
+                                                </div>
+                                            )}
+                                        </div>
                                     </label>
                                 );
                             })}
@@ -210,6 +252,9 @@ function CombatSuperiorityModal({ payload, onConfirm, onClose }) {
                 <div className="sp-actions">
                     <button className="sp-roll-btn" onClick={handleUseManeuver} disabled={!selectedForUse}>
                         <i className="fa-solid fa-bolt"></i> Use Maneuver
+                    </button>
+                    <button className="sp-dismiss-btn" onClick={handleReopenSelection}>
+                        <i className="fa-solid fa-gear"></i> Manage Maneuvers
                     </button>
                     <button className="sp-dismiss-btn" onClick={onClose}>Cancel</button>
                 </div>

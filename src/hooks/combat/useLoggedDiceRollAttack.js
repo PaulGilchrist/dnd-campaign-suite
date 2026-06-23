@@ -347,6 +347,21 @@ export function createLogAndShow(deps) {
                 timestamp: Date.now(),
             }, campaignName);
 
+            setRuntimeValue(characterName, 'pendingCombatSuperiorityPrompt', {
+                rollType: 'attack',
+                attackContext: {
+                    hit: hit,
+                    isCrit: isCrit,
+                    weaponType: context?.damageType === 'ranged' ? 'ranged' : 'melee',
+                    isUnarmedStrike: context?.isUnarmedStrike || false,
+                    targetName: targetName,
+                    saveDc: context?.saveDc || null,
+                    saveType: context?.saveType || null,
+                    timestamp: Date.now(),
+                },
+                timestamp: Date.now(),
+            }, campaignName);
+
             const ps = context?.playerStats;
             const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
             const hasSoulBlades = isSoulknife && ps?.level >= 9;
@@ -651,6 +666,16 @@ export function createLogAndShow(deps) {
                 oldTotal: effectiveD20 + bonus,
                 timestamp: Date.now(),
             }, campaignName);
+
+            setRuntimeValue(characterName, 'pendingCombatSuperiorityPrompt', {
+                rollType: 'skill_check',
+                skillContext: {
+                    skillName: name,
+                    isInitiative: false,
+                    timestamp: Date.now(),
+                },
+                timestamp: Date.now(),
+            }, campaignName);
         }
 
         if (rollType === 'save') {
@@ -742,6 +767,15 @@ export function createLogAndShow(deps) {
             }
             clearAllExpirationEffects(characterName, campaignName);
             setRuntimeValue(characterName, 'uncannyMetabolismUsed', false, campaignName);
+            setRuntimeValue(characterName, 'pendingCombatSuperiorityPrompt', {
+                rollType: 'skill_check',
+                skillContext: {
+                    skillName: 'Initiative',
+                    isInitiative: true,
+                    timestamp: Date.now(),
+                },
+                timestamp: Date.now(),
+            }, campaignName);
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
         }
     };

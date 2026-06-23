@@ -15,6 +15,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'teleport',
     'signature_spells',
     'spell_mastery',
+    'combat_superiority',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

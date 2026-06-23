@@ -53,7 +53,7 @@ import { handle as handleCosmicOmen } from './handlers/class-sorcerer/cosmicOmen
 import { handle as handleTwinklingConstellation } from './handlers/class-sorcerer/twinklingConstellationHandler.js';
 import { handle as handleTacticalMind } from './handlers/class-fighter-rogue/tacticalMindHandler.js';
 import { handle as handleCombatSuperiority } from './handlers/class-fighter-rogue/combatSuperiorityHandler.js';
-import { handleCombatSuperiorityBonusAction, handleCombatSuperiorityReaction, handleCombatSuperiorityGrantAttack, handleCombatSuperiorityMovement, handleCombatSuperioritySkillCheck, handleCombatSuperiorityCommandingPresenceReaction, handleCombatSuperioritySweepingAttack } from './handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { handleCombatSuperiorityBonusAction, handleCombatSuperiorityReaction, handleCombatSuperiorityGrantAttack, handleCombatSuperiorityMovement, handleCombatSuperioritySkillCheck, handleCombatSuperiorityCommandingPresenceReaction, handleCombatSuperioritySweepingAttack, handleAttackRiderPrompt, handleSkillCheckPrompt } from './handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { handle as handleKnowEnemy } from './handlers/class-fighter-rogue/knowEnemyHandler.js';
 import { handle as handleWarBond } from './handlers/class-fighter-rogue/warBondHandler.js';
 import { handle as handleWarMagicCantrip } from './handlers/class-fighter-rogue/warMagicCantripHandler.js';
@@ -277,7 +277,9 @@ const HANDLER_MAP = {
             combat_superiority_movement: handleCombatSuperiorityMovement,
              combat_superiority_skill_check: handleCombatSuperioritySkillCheck,
               combat_superiority_commanding_presence_reaction: handleCombatSuperiorityCommandingPresenceReaction,
-              combat_superiority_sweeping_attack: handleCombatSuperioritySweepingAttack,
+               combat_superiority_sweeping_attack: handleCombatSuperioritySweepingAttack,
+               combat_superiority_attack_rider: handleAttackRiderPrompt,
+               combat_superiority_prompt_skill_check: handleSkillCheckPrompt,
             know_enemy: handleKnowEnemy,
         war_bond_summon: handleWarBond,
         war_magic_cantrip: handleWarMagicCantrip,
