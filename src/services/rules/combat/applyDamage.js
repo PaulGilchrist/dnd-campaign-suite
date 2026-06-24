@@ -100,6 +100,8 @@ export function applyDamageToTarget(combatSummary, targetName, rawDamage, damage
     ...existingAttack,
     attackerName: attackerName || existingAttack?.attackerName || null,
     targetName,
+    weaponType: existingAttack?.weaponType || 'melee',
+    isUnarmedStrike: existingAttack?.isUnarmedStrike || false,
     rawDamage,
     ...(isSecondary ? {} : { primaryDamage: rawDamage }),
     secondaryDamage: isSecondary ? rawDamage : null,

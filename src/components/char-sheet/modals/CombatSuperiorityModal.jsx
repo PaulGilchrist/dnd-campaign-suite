@@ -21,6 +21,7 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
         attackContext,
         skillContext,
         lastAttack,
+        playerStats,
     } = payload;
 
 
@@ -73,37 +74,42 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
     const maneuverList = availableManeuvers && availableManeuvers.length > 0 ? availableManeuvers : (() => {
         if (!allManeuvers || allManeuvers.length === 0) return [];
         if (selectionMode) return allManeuvers;
-        if (!lastAttack) return allManeuvers.filter(m => knownManeuvers.includes(m.name));
+        if (!lastAttack) {
+            return allManeuvers.filter(m => knownManeuvers.includes(m.name));
+        }
+        const playerName = playerStats?.name;
         const attackContext = {
             hit: lastAttack.hit,
             isCrit: lastAttack.isCrit || false,
             weaponType: lastAttack.weaponType || null,
             isUnarmedStrike: lastAttack.isUnarmedStrike || false,
             replacingAttack: lastAttack.replacingAttack || false,
+            attackerName: lastAttack.attackerName || null,
+            targetName: lastAttack.targetName || null,
         };
         return allManeuvers.filter(m => {
             if (!knownManeuvers.includes(m.name)) return false;
             if (!m.trigger || m.trigger === 'any') return true;
             if (m.trigger === 'weapon_attack_hit') {
-                return attackContext.weaponType === 'melee' || attackContext.weaponType === 'ranged' || attackContext.isUnarmedStrike;
+                return attackContext.attackerName === playerName && (attackContext.weaponType === 'melee' || attackContext.weaponType === 'ranged' || attackContext.isUnarmedStrike);
             }
             if (m.trigger === 'melee_weapon_attack_hit') {
-                return attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike;
+                return attackContext.attackerName === playerName && (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike);
             }
             if (m.trigger === 'attack_roll_miss') {
-                return attackContext.hit === false;
+                return attackContext.attackerName === playerName && attackContext.hit === false;
             }
             if (m.trigger === 'melee_attack_miss') {
-                return (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike) && attackContext.hit === false;
+                return attackContext.attackerName === playerName && (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike) && attackContext.hit === false;
             }
             if (m.trigger === 'melee_damage_taken') {
-                return attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike;
+                return attackContext.targetName === playerName && (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike);
             }
             if (m.trigger === 'melee_attack_straight_line') {
-                return attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike;
+                return attackContext.attackerName === playerName && (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike);
             }
             if (m.trigger === 'replace_attack') {
-                return attackContext.replacingAttack === true;
+                return attackContext.attackerName === playerName && attackContext.replacingAttack === true;
             }
             return true;
         });

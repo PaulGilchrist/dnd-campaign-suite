@@ -1265,7 +1265,7 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
 
     let description = `<b>${maneuver.name}</b> (Reaction)<br/>${dieDescription}`;
 
-    if (targetName) {
+    if (targetName && maneuver.effect !== 'damage_reduction') {
         description += ` Target: ${targetName}.`;
     }
 
@@ -1648,7 +1648,7 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
 
     let description = `${maneuver.name}: ${dieDescription}`;
 
-    if (targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'ac_bonus_and_swap') {
+    if (targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'ac_bonus_and_swap' && maneuver.effect !== 'damage_reduction') {
         description += ` Target: ${targetName}.`;
     }
 

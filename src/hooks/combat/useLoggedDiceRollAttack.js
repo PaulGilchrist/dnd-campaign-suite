@@ -299,6 +299,10 @@ export function createLogAndShow(deps) {
                     effectiveAc,
                     hit,
                     isCrit,
+                    weaponType: context?.isMelee != null
+                        ? (context.isMelee ? 'melee' : 'ranged')
+                        : (context?.damageType === 'ranged' ? 'ranged' : 'melee'),
+                    isUnarmedStrike: context?.isUnarmedStrike || false,
                     isAutoMiss,
                     isNatural20: r1 === 20,
                     isNatural1: r1 === 1,
