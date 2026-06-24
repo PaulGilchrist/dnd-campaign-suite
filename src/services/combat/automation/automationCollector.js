@@ -302,6 +302,15 @@ export function collectAutomationFromFeatures(features, playerStats) {
                 })
                 continue
             }
+            if (auto?.type === 'passive_rule' && auto?.effect === 'relentless') {
+                result.passives.push({
+                    type: 'passive_rule',
+                    name: feature.name,
+                    effect: 'relentless',
+                    hasAutomation: true,
+                })
+                continue
+            }
             const info = buildAttackInfo({ ...feature, automation: auto }, playerStats)
             if (!info) continue
 

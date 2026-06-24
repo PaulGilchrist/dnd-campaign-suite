@@ -10,7 +10,7 @@ function TrackedResourceInput({ label, resourceKey, playerName, getMax, deps, ca
 
     return (
           <div className="clickable" onClick={handleToggle} onKeyDown={handleToggle} tabIndex={0}>
-              <b>{label}:</b> <HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={current}></HiddenInput>/{max} <span className="text-muted">(cur/max)</span>
+              <b>{label}:</b> <HiddenInput handleInputToggle={handleToggle} handleValueChange={handleChange} showInput={showInput} value={current} max={max}></HiddenInput>/{max} <span className="text-muted">(cur/max)</span>
           </div>
       );
 }

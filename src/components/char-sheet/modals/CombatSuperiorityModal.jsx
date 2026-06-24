@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 
 const ACTION_TYPE_LABELS = {
     attack_rider: 'Attack Riders (on hit)',
@@ -32,6 +33,12 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
 
     const isPromptMode = !!attackContext || !!skillContext;
     const isPrompt = isPromptMode;
+
+    const hasSuperiorityDice = (() => {
+        if (!playerStats?.name) return true;
+        const dice = getRuntimeValue(playerStats.name, 'superiorityDice');
+        return dice != null && Number(dice) > 0;
+    })();
 
     const toggleSelection = (maneuverName) => {
         setSelectedForSelection(prev => {
@@ -135,6 +142,24 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
                     </div>
                     <div className="sp-actions">
                         <button className="sp-roll-btn" onClick={onClose}>Done</button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (!selectionMode && !hasSuperiorityDice) {
+        return (
+            <div className="sp-overlay" onClick={onClose}>
+                <div className="sp-modal sp-modal--wide" onClick={e => e.stopPropagation()}>
+                    <div className="sp-header">
+                        <i className="fa-solid fa-bolt"></i> Combat Superiority
+                    </div>
+                    <div className="sp-body">
+                        <p>No Superiority Dice remaining. Recharges on a Short or Long Rest.</p>
+                    </div>
+                    <div className="sp-actions">
+                        <button className="sp-dismiss-btn" onClick={onClose}>Close</button>
                     </div>
                 </div>
             </div>

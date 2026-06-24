@@ -158,7 +158,7 @@ describe('HiddenInput', () => {
       fireEvent.change(input, { target: { value: '10' } });
       fireEvent.blur(input);
 
-      expect(mockOnChange).toHaveBeenCalledWith('10');
+      expect(mockOnChange).toHaveBeenCalledWith(10);
       expect(mockOnToggle).toHaveBeenCalled();
     });
 
@@ -373,6 +373,74 @@ describe('HiddenInput', () => {
 
       const input = screen.getByRole('spinbutton');
       expect(input).toHaveAttribute('min', '0');
+    });
+
+    it('should set max attribute on the input when provided', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={5}
+          max={10}
+        />
+      );
+
+      const input = screen.getByRole('spinbutton');
+      expect(input).toHaveAttribute('max', '10');
+    });
+
+    it('should clamp value to max on commit', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={5}
+          max={10}
+        />
+      );
+
+      const input = screen.getByRole('spinbutton');
+      fireEvent.change(input, { target: { value: '15' } });
+      fireEvent.blur(input);
+
+      expect(mockOnChange).toHaveBeenCalledWith(10);
+    });
+
+    it('should clamp value to 0 on commit when negative', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={5}
+          max={10}
+        />
+      );
+
+      const input = screen.getByRole('spinbutton');
+      fireEvent.change(input, { target: { value: '-5' } });
+      fireEvent.blur(input);
+
+      expect(mockOnChange).toHaveBeenCalledWith(0);
+    });
+
+    it('should clamp value to 0 on commit when negative without max', () => {
+      render(
+        <HiddenInput
+          handleInputToggle={mockOnToggle}
+          handleValueChange={mockOnChange}
+          showInput
+          value={5}
+        />
+      );
+
+      const input = screen.getByRole('spinbutton');
+      fireEvent.change(input, { target: { value: '-5' } });
+      fireEvent.blur(input);
+
+      expect(mockOnChange).toHaveBeenCalledWith(0);
     });
   });
 });

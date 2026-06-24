@@ -191,7 +191,7 @@ describe('TrackedResourceInput', () => {
       const input = document.querySelector('input');
       fireEvent.change(input, { target: { value: '7' } });
       fireEvent.blur(input);
-      expect(mockUpdate).toHaveBeenCalledWith('7');
+      expect(mockUpdate).toHaveBeenCalledWith(7);
     });
 
     it('calls the update function when Enter is pressed in the input', () => {
@@ -203,7 +203,7 @@ describe('TrackedResourceInput', () => {
       const input = document.querySelector('input');
       fireEvent.change(input, { target: { value: '4' } });
       fireEvent.keyDown(input, { key: 'Enter' });
-      expect(mockUpdate).toHaveBeenCalledWith('4');
+      expect(mockUpdate).toHaveBeenCalledWith(4);
     });
 
     it('closes the input after committing a value via blur', () => {

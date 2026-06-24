@@ -40,9 +40,16 @@ const makePlayerStats = (overrides = {}) => ({
     ...overrides,
 });
 
+const SELECTION_KEY = 'BattleMasterManeuvers_selection';
+
 describe('combatSuperiorityHandler.handle', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 4;
+            if (key === SELECTION_KEY) return [];
+            return undefined;
+        });
     });
 
     it('returns popup when no maneuvers available', async () => {
@@ -65,7 +72,6 @@ describe('combatSuperiorityHandler.handle', () => {
             { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
             { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
         ]);
-        getRuntimeValue.mockReturnValue(undefined);
 
         const result = await handle(
             makeAction(),
@@ -90,7 +96,11 @@ describe('combatSuperiorityHandler.handle', () => {
             { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
             { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
         ]);
-        getRuntimeValue.mockReturnValue(['Trip Attack', 'Pushing Attack']);
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 4;
+            if (key === SELECTION_KEY) return ['Trip Attack', 'Pushing Attack'];
+            return undefined;
+        });
 
         const result = await handle(
             makeAction(),
@@ -110,7 +120,11 @@ describe('combatSuperiorityHandler.handle', () => {
             { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
             { name: 'Rally', effect: 'temp_hp' },
         ]);
-        getRuntimeValue.mockReturnValue(['Trip Attack']);
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 4;
+            if (key === SELECTION_KEY) return ['Trip Attack'];
+            return undefined;
+        });
 
         const result = await handle(
             makeAction(),
@@ -131,7 +145,11 @@ describe('combatSuperiorityHandler.handle', () => {
             { name: 'Rally', effect: 'temp_hp' },
             { name: 'Riposte', effect: 'melee_attack_reaction' },
         ]);
-        getRuntimeValue.mockReturnValue(['Trip Attack']);
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 4;
+            if (key === SELECTION_KEY) return ['Trip Attack'];
+            return undefined;
+        });
 
         const result = await handle(
             makeAction({ maxOptions: 2 }),
@@ -149,7 +167,11 @@ describe('combatSuperiorityHandler.handle', () => {
             { name: 'Trip Attack', effect: 'knock_prone' },
             { name: 'Pushing Attack', effect: 'push' },
         ]);
-        getRuntimeValue.mockReturnValue(['Trip Attack', 'Pushing Attack']);
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 4;
+            if (key === SELECTION_KEY) return ['Trip Attack', 'Pushing Attack'];
+            return undefined;
+        });
 
         const result = await handle(
             makeAction({ maxOptions: 3 }),
@@ -166,7 +188,6 @@ describe('combatSuperiorityHandler.handle', () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Trip Attack', effect: 'knock_prone' },
         ]);
-        getRuntimeValue.mockReturnValue([]);
 
         const result = await handle(
             makeAction({ saveType: undefined }),
@@ -182,7 +203,6 @@ describe('combatSuperiorityHandler.handle', () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Trip Attack', effect: 'knock_prone' },
         ]);
-        getRuntimeValue.mockReturnValue([]);
 
         const action = makeAction();
         const playerStats = makePlayerStats();
@@ -200,7 +220,6 @@ describe('combatSuperiorityHandler.handle', () => {
 
     it('loads maneuvers with correct ruleset', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([]);
-        getRuntimeValue.mockReturnValue([]);
 
         await handle(
             makeAction(),
@@ -214,7 +233,6 @@ describe('combatSuperiorityHandler.handle', () => {
 
     it('defaults to 2024 rules when playerStats has no rules field', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([]);
-        getRuntimeValue.mockReturnValue([]);
 
         const playerStats = makePlayerStats();
         delete playerStats.rules;
@@ -227,5 +245,27 @@ describe('combatSuperiorityHandler.handle', () => {
         );
 
         expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
+    });
+
+    it('returns popup when no superiority dice remaining', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+        ]);
+        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+            if (key === 'superiorityDice') return 0;
+            if (key === SELECTION_KEY) return ['Trip Attack'];
+            return undefined;
+        });
+
+        const result = await handle(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null
+        );
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toBe('No Superiority Dice remaining. Recharges on a Short or Long Rest.');
     });
 });

@@ -2,7 +2,7 @@
 import React from 'react'
 import './HiddenInput.css'
 
-function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, displayValue = true }) {
+function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, displayValue = true, max }) {
     const inputRef = React.useRef(null);
     const [localValue, setLocalValue] = React.useState(value ?? '');
     const isEditingRef = React.useRef(false);
@@ -19,7 +19,9 @@ function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, d
       }, [value]);
 
     const commit = () => {
-        handleValueChange(localValue);
+        const numVal = Number(localValue);
+        const clamped = max != null ? Math.min(Math.max(numVal, 0), max) : Math.max(numVal, 0);
+        handleValueChange(clamped);
         handleInputToggle();
      };
     const handleChange = (event) => {
@@ -39,16 +41,17 @@ function HiddenInput({ handleInputToggle, handleValueChange, showInput, value, d
            <span className='hidden-input clickable'>
               {
                 showInput ? (
-                     <input
-                        min="0"
-                        onBlur={commit}
-                        onChange={handleChange}
-                        onClick={handleStopPropagation}
-                        onKeyDown={handleKeyDown}
-                        ref={inputRef}
-                        type="number"
-                        value={localValue}
-                      />
+                      <input
+                         max={max}
+                         min="0"
+                         onBlur={commit}
+                         onChange={handleChange}
+                         onClick={handleStopPropagation}
+                         onKeyDown={handleKeyDown}
+                         ref={inputRef}
+                         type="number"
+                         value={localValue}
+                       />
                   ) : (
                                     displayValue ? value : null
                                    )

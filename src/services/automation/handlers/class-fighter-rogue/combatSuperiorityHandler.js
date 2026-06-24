@@ -348,6 +348,23 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const maxOptions = computeMaxOptions(playerStats, auto);
 
+    const superiorityDice = getSuperiorityDice(playerStats, campaignName);
+    const relentless = hasRelentless(playerStats);
+    const storedRound = getRelentlessUsedRound(playerStats, campaignName);
+    const currentRound = getCurrentCombatRound();
+    const relentlessUsed = relentless && storedRound === currentRound;
+    if (superiorityDice <= 0 && !(relentless && !relentlessUsed)) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: action.name,
+                description: 'No Superiority Dice remaining. Recharges on a Short or Long Rest.',
+                automation: auto,
+            },
+        };
+    }
+
     const unknownManeuvers = allManeuvers.filter(m => !knownManeuvers.includes(m.name));
     const known = allManeuvers.filter(m => knownManeuvers.includes(m.name));
 
@@ -517,8 +534,11 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
 
     const superiorityDice = getSuperiorityDice(playerStats, campaignName);
     const relentless = hasRelentless(playerStats);
+    const storedRound = getRelentlessUsedRound(playerStats, campaignName);
+    const currentRound = getCurrentCombatRound();
+    const relentlessUsed = relentless && storedRound === currentRound;
 
-    if (superiorityDice <= 0 && !relentless) {
+    if (superiorityDice <= 0 && !(relentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
@@ -780,7 +800,7 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
     const currentRound = getCurrentCombatRound();
     const relentlessUsed = relentless && storedRound === currentRound;
 
-    if (superiorityDice <= 0 && !relentless) {
+    if (superiorityDice <= 0 && !(relentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
@@ -961,7 +981,7 @@ export async function executeGrantAttackManeuver(action, playerStats, campaignNa
     const currentRound = getCurrentCombatRound();
     const relentlessUsed = relentless && storedRound === currentRound;
 
-    if (superiorityDice <= 0 && !relentless) {
+    if (superiorityDice <= 0 && !(relentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
@@ -1144,7 +1164,7 @@ export async function executeMovementManeuver(action, playerStats, campaignName,
     const currentRound = getCurrentCombatRound();
     const relentlessUsed = relentless && storedRound === currentRound;
 
-    if (superiorityDice <= 0 && !relentless) {
+    if (superiorityDice <= 0 && !(relentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
@@ -1219,7 +1239,7 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
     const currentRound = getCurrentCombatRound();
     const relentlessUsed = relentless && storedRound === currentRound;
 
-    if (superiorityDice <= 0 && !relentless) {
+    if (superiorityDice <= 0 && !(relentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
@@ -1367,7 +1387,7 @@ export async function executeSkillCheckManeuver(action, playerStats, campaignNam
     const currentRound = getCurrentCombatRound();
     const relentlessUsed = relentless && storedRound === currentRound;
 
-    if (superiorityDice <= 0 && !relentless) {
+    if (superiorityDice <= 0 && !(relentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
@@ -1474,7 +1494,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
     const currentRound = getCurrentCombatRound();
     const relentlessUsed = relentless && storedRound === currentRound;
 
-    if (superiorityDice <= 0 && !relentless) {
+    if (superiorityDice <= 0 && !(relentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
@@ -1598,7 +1618,7 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     const currentRound = getCurrentCombatRound();
     const relentlessUsed = relentless && storedRound === currentRound;
 
-    if (currentUses <= 0 && !relentless) {
+    if (currentUses <= 0 && !(relentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
