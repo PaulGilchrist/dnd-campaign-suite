@@ -109,6 +109,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                     : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
                 setPopupHtml(html);
             }
+            if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
+                window.dispatchEvent(new CustomEvent('sweeping-attack-modal-show', { detail: result.payload }));
+            }
             return;
         }
 

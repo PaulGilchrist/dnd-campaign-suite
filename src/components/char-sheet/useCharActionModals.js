@@ -71,6 +71,7 @@ export default function useCharActionModals({
         popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
         setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal, setAttackRiderModal,
         setAttackRiderManeuverPrompt,
+        setSweepingAttackTargetModal,
         pendingDamageRef,
     });
 

@@ -701,7 +701,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
         if (cs && cs.creatures && targetName) {
             const primaryTarget = cs.creatures.find(c => c.name === targetName);
             if (primaryTarget?.position) {
-                const rangeFt = rangeToFeet(maneuver.range || '5_ft');
+                const rangeFt = rangeToFeet(maneuver.range || '8_ft') || 8;
                 const secondaryCandidates = cs.creatures
                     .filter(c => c.name !== targetName && c.position)
                     .map(c => ({
@@ -711,7 +711,7 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
                     .filter(t => t.distance != null && t.distance <= rangeFt);
 
                 if (secondaryCandidates.length === 0) {
-                    description += ` No valid secondary targets within ${maneuver.range || '5_ft'} of ${targetName}.`;
+                    description += ` No valid secondary targets within 5 feet of ${targetName}.`;
                 } else {
                     setRuntimeValue(playerStats.name, 'pendingSweepingAttack', {
                         dieValue,

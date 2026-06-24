@@ -14,6 +14,7 @@ export default function useDamageClick({
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
     setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal, setAttackRiderModal,
     setAttackRiderManeuverPrompt,
+    setSweepingAttackTargetModal,
     pendingDamageRef,
 }) {
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
@@ -1306,6 +1307,9 @@ export default function useDamageClick({
             setAttackRiderManeuverPrompt(null);
             if (result?.type === 'popup') {
                 setPopupHtml(result.payload);
+            }
+            if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
+                setSweepingAttackTargetModal(result.payload);
             }
         }
 

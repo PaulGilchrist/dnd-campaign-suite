@@ -175,7 +175,7 @@
     "effect": "secondary_damage",
     "damageBonus": false,
     "dieExpression": "superiority_die",
-    "range": "5_ft"
+    "range": "8 ft"
   },
   {
     "name": "Tactical Assessment",
