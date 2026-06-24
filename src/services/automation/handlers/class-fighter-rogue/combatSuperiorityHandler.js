@@ -76,13 +76,12 @@ async function resolveAllyForRally(campaignName, playerStats, mapName) {
     const attacker = findCreatureByName(cs, playerName);
     if (!attacker) return null;
 
-    const attackerCreature = cs.creatures.find(c => c.name === playerName)
-        || cs.creatures.find(c => c.name.startsWith(playerName + ' '));
-    if (!attackerCreature) return null;
+    if (attacker.targetName && attacker.targetName !== playerName) {
+        return attacker.targetName;
+    }
 
     const allies = cs.creatures.filter(c => {
         if (c.name === playerName) return false;
-        if (c.name === attacker.targetName) return false;
         return true;
     });
 
