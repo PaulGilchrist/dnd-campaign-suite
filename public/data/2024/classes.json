@@ -4063,6 +4063,7 @@
         "proficiency_bonus": 2,
         "extra_attacks": 0,
         "second_wind": 2,
+        "superiority_dice": 0,
         "weapon_mastery": 3,
         "features": [
           {
@@ -4110,6 +4111,7 @@
         "proficiency_bonus": 2,
         "extra_attacks": 0,
         "second_wind": 2,
+        "superiority_dice": 0,
         "weapon_mastery": 3,
         "features": [
           {
@@ -4146,6 +4148,7 @@
         "proficiency_bonus": 2,
         "extra_attacks": 0,
         "second_wind": 2,
+        "superiority_dice": 4,
         "weapon_mastery": 3,
         "features": [
           {
@@ -4176,6 +4179,7 @@
         "proficiency_bonus": 2,
         "extra_attacks": 0,
         "second_wind": 3,
+        "superiority_dice": 4,
         "weapon_mastery": 4,
         "features": [
           {
@@ -4206,6 +4210,7 @@
         "proficiency_bonus": 3,
         "extra_attacks": 1,
         "second_wind": 3,
+        "superiority_dice": 4,
         "weapon_mastery": 4,
         "features": [
           {
@@ -4247,6 +4252,7 @@
         "proficiency_bonus": 3,
         "extra_attacks": 1,
         "second_wind": 3,
+        "superiority_dice": 4,
         "weapon_mastery": 4,
         "features": [
           {
@@ -4277,6 +4283,7 @@
         "proficiency_bonus": 3,
         "extra_attacks": 1,
         "second_wind": 3,
+        "superiority_dice": 5,
         "weapon_mastery": 4,
         "features": [
           {
@@ -4307,6 +4314,7 @@
         "proficiency_bonus": 3,
         "extra_attacks": 1,
         "second_wind": 3,
+        "superiority_dice": 5,
         "weapon_mastery": 4,
         "features": [
           {
@@ -4337,6 +4345,7 @@
         "proficiency_bonus": 4,
         "extra_attacks": 1,
         "second_wind": 3,
+        "superiority_dice": 5,
         "weapon_mastery": 4,
         "features": [
           {
@@ -4391,6 +4400,7 @@
         "proficiency_bonus": 4,
         "extra_attacks": 1,
         "second_wind": 4,
+        "superiority_dice": 5,
         "weapon_mastery": 5,
         "features": [
           {
@@ -4421,6 +4431,7 @@
         "proficiency_bonus": 4,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 5,
         "weapon_mastery": 5,
         "features": [
           {
@@ -4451,6 +4462,7 @@
         "proficiency_bonus": 4,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 5,
         "weapon_mastery": 5,
         "features": [
           {
@@ -4481,6 +4493,7 @@
         "proficiency_bonus": 5,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 5,
         "weapon_mastery": 5,
         "features": [
           {
@@ -4532,6 +4545,7 @@
         "proficiency_bonus": 5,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 5,
         "weapon_mastery": 5,
         "features": [
           {
@@ -4562,6 +4576,7 @@
         "proficiency_bonus": 5,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 6,
         "weapon_mastery": 5,
         "features": [
           {
@@ -4592,6 +4607,7 @@
         "proficiency_bonus": 5,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 6,
         "weapon_mastery": 6,
         "features": [
           {
@@ -4622,6 +4638,7 @@
         "proficiency_bonus": 6,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 6,
         "weapon_mastery": 6,
         "features": [
           {
@@ -4673,6 +4690,7 @@
         "proficiency_bonus": 6,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 6,
         "weapon_mastery": 6,
         "features": [
           {
@@ -4703,6 +4721,7 @@
         "proficiency_bonus": 6,
         "extra_attacks": 2,
         "second_wind": 4,
+        "superiority_dice": 6,
         "weapon_mastery": 6,
         "features": [
           {
@@ -4733,6 +4752,7 @@
         "proficiency_bonus": 6,
         "extra_attacks": 3,
         "second_wind": 4,
+        "superiority_dice": 6,
         "weapon_mastery": 6,
         "energy": {
           "required_major": "Psi Warrior",
