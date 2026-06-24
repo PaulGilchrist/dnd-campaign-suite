@@ -712,7 +712,7 @@ function combineAttackModes(attackerEffects, targetEffects, attackRange, targetN
   let adv = attackerEffects.attackAdvantageCount + targetEffects.targetAdvantageCount
   let dis = attackerEffects.attackDisadvantageCount + targetEffects.targetDisadvantageCount
 
-  if (targetEffects.vexAdvantageTargets && targetName && targetEffects.vexAdvantageTargets.includes(targetName)) {
+  if (attackerEffects.vexAdvantageTargets && targetName && attackerEffects.vexAdvantageTargets.includes(targetName)) {
     adv++
   }
   if (targetEffects.targetAdvantageIfWithin5ft && attackRange <= 5) adv++

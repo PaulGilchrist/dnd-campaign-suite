@@ -484,14 +484,15 @@ export function rollManeuverDie(maneuver, playerStats, campaignName) {
     let dieDescription;
     let expendedDie = true;
 
+    const superiorityDieSize = evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
+
     if (relentless && !relentlessUsed) {
-        const relentlessRoll = rollExpression('1d8');
-        dieValue = relentlessRoll?.total || 8;
-        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue} (Relentless).`;
         setRelentlessUsed(playerStats, campaignName);
         expendedDie = false;
     } else {
-        const superiorityDieSize = evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
         const dieRoll = rollExpression(`1d${superiorityDieSize}`);
         dieValue = dieRoll?.total || superiorityDieSize;
         dieDescription = `Rolled d${superiorityDieSize} for ${dieValue}.`;
@@ -801,9 +802,9 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
     let expendedDie = true;
 
     if (relentless && !relentlessUsed) {
-        const relentlessRoll = rollExpression('1d8');
-        dieValue = relentlessRoll?.total || 8;
-        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue} (Relentless).`;
         setRelentlessUsed(playerStats, campaignName);
         expendedDie = false;
     } else {
@@ -863,6 +864,20 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
     }
 
     if (maneuver.effect === 'advantage_and_damage') {
+        await setRuntimeValue(playerStats.name, 'feintingAttackDieValue', dieValue, campaignName);
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const currentRound = getCurrentCombatRound();
+        const newEffect = {
+            target: playerStats.name,
+            source: maneuver.name,
+            effect: 'next_attack_advantage',
+            vexTarget: targetName || null,
+            value: null,
+            duration: 'until_end_of_turn',
+            appliedRound: currentRound,
+        };
+        await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+        console.log(`[FeintingAttack] Stored effect for ${playerStats.name} vs ${targetName}: dieValue=${dieValue}, effect=${JSON.stringify(newEffect)}`);
         description += ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
     }
 
@@ -965,9 +980,9 @@ export async function executeGrantAttackManeuver(action, playerStats, campaignNa
     let expendedDie = true;
 
     if (relentless && !relentlessUsed) {
-        const relentlessRoll = rollExpression('1d8');
-        dieValue = relentlessRoll?.total || 8;
-        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue} (Relentless).`;
         setRelentlessUsed(playerStats, campaignName);
         expendedDie = false;
     } else {
@@ -1148,9 +1163,9 @@ export async function executeMovementManeuver(action, playerStats, campaignName,
     let expendedDie = true;
 
     if (relentless && !relentlessUsed) {
-        const relentlessRoll = rollExpression('1d8');
-        dieValue = relentlessRoll?.total || 8;
-        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue} (Relentless).`;
         setRelentlessUsed(playerStats, campaignName);
         expendedDie = false;
     } else {
@@ -1226,9 +1241,9 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
     let expendedDie = true;
 
     if (relentless && !relentlessUsed) {
-        const relentlessRoll = rollExpression('1d8');
-        dieValue = relentlessRoll?.total || 8;
-        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue} (Relentless).`;
         setRelentlessUsed(playerStats, campaignName);
         expendedDie = false;
     } else {
@@ -1367,9 +1382,9 @@ export async function executeSkillCheckManeuver(action, playerStats, campaignNam
     let expendedDie = true;
 
     if (relentless && !relentlessUsed) {
-        const relentlessRoll = rollExpression('1d8');
-        dieValue = relentlessRoll?.total || 8;
-        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue} (Relentless).`;
         setRelentlessUsed(playerStats, campaignName);
         expendedDie = false;
     } else {
@@ -1474,9 +1489,9 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
     let expendedDie = true;
 
     if (relentless && !relentlessUsed) {
-        const relentlessRoll = rollExpression('1d8');
-        dieValue = relentlessRoll?.total || 8;
-        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue} (Relentless).`;
         setRelentlessUsed(playerStats, campaignName);
         expendedDie = false;
     } else {
@@ -1617,9 +1632,9 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     let expendedDie = true;
 
     if (relentless && !relentlessUsed) {
-        const relentlessRoll = rollExpression('1d8');
-        dieValue = relentlessRoll?.total || 8;
-        dieDescription = `Rolled 1d8 for ${dieValue} (Relentless).`;
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        dieDescription = `Rolled d${superiorityDieSize} for ${dieValue} (Relentless).`;
         setRelentlessUsed(playerStats, campaignName);
         expendedDie = false;
     } else {
@@ -1776,6 +1791,20 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     }
 
     if (maneuver.effect === 'advantage_and_damage') {
+        await setRuntimeValue(playerStats.name, 'feintingAttackDieValue', dieValue, campaignName);
+        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+        const currentRound = getCurrentCombatRound();
+        const newEffect = {
+            target: playerStats.name,
+            source: maneuver.name,
+            effect: 'next_attack_advantage',
+            vexTarget: targetName || null,
+            value: null,
+            duration: 'until_end_of_turn',
+            appliedRound: currentRound,
+        };
+        await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
+        console.log(`[FeintingAttack/executeManeuver] Stored effect for ${playerStats.name} vs ${targetName}: dieValue=${dieValue}, effect=${JSON.stringify(newEffect)}`);
         description += ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
     }
 

@@ -182,7 +182,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     }
 
     const attackRange = action?.reach ? rangeToFeet(action.reach) : (action?.range ? rangeToFeet(action.range) : 30);
-    const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange)
+    const forcedMode = combineAttackModes(attackerEffects, targetEffectData, attackRange, target?.name)
 
     const isMelee = attackRange <= 5
     const isAutoCrit = isMelee && targetEffectData.autoCritWithin5ft

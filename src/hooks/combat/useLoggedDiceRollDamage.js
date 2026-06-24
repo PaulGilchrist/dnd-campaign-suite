@@ -1147,6 +1147,17 @@ export function createLogDamageAndShow(deps) {
     }
 
     return async function logDamageAndShow(name, formula, total, rolls, modifier, context) {
+        // Apply Feinting Attack superiority die damage bonus
+        const feintDieValue = getRuntimeValue(characterName, 'feintingAttackDieValue');
+        if (feintDieValue && Number(feintDieValue) > 0) {
+            const feintVal = Number(feintDieValue);
+            const dmgType = context?.damageType || 'same_as_weapon';
+            formula += ` + ${feintVal}[${dmgType}]`;
+            total += feintVal;
+            rolls = [...rolls, feintVal];
+            setRuntimeValue(characterName, 'feintingAttackDieValue', null, campaignName);
+        }
+
         const { saveDc, saveType, damageType, isAutoMiss } = context || {};
         const adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
 
