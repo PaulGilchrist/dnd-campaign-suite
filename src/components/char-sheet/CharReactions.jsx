@@ -1,6 +1,4 @@
 import React from 'react'
-import Popup from '../common/Popup.jsx'
-import DiceRollResult from './DiceRollResult.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
@@ -8,6 +6,7 @@ import { getCategories } from '../../services/character/featureCategories.js'
       import { sanitizeHtml } from '../../services/ui/sanitize.js';
        import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
        import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
+       import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
        import { OPPORTUNITY_ATTACK, MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js'
          import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js'
         import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
@@ -21,7 +20,8 @@ import { applyWarCasterReaction } from '../../services/automation/handlers/react
      import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
-    const { popupHtml, setPopupHtml, rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
+    const { popupHtml, setPopupHtml } = useDiceRollPopup();
+    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
     const [selectedSpell, setSelectedSpell] = React.useState(null);
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);
     const [reactiveSpellWarnings, setReactiveSpellWarnings] = React.useState(false);
@@ -312,13 +312,6 @@ const reactionCastAction = React.useCallback((spell, metaCtx) => {
                     campaignName={campaignName}
                     onClose={() => setArcaneWardRestoreModal(null)}
                 />
-            )}
-              {popupHtml && (
-                 <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                     {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
-                      popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
-                      <DiceRollResult {...popupHtml} />}
-                 </Popup>
             )}
               {reactions.filter(r => !getCategories(playerStats.rules || '5e').featuresToIgnore.includes(r.name)).map((reaction) => {
                 const isClickable = reaction.details || reaction.name === OPPORTUNITY_ATTACK.name || hasAutomation(reaction);

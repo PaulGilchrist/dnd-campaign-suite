@@ -1,7 +1,5 @@
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import Popup from '../common/Popup.jsx'
-import DiceRollResult from './DiceRollResult.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { renderMarkdownInline, sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getFightingStyle } from '../../services/character/fightingStyles.js'
@@ -20,6 +18,7 @@ import { addEntry } from '../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 
 function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }) {
     const [teleportModal, setTeleportModal] = useState(null);
@@ -27,7 +26,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [spellMasteryModal, setSpellMasteryModal] = useState(null);
     const [savantModal, setSavantModal] = useState(null);
     const [combatSuperiorityModal, setCombatSuperiorityModal] = useState(null);
-    const { rollAttack, rollDamage, popupHtml, setPopupHtml } = useLoggedDiceRoll(playerStats?.name, campaignName, {
+    const { popupHtml, setPopupHtml } = useDiceRollPopup();
+    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
         characters,
         autoDamageRoll: async (autoDamage, isCrit) => {
             console.log('[CharSpecialActions] autoDamageRoll called', { formula: autoDamage.formula, isCrit, rollDamageType: typeof rollDamage });
@@ -305,15 +305,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     
     const uniqueActions = Array.from(new Map(filteredActions.map(action => [action.name, action])).values());
     return (
-           <div>
-               <div className='sectionHeader'>Special Actions</div>
-              {popupHtml && <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
-                    popupHtml.type === 'd20' ? <DiceRollResult {...popupHtml} /> :
-                        popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
-                            null}
-            </Popup>}
-            {teleportModal && (
+            <div>
+                <div className='sectionHeader'>Special Actions</div>
+             {teleportModal && (
                 <TeleportModal
                     action={teleportModal.action}
                     playerStats={teleportModal.playerStats}

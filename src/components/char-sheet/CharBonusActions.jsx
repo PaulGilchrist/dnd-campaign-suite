@@ -1,6 +1,4 @@
 import React, { useState } from 'react'
-import Popup from '../common/Popup.jsx'
-import DiceRollResult from './DiceRollResult.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
@@ -17,6 +15,7 @@ import * as mapsService from '../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -52,7 +51,7 @@ function isActionSpell(castingTime) {
 }
 
 function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
-    const [popupHtml, setPopupHtml] = useState(null);
+    const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
 
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
@@ -199,43 +198,8 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                      })}
                      <div className='half-line'></div>
                  </div>
-             ) : null}
-             {popupHtml && (
-                 <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
-                     {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
-                        popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
-                            popupHtml.type === 'empowered_spell' ? <div className="dice-roll-result">
-                                 <div className="dice-roll-header"><i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}</div>
-                                 <div className="metamagic-sp-display">Sorcery Points: <strong>{popupHtml.currentSP}</strong> / {popupHtml.maxSP}</div>
-                                 {popupHtml.error && <div className="empowered-error" style={{ color: 'var(--stat-penalized, #cc4444)', marginTop: '8px' }}>{popupHtml.error}</div>}
-                                 {popupHtml.lastEvent && !popupHtml.completed && popupHtml.lastEvent.rolls && (
-                                     <div className="empowered-damage-info" style={{ marginTop: '8px' }}>
-                                         <div><strong>Spell:</strong> {popupHtml.lastEvent.spellName}</div>
-                                         <div><strong>Target:</strong> {popupHtml.lastEvent.targetName}</div>
-                                         <div><strong>Formula:</strong> {popupHtml.lastEvent.damageFormula}</div>
-                                         <div><strong>Original Damage:</strong> {popupHtml.lastEvent.rawDamage}</div>
-                                         <div><strong>CHA Modifier:</strong> {popupHtml.chaMod} - can reroll up to {popupHtml.chaMod} dice</div>
-                                     </div>
-                                 )}
-                                 {popupHtml.completed && popupHtml.result && (
-                                     <div className="empowered-result" style={{ marginTop: '8px' }}>
-                                         <hr />
-                                         {popupHtml.result.message ? (
-                                             <div>{popupHtml.result.message}</div>
-                                         ) : (
-                                             <>
-                                                 <div><strong>Original Damage:</strong> {popupHtml.result.oldTotal}</div>
-                                                 <div><strong>New Damage:</strong> {popupHtml.result.newTotal}</div>
-                                                 <div><strong>Difference:</strong> {popupHtml.result.damageDifference > 0 ? '+' : ''}{popupHtml.result.damageDifference}</div>
-                                             </>
-                                         )}
-                                     </div>
-                                 )}
-                             </div> :
-                             <DiceRollResult {...popupHtml} />}
-                 </Popup>
-             )}
-             {selectedBonusSpell && (
+              ) : null}
+              {selectedBonusSpell && (
                  <Popup onClickOrKeyDown={() => setSelectedBonusSpell(null)}>
                      <SpellDetailPopup
                         spell={selectedBonusSpell}

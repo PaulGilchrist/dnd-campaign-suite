@@ -1,7 +1,6 @@
 
 import React from 'react'
 import './CharSummary.css'
-import DiceRollResult from '../DiceRollResult.jsx'
 
 import rulesFactory from '../../../services/rules/rulesFactory.js'
 import { parseMagicItemName } from '../../../services/rules/core/attackCalc.js'
@@ -9,13 +8,13 @@ import CharGold from './CharGold.jsx'
 import CharHitPoints from './CharHitPoints.jsx'
 import CharClassFeatures from './CharClassFeatures.jsx'
 import CharFeats from '../char-feats/CharFeats.jsx'
-import Popup from '../../common/Popup.jsx'
 import AvatarImage from '../../common/AvatarImage.jsx'
 import AvatarModal from '../../common/AvatarModal.jsx';
 import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js'
 
 import { showBackgroundPopup } from '../../../hooks/combat/useActionPopup.js';
 import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js';
+import { useDiceRollPopup } from '../../../hooks/combat/DiceRollContext.js';
 import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
@@ -27,7 +26,8 @@ import CharConditions from './CharConditions.jsx'
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
-    const { popupHtml, setPopupHtml, rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
+    const { popupHtml, setPopupHtml } = useDiceRollPopup();
+    const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [showShortRest, setShowShortRest] = React.useState(false);
     const [showXpModal, setShowXpModal] = React.useState(false);
     const [xpDelta, setXpDelta] = React.useState('');
@@ -274,13 +274,7 @@ function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUpload
 
     return (
         <div>
-                {popupHtml && (
-                    <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
-                        {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                         <DiceRollResult {...popupHtml} />}
-                    </Popup>
-                )}
-            <div className='char-header'>
+             <div className='char-header'>
                 <AvatarImage name={playerStats.name} imagePath={playerStats.imagePath} size={60} onClick={() => setShowAvatarModal(true)} />
                 <div className='char-header-text'>
                     <div className='name-row'>

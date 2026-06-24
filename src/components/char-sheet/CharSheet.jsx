@@ -2,6 +2,11 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import rulesFactory from '../../services/rules/rulesFactory.js'
+import useSharedPopup from '../../hooks/combat/useSharedPopup.js'
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js'
+import Popup from './common/Popup.jsx'
+import DiceRollResult from './common/DiceRollResult.jsx'
+import { sanitizeHtml } from '../../services/ui/sanitize.js'
 import CharAbilities from './CharAbilities.jsx'
 import CharActions from './CharActions.jsx'
 import CharInventory from './CharInventory.jsx'
@@ -21,6 +26,8 @@ import './CharSheet.css'
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
     const [playerStats, setPlayerStats] = React.useState(null);
+
+    const { popupHtml, setPopupHtml, value, Provider } = useSharedPopup();
 
     const storedExhaustion = useRuntimeValue(playerSummary?.name, 'exhaustionLevel', campaignName);
     const exhaustionLevel = typeof storedExhaustion === 'number' ? Math.min(EXHAUSTION_LEVELS, Math.max(0, storedExhaustion)) : 0;
@@ -454,7 +461,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
       }).then(setAuraComboEffects);
     }, [playerStats, characters, campaignName, activeMapName]);
 
-    return (<React.Fragment>
+    return (<Provider value={value}>
+        <React.Fragment>
         {playerStats && <div className='char-sheet' data-testid='char-sheet'>
             <CharSummary
               playerStats={playerStats}
@@ -508,7 +516,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             <CharSpecialActions playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} characters={characters}></CharSpecialActions><hr />
             <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
         </div>}
-    </React.Fragment>)
+    </React.Fragment>
+        </Provider>)
 }
 
 export default CharSheet

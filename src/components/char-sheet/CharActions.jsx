@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react'
-import Popup from '../common/Popup.jsx'
-import DiceRollResult from './DiceRollResult.jsx'
 import EmpoweredSpellPopup from './popups/EmpoweredSpellPopup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { collectWeaponMastery } from '../../services/combat/automation/automationService.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../services/dice/diceRoller.js';
@@ -72,6 +71,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const [selectedActionSpell, setSelectedActionSpell] = useState(null);
     const [featRangeEffects, setFeatRangeEffects] = useState(null);
     const { saveDcBonus: displaySaveDcBonus } = getInnateSorceryBonus(playerStats.name, campaignName);
+    const { popupHtml, setPopupHtml } = useDiceRollPopup();
 
     useEffect(() => {
         computeFeatRangeEffects(playerStats.feats, playerStats.rules, playerStats).then(setFeatRangeEffects).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
@@ -84,7 +84,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             .catch(error => console.error('Error loading actions:', error));
     }, []);
 
-    const { popupHtml, setPopupHtml, rollAttack, rollDamage, quickRollPlayerSave, triggerGloriousDefenseCounterAttack } = useLoggedDiceRoll(playerStats.name, campaignName, {
+    const { rollAttack, rollDamage, quickRollPlayerSave, triggerGloriousDefenseCounterAttack } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageRoll: async (autoDamage, isCrit) => {
             let autoFormula = autoDamage.formula;

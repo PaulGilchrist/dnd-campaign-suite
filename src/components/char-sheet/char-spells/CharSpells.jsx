@@ -3,6 +3,7 @@ import React from 'react'
 import { cloneDeep } from 'lodash';
 import useActionPopup from '../../../hooks/combat/useActionPopup.js'
 import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js'
+import { useDiceRollPopup } from '../../../hooks/combat/DiceRollContext.js'
 import Popup from '../../common/Popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import MetamagicPopup from '../popups/MetamagicPopup.jsx'
@@ -42,7 +43,8 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs); // subscribe to activeBuffs changes for re-render
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
     const { popupHtml, setPopupHtml } = useActionPopup('spell');
-     const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml, rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+    const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml } = useDiceRollPopup();
+    const { rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageRoll: (autoDamage, isCrit) => {
           let autoFormula = autoDamage.formula;
@@ -392,12 +394,6 @@ return (
                                 onClose={() => setSelectedSpell(null)}
                                 onCast={handleSpellCast}
                             />
-                        </Popup>
-                    )}
-                    {dicePopupHtml && (
-                        <Popup onClickOrKeyDown={() => setDicePopupHtml && setDicePopupHtml(null)}>
-                            {typeof dicePopupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(dicePopupHtml) }}></div> : 
-                             <DiceRollResult {...dicePopupHtml} onQuickRoll={dicePopupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(dicePopupHtml.promptId, dicePopupHtml.targetName, dicePopupHtml.saveType, dicePopupHtml.saveDc) : undefined} />}
                         </Popup>
                     )}
                     {pendingUpcast && (
