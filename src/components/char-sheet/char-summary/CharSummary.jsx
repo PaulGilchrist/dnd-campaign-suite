@@ -15,7 +15,6 @@ import useTrackedResource from '../../../hooks/runtime/useTrackedResource.js'
 import { showBackgroundPopup } from '../../../hooks/combat/useActionPopup.js';
 import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js';
 import { useDiceRollPopup } from '../../../hooks/combat/DiceRollContext.js';
-import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import LongRestButton from '../LongRestButton.jsx'
 import ShortRestButton from '../ShortRestButton.jsx'
 import ShortRestModal from '../ShortRestModal.jsx'
@@ -26,7 +25,7 @@ import CharConditions from './CharConditions.jsx'
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
 function CharSummary({ playerStats, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters, onLongRest, exhaustionLevel, conditionEffects, onConditionsChange, auraComboEffects }) {
-    const { popupHtml, setPopupHtml } = useDiceRollPopup();
+    const { setPopupHtml } = useDiceRollPopup();
     const { rollInitiative } = useLoggedDiceRoll(playerStats.name, campaignName);
     const [showShortRest, setShowShortRest] = React.useState(false);
     const [showXpModal, setShowXpModal] = React.useState(false);

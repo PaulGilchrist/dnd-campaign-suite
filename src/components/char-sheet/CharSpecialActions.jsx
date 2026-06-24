@@ -1,7 +1,7 @@
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { getCategories } from '../../services/character/featureCategories.js'
-import { renderMarkdownInline, sanitizeHtml } from '../../services/ui/sanitize.js';
+import { renderMarkdownInline } from '../../services/ui/sanitize.js';
 import { getFightingStyle } from '../../services/character/fightingStyles.js'
 import { executeHandler } from '../../services/automation/index.js';
 import { isInteractiveAutomation } from '../../services/combat/automation/automationService.js';
@@ -26,7 +26,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [spellMasteryModal, setSpellMasteryModal] = useState(null);
     const [savantModal, setSavantModal] = useState(null);
     const [combatSuperiorityModal, setCombatSuperiorityModal] = useState(null);
-    const { popupHtml, setPopupHtml } = useDiceRollPopup();
+    const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
         characters,
         autoDamageRoll: async (autoDamage, isCrit) => {

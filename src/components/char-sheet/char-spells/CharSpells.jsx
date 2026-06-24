@@ -5,7 +5,6 @@ import useActionPopup from '../../../hooks/combat/useActionPopup.js'
 import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../../hooks/combat/DiceRollContext.js'
 import Popup from '../../common/popup.jsx'
-import DiceRollResult from '../DiceRollResult.jsx'
 import MetamagicPopup from '../popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
@@ -21,7 +20,6 @@ import ProtectionFromEnergyTargetPopup from '../popups/ProtectionFromEnergyTarge
 import ResistanceTargetPopup from '../popups/ResistanceTargetPopup.jsx'
 import MagicMissileTargetPopup from '../popups/MagicMissileTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
-import { sanitizeHtml } from '../../../services/ui/sanitize.js';
 import { getCombatContext, getTargetFromAttacker, getAttackerTargetName } from '../../../services/rules/combat/damageUtils.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 import { getCurrentSorceryPoints, getMaxSorceryPoints, spendSorceryPoints } from '../../../hooks/combat/useMetamagic.js'
@@ -42,9 +40,9 @@ import './CharSpells.css'
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters }) {
     const _activeBuffs = useRuntimeValue(playerStats.name, 'activeBuffs', campaignName); (void _activeBuffs); // subscribe to activeBuffs changes for re-render
     const innateSorceryActive = isInnateSorceryActive(playerStats.name, campaignName);
-    const { popupHtml, setPopupHtml } = useActionPopup('spell');
+    useActionPopup('spell');
     const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml } = useDiceRollPopup();
-    const { rollAttack, rollDamage, quickRollPlayerSave } = useLoggedDiceRoll(playerStats.name, campaignName, {
+    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageRoll: (autoDamage, isCrit) => {
           let autoFormula = autoDamage.formula;

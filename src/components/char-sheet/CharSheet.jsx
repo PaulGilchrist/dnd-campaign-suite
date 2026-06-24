@@ -3,7 +3,6 @@ import { cloneDeep } from 'lodash';
 import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/runtime/useRuntimeState.js'
 import rulesFactory from '../../services/rules/rulesFactory.js'
 import useSharedPopup from '../../hooks/combat/useSharedPopup.js'
-import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js'
 import Popup from '../common/popup.jsx'
 import DiceRollResult from './DiceRollResult.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js'

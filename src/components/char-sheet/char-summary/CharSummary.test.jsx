@@ -31,7 +31,8 @@ vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
     showBackgroundPopup: vi.fn(),
 }));
 
-    default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn(), rollInitiative: vi.fn() })),
+vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn(), rollInitiative: vi.fn() })),
 }));
 
 vi.mock('../../../services/ui/sanitize.js', () => ({

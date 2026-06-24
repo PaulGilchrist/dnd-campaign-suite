@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react'
-import EmpoweredSpellPopup from './popups/EmpoweredSpellPopup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { collectWeaponMastery } from '../../services/combat/automation/automationService.js'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
@@ -31,7 +30,7 @@ import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
-import { buildEmpoweredSpellState, executeEmpoweredReroll, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
+import { buildEmpoweredSpellState, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
@@ -84,7 +83,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             .catch(error => console.error('Error loading actions:', error));
     }, []);
 
-    const { rollAttack, rollDamage, quickRollPlayerSave, triggerGloriousDefenseCounterAttack } = useLoggedDiceRoll(playerStats.name, campaignName, {
+    const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
         autoDamageRoll: async (autoDamage, isCrit) => {
             let autoFormula = autoDamage.formula;

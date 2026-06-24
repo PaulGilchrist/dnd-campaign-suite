@@ -6,13 +6,13 @@ import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
-import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
     popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
   })),

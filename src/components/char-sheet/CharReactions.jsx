@@ -21,7 +21,7 @@ import { applyWarCasterReaction } from '../../services/automation/handlers/react
      import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
 
 function CharReactions({ playerStats, campaignName, cannotAct, mapName, characters }) {
-    const { popupHtml, setPopupHtml } = useDiceRollPopup();
+    const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, { characters });
     const [selectedSpell, setSelectedSpell] = React.useState(null);
     const [reactiveSpellEligible, setReactiveSpellEligible] = React.useState(null);

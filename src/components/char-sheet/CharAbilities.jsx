@@ -2,15 +2,14 @@
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { buildAbilityDetailHtml } from '../../hooks/combat/useActionPopup.js';
-import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
 
-function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, onReroll, onStrokeOfLuck }) {
+function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustionPenalty = 0, conditionEffects, isRaging = false, _onReroll, _onStrokeOfLuck }) {
      const abilityDesc = buildAbilityDetailHtml(allAbilityScores);
-     const { popupHtml, setPopupHtml } = useDiceRollPopup();
+     const { setPopupHtml } = useDiceRollPopup();
      const { rollAbilityCheck, rollSavingThrow, rollSkillCheck } = useLoggedDiceRoll(playerStats.name, campaignName);
 
       const getCosmicOmenBonus = () => {

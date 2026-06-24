@@ -4,13 +4,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
 import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
-  const mockFn = vi.fn(() => ({
+  vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
+  default: vi.fn(() => ({
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(),
     rollSkillCheck: vi.fn(),
-  }));
-  return { default: mockFn };
-});
+  })),
+}));
 
 const mockStore = new Map();
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({

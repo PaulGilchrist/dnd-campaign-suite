@@ -110,8 +110,11 @@ vi.mock('../../services/automation/handlers/class-wizard/SavantHandler.js', () =
 }));
 
 import { executeHandler } from '../../services/automation/index.js';
+// eslint-disable-next-line no-unused-vars
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
+// eslint-disable-next-line no-unused-vars
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
+// eslint-disable-next-line no-unused-vars
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
 
 const basePlayerStats = {
