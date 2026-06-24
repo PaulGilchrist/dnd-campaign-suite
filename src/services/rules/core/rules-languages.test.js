@@ -1,205 +1,329 @@
-import { describe, it, expect, vi } from 'vitest';
-
-vi.mock('../../ui/dataLoader.js', () => ({
-  loadSkills: vi.fn(),
-  loadPassiveSkills: vi.fn(),
-  loadFeatData: vi.fn().mockResolvedValue([])
-}));
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import rules from '../rules.js';
 
-describe('rules', () => {
-  describe('getLanguages', () => {
-    it('should include race languages', () => {
-      const playerStats = {
-        race: {
-          languages: ['Common', 'Elvish']
-        },
-        class: {
-          languages: []
-        },
-        level: 1
-      };
+vi.mock('../ui/dataLoader.js', () => ({
+  loadSkills: vi.fn(),
+  loadPassiveSkills: vi.fn(),
+  loadFeatData: vi.fn().mockResolvedValue([]),
+}));
 
-      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
-      void _languagesAllowed;
+describe('rules.getLanguages', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-      expect(languages).toContain('Common');
-      expect(languages).toContain('Elvish');
+  const baseStats = {
+    race: { languages: ['Common'] },
+    class: { languages: [] },
+    level: 1,
+  };
+
+  describe('5e ruleset', () => {
+    it('returns [languagesAllowed, sortedLanguages] tuple', () => {
+      const result = rules.getLanguages(
+        { ...baseStats, languages: [] },
+        {},
+      );
+
+      expect(Array.isArray(result)).toBe(true);
+      expect(result.length).toBe(2);
+      expect(typeof result[0]).toBe('number');
+      expect(Array.isArray(result[1])).toBe(true);
     });
 
-    it('should include class languages', () => {
-      const playerStats = {
-        race: {
-          languages: ['Common']
-        },
-        class: {
-          languages: ['Druidic']
-        },
-        level: 1
+    it('returns race languages in the list', () => {
+      const stats = {
+        ...baseStats,
+        race: { languages: ['Common', 'Elvish'] },
+        languages: [],
       };
+      const [, languages] = rules.getLanguages(stats, {});
+      expect(languages).toEqual(['Common', 'Elvish']);
+    });
 
-      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
-      void _languagesAllowed;
-
-      expect(languages).toContain('Common');
+    it('includes class languages in the list', () => {
+      const stats = {
+        ...baseStats,
+        class: { languages: ['Druidic'] },
+        languages: [],
+      };
+      const [, languages] = rules.getLanguages(stats, {});
       expect(languages).toContain('Druidic');
     });
 
-    it('should add 2 backstory languages', () => {
-      const playerStats = {
-        race: {
-          languages: ['Common']
-        },
-        class: {
-          languages: []
-        },
-        level: 1
-      };
-
-      const [languagesAllowed] = rules.getLanguages(playerStats);
-
-      expect(languagesAllowed).toBeGreaterThanOrEqual(2);
-    });
-
-    it('should include player languages', () => {
-      const playerStats = {
-        race: {
-          languages: ['Common']
-        },
-        class: {
-          languages: []
-        },
+    it('includes player-chosen languages', () => {
+      const stats = {
+        ...baseStats,
         languages: ['Dwarvish'],
-        level: 1
       };
-
-      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
-      void _languagesAllowed;
-
-      expect(languages).toContain('Common');
+      const [, languages] = rules.getLanguages(stats, {});
       expect(languages).toContain('Dwarvish');
     });
 
-    it('should deduplicate languages', () => {
-      const playerStats = {
-        race: {
-          languages: ['Common']
-        },
-        class: {
-          languages: ['Common']
-        },
+    it('deduplicates languages across all sources', () => {
+      const stats = {
+        ...baseStats,
+        race: { languages: ['Common'] },
+        class: { languages: ['Common'] },
         languages: ['Common'],
-        level: 1
       };
-
-      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
-      void _languagesAllowed;
-
-      expect(languages.filter(l => l === 'Common')).toHaveLength(1);
+      const [, languages] = rules.getLanguages(stats, {});
+      expect(languages).toEqual(['Common']);
     });
 
-    it('should return sorted languages', () => {
-      const playerStats = {
-        race: {
-          languages: ['Zebrian', 'Common']
-        },
-        class: {
-          languages: []
-        },
-        level: 1
+    it('returns languages sorted alphabetically', () => {
+      const stats = {
+        ...baseStats,
+        race: { languages: ['Zebrian', 'Abyssal', 'Common'] },
+        languages: [],
       };
-
-      const [_languagesAllowed, languages] = rules.getLanguages(playerStats);
-      void _languagesAllowed;
-
-      expect(languages[0]).toBe('Common');
+      const [, languages] = rules.getLanguages(stats, {});
+      expect(languages).toEqual(['Abyssal', 'Common', 'Zebrian']);
     });
 
-    it('should handle race language choices', () => {
-      const playerStats = {
+    it('adds 2 background languages to the allowed count', () => {
+      const stats = {
+        ...baseStats,
+        race: { languages: [] },
+        class: { languages: [] },
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      expect(languagesAllowed).toBe(2);
+    });
+
+    it('includes subrace languages in the list', () => {
+      const stats = {
+        ...baseStats,
         race: {
           languages: ['Common'],
-          language_choices: {
-            choose: 2,
-            options: ['Dwarvish', 'Elvish', 'Gnomish']
-          }
+          subrace: {
+            languages: ['Elvish'],
+            language_options: { choose: 0 },
+          },
         },
-        class: {
-          languages: []
-        },
-        level: 1
+        languages: [],
       };
-
-      const [languagesAllowed] = rules.getLanguages(playerStats);
-
-      expect(languagesAllowed).toBeGreaterThanOrEqual(4); // 1 base + 2 backstory + 2 choices
+      const [, languages] = rules.getLanguages(stats, {});
+      expect(languages).toContain('Elvish');
     });
 
-    it('should handle Ranger bonus languages at level 6+', () => {
-      const playerStats = {
+    it('adds subrace choose count to languagesAllowed', () => {
+      const stats = {
+        ...baseStats,
         race: {
-          languages: ['Common']
+          languages: ['Common'],
+          subrace: {
+            languages: [],
+            language_options: { choose: 3 },
+          },
+        },
+        class: { languages: [] },
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // 1 (race) + 2 (background) + 3 (subrace choose) = 6
+      expect(languagesAllowed).toBe(6);
+    });
+
+    it('adds race language_choices choose count', () => {
+      const stats = {
+        ...baseStats,
+        race: {
+          languages: ['Common'],
+          language_choices: { choose: 2 },
+        },
+        class: { languages: [] },
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // 1 (race) + 2 (background) + 2 (race language_choices) = 5
+      expect(languagesAllowed).toBe(5);
+    });
+
+    it('adds subclass language_choices choose count', () => {
+      const stats = {
+        ...baseStats,
+        class: {
+          languages: [],
+          subclass: { language_choices: { choose: 2 } },
+        },
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // 1 (race) + 2 (background) + 2 (subclass) = 5
+      expect(languagesAllowed).toBe(5);
+    });
+
+    it('adds Ranger level >5 bonus language', () => {
+      const stats = {
+        ...baseStats,
+        class: {
+          name: 'Ranger',
+          languages: [],
+          language_choices: { choose: 0 },
+        },
+        level: 6,
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // 1 (race) + 2 (background) + 1 (ranger level>5) = 4
+      expect(languagesAllowed).toBe(4);
+    });
+
+    it('adds Ranger level >13 bonus language', () => {
+      const stats = {
+        ...baseStats,
+        class: {
+          name: 'Ranger',
+          languages: [],
+          language_choices: { choose: 0 },
+        },
+        level: 14,
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // 1 (race) + 2 (background) + 1 (ranger level>5) + 1 (ranger level>13) = 5
+      expect(languagesAllowed).toBe(5);
+    });
+
+    it('does not add Ranger bonus at level 5 or below', () => {
+      const stats = {
+        ...baseStats,
+        class: {
+          name: 'Ranger',
+          languages: [],
+          language_choices: { choose: 0 },
+        },
+        level: 5,
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // 1 (race) + 2 (background) = 3
+      expect(languagesAllowed).toBe(3);
+    });
+
+    it('does not add Ranger bonus at level 13', () => {
+      const stats = {
+        ...baseStats,
+        class: {
+          name: 'Ranger',
+          languages: [],
+          language_choices: { choose: 0 },
+        },
+        level: 13,
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // 1 (race) + 2 (background) + 1 (ranger level>5) = 4
+      expect(languagesAllowed).toBe(4);
+    });
+
+    it('combines all language sources', () => {
+      const stats = {
+        rules: '5e',
+        race: {
+          languages: ['Common'],
+          language_choices: { choose: 1 },
         },
         class: {
           name: 'Ranger',
           languages: ['Druidic'],
-          language_choices: {
-            choose: 1
-          }
+          language_choices: { choose: 0 },
         },
-        level: 6
+        languages: ['Giant'],
+        level: 8,
       };
-
-      const [languagesAllowed] = rules.getLanguages(playerStats);
-
-      expect(languagesAllowed).toBeGreaterThan(4);
+      const [languagesAllowed, languages] = rules.getLanguages(stats, {});
+      // languages: Common, Druidic, Giant (sorted)
+      expect(languages).toEqual(['Common', 'Druidic', 'Giant']);
+      // 1 (race) + 2 (background) + 1 (race language_choices) + 1 (ranger level>5) = 5
+      expect(languagesAllowed).toBe(5);
     });
 
-    it('should handle Ranger bonus languages at level 14+', () => {
-      const playerStats = {
-        race: {
-          languages: ['Common']
-        },
-        class: {
-          name: 'Ranger',
-          languages: ['Druidic'],
-          language_choices: {
-            choose: 1
-          }
-        },
-        level: 14
+    it('throws when class is undefined', () => {
+      const stats = {
+        ...baseStats,
+        class: undefined,
+        languages: [],
       };
+      expect(() => rules.getLanguages(stats, {})).toThrow();
+    });
 
-      const [languagesAllowed] = rules.getLanguages(playerStats);
-
-      expect(languagesAllowed).toBeGreaterThan(5);
+    it('handles empty race languages', () => {
+      const stats = {
+        ...baseStats,
+        race: { languages: [] },
+        class: { languages: [] },
+        languages: [],
+      };
+      const [, languages] = rules.getLanguages(stats, {});
+      expect(languages).toEqual([]);
     });
   });
 
-  describe('2024 ruleset dispatch / getLanguages', () => {
-    it('should use class.major.language_choices in 2024 mode', () => {
-      const playerStats = {
+  describe('2024 ruleset', () => {
+    it('uses class.major.language_choices instead of subclass', () => {
+      const stats = {
         rules: '2024',
-        race: { languages: ['Common'] },
-        class: { languages: [], major: { language_choices: { choose: 3 } } },
-        level: 1
-      };
-      const [languagesAllowed] = rules.getLanguages(playerStats);
-      expect(languagesAllowed).toBeGreaterThanOrEqual(5); // 1 + 2 (background) + 3 (major)
-    });
-
-    it('should use class.subclass.language_choices in 5e mode', () => {
-      const playerStats = {
         race: { languages: ['Common'] },
         class: {
           languages: [],
-          subclass: { language_choices: { choose: 2 } }
+          major: { language_choices: { choose: 3 } },
         },
-        level: 1
+        languages: [],
       };
-      const [languagesAllowed] = rules.getLanguages(playerStats);
-      expect(languagesAllowed).toBeGreaterThanOrEqual(4); // 1 + 2 (background) + 2 (subclass)
+      const [languagesAllowed, languages] = rules.getLanguages(stats, {});
+      // languages: Common
+      expect(languages).toEqual(['Common']);
+      // 1 (race) + 2 (background) + 3 (major) = 6
+      expect(languagesAllowed).toBe(6);
+    });
+
+    it('ignores class.subclass.language_choices in 2024 mode', () => {
+      const stats = {
+        rules: '2024',
+        race: { languages: ['Common'] },
+        class: {
+          languages: [],
+          subclass: { language_choices: { choose: 5 } },
+        },
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // 2024 should NOT count subclass language_choices
+      // 1 (race) + 2 (background) = 3
+      expect(languagesAllowed).toBe(3);
+    });
+
+    it('supports both major and subclass language_choices in 2024', () => {
+      const stats = {
+        rules: '2024',
+        race: { languages: ['Common'] },
+        class: {
+          languages: [],
+          major: { language_choices: { choose: 1 } },
+          subclass: { language_choices: { choose: 2 } },
+        },
+        languages: [],
+      };
+      const [languagesAllowed] = rules.getLanguages(stats, {});
+      // Only major counts in 2024
+      // 1 (race) + 2 (background) + 1 (major) = 4
+      expect(languagesAllowed).toBe(4);
+    });
+
+    it('handles missing major in 2024 mode', () => {
+      const stats = {
+        rules: '2024',
+        race: { languages: ['Common'] },
+        class: { languages: [] },
+        languages: [],
+      };
+      const [, languages] = rules.getLanguages(stats, {});
+      expect(languages).toEqual(['Common']);
     });
   });
 });

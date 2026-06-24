@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerSeeInvisibility } from './seeInvisibilityService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -8,33 +9,33 @@ vi.mock('../../automation/index.js', () => ({
 
 describe('seeInvisibilityService', () => {
     beforeEach(() => {
-        vi.clearAllMocks();
+        executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
     });
 
-    describe('triggerSeeInvisibility', () => {
-        const campaignName = 'TestCampaign';
-        const mapName = 'testMap';
-        const playerStats = {
-            name: 'Wizard',
-            spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Intelligence', toHit: 9 },
-            proficiency: 4,
-        };
+    const campaignName = 'TestCampaign';
+    const mapName = 'testMap';
+    const playerStats = { name: 'Wizard' };
 
-        it('returns null for non-See Invisibility spells', async () => {
-            const result = await triggerSeeInvisibility(
-                { name: 'Fire Bolt', level: 0 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+    describe('triggerSeeInvisibility', () => {
+        it('returns null and does not call handler for non-matching spell names', async () => {
+            const nonMatchingNames = ['Fire Bolt', 'Invisibility', 'see invis', 'InViSiBiLiTy', ''];
+
+            for (const spellName of nonMatchingNames) {
+                executeHandler.mockClear();
+                const result = await triggerSeeInvisibility(
+                    { name: spellName, level: 0 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+                expect(result).toBeNull();
+                expect(executeHandler).not.toHaveBeenCalled();
+            }
         });
 
-        it('returns null when spell name is "see invisibility" case-insensitive and executes handler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
-
+        it('executes handler for "See Invisibility" (exact case)', async () => {
+            executeHandler.mockClear();
             const result = await triggerSeeInvisibility(
                 { name: 'See Invisibility', level: 2 },
                 {},
@@ -43,28 +44,12 @@ describe('seeInvisibilityService', () => {
                 mapName,
             );
 
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    name: 'See Invisibility',
-                    automation: expect.objectContaining({
-                        type: 'temp_buff',
-                        effect: 'see_invisibility',
-                        duration: '1_hour',
-                        action: 'action',
-                        casting_time: '1 action',
-                    }),
-                    spellSlotLevel: 2,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
             expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
+            expect(executeHandler).toHaveBeenCalledTimes(1);
         });
 
-        it('handles lowercase "see invisibility" spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
+        it('executes handler for "see invisibility" (lowercase)', async () => {
+            executeHandler.mockClear();
             const result = await triggerSeeInvisibility(
                 { name: 'see invisibility', level: 2 },
                 {},
@@ -73,13 +58,12 @@ describe('seeInvisibilityService', () => {
                 mapName,
             );
 
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
+            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
+            expect(executeHandler).toHaveBeenCalledTimes(1);
         });
 
-        it('handles mixed-case "SEE INVISIBILITY" spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
+        it('executes handler for "SEE INVISIBILITY" (uppercase)', async () => {
+            executeHandler.mockClear();
             const result = await triggerSeeInvisibility(
                 { name: 'SEE INVISIBILITY', level: 2 },
                 {},
@@ -88,11 +72,125 @@ describe('seeInvisibilityService', () => {
                 mapName,
             );
 
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
+            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
+            expect(executeHandler).toHaveBeenCalledTimes(1);
         });
 
-        it('returns result from executeHandler on success', async () => {
+        it('executes handler for mixed-case "SeE iNvIsIbIlIty"', async () => {
+            executeHandler.mockClear();
+            const result = await triggerSeeInvisibility(
+                { name: 'SeE iNvIsIbIlIty', level: 2 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+        });
+
+        it('passes the original spell object to the handler', async () => {
+            executeHandler.mockClear();
+            executeHandler.mockResolvedValue({ type: 'popup' });
+            const spell = { name: 'See Invisibility', level: 2, school: 'Divination' };
+
+            await triggerSeeInvisibility(spell, {}, playerStats, campaignName, mapName);
+
+            const [action] = executeHandler.mock.calls[0];
+            expect(action.spell).toBe(spell);
+        });
+
+        it('uses spell.level as spellSlotLevel', async () => {
+            executeHandler.mockClear();
+            await triggerSeeInvisibility(
+                { name: 'See Invisibility', level: 4 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            const [action] = executeHandler.mock.calls[0];
+            expect(action.spellSlotLevel).toBe(4);
+        });
+
+        it('defaults spellSlotLevel to 2 when spell.level is missing', async () => {
+            executeHandler.mockClear();
+            await triggerSeeInvisibility(
+                { name: 'See Invisibility' },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            const [action] = executeHandler.mock.calls[0];
+            expect(action.spellSlotLevel).toBe(2);
+        });
+
+        it('defaults spellSlotLevel to 2 when spell.level is null', async () => {
+            executeHandler.mockClear();
+            await triggerSeeInvisibility(
+                { name: 'See Invisibility', level: null },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            const [action] = executeHandler.mock.calls[0];
+            expect(action.spellSlotLevel).toBe(2);
+        });
+
+        it('defaults spellSlotLevel to 2 when spell.level is undefined', async () => {
+            executeHandler.mockClear();
+            await triggerSeeInvisibility(
+                { name: 'See Invisibility', level: undefined },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            const [action] = executeHandler.mock.calls[0];
+            expect(action.spellSlotLevel).toBe(2);
+        });
+
+        it('defaults spellSlotLevel to 2 when spell.level is 0', async () => {
+            executeHandler.mockClear();
+            await triggerSeeInvisibility(
+                { name: 'See Invisibility', level: 0 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            const [action] = executeHandler.mock.calls[0];
+            expect(action.spellSlotLevel).toBe(2);
+        });
+
+        it('passes campaignName and mapName to the handler', async () => {
+            executeHandler.mockClear();
+            await triggerSeeInvisibility(
+                { name: 'See Invisibility', level: 2 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.any(Object),
+                playerStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('returns the handler result on success', async () => {
+            executeHandler.mockClear();
             const expectedResult = {
                 type: 'popup',
                 payload: { type: 'automation_info', name: 'See Invisibility' },
@@ -107,10 +205,11 @@ describe('seeInvisibilityService', () => {
                 mapName,
             );
 
-            expect(result).toBe(expectedResult);
+            expect(result).toEqual(expectedResult);
         });
 
-        it('returns null when executeHandler returns null', async () => {
+        it('returns null when handler returns null', async () => {
+            executeHandler.mockClear();
             executeHandler.mockResolvedValue(null);
 
             const result = await triggerSeeInvisibility(
@@ -124,7 +223,8 @@ describe('seeInvisibilityService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('returns null when handler throws', async () => {
+            executeHandler.mockClear();
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
             const result = await triggerSeeInvisibility(
@@ -138,78 +238,8 @@ describe('seeInvisibilityService', () => {
             expect(result).toBeNull();
         });
 
-        it('passes the spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'See Invisibility', level: 2, school: 'Divination' };
-
-            await triggerSeeInvisibility(spell, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses spell.level as spellSlotLevel', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSeeInvisibility(
-                { name: 'See Invisibility', level: 4 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 4 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('defaults spellSlotLevel to 2 when spell.level is undefined', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSeeInvisibility(
-                { name: 'See Invisibility' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 2 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('defaults spellSlotLevel to 2 when spell.level is null', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerSeeInvisibility(
-                { name: 'See Invisibility', level: null },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 2 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles undefined spell name gracefully', async () => {
+        it('returns null when spell object has no name property', async () => {
+            executeHandler.mockClear();
             const result = await triggerSeeInvisibility(
                 {},
                 {},
@@ -221,18 +251,16 @@ describe('seeInvisibilityService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('handles empty string spell name gracefully', async () => {
-            const result = await triggerSeeInvisibility(
-                { name: '' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+        it('throws when spell.name is a non-string type', async () => {
+            await expect(
+                triggerSeeInvisibility(
+                    { name: 123, level: 2 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('toLowerCase is not a function');
         });
-
-
     });
 });

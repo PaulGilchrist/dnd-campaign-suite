@@ -1,6 +1,7 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports ───────────────────────────────────────
+// ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -36,6 +37,10 @@ vi.mock('../../../rules/combat/applyDamage.js', () => ({
   applyDamageToTarget: vi.fn(),
 }));
 
+vi.mock('../../../rules/features/invisibilityService.js', () => ({
+  endInvisibilityOnHostileAction: vi.fn(),
+}));
+
 vi.mock('../../../shared/logPoster.js', () => ({
   postLogEntry: vi.fn(),
 }));
@@ -51,6 +56,7 @@ import { rangeToFeet, getDistanceFeet } from '../../../rules/combat/rangeValidat
 import { resolveMapPositions } from '../../common/targetResolver.js';
 import { applyHealingToTarget } from '../../../rules/combat/applyHealing.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
+import { endInvisibilityOnHostileAction } from '../../../rules/features/invisibilityService.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -78,45 +84,58 @@ function makeAction(automation = {}) {
   };
 }
 
-const baseCombatSummary = {
-  creatures: [
-    { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-    { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-    { name: 'Ally', type: 'player', currentHp: 20, maxHp: 30 },
-  ],
-  players: [
-    { name: 'TestHero', gridX: 5, gridY: 10 },
-    { name: 'Ally', gridX: 8, gridY: 12 },
-  ],
-  placedItems: [],
-};
+function makeCombatSummary(creatures = [], players = []) {
+  return { creatures, players, placedItems: [] };
+}
+
+function makeDamageSpell(spellName, damageType) {
+  return { name: spellName, damage: { damage_type: damageType } };
+}
+
+function makeHealSpell(overrides = {}) {
+  return { name: 'Power Word Heal', ...overrides };
+}
 
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('multiTargetHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getCombatSummary.mockImplementation((_name) => {
+      // Return a default that will be overridden by individual tests
+      return { creatures: [], players: [], placedItems: [] };
+    });
   });
 
   describe('combat context validation', () => {
     it('should return popup when no combat context exists', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
       getCombatContext.mockResolvedValue(null);
 
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.name).toBe('Word of Creation');
       expect(result.payload.description).toContain('No combat context found');
+      expect(result.payload.automation).toEqual(action.automation);
+    });
+
+    it('should use default feature name when no combat context and action.name is missing', async () => {
+      const ps = makePlayerStats();
+      const action = { automation: { range: '30 ft' } };
+      getCombatContext.mockResolvedValue(null);
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.payload.name).toBe('Words of Creation');
     });
 
     it('should return popup when first target not found in combat summary', async () => {
       const ps = makePlayerStats();
-      const action = makeAction();
-
-      getCombatContext.mockResolvedValue({ creatures: [] });
+      const action = makeAction({ payload: { targetName: 'Goblin' } });
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Orc' }]));
 
       const result = await handle(action, ps, campaignName, mapName);
 
@@ -127,10 +146,8 @@ describe('multiTargetHandler.handle', () => {
 
     it('should return popup when action.payload has no targetName', async () => {
       const ps = makePlayerStats();
-      const action = makeAction();
-      // No payload.targetName
-
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
+      const action = makeAction({ payload: {} });
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
 
       const result = await handle(action, ps, campaignName, mapName);
 
@@ -148,8 +165,16 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft' },
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      const cs = makeCombatSummary(
+        [
+          { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
+          { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
+          { name: 'Ally', type: 'player', currentHp: 20, maxHp: 30 },
+        ],
+        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
+      );
+      getCombatContext.mockResolvedValue(cs);
+      getCombatSummary.mockReturnValue(cs);
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
 
@@ -159,8 +184,10 @@ describe('multiTargetHandler.handle', () => {
       expect(result.payload.type).toBe('multi_target_selection');
       expect(result.payload.name).toBe('Word of Creation');
       expect(result.payload.firstTargetName).toBe('Goblin');
-      expect(Array.isArray(result.payload.creatureTargets)).toBe(true);
       expect(result.payload.range).toBe('30 ft');
+      expect(Array.isArray(result.payload.creatureTargets)).toBe(true);
+      expect(result.payload.creatureTargets).toContain('Orc');
+      expect(result.payload.creatureTargets).toContain('Ally');
     });
 
     it('should exclude the first target from creatureTargets', async () => {
@@ -170,9 +197,16 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft' },
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      getCombatSummary.mockReturnValue(baseCombatSummary);
+      const cs = makeCombatSummary(
+        [
+          { name: 'Goblin', type: 'monster' },
+          { name: 'Orc', type: 'monster' },
+          { name: 'Ally', type: 'player' },
+        ],
+        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
+      );
+      getCombatContext.mockResolvedValue(cs);
+      getCombatSummary.mockReturnValue(cs);
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
 
@@ -189,8 +223,8 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft' },
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
+      getCombatSummary.mockReturnValue(makeCombatSummary([{ name: 'Goblin' }]));
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
 
@@ -206,8 +240,8 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft' },
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
+      getCombatSummary.mockReturnValue(makeCombatSummary([{ name: 'Goblin' }]));
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 5, gridY: 10 } });
 
@@ -223,8 +257,8 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft' },
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
+      getCombatSummary.mockReturnValue(makeCombatSummary([{ name: 'Goblin' }]));
       rangeToFeet.mockReturnValue(30);
 
       await handle(action, ps, campaignName, null);
@@ -239,8 +273,8 @@ describe('multiTargetHandler.handle', () => {
         automation: {},
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
+      getCombatSummary.mockReturnValue(makeCombatSummary([{ name: 'Goblin' }]));
       rangeToFeet.mockReturnValue(10);
       resolveMapPositions.mockResolvedValue(null);
 
@@ -256,8 +290,8 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft', spellFilter: ['evocation', 'conjuration'] },
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
+      getCombatSummary.mockReturnValue(makeCombatSummary([{ name: 'Goblin' }]));
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
 
@@ -273,8 +307,8 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft' },
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
+      getCombatSummary.mockReturnValue(makeCombatSummary([{ name: 'Goblin' }]));
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
 
@@ -292,29 +326,24 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft' },
         payload: { targetName: 'Goblin' },
       };
-
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-          { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-          { name: 'Ally', type: 'player', currentHp: 20, maxHp: 30 },
+      const cs = makeCombatSummary(
+        [
+          { name: 'Goblin', type: 'monster' },
+          { name: 'Orc', type: 'monster' },
+          { name: 'Ally', type: 'player' },
         ],
-        players: [
-          { name: 'TestHero', gridX: 1, gridY: 1 },
-          { name: 'Ally', gridX: 3, gridY: 3 },
-        ],
-        placedItems: [],
-      };
-
-      getCombatContext.mockResolvedValue(combatSummary);
-      getCombatSummary.mockReturnValue(combatSummary);
+        [{ name: 'TestHero', gridX: 1, gridY: 1 }, { name: 'Ally', gridX: 3, gridY: 3 }]
+      );
+      getCombatContext.mockResolvedValue(cs);
+      getCombatSummary.mockReturnValue(cs);
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 1 } });
-      getDistanceFeet.mockReturnValue(10); // within range
+      getDistanceFeet.mockReturnValue(10);
 
       const result = await handle(action, ps, campaignName, mapName);
 
       expect(result.payload.creatureTargets).toContain('Ally');
+      expect(result.payload.creatureTargets).not.toContain('Goblin');
     });
 
     it('should include all creatures when attackerPos is null but range is specified', async () => {
@@ -324,9 +353,14 @@ describe('multiTargetHandler.handle', () => {
         automation: { range: '30 ft' },
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      getCombatSummary.mockReturnValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }, { name: 'Ally', type: 'player' }],
+        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
+      ));
+      getCombatSummary.mockReturnValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }, { name: 'Ally', type: 'player' }],
+        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
+      ));
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
 
@@ -334,18 +368,24 @@ describe('multiTargetHandler.handle', () => {
 
       expect(result.payload.creatureTargets).toContain('Orc');
       expect(result.payload.creatureTargets).toContain('Ally');
+      expect(result.payload.creatureTargets).not.toContain('Goblin');
     });
 
-    it('should include all creatures when withinRangeFt is null', async () => {
+    it('should include all creatures when range is null', async () => {
       const ps = makePlayerStats();
       const action = {
         name: 'Word of Creation',
         automation: {},
         payload: { targetName: 'Goblin' },
       };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      getCombatSummary.mockReturnValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }, { name: 'Ally', type: 'player' }],
+        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
+      ));
+      getCombatSummary.mockReturnValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }, { name: 'Ally', type: 'player' }],
+        [{ name: 'TestHero', gridX: 5, gridY: 10 }]
+      ));
       rangeToFeet.mockReturnValue(null);
       resolveMapPositions.mockResolvedValue(null);
 
@@ -353,6 +393,34 @@ describe('multiTargetHandler.handle', () => {
 
       expect(result.payload.creatureTargets).toContain('Orc');
       expect(result.payload.creatureTargets).toContain('Ally');
+      expect(result.payload.creatureTargets).not.toContain('Goblin');
+    });
+
+    it('should exclude creatures out of range when attackerPos and range are both available', async () => {
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Word of Creation',
+        automation: { range: '10 ft' },
+        payload: { targetName: 'Goblin' },
+      };
+      const cs = makeCombatSummary(
+        [
+          { name: 'Goblin', type: 'monster' },
+          { name: 'Nearby', type: 'monster' },
+          { name: 'FarAway', type: 'monster' },
+        ],
+        [{ name: 'TestHero', gridX: 1, gridY: 1 }]
+      );
+      getCombatContext.mockResolvedValue(cs);
+      getCombatSummary.mockReturnValue(cs);
+      rangeToFeet.mockReturnValue(10);
+      resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 1 } });
+
+      const result = await handle(action, ps, campaignName, mapName);
+
+      expect(result.payload.creatureTargets).toContain('Nearby');
+      expect(result.payload.creatureTargets).toContain('FarAway');
+      expect(result.payload.creatureTargets).not.toContain('Goblin');
     });
   });
 });
@@ -360,22 +428,29 @@ describe('multiTargetHandler.handle', () => {
 describe('multiTargetHandler.applyMultiTarget', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    addEntry.mockReturnValue(Promise.resolve());
   });
 
   describe('early returns', () => {
-    it('should return null when secondTargetName is missing', async () => {
+    it('should return null when secondTargetName is empty string', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        '',
-        null,
-        null
+        action, ps, campaignName, mapName,
+        'Goblin', '', null, null
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('should return null when secondTargetName is null', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+
+      const result = await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', null, null, null
       );
 
       expect(result).toBeNull();
@@ -384,18 +459,11 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should return null when no combat context exists', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
       getCombatContext.mockResolvedValue(null);
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        null,
-        null
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', null, null
       );
 
       expect(result).toBeNull();
@@ -404,18 +472,11 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should return null when first target not found in combat summary', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'Orc' }] });
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Orc' }]));
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        null,
-        null
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', null, null
       );
 
       expect(result).toBeNull();
@@ -424,18 +485,11 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should return null when second target not found in combat summary', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue({ creatures: [{ name: 'Goblin' }] });
+      getCombatContext.mockResolvedValue(makeCombatSummary([{ name: 'Goblin' }]));
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        null,
-        null
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', null, null
       );
 
       expect(result).toBeNull();
@@ -443,120 +497,99 @@ describe('multiTargetHandler.applyMultiTarget', () => {
   });
 
   describe('range validation', () => {
+    function makeBaseCombatSummary() {
+      return makeCombatSummary(
+        [
+          { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
+          { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
+        ],
+        [{ name: 'TestHero', gridX: 1, gridY: 1 }]
+      );
+    }
+
     it('should return out-of-range popup when first target is out of range', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeBaseCombatSummary());
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 1 } });
-      getDistanceFeet.mockReturnValue(50); // out of range
+      getDistanceFeet.mockReturnValue(50);
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        null,
-        null
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', null, null
       );
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('out of range');
+      expect(result.payload.description).toContain('Orc');
     });
 
     it('should return out-of-range popup when second target is out of range', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeBaseCombatSummary());
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 1 } });
-      getDistanceFeet.mockReturnValueOnce(10).mockReturnValueOnce(50); // first in range, second out
+      getDistanceFeet.mockReturnValueOnce(10).mockReturnValueOnce(50);
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        null,
-        null
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', null, null
       );
 
       expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('out of range');
     });
 
     it('should skip range check when mapName is null', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeBaseCombatSummary());
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue(null);
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        null,
-        'Goblin',
-        'Orc',
-        null,
-        null
+        action, ps, campaignName, null,
+        'Goblin', 'Orc', null, null
       );
 
-      expect(result).not.toBeNull();
+      expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
     });
 
     it('should skip range check when attackerPos is null', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeBaseCombatSummary());
       rangeToFeet.mockReturnValue(30);
       resolveMapPositions.mockResolvedValue({ attackerPos: null });
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        null,
-        null
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', null, null
       );
 
-      expect(result).not.toBeNull();
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
 
     it('should not check range when rangeFt is null', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeBaseCombatSummary());
       rangeToFeet.mockReturnValue(null);
       resolveMapPositions.mockResolvedValue({ attackerPos: { gridX: 1, gridY: 1 } });
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        null,
-        null
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', null, null
       );
 
-      expect(result).not.toBeNull();
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
   });
 
@@ -564,40 +597,28 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should apply damage to second target when spell has damage and rawDamage > 0', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Cone of Cold',
-        damage: { damage_type: 'cold' },
-      };
+      const spell = makeDamageSpell('Cone of Cold', 'cold');
       const metaCtx = { totalDamage: 20 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      applyDamageToTarget.mockReturnValue({ newHp: 5 });
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 10 });
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(applyDamageToTarget).toHaveBeenCalledWith(
-        baseCombatSummary,
-        'Orc',
-        20,
-        ['cold'],
-        campaignName,
-        null,
-        false,
-        ps.name
+        cs, 'Orc', 20, ['cold'], campaignName, null, false, ps.name
       );
+      expect(endInvisibilityOnHostileAction).toHaveBeenCalledWith(ps.name, campaignName);
       expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
         type: 'hp_change',
         targetName: 'Orc',
-        delta: 5 - baseCombatSummary.creatures[1].currentHp,
+        delta: -10,
         currentHp: 5,
         maxHp: 22,
         isHealing: false,
@@ -610,26 +631,19 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should skip damage application when rawDamage is 0', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Cone of Cold',
-        damage: { damage_type: 'cold' },
-      };
+      const spell = makeDamageSpell('Cone of Cold', 'cold');
       const metaCtx = { totalDamage: 0 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(applyDamageToTarget).not.toHaveBeenCalled();
+      expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
     });
 
     it('should skip damage application when spell has no damage property', async () => {
@@ -637,18 +651,13 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       const action = makeAction();
       const spell = { name: 'Some Spell' };
       const metaCtx = { totalDamage: 20 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(applyDamageToTarget).not.toHaveBeenCalled();
@@ -656,87 +665,100 @@ describe('multiTargetHandler.applyMultiTarget', () => {
 
     it('should use action.payload.spellName when spell.name is missing', async () => {
       const ps = makePlayerStats();
-      const action = makeAction();
-      const spell = { damage: { damage_type: 'fire' } };
+      const action = {
+        name: 'Word of Creation',
+        automation: { range: '30 ft' },
+        payload: { spellName: 'Misty Step' },
+      };
+      const spell = { damage: { damage_type: 'fire' }, name: undefined };
       const metaCtx = { totalDamage: 10 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      applyDamageToTarget.mockReturnValue({ newHp: 5 });
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 10 });
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        { ...spell, name: undefined },
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
-      // The spellName will be from action.payload.spellName or 'Unknown Spell'
-      expect(result.payload.description).toContain('Unknown Spell');
+      expect(result.payload.description).toContain('Misty Step');
     });
 
     it('should use rawDamage from metaCtx when totalDamage is missing', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Fireball',
-        damage: { damage_type: 'fire' },
-      };
+      const spell = makeDamageSpell('Fireball', 'fire');
       const metaCtx = { rawDamage: 15 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      applyDamageToTarget.mockReturnValue({ newHp: 5 });
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 10 });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(applyDamageToTarget).toHaveBeenCalledWith(
-        baseCombatSummary,
-        'Orc',
-        15,
-        ['fire'],
-        campaignName,
-        null,
-        false,
-        ps.name
+        expect.any(Object), 'Orc', 15, ['fire'], campaignName, null, false, ps.name
       );
     });
 
     it('should not apply damage when applyDamageToTarget returns null', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Fireball',
-        damage: { damage_type: 'fire' },
-      };
+      const spell = makeDamageSpell('Fireball', 'fire');
       const metaCtx = { totalDamage: 10 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
       applyDamageToTarget.mockReturnValue(null);
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(postLogEntry).not.toHaveBeenCalled();
+    });
+
+    it('should not call endInvisibility when finalDamage is 0', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      const spell = makeDamageSpell('Fireball', 'fire');
+      const metaCtx = { totalDamage: 10 };
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 15, finalDamage: 0 });
+
+      await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
+      );
+
+      expect(endInvisibilityOnHostileAction).not.toHaveBeenCalled();
+    });
+
+    it('should use empty string for damageType when spell.damage exists but damage_type is missing', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      const spell = { damage: {} };
+      const metaCtx = { totalDamage: 10 };
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 15, finalDamage: 5 });
+
+      await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
+      );
+
+      expect(applyDamageToTarget).toHaveBeenCalledWith(
+        expect.any(Object), 'Orc', 10, [''], campaignName, null, false, ps.name
+      );
     });
   });
 
@@ -744,33 +766,21 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should apply healing when spellName is "power word heal"', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Power Word Heal',
-        maxHp: 30,
-      };
+      const spell = makeHealSpell({ maxHp: 30 });
       const metaCtx = {};
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      getRuntimeValue.mockReturnValue(15); // current HP of Orc
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 7 });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
-      expect(applyHealingToTarget).toHaveBeenCalledWith(
-        baseCombatSummary,
-        'Orc',
-        7,
-        campaignName
-      );
+      expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Orc', 7, campaignName);
       expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
         type: 'hp_change',
         targetName: 'Orc',
@@ -786,133 +796,97 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should use getRuntimeValue for current HP when target.currentHp is missing', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Power Word Heal',
-      };
+      const spell = makeHealSpell();
       const metaCtx = {};
-
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster', maxHp: 22 },
-        ],
-        players: [],
-        placedItems: [],
-      };
-
-      getCombatContext.mockResolvedValue(combatSummary);
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
       getRuntimeValue.mockReturnValue(10);
-      applyHealingToTarget.mockReturnValue({ newHp: 18, actualHeal: 4 });
+      applyHealingToTarget.mockReturnValue({ newHp: 18, actualHeal: 8 });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(getRuntimeValue).toHaveBeenCalledWith('Orc', 'currentHitPoints', campaignName);
     });
 
-    it('should use maxHp from playerStats when target has no maxHp', async () => {
+    it('should use maxHp from playerStats when target has no maxHp and runtimeValue is null', async () => {
       const ps = makePlayerStats({ hitPoints: 25 });
       const action = makeAction();
-      const spell = {
-        name: 'Power Word Heal',
-      };
+      const spell = makeHealSpell();
       const metaCtx = {};
-
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster', currentHp: 10 },
-        ],
-        players: [],
-        placedItems: [],
-      };
-
-      getCombatContext.mockResolvedValue(combatSummary);
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
       getRuntimeValue.mockReturnValue(null);
       applyHealingToTarget.mockReturnValue({ newHp: 25, actualHeal: 15 });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
-      expect(applyHealingToTarget).toHaveBeenCalledWith(
-        combatSummary,
-        'Orc',
-        15,
-        campaignName
-      );
+      expect(applyHealingToTarget).toHaveBeenCalledWith(cs, 'Orc', 15, campaignName);
     });
 
     it('should skip healing when healAmount is 0 (target already full HP)', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Power Word Heal',
-      };
+      const spell = makeHealSpell();
       const metaCtx = {};
-
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster', currentHp: 22, maxHp: 22 },
-        ],
-        players: [],
-        placedItems: [],
-      };
-
-      getCombatContext.mockResolvedValue(combatSummary);
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 22, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
       getRuntimeValue.mockReturnValue(22);
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 0 });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(applyHealingToTarget).not.toHaveBeenCalled();
     });
 
+    it('should skip healing when applyHealingToTarget returns null', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      const spell = makeHealSpell();
+      const metaCtx = {};
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
+      getRuntimeValue.mockReturnValue(10);
+      applyHealingToTarget.mockReturnValue(null);
+
+      await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
+      );
+
+      expect(postLogEntry).not.toHaveBeenCalled();
+    });
+
     it('should remove conditions when spell has status_effects', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Power Word Heal',
-        status_effects: ['poisoned', 'blinded'],
-      };
+      const spell = makeHealSpell({ status_effects: ['poisoned', 'blinded'] });
       const metaCtx = {};
-
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 },
-        ],
-        players: [],
-        placedItems: [],
-      };
-
-      getCombatContext.mockResolvedValue(combatSummary);
-      getRuntimeValue.mockReturnValue(10);
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 12 });
       getRuntimeValue.mockImplementation((targetName, key, _camp) => {
         if (key === 'activeConditions') return ['poisoned', 'blinded', 'frightened'];
@@ -920,44 +894,25 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Orc',
-        'activeConditions',
-        ['frightened'],
-        campaignName
+        'Orc', 'activeConditions', ['frightened'], campaignName
       );
     });
 
     it('should log condition removals', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Power Word Heal',
-        status_effects: ['poisoned'],
-      };
+      const spell = makeHealSpell({ status_effects: ['poisoned'] });
       const metaCtx = {};
-
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 },
-        ],
-        players: [],
-        placedItems: [],
-      };
-
-      getCombatContext.mockResolvedValue(combatSummary);
-      getRuntimeValue.mockReturnValue(10);
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 12 });
       getRuntimeValue.mockImplementation((targetName, key, _camp) => {
         if (key === 'activeConditions') return ['poisoned', 'frightened'];
@@ -965,14 +920,8 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
@@ -988,23 +937,13 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should not call setRuntimeValue when no conditions are removed', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Power Word Heal',
-        status_effects: ['poisoned'],
-      };
+      const spell = makeHealSpell({ status_effects: ['poisoned'] });
       const metaCtx = {};
-
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 },
-        ],
-        players: [],
-        placedItems: [],
-      };
-
-      getCombatContext.mockResolvedValue(combatSummary);
-      getRuntimeValue.mockReturnValue(10);
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 12 });
       getRuntimeValue.mockImplementation((targetName, key, _camp) => {
         if (key === 'activeConditions') return ['frightened'];
@@ -1012,39 +951,77 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('should handle status_effects with lowercase type strings', async () => {
+    it('should set powerWordHealStandPermission when target has prone condition', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Power Word Heal',
-        status_effects: ['poisoned'],
-      };
+      const spell = makeHealSpell({ status_effects: ['poisoned'] });
       const metaCtx = {};
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
+      applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 12 });
+      getRuntimeValue.mockImplementation((targetName, key, _camp) => {
+        if (key === 'activeConditions') return ['prone', 'poisoned'];
+        return null;
+      });
 
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 },
-        ],
-        players: [],
-        placedItems: [],
-      };
+      await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
+      );
 
-      getCombatContext.mockResolvedValue(combatSummary);
-      getRuntimeValue.mockReturnValue(10);
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Orc', 'powerWordHealStandPermission', true, campaignName
+      );
+    });
+
+    it('should not set powerWordHealStandPermission when permission already exists', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      const spell = makeHealSpell({ status_effects: ['poisoned'] });
+      const metaCtx = {};
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
+      applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 12 });
+      getRuntimeValue.mockImplementation((targetName, key, _camp) => {
+        if (key === 'activeConditions') return ['prone', 'poisoned'];
+        if (key === 'powerWordHealStandPermission') return true;
+        return null;
+      });
+
+      await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
+      );
+
+      const setCalls = setRuntimeValue.mock.calls.filter(
+        call => call[1] === 'powerWordHealStandPermission'
+      );
+      expect(setCalls).toHaveLength(0);
+    });
+
+    it('should handle status_effects with case-insensitive condition matching', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      const spell = makeHealSpell({ status_effects: ['Poisoned'] });
+      const metaCtx = {};
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 12 });
       getRuntimeValue.mockImplementation((targetName, key, _camp) => {
         if (key === 'activeConditions') return ['poisoned', 'frightened'];
@@ -1052,22 +1029,40 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
-        'Orc',
-        'activeConditions',
-        ['frightened'],
-        campaignName
+        'Orc', 'activeConditions', ['frightened'], campaignName
       );
+    });
+
+    it('should not set powerWordHealStandPermission when target has no prone condition', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      const spell = makeHealSpell({ status_effects: ['poisoned'] });
+      const metaCtx = {};
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
+      applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 12 });
+      getRuntimeValue.mockImplementation((targetName, key, _camp) => {
+        if (key === 'activeConditions') return ['blinded', 'frightened'];
+        return null;
+      });
+
+      await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
+      );
+
+      const setCalls = setRuntimeValue.mock.calls.filter(
+        call => call[1] === 'powerWordHealStandPermission'
+      );
+      expect(setCalls).toHaveLength(0);
     });
   });
 
@@ -1075,23 +1070,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should call addEntry with correct ability_use log', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Cone of Cold',
-        damage: { damage_type: 'cold' },
-      };
+      const spell = makeDamageSpell('Cone of Cold', 'cold');
       const metaCtx = { totalDamage: 10 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 10 });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(addEntry).toHaveBeenCalledWith(campaignName, {
@@ -1104,30 +1092,49 @@ describe('multiTargetHandler.applyMultiTarget', () => {
       });
     });
 
-    it('should catch and suppress addEntry errors', async () => {
+    it('should include spell name from payload when spell.name is missing', async () => {
       const ps = makePlayerStats();
-      const action = makeAction();
-      const spell = {
-        name: 'Cone of Cold',
-        damage: { damage_type: 'cold' },
+      const action = {
+        name: 'Word of Creation',
+        automation: { range: '30 ft' },
+        payload: { spellName: 'Misty Step' },
       };
-      const metaCtx = { totalDamage: 10 };
+      const spell = { damage: { damage_type: 'force' }, name: undefined };
+      const metaCtx = { totalDamage: 5 };
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 15, finalDamage: 5 });
 
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      addEntry.mockReturnValue(Promise.reject(new Error('log error')).catch(() => {}));
-
-      const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+      await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
-      expect(result).not.toBeNull();
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        description: expect.stringContaining('Misty Step'),
+      }));
+    });
+
+    it('should propagate addEntry errors', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      const spell = makeDamageSpell('Fireball', 'fire');
+      const metaCtx = { totalDamage: 10 };
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 5 });
+      addEntry.mockRejectedValue(new Error('log error'));
+
+      // addEntry returns a promise that rejects; applyMultiTarget returns the popup
+      // before awaiting addEntry, so the function itself resolves.
+      // The rejection is unhandled but the function still returns.
+      const result = await applyMultiTarget(
+        action, ps, campaignName, mapName, 'Goblin', 'Orc', spell, metaCtx
+      );
+
+      expect(result.type).toBe('popup');
     });
   });
 
@@ -1135,24 +1142,16 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should return automation_info popup on successful application', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Cone of Cold',
-        damage: { damage_type: 'cold' },
-      };
+      const spell = makeDamageSpell('Cone of Cold', 'cold');
       const metaCtx = { totalDamage: 10 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      applyDamageToTarget.mockReturnValue({ newHp: 5 });
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 5 });
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(result.type).toBe('popup');
@@ -1166,31 +1165,45 @@ describe('multiTargetHandler.applyMultiTarget', () => {
     it('should include range in success description', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
-      const spell = {
-        name: 'Cone of Cold',
-        damage: { damage_type: 'cold' },
-      };
+      const spell = makeDamageSpell('Cone of Cold', 'cold');
       const metaCtx = { totalDamage: 10 };
-
-      getCombatContext.mockResolvedValue(baseCombatSummary);
-      applyDamageToTarget.mockReturnValue({ newHp: 5 });
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 5 });
 
       const result = await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(result.payload.description).toContain('30 ft');
     });
+
+    it('should use default range in description when automation.range is missing', async () => {
+      const ps = makePlayerStats();
+      const action = {
+        name: 'Word of Creation',
+        automation: {},
+        payload: { targetName: 'Goblin' },
+      };
+      const spell = makeDamageSpell('Cone of Cold', 'cold');
+      const metaCtx = { totalDamage: 10 };
+      getCombatContext.mockResolvedValue(makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster' }], []
+      ));
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 5 });
+
+      const result = await applyMultiTarget(
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
+      );
+
+      expect(result.payload.description).toContain('10 ft');
+    });
   });
 
-  describe('damage/heal interaction', () => {
+  describe('combined damage and healing', () => {
     it('should apply both damage and power word heal effects when applicable', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
@@ -1200,30 +1213,21 @@ describe('multiTargetHandler.applyMultiTarget', () => {
         status_effects: ['poisoned'],
       };
       const metaCtx = { totalDamage: 5 };
-
-      const combatSummary = {
-        creatures: [
-          { name: 'Goblin', type: 'monster' },
-          { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 },
-        ],
-        players: [],
-        placedItems: [],
-      };
-
-      getCombatContext.mockResolvedValue(combatSummary);
-      applyDamageToTarget.mockReturnValue({ newHp: 5 });
-      getRuntimeValue.mockReturnValue(10);
+      const cs = makeCombatSummary(
+        [{ name: 'Goblin', type: 'monster' }, { name: 'Orc', type: 'monster', currentHp: 10, maxHp: 22 }],
+        []
+      );
+      getCombatContext.mockResolvedValue(cs);
+      applyDamageToTarget.mockReturnValue({ newHp: 5, finalDamage: 5 });
+      getRuntimeValue.mockImplementation((targetName, key, _camp) => {
+        if (key === 'activeConditions') return ['poisoned'];
+        return null;
+      });
       applyHealingToTarget.mockReturnValue({ newHp: 22, actualHeal: 12 });
 
       await applyMultiTarget(
-        action,
-        ps,
-        campaignName,
-        mapName,
-        'Goblin',
-        'Orc',
-        spell,
-        metaCtx
+        action, ps, campaignName, mapName,
+        'Goblin', 'Orc', spell, metaCtx
       );
 
       expect(applyDamageToTarget).toHaveBeenCalled();

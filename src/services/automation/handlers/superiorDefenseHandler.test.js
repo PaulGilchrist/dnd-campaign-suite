@@ -1,4 +1,9 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+import { handle, activateAtTurnStart } from './superiorDefenseHandler.js';
+import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
+import * as logService from '../../ui/logService.js';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -8,10 +13,6 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 vi.mock('../../ui/logService.js', () => ({
   addEntry: vi.fn(() => Promise.resolve()),
 }));
-
-import { handle, activateAtTurnStart } from './superiorDefenseHandler.js';
-import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js';
-import * as logService from '../../ui/logService.js';
 
 const campaignName = 'TestCampaign';
 
@@ -28,6 +29,16 @@ function makePlayerStats(overrides = {}) {
   };
 }
 
+// ── Helpers ──────────────────────────────────────────────────────
+
+/**
+ * Configure getRuntimeValue to dispatch on key, returning the appropriate value.
+ * Returns a function to call before each test so the mock is fresh.
+ */
+function mockGetRuntimeValue(dispatch) {
+  runtimeState.getRuntimeValue.mockImplementation((playerName, key, _cName) => dispatch(playerName, key, _cName));
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('superiorDefenseHandler', () => {
@@ -38,9 +49,10 @@ describe('superiorDefenseHandler', () => {
   describe('handle', () => {
     describe('Buff deactivation', () => {
       it('should deactivate when buff is already active', async () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-          { name: 'Superior Defense', effect: 'damage_resistance' },
-        ]);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [{ name: 'Superior Defense', effect: 'damage_resistance' }];
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -52,6 +64,9 @@ describe('superiorDefenseHandler', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toBe('Superior Defense ended.');
+        expect(result.payload.name).toBe('Superior Defense');
+        expect(result.payload.automationType).toBe('superior_defense');
+        expect(result.payload.automation).toEqual({ type: 'superior_defense' });
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
           'TestHero',
           'activeBuffs',
@@ -66,20 +81,22 @@ describe('superiorDefenseHandler', () => {
         });
       });
 
-      it('should deactivate when buff name matches action.name', async () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-          { name: 'Superior Defense', effect: 'damage_resistance', duration: '1_minute' },
-          { name: 'Other Buff', effect: 'other' },
-        ]);
+      it('should remove only the matching buff and preserve others', async () => {
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [
+            { name: 'Superior Defense', effect: 'damage_resistance', duration: '1_minute' },
+            { name: 'Other Buff', effect: 'other' },
+          ];
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
           automation: { type: 'superior_defense' },
         };
 
-        const result = await handle(action, makePlayerStats(), campaignName);
+        await handle(action, makePlayerStats(), campaignName);
 
-        expect(result.payload.description).toBe('Superior Defense ended.');
         expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
           'TestHero',
           'activeBuffs',
@@ -89,9 +106,10 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should return automation object in payload', async () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-          { name: 'Superior Defense' },
-        ]);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [{ name: 'Superior Defense' }];
+          return null;
+        });
 
         const auto = { type: 'superior_defense', cost: 3 };
         const action = {
@@ -107,9 +125,10 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should handle addEntry rejection gracefully', async () => {
-        runtimeState.getRuntimeValue.mockReturnValue([
-          { name: 'Superior Defense' },
-        ]);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [{ name: 'Superior Defense' }];
+          return null;
+        });
         logService.addEntry.mockRejectedValue(new Error('Network error'));
 
         const action = {
@@ -124,12 +143,12 @@ describe('superiorDefenseHandler', () => {
     });
 
     describe('Focus point check', () => {
-      it('should fail when current focus is less than cost (default cost 3)', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([
-            { name: 'Other Buff' },
-          ])
-          .mockReturnValueOnce(2);
+      it('should fail when current focus is less than default cost (3)', async () => {
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 2;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -143,35 +162,16 @@ describe('superiorDefenseHandler', () => {
         expect(result.payload.description).toBe(
           'Not enough Focus Points. Superior Defense requires 3 Focus Points.'
         );
-        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
-          'TestHero',
-          'focusPoints',
-          expect.anything(),
-          campaignName
-        );
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
       });
 
-      it('should succeed when current focus equals cost', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(3);
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toBe(
-          'Superior Defense activated. Resistance to all damage except Force for 1 minute or until Incapacitated. (0 Focus Points remaining)'
-        );
-      });
-
-      it('should use custom cost from auto.cost when provided', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(2);
+      it('should fail when current focus is less than custom cost', async () => {
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 2;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -185,27 +185,13 @@ describe('superiorDefenseHandler', () => {
         );
       });
 
-      it('should succeed when current focus equals cost', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(3);
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('activated');
-        expect(result.payload.description).toContain('0 Focus Points remaining');
-      });
-
       it('should fail when maxFocus is 0 (no class_levels)', async () => {
         const ps = makePlayerStats({ class: { class_levels: [] } });
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(0);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 0;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -218,13 +204,49 @@ describe('superiorDefenseHandler', () => {
           'Not enough Focus Points. Superior Defense requires 3 Focus Points.'
         );
       });
+
+      it('should use default cost of 3 when auto.cost is null', async () => {
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 3;
+          return null;
+        });
+
+        const action = {
+          name: 'Superior Defense',
+          automation: { type: 'superior_defense', cost: null },
+        };
+
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.payload.description).toContain('0 Focus Points remaining');
+      });
+
+      it('should use default cost of 3 when auto.cost is undefined', async () => {
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 3;
+          return null;
+        });
+
+        const action = {
+          name: 'Superior Defense',
+          automation: { type: 'superior_defense' },
+        };
+
+        const result = await handle(action, makePlayerStats(), campaignName);
+
+        expect(result.payload.description).toContain('0 Focus Points remaining');
+      });
     });
 
     describe('Buff activation', () => {
       it('should activate buff when focus is sufficient', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(6);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 6;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -270,9 +292,11 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should use custom duration from auto.duration when provided', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(6);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 6;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -292,9 +316,11 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should use default duration of 1_minute when auto.duration is missing', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(6);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 6;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -314,11 +340,11 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should add buff to existing buffs array', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([
-            { name: 'Other Buff', effect: 'other' },
-          ])
-          .mockReturnValueOnce(6);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [{ name: 'Other Buff', effect: 'other' }];
+          if (key === 'focusPoints') return 6;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -338,10 +364,12 @@ describe('superiorDefenseHandler', () => {
         );
       });
 
-      it('should handle non-array stored activeBuffs', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce('invalid')
-          .mockReturnValueOnce(6);
+      it('should handle non-array stored activeBuffs by treating as empty', async () => {
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return 'invalid';
+          if (key === 'focusPoints') return 6;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -362,9 +390,11 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should handle addEntry rejection during activation gracefully', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(6);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 6;
+          return null;
+        });
         logService.addEntry.mockRejectedValue(new Error('Network error'));
 
         const action = {
@@ -377,40 +407,12 @@ describe('superiorDefenseHandler', () => {
         expect(result.payload.description).toContain('activated');
       });
 
-      it('should use default cost of 3 when auto.cost is undefined', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(6);
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense' },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('3 Focus Points remaining');
-      });
-
-      it('should use default cost of 3 when auto.cost is null', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(6);
-
-        const action = {
-          name: 'Superior Defense',
-          automation: { type: 'superior_defense', cost: null },
-        };
-
-        const result = await handle(action, makePlayerStats(), campaignName);
-
-        expect(result.payload.description).toContain('3 Focus Points remaining');
-      });
-
       it('should handle focusPoints stored as string by converting to number', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce('6');
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return '6';
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -423,9 +425,11 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should use maxFocus as fallback when focusPoints not in runtime state', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(undefined);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return undefined;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -438,9 +442,11 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should use currentFocus from runtime state over maxFocus when both available', async () => {
-        runtimeState.getRuntimeValue
-          .mockReturnValueOnce([])
-          .mockReturnValueOnce(4);
+        mockGetRuntimeValue((playerName, key, _cName) => {
+          if (key === 'activeBuffs') return [];
+          if (key === 'focusPoints') return 4;
+          return null;
+        });
 
         const action = {
           name: 'Superior Defense',
@@ -457,8 +463,10 @@ describe('superiorDefenseHandler', () => {
   describe('activateAtTurnStart', () => {
     describe('Incapacitated check', () => {
       it('should return early when player is incapacitated', async () => {
-        runtimeState.getRuntimeValue
-          .mockImplementationOnce(() => ['Incapacitated']);
+        mockGetRuntimeValue((playerName, key) => {
+          if (key === 'activeConditions') return ['Incapacitated'];
+          return null;
+        });
 
         const result = await activateAtTurnStart(
           makePlayerStats(),
@@ -471,8 +479,10 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should return early when player has incapacitated condition (case insensitive)', async () => {
-        runtimeState.getRuntimeValue
-          .mockImplementationOnce(() => ['INCAPACITATED']);
+        mockGetRuntimeValue((playerName, key) => {
+          if (key === 'activeConditions') return ['INCAPACITATED'];
+          return null;
+        });
 
         const result = await activateAtTurnStart(
           makePlayerStats(),
@@ -483,12 +493,10 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should return early when incapacitated is among multiple conditions', async () => {
-        runtimeState.getRuntimeValue
-          .mockImplementationOnce(() => [
-            'Blinded',
-            'Incapacitated',
-            'Deafened',
-          ]);
+        mockGetRuntimeValue((playerName, key) => {
+          if (key === 'activeConditions') return ['Blinded', 'Incapacitated', 'Deafened'];
+          return null;
+        });
 
         const result = await activateAtTurnStart(
           makePlayerStats(),
@@ -501,7 +509,7 @@ describe('superiorDefenseHandler', () => {
 
     describe('Already active check', () => {
       it('should return early when buff is already active', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [{ name: 'Superior Defense', effect: 'damage_resistance' }];
           return null;
@@ -517,7 +525,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should check among multiple buffs', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [
             { name: 'Mage Armor', effect: 'mage_armor' },
@@ -537,8 +545,8 @@ describe('superiorDefenseHandler', () => {
     });
 
     describe('Automation check', () => {
-      it('should return early when no automation found', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+      it('should return early when no automation found (empty specialActions)', async () => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           return null;
@@ -555,7 +563,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should return early when specialActions is undefined', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           return null;
@@ -569,7 +577,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should return early when playerStats.automation is undefined', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           return null;
@@ -586,7 +594,7 @@ describe('superiorDefenseHandler', () => {
 
     describe('Focus point check', () => {
       it('should return insufficient_focus when focus is below cost', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return 1;
@@ -613,7 +621,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should use default cost of 3 when auto.cost is missing', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return 2;
@@ -639,7 +647,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should succeed when focus equals cost', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return 3;
@@ -663,7 +671,7 @@ describe('superiorDefenseHandler', () => {
 
     describe('Buff activation', () => {
       it('should activate buff and return success', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return 6;
@@ -713,7 +721,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should use custom duration from automation', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return 6;
@@ -741,7 +749,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should add buff to existing buffs', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [{ name: 'Mage Armor', effect: 'mage_armor' }];
           if (key === 'focusPoints') return 6;
@@ -769,8 +777,8 @@ describe('superiorDefenseHandler', () => {
         );
       });
 
-      it('should handle non-array stored activeBuffs', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+      it('should handle non-array stored activeBuffs by treating as empty', async () => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return 'invalid';
           if (key === 'focusPoints') return 6;
@@ -799,7 +807,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should handle addEntry rejection gracefully', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return 6;
@@ -821,7 +829,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should use maxFocus as fallback when focusPoints not in runtime state', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return undefined;
@@ -843,7 +851,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should handle focusPoints stored as string', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return '6';
@@ -865,7 +873,7 @@ describe('superiorDefenseHandler', () => {
       });
 
       it('should use custom cost from automation', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((name, key) => {
+        mockGetRuntimeValue((playerName, key) => {
           if (key === 'activeConditions') return [];
           if (key === 'activeBuffs') return [];
           if (key === 'focusPoints') return 8;

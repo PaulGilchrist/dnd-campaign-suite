@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     handle,
@@ -7,192 +8,169 @@ import {
     restoreOverchannelOnLongRest,
     getOverchannelNecroticDamage,
 } from './overchannelHandler.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    setRuntimeValue: vi.fn(async () => {}),
+    setRuntimeValue: vi.fn(),
     getRuntimeValue: vi.fn(),
 }));
 
-const { setRuntimeValue, getRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
+const mockPlayerStats = { name: 'TestWizard' };
 
 beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
 });
-
-function makePlayerStats(overrides = {}) {
-    return {
-        name: 'WizardBoy',
-        ...overrides,
-    };
-}
 
 function makeAction(overrides = {}) {
     return {
         name: 'Overchannel',
-        automation: {
-            type: 'overchannel',
-            ...overrides.automation,
-        },
+        automation: { type: 'overchannel', ...overrides.automation },
         ...overrides,
     };
 }
 
 describe('overchannelHandler', () => {
     describe('handle', () => {
-        it('returns popup with automation_info type', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+        it('returns popup with automation_info type and correct payload structure', async () => {
+            const result = await handle(makeAction(), mockPlayerStats, 'test-campaign', null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Overchannel');
+            expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
-        it('includes description with current use count', async () => {
-            getRuntimeValue.mockReturnValue(0);
+        it('describes first use as having no adverse effect', async () => {
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(0);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+            const result = await handle(makeAction(), mockPlayerStats, 'test-campaign', null);
 
-            expect(result.payload.description).toContain('First use: no adverse effect');
+            expect(result.payload.description).toContain('First use');
+            expect(result.payload.description).toContain('no adverse effect');
         });
 
-        it('includes description with correct action name', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+        it('describes subsequent uses with escalating necrotic damage', async () => {
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(5);
+
+            const result = await handle(makeAction(), mockPlayerStats, 'test-campaign', null);
+
+            expect(result.payload.description).toContain('Use #6');
+            expect(result.payload.description).toContain('12d12 necrotic damage');
+        });
+
+        it('uses the action name in the popup description', async () => {
+            const result = await handle(makeAction(), mockPlayerStats, 'test-campaign', null);
 
             expect(result.payload.description).toContain('Overchannel');
         });
 
-        it('includes automation in payload', async () => {
-            const action = makeAction({ automation: { type: 'overchannel', customField: true } });
-            const result = await handle(action, makePlayerStats(), 'test-campaign', null);
+        it('uses custom action name when provided', async () => {
+            const result = await handle(
+                makeAction({ name: 'Custom Overchannel' }),
+                mockPlayerStats,
+                'test-campaign',
+                null
+            );
 
-            expect(result.payload.automation).toBe(action.automation);
+            expect(result.payload.name).toBe('Custom Overchannel');
+            expect(result.payload.description).toContain('Custom Overchannel');
+        });
+
+        it('passes through automation object unchanged', async () => {
+            const customAutomation = { type: 'overchannel', customField: true };
+            const result = await handle(
+                makeAction({ automation: customAutomation }),
+                mockPlayerStats,
+                'test-campaign',
+                null
+            );
+
+            expect(result.payload.automation).toBe(customAutomation);
         });
     });
 
     describe('getOverchannelUses', () => {
-        it('returns 0 when no stored values exist', () => {
-            getRuntimeValue.mockReturnValue(undefined);
+        it('returns 0 when no stored value exists', () => {
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(undefined);
 
-            const result = getOverchannelUses(makePlayerStats(), 'test-campaign');
+            const result = getOverchannelUses(mockPlayerStats, 'test-campaign');
 
             expect(result).toBe(0);
         });
 
-        it('returns stored use count when rest timestamp exists and is within 24 hours', () => {
-            const now = Date.now();
-            const recentRest = now - 3600000;
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'Overchannel_restTimestamp') return recentRest;
-                if (key === 'Overchannel_useCount') return 3;
-                return undefined;
-            });
+        it('returns the stored use count as a number', () => {
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(3);
 
-            const result = getOverchannelUses(makePlayerStats(), 'test-campaign');
+            const result = getOverchannelUses(mockPlayerStats, 'test-campaign');
 
             expect(result).toBe(3);
         });
 
-        it('returns stored use count when no rest timestamp exists', () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'Overchannel_restTimestamp') return undefined;
-                if (key === 'Overchannel_useCount') return 2;
-                return undefined;
-            });
+        it('coerces string values to numbers', () => {
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue('5');
 
-            const result = getOverchannelUses(makePlayerStats(), 'test-campaign');
-
-            expect(result).toBe(2);
-        });
-
-        it('returns stored use count even when rest timestamp is older than 24 hours', () => {
-            const now = Date.now();
-            const oldRest = now - 172800000;
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'Overchannel_restTimestamp') return oldRest;
-                if (key === 'Overchannel_useCount') return 5;
-                return undefined;
-            });
-
-            const result = getOverchannelUses(makePlayerStats(), 'test-campaign');
+            const result = getOverchannelUses(mockPlayerStats, 'test-campaign');
 
             expect(result).toBe(5);
+        });
+
+        it('returns 0 for falsy stored values', () => {
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(null);
+
+            const result = getOverchannelUses(mockPlayerStats, 'test-campaign');
+
+            expect(result).toBe(0);
         });
     });
 
     describe('hasOverchannelRemaining', () => {
-        it('returns true (unlimited uses with damage)', () => {
-            expect(hasOverchannelRemaining(makePlayerStats(), 'test-campaign')).toBe(true);
+        it('always returns true (unlimited uses feature)', () => {
+            expect(hasOverchannelRemaining(mockPlayerStats, 'test-campaign')).toBe(true);
         });
     });
 
     describe('consumeOverchannelUse', () => {
-        it('returns true and increments when no stored values exist', async () => {
-            getRuntimeValue.mockReturnValue(undefined);
+        it('increments from 0 when no stored value exists', async () => {
+            const setRuntimeValue = vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(undefined);
 
-            const result = await consumeOverchannelUse(makePlayerStats(), 'test-campaign');
+            const result = await consumeOverchannelUse(mockPlayerStats, 'test-campaign');
 
             expect(result).toBe(true);
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WizardBoy',
+                'TestWizard',
                 'Overchannel_useCount',
                 1,
                 'test-campaign'
             );
         });
 
-        it('returns true and increments from stored value', async () => {
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'Overchannel_useCount') return 2;
-                return undefined;
-            });
+        it('increments from the stored use count', async () => {
+            const setRuntimeValue = vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue(4);
 
-            const result = await consumeOverchannelUse(makePlayerStats(), 'test-campaign');
+            const result = await consumeOverchannelUse(mockPlayerStats, 'test-campaign');
 
             expect(result).toBe(true);
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WizardBoy',
+                'TestWizard',
+                'Overchannel_useCount',
+                5,
+                'test-campaign'
+            );
+        });
+
+        it('handles stored string values by coercing to number', async () => {
+            const setRuntimeValue = vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
+            vi.spyOn(runtimeState, 'getRuntimeValue').mockReturnValue('2');
+
+            const result = await consumeOverchannelUse(mockPlayerStats, 'test-campaign');
+
+            expect(result).toBe(true);
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestWizard',
                 'Overchannel_useCount',
                 3,
-                'test-campaign'
-            );
-        });
-
-        it('increments when rest timestamp exists within 24 hours', async () => {
-            const now = Date.now();
-            const recentRest = now - 3600000;
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'Overchannel_restTimestamp') return recentRest;
-                if (key === 'Overchannel_useCount') return 1;
-                return undefined;
-            });
-
-            const result = await consumeOverchannelUse(makePlayerStats(), 'test-campaign');
-
-            expect(result).toBe(true);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WizardBoy',
-                'Overchannel_useCount',
-                2,
-                'test-campaign'
-            );
-        });
-
-        it('increments even when rest timestamp is older than 24 hours', async () => {
-            const now = Date.now();
-            const oldRest = now - 172800000;
-            getRuntimeValue.mockImplementation((_playerName, key) => {
-                if (key === 'Overchannel_restTimestamp') return oldRest;
-                if (key === 'Overchannel_useCount') return 1;
-                return undefined;
-            });
-
-            const result = await consumeOverchannelUse(makePlayerStats(), 'test-campaign');
-
-            expect(result).toBe(true);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WizardBoy',
-                'Overchannel_useCount',
-                2,
                 'test-campaign'
             );
         });
@@ -200,10 +178,12 @@ describe('overchannelHandler', () => {
 
     describe('restoreOverchannelOnLongRest', () => {
         it('resets use count to 0', async () => {
-            await restoreOverchannelOnLongRest(makePlayerStats(), 'test-campaign');
+            const setRuntimeValue = vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
+
+            await restoreOverchannelOnLongRest(mockPlayerStats, 'test-campaign');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
-                'WizardBoy',
+                'TestWizard',
                 'Overchannel_useCount',
                 0,
                 'test-campaign'
@@ -212,13 +192,19 @@ describe('overchannelHandler', () => {
     });
 
     describe('getOverchannelNecroticDamage', () => {
-        it('returns 0 damage when useCount <= 1', () => {
+        it('returns 0 when useCount is 0', () => {
+            const result = getOverchannelNecroticDamage(3, 0);
+
+            expect(result).toBe(0);
+        });
+
+        it('returns 0 when useCount is 1 (first use has no damage)', () => {
             const result = getOverchannelNecroticDamage(3, 1);
 
             expect(result).toBe(0);
         });
 
-        it('returns correct formula for first additional use', () => {
+        it('returns correct formula for first additional use (useCount=2)', () => {
             const result = getOverchannelNecroticDamage(3, 2);
 
             expect(result.formula).toBe('3d12');
@@ -229,15 +215,28 @@ describe('overchannelHandler', () => {
             expect(result.expression).toBe('9d12');
         });
 
-        it('returns correct formula for second additional use', () => {
+        it('returns correct formula for second additional use (useCount=3)', () => {
             const result = getOverchannelNecroticDamage(3, 3);
 
             expect(result.formula).toBe('4d12');
             expect(result.expression).toBe('12d12');
         });
 
-        it('uses default spellLevel of 1 when not provided', () => {
+        it('returns correct formula for third additional use (useCount=4)', () => {
+            const result = getOverchannelNecroticDamage(3, 4);
+
+            expect(result.formula).toBe('5d12');
+            expect(result.expression).toBe('15d12');
+        });
+
+        it('uses default spellLevel of 1 when spellLevel is null', () => {
             const result = getOverchannelNecroticDamage(null, 2);
+
+            expect(result.expression).toBe('3d12');
+        });
+
+        it('uses default spellLevel of 1 when spellLevel is undefined', () => {
+            const result = getOverchannelNecroticDamage(undefined, 2);
 
             expect(result.expression).toBe('3d12');
         });
@@ -246,6 +245,12 @@ describe('overchannelHandler', () => {
             const result = getOverchannelNecroticDamage(5, 2);
 
             expect(result.expression).toBe('15d12');
+        });
+
+        it('treats spellLevel 0 as falsy and defaults to 1', () => {
+            const result = getOverchannelNecroticDamage(0, 2);
+
+            expect(result.expression).toBe('3d12');
         });
     });
 });

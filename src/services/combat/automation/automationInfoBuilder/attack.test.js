@@ -1,9 +1,10 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest'
 import { attackHandlers } from './attack.js'
 import { BASE_STATS, makeFeature } from '../automationInfoBuilder.fixtures.js'
 
 describe('attackHandlers – attack_rider', () => {
-    it('returns attack_rider info with default values', () => {
+    it('returns default attack_rider info', () => {
         const feature = makeFeature({ type: 'attack_rider' })
         const result = attackHandlers.attack_rider(feature, BASE_STATS)
         expect(result).toEqual({
@@ -35,17 +36,13 @@ describe('attackHandlers – attack_rider', () => {
             damageExpression: '1d6',
             scaling: { 5: '2d6', 11: '3d6' }
         })
-        // Level below all breakpoints keeps base
         expect(attackHandlers.attack_rider(feature, { ...BASE_STATS, level: 3 }).damageExpression).toBe('1d6')
-        // Level 5 triggers first tier
         expect(attackHandlers.attack_rider(feature, { ...BASE_STATS, level: 5 }).damageExpression).toBe('2d6')
-        // Level 11 triggers second tier
         expect(attackHandlers.attack_rider(feature, { ...BASE_STATS, level: 11 }).damageExpression).toBe('3d6')
-        // Level above highest tier keeps highest
         expect(attackHandlers.attack_rider(feature, { ...BASE_STATS, level: 20 }).damageExpression).toBe('3d6')
     })
 
-    it('ignores invalid scaling entries', () => {
+    it('skips non-numeric scaling keys', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             damageExpression: '1d6',
@@ -55,7 +52,7 @@ describe('attackHandlers – attack_rider', () => {
         expect(result.damageExpression).toBe('1d6')
     })
 
-    it('creates push option from effect when options is empty', () => {
+    it('builds push option from effect when options is empty', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             effect: 'push',
@@ -70,7 +67,7 @@ describe('attackHandlers – attack_rider', () => {
         }])
     })
 
-    it('creates push_or_prone options from effect when options is empty', () => {
+    it('builds push_or_prone options from effect when options is empty', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             effect: 'push_or_prone',
@@ -105,7 +102,7 @@ describe('attackHandlers – attack_rider', () => {
         expect(result.options[1].saveDc).toBe(17)
     })
 
-    it('creates speed_reduction option from effect when options is empty', () => {
+    it('builds speed_reduction option from effect when options is empty', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             effect: 'reduce_speed',
@@ -119,7 +116,7 @@ describe('attackHandlers – attack_rider', () => {
         }])
     })
 
-    it('parses distance with non-numeric characters for push', () => {
+    it('strips non-numeric chars from push distance', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             effect: 'push',
@@ -129,7 +126,7 @@ describe('attackHandlers – attack_rider', () => {
         expect(result.options[0].value).toBe(20)
     })
 
-    it('parses speedReduction using regex for reduce_speed', () => {
+    it('extracts numeric value from speedReduction via regex', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             effect: 'reduce_speed',
@@ -139,13 +136,13 @@ describe('attackHandlers – attack_rider', () => {
         expect(result.options[0].value).toBe(15)
     })
 
-    it('uses default distance when missing for push', () => {
+    it('falls back to default distance when missing for push', () => {
         const feature = makeFeature({ type: 'attack_rider', effect: 'push' })
         const result = attackHandlers.attack_rider(feature, BASE_STATS)
         expect(result.options[0].value).toBe(10)
     })
 
-    it('uses default speedReduction when missing for reduce_speed', () => {
+    it('falls back to default speedReduction when missing for reduce_speed', () => {
         const feature = makeFeature({ type: 'attack_rider', effect: 'reduce_speed' })
         const result = attackHandlers.attack_rider(feature, BASE_STATS)
         expect(result.options[0].value).toBe(10)
@@ -235,7 +232,7 @@ describe('attackHandlers – attack_rider', () => {
         })
     })
 
-    it('passthroughs known effect options to generic fallback', () => {
+    it('passthroughs unknown effect options to generic fallback', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             effects: [{ option: 'knock_prone', name: 'Knock Down', value: 5 }]
@@ -249,7 +246,7 @@ describe('attackHandlers – attack_rider', () => {
         })
     })
 
-    it('passthroughs existing options array without processing effects', () => {
+    it('preserves existing options array without processing effects', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             options: [{ name: 'Custom', effect: 'custom' }],
@@ -259,7 +256,7 @@ describe('attackHandlers – attack_rider', () => {
         expect(result.options).toEqual([{ name: 'Custom', effect: 'custom' }])
     })
 
-    it('passthroughs custom fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'attack_rider',
             cost: 2,
@@ -277,19 +274,43 @@ describe('attackHandlers – attack_rider', () => {
             maxEffects: 3,
         })
         const result = attackHandlers.attack_rider(feature, BASE_STATS)
-        expect(result.cost).toBe(2)
-        expect(result.damageType).toBe('Force')
-        expect(result.saveType).toBe('STR')
-        expect(result.saveDc).toBe(15)
-        expect(result.saveAbility).toBe('STR')
-        expect(result.damageDoubled).toBe(true)
-        expect(result.restoreCost).toBe(5)
-        expect(result.uses).toBe(3)
-        expect(result.recharge).toBe('short_rest')
-        expect(result.casting_time).toBe('1 action')
-        expect(result.oncePerTurn).toBe(true)
-        expect(result.chooseOne).toBe(true)
-        expect(result.maxEffects).toBe(3)
+        expect(result).toMatchObject({
+            cost: 2,
+            damageType: 'Force',
+            saveType: 'STR',
+            saveDc: 15,
+            saveAbility: 'STR',
+            damageDoubled: true,
+            restoreCost: 5,
+            uses: 3,
+            recharge: 'short_rest',
+            casting_time: '1 action',
+            oncePerTurn: true,
+            chooseOne: true,
+            maxEffects: 3,
+        })
+    })
+
+    it('uses push distance default 5 ft for push_or_prone when distance is missing', () => {
+        const feature = makeFeature({ type: 'attack_rider', effect: 'push_or_prone' })
+        const result = attackHandlers.attack_rider(feature, BASE_STATS)
+        expect(result.options[0].value).toBe(5)
+    })
+
+    it('uses push_or_prone prone defaults saveType STR when not specified', () => {
+        const feature = makeFeature({ type: 'attack_rider', effect: 'push_or_prone' })
+        const result = attackHandlers.attack_rider(feature, BASE_STATS)
+        expect(result.options[1].saveType).toBe('STR')
+        expect(result.options[1].saveAbility).toBe('STR')
+    })
+
+    it('uses damage_bonus default dice 1d6 when dice is missing', () => {
+        const feature = makeFeature({
+            type: 'attack_rider',
+            effects: [{ option: 'damage_bonus', damageType: 'Cold' }]
+        })
+        const result = attackHandlers.attack_rider(feature, BASE_STATS)
+        expect(result.options[0].damageExpression).toBe('1d6')
     })
 })
 
@@ -308,7 +329,7 @@ describe('attackHandlers – open_hand_technique', () => {
         })
     })
 
-    it('passthroughs custom fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'open_hand_technique',
             saveType: 'DEX',
@@ -317,10 +338,12 @@ describe('attackHandlers – open_hand_technique', () => {
             options: [{ effect: 'shove' }],
         })
         const result = attackHandlers.open_hand_technique(feature, BASE_STATS)
-        expect(result.saveType).toBe('DEX')
-        expect(result.saveDc).toBe(16)
-        expect(result.saveAbility).toBe('CHA')
-        expect(result.options).toEqual([{ effect: 'shove' }])
+        expect(result).toMatchObject({
+            saveType: 'DEX',
+            saveDc: 16,
+            saveAbility: 'CHA',
+            options: [{ effect: 'shove' }],
+        })
     })
 })
 
@@ -338,7 +361,7 @@ describe('attackHandlers – mastery_rider', () => {
         })
     })
 
-    it('passthroughs custom fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'mastery_rider',
             masteries: ['push', 'topple'],
@@ -346,9 +369,82 @@ describe('attackHandlers – mastery_rider', () => {
             trigger: 'miss',
         })
         const result = attackHandlers.mastery_rider(feature, BASE_STATS)
-        expect(result.masteries).toEqual(['push', 'topple'])
-        expect(result.extraMastery).toEqual(['trip'])
-        expect(result.trigger).toBe('miss')
+        expect(result).toMatchObject({
+            masteries: ['push', 'topple'],
+            extraMastery: ['trip'],
+            trigger: 'miss',
+        })
+    })
+})
+
+describe('attackHandlers – weapon_kind_mastery', () => {
+    it('returns weapon_kind_mastery info with defaults', () => {
+        const feature = makeFeature({ type: 'weapon_kind_mastery' })
+        const result = attackHandlers.weapon_kind_mastery(feature, BASE_STATS)
+        expect(result).toEqual({
+            type: 'weapon_kind_mastery',
+            name: 'Test Feature',
+            meleeOnly: false,
+            maxKinds: 2,
+            hasAutomation: true,
+        })
+    })
+
+    it('passes through custom maxKinds', () => {
+        const feature = makeFeature({
+            type: 'weapon_kind_mastery',
+            maxKinds: 4,
+            meleeOnly: true,
+        })
+        const result = attackHandlers.weapon_kind_mastery(feature, BASE_STATS)
+        expect(result.maxKinds).toBe(4)
+        expect(result.meleeOnly).toBe(true)
+    })
+
+    it('resolves class_level_scaling from class_levels', () => {
+        const feature = makeFeature({
+            type: 'weapon_kind_mastery',
+            maxKinds: 'class_level_scaling',
+        })
+        const stats = {
+            ...BASE_STATS,
+            class: {
+                class_levels: [
+                    { level: 1, weapon_mastery: 2 },
+                    { level: 5, weapon_mastery: 3 },
+                    { level: 9, weapon_mastery: 4 },
+                ]
+            }
+        }
+        const result = attackHandlers.weapon_kind_mastery(feature, { ...stats, level: 5 })
+        expect(result.maxKinds).toBe(3)
+    })
+
+    it('falls back to 2 when class_level_scaling finds no matching level', () => {
+        const feature = makeFeature({
+            type: 'weapon_kind_mastery',
+            maxKinds: 'class_level_scaling',
+        })
+        const stats = {
+            ...BASE_STATS,
+            class: {
+                class_levels: [
+                    { level: 1, weapon_mastery: 2 },
+                    { level: 5, weapon_mastery: 3 },
+                ]
+            }
+        }
+        const result = attackHandlers.weapon_kind_mastery(feature, { ...stats, level: 9 })
+        expect(result.maxKinds).toBe(2)
+    })
+
+    it('falls back to 2 when class data is missing', () => {
+        const feature = makeFeature({
+            type: 'weapon_kind_mastery',
+            maxKinds: 'class_level_scaling',
+        })
+        const result = attackHandlers.weapon_kind_mastery(feature, BASE_STATS)
+        expect(result.maxKinds).toBe(2)
     })
 })
 
@@ -371,7 +467,7 @@ describe('attackHandlers – bonus_action_attack', () => {
         })
     })
 
-    it('resolves uses_expression via evaluateAutoExpression', () => {
+    it('evaluates uses_expression to numeric value', () => {
         const feature = makeFeature({
             type: 'bonus_action_attack',
             uses_expression: 'proficiency_bonus'
@@ -380,7 +476,7 @@ describe('attackHandlers – bonus_action_attack', () => {
         expect(result.usesMax).toBe(3)
     })
 
-    it('passthroughs custom fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'bonus_action_attack',
             trigger: 'after_hit',
@@ -391,13 +487,14 @@ describe('attackHandlers – bonus_action_attack', () => {
             weaponRequirement: 'melee',
         })
         const result = attackHandlers.bonus_action_attack(feature, BASE_STATS)
-        expect(result.trigger).toBe('after_hit')
-        expect(result.action).toBe('action')
-        expect(result.weaponAttack).toBe(true)
-        expect(result.extraDamageExpression).toBe('1d8')
-        expect(result.recharge).toBe('5-6')
-        expect(result.resourceKey).toBe('warPriestUses')
-        expect(result.weaponRequirement).toBe('melee')
+        expect(result).toMatchObject({
+            trigger: 'after_hit',
+            action: 'action',
+            weaponAttack: true,
+            extraDamageExpression: '1d8',
+            recharge: '5-6',
+            weaponRequirement: 'melee',
+        })
     })
 })
 
@@ -431,7 +528,7 @@ describe('attackHandlers – bonus_attacks', () => {
         expect(result.action).toBeNull()
     })
 
-    it('passthroughs custom fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'bonus_attacks',
             attacks: 3,
@@ -443,13 +540,15 @@ describe('attackHandlers – bonus_attacks', () => {
             weaponRestriction: 'melee',
         })
         const result = attackHandlers.bonus_attacks(feature, BASE_STATS)
-        expect(result.attacks).toBe(3)
-        expect(result.attackType).toBe('fist')
-        expect(result.cost).toBe('1d4')
-        expect(result.trigger).toBe('on_hit')
-        expect(result.casting_time).toBe('1 minute')
-        expect(result.weaponRequirements).toEqual(['finesse'])
-        expect(result.weaponRestriction).toBe('melee')
+        expect(result).toMatchObject({
+            attacks: 3,
+            attackType: 'fist',
+            cost: '1d4',
+            trigger: 'on_hit',
+            casting_time: '1 minute',
+            weaponRequirements: ['finesse'],
+            weaponRestriction: 'melee',
+        })
     })
 })
 
@@ -472,7 +571,7 @@ describe('attackHandlers – concentration_bonus_attack', () => {
         })
     })
 
-    it('passthroughs custom fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'concentration_bonus_attack',
             trigger: 'on_cast',
@@ -485,14 +584,16 @@ describe('attackHandlers – concentration_bonus_attack', () => {
             attack_type: 'melee',
         })
         const result = attackHandlers.concentration_bonus_attack(feature, BASE_STATS)
-        expect(result.trigger).toBe('on_cast')
-        expect(result.action).toBe('action')
-        expect(result.weaponAttack).toBe(true)
-        expect(result.concentrationSpell).toBe('spirit_guardians')
-        expect(result.casting_time).toBe('1 action')
-        expect(result.attacks).toBe(3)
-        expect(result.weaponRequirement).toBe('staff')
-        expect(result.attack_type).toBe('melee')
+        expect(result).toMatchObject({
+            trigger: 'on_cast',
+            action: 'action',
+            weaponAttack: true,
+            concentrationSpell: 'spirit_guardians',
+            casting_time: '1 action',
+            attacks: 3,
+            weaponRequirement: 'staff',
+            attack_type: 'melee',
+        })
     })
 })
 
@@ -509,15 +610,17 @@ describe('attackHandlers – stealth_attack', () => {
         })
     })
 
-    it('passthroughs custom fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'stealth_attack',
             cost: '2d6',
             casting_time: '1 action',
         })
         const result = attackHandlers.stealth_attack(feature, BASE_STATS)
-        expect(result.cost).toBe('2d6')
-        expect(result.casting_time).toBe('1 action')
+        expect(result).toMatchObject({
+            cost: '2d6',
+            casting_time: '1 action',
+        })
     })
 })
 
@@ -535,7 +638,7 @@ describe('attackHandlers – war_bond_summon', () => {
         })
     })
 
-    it('passthroughs custom fields', () => {
+    it('passes through custom fields', () => {
         const feature = makeFeature({
             type: 'war_bond_summon',
             action: 'action',
@@ -543,8 +646,10 @@ describe('attackHandlers – war_bond_summon', () => {
             casting_time: '1 reaction',
         })
         const result = attackHandlers.war_bond_summon(feature, BASE_STATS)
-        expect(result.action).toBe('action')
-        expect(result.bondedWeaponCount).toBe(3)
-        expect(result.casting_time).toBe('1 reaction')
+        expect(result).toMatchObject({
+            action: 'action',
+            bondedWeaponCount: 3,
+            casting_time: '1 reaction',
+        })
     })
 })

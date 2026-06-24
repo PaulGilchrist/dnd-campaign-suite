@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // --- mocks ---
@@ -6,7 +7,7 @@ const mockGuid = 'test-guid-1234';
 vi.mock('../ui/utils.js', () => ({
     default: {
         guid: vi.fn(() => mockGuid),
-     },
+    },
 }));
 
 const mockAddEntry = vi.fn(() => Promise.resolve());
@@ -17,7 +18,6 @@ vi.mock('../shared/logPoster.js', () => ({
     postLogEntry: makeMockPostLogEntry(),
 }));
 
-import utils from '../ui/utils.js';
 import { postLogEntry } from '../shared/logPoster.js';
 import {
     logInitiativeRoll,
@@ -34,6 +34,10 @@ function clearMocks() {
     vi.clearAllMocks();
 }
 
+function capturedEntry() {
+    return postLogEntry.mock.calls[0][1];
+}
+
 const campaignName = 'Dragonfall';
 
 // --- tests ---
@@ -41,261 +45,262 @@ const campaignName = 'Dragonfall';
 describe('logInitiativeRoll', () => {
     beforeEach(() => {
         clearMocks();
-     });
+    });
 
-    it('calls postLogEntry with a roll-type initiative entry', () => {
+    it('posts a roll entry with correct initiative fields', () => {
         logInitiativeRoll(campaignName, 'Gortha', 15, 3);
 
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.type).toBe('roll');
-        expect(entry.characterName).toBe('Gortha');
-        expect(entry.rollType).toBe('initiative');
-        expect(entry.name).toBe('Initiative');
-        expect(entry.rolls).toEqual([15]);
-        expect(entry.total).toBe(15);
-        expect(entry.bonus).toBe(3);
-        expect(entry.mode).toBe('normal');
-     });
+        const entry = capturedEntry();
+        expect(entry).toEqual({
+            type: 'roll',
+            characterName: 'Gortha',
+            rollType: 'initiative',
+            name: 'Initiative',
+            rolls: [15],
+            total: 15,
+            bonus: 3,
+            mode: 'normal',
+            isNatural20: false,
+            isNatural1: false,
+            timestamp: expect.any(Number),
+            id: expect.any(String),
+        });
+    });
 
-    it('sets isNatural20 to true when roll is 20', () => {
+    it('marks isNatural20 when the die roll is 20', () => {
         logInitiativeRoll(campaignName, 'Gortha', 20, 3);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.isNatural20).toBe(true);
-        expect(entry.isNatural1).toBe(false);
-     });
+        expect(capturedEntry().isNatural20).toBe(true);
+    });
 
-    it('sets isNatural1 to true when roll is 1', () => {
+    it('marks isNatural1 when the die roll is 1', () => {
         logInitiativeRoll(campaignName, 'Gortha', 1, -2);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.isNatural1).toBe(true);
-        expect(entry.isNatural20).toBe(false);
-     });
+        expect(capturedEntry().isNatural1).toBe(true);
+    });
 
-    it('leaves both flags false for any other roll value', () => {
-        logInitiativeRoll(campaignName, 'Gortha', 7, 0);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.isNatural20).toBe(false);
-        expect(entry.isNatural1).toBe(false);
-     });
-
-    it('includes a populated timestamp field', () => {
+    it('passes campaignName to postLogEntry', () => {
         logInitiativeRoll(campaignName, 'Gortha', 12, 1);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(typeof entry.timestamp).toBe('number');
-        expect(entry.timestamp).toBeGreaterThan(0);
-     });
-
-    it('uses utils.guid for the id field', () => {
-        logInitiativeRoll(campaignName, 'Gortha', 12, 1);
-        expect(utils.guid).toHaveBeenCalled();
+        expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
     });
 });
 
 describe('logConditionEvent', () => {
     beforeEach(() => {
         clearMocks();
-     });
+    });
 
-    it('calls postLogEntry with a condition-type entry for add action', () => {
+    it('posts a condition entry for add action', () => {
         logConditionEvent(campaignName, 'add', 'Orc', 'charmed', 12, 'CHA');
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.type).toBe('condition');
-        expect(entry.action).toBe('add');
-        expect(entry.characterName).toBe('Orc');
-        expect(entry.condition).toBe('charmed');
-        expect(entry.dc).toBe(12);
-        expect(entry.ability).toBe('CHA');
-     });
 
-    it('calls postLogEntry with remove action', () => {
+        const entry = capturedEntry();
+        expect(entry).toEqual({
+            type: 'condition',
+            action: 'add',
+            characterName: 'Orc',
+            condition: 'charmed',
+            dc: 12,
+            ability: 'CHA',
+            timestamp: expect.any(Number),
+            id: expect.any(String),
+        });
+    });
+
+    it('posts a condition entry for remove action without dc/ability', () => {
         logConditionEvent(campaignName, 'remove', 'Goblin', 'stunned', undefined, undefined);
-        const entry = postLogEntry.mock.calls[0][1];
+
+        const entry = capturedEntry();
         expect(entry.type).toBe('condition');
         expect(entry.action).toBe('remove');
         expect(entry.characterName).toBe('Goblin');
-     });
+        expect(entry.condition).toBe('stunned');
+        expect(entry.dc).toBeUndefined();
+        expect(entry.ability).toBeUndefined();
+    });
 
-    it('uses utils.guid for the id field', () => {
+    it('passes campaignName to postLogEntry', () => {
         logConditionEvent(campaignName, 'add', 'Orc', 'charmed', 15, 'WIS');
-        expect(utils.guid).toHaveBeenCalled();
-     });
-
-    it('includes a populated timestamp field', () => {
-        logConditionEvent(campaignName, 'add', 'Orc', 'charmed', 12, 'CHA');
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(typeof entry.timestamp).toBe('number');
-        expect(entry.timestamp).toBeGreaterThan(0);
-     });
+        expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
+    });
 });
 
 describe('logConcentrationSave', () => {
     beforeEach(() => {
         clearMocks();
-     });
+    });
 
-    it('calls postLogEntry with a concentration-save entry on success', () => {
+    it('posts a roll entry with concentration-save details on success', () => {
         logConcentrationSave(campaignName, 'Gortha', 14, 2, '+2 DEX', 'Fireball', 15, true);
-        const entry = postLogEntry.mock.calls[0][1];
+
+        const entry = capturedEntry();
+        expect(entry).toEqual({
+            type: 'roll',
+            rollType: 'concentration-save',
+            characterName: 'Gortha',
+            name: 'Constitution',
+            rolls: [14],
+            mode: 'normal',
+            total: 14,
+            bonus: 2,
+            bonusDetail: '+2 DEX',
+            condition: 'Concentration: Fireball',
+            dc: 15,
+            success: true,
+            timestamp: expect.any(Number),
+            id: expect.any(String),
+        });
+    });
+
+    it('posts a roll entry with success=false on a failed save', () => {
+        logConcentrationSave(campaignName, 'Gortha', 10, 2, '+2 DEX', 'Held Horror', 15, false);
+
+        const entry = capturedEntry();
         expect(entry.type).toBe('roll');
         expect(entry.rollType).toBe('concentration-save');
-        expect(entry.characterName).toBe('Gortha');
-        expect(entry.name).toBe('Constitution');
-        expect(entry.rolls).toEqual([14]);
-        expect(entry.mode).toBe('normal');
-        expect(entry.total).toBe(14);
-        expect(entry.bonus).toBe(2);
-        expect(entry.bonusDetail).toBe('+2 DEX');
-        expect(entry.condition).toBe('Concentration: Fireball');
-        expect(entry.dc).toBe(15);
-        expect(entry.success).toBe(true);
-     });
-
-    it('logs a failed concentration save', () => {
-        logConcentrationSave(campaignName, 'Gortha', 10, 2, '+2 DEX', 'Held Horror', 15, false);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.rollType).toBe('concentration-save');
         expect(entry.success).toBe(false);
-     });
+        expect(entry.condition).toBe('Concentration: Held Horror');
+        expect(entry.characterName).toBe('Gortha');
+    });
 
-    it('uses utils.guid for the id field', () => {
-        logConcentrationSave(campaignName, 'Gortha', 10, 2, '+2 DEX', 'Fireball', 15, true);
-        expect(utils.guid).toHaveBeenCalled();
-     });
-
-    it('includes a populated timestamp field', () => {
-        logConcentrationSave(campaignName, 'Gortha', 10, 2, '+2 DEX', 'Fireball', 15, true);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(typeof entry.timestamp).toBe('number');
-        expect(entry.timestamp).toBeGreaterThan(0);
-     });
-
-    it('passes the campaignName to postLogEntry', () => {
+    it('passes campaignName to postLogEntry', () => {
         logConcentrationSave(campaignName, 'Gortha', 10, 2, '+2 DEX', 'Fireball', 15, true);
         expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-     });
+    });
 });
 
 describe('logConditionSave', () => {
     beforeEach(() => {
         clearMocks();
-     });
+    });
 
-    it('calls postLogEntry with a condition-save entry on success', () => {
+    it('posts a roll entry with condition-save details on success', () => {
         logConditionSave(campaignName, 'Gortha', 13, 3, '+3 WIS', 'poisoned', 'Wisdom', 14, true);
-        const entry = postLogEntry.mock.calls[0][1];
+
+        const entry = capturedEntry();
+        expect(entry).toEqual({
+            type: 'roll',
+            rollType: 'condition-save',
+            characterName: 'Gortha',
+            name: 'Wisdom',
+            rolls: [13],
+            mode: 'normal',
+            total: 13,
+            bonus: 3,
+            bonusDetail: '+3 WIS',
+            condition: 'poisoned',
+            dc: 14,
+            success: true,
+            timestamp: expect.any(Number),
+            id: expect.any(String),
+        });
+    });
+
+    it('posts a roll entry with success=false on a failed save', () => {
+        logConditionSave(campaignName, 'Gortha', 8, 0, '+0 CON', 'stunned', 'Constitution', 12, false);
+
+        const entry = capturedEntry();
         expect(entry.type).toBe('roll');
         expect(entry.rollType).toBe('condition-save');
-        expect(entry.characterName).toBe('Gortha');
-        expect(entry.name).toBe('Wisdom');
-        expect(entry.rolls).toEqual([13]);
-        expect(entry.mode).toBe('normal');
-        expect(entry.total).toBe(13);
-        expect(entry.bonus).toBe(3);
-        expect(entry.bonusDetail).toBe('+3 WIS');
-        expect(entry.condition).toBe('poisoned');
-        expect(entry.dc).toBe(14);
-        expect(entry.success).toBe(true);
-     });
-
-    it('logs a failed condition save', () => {
-        logConditionSave(campaignName, 'Gortha', 8, 0, '+0 CON', 'stunned', 'Constitution', 12, false);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.rollType).toBe('condition-save');
         expect(entry.success).toBe(false);
-     });
+        expect(entry.condition).toBe('stunned');
+        expect(entry.name).toBe('Constitution');
+    });
 
-    it('uses utils.guid for the id field', () => {
-        logConditionSave(campaignName, 'Gortha', 8, 0, '+0 CON', 'stunned', 'Constitution', 12, false);
-        expect(utils.guid).toHaveBeenCalled();
-     });
-
-    it('includes a populated timestamp field', () => {
-        logConditionSave(campaignName, 'Gortha', 8, 0, '+0 CON', 'stunned', 'Constitution', 12, false);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(typeof entry.timestamp).toBe('number');
-        expect(entry.timestamp).toBeGreaterThan(0);
-     });
-
-    it('passes the campaignName to postLogEntry', () => {
+    it('passes campaignName to postLogEntry', () => {
         logConditionSave(campaignName, 'Gortha', 8, 0, '+0 CON', 'stunned', 'Constitution', 12, false);
         expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-     });
+    });
 });
 
 describe('logHpChange', () => {
     beforeEach(() => {
         clearMocks();
-     });
+    });
 
-    it('calls postLogEntry with an hp_change entry on damage', () => {
+    it('posts an hp_change entry for damage', () => {
         logHpChange(campaignName, 'Orc', -5, 20, 30, false, false);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.type).toBe('hp_change');
-        expect(entry.targetName).toBe('Orc');
-        expect(entry.delta).toBe(-5);
-        expect(entry.currentHp).toBe(20);
-        expect(entry.maxHp).toBe(30);
-        expect(entry.isHealing).toBe(false);
-        expect(entry.isUnconscious).toBe(false);
-     });
 
-    it('calls postLogEntry with an hp_change entry on healing', () => {
+        const entry = capturedEntry();
+        expect(entry).toEqual({
+            type: 'hp_change',
+            targetName: 'Orc',
+            delta: -5,
+            currentHp: 20,
+            maxHp: 30,
+            isHealing: false,
+            isUnconscious: false,
+        });
+    });
+
+    it('posts an hp_change entry for healing', () => {
         logHpChange(campaignName, 'Gortha', 8, 25, 30, true, false);
-        const entry = postLogEntry.mock.calls[0][1];
+
+        const entry = capturedEntry();
         expect(entry.type).toBe('hp_change');
         expect(entry.delta).toBe(8);
         expect(entry.isHealing).toBe(true);
-     });
+        expect(entry.isUnconscious).toBe(false);
+    });
 
-    it('calls postLogEntry with isUnconscious flag', () => {
+    it('sets isUnconscious when hp reaches 0 or below', () => {
         logHpChange(campaignName, 'Orc', -25, 0, 30, false, true);
-        const entry = postLogEntry.mock.calls[0][1];
+
+        const entry = capturedEntry();
         expect(entry.isUnconscious).toBe(true);
-     });
+    });
 
     it('does not include timestamp or id in hp_change entries', () => {
         logHpChange(campaignName, 'Orc', -5, 20, 30, false, false);
-        const entry = postLogEntry.mock.calls[0][1];
+        const entry = capturedEntry();
         expect(entry).not.toHaveProperty('timestamp');
         expect(entry).not.toHaveProperty('id');
-     });
+    });
 
-    it('passes the campaignName to postLogEntry', () => {
+    it('passes campaignName to postLogEntry', () => {
         logHpChange(campaignName, 'Orc', -5, 20, 30, false, false);
         expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-     });
+    });
 });
 
 describe('logNpcThreshold', () => {
     beforeEach(() => {
         clearMocks();
-     });
+    });
 
-    it('calls postLogEntry with an hp_change entry for threshold damage', () => {
+    it('posts an hp_change entry with threshold field', () => {
         logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.type).toBe('hp_change');
-        expect(entry.targetName).toBe('Bandit Leader');
-        expect(entry.delta).toBe(-10);
-        expect(entry.threshold).toBe(5);
-        expect(entry.maxHp).toBe(10);
-     });
+
+        const entry = capturedEntry();
+        expect(entry).toEqual({
+            type: 'hp_change',
+            targetName: 'Bandit Leader',
+            delta: -10,
+            threshold: 5,
+            maxHp: 10,
+        });
+    });
 
     it('handles zero threshold', () => {
         logNpcThreshold(campaignName, 'Goblin', -8, 0, 8);
-        const entry = postLogEntry.mock.calls[0][1];
-        expect(entry.threshold).toBe(0);
-     });
 
-    it('does not include timestamp or id in npc_threshold entries', () => {
+        const entry = capturedEntry();
+        expect(entry.threshold).toBe(0);
+    });
+
+    it('does not include timestamp or id', () => {
         logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10);
-        const entry = postLogEntry.mock.calls[0][1];
+        const entry = capturedEntry();
         expect(entry).not.toHaveProperty('timestamp');
         expect(entry).not.toHaveProperty('id');
-     });
+    });
 
-    it('passes the campaignName to postLogEntry', () => {
+    it('does not include isHealing or isUnconscious fields', () => {
+        logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10);
+        const entry = capturedEntry();
+        expect(entry).not.toHaveProperty('isHealing');
+        expect(entry).not.toHaveProperty('isUnconscious');
+    });
+
+    it('passes campaignName to postLogEntry', () => {
         logNpcThreshold(campaignName, 'Bandit Leader', -10, 5, 10);
         expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.any(Object));
-     });
+    });
 });

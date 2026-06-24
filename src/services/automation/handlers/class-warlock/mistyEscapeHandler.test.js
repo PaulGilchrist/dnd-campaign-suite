@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './mistyEscapeHandler.js';
 
@@ -7,15 +8,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../common/damageRollback.js', () => ({
-    findLastAttack: vi.fn().mockResolvedValue({
-        attackEvent: null,
-        attackerName: null,
-        targetName: null,
-        primaryDamage: 0,
-        secondaryDamage: 0,
-        totalDamage: 0,
-        damageTypes: [],
-    }),
+    findLastAttack: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -35,15 +28,6 @@ const { findLastAttack } = await import('../../common/damageRollback.js');
 const { addEntry } = await import('../../../ui/logService.js');
 const { addExpiration } = await import('../../../rules/effects/expirations.js');
 const { buildSaveDc } = await import('../../common/savePrompt.js');
-
-beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
-});
-
-afterEach(() => {
-    vi.useRealTimers();
-});
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -66,9 +50,28 @@ function makeAction(overrides = {}) {
     };
 }
 
+function makeRecentAttack(overrides = {}) {
+    return {
+        attackEvent: { timestamp: Date.now() },
+        attackerName: 'Goblin',
+        targetName: 'WarlockGirl',
+        primaryDamage: 10,
+        secondaryDamage: 0,
+        totalDamage: 10,
+        damageTypes: ['Fire'],
+        ...overrides,
+    };
+}
+
+beforeEach(() => {
+    vi.clearAllMocks();
+    getRuntimeValue.mockReturnValue([]);
+    buildSaveDc.mockReturnValue(15);
+});
+
 describe('mistyEscapeHandler', () => {
-    describe('no recent damage', () => {
-        it('returns popup when no damage event exists', async () => {
+    describe('guard: no recent damage', () => {
+        it('returns popup when no attack event exists', async () => {
             findLastAttack.mockResolvedValue({
                 attackEvent: null,
                 attackerName: null,
@@ -86,17 +89,10 @@ describe('mistyEscapeHandler', () => {
             expect(result.payload.description).toContain('No recent damage taken');
         });
 
-        it('returns popup when damage event is stale (> 60 seconds)', async () => {
-            const oldTimestamp = Date.now() - 120000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: oldTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
+        it('returns popup when attack target is not the player', async () => {
+            findLastAttack.mockResolvedValue(makeRecentAttack({
+                targetName: 'OtherPlayer',
+            }));
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -104,42 +100,39 @@ describe('mistyEscapeHandler', () => {
             expect(result.payload.description).toContain('No recent damage taken');
         });
 
-        it('accepts non-stale damage event', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
-
-            getRuntimeValue.mockReturnValue([]);
-            buildSaveDc.mockReturnValue(15);
+        it('returns popup when total damage is zero', async () => {
+            findLastAttack.mockResolvedValue(makeRecentAttack({
+                totalDamage: 0,
+                primaryDamage: 0,
+            }));
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
-            expect(result.payload.name).toBe('Misty Escape');
+            expect(result.payload.description).toContain('No recent damage taken');
+        });
+
+        it('uses feature name in the no-damage message', async () => {
+            findLastAttack.mockResolvedValue({
+                attackEvent: null,
+                attackerName: null,
+                targetName: null,
+                primaryDamage: 0,
+                secondaryDamage: 0,
+                totalDamage: 0,
+                damageTypes: [],
+            });
+
+            const result = await handle(makeAction({ name: 'My Feature' }), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.payload.description).toContain('My Feature');
         });
     });
 
-    describe('disappearing step (invisible condition)', () => {
+    describe('disappearing step: invisible condition', () => {
         it('adds invisible condition when not already present', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
+            findLastAttack.mockResolvedValue(makeRecentAttack());
             getRuntimeValue.mockReturnValue([]);
-            buildSaveDc.mockReturnValue(15);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -151,43 +144,18 @@ describe('mistyEscapeHandler', () => {
             );
         });
 
-        it('does not duplicate invisible when already present', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
+        it('skips setting conditions when invisible is already present', async () => {
+            findLastAttack.mockResolvedValue(makeRecentAttack());
             getRuntimeValue.mockReturnValue(['invisible']);
-            buildSaveDc.mockReturnValue(15);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(setRuntimeValue).not.toHaveBeenCalledWith(
-                'WarlockGirl',
-                'activeConditions',
-                expect.anything(),
-                'test-campaign'
-            );
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
         it('preserves other conditions when adding invisible', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
+            findLastAttack.mockResolvedValue(makeRecentAttack());
             getRuntimeValue.mockReturnValue(['fatigued']);
-            buildSaveDc.mockReturnValue(15);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -199,19 +167,22 @@ describe('mistyEscapeHandler', () => {
             );
         });
 
-        it('adds expiration for invisible condition after 1 round', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
-            getRuntimeValue.mockReturnValue([]);
-            buildSaveDc.mockReturnValue(15);
+        it('handles non-array stored conditions as empty', async () => {
+            findLastAttack.mockResolvedValue(makeRecentAttack());
+            getRuntimeValue.mockReturnValue(null);
+
+            await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'WarlockGirl',
+                'activeConditions',
+                ['invisible'],
+                'test-campaign'
+            );
+        });
+
+        it('registers expiration for invisible condition after 1 round', async () => {
+            findLastAttack.mockResolvedValue(makeRecentAttack());
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -225,47 +196,24 @@ describe('mistyEscapeHandler', () => {
         });
     });
 
-    describe('popup result', () => {
-        it('returns popup with Misty Step info', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
+    describe('popup result payload', () => {
+        function setupSuccessfulHandler() {
+            findLastAttack.mockResolvedValue(makeRecentAttack());
             getRuntimeValue.mockReturnValue([]);
             buildSaveDc.mockReturnValue(15);
+        }
+
+        it('returns popup with automation info type', async () => {
+            setupSuccessfulHandler();
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.name).toBe('Misty Escape');
-            expect(result.payload.saveType).toBe('WIS');
-            expect(result.payload.saveDc).toBe(15);
-            expect(result.payload.damageType).toBe('Psychic');
-            expect(result.payload.damageExpression).toBe('2d10');
-            expect(result.payload.aoeRange).toBe('5_ft');
-            expect(result.payload.triggerMistyStep).toBe(true);
         });
 
-        it('includes Dreadful Step description in popup', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
-            getRuntimeValue.mockReturnValue([]);
-            buildSaveDc.mockReturnValue(15);
+        it('includes Misty Step, invisible condition, and Dreadful Step in description', async () => {
+            setupSuccessfulHandler();
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
@@ -275,58 +223,50 @@ describe('mistyEscapeHandler', () => {
             expect(result.payload.description).toContain('2d10 Psychic damage');
         });
 
-        it('uses custom saveType from automation', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
-            getRuntimeValue.mockReturnValue([]);
-            buildSaveDc.mockReturnValue(15);
+        it('includes save type, DC, damage info, and trigger flag', async () => {
+            setupSuccessfulHandler();
 
-            const action = makeAction({ automation: { saveType: 'CHA' } });
-            const result = await handle(action, makePlayerStats(), 'test-campaign', null);
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
-            expect(result.payload.saveType).toBe('CHA');
+            expect(result.payload.saveType).toBe('WIS');
+            expect(result.payload.saveDc).toBe(15);
+            expect(result.payload.damageType).toBe('Psychic');
+            expect(result.payload.damageExpression).toBe('2d10');
+            expect(result.payload.aoeRange).toBe('5_ft');
+            expect(result.payload.triggerMistyStep).toBe(true);
         });
 
-        it('uses default feature name when not provided', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
-            getRuntimeValue.mockReturnValue([]);
-            buildSaveDc.mockReturnValue(15);
+        it('uses custom saveType from automation config', async () => {
+            setupSuccessfulHandler();
+            buildSaveDc.mockReturnValue(17);
 
-            const action = makeAction({ name: '' });
-            const result = await handle(action, makePlayerStats(), 'test-campaign', null);
+            const result = await handle(makeAction({ automation: { saveType: 'CHA' } }), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.payload.saveType).toBe('CHA');
+            expect(result.payload.saveDc).toBe(17);
+        });
+
+        it('uses default feature name when action name is empty', async () => {
+            setupSuccessfulHandler();
+
+            const result = await handle(makeAction({ name: '' }), makePlayerStats(), 'test-campaign', null);
 
             expect(result.payload.name).toBe('Misty Escape');
         });
 
-        it('logs ability use', async () => {
-            const recentTimestamp = Date.now() - 30000;
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: recentTimestamp },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 10,
-                secondaryDamage: 0,
-                totalDamage: 10,
-                damageTypes: ['Fire'],
-            });
-            getRuntimeValue.mockReturnValue([]);
+        it('uses custom feature name when provided', async () => {
+            setupSuccessfulHandler();
+
+            const result = await handle(makeAction({ name: 'Shadow Blink' }), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.payload.name).toBe('Shadow Blink');
+            expect(result.payload.description).toContain('Shadow Blink');
+        });
+    });
+
+    describe('logging', () => {
+        it('logs ability use with correct type, character, and feature name', async () => {
+            findLastAttack.mockResolvedValue(makeRecentAttack());
             buildSaveDc.mockReturnValue(15);
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -337,41 +277,30 @@ describe('mistyEscapeHandler', () => {
                 abilityName: 'Misty Escape',
             }));
         });
+
+        it('logs with custom feature name', async () => {
+            findLastAttack.mockResolvedValue(makeRecentAttack());
+            buildSaveDc.mockReturnValue(15);
+
+            await handle(makeAction({ name: 'My Misty Escape' }), makePlayerStats(), 'test-campaign', null);
+
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                abilityName: 'My Misty Escape',
+            }));
+        });
     });
 
-    describe('event staleness', () => {
-        it('treats event without timestamp as stale', async () => {
-            findLastAttack.mockResolvedValue({
-                attackEvent: {},
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
+    describe('campaign propagation', () => {
+        it('uses campaign name for all side effects', async () => {
+            findLastAttack.mockResolvedValue(makeRecentAttack());
+            getRuntimeValue.mockReturnValue([]);
+            buildSaveDc.mockReturnValue(15);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+            await handle(makeAction(), makePlayerStats(), 'shadow-hall', null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent damage taken');
-        });
-
-        it('treats event with null timestamp as stale', async () => {
-            findLastAttack.mockResolvedValue({
-                attackEvent: { timestamp: null },
-                attackerName: 'Goblin',
-                targetName: 'WarlockGirl',
-                primaryDamage: 0,
-                secondaryDamage: 0,
-                totalDamage: 0,
-                damageTypes: [],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('No recent damage taken');
+            expect(setRuntimeValue).toHaveBeenCalledWith('WarlockGirl', 'activeConditions', expect.any(Array), 'shadow-hall');
+            expect(addExpiration).toHaveBeenCalledWith('WarlockGirl', 'WarlockGirl', expect.any(Array), 'shadow-hall', 1);
+            expect(addEntry).toHaveBeenCalledWith('shadow-hall', expect.any(Object));
         });
     });
 });

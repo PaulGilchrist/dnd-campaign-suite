@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerMassSuggestion } from './massSuggestionService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -14,7 +15,7 @@ describe('massSuggestionService', () => {
     describe('triggerMassSuggestion', () => {
         const campaignName = 'TestCampaign';
         const mapName = 'testMap';
-        const playerStats = {
+        const basePlayerStats = {
             name: 'Wizard',
             spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Intelligence', toHit: 9 },
             proficiency: 4,
@@ -24,7 +25,7 @@ describe('massSuggestionService', () => {
             const result = await triggerMassSuggestion(
                 { name: 'Fire Bolt', level: 0 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -32,13 +33,51 @@ describe('massSuggestionService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null when spell name is "mass suggestion" case-insensitive and executes handler', async () => {
+        it('returns null when spell name is missing', async () => {
+            const result = await triggerMassSuggestion(
+                { level: 6 },
+                {},
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('returns null when spell name is empty string', async () => {
+            const result = await triggerMassSuggestion(
+                { name: '', level: 6 },
+                {},
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('matches spell name case-insensitively', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerMassSuggestion(
+                { name: 'MASS SUGGESTION', level: 6 },
+                {},
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledTimes(1);
+        });
+
+        it('delegates to executeHandler with correct action shape', async () => {
             executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
 
-            const result = await triggerMassSuggestion(
+            await triggerMassSuggestion(
                 { name: 'Mass Suggestion', level: 6 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -46,48 +85,30 @@ describe('massSuggestionService', () => {
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
                     name: 'Mass Suggestion',
+                    spellSlotLevel: 6,
                     automation: expect.objectContaining({
                         type: 'mass_suggestion',
-                        saveDc: 15,
                         saveType: 'WIS',
                     }),
-                    spellSlotLevel: 6,
                 }),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
-            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
         });
 
-        it('handles lowercase "mass suggestion" spell name', async () => {
+        it('passes the original spell object into the action', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
+            const spell = { name: 'Mass Suggestion', level: 6, school: 'Enchantment' };
 
-            const result = await triggerMassSuggestion(
-                { name: 'mass suggestion', level: 6 },
-                {},
-                playerStats,
+            await triggerMassSuggestion(spell, {}, basePlayerStats, campaignName, mapName);
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spell }),
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('handles mixed-case "MASS SUGGESTION" spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerMassSuggestion(
-                { name: 'MASS SUGGESTION', level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
         });
 
         it('uses spellSaveDc from metaCtx when provided', async () => {
@@ -96,7 +117,7 @@ describe('massSuggestionService', () => {
             await triggerMassSuggestion(
                 { name: 'Mass Suggestion', level: 6 },
                 { spellSaveDc: 18, slotLevel: 6 },
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -106,7 +127,7 @@ describe('massSuggestionService', () => {
                     automation: expect.objectContaining({ saveDc: 18 }),
                     spellSlotLevel: 6,
                 }),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -118,7 +139,7 @@ describe('massSuggestionService', () => {
             await triggerMassSuggestion(
                 { name: 'Mass Suggestion', level: 6 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -127,13 +148,13 @@ describe('massSuggestionService', () => {
                 expect.objectContaining({
                     automation: expect.objectContaining({ saveDc: 15 }),
                 }),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
         });
 
-        it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
+        it('computes saveDc from proficiency when spellAbilities is missing', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const stats = { name: 'Wizard', proficiency: 3 };
 
@@ -156,7 +177,6 @@ describe('massSuggestionService', () => {
         });
 
         it('throws when proficiency is not available', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
             const stats = { name: 'Wizard' };
 
             await expect(
@@ -167,10 +187,60 @@ describe('massSuggestionService', () => {
                     campaignName,
                     mapName,
                 )
-            ).rejects.toThrow('playerStats.proficiency is required');
+            ).rejects.toThrow('playerStats.proficiency is required for mass suggestion');
         });
 
-        it('returns result from executeHandler on success', async () => {
+        it('throws when slot level is not available from either source', async () => {
+            await expect(
+                triggerMassSuggestion(
+                    { name: 'Mass Suggestion' },
+                    {},
+                    basePlayerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('slot level is required for mass suggestion');
+        });
+
+        it('uses metaCtx slotLevel over spell.level when both are present', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerMassSuggestion(
+                { name: 'Mass Suggestion', level: 6 },
+                { spellSaveDc: 15, slotLevel: 7 },
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spellSlotLevel: 7 }),
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('falls back to spell.level when metaCtx has no slotLevel', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerMassSuggestion(
+                { name: 'Mass Suggestion', level: 7 },
+                { spellSaveDc: 17 },
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spellSlotLevel: 7 }),
+                basePlayerStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('returns the result from executeHandler', async () => {
             const expectedResult = {
                 type: 'popup',
                 payload: { type: 'automation_info', name: 'Mass Suggestion', description: 'Mass suggestion affects...' },
@@ -180,7 +250,7 @@ describe('massSuggestionService', () => {
             const result = await triggerMassSuggestion(
                 { name: 'Mass Suggestion', level: 6 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -194,7 +264,7 @@ describe('massSuggestionService', () => {
             const result = await triggerMassSuggestion(
                 { name: 'Mass Suggestion', level: 6 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -202,13 +272,13 @@ describe('massSuggestionService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('returns null when executeHandler throws', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
             const result = await triggerMassSuggestion(
                 { name: 'Mass Suggestion', level: 6 },
                 {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
@@ -216,140 +286,41 @@ describe('massSuggestionService', () => {
             expect(result).toBeNull();
         });
 
-        it('passes the spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Mass Suggestion', level: 6, school: 'Enchantment' };
-
-            await triggerMassSuggestion(spell, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses spell.level as fallback when metaCtx has no slotLevel', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerMassSuggestion(
-                { name: 'Mass Suggestion', level: 7 },
-                { spellSaveDc: 17 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 7 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('throws when slot level is not available', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await expect(
-                triggerMassSuggestion(
-                    { name: 'Mass Suggestion' },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('slot level is required');
-        });
-
-        it('hardcodes saveType to WIS', async () => {
+        it('passes campaignName and mapName through to executeHandler', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerMassSuggestion(
                 { name: 'Mass Suggestion', level: 6 },
                 {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveType: 'WIS' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('hardcodes automation type to mass_suggestion', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerMassSuggestion(
-                { name: 'Mass Suggestion', level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ type: 'mass_suggestion' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles undefined spell name gracefully', async () => {
-            const result = await triggerMassSuggestion(
-                {},
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('passes campaignName and mapName to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerMassSuggestion(
-                { name: 'Mass Suggestion', level: 6 },
-                {},
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.any(Object),
-                playerStats,
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
         });
 
-        it('uses metaCtx slotLevel when provided', async () => {
+        it('prefers metaCtx spellSaveDc over playerStats spellAbilities.saveDc', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerMassSuggestion(
                 { name: 'Mass Suggestion', level: 6 },
-                { slotLevel: 7 },
-                playerStats,
+                { spellSaveDc: 20 },
+                basePlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 7 }),
-                playerStats,
+                expect.objectContaining({
+                    automation: expect.objectContaining({ saveDc: 20 }),
+                }),
+                basePlayerStats,
                 campaignName,
                 mapName,
             );

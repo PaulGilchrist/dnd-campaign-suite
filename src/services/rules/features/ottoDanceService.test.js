@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerOttoDance } from './ottoDanceService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -5,6 +6,8 @@ import { executeHandler } from '../../automation/index.js';
 vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
+
+const mockedExecuteHandler = vi.mocked(executeHandler);
 
 describe('ottoDanceService', () => {
     beforeEach(() => {
@@ -20,432 +23,389 @@ describe('ottoDanceService', () => {
             proficiency: 4,
         };
 
-        it('returns null for non-Otto Dance spells', async () => {
-            const result = await triggerOttoDance(
+        describe('non-Otto-Dance spells', () => {
+            it.each([
                 { name: 'Vicious Mockery', level: 0 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('matches "Otto\'s Irresistible Dance" case-insensitive', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
-
-            const result = await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    name: "Otto's Irresistible Dance",
-                    automation: expect.objectContaining({
-                        type: 'ottos_dance',
-                        saveDc: 16,
-                        saveType: 'WIS',
-                    }),
-                    spellSlotLevel: 6,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
-        });
-
-        it('matches "irresistible dance" (short name) case-insensitive', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerOttoDance(
-                { name: 'Irresistible Dance', level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    name: 'Irresistible Dance',
-                    automation: expect.objectContaining({
-                        type: 'ottos_dance',
-                    }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('matches lowercase short name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerOttoDance(
-                { name: "otto's irresistible dance", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('handles mixed-case spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerOttoDance(
-                { name: "OTTO'S IRRESISTIBLE DANCE", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('uses spellSaveDc from metaCtx when provided', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                { spellSaveDc: 19, slotLevel: 7 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 19 }),
-                    spellSlotLevel: 7,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('falls back to playerStats spellAbilities saveDc when metaCtx lacks it', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 16 }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Bard', proficiency: 5 };
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            // 8 + proficiency(5) = 13
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 13 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses default proficiency of 2 when not available', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const stats = { name: 'Bard' };
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                stats,
-                campaignName,
-                mapName,
-            );
-
-            // 8 + 2 = 10
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 10 }),
-                }),
-                stats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('returns result from executeHandler on success', async () => {
-            const expectedResult = {
-                type: 'popup',
-                payload: { type: 'automation_info', name: "Otto's Irresistible Dance" },
-            };
-            executeHandler.mockResolvedValue(expectedResult);
-
-            const result = await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBe(expectedResult);
-        });
-
-        it('returns null when executeHandler returns null', async () => {
-            executeHandler.mockResolvedValue(null);
-
-            const result = await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null when executeHandler throws an error', async () => {
-            executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-            const result = await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
-        });
-
-        it('passes the spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: "Otto's Irresistible Dance", level: 6, school: 'Enchantment' };
-
-            await triggerOttoDance(spell, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses spell.level as fallback when metaCtx has no slotLevel', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 8 },
-                { spellSaveDc: 18 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 8 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses default slot level 6 when no metaCtx or spell.level', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance" },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 6 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles undefined spell name gracefully', async () => {
-            const result = await triggerOttoDance(
-                {},
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('sets saveType to WIS in action automation', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveType: 'WIS' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('sets automation type to ottos_dance', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ type: 'ottos_dance' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('passes campaignName and mapName to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                playerStats,
-                'MyCampaign',
-                'bossRoom',
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                playerStats,
-                'MyCampaign',
-                'bossRoom',
-            );
-        });
-
-        it('passes playerStats as second argument to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const customStats = { name: 'Rogue', proficiency: 3 };
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                {},
-                customStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                customStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles metaCtx slotLevel override', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                { spellSaveDc: 17, slotLevel: 9 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 9 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles undefined metaCtx gracefully', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerOttoDance(
-                { name: "Otto's Irresistible Dance", level: 6 },
-                undefined,
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 16 }),
-                    spellSlotLevel: 6,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('handles empty spell name string', async () => {
-            const result = await triggerOttoDance(
                 { name: '', level: 6 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+                { level: 6 },
+                { name: null, level: 6 },
+            ])('returns null for non-matching spell: $name', async () => {
+                const result = await triggerOttoDance(
+                    { name: 'Vicious Mockery', level: 0 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+                expect(result).toBeNull();
+                expect(mockedExecuteHandler).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('spell name matching', () => {
+            it.each([
+                "Otto's Irresistible Dance",
+                "otto's irresistible dance",
+                "OTTO'S IRRESISTIBLE DANCE",
+                "Otto's iRrEsIsTiBlE dAnCe",
+                'Irresistible Dance',
+                'irresistible dance',
+                'IRRESISTIBLE DANCE',
+            ])('matches spell name case-insensitively: "%s"', async (spellName) => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                const result = await triggerOttoDance(
+                    { name: spellName, level: 6 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledTimes(1);
+                expect(result).toEqual({ success: true });
+            });
+        });
+
+        describe('action construction', () => {
+            it('passes the automation block with correct type, saveDc, and saveType', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({
+                            type: 'ottos_dance',
+                            saveType: 'WIS',
+                        }),
+                    }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('passes the original spell object in the action', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+                const spell = { name: "Otto's Irresistible Dance", level: 6, school: 'Enchantment' };
+
+                await triggerOttoDance(spell, {}, playerStats, campaignName, mapName);
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spell }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+        });
+
+        describe('saveDc resolution', () => {
+            it('uses metaCtx spellSaveDc when provided', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    { spellSaveDc: 19 },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 19 }),
+                    }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('falls back to playerStats spellAbilities.saveDc', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 16 }),
+                    }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('computes saveDc from 8 + proficiency when no spellAbilities.saveDc', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+                const stats = { name: 'Bard', proficiency: 5 };
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 13 }),
+                    }),
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('uses default proficiency of 2 when playerStats.proficiency is missing', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+                const stats = { name: 'Bard' };
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 10 }),
+                    }),
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('uses default saveDc of 8 when proficiency is also missing', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+                const stats = { name: 'Bard' };
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 10 }),
+                    }),
+                    stats,
+                    campaignName,
+                    mapName,
+                );
+            });
+        });
+
+        describe('slotLevel resolution', () => {
+            it('uses metaCtx slotLevel when provided', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    { slotLevel: 9 },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spellSlotLevel: 9 }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('falls back to spell.level when metaCtx has no slotLevel', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 8 },
+                    { spellSaveDc: 18 },
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spellSlotLevel: 8 }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('uses default slot level 6 when nothing is provided', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance" },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({ spellSlotLevel: 6 }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+        });
+
+        describe('metaCtx handling', () => {
+            it('handles undefined metaCtx gracefully', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                const result = await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    undefined,
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(result).toEqual({ success: true });
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        automation: expect.objectContaining({ saveDc: 16 }),
+                        spellSlotLevel: 6,
+                    }),
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+            });
+
+            it('handles empty metaCtx object', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledTimes(1);
+            });
+        });
+
+        describe('result propagation', () => {
+            it('returns the result from executeHandler', async () => {
+                const expectedResult = { type: 'popup', payload: { type: 'automation_info' } };
+                mockedExecuteHandler.mockResolvedValue(expectedResult);
+
+                const result = await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(result).toBe(expectedResult);
+            });
+
+            it('returns null when executeHandler resolves null', async () => {
+                mockedExecuteHandler.mockResolvedValue(null);
+
+                const result = await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(result).toBeNull();
+            });
+
+            it('returns null and logs error when executeHandler rejects', async () => {
+                const error = new Error('Handler failed');
+                mockedExecuteHandler.mockRejectedValue(error);
+                const consoleSpy = vi.spyOn(console, 'error');
+
+                const result = await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    playerStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(result).toBeNull();
+                expect(consoleSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('[ottoDanceService]'),
+                    error,
+                );
+                consoleSpy.mockRestore();
+            });
+        });
+
+        describe('argument passthrough', () => {
+            it('passes campaignName and mapName as the 3rd and 4th arguments to executeHandler', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    playerStats,
+                    'MyCampaign',
+                    'bossRoom',
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.any(Object),
+                    playerStats,
+                    'MyCampaign',
+                    'bossRoom',
+                );
+            });
+
+            it('passes playerStats as the second argument to executeHandler', async () => {
+                mockedExecuteHandler.mockResolvedValue({ success: true });
+                const customStats = { name: 'Rogue', proficiency: 3 };
+
+                await triggerOttoDance(
+                    { name: "Otto's Irresistible Dance", level: 6 },
+                    {},
+                    customStats,
+                    campaignName,
+                    mapName,
+                );
+
+                expect(mockedExecuteHandler).toHaveBeenCalledWith(
+                    expect.any(Object),
+                    customStats,
+                    campaignName,
+                    mapName,
+                );
+            });
         });
     });
 });

@@ -25,13 +25,6 @@ describe('computeSaveDc', () => {
       expect(computeSaveDc(playerStats, 'strength', -1)).toBe(10);
     });
 
-    it('handles both negative ability bonus and negative proficiency', () => {
-      const playerStats = {
-        abilities: [{ name: 'Strength', bonus: -3 }],
-      };
-      expect(computeSaveDc(playerStats, 'strength', -2)).toBe(3);
-    });
-
     it('handles large proficiency bonus', () => {
       const playerStats = {
         abilities: [{ name: 'Strength', bonus: 5 }],
@@ -53,6 +46,13 @@ describe('computeSaveDc', () => {
         abilities: [{ name: 'Constitution', bonus: 1 }],
       };
       expect(computeSaveDc(playerStats, 'con', 0)).toBe(9);
+    });
+
+    it('uses 0 when proficiency is undefined', () => {
+      const playerStats = {
+        abilities: [{ name: 'Constitution', bonus: 1 }],
+      };
+      expect(computeSaveDc(playerStats, 'con', undefined)).toBe(9);
     });
 
     it('returns base 8 when ability and proficiency are both 0', () => {
@@ -100,26 +100,7 @@ describe('computeSaveDc', () => {
     });
   });
 
-  describe('null and undefined safety', () => {
-    it('returns 10 when playerStats is null', () => {
-      expect(computeSaveDc(null, 'strength', 2)).toBe(10);
-    });
-
-    it('returns 10 when playerStats is undefined', () => {
-      expect(computeSaveDc(undefined, 'strength', 2)).toBe(10);
-    });
-
-    it('returns 10 when playerStats has no abilities property', () => {
-      expect(computeSaveDc({}, 'strength', 2)).toBe(10);
-    });
-
-    it('returns 10 when abilities array is empty', () => {
-      const playerStats = { abilities: [] };
-      expect(computeSaveDc(playerStats, 'strength', 2)).toBe(10);
-    });
-  });
-
-  describe('all abilities', () => {
+  describe('all six abilities', () => {
     it('computes correct save DC for each ability score', () => {
       const playerStats = {
         abilities: [

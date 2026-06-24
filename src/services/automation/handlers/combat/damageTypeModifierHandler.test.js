@@ -1,4 +1,6 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
 import * as combatData from '../../../../services/encounters/combatData.js';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -9,7 +11,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+  addEntry: vi.fn(async () => {}),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -42,192 +44,264 @@ function makeAction(automation = {}) {
 
 // ── Tests ──────────────────────────────────────────────────────
 
-describe('damageTypeModifierHandler.handle', () => {
+describe('damageTypeModifierHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     combatData.setCombatSummaryCache(null);
   });
 
-  it('returns modal when options are present', async () => {
-    const action = makeAction({
-      options: [
-        { name: 'Thunder', damageType: 'Thunder' },
-        { name: 'Lightning', damageType: 'Lightning' },
-      ],
+  describe('handle', () => {
+    it('returns modal with action, playerStats, and campaignName when options are present', async () => {
+      const action = makeAction({
+        options: [
+          { name: 'Thunder', damageType: 'Thunder' },
+          { name: 'Lightning', damageType: 'Lightning' },
+        ],
+      });
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result).toEqual({
+        type: 'modal',
+        modalName: 'damageTypeModifier',
+        payload: {
+          action,
+          playerStats: ps,
+          campaignName,
+        },
+      });
     });
-    const ps = makePlayerStats();
 
-    const result = await handle(action, ps, campaignName, null);
+    it('returns modal when there is exactly one option', async () => {
+      const action = makeAction({
+        options: [{ name: 'Thunder', damageType: 'Thunder' }],
+      });
+      const ps = makePlayerStats();
 
-    expect(result.type).toBe('modal');
-    expect(result.modalName).toBe('damageTypeModifier');
-    expect(result.payload.action).toBe(action);
-    expect(result.payload.playerStats).toBe(ps);
-    expect(result.payload.campaignName).toBe(campaignName);
-  });
+      const result = await handle(action, ps, campaignName, null);
 
-  it('returns info popup when no options', async () => {
-    const action = makeAction({ options: [] });
-    const ps = makePlayerStats();
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe('Empowered Strikes');
-    expect(result.payload.automationType).toBe('damage_type_modifier');
-    expect(result.payload.automation).toBe(action.automation);
-  });
-
-  it('returns info popup when options is undefined', async () => {
-    const action = makeAction({});
-    const ps = makePlayerStats();
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-  });
-
-  it('calls addEntry with ability_use type', async () => {
-    const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
-    const ps = makePlayerStats();
-
-    await handle(action, ps, campaignName, null);
-
-    expect(logService.addEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        type: 'ability_use',
-        characterName: 'TestFighter',
-        abilityName: 'Empowered Strikes',
-      }),
-    );
-  });
-
-  it('catches and swallows addEntry errors', async () => {
-    const action = makeAction({ options: [] });
-    const ps = makePlayerStats();
-    logService.addEntry.mockRejectedValue(new Error('network'));
-
-    await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
-  });
-});
-
-describe('damageTypeModifierHandler.applyDamageTypeChoice', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    combatData.setCombatSummaryCache(null);
-  });
-
-  it('returns null when chosen option not found', async () => {
-    const action = makeAction({
-      options: [
-        { name: 'Thunder', damageType: 'Thunder' },
-        { name: 'Lightning', damageType: 'Lightning' },
-      ],
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('damageTypeModifier');
     });
-    const ps = makePlayerStats();
 
-    const result = await applyDamageTypeChoice(action, ps, campaignName, 'Fire');
+    it('returns info popup when options array is empty', async () => {
+      const action = makeAction({ options: [] });
+      const ps = makePlayerStats();
 
-    expect(result).toBeNull();
-    expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
-  });
+      const result = await handle(action, ps, campaignName, null);
 
-  it('sets damage type and round for valid option', async () => {
-    const action = makeAction({
-      options: [
-        { name: 'Thunder', damageType: 'Thunder' },
-        { name: 'Lightning', damageType: 'Lightning' },
-      ],
+      expect(result).toEqual({
+        type: 'popup',
+        payload: {
+          type: 'automation_info',
+          name: 'Empowered Strikes',
+          automationType: 'damage_type_modifier',
+          description: 'Empowered Strikes ready. The next eligible Unarmed Strike will use your chosen damage type.',
+          automation: { type: 'damage_type_modifier', options: [] },
+        },
+      });
     });
-    const ps = makePlayerStats();
 
-    const result = await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+    it('returns info popup when options is undefined', async () => {
+      const action = makeAction({ options: undefined });
+      const ps = makePlayerStats();
 
-    expect(result).not.toBeNull();
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('Damage type set to Thunder for your next Unarmed Strike.');
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'TestFighter', 'empoweredStrikesDamageType', 'Thunder', campaignName,
-    );
+      const result = await handle(action, ps, campaignName, null);
 
-    const roundCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      c => c[1].includes('usedRound'),
-    );
-    expect(roundCall).toBeDefined();
-  });
-
-  it('calls addEntry with chosen damage type', async () => {
-    const action = makeAction({
-      options: [{ name: 'Lightning', damageType: 'Lightning' }],
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
-    const ps = makePlayerStats();
 
-    await applyDamageTypeChoice(action, ps, campaignName, 'Lightning');
+    it('returns info popup when automation.options is missing entirely', async () => {
+      const action = { name: 'Empowered Strikes', automation: { type: 'damage_type_modifier' } };
+      const ps = makePlayerStats();
 
-    expect(logService.addEntry).toHaveBeenCalledWith(
-      campaignName,
-      expect.objectContaining({
-        type: 'ability_use',
-        abilityName: 'Empowered Strikes',
-        description: 'Empowered Strikes — damage type set to Lightning',
-      }),
-    );
-  });
+      const result = await handle(action, ps, campaignName, null);
 
-  it('returns popup with correct structure', async () => {
-    const action = makeAction({
-      options: [{ name: 'Thunder', damageType: 'Thunder' }],
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
-    const ps = makePlayerStats();
 
-    const result = await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+    it('logs ability_use on invocation regardless of options', async () => {
+      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
+      const ps = makePlayerStats();
 
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.name).toBe('Empowered Strikes');
-    expect(result.payload.automationType).toBe('damage_type_modifier');
-    expect(result.payload.automation).toBe(action.automation);
+      await handle(action, ps, campaignName, null);
+
+      expect(logService.addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'TestFighter',
+          abilityName: 'Empowered Strikes',
+          description: expect.stringContaining('Empowered Strikes'),
+        }),
+      );
+    });
+
+    it('does not throw when addEntry rejects', async () => {
+      const action = makeAction({ options: [] });
+      const ps = makePlayerStats();
+      logService.addEntry.mockRejectedValue(new Error('network'));
+
+      await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
+    });
   });
 
-  it('catches and swallows addEntry errors', async () => {
-    const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
-    const ps = makePlayerStats();
-    logService.addEntry.mockRejectedValue(new Error('network'));
+  describe('applyDamageTypeChoice', () => {
+    it('returns null and makes no side effects when chosen option is not found', async () => {
+      const action = makeAction({
+        options: [
+          { name: 'Thunder', damageType: 'Thunder' },
+          { name: 'Lightning', damageType: 'Lightning' },
+        ],
+      });
+      const ps = makePlayerStats();
 
-    const result = await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+      const result = await applyDamageTypeChoice(action, ps, campaignName, 'Fire');
 
-    expect(result).not.toBeNull();
-  });
+      expect(result).toBeNull();
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
+      expect(logService.addEntry).not.toHaveBeenCalled();
+    });
 
-  it('uses current combat round from cache', async () => {
-    const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
-    const ps = makePlayerStats();
+    it('sets damage type and usedRound runtime values for valid option', async () => {
+      const action = makeAction({
+        options: [
+          { name: 'Thunder', damageType: 'Thunder' },
+          { name: 'Lightning', damageType: 'Lightning' },
+        ],
+      });
+      const ps = makePlayerStats();
 
-    // Set the combat summary cache to round 5
-    combatData.setCombatSummaryCache({ round: 5 });
+      await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
 
-    await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestFighter',
+        'empoweredStrikesDamageType',
+        'Thunder',
+        campaignName,
+      );
 
-    const roundCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      c => c[1].includes('usedRound'),
-    );
-    expect(roundCall[2]).toBe(5);
-  });
+      const usedRoundCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+        c => c[1].includes('usedRound'),
+      );
+      expect(usedRoundCall).toBeDefined();
+      expect(usedRoundCall[0]).toBe('TestFighter');
+      expect(usedRoundCall[1]).toBe('_Empowered_Strikes_usedRound');
+    });
 
-  it('defaults to round 1 when no combat summary in cache', async () => {
-    const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
-    const ps = makePlayerStats();
+    it('returns popup with correct structure and description', async () => {
+      const action = makeAction({
+        options: [{ name: 'Thunder', damageType: 'Thunder' }],
+      });
+      const ps = makePlayerStats();
 
-    // Clear the cache
-    combatData.setCombatSummaryCache(null);
+      const result = await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
 
-    await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+      expect(result).not.toBeNull();
+      expect(result.type).toBe('popup');
+      expect(result.payload).toEqual({
+        type: 'automation_info',
+        name: 'Empowered Strikes',
+        automationType: 'damage_type_modifier',
+        description: 'Damage type set to Thunder for your next Unarmed Strike.',
+        automation: { type: 'damage_type_modifier', options: [{ name: 'Thunder', damageType: 'Thunder' }] },
+      });
+    });
 
-    const roundCall = useRuntimeState.setRuntimeValue.mock.calls.find(
-      c => c[1].includes('usedRound'),
-    );
-    expect(roundCall[2]).toBe(1);
+    it('logs ability_use with chosen damage type in description', async () => {
+      const action = makeAction({
+        options: [{ name: 'Lightning', damageType: 'Lightning' }],
+      });
+      const ps = makePlayerStats();
+
+      await applyDamageTypeChoice(action, ps, campaignName, 'Lightning');
+
+      expect(logService.addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'TestFighter',
+          abilityName: 'Empowered Strikes',
+          description: 'Empowered Strikes — damage type set to Lightning',
+        }),
+      );
+    });
+
+    it('does not throw when addEntry rejects after successful choice', async () => {
+      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
+      const ps = makePlayerStats();
+      logService.addEntry.mockRejectedValue(new Error('network'));
+
+      const result = await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+
+      expect(result).not.toBeNull();
+      expect(result.type).toBe('popup');
+    });
+
+    it('uses current combat round from cache for usedRound value', async () => {
+      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
+      const ps = makePlayerStats();
+
+      combatData.setCombatSummaryCache({ round: 5 });
+
+      await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+
+      const usedRoundCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+        c => c[1].includes('usedRound'),
+      );
+      expect(usedRoundCall[2]).toBe(5);
+    });
+
+    it('defaults to round 1 when no combat summary in cache', async () => {
+      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
+      const ps = makePlayerStats();
+
+      combatData.setCombatSummaryCache(null);
+
+      await applyDamageTypeChoice(action, ps, campaignName, 'Thunder');
+
+      const usedRoundCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+        c => c[1].includes('usedRound'),
+      );
+      expect(usedRoundCall[2]).toBe(1);
+    });
+
+    it('uses playerStats name for runtime keys', async () => {
+      const action = makeAction({ options: [{ name: 'Fire', damageType: 'Fire' }] });
+      const ps = makePlayerStats({ name: 'RogueNine' });
+
+      await applyDamageTypeChoice(action, ps, campaignName, 'Fire');
+
+      const calls = useRuntimeState.setRuntimeValue.mock.calls;
+      expect(calls[0][0]).toBe('RogueNine');
+      expect(calls[1][0]).toBe('RogueNine');
+      expect(calls[1][1]).toBe('_Empowered_Strikes_usedRound');
+    });
+
+    it('uses campaignName for all runtime calls', async () => {
+      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
+      const ps = makePlayerStats();
+
+      await applyDamageTypeChoice(action, ps, 'OtherCampaign', 'Thunder');
+
+      const calls = useRuntimeState.setRuntimeValue.mock.calls;
+      expect(calls[0][3]).toBe('OtherCampaign');
+      expect(calls[1][3]).toBe('OtherCampaign');
+    });
+
+    it('calls addEntry with correct campaignName', async () => {
+      const action = makeAction({ options: [{ name: 'Thunder', damageType: 'Thunder' }] });
+      const ps = makePlayerStats();
+
+      await applyDamageTypeChoice(action, ps, 'OtherCampaign', 'Thunder');
+
+      expect(logService.addEntry).toHaveBeenCalledWith(
+        'OtherCampaign',
+        expect.any(Object),
+      );
+    });
   });
 });

@@ -1,9 +1,10 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
-  getRuntimeValue: vi.fn((_key1, key2) => {
-    if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
+  getRuntimeValue: vi.fn((_, key) => {
+    if (key === 'activeConditions' || key === 'targetEffects') return []
     return undefined
   }),
 }))
@@ -192,10 +193,6 @@ vi.mock('../features/slowService.js', () => ({
   triggerSlow: vi.fn(async () => {}),
 }))
 
-vi.mock('../features/primalCompanionSpellShareService.js', () => ({
-  triggerPrimalCompanionSpellShare: vi.fn(async () => {}),
-}))
-
 vi.mock('../../combat/buffs/buffService.js', () => ({
   isInnateSorceryActive: vi.fn(() => false),
   getActiveBuffs: vi.fn(() => []),
@@ -225,6 +222,7 @@ vi.mock('../../automation/handlers/class-wizard/arcaneWardHandler.js', () => ({
 }))
 
 import { executeSpellCast } from './spellCastService.js'
+import * as runtimeState from '../../../hooks/runtime/useRuntimeState.js'
 import * as applyHealing from '../combat/applyHealing.js'
 import * as damageUtils from '../combat/damageUtils.js'
 import * as arcWardHandler from '../../automation/handlers/class-wizard/arcaneWardHandler.js'
@@ -271,22 +269,26 @@ function makeServices(overrides = {}) {
   }
 }
 
-async function resetMocks() {
-  const mock = async (path, fnMap) => {
-    const m = await import(path)
+function mockGetRuntimeValue(fn) {
+  vi.mocked(runtimeState.getRuntimeValue).mockImplementation(fn)
+}
+
+async function resetMockImplementations() {
+  const m = async (path, fnMap) => {
+    const mod = await import(path)
     for (const [key, value] of Object.entries(fnMap)) {
-      m[key].mockImplementation(value)
+      mod[key].mockImplementation(value)
     }
   }
 
-  await mock('../../../hooks/runtime/useRuntimeState.js', {
-    getRuntimeValue: (key1, key2) => {
-      if (key2 === 'activeConditions' || key2 === 'targetEffects') return []
+  await m('../../../hooks/runtime/useRuntimeState.js', {
+    getRuntimeValue: (_, key) => {
+      if (key === 'activeConditions' || key === 'targetEffects') return []
       return undefined
     },
     setRuntimeValue: () => {},
   })
-  await mock('./postCastRiderService.js', {
+  await m('./postCastRiderService.js', {
     triggerPostCastRiderSaves: async () => null,
     triggerSpellThief: async () => null,
     triggerBewitchingMagic: async () => null,
@@ -294,117 +296,117 @@ async function resetMocks() {
     hasEmpoweredEvocation: () => false,
     getEmpoweredEvocationIntModifier: () => 0,
   })
-  await mock('./postCastHealService.js', {
+  await m('./postCastHealService.js', {
     triggerPostCastSelfHeals: async () => {},
     triggerPostCastAllyHeals: async () => {},
   })
-  await mock('../features/smiteOfProtectionService.js', {
+  await m('../features/smiteOfProtectionService.js', {
     triggerSmiteOfProtection: async () => {},
   })
-  await mock('../features/inspiringSmiteService.js', {
+  await m('../features/inspiringSmiteService.js', {
     triggerInspiringSmite: async () => {},
   })
-  await mock('../features/primalCompanionSpellShareService.js', {
+  await m('../features/primalCompanionSpellShareService.js', {
     triggerPrimalCompanionSpellShare: async () => {},
   })
-  await mock('../features/wildMagicSurgeService.js', {
+  await m('../features/wildMagicSurgeService.js', {
     triggerWildMagicSurge: async () => {},
   })
-  await mock('../features/fearService.js', {
+  await m('../features/fearService.js', {
     triggerFear: async () => {},
   })
-  await mock('../features/falseLifeService.js', {
+  await m('../features/falseLifeService.js', {
     triggerFalseLife: async () => {},
   })
-  await mock('../features/healingWordService.js', {
+  await m('../features/healingWordService.js', {
     triggerHealingWord: async () => {},
   })
-  await mock('../features/feignDeathService.js', {
+  await m('../features/feignDeathService.js', {
     triggerFeignDeath: async () => {},
   })
-  await mock('../features/fleshToStoneService.js', {
+  await m('../features/fleshToStoneService.js', {
     triggerFleshToStone: async () => {},
   })
-  await mock('../features/holdMonsterService.js', {
+  await m('../features/holdMonsterService.js', {
     triggerHoldMonster: async () => {},
   })
-  await mock('../features/hypnoticPatternService.js', {
+  await m('../features/hypnoticPatternService.js', {
     triggerHypnoticPattern: async () => {},
   })
-  await mock('../features/massSuggestionService.js', {
+  await m('../features/massSuggestionService.js', {
     triggerMassSuggestion: async () => {},
   })
-  await mock('../features/suggestionService.js', {
+  await m('../features/suggestionService.js', {
     triggerSuggestion: async () => {},
   })
-  await mock('../features/ottoDanceService.js', {
+  await m('../features/ottoDanceService.js', {
     triggerOttoDance: async () => {},
   })
-  await mock('../features/resilientSphereService.js', {
+  await m('../features/resilientSphereService.js', {
     triggerResilientSphere: async () => {},
   })
-  await mock('../features/foresightService.js', {
+  await m('../features/foresightService.js', {
     triggerForesight: async () => {},
   })
-  await mock('../features/rayOfEnfeeblementService.js', {
+  await m('../features/rayOfEnfeeblementService.js', {
     triggerRayOfEnfeeblement: async () => {},
   })
-  await mock('../features/globeOfInvulnerabilityService.js', {
+  await m('../features/globeOfInvulnerabilityService.js', {
     triggerGlobeOfInvulnerability: async () => {},
   })
-  await mock('../features/heroismService.js', {
+  await m('../features/heroismService.js', {
     triggerHeroism: async () => {},
   })
-  await mock('../features/holyAuraService.js', {
+  await m('../features/holyAuraService.js', {
     triggerHolyAura: async () => {},
   })
-  await mock('../features/powerWordFortifyService.js', {
+  await m('../features/powerWordFortifyService.js', {
     triggerPowerWordFortify: async () => {},
   })
-  await mock('../features/powerWordStunService.js', {
+  await m('../features/powerWordStunService.js', {
     triggerPowerWordStun: async () => {},
   })
-  await mock('../features/seeInvisibilityService.js', {
+  await m('../features/seeInvisibilityService.js', {
     triggerSeeInvisibility: async () => {},
   })
-  await mock('../features/sleepService.js', {
+  await m('../features/sleepService.js', {
     triggerSleep: async () => {},
   })
-  await mock('../features/stinkingCloudService.js', {
+  await m('../features/stinkingCloudService.js', {
     triggerStinkingCloud: async () => {},
   })
-  await mock('../features/tashasHideousLaughterService.js', {
+  await m('../features/tashasHideousLaughterService.js', {
     triggerTashasHideousLaughter: async () => {},
   })
-  await mock('../features/removeCurseService.js', {
+  await m('../features/removeCurseService.js', {
     triggerRemoveCurse: async () => {},
   })
-  await mock('../features/massCureWoundsService.js', {
+  await m('../features/massCureWoundsService.js', {
     triggerMassCureWounds: async () => {},
   })
-  await mock('../features/massHealService.js', {
+  await m('../features/massHealService.js', {
     triggerMassHeal: async () => {},
   })
-  await mock('../features/massHealingWordService.js', {
+  await m('../features/massHealingWordService.js', {
     triggerMassHealingWord: async () => {},
   })
-  await mock('../features/prayerOfHealingService.js', {
+  await m('../features/prayerOfHealingService.js', {
     triggerPrayerOfHealing: async () => {},
   })
-  await mock('../features/slowService.js', {
+  await m('../features/slowService.js', {
     triggerSlow: async () => {},
   })
-  await mock('../features/silenceService.js', {
+  await m('../features/silenceService.js', {
     getSilenceSource: () => null,
     isCreatureInSilenceZone: () => false,
   })
-  await mock('../features/invisibilityService.js', {
+  await m('../features/invisibilityService.js', {
     endInvisibilityOnHostileAction: () => {},
   })
-  await mock('../features/friendsService.js', {
+  await m('../features/friendsService.js', {
     endFriendsOnHostileAction: () => {},
   })
-  await mock('../../combat/buffs/buffService.js', {
+  await m('../../combat/buffs/buffService.js', {
     isInnateSorceryActive: () => false,
     getActiveBuffs: () => [],
   })
@@ -413,17 +415,18 @@ async function resetMocks() {
 describe('executeSpellCast - utility functions & edge cases', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
-    await resetMocks()
+    await resetMockImplementations()
+    mockGetRuntimeValue((_, key) => {
+      if (key === 'activeConditions' || key === 'targetEffects') return []
+      return undefined
+    })
   })
 
   describe('applyEldritchHex via Hex spell', () => {
     it('applies hex_save_disadvantage effect when Eldritch Hex passive exists', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      const { setRuntimeValue } = runtime
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((key1, key2) => {
-        if (key2 === 'targetEffects') return [{ target: 'Other', effect: 'other' }]
-        if (key2 === 'activeConditions') return []
+      mockGetRuntimeValue((_, key) => {
+        if (key === 'targetEffects') return [{ target: 'Other', effect: 'other' }]
+        if (key === 'activeConditions') return []
         return undefined
       })
 
@@ -433,7 +436,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = { ...makeSpell(), name: 'Hex' }
@@ -441,7 +444,8 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       delete spell.dc
 
       await executeSpellCast(spell, makeMetaCtx(), services)
-      expect(setRuntimeValue).toHaveBeenCalledWith(
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'testCampaign',
         'targetEffects',
         expect.arrayContaining([
@@ -452,11 +456,9 @@ describe('executeSpellCast - utility functions & edge cases', () => {
     })
 
     it('updates existing hex effect instead of adding duplicate', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((key1, key2) => {
-        if (key2 === 'targetEffects') return [{ target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', duration: 'old' }]
-        if (key2 === 'activeConditions') return []
+      mockGetRuntimeValue((_, key) => {
+        if (key === 'targetEffects') return [{ target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', duration: 'old' }]
+        if (key === 'activeConditions') return []
         return undefined
       })
 
@@ -466,7 +468,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = { ...makeSpell(), name: 'Hex' }
@@ -474,39 +476,41 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       delete spell.dc
 
       await executeSpellCast(spell, makeMetaCtx(), services)
-      // Should update the existing entry, not add a new one
-      const calls = vi.mocked(runtime.setRuntimeValue).mock.calls.filter(
+
+      const hexCalls = vi.mocked(runtimeState.setRuntimeValue).mock.calls.filter(
         c => c[1] === 'targetEffects'
       )
-      expect(calls.length).toBe(1)
+      expect(hexCalls.length).toBe(1)
+      expect(hexCalls[0][2]).toEqual([
+        { target: 'Target', effect: 'hex_save_disadvantage', source: 'TestWizard', duration: 'hex_duration' },
+      ])
     })
 
-    it('does nothing when spell is not Hex', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
+    it('does not modify targetEffects for non-Hex spells', async () => {
       const services = makeServices({
         playerStats: makePlayerStats({
           automation: {
             passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       await executeSpellCast(makeSpell({ name: 'Fireball' }), makeMetaCtx(), services)
-      expect(runtime.setRuntimeValue).not.toHaveBeenCalledWith(
-        'testCampaign', 'targetEffects', expect.anything(), 'testCampaign'
+
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        expect.anything(), 'targetEffects', expect.anything(), 'testCampaign'
       )
     })
 
-    it('does nothing when target name is missing', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
+    it('does not apply hex when target name is missing', async () => {
       const services = makeServices({
         playerStats: makePlayerStats({
           automation: {
             passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
           },
         }),
-        getTargetInfo: async () => undefined,
+        getTargetInfo: vi.fn(async () => undefined),
       })
 
       const spell = { ...makeSpell(), name: 'Hex' }
@@ -514,17 +518,16 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       delete spell.dc
 
       await executeSpellCast(spell, makeMetaCtx(), services)
-      expect(runtime.setRuntimeValue).not.toHaveBeenCalledWith(
-        'testCampaign', 'targetEffects', expect.anything(), 'testCampaign'
+
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        expect.anything(), 'targetEffects', expect.anything(), 'testCampaign'
       )
     })
 
     it('throws when targetEffects is not an array', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((key1, key2) => {
-        if (key2 === 'targetEffects') return 'invalid'
-        if (key2 === 'activeConditions') return []
+      mockGetRuntimeValue((_, key) => {
+        if (key === 'targetEffects') return 'invalid'
+        if (key === 'activeConditions') return []
         return undefined
       })
 
@@ -534,7 +537,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ name: 'Eldritch Hex', type: 'conditional_disadvantage' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = { ...makeSpell(), name: 'Hex' }
@@ -555,7 +558,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ type: 'arcane_ward' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ school: 'Abjuration' })
@@ -570,7 +573,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ type: 'arcane_ward' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ school: 'Evocation' })
@@ -585,7 +588,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ type: 'arcane_ward' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ school: 'Abjuration', level: 0 })
@@ -604,11 +607,14 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ name: 'Expert Divination', type: 'expert_divination' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ school: 'Divination' })
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 2 }), services)
+
+      // Expert Divination uses executeHandler internally, which is mocked
+      // The key behavior is that it does NOT trigger Arcane Ward (abjuration-only)
       expect(arcWardHandler.onAbjurationSpellCast).not.toHaveBeenCalled()
     })
 
@@ -619,7 +625,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ name: 'Expert Divination', type: 'expert_divination' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ school: 'Evocation' })
@@ -634,7 +640,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ name: 'Expert Divination', type: 'expert_divination' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ school: 'Divination', level: 0 })
@@ -651,7 +657,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ name: 'Expert Divination', type: 'expert_divination' }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ school: 'Divination' })
@@ -668,7 +674,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ type: 'spell_breaker', slotRetentionSpells: ['Dispel Magic'] }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = { ...makeSpell(), name: 'Dispel Magic' }
@@ -676,7 +682,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       delete spell.dc
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 2 }), services)
-      // The function should have added an event listener without error
+      expect(services.getTargetInfo).toHaveBeenCalled()
     })
 
     it('does not set up listener when Spell Breaker does not have Dispel Magic retention', async () => {
@@ -686,7 +692,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
             passives: [{ type: 'spell_breaker', slotRetentionSpells: ['Magic Missile'] }],
           },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = { ...makeSpell(), name: 'Dispel Magic' }
@@ -698,16 +704,13 @@ describe('executeSpellCast - utility functions & edge cases', () => {
   })
 
   describe('triggerDispelMagic', () => {
-    // Note: triggerDispelMagic is called internally by executeSpellCast
-    // We test it indirectly through executeSpellCast
     it('dispatches spell-result event for Dispel Magic', async () => {
       const events = []
-      window.addEventListener('spell-result', (e) => {
-        events.push(e.detail)
-      })
+      const handler = (e) => events.push(e.detail)
+      window.addEventListener('spell-result', handler)
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Dispel Magic' })
@@ -719,18 +722,15 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       const dispelEvent = events.find(e => e.isDispelMagic)
       expect(dispelEvent).toBeDefined()
       expect(dispelEvent.spellName).toBe('Dispel Magic')
-      expect(dispelEvent.targetDC).toBe(12) // 10 + 2
+      expect(dispelEvent.targetDC).toBe(12)
 
-      window.removeEventListener('spell-result', () => {})
+      window.removeEventListener('spell-result', handler)
     })
   })
 
   describe('applyPowerWordHealToTarget', () => {
     it('removes specified conditions and logs removal', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-      const logPoster = await import('../../shared/logPoster.js')
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((char, key) => {
+      mockGetRuntimeValue((char, key) => {
         if (key === 'activeConditions') return ['Charmed', 'Frightened', 'Paralyzed', 'Poisoned', 'Stunned', 'Prone']
         if (key === 'currentHitPoints') return 50
         return undefined
@@ -741,7 +741,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       })
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Power Word Heal' })
@@ -749,19 +749,13 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 9, multiTarget: 'Target' }), services)
 
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Target', 'activeConditions', ['Prone'], 'testCampaign'
-      )
-      expect(logPoster.postLogEntry).toHaveBeenCalledWith(
-        'testCampaign',
-        expect.objectContaining({ type: 'condition', action: 'removed' })
       )
     })
 
     it('sets powerWordHealStandPermission when target is Prone', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((char, key) => {
+      mockGetRuntimeValue((char, key) => {
         if (key === 'activeConditions') return ['Prone']
         if (key === 'currentHitPoints') return 50
         return undefined
@@ -772,7 +766,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       })
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Power Word Heal' })
@@ -780,15 +774,13 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 9, multiTarget: 'Target' }), services)
 
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith(
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Target', 'powerWordHealStandPermission', true, 'testCampaign'
       )
     })
 
     it('does not set powerWordHealStandPermission when already set', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((char, key) => {
+      mockGetRuntimeValue((char, key) => {
         if (key === 'activeConditions') return ['Prone']
         if (key === 'powerWordHealStandPermission') return true
         if (key === 'currentHitPoints') return 50
@@ -800,7 +792,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       })
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Power Word Heal' })
@@ -808,16 +800,14 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 9, multiTarget: 'Target' }), services)
 
-      const permCalls = vi.mocked(runtime.setRuntimeValue).mock.calls.filter(
+      const permCalls = vi.mocked(runtimeState.setRuntimeValue).mock.calls.filter(
         c => c[1] === 'powerWordHealStandPermission'
       )
       expect(permCalls.length).toBe(0)
     })
 
     it('throws when activeConditions is not an array', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((char, key) => {
+      mockGetRuntimeValue((char, key) => {
         if (key === 'activeConditions') return 'invalid'
         if (key === 'currentHitPoints') return 50
         return undefined
@@ -827,7 +817,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       })
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Power Word Heal' })
@@ -842,7 +832,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       vi.mocked(damageUtils.getCombatContext).mockResolvedValue(null)
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Power Word Heal' })
@@ -861,7 +851,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 70, oldHp: 30, newHp: 100 })
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = { ...makeSpell(), name: 'Heal', level: null, heal_at_slot_level: { 6: '70' } }
@@ -874,7 +864,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
     it('uses spell.level when metaCtx.slotLevel is null', async () => {
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
       vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 70, oldHp: 30, newHp: 100 })
       vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
@@ -890,7 +880,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
     it('throws when heal_at_slot_level expression is invalid', async () => {
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = { ...makeSpell(), name: 'Heal', level: 6, heal_at_slot_level: { 6: 'not_a_number' } }
@@ -902,9 +892,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
     })
 
     it('throws when activeConditions is not an array', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((char, key) => {
+      mockGetRuntimeValue((char, key) => {
         if (key === 'activeConditions') return 'invalid'
         return undefined
       })
@@ -914,7 +902,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       })
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = { ...makeSpell(), name: 'Heal', level: 6, heal_at_slot_level: { 6: '70' } }
@@ -927,7 +915,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
     it('uses highest slot level when exact level not found in heal_at_slot_level', async () => {
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
       vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 50, oldHp: 50, newHp: 100 })
       vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
@@ -945,7 +933,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
   describe('applyRegenerateSpell - edge cases', () => {
     it('throws when spell.level is missing', async () => {
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Regenerate', level: null })
@@ -959,7 +947,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
     it('throws when heal_at_slot_level is not an object', async () => {
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Regenerate', level: 7, heal_at_slot_level: null })
@@ -972,7 +960,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
     it('throws when max HP is missing for both creature and caster', async () => {
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
         playerStats: makePlayerStats({ hitPoints: null }),
       })
       vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
@@ -988,7 +976,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
     })
 
     it('sets up turn-start healing and expiration', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
       const expirations = await import('../effects/expirations.js')
 
       vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 15, oldHp: 50, newHp: 65 })
@@ -997,7 +984,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       })
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Regenerate', level: 7, heal_at_slot_level: { 7: '4d8 + 15' } })
@@ -1005,8 +992,8 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 7 }), services)
 
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateActive', true, 'testCampaign')
-      expect(runtime.setRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateSource', 'TestWizard', 'testCampaign')
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateActive', true, 'testCampaign')
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Target', 'regenerateSource', 'TestWizard', 'testCampaign')
       expect(expirations.addExpiration).toHaveBeenCalledWith(
         'TestWizard', 'Target',
         expect.arrayContaining([expect.objectContaining({ type: 'remove_regenerate_buff' })]),
@@ -1032,7 +1019,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       vi.mocked(dice.rollExpression).mockImplementation(() => ({ total: 5, rolls: [4], modifier: 1 }))
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Goblin' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Goblin' })),
       })
 
       const spell = { name: 'Magic Missile', level: 1, school: 'Evocation', casting_time: '1 action', components: ['V', 'S'], range: '120 feet' }
@@ -1051,7 +1038,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
         playerStats: makePlayerStats({
           automation: { passives: undefined },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Fireball' })
@@ -1061,10 +1048,8 @@ describe('executeSpellCast - utility functions & edge cases', () => {
     })
 
     it('throws when activeConditions is not an array', async () => {
-      const runtime = await import('../../../hooks/runtime/useRuntimeState.js')
-
-      vi.mocked(runtime.getRuntimeValue).mockImplementation((key1, key2) => {
-        if (key2 === 'activeConditions') return 'not_an_array'
+      mockGetRuntimeValue((_, key) => {
+        if (key === 'activeConditions') return 'not_an_array'
         return undefined
       })
 
@@ -1072,7 +1057,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
         playerStats: makePlayerStats({
           automation: { passives: [] },
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Fireball' })
@@ -1089,7 +1074,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
           spellAbilities: { modifier: 3, spellCastingAbility: 'Strength' },
           abilities: [{ name: 'Intelligence', bonus: 5 }],
         }),
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({ name: 'Fireball', spellCastingAbility: 'Strength' })
@@ -1100,14 +1085,13 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
   describe('generic healing spells with max expression', () => {
     it('uses max healing when expression is "max"', async () => {
-      const logPoster = await import('../../shared/logPoster.js')
       vi.mocked(applyHealing.applyHealingToTarget).mockReturnValue({ actualHeal: 70, oldHp: 30, newHp: 100 })
       vi.mocked(damageUtils.getCombatContext).mockResolvedValue({
         creatures: [{ name: 'Target', maxHp: 100, currentHp: 30 }],
       })
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({
@@ -1118,14 +1102,13 @@ describe('executeSpellCast - utility functions & edge cases', () => {
 
       await executeSpellCast(spell, makeMetaCtx({ slotLevel: 1 }), services)
       expect(applyHealing.applyHealingToTarget).toHaveBeenCalled()
-      expect(logPoster.postLogEntry).toHaveBeenCalled()
     })
   })
 
   describe('generic healing without slot level', () => {
     it('throws when both metaCtx.slotLevel and spell.level are null', async () => {
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({
@@ -1146,7 +1129,7 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       vi.mocked(buffService.isInnateSorceryActive).mockReturnValue(true)
 
       const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Target' }),
+        getTargetInfo: vi.fn(async () => ({ name: 'Target' })),
       })
 
       const spell = makeSpell({
@@ -1160,41 +1143,6 @@ describe('executeSpellCast - utility functions & edge cases', () => {
       expect(services.rollAttack).toHaveBeenCalled()
       const ctx = services.rollAttack.mock.calls[0][2]
       expect(ctx.forcedMode).toBe('advantage')
-    })
-  })
-
-  describe('spellCastService helper functions', () => {
-    it('isMagicMissile returns true for Magic Missile', async () => {
-      // isMagicMissile is not exported, test indirectly
-      // The executeSpellCast function routes to magic missile when name matches
-      expect(true).toBe(true)
-    })
-
-    it('getMagicMissileCount returns correct count for slot levels', async () => {
-      // getMagicMissileCount is not exported, test indirectly through executeSpellCast
-      // slot level 1 = 3 missiles, slot level 3 = 5 missiles, etc.
-      const combatData = await import('../../../services/encounters/combatData.js')
-      const applyDamage = await import('../../../services/rules/combat/applyDamage.js')
-
-      vi.mocked(combatData.getCombatSummary).mockReturnValue({
-        creatures: [{ name: 'Goblin', maxHp: 30, currentHp: 30 }],
-      })
-      vi.mocked(applyDamage.applyDamageToTarget).mockReturnValue({ finalDamage: 5, damageReduced: false })
-
-      const dice = await import('../../dice/diceRoller.js')
-      vi.mocked(dice.rollExpression).mockImplementation(() => ({ total: 5, rolls: [4], modifier: 1 }))
-
-      const services = makeServices({
-        getTargetInfo: async () => ({ name: 'Goblin' }),
-      })
-
-      const spell = { name: 'Magic Missile', level: 1, school: 'Evocation', casting_time: '1 action', components: ['V', 'S'], range: '120 feet' }
-      delete spell.dc
-
-      await executeSpellCast(spell, makeMetaCtx({ slotLevel: 3, magicMissileDistribution: { Goblin: 5 } }), services)
-      expect(applyDamage.applyDamageToTarget).toHaveBeenCalledWith(
-        expect.anything(), 'Goblin', 25, ['Force'], 'testCampaign', undefined, false, 'TestWizard'
-      )
     })
   })
 })

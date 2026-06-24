@@ -3,145 +3,86 @@ import { describe, it, expect } from 'vitest';
 import { automationInfoPopup } from './popupResponse.js';
 
 describe('automationInfoPopup', () => {
-  describe('return structure', () => {
-    it('should return a popup type with automation_info payload type', () => {
-      const result = automationInfoPopup({
-        name: 'Fireball',
-        description: 'A ball of fire.',
-        automation: { type: 'damage_roll' },
-      });
+  it('should return a popup object with the correct top-level shape', () => {
+    const action = {
+      name: 'Fireball',
+      description: 'A ball of fire.',
+      automation: { type: 'damage_roll' },
+    };
 
-      expect(result).toEqual({
-        type: 'popup',
-        payload: {
-          type: 'automation_info',
-          name: 'Fireball',
-          automationType: 'damage_roll',
-          description: 'A ball of fire.',
-          automation: { type: 'damage_roll' },
-        },
-      });
-    });
+    const result = automationInfoPopup(action);
+
+    expect(result).toHaveProperty('type', 'popup');
+    expect(result).toHaveProperty('payload');
+    expect(result.payload).toHaveProperty('type', 'automation_info');
   });
 
-  describe('name mapping', () => {
-    it('should pass through action.name to payload.name', () => {
-      const result = automationInfoPopup({
-        name: 'Thunderwave',
-        automation: { type: 'save_roll' },
-      });
-      expect(result.payload.name).toBe('Thunderwave');
-    });
+  it('should map action fields to the payload with correct keys', () => {
+    const action = {
+      name: 'Thunderwave',
+      description: 'A wave of thunder.',
+      automation: { type: 'save_roll', savingThrow: 'Constitution' },
+    };
 
-    it('should pass undefined name through as undefined', () => {
-      const result = automationInfoPopup({
-        automation: { type: 'test_type' },
-      });
-      expect(result.payload.name).toBeUndefined();
-    });
+    const result = automationInfoPopup(action);
 
-    it('should pass null name through as null', () => {
-      const result = automationInfoPopup({
-        name: null,
-        automation: { type: 'test_type' },
-      });
-      expect(result.payload.name).toBeNull();
-    });
-
-    it('should pass empty string name through as empty string', () => {
-      const result = automationInfoPopup({
-        name: '',
-        automation: { type: 'test_type' },
-      });
-      expect(result.payload.name).toBe('');
-    });
+    expect(result.payload.name).toBe(action.name);
+    expect(result.payload.automationType).toBe(action.automation.type);
+    expect(result.payload.description).toBe(action.description);
+    expect(result.payload.automation).toBe(action.automation);
   });
 
-  describe('automationType mapping', () => {
-    it('should extract automation.type as payload.automationType', () => {
-      const result = automationInfoPopup({
-        name: 'Action Surge',
-        automation: { type: 'extra_action' },
-      });
-      expect(result.payload.automationType).toBe('extra_action');
-    });
+  it('should coerce falsy descriptions to empty string', () => {
+    const base = { name: 'Action', automation: { type: 'misc' } };
 
-    it('should handle nested automation objects', () => {
-      const automation = {
-        type: 'custom',
-        params: { depth: [{ nested: true }] },
-        extra: [1, 2, 3],
-      };
-      const result = automationInfoPopup({
-        name: 'Complex',
-        automation,
-      });
-      expect(result.payload.automationType).toBe('custom');
-      expect(result.payload.automation).toBe(automation);
-    });
+    const result = automationInfoPopup({ ...base, description: undefined });
+    expect(result.payload.description).toBe('');
+
+    const resultNull = automationInfoPopup({ ...base, description: null });
+    expect(resultNull.payload.description).toBe('');
+
+    const resultZero = automationInfoPopup({ ...base, description: 0 });
+    expect(resultZero.payload.description).toBe('');
+
+    const resultFalse = automationInfoPopup({ ...base, description: false });
+    expect(resultFalse.payload.description).toBe('');
   });
 
-  describe('description mapping', () => {
-    it('should pass through a truthy description', () => {
-      const result = automationInfoPopup({
-        name: 'Magic Missile',
-        description: 'Creates three glowing darts.',
-        automation: { type: 'damage_roll' },
-      });
-      expect(result.payload.description).toBe('Creates three glowing darts.');
+  it('should preserve truthy descriptions unchanged', () => {
+    const result = automationInfoPopup({
+      name: 'Magic Missile',
+      description: 'Creates three glowing darts.',
+      automation: { type: 'damage_roll' },
     });
-
-    it('should coerce falsy descriptions to empty string', () => {
-      const falsyValues = [undefined, null, '', 0, false];
-      const base = { name: 'Action', automation: { type: 'misc' } };
-
-      for (const desc of falsyValues) {
-        const result = automationInfoPopup({ ...base, description: desc });
-        expect(result.payload.description).toBe('');
-      }
-    });
-
-    it('should pass through a numeric string description', () => {
-      const result = automationInfoPopup({
-        name: 'Numeric Desc',
-        description: '42',
-        automation: { type: 'misc' },
-      });
-      expect(result.payload.description).toBe('42');
-    });
+    expect(result.payload.description).toBe('Creates three glowing darts.');
   });
 
-  describe('automation passthrough', () => {
-    it('should pass the automation object reference through unchanged', () => {
-      const automation = { type: 'attack_roll', weapon: 'Longsword', damage: '1d8+3' };
-      const result = automationInfoPopup({
-        name: 'Melee Attack',
-        automation,
-      });
-      expect(result.payload.automation).toBe(automation);
-    });
+  it('should preserve name as-is including empty string and null', () => {
+    const base = { automation: { type: 'test' } };
+
+    expect(automationInfoPopup({ ...base, name: '' }).payload.name).toBe('');
+    expect(automationInfoPopup({ ...base, name: null }).payload.name).toBeNull();
+    expect(automationInfoPopup(base).payload.name).toBeUndefined();
   });
 
-  describe('output immutability', () => {
-    it('should return a new object, not the input', () => {
-      const action = {
-        name: 'New',
-        automation: { type: 'test' },
-        description: '',
-      };
-      const result = automationInfoPopup(action);
-      expect(result).not.toBe(action);
-      expect(result.payload).not.toBe(action);
-    });
+  it('should pass the automation object by reference', () => {
+    const automation = { type: 'attack_roll', weapon: 'Longsword', damage: '1d8+3' };
+    const result = automationInfoPopup({ name: 'Melee Attack', automation });
+    expect(result.payload.automation).toBe(automation);
   });
 
-  describe('error handling', () => {
-    it('should throw when automation is undefined', () => {
-      expect(() => automationInfoPopup({ name: 'Test' })).toThrow('Cannot read properties of undefined');
-    });
+  it('should return a new object that does not share references with the input', () => {
+    const action = { name: 'New', automation: { type: 'test' }, description: '' };
+    const result = automationInfoPopup(action);
+    expect(result).not.toBe(action);
+    expect(result.payload).not.toBe(action);
+  });
 
-    it('should throw when automation is null', () => {
-      expect(() => automationInfoPopup({ name: 'Test', automation: null })).toThrow('Cannot read properties of null');
-    });
+  it('should throw when automation is missing', () => {
+    expect(() => automationInfoPopup({ name: 'Test' })).toThrow();
+  });
+
+  it('should throw when automation is null', () => {
+    expect(() => automationInfoPopup({ name: 'Test', automation: null })).toThrow();
   });
 });

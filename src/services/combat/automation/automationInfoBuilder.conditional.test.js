@@ -1,219 +1,360 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest'
 
 import { buildAttackInfo } from './automationInfoBuilder.js'
 import { BASE_STATS, makeFeature } from './automationInfoBuilder.fixtures.js'
 
 describe('buildAttackInfo – dispatcher behavior', () => {
-    it('returns null when feature has no automation', () => {
-        const feature = { name: 'Test Feature' }
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toBeNull()
+    it('returns null when feature has no automation property', () => {
+        const feature = { name: 'No Automation Feature' }
+        expect(buildAttackInfo(feature, BASE_STATS)).toBeNull()
+    })
+
+    it('returns null when feature automation is null', () => {
+        const feature = { name: 'Null Automation Feature', automation: null }
+        expect(buildAttackInfo(feature, BASE_STATS)).toBeNull()
     })
 
     it('returns null when automation has no type', () => {
         const feature = makeFeature({})
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toBeNull()
+        expect(buildAttackInfo(feature, BASE_STATS)).toBeNull()
     })
 
     it('returns null for unknown automation type', () => {
         const feature = makeFeature({ type: 'nonexistent_type' })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toBeNull()
+        expect(buildAttackInfo(feature, BASE_STATS)).toBeNull()
     })
 
-    it('returns correct structure for condition_immunity_while_active with defaults', () => {
-        const feature = makeFeature({ type: 'condition_immunity_while_active' })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'condition_immunity_while_active',
-            name: 'Test Feature',
-            target: 'self',
-            immunities: [],
-            requiresActive: '',
-            hasAutomation: true,
+    describe('condition_immunity_while_active', () => {
+        it('applies defaults when no custom fields provided', () => {
+            const feature = makeFeature({ type: 'condition_immunity_while_active' })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'condition_immunity_while_active',
+                name: 'Test Feature',
+                target: 'self',
+                immunities: [],
+                requiresActive: '',
+                hasAutomation: true,
+            })
+        })
+
+        it('passes through all custom fields', () => {
+            const feature = makeFeature({
+                type: 'condition_immunity_while_active',
+                target: 'allies',
+                immunities: ['poisoned', 'paralyzed'],
+                requiresActive: 'stance',
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'condition_immunity_while_active',
+                name: 'Test Feature',
+                target: 'allies',
+                immunities: ['poisoned', 'paralyzed'],
+                requiresActive: 'stance',
+                hasAutomation: true,
+            })
         })
     })
 
-    it('passes custom fields through for condition_immunity_while_active', () => {
-        const feature = makeFeature({
-            type: 'condition_immunity_while_active',
-            target: 'allies',
-            immunities: ['poisoned', 'paralyzed'],
-            requiresActive: 'stance',
+    describe('conditional_replacement', () => {
+        it('applies defaults when no custom fields provided', () => {
+            const feature = makeFeature({ type: 'conditional_replacement' })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'conditional_replacement',
+                name: 'Test Feature',
+                target: 'saving_throw',
+                saveType: '',
+                condition: '',
+                effect: '',
+                replacementAbility: '',
+                hasAutomation: true,
+            })
         })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.target).toBe('allies')
-        expect(result.immunities).toEqual(['poisoned', 'paralyzed'])
-        expect(result.requiresActive).toBe('stance')
-    })
 
-    it('returns correct structure for conditional_replacement with defaults', () => {
-        const feature = makeFeature({ type: 'conditional_replacement' })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result).toEqual({
-            type: 'conditional_replacement',
-            name: 'Test Feature',
-            target: 'saving_throw',
-            saveType: '',
-            condition: '',
-            effect: '',
-            replacementAbility: '',
-            hasAutomation: true,
+        it('passes through all custom fields', () => {
+            const feature = makeFeature({
+                type: 'conditional_replacement',
+                target: 'attack_roll',
+                saveType: 'DEX',
+                condition: 'natural_1',
+                effect: 'replace_with_max',
+                replacementAbility: 'INT',
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'conditional_replacement',
+                name: 'Test Feature',
+                target: 'attack_roll',
+                saveType: 'DEX',
+                condition: 'natural_1',
+                effect: 'replace_with_max',
+                replacementAbility: 'INT',
+                hasAutomation: true,
+            })
         })
     })
 
-    it('passes custom fields through for conditional_replacement', () => {
-        const feature = makeFeature({
-            type: 'conditional_replacement',
-            target: 'attack_roll',
-            saveType: 'DEX',
-            condition: 'natural_1',
-            effect: 'replace_with_max',
-            replacementAbility: 'INT',
+    describe('evasion', () => {
+        it('applies defaults when no custom fields provided', () => {
+            const feature = makeFeature({ type: 'evasion' })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'evasion',
+                name: 'Test Feature',
+                saveType: 'DEX',
+                shareable: false,
+                shareRange: 0,
+                hasAutomation: true,
+            })
         })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.target).toBe('attack_roll')
-        expect(result.saveType).toBe('DEX')
-        expect(result.condition).toBe('natural_1')
-        expect(result.effect).toBe('replace_with_max')
-        expect(result.replacementAbility).toBe('INT')
-    })
 
-    it('returns passive_rule with ignore_resistance effect and damageTypes', () => {
-        const feature = makeFeature({
-            type: 'passive_rule',
-            effect: 'ignore_resistance',
-            damageTypes: ['fire', 'cold'],
+        it('coerces shareable to boolean for truthy values', () => {
+            const feature = makeFeature({ type: 'evasion', shareable: 1 })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result.shareable).toBe(true)
         })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.type).toBe('passive_rule')
-        expect(result.effect).toBe('ignore_resistance')
-        expect(result.damageTypes).toEqual(['fire', 'cold'])
-        expect(result.hasAutomation).toBe(true)
-    })
 
-    it('returns generic passive_rule for non-ignore_resistance effects', () => {
-        const feature = makeFeature({
-            type: 'passive_rule',
-            effect: 'critical_range',
-            bonusExpression: '+1',
-            criticalRange: '19-20',
-            spells: ['fireball'],
-            riderSave: 'save_expr',
-            skills: ['history', 'arcana'],
-            casting_time: '1 action',
+        it('coerces shareable to boolean for falsy values', () => {
+            const feature = makeFeature({ type: 'evasion', shareable: 0 })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result.shareable).toBe(false)
         })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.type).toBe('passive_rule')
-        expect(result.effect).toBe('critical_range')
-        expect(result.bonusExpression).toBe('+1')
-        expect(result.criticalRange).toBe('19-20')
-        expect(result.spells).toEqual(['fireball'])
-        expect(result.riderSave).toBe('save_expr')
-        expect(result.primalKnowledge).toEqual(['history', 'arcana'])
-        expect(result.casting_time).toBe('1 action')
-    })
 
-    it('returns correct structure for evasion with defaults', () => {
-        const feature = makeFeature({ type: 'evasion' })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.type).toBe('evasion')
-        expect(result.name).toBe('Test Feature')
-        expect(result.saveType).toBe('DEX')
-        expect(result.shareable).toBe(false)
-        expect(result.shareRange).toBe(0)
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('coerces shareable to boolean and passes custom fields for evasion', () => {
-        const feature = makeFeature({
-            type: 'evasion',
-            saveType: 'CON',
-            shareable: true,
-            shareRange: 30,
+        it('passes through custom fields including shareable coercion', () => {
+            const feature = makeFeature({
+                type: 'evasion',
+                saveType: 'CON',
+                shareable: true,
+                shareRange: 30,
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'evasion',
+                name: 'Test Feature',
+                saveType: 'CON',
+                shareable: true,
+                shareRange: 30,
+                hasAutomation: true,
+            })
         })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.saveType).toBe('CON')
-        expect(result.shareable).toBe(true)
-        expect(result.shareRange).toBe(30)
     })
 
-    it('returns correct structure for save_proficiency with defaults', () => {
-        const feature = makeFeature({ type: 'save_proficiency' })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.type).toBe('save_proficiency')
-        expect(result.name).toBe('Test Feature')
-        expect(result.saveType).toBe('')
-        expect(result.fallbackTypes).toEqual([])
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes custom fields through for save_proficiency', () => {
-        const feature = makeFeature({
-            type: 'save_proficiency',
-            saveType: 'WIS',
-            fallbackTypes: ['INT', 'CHA'],
+    describe('save_proficiency', () => {
+        it('applies defaults when no custom fields provided', () => {
+            const feature = makeFeature({ type: 'save_proficiency' })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'save_proficiency',
+                name: 'Test Feature',
+                saveType: '',
+                fallbackTypes: [],
+                hasAutomation: true,
+            })
         })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.saveType).toBe('WIS')
-        expect(result.fallbackTypes).toEqual(['INT', 'CHA'])
-    })
 
-    it('returns correct structure for conditional_advantage with defaults', () => {
-        const feature = makeFeature({ type: 'conditional_advantage' })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.type).toBe('conditional_advantage')
-        expect(result.name).toBe('Test Feature')
-        expect(result.target).toBe('saving_throw')
-        expect(result.condition).toBe('')
-        expect(result.effect).toBe('advantage')
-        expect(result.abilities).toEqual([])
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes custom fields through for conditional_advantage', () => {
-        const feature = makeFeature({
-            type: 'conditional_advantage',
-            target: 'ability_check',
-            condition: 'adjacent_to_enemy',
-            effect: 'advantage',
-            abilities: ['STR', 'DEX'],
-            uses: 3,
-            recharge: 'short_rest',
-            casting_time: '1 action',
+        it('passes through custom fields', () => {
+            const feature = makeFeature({
+                type: 'save_proficiency',
+                saveType: 'WIS',
+                fallbackTypes: ['INT', 'CHA'],
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'save_proficiency',
+                name: 'Test Feature',
+                saveType: 'WIS',
+                fallbackTypes: ['INT', 'CHA'],
+                hasAutomation: true,
+            })
         })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.target).toBe('ability_check')
-        expect(result.condition).toBe('adjacent_to_enemy')
-        expect(result.abilities).toEqual(['STR', 'DEX'])
-        expect(result.uses).toBe(3)
-        expect(result.recharge).toBe('short_rest')
-        expect(result.casting_time).toBe('1 action')
     })
 
-    it('returns correct structure for conditional_disadvantage with defaults', () => {
-        const feature = makeFeature({ type: 'conditional_disadvantage' })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.type).toBe('conditional_disadvantage')
-        expect(result.name).toBe('Test Feature')
-        expect(result.target).toBe('attack_roll')
-        expect(result.condition).toBe('')
-        expect(result.effect).toBe('disadvantage')
-        expect(result.abilities).toEqual([])
-        expect(result.hasAutomation).toBe(true)
-    })
-
-    it('passes custom fields through for conditional_disadvantage', () => {
-        const feature = makeFeature({
-            type: 'conditional_disadvantage',
-            target: 'saving_throw',
-            condition: 'below_half_hp',
-            abilities: ['CON'],
+    describe('conditional_advantage', () => {
+        it('applies defaults when no custom fields provided', () => {
+            const feature = makeFeature({ type: 'conditional_advantage' })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'conditional_advantage',
+                name: 'Test Feature',
+                target: 'saving_throw',
+                condition: '',
+                effect: 'advantage',
+                abilities: [],
+                uses: null,
+                recharge: 'long_rest',
+                casting_time: 'passive',
+                trigger: '',
+                hasAutomation: true,
+            })
         })
-        const result = buildAttackInfo(feature, BASE_STATS)
-        expect(result.target).toBe('saving_throw')
-        expect(result.condition).toBe('below_half_hp')
-        expect(result.abilities).toEqual(['CON'])
+
+        it('passes through custom fields', () => {
+            const feature = makeFeature({
+                type: 'conditional_advantage',
+                target: 'ability_check',
+                condition: 'adjacent_to_enemy',
+                effect: 'advantage',
+                abilities: ['STR', 'DEX'],
+                uses: 3,
+                recharge: 'short_rest',
+                casting_time: '1 action',
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'conditional_advantage',
+                name: 'Test Feature',
+                target: 'ability_check',
+                condition: 'adjacent_to_enemy',
+                effect: 'advantage',
+                abilities: ['STR', 'DEX'],
+                uses: 3,
+                recharge: 'short_rest',
+                casting_time: '1 action',
+                trigger: '',
+                hasAutomation: true,
+            })
+        })
+
+        it('uses empty string trigger when not provided', () => {
+            const feature = makeFeature({
+                type: 'conditional_advantage',
+                target: 'attack_roll',
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result.trigger).toBe('')
+        })
+    })
+
+    describe('conditional_disadvantage', () => {
+        it('applies defaults when no custom fields provided', () => {
+            const feature = makeFeature({ type: 'conditional_disadvantage' })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'conditional_disadvantage',
+                name: 'Test Feature',
+                target: 'attack_roll',
+                condition: '',
+                effect: 'disadvantage',
+                abilities: [],
+                hasAutomation: true,
+            })
+        })
+
+        it('passes through custom fields', () => {
+            const feature = makeFeature({
+                type: 'conditional_disadvantage',
+                target: 'saving_throw',
+                condition: 'below_half_hp',
+                abilities: ['CON'],
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'conditional_disadvantage',
+                name: 'Test Feature',
+                target: 'saving_throw',
+                condition: 'below_half_hp',
+                effect: 'disadvantage',
+                abilities: ['CON'],
+                hasAutomation: true,
+            })
+        })
+    })
+
+    describe('passive_rule – ignore_resistance', () => {
+        it('returns correct structure with damageTypes', () => {
+            const feature = makeFeature({
+                type: 'passive_rule',
+                effect: 'ignore_resistance',
+                damageTypes: ['fire', 'cold'],
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'passive_rule',
+                name: 'Test Feature',
+                effect: 'ignore_resistance',
+                damageTypes: ['fire', 'cold'],
+                hasAutomation: true,
+            })
+        })
+
+        it('applies defaults for damageTypes', () => {
+            const feature = makeFeature({
+                type: 'passive_rule',
+                effect: 'ignore_resistance',
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result.damageTypes).toEqual([])
+        })
+    })
+
+    describe('passive_rule – generic effects', () => {
+        it('returns generic structure for non-ignore_resistance effects', () => {
+            const feature = makeFeature({
+                type: 'passive_rule',
+                effect: 'critical_range',
+                bonusExpression: '+1',
+                criticalRange: '19-20',
+                spells: ['fireball'],
+                riderSave: 'save_expr',
+                skills: ['history', 'arcana'],
+                casting_time: '1 action',
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'passive_rule',
+                name: 'Test Feature',
+                effect: 'critical_range',
+                bonusExpression: '+1',
+                criticalRange: '19-20',
+                spells: ['fireball'],
+                riderSave: 'save_expr',
+                primalKnowledge: ['history', 'arcana'],
+                casting_time: '1 action',
+                cost: 0,
+                resource: '',
+                resistanceTypes: [],
+                duration: '',
+                endsOnCondition: '',
+                hasAutomation: true,
+            })
+        })
+
+        it('applies defaults for all generic fields', () => {
+            const feature = makeFeature({
+                type: 'passive_rule',
+                effect: 'critical_range',
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result).toEqual({
+                type: 'passive_rule',
+                name: 'Test Feature',
+                effect: 'critical_range',
+                bonusExpression: '',
+                criticalRange: '',
+                spells: [],
+                riderSave: null,
+                primalKnowledge: [],
+                casting_time: '',
+                cost: 0,
+                resource: '',
+                resistanceTypes: [],
+                duration: '',
+                endsOnCondition: '',
+                hasAutomation: true,
+            })
+        })
+
+        it('maps skills to primalKnowledge field', () => {
+            const feature = makeFeature({
+                type: 'passive_rule',
+                effect: 'some_effect',
+                skills: ['religion'],
+            })
+            const result = buildAttackInfo(feature, BASE_STATS)
+            expect(result.primalKnowledge).toEqual(['religion'])
+        })
     })
 })

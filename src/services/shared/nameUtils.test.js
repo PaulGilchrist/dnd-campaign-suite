@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect } from 'vitest';
 import { stripParenthetical, stripNumericSuffix } from './nameUtils.js';
 
@@ -6,19 +7,20 @@ describe('stripParenthetical', () => {
     expect(stripParenthetical('Grimjaw')).toBe('Grimjaw');
   });
 
-  it('removes a trailing parenthetical with surrounding whitespace', () => {
+  it('trims trailing whitespace after removing a trailing parenthetical', () => {
     expect(stripParenthetical('Grimjaw (Orc)')).toBe('Grimjaw');
-  });
-
-  it('trims trailing whitespace after removing a parenthetical', () => {
     expect(stripParenthetical('Grimjaw (Orc)  ')).toBe('Grimjaw');
+    expect(stripParenthetical('Longfellow the Brave (Halfling)')).toBe(
+      'Longfellow the Brave',
+    );
   });
 
-  it('removes an empty parenthetical', () => {
+  it('removes a parenthetical with no space before it', () => {
+    expect(stripParenthetical('Grimjaw(Orc)')).toBe('Grimjaw');
+  });
+
+  it('handles empty or whitespace-only parentheticals', () => {
     expect(stripParenthetical('Grimjaw ()')).toBe('Grimjaw');
-  });
-
-  it('removes a parenthetical containing only whitespace', () => {
     expect(stripParenthetical('Grimjaw (  )')).toBe('Grimjaw');
   });
 
@@ -28,99 +30,59 @@ describe('stripParenthetical', () => {
     );
   });
 
-  it('does not remove nested parentheses at the end (regex stops at first closing paren)', () => {
-    expect(stripParenthetical('Grimjaw (Orc (Subrace))')).toBe(
-      'Grimjaw (Orc (Subrace))',
-    );
-  });
-
-  it('returns empty string when the name is only a parenthetical', () => {
+  it('returns empty string when input is only a parenthetical or empty', () => {
     expect(stripParenthetical('(Orc)')).toBe('');
-  });
-
-  it('returns empty string for an empty input', () => {
     expect(stripParenthetical('')).toBe('');
   });
 
-  it('handles a multi-word name with a parenthetical', () => {
-    expect(stripParenthetical('Longfellow the Brave (Halfling)')).toBe(
-      'Longfellow the Brave',
-    );
-  });
-
-  it('handles special characters inside the parenthetical', () => {
+  it('preserves special characters inside the parenthetical before stripping it', () => {
     expect(stripParenthetical('Grimjaw (Orc/Barbarian)')).toBe('Grimjaw');
-  });
-
-  it('handles a parenthetical with no space before the opening parenthesis', () => {
-    expect(stripParenthetical('Grimjaw(Orc)')).toBe('Grimjaw');
   });
 });
 
 describe('stripNumericSuffix', () => {
   it('returns the name unchanged when there is no numeric suffix', () => {
     expect(stripNumericSuffix('Grimjaw')).toBe('Grimjaw');
+    expect(stripNumericSuffix('Grimjaw   ')).toBe('Grimjaw   ');
   });
 
-  it('removes a single-digit numeric suffix', () => {
+  it('removes a numeric suffix preceded by whitespace', () => {
     expect(stripNumericSuffix('Grimjaw 1')).toBe('Grimjaw');
-  });
-
-  it('removes a multi-digit numeric suffix', () => {
     expect(stripNumericSuffix('Grimjaw 12')).toBe('Grimjaw');
+    expect(stripNumericSuffix('Grimjaw 01')).toBe('Grimjaw');
+    expect(stripNumericSuffix('Longfellow the Brave 3')).toBe(
+      'Longfellow the Brave',
+    );
   });
 
   it('does not remove a number without a space before it', () => {
     expect(stripNumericSuffix('Grimjaw1')).toBe('Grimjaw1');
   });
 
-  it('returns an empty string when input is null', () => {
-    expect(stripNumericSuffix(null)).toBe('');
-  });
-
-  it('returns an empty string when input is undefined', () => {
-    expect(stripNumericSuffix(undefined)).toBe('');
-  });
-
-  it('returns an empty string when input is an empty string', () => {
-    expect(stripNumericSuffix('')).toBe('');
-  });
-
-  it('handles a multi-word name with a numeric suffix', () => {
-    expect(stripNumericSuffix('Longfellow the Brave 3')).toBe(
-      'Longfellow the Brave',
-    );
-  });
-
-  it('does not remove a number embedded in the middle of the name', () => {
+  it('does not remove numbers embedded in the name or followed by non-digits', () => {
     expect(stripNumericSuffix('Grimjaw the 1st')).toBe('Grimjaw the 1st');
+    expect(stripNumericSuffix('Grimjaw 5a')).toBe('Grimjaw 5a');
   });
 
-  it('returns the number unchanged when the name is only a number', () => {
-    expect(stripNumericSuffix('42')).toBe('42');
-  });
-
-  it('does not remove a trailing number when there are extra spaces after it', () => {
+  it('preserves trailing whitespace when there is no numeric suffix at the very end', () => {
     expect(stripNumericSuffix('Grimjaw 5  ')).toBe('Grimjaw 5  ');
   });
 
-  it('preserves trailing whitespace when there is no numeric suffix', () => {
-    expect(stripNumericSuffix('Grimjaw   ')).toBe('Grimjaw   ');
+  it('returns empty string for null, undefined, or empty input', () => {
+    expect(stripNumericSuffix(null)).toBe('');
+    expect(stripNumericSuffix(undefined)).toBe('');
+    expect(stripNumericSuffix('')).toBe('');
   });
 
-  it('handles a parenthesized name with a numeric suffix', () => {
+  it('returns the number unchanged when the input is only a number', () => {
+    expect(stripNumericSuffix('42')).toBe('42');
+  });
+
+  it('strips a numeric suffix after a parenthetical', () => {
     expect(stripNumericSuffix('Grimjaw (Orc) 2')).toBe('Grimjaw (Orc)');
   });
 
-  it('handles a string of only whitespace', () => {
+  it('preserves whitespace-only input unchanged', () => {
     expect(stripNumericSuffix('   ')).toBe('   ');
-  });
-
-  it('removes a leading-zero numeric suffix', () => {
-    expect(stripNumericSuffix('Grimjaw 01')).toBe('Grimjaw');
-  });
-
-  it('does not remove a number followed by a non-digit', () => {
-    expect(stripNumericSuffix('Grimjaw 5a')).toBe('Grimjaw 5a');
   });
 });

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './postCastRiderHandler.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
@@ -31,39 +32,52 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 describe('postCastRiderHandler.handle', () => {
     let action;
     let playerStats;
-    let campaignName = 'TestCampaign';
-    let mapName = 'TestMap';
+    let campaignName;
 
     beforeEach(() => {
         vi.clearAllMocks();
+
+        campaignName = 'TestCampaign';
 
         action = {
             name: 'Control Spell',
             automation: {
                 saveType: 'WIS',
                 type: 'spell',
-                condition: 'Charmed or Frightened'
-            }
+                condition: 'Charmed or Frightened',
+            },
         };
 
         playerStats = {
             name: 'Caster',
         };
 
-        // Default mocks
-        getRuntimeValue.mockImplementation((char, key) => {
-            if (key === `postCastRider_${action.name.replace(/\s+/g, '_')}`) return 1;
-            return null;
+        const usesKey = `postCastRider_${action.name.replace(/\s+/g, '_')}`;
+
+        getRuntimeValue.mockImplementation((_char, key) => {
+            if (key === usesKey) return 1;
+            return [];
         });
+
         buildSaveDc.mockReturnValue(15);
         resolveTarget.mockResolvedValue({ target: { name: 'Enemy' } });
         createSaveListener.mockReturnValue({ promptId: 'test-prompt-id' });
     });
 
-    it('should return popup when uses are exhausted', async () => {
+    function usesKeyFor(name) {
+        return `postCastRider_${name.replace(/\s+/g, '_')}`;
+    }
+
+    function dispatchSaveResult(promptId, success) {
+        window.dispatchEvent(new CustomEvent('save-result', {
+            detail: { promptId, success },
+        }));
+    }
+
+    it('returns popup with info message when uses are exhausted', async () => {
         getRuntimeValue.mockReturnValue(0);
 
-        const result = await handle(action, playerStats, campaignName, mapName);
+        const result = await handle(action, playerStats, campaignName);
 
         expect(result).toEqual({
             type: 'popup',
@@ -73,11 +87,15 @@ describe('postCastRiderHandler.handle', () => {
                 description: `${action.name} has no uses remaining.`,
             },
         });
+
         expect(buildSaveDc).not.toHaveBeenCalled();
+        expect(resolveTarget).not.toHaveBeenCalled();
+        expect(createSaveListener).not.toHaveBeenCalled();
+        expect(addEntry).not.toHaveBeenCalled();
     });
 
-    it('should return popup and setup listener when uses are available', async () => {
-        const result = await handle(action, playerStats, campaignName, mapName);
+    it('returns popup with save prompt and sets up listener when uses are available', async () => {
+        const result = await handle(action, playerStats, campaignName);
 
         expect(result).toEqual({
             type: 'popup',
@@ -85,30 +103,33 @@ describe('postCastRiderHandler.handle', () => {
                 type: 'automation_info',
                 name: action.name,
                 targetName: 'Enemy',
-                description: `Target Enemy must make a WIS saving throw (DC 15). On a failed save, choose Charmed or Frightened for 1 minute.`,
+                description: 'Target Enemy must make a WIS saving throw (DC 15). On a failed save, choose Charmed or Frightened for 1 minute.',
                 automation: action.automation,
             },
         });
 
+        const usesKey = usesKeyFor(action.name);
+        expect(getRuntimeValue).toHaveBeenCalledWith(playerStats.name, usesKey, campaignName);
         expect(buildSaveDc).toHaveBeenCalledWith(action.automation, playerStats);
         expect(resolveTarget).toHaveBeenCalledWith(campaignName, playerStats.name);
         expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
-             targetName: 'Enemy',
-             saveType: 'WIS',
-             saveDc: 15,
+            targetName: 'Enemy',
+            saveType: 'WIS',
+            saveDc: 15,
         });
-        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        expect(addEntry).toHaveBeenCalledWith(campaignName, {
             type: 'ability_use',
             characterName: playerStats.name,
             abilityName: action.name,
-            promptId: 'test-prompt-id'
-        }));
+            description: expect.stringContaining('Control Spell'),
+            promptId: 'test-prompt-id',
+        });
     });
 
-    it('should handle unknown target name gracefully', async () => {
+    it('uses "Unknown" as targetName when resolveTarget returns null', async () => {
         resolveTarget.mockResolvedValue(null);
 
-        const result = await handle(action, playerStats, campaignName, mapName);
+        const result = await handle(action, playerStats, campaignName);
 
         expect(result.payload.targetName).toBe('Unknown');
         expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
@@ -116,101 +137,171 @@ describe('postCastRiderHandler.handle', () => {
         }));
     });
 
-    it('should handle successful save result', async () => {
-        await handle(action, playerStats, campaignName, mapName);
+    it('uses "Unknown" as targetName when resolveTarget returns object without target', async () => {
+        resolveTarget.mockResolvedValue({});
 
-        // Simulate the custom event
-        window.dispatchEvent(new CustomEvent('save-result', {
-            detail: {
-                promptId: 'test-prompt-id',
-                success: true
-            }
-        }));
+        const result = await handle(action, playerStats, campaignName);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(playerStats.name, `postCastRider_${action.name.replace(/\s+/g, '_')}`, 0, campaignName);
+        expect(result.payload.targetName).toBe('Unknown');
+    });
+
+    it('handles successful save: decrements uses and logs result', async () => {
+        await handle(action, playerStats, campaignName);
+
+        dispatchSaveResult('test-prompt-id', true);
+
+        const usesKey = usesKeyFor(action.name);
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            playerStats.name,
+            usesKey,
+            0,
+            campaignName,
+        );
+
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'save_result',
             success: true,
-            description: 'Enemy succeeded on WIS save. No effect.'
+            targetName: 'Enemy',
+            saveType: 'WIS',
+            saveDc: 15,
+            description: 'Enemy succeeded on WIS save. No effect.',
         }));
     });
 
-    it('should handle failed save result with mapped condition', async () => {
-        await handle(action, playerStats, campaignName, mapName);
-
-        getRuntimeValue.mockImplementation((char, key) => {
-            if (key === 'activeConditions' && char === 'Enemy') return ['blinded'];
-            return null;
+    it('handles failed save: applies first mapped condition and expiration', async () => {
+        getRuntimeValue.mockImplementation((_char, key) => {
+            if (key === usesKeyFor(action.name)) return 1;
+            if (key === 'activeConditions' && _char === 'Enemy') return ['blinded'];
+            return [];
         });
 
-        window.dispatchEvent(new CustomEvent('save-result', {
-            detail: {
-                promptId: 'test-prompt-id',
-                success: false
-            }
-        }));
+        await handle(action, playerStats, campaignName);
 
-        // Uses decremented
-        expect(setRuntimeValue).toHaveBeenCalledWith(playerStats.name, `postCastRider_${action.name.replace(/\s+/g, '_')}`, 0, campaignName);
-        
-        // Condition 'charmed' applied from mapping 'Charmed or Frightened' -> ['charmed', 'frightened']
-        expect(setRuntimeValue).toHaveBeenCalledWith('Enemy', 'activeConditions', ['blinded', 'charmed'], campaignName);
-        
+        dispatchSaveResult('test-prompt-id', false);
+
+        const usesKey = usesKeyFor(action.name);
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            playerStats.name,
+            usesKey,
+            0,
+            campaignName,
+        );
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'Enemy',
+            'activeConditions',
+            ['blinded', 'charmed'],
+            campaignName,
+        );
+
+        expect(addExpiration).toHaveBeenCalledWith(
+            playerStats.name,
+            'Enemy',
+            [{ type: 'condition', condition: 'charmed' }],
+            campaignName,
+            10,
+        );
+
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
             type: 'save_result',
             success: false,
-            description: 'Enemy failed WIS save. Charmed for 1 minute.'
+            targetName: 'Enemy',
+            description: 'Enemy failed WIS save. Charmed for 1 minute.',
         }));
-
-        expect(addExpiration).toHaveBeenCalledWith(playerStats.name, 'Enemy', [
-            { type: 'condition', condition: 'charmed' }
-        ], campaignName, 10);
     });
 
-    it('should handle failed save result with unmapped condition', async () => {
+    it('handles failed save with unmapped condition by lowercasing it', async () => {
         action.automation.condition = 'Prone';
-        await handle(action, playerStats, campaignName, mapName);
 
-        window.dispatchEvent(new CustomEvent('save-result', {
-            detail: {
-                promptId: 'test-prompt-id',
-                success: false
-            }
-        }));
+        await handle(action, playerStats, campaignName);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith('Enemy', 'activeConditions', ['prone'], campaignName);
+        dispatchSaveResult('test-prompt-id', false);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'Enemy',
+            'activeConditions',
+            ['prone'],
+            campaignName,
+        );
+
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            description: 'Enemy failed WIS save. Prone for 1 minute.'
+            type: 'save_result',
+            success: false,
+            description: 'Enemy failed WIS save. Prone for 1 minute.',
         }));
     });
 
-    it('should ignore save result if promptId does not match', async () => {
-        await handle(action, playerStats, campaignName, mapName);
+    it('ignores save-result event with mismatched promptId', async () => {
+        await handle(action, playerStats, campaignName);
 
-        window.dispatchEvent(new CustomEvent('save-result', {
-            detail: {
-                promptId: 'wrong-id',
-                success: true
-            }
-        }));
+        dispatchSaveResult('wrong-id', true);
 
         expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(addExpiration).not.toHaveBeenCalled();
     });
 
-    it('should use default WIS save if saveType is missing', async () => {
+    it('defaults saveType to WIS when automation.saveType is missing', async () => {
         delete action.automation.saveType;
-        await handle(action, playerStats, campaignName, mapName);
 
+        const result = await handle(action, playerStats, campaignName);
+
+        expect(result.payload.description).toContain('WIS');
         expect(createSaveListener).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            saveType: 'WIS'
+            saveType: 'WIS',
         }));
 
-        window.dispatchEvent(new CustomEvent('save-result', {
-            detail: { promptId: 'test-prompt-id', success: true }
-        }));
+        dispatchSaveResult('test-prompt-id', true);
 
         expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-            saveType: 'WIS'
+            type: 'save_result',
+            saveType: 'WIS',
         }));
+    });
+
+    it('defaults saveType to WIS in failed-save description when saveType is missing', async () => {
+        delete action.automation.saveType;
+
+        await handle(action, playerStats, campaignName);
+
+        dispatchSaveResult('test-prompt-id', false);
+
+        expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+            success: false,
+            description: 'Enemy failed WIS save. Charmed for 1 minute.',
+        }));
+    });
+
+    it('removes save-result event listener after handling', async () => {
+        await handle(action, playerStats, campaignName);
+
+        // First dispatch triggers the handler (decrements uses)
+        dispatchSaveResult('test-prompt-id', true);
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+
+        // Second dispatch should be ignored since the listener was removed
+        dispatchSaveResult('test-prompt-id', true);
+        expect(setRuntimeValue).toHaveBeenCalledTimes(1);
+    });
+
+    it('appends condition to existing conditions without mutating the original array', async () => {
+        const existingConditions = ['exhausted'];
+        getRuntimeValue.mockImplementation((_char, key) => {
+            if (key === usesKeyFor(action.name)) return 1;
+            if (key === 'activeConditions' && _char === 'Enemy') return existingConditions;
+            return [];
+        });
+
+        await handle(action, playerStats, campaignName);
+
+        dispatchSaveResult('test-prompt-id', false);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'Enemy',
+            'activeConditions',
+            ['exhausted', 'charmed'],
+            campaignName,
+        );
+
+        expect(existingConditions).toEqual(['exhausted']);
     });
 });

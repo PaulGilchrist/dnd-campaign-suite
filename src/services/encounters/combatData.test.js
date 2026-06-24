@@ -1,163 +1,257 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import * as damageUtils from '../rules/combat/damageUtils.js';
-import * as combatDataModule from './combatData.js';
+import * as combatData from './combatData.js';
+
+// Capture the fetch function so we can spy on it per-test.
+const originalFetch = globalThis.fetch;
 
 describe('combatData', () => {
-  let getCombatContextSpy;
-
   beforeEach(() => {
     localStorage.clear();
-    getCombatContextSpy = vi.spyOn(damageUtils, 'getCombatContext');
-    // Clear the combat summary cache
-    combatDataModule.setCombatSummaryCache(null);
+    combatData.setCombatSummaryCache(null);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    globalThis.fetch = originalFetch;
+    combatData.setCombatSummaryCache(null);
+  });
+
+  /**
+   * Helper: stub fetch to return a JSON response for the combat summary
+   * endpoint that combatData uses.
+   */
+  function stubFetchCombatSummary(payload) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ combatSummary: payload }),
+      })
+    );
+  }
+
+  function stubFetchCombatSummaryError() {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false })
+    );
+  }
+
+  describe('setCombatSummaryCache', () => {
+    it('stores the summary in the in-memory cache', () => {
+      const summary = { round: 7, creatures: [{ name: 'Orc' }] };
+      combatData.setCombatSummaryCache(summary, 'testCampaign');
+      expect(combatData.getCombatSummary()).toBe(summary);
+    });
+
+    it('overwrites a previous cache entry', () => {
+      combatData.setCombatSummaryCache({ round: 1 }, 'testCampaign');
+      combatData.setCombatSummaryCache({ round: 2 }, 'testCampaign');
+      expect(combatData.getCombatSummary()).toEqual({ round: 2 });
+    });
+
+    it('clears cache when null is passed', () => {
+      combatData.setCombatSummaryCache({ round: 1 }, 'testCampaign');
+      combatData.setCombatSummaryCache(null, 'testCampaign');
+      expect(combatData.getCombatSummary()).toBeNull();
+    });
   });
 
   describe('loadCombatSummary', () => {
-    it('returns null when no campaignName', async () => {
-      getCombatContextSpy.mockResolvedValue(null);
-      const { loadCombatSummary } = await import('./combatData.js');
-      const result = await loadCombatSummary(null);
+    it('returns the combat summary from the API and caches it', async () => {
+      stubFetchCombatSummary({ round: 5, creatures: [{ name: 'Orc' }] });
+      const result = await combatData.loadCombatSummary('testCampaign');
+      expect(result).toEqual({ round: 5, creatures: [{ name: 'Orc' }] });
+      expect(combatData.getCombatSummary()).toEqual(result);
+    });
+
+    it('returns null when the API returns no combatSummary', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ combatSummary: null }),
+        })
+      );
+      const result = await combatData.loadCombatSummary('testCampaign');
+      expect(result).toBeNull();
+      expect(combatData.getCombatSummary()).toBeNull();
+    });
+
+    it('returns null when the API responds with non-OK status', async () => {
+      stubFetchCombatSummaryError();
+      const result = await combatData.loadCombatSummary('testCampaign');
       expect(result).toBeNull();
     });
 
-    it('returns null from API when campaignName but API returns null', async () => {
-      getCombatContextSpy.mockResolvedValue(null);
-      const { loadCombatSummary } = await import('./combatData.js');
-      const result = await loadCombatSummary('testCampaign');
+    it('returns null when fetch throws', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new Error('network error'))
+      );
+      const result = await combatData.loadCombatSummary('testCampaign');
       expect(result).toBeNull();
     });
 
-    it('returns data from API and updates cache when campaignName provided', async () => {
-      getCombatContextSpy.mockResolvedValue({ round: 5, creatures: [] });
-      const { loadCombatSummary, getCombatSummary } = await import('./combatData.js');
-      const result = await loadCombatSummary('testCampaign');
-      expect(result).toEqual({ round: 5, creatures: [] });
-      // Verify cache was updated
-      expect(getCombatSummary()).toEqual({ round: 5, creatures: [] });
-      // Verify NO localStorage write
-      expect(localStorage.getItem('combatSummary')).toBeNull();
+    it('returns null and does not call fetch when campaignName is null', async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+      const result = await combatData.loadCombatSummary(null);
+      expect(result).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
 
-    it('returns null when API call fails', async () => {
-      getCombatContextSpy.mockRejectedValue(new Error('network error'));
-      const { loadCombatSummary } = await import('./combatData.js');
-      const result = await loadCombatSummary('testCampaign');
+    it('returns null and does not call fetch when campaignName is empty string', async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+      const result = await combatData.loadCombatSummary('');
       expect(result).toBeNull();
-    });
-
-    it('returns null when no campaignName provided', async () => {
-      getCombatContextSpy.mockResolvedValue(null);
-      const { loadCombatSummary } = await import('./combatData.js');
-      const result = await loadCombatSummary(null);
-      expect(result).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('getCombatSummary', () => {
-    it('returns cached value when set via loadCombatSummary', async () => {
-      getCombatContextSpy.mockResolvedValue({ round: 4 });
-      const { loadCombatSummary, getCombatSummary } = await import('./combatData.js');
-      await loadCombatSummary('testCampaign');
-      expect(getCombatSummary()).toEqual({ round: 4 });
+    it('returns the cached summary after loadCombatSummary', async () => {
+      stubFetchCombatSummary({ round: 4, creatures: [] });
+      await combatData.loadCombatSummary('testCampaign');
+      expect(combatData.getCombatSummary()).toEqual({ round: 4, creatures: [] });
     });
 
-    it('returns null when no cache set', () => {
-      const { getCombatSummary } = require('./combatData.js');
-      expect(getCombatSummary()).toBeNull();
+    it('returns null when no summary has been loaded', () => {
+      expect(combatData.getCombatSummary()).toBeNull();
+    });
+
+    it('ignores the campaignName parameter (single cache)', () => {
+      combatData.setCombatSummaryCache({ round: 1 }, 'campaignA');
+      // Passing a different campaign name should still return the same cache
+      expect(combatData.getCombatSummary('campaignB')).toEqual({ round: 1 });
     });
   });
 
   describe('loadActiveCreatureName', () => {
-    it('returns null when no campaignName', async () => {
-      getCombatContextSpy.mockResolvedValue(null);
-      const { loadActiveCreatureName } = await import('./combatData.js');
-      const result = await loadActiveCreatureName(null);
-      expect(result).toBeNull();
-    });
-
-    it('reads from API when campaignName provided', async () => {
-      getCombatContextSpy.mockResolvedValue({ round: 1, activeCreatureName: 'Orc' });
-      const { loadActiveCreatureName } = await import('./combatData.js');
-      const result = await loadActiveCreatureName('testCampaign');
+    it('returns the active creature name from the API', async () => {
+      stubFetchCombatSummary({ round: 1, activeCreatureName: 'Orc' });
+      const result = await combatData.loadActiveCreatureName('testCampaign');
       expect(result).toBe('Orc');
-      // Verify NO localStorage write
-      expect(localStorage.getItem('activeCreatureName')).toBeNull();
     });
 
-    it('returns null when API returns no activeCreatureName', async () => {
-      getCombatContextSpy.mockResolvedValue({ round: 1 });
-      const { loadActiveCreatureName } = await import('./combatData.js');
-      const result = await loadActiveCreatureName('testCampaign');
+    it('returns null when the API has no activeCreatureName', async () => {
+      stubFetchCombatSummary({ round: 1, creatures: [] });
+      const result = await combatData.loadActiveCreatureName('testCampaign');
       expect(result).toBeNull();
     });
 
-    it('returns null when API fails', async () => {
-      getCombatContextSpy.mockRejectedValue(new Error('network error'));
-      const { loadActiveCreatureName } = await import('./combatData.js');
-      const result = await loadActiveCreatureName('testCampaign');
+    it('returns null when the API call fails', async () => {
+      stubFetchCombatSummaryError();
+      const result = await combatData.loadActiveCreatureName('testCampaign');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when fetch throws', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new Error('network error'))
+      );
+      const result = await combatData.loadActiveCreatureName('testCampaign');
+      expect(result).toBeNull();
+    });
+
+    it('returns null and does not call fetch when campaignName is null', async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+      const result = await combatData.loadActiveCreatureName(null);
+      expect(result).toBeNull();
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it('returns null when API returns null combatSummary', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ combatSummary: null }),
+        })
+      );
+      const result = await combatData.loadActiveCreatureName('testCampaign');
       expect(result).toBeNull();
     });
   });
 
   describe('getActiveCreatureName', () => {
-    it('returns cached active creature name', async () => {
-      getCombatContextSpy.mockResolvedValue({ round: 1, activeCreatureName: 'Goblin' });
-      const { loadCombatSummary, getActiveCreatureName } = await import('./combatData.js');
-      await loadCombatSummary('testCampaign');
-      expect(getActiveCreatureName()).toBe('Goblin');
+    it('returns the cached active creature name', () => {
+      combatData.setCombatSummaryCache({ round: 1, activeCreatureName: 'Goblin' });
+      expect(combatData.getActiveCreatureName()).toBe('Goblin');
     });
 
-    it('returns null when no cache set', () => {
-      const { getActiveCreatureName } = require('./combatData.js');
-      expect(getActiveCreatureName()).toBeNull();
+    it('returns null when no cache is set', () => {
+      expect(combatData.getActiveCreatureName()).toBeNull();
+    });
+
+    it('returns null when cache exists but no activeCreatureName', () => {
+      combatData.setCombatSummaryCache({ round: 1, creatures: [] });
+      expect(combatData.getActiveCreatureName()).toBeNull();
     });
   });
 
   describe('loadCurrentCombatRound', () => {
-    it('returns round from combatSummary', async () => {
-      getCombatContextSpy.mockResolvedValue({ round: 5 });
-      const { loadCurrentCombatRound } = await import('./combatData.js');
-      const result = await loadCurrentCombatRound('testCampaign');
+    it('returns the round from the API', async () => {
+      stubFetchCombatSummary({ round: 5 });
+      const result = await combatData.loadCurrentCombatRound('testCampaign');
       expect(result).toBe(5);
     });
 
-    it('returns 1 when no round in combatSummary', async () => {
-      getCombatContextSpy.mockResolvedValue({});
-      const { loadCurrentCombatRound } = await import('./combatData.js');
-      const result = await loadCurrentCombatRound('testCampaign');
+    it('returns 1 when the API returns no round', async () => {
+      stubFetchCombatSummary({ creatures: [] });
+      const result = await combatData.loadCurrentCombatRound('testCampaign');
       expect(result).toBe(1);
     });
 
-    it('returns 1 when API returns null', async () => {
-      getCombatContextSpy.mockResolvedValue(null);
-      const { loadCurrentCombatRound } = await import('./combatData.js');
-      const result = await loadCurrentCombatRound('testCampaign');
+    it('returns 1 when the API returns null', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ combatSummary: null }),
+        })
+      );
+      const result = await combatData.loadCurrentCombatRound('testCampaign');
       expect(result).toBe(1);
+    });
+
+    it('returns 1 when the API call fails', async () => {
+      stubFetchCombatSummaryError();
+      const result = await combatData.loadCurrentCombatRound('testCampaign');
+      expect(result).toBe(1);
+    });
+
+    it('returns 1 when campaignName is null', async () => {
+      const fetchSpy = vi.fn();
+      vi.stubGlobal('fetch', fetchSpy);
+      const result = await combatData.loadCurrentCombatRound(null);
+      expect(result).toBe(1);
+      expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 
   describe('getCurrentCombatRound', () => {
-    it('returns round from cache', async () => {
-      getCombatContextSpy.mockResolvedValue({ round: 3 });
-      const { loadCombatSummary, getCurrentCombatRound } = await import('./combatData.js');
-      await loadCombatSummary('testCampaign');
-      expect(getCurrentCombatRound()).toBe(3);
+    it('returns the cached round', () => {
+      combatData.setCombatSummaryCache({ round: 3, creatures: [] });
+      expect(combatData.getCurrentCombatRound()).toBe(3);
     });
 
-    it('returns 1 when no cache set', () => {
-      const { getCurrentCombatRound } = require('./combatData.js');
-      expect(getCurrentCombatRound()).toBe(1);
+    it('returns 1 when no cache is set', () => {
+      expect(combatData.getCurrentCombatRound()).toBe(1);
     });
 
-    it('returns 1 when combatSummary has no round', async () => {
-      getCombatContextSpy.mockResolvedValue({ creatures: [] });
-      const { loadCombatSummary, getCurrentCombatRound } = await import('./combatData.js');
-      await loadCombatSummary('testCampaign');
-      expect(getCurrentCombatRound()).toBe(1);
+    it('returns 1 when cached summary has no round', () => {
+      combatData.setCombatSummaryCache({ creatures: [] });
+      expect(combatData.getCurrentCombatRound()).toBe(1);
+    });
+
+    it('ignores the campaignName parameter (single cache)', () => {
+      combatData.setCombatSummaryCache({ round: 2 }, 'campaignA');
+      expect(combatData.getCurrentCombatRound('campaignB')).toBe(2);
     });
   });
 });

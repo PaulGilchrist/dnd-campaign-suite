@@ -1,4 +1,7 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+// ── Mocks BEFORE imports ───────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -6,10 +9,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
-  evaluateAutoExpression: vi.fn((expr) => {
-    if (expr === 'proficiency_bonus') return 3;
-    return 0;
-  }),
+  evaluateAutoExpression: vi.fn(),
 }));
 
 vi.mock('../../../maps/mapsService.js', () => ({
@@ -17,33 +17,39 @@ vi.mock('../../../maps/mapsService.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue(undefined),
+  addEntry: vi.fn(() => Promise.resolve(undefined)),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-  rangeToFeet: vi.fn((val) => {
-    const match = String(val).match(/(\d+)_ft/);
-    return match ? parseInt(match[1], 10) : null;
-  }),
-  getDistanceFeet: vi.fn(() => 15),
+  rangeToFeet: vi.fn(),
+  getDistanceFeet: vi.fn(),
 }));
 
-import { handle } from './encouragingSongHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { loadMapData } from '../../../maps/mapsService.js';
-import { addEntry } from '../../../ui/logService.js';
+// ── Imports ────────────────────────────────────────────────────
 
-describe('encouragingSongHandler', () => {
-  const playerStats = {
+import { handle } from './encouragingSongHandler.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as automationService from '../../../combat/automation/automationService.js';
+import * as mapsService from '../../../maps/mapsService.js';
+import * as logService from '../../../ui/logService.js';
+import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+
+// ── Helpers ────────────────────────────────────────────────────
+
+const campaignName = 'TestCampaign';
+
+function makePlayerStats(overrides = {}) {
+  return {
     name: 'Bard',
     proficiency: 3,
     abilities: [{ name: 'Charisma', score: 16, bonus: 3 }],
     class: { class_levels: [{ level: 1, bardic_die: 6 }] },
+    ...overrides,
   };
+}
 
-  const campaignName = 'test-campaign';
-
-  const defaultAction = {
+function makeAction(automation = {}) {
+  return {
     name: 'Encouraging Song',
     automation: {
       type: 'heroic_inspiration_buff',
@@ -55,140 +61,500 @@ describe('encouragingSongHandler', () => {
       casting_time: '1 action',
       buffExpression: 'heroic_inspiration',
       targetsExpression: 'proficiency_bonus',
+      ...automation,
     },
   };
+}
 
+function makeMapData(players) {
+  return { players };
+}
+
+const defaultMapPlayers = [
+  { name: 'Bard', gridX: 0, gridY: 0 },
+  { name: 'Ally1', gridX: 1, gridY: 1 },
+  { name: 'Ally2', gridX: 2, gridY: 2 },
+];
+
+// ── Tests ──────────────────────────────────────────────────────
+
+describe('encouragingSongHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    getRuntimeValue.mockImplementation(() => null);
+    runtimeState.getRuntimeValue.mockReturnValue(null);
   });
 
-  it('should return popup when no map data available', async () => {
-    loadMapData.mockResolvedValue(null);
+  // ── No map / no map data ────────────────────────────────────
 
-    const result = await handle(defaultAction, playerStats, campaignName, null);
+  describe('map resolution', () => {
+    it('should return popup when mapName is null', async () => {
+      const action = makeAction();
+      const ps = makePlayerStats();
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('Could not resolve allies without a map');
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('Could not resolve allies without a map');
+      expect(result.payload.name).toBe('Encouraging Song');
+      expect(result.payload.automationType).toBe('heroic_inspiration_buff');
+    });
+
+    it('should return popup when map data is null', async () => {
+      mapsService.loadMapData.mockResolvedValue(null);
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'nonexistent-map');
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('no targets in range');
+    });
+
+    it('should return popup when map data has no players array', async () => {
+      mapsService.loadMapData.mockResolvedValue({});
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'empty-map');
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('no targets in range');
+    });
   });
 
-  it('should grant inspiration to allies in range on map', async () => {
-    loadMapData.mockImplementation(async (campaign, map) => {
-      if (map === 'test-map') {
-        return {
-          players: [
-            { name: 'Bard', gridX: 0, gridY: 0 },
-            { name: 'Ally1', gridX: 1, gridY: 1 },
-            { name: 'Ally2', gridX: 2, gridY: 2 },
-          ],
-        };
-      }
-      return null;
+  // ── Player not on map ───────────────────────────────────────
+
+  describe('player presence on map', () => {
+    it('should return popup when player is not found on the map', async () => {
+      mapsService.loadMapData.mockResolvedValue(makeMapData([
+        { name: 'Ally1', gridX: 5, gridY: 5 },
+      ]));
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('no targets in range');
     });
-
-    const result = await handle(defaultAction, playerStats, campaignName, 'test-map');
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.type).toBe('automation_info');
-    expect(result.payload.description).toContain('Heroic Inspiration');
-    expect(result.payload.description).toContain('Ally1');
-    expect(result.payload.description).toContain('Ally2');
-    expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'hasInspiration', true, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('Ally2', 'hasInspiration', true, campaignName);
   });
 
-  it('should skip allies that already have inspiration', async () => {
-    getRuntimeValue.mockImplementation((key, subKey) => {
-      if (subKey === 'hasInspiration') return true;
-      return null;
+  // ── Range filtering ─────────────────────────────────────────
+
+  describe('range filtering', () => {
+    it('should skip allies outside the specified range', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(15);
+      rangeValidation.getDistanceFeet.mockReturnValue(30);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('no targets in range');
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        expect.any(String),
+        'hasInspiration',
+        true,
+        campaignName,
+      );
     });
 
-    loadMapData.mockImplementation(async (campaign, map) => {
-      if (map === 'test-map') {
-        return {
-          players: [
-            { name: 'Bard', gridX: 0, gridY: 0 },
-            { name: 'Ally1', gridX: 1, gridY: 1 },
-          ],
-        };
-      }
-      return null;
+    it('should skip allies when rangeToFeet returns null', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(null);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('no targets in range');
     });
 
-    await handle(defaultAction, playerStats, campaignName, 'test-map');
+    it('should skip allies when getDistanceFeet returns null', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(null);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
 
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('Ally1', 'hasInspiration', true, campaignName);
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.payload.description).toContain('no targets in range');
+    });
+
+    it('should include allies within range', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toMatch(/all(y|ies)/);
+      expect(result.payload.description).toContain('Ally1');
+      expect(result.payload.description).toContain('Ally2');
+    });
+
+    it('should list individual ally names when multiple targets', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(false);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.payload.description).toContain('Ally1');
+      expect(result.payload.description).toContain('Ally2');
+    });
+
+    it('should use singular "ally" when exactly one target', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData([
+        { name: 'Bard', gridX: 0, gridY: 0 },
+        { name: 'Ally1', gridX: 1, gridY: 1 },
+      ]));
+      runtimeState.getRuntimeValue.mockReturnValue(false);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.payload.description).toContain('1 ally');
+      expect(result.payload.description).not.toContain('allies');
+    });
   });
 
-  it('should decrement uses when maxUses > 0', async () => {
-    getRuntimeValue.mockImplementation((key, subKey) => {
-      if (subKey === 'hasInspiration') return false;
-      if (subKey === 'encouragingsongUses') return 2;
-      return null;
+  // ── Inspiration toggle ──────────────────────────────────────
+
+  describe('inspiration toggling', () => {
+    it('should grant inspiration to allies without it', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(false);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'hasInspiration', true, campaignName);
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Ally2', 'hasInspiration', true, campaignName);
     });
 
-    loadMapData.mockImplementation(async (campaign, map) => {
-      if (map === 'test-map') {
-        return {
-          players: [
-            { name: 'Bard', gridX: 0, gridY: 0 },
-            { name: 'Ally1', gridX: 1, gridY: 1 },
-          ],
-        };
-      }
-      return null;
+    it('should skip allies that already have inspiration', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
+        if (key === 'hasInspiration') return true;
+        return null;
+      });
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'Ally1',
+        'hasInspiration',
+        true,
+        campaignName,
+      );
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'Ally2',
+        'hasInspiration',
+        true,
+        campaignName,
+      );
     });
 
-    await handle(defaultAction, playerStats, campaignName, 'test-map');
+    it('should grant inspiration to eligible allies when some already have it', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
+        if (key === 'hasInspiration') return false;
+        return null;
+      });
+      // Override for Ally1 only: already has inspiration
+      runtimeState.getRuntimeValue.mockImplementation((player, key) => {
+        if (key === 'hasInspiration' && player === 'Ally1') return true;
+        if (key === 'hasInspiration') return false;
+        return null;
+      });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('Bard', 'encouragingsongUses', 1, campaignName);
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'Ally1',
+        'hasInspiration',
+        true,
+        campaignName,
+      );
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Ally2',
+        'hasInspiration',
+        true,
+        campaignName,
+      );
+    });
   });
 
-  it('should return error when no uses remaining', async () => {
-    getRuntimeValue.mockImplementation((key, subKey) => {
-      if (subKey === 'hasInspiration') return false;
-      if (subKey === 'encouragingsongUses') return 0;
-      return null;
+  // ── Uses tracking ───────────────────────────────────────────
+
+  describe('uses tracking', () => {
+    it('should decrement uses when maxUses > 0', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
+        if (key === 'hasInspiration') return false;
+        if (key === 'encouragingsongUses') return 2;
+        return null;
+      });
+      automationService.evaluateAutoExpression.mockReturnValue(3);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'encouragingsongUses', 1, campaignName);
     });
 
-    loadMapData.mockImplementation(async (campaign, map) => {
-      if (map === 'test-map') {
-        return {
-          players: [
-            { name: 'Bard', gridX: 0, gridY: 0 },
-            { name: 'Ally1', gridX: 1, gridY: 1 },
-          ],
-        };
-      }
-      return null;
+    it('should return error popup when no uses remaining', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
+        if (key === 'encouragingsongUses') return 0;
+        return null;
+      });
+      automationService.evaluateAutoExpression.mockReturnValue(3);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.description).toContain('cannot be used again');
+      expect(result.payload.name).toBe('Encouraging Song');
     });
 
-    const result = await handle(defaultAction, playerStats, campaignName, 'test-map');
+    it('should not decrement uses when maxUses is 0 (no uses_expression)', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(false);
+      automationService.evaluateAutoExpression.mockReturnValue(0);
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('cannot be used again');
+      const action = makeAction({ uses_expression: null });
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('Uses'),
+        expect.any(Number),
+        campaignName,
+      );
+    });
+
+    it('should not decrement uses when maxUses is negative', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(false);
+      automationService.evaluateAutoExpression.mockReturnValue(-1);
+
+      const action = makeAction({ uses_expression: '-1' });
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.type).toBe('popup');
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        expect.any(String),
+        expect.stringContaining('Uses'),
+        expect.any(Number),
+        campaignName,
+      );
+    });
+
+    it('should use resourceKey from automation when provided', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
+        if (key === 'hasInspiration') return false;
+        if (key === 'customResource') return 3;
+        return null;
+      });
+      automationService.evaluateAutoExpression.mockReturnValue(3);
+
+      const action = makeAction({ resourceKey: 'customResource' });
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'customResource', 2, campaignName);
+    });
+
+    it('should default usesKey to action name when no resourceKey', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
+        if (key === 'hasInspiration') return false;
+        if (key === 'encouragingsongUses') return 5;
+        return null;
+      });
+      automationService.evaluateAutoExpression.mockReturnValue(3);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'Bard',
+        'encouragingsongUses',
+        4,
+        campaignName,
+      );
+    });
+
+    it('should handle currentUses as string and convert to number', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockImplementation((_player, key) => {
+        if (key === 'hasInspiration') return false;
+        if (key === 'encouragingsongUses') return '2';
+        return null;
+      });
+      automationService.evaluateAutoExpression.mockReturnValue(3);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+
+      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith('Bard', 'encouragingsongUses', 1, campaignName);
+    });
   });
 
-  it('should call addEntry for logging', async () => {
-    loadMapData.mockImplementation(async (campaign, map) => {
-      if (map === 'test-map') {
-        return {
-          players: [
-            { name: 'Bard', gridX: 0, gridY: 0 },
-            { name: 'Ally1', gridX: 1, gridY: 1 },
-          ],
-        };
-      }
-      return null;
+  // ── Logging ─────────────────────────────────────────────────
+
+  describe('logging', () => {
+    it('should call addEntry with ability_use log type', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+      await Promise.resolve();
+
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'ability_use',
+        characterName: 'Bard',
+        abilityName: 'Encouraging Song',
+        timestamp: expect.any(Number),
+      }));
     });
 
-    await handle(defaultAction, playerStats, campaignName, 'test-map');
+    it('should include description in log entry', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(null);
 
-    expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-      type: 'ability_use',
-      characterName: 'Bard',
-      abilityName: 'Encouraging Song',
-    }));
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      await handle(action, ps, campaignName, 'test-map');
+      await Promise.resolve();
+
+      const logCall = logService.addEntry.mock.calls[0][1];
+      expect(logCall.description).toContain('Encouraging Song');
+      expect(logCall.description).toContain('Heroic Inspiration');
+    });
+  });
+
+  // ── Return payload structure ────────────────────────────────
+
+  describe('return payload', () => {
+    it('should include automation object in returned payload', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(false);
+
+      const action = makeAction({ effect: 'advantage' });
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.payload.automation).toEqual(action.automation);
+    });
+
+    it('should include automationType in payload', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(null);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.payload.automationType).toBe('heroic_inspiration_buff');
+    });
+
+    it('should include action name in payload', async () => {
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(15);
+      mapsService.loadMapData.mockResolvedValue(makeMapData(defaultMapPlayers));
+      runtimeState.getRuntimeValue.mockReturnValue(false);
+
+      const action = makeAction();
+      const ps = makePlayerStats();
+
+      const result = await handle(action, ps, campaignName, 'test-map');
+
+      expect(result.payload.name).toBe('Encouraging Song');
+    });
   });
 });

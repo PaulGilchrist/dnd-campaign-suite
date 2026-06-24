@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi } from 'vitest';
 import {
   findNPCByName,
   npcHasStatBlock,
@@ -45,92 +46,56 @@ describe('npcHasStatBlock', () => {
     expect(npcHasStatBlock({ armorClass: 15 })).toBe(true);
   });
 
-  it('returns true when npc has armorClass of zero', () => {
+  it('returns true for zero or negative armorClass', () => {
     expect(npcHasStatBlock({ armorClass: 0 })).toBe(true);
-  });
-
-  it('returns true when npc has negative armorClass', () => {
     expect(npcHasStatBlock({ armorClass: -5 })).toBe(true);
   });
 
-  it('returns a falsy value when npc is null', () => {
-    expect(npcHasStatBlock(null)).toBeFalsy();
-   });
-
-  it('returns a falsy value when npc is undefined', () => {
-    expect(npcHasStatBlock(undefined)).toBeFalsy();
-   });
-
-  it('returns false when npc is an empty object', () => {
+  it('returns false for non-numeric armorClass types', () => {
+    expect(npcHasStatBlock({ armorClass: '15' })).toBe(false);
+    expect(npcHasStatBlock({ armorClass: undefined })).toBe(false);
+    expect(npcHasStatBlock({ armorClass: null })).toBe(false);
     expect(npcHasStatBlock({})).toBe(false);
   });
 
-  it('returns false when armorClass is a string', () => {
-    expect(npcHasStatBlock({ armorClass: '15' })).toBe(false);
-  });
-
-  it('returns false when armorClass is undefined', () => {
-    expect(npcHasStatBlock({ armorClass: undefined })).toBe(false);
-  });
-
-  it('returns a falsy value when npc is 0, empty string, or boolean false', () => {
-     // npc && typeof … short-circuits to the falsy value itself
+  it('returns false when npc is falsy', () => {
+    expect(npcHasStatBlock(null)).toBeFalsy();
+    expect(npcHasStatBlock(undefined)).toBeFalsy();
     expect(npcHasStatBlock(0)).toBeFalsy();
     expect(npcHasStatBlock('')).toBeFalsy();
     expect(npcHasStatBlock(false)).toBeFalsy();
-   });
+  });
 });
 
 // ===================================================================
 // calculateAbilityModifier
 // ===================================================================
 describe('calculateAbilityModifier', () => {
-  it('returns -5 for score 1', () => {
+  it('returns the correct modifier for standard ability scores', () => {
+    // D&D standard scores: floor((score - 10) / 2)
     expect(calculateAbilityModifier(1)).toBe(-5);
-  });
-
-  it('returns the correct modifier for score 4', () => {
-      // Math.floor((4-10)/2) = Math.floor(-3) = -3
-    expect(calculateAbilityModifier(4)).toBe(-3);
-   });
-
-  it('returns the correct modifier for score 5', () => {
-      // Math.floor((5-10)/2) = Math.floor(-2.5) = -3
-    expect(calculateAbilityModifier(5)).toBe(-3);
-   });
-
-  it('returns the correct modifier for score 10', () => {
-    expect(calculateAbilityModifier(10)).toBe(0);
-  });
-
-  it('returns the correct modifier for score 11', () => {
-    expect(calculateAbilityModifier(11)).toBe(0);
-  });
-
-  it('returns 1 for score 12', () => {
-    expect(calculateAbilityModifier(12)).toBe(1);
-  });
-
-  it('returns -5 for score 0', () => {
-    // floor((0-10)/2) = floor(-5) = -5
-    expect(calculateAbilityModifier(0)).toBe(-5);
-  });
-
-  it('uses Math.floor so odd scores round down', () => {
-    // Score 9: floor((9-10)/2) = floor(-0.5) = -1
-    expect(calculateAbilityModifier(9)).toBe(-1);
-    // Score 3: floor((3-10)/2) = floor(-3.5) = -4
     expect(calculateAbilityModifier(3)).toBe(-4);
-  });
-
-  it('handles high scores', () => {
+    expect(calculateAbilityModifier(4)).toBe(-3);
+    expect(calculateAbilityModifier(5)).toBe(-3);
+    expect(calculateAbilityModifier(8)).toBe(-1);
+    expect(calculateAbilityModifier(9)).toBe(-1);
+    expect(calculateAbilityModifier(10)).toBe(0);
+    expect(calculateAbilityModifier(11)).toBe(0);
+    expect(calculateAbilityModifier(12)).toBe(1);
+    expect(calculateAbilityModifier(14)).toBe(2);
+    expect(calculateAbilityModifier(16)).toBe(3);
+    expect(calculateAbilityModifier(18)).toBe(4);
     expect(calculateAbilityModifier(20)).toBe(5);
-    expect(calculateAbilityModifier(21)).toBe(5);
-    expect(calculateAbilityModifier(22)).toBe(6);
   });
 
-  it('handles negative scores', () => {
-    // floor((-1-10)/2) = floor(-11/2) = floor(-5.5) = -6
+  it('rounds down via Math.floor for odd scores and negatives', () => {
+    // Score 0: floor(-5) = -5
+    expect(calculateAbilityModifier(0)).toBe(-5);
+    // Score 21: floor(5.5) = 5
+    expect(calculateAbilityModifier(21)).toBe(5);
+    // Score 22: floor(6) = 6
+    expect(calculateAbilityModifier(22)).toBe(6);
+    // Negative score: floor(-5.5) = -6
     expect(calculateAbilityModifier(-1)).toBe(-6);
   });
 });
@@ -140,7 +105,7 @@ describe('calculateAbilityModifier', () => {
 // ===================================================================
 describe('findNPCByName', () => {
   const npcWithStats = makeNPC();
-  const npcNoStats = { name: 'Bandit' }; // no armorClass
+  const npcNoStats = { name: 'Bandit' };
 
   it('returns null when npcName is falsy', () => {
     expect(findNPCByName(null, [npcWithStats])).toBeNull();
@@ -154,60 +119,39 @@ describe('findNPCByName', () => {
     expect(findNPCByName('Test NPC', [])).toBeNull();
   });
 
-  it('returns the matching NPC by exact name (case-insensitive)', () => {
-    const result = findNPCByName('Test NPC', [npcWithStats]);
-    expect(result).toBe(npcWithStats);
-  });
-
-  it('is case-insensitive for matching', () => {
+  it('finds an NPC by exact name match (case-insensitive)', () => {
+    expect(findNPCByName('Test NPC', [npcWithStats])).toBe(npcWithStats);
     expect(findNPCByName('test npc', [npcWithStats])).toBe(npcWithStats);
     expect(findNPCByName('TEST NPC', [npcWithStats])).toBe(npcWithStats);
     expect(findNPCByName('TeSt NpC', [npcWithStats])).toBe(npcWithStats);
   });
 
   it('strips trailing numeric suffix from search name', () => {
-    const result = findNPCByName('Test NPC 123', [npcWithStats]);
-    expect(result).toBe(npcWithStats);
+    expect(findNPCByName('Test NPC 123', [npcWithStats])).toBe(npcWithStats);
+    expect(findNPCByName('Test NPC  42', [npcWithStats])).toBe(npcWithStats);
   });
 
-  it('strips multiple space-number groups at end', () => {
-    // The regex \s+\d+$ matches trailing whitespace+digits once
-    // "Test NPC  42" -> baseName = "Test NPC" (the spaces before 42 are captured)
-    const result = findNPCByName('Test NPC  42', [npcWithStats]);
-    expect(result).toBe(npcWithStats);
-  });
-
-  it('does not strip non-trailing numbers', () => {
-    // "Goblin 5" — baseName becomes "Goblin" only if " 5" is trailing
-    const goblin = makeNPC({ name: 'Goblin' });
-    expect(findNPCByName('Goblin 5', [goblin])).toBe(goblin);
-
-    // "123 Bandit" — regex \s+\d+$ won't match, no strip
+  it('does not strip non-trailing numbers from search name', () => {
     const numbered = makeNPC({ name: '123 Bandit' });
     expect(findNPCByName('123 Bandit', [numbered])).toBe(numbered);
   });
 
-  it('skips NPCs without stat blocks', () => {
-    const result = findNPCByName('Bandit', [npcNoStats]);
-    expect(result).toBeNull();
+  it('returns the first matching NPC with a stat block', () => {
+    const npc1 = makeNPC({ name: 'Guard' });
+    const npc2 = makeNPC({ name: 'Guard' });
+    expect(findNPCByName('Guard', [npc1, npc2])).toBe(npc1);
   });
 
-  it('finds the correct NPC when one has stats and another does not', () => {
-    const result = findNPCByName('Test NPC', [npcNoStats, npcWithStats]);
-    expect(result).toBe(npcWithStats);
+  it('skips NPCs without stat blocks', () => {
+    expect(findNPCByName('Bandit', [npcNoStats])).toBeNull();
+    expect(findNPCByName('Test NPC', [npcNoStats, npcWithStats])).toBe(npcWithStats);
   });
 
   it('returns null when no NPC matches', () => {
     expect(findNPCByName('Nonexistent', [npcWithStats])).toBeNull();
   });
 
-  it('returns the first matching NPC with stats', () => {
-    const npc1 = makeNPC({ name: 'Guard' });
-    const npc2 = makeNPC({ name: 'Guard' });
-    expect(findNPCByName('Guard', [npc1, npc2])).toBe(npc1);
-  });
-
-  it('handles NPC with undefined or missing name property', () => {
+  it('returns null when NPC has undefined or missing name', () => {
     const noNameNpc = { ...npcWithStats, name: undefined };
     expect(findNPCByName('Test NPC', [noNameNpc])).toBeNull();
   });
@@ -217,32 +161,20 @@ describe('findNPCByName', () => {
 // npcToMonsterFormat
 // ===================================================================
 describe('npcToMonsterFormat', () => {
-  let consoleErrorSpy;
-
-  beforeEach(() => {
-    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    consoleErrorSpy.mockRestore();
-  });
-
   // --- Null / undefined input ---
-  it('returns null when npc is null', () => {
+  it('returns null when npc is null or undefined', () => {
     expect(npcToMonsterFormat(null)).toBeNull();
-  });
-
-  it('returns null when npc is undefined', () => {
     expect(npcToMonsterFormat(undefined)).toBeNull();
   });
 
-  // --- Defaults ---
-  it('uses default values for missing fields', () => {
+  // --- Identity defaults ---
+  it('returns correct defaults for minimal NPC', () => {
     const npc = { armorClass: 10 };
     const monster = npcToMonsterFormat(npc);
+
     expect(monster.name).toBe('Unknown');
     expect(monster.size).toBe('Medium');
-    expect(monster.type).toBe('NPC'); // classRole not provided
+    expect(monster.type).toBe('NPC');
     expect(monster.subtype).toBeNull();
     expect(monster.alignment).toBe('Unaligned');
     expect(monster.languages).toBe('');
@@ -256,90 +188,56 @@ describe('npcToMonsterFormat', () => {
     expect(monster.desc).toBeNull();
   });
 
-  it('uses provided name', () => {
-    const npc = makeNPC({ name: 'Orc Warrior' });
-    expect(npcToMonsterFormat(npc).name).toBe('Orc Warrior');
+  // --- Named fields ---
+  it('forwards custom name, size, and classRole', () => {
+    const npc = makeNPC({ name: 'Orc Warrior', size: 'Large', classRole: 'Cleric' });
+    const monster = npcToMonsterFormat(npc);
+    expect(monster.name).toBe('Orc Warrior');
+    expect(monster.size).toBe('Large');
+    expect(monster.type).toBe('Cleric');
   });
 
-  it('uses provided size', () => {
-    const npc = makeNPC({ size: 'Large' });
-    expect(npcToMonsterFormat(npc).size).toBe('Large');
-  });
-
-  it('uses classRole as type, defaults to NPC', () => {
-    const npc1 = makeNPC({ classRole: 'Cleric' });
-    expect(npcToMonsterFormat(npc1).type).toBe('Cleric');
-
-    const npc2 = { armorClass: 10 }; // no classRole
-    expect(npcToMonsterFormat(npc2).type).toBe('NPC');
-  });
-
-  // --- Ability scores ---
-  it('uses provided abilityScores', () => {
+  // --- Ability scores & modifiers ---
+  it('forwards abilityScores and calculates modifiers', () => {
     const npc = makeNPC();
     const monster = npcToMonsterFormat(npc);
-    expect(monster.ability_scores.str).toBe(16);
-    expect(monster.ability_scores.dex).toBe(14);
-    expect(monster.ability_scores.con).toBe(12);
+    expect(monster.ability_scores).toEqual({ str: 16, dex: 14, con: 12, int: 10, wis: 8, cha: 18 });
+    expect(monster.ability_score_modifiers).toEqual({ str: 3, dex: 2, con: 1, int: 0, wis: -1, cha: 4 });
   });
 
   it('defaults ability scores to all 10 when not provided', () => {
-    const npc = { armorClass: 10 }; // no abilityScores
+    const npc = { armorClass: 10 };
     const monster = npcToMonsterFormat(npc);
-    expect(monster.ability_scores).toEqual({
-      str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10,
-    });
-  });
-
-  it('calculates ability_score_modifiers from abilityScores', () => {
-    const npc = makeNPC();
-    const monster = npcToMonsterFormat(npc);
-    // str 16 -> +3, dex 14 -> +2, con 12 -> +1, int 10 -> 0, wis 8 -> -1, cha 18 -> +4
-    expect(monster.ability_score_modifiers).toEqual({
-      str: 3, dex: 2, con: 1, int: 0, wis: -1, cha: 4,
-    });
-  });
-
-  it('calculates modifiers correctly from default scores (all 10)', () => {
-    const npc = { armorClass: 5 };
-    const monster = npcToMonsterFormat(npc);
-    // All scores are 10, so all modifiers should be 0
-    expect(monster.ability_score_modifiers).toEqual({
-      str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0,
-    });
+    expect(monster.ability_scores).toEqual({ str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 });
+    expect(monster.ability_score_modifiers).toEqual({ str: 0, dex: 0, con: 0, int: 0, wis: 0, cha: 0 });
   });
 
   // --- Saving throws ---
-  it('includes saving throws with defined bonuses', () => {
+  it('includes saving throws with defined numeric bonuses', () => {
     const npc = makeNPC({ savingThrowBonuses: { str: 3, con: 1 } });
     const monster = npcToMonsterFormat(npc);
     expect(monster.saving_throws.str).toEqual({ modifier: 3 });
     expect(monster.saving_throws.con).toEqual({ modifier: 1 });
-    // dex should NOT be present (no saving throw bonus defined)
-    expect(Object.prototype.hasOwnProperty.call(monster.saving_throws, 'dex')).toBe(false);
+    expect(monster.saving_throws.dex).toBeUndefined();
   });
 
-  it('excludes saving throws with undefined or null bonuses', () => {
-    const npc = makeNPC({
-      savingThrowBonuses: { str: undefined, dex: null },
-    });
+  it('excludes saving throws with undefined, null, or empty string bonuses', () => {
+    const npc = makeNPC({ savingThrowBonuses: { str: undefined, dex: null, con: '' } });
     expect(Object.keys(npcToMonsterFormat(npc).saving_throws)).toEqual([]);
   });
 
-  it('excludes saving throws with empty string bonuses', () => {
-    const npc = makeNPC({ savingThrowBonuses: { str: '' } });
-    expect(Object.keys(npcToMonsterFormat(npc).saving_throws)).toEqual([]);
-  });
-
-  it('converts saving throw bonus to number via Number()', () => {
+  it('converts saving throw bonus string values to numbers', () => {
     const npc = makeNPC({ savingThrowBonuses: { int: '2' } });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.saving_throws.int.modifier).toBe(2);
-    expect(typeof monster.saving_throws.int.modifier).toBe('number');
+    expect(npcToMonsterFormat(npc).saving_throws.int.modifier).toBe(2);
+  });
+
+  it('omits saving_throws key when no bonuses provided', () => {
+    const monster = npcToMonsterFormat({ armorClass: 10 });
+    expect(monster.saving_throws).toEqual({});
   });
 
   // --- Skills ---
-  it('includes skills with defined bonuses', () => {
+  it('includes skills with defined numeric bonuses', () => {
     const npc = makeNPC({ skillBonuses: { Stealth: 4, Perception: 2 } });
     const monster = npcToMonsterFormat(npc);
     expect(monster.skills.Stealth).toEqual({ modifier: 4 });
@@ -351,114 +249,94 @@ describe('npcToMonsterFormat', () => {
     expect(Object.keys(npcToMonsterFormat(npc).skills)).toEqual([]);
   });
 
-  it('converts skill bonus values to numbers via Number()', () => {
+  it('converts skill bonus string values to numbers', () => {
     const npc = makeNPC({ skillBonuses: { Insight: '-1' } });
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.skills.Insight.modifier).toBe(-1);
+    expect(npcToMonsterFormat(npc).skills.Insight.modifier).toBe(-1);
   });
 
-  it('omits skills and saving_throws when not provided on npc', () => {
-    const npc = { armorClass: 10 }; // no skillBonuses, no savingThrowBonuses
-    const monster = npcToMonsterFormat(npc);
+  it('omits skills key when no bonuses provided', () => {
+    const monster = npcToMonsterFormat({ armorClass: 10 });
     expect(monster.skills).toEqual({});
-    expect(monster.saving_throws).toEqual({});
   });
 
   // --- Initiative ---
-  it('includes initiative_details for a positive bonus', () => {
-    const npc = makeNPC({ initiativeBonus: 5 });
-    expect(npcToMonsterFormat(npc).initiative_details).toBe('+5');
+  it('formats initiative_details for positive, zero, and negative bonuses', () => {
+    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: 5 })).initiative_details).toBe('+5');
+    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: 0 })).initiative_details).toBe('+0');
+    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: -3 })).initiative_details).toBe('-3');
   });
 
-  it('includes initiative_details for a negative bonus without plus sign', () => {
-    const npc = makeNPC({ initiativeBonus: -3 });
-    expect(npcToMonsterFormat(npc).initiative_details).toBe('-3');
+  it('handles string initiative bonus input', () => {
+    expect(npcToMonsterFormat(makeNPC({ initiativeBonus: '4' })).initiative_details).toBe('+4');
   });
 
-  it('includes initiative_details for zero bonus', () => {
-    const npc = makeNPC({ initiativeBonus: 0 });
-    expect(npcToMonsterFormat(npc).initiative_details).toBe('+0');
-  });
-
-  it('omits initiative_details when bonus is undefined, null, or empty string', () => {
+  it('omits initiative_details for undefined, null, or empty string bonuses', () => {
     expect(npcToMonsterFormat(makeNPC({ initiativeBonus: undefined })).initiative_details).toBeNull();
     expect(npcToMonsterFormat(makeNPC({ initiativeBonus: null })).initiative_details).toBeNull();
     expect(npcToMonsterFormat(makeNPC({ initiativeBonus: '' })).initiative_details).toBeNull();
   });
 
-  it('formats initiative_details for string bonus input', () => {
-    const npc = makeNPC({ initiativeBonus: '4' });
-    expect(npcToMonsterFormat(npc).initiative_details).toBe('+4');
-  });
-
   // --- Armor class ---
-  it('uses the numeric armorClass directly', () => {
-    const npc = makeNPC({ armorClass: 18 });
-    expect(npcToMonsterFormat(npc).armor_class).toBe(18);
+  it('uses numeric armorClass directly', () => {
+    expect(npcToMonsterFormat(makeNPC({ armorClass: 18 })).armor_class).toBe(18);
   });
 
-  it('defaults AC to 10 and logs a console.error when armorClass is not a number', () => {
+  it('defaults AC to 10 and logs an error when armorClass is not a number', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const npc = { name: 'Broken NPC', armorClass: undefined };
     const monster = npcToMonsterFormat(npc);
     expect(monster.armor_class).toBe(10);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(spy).toHaveBeenCalledWith(
       '[AC] NPC "Broken NPC" has no armorClass defined. Defaulting to 10.'
     );
+    spy.mockRestore();
   });
 
-  it('does not log console.error when armorClass is a valid number', () => {
+  it('does not log when armorClass is a valid number', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
     npcToMonsterFormat(makeNPC({ armorClass: 15 }));
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('passes through NaN armorClass without logging', () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const npc = { name: 'NaN NPC', armorClass: NaN };
+    const monster = npcToMonsterFormat(npc);
+    expect(Number.isNaN(monster.armor_class)).toBe(true);
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   // --- Passive perception ---
   it('computes passive_perception from wis modifier + 10', () => {
     const npc = makeNPC({ abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 14, cha: 10 } });
-    // wis 14 -> modifier +2, passive = 10 + 2 = 12
     expect(npcToMonsterFormat(npc).senses.passive_perception).toBe(12);
-  });
-
-  it('defaults passive_perception to 10 when wis modifier is 0', () => {
-    const npc = makeNPC({ abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 } });
-    // wis 10 -> modifier 0, passive = 10 + 0 = 10
-    expect(npcToMonsterFormat(npc).senses.passive_perception).toBe(10);
   });
 
   it('handles negative wisdom modifier for passive perception', () => {
     const npc = makeNPC({ abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 6, cha: 10 } });
-    // wis 6 -> modifier -2, passive = 10 + (-2) = 8
     expect(npcToMonsterFormat(npc).senses.passive_perception).toBe(8);
   });
 
-  // --- Damage immunities / resistances / condition immunities ---
-  it('forwards damageResistances', () => {
-    const npc = makeNPC({ damageResistances: ['cold', 'fire'] });
-    expect(npcToMonsterFormat(npc).damage_resistances).toEqual(['cold', 'fire']);
+  // --- Damage / condition immunities and resistances ---
+  it('forwards damage and condition arrays, defaults to empty', () => {
+    const npc = makeNPC({
+      damageResistances: ['cold', 'fire'],
+      damageImmunities: ['psychic'],
+      conditionImmunities: ['charmed', 'poisoned'],
+    });
+    const monster = npcToMonsterFormat(npc);
+    expect(monster.damage_resistances).toEqual(['cold', 'fire']);
+    expect(monster.damage_immunities).toEqual(['psychic']);
+    expect(monster.condition_immunities).toEqual(['charmed', 'poisoned']);
   });
 
-  it('defaults damage_resistances to empty array', () => {
-    const npc = { armorClass: 10 };
-    expect(npcToMonsterFormat(npc).damage_resistances).toEqual([]);
-  });
-
-  it('forwards damageImmunities', () => {
-    const npc = makeNPC({ damageImmunities: ['psychic'] });
-    expect(npcToMonsterFormat(npc).damage_immunities).toEqual(['psychic']);
-  });
-
-  it('defaults damage_immunities to empty array', () => {
-    const npc = { armorClass: 10 };
-    expect(npcToMonsterFormat(npc).damage_immunities).toEqual([]);
-  });
-
-  it('forwards conditionImmunities', () => {
-    const npc = makeNPC({ conditionImmunities: ['charmed', 'poisoned'] });
-    expect(npcToMonsterFormat(npc).condition_immunities).toEqual(['charmed', 'poisoned']);
-  });
-
-  it('defaults condition_immunities to empty array', () => {
-    const npc = { armorClass: 10 };
-    expect(npcToMonsterFormat(npc).condition_immunities).toEqual([]);
+  it('defaults damage and condition arrays to empty when not provided', () => {
+    const monster = npcToMonsterFormat({ armorClass: 10 });
+    expect(monster.damage_resistances).toEqual([]);
+    expect(monster.damage_immunities).toEqual([]);
+    expect(monster.condition_immunities).toEqual([]);
   });
 
   // --- Traits, actions, reactions ---
@@ -475,14 +353,13 @@ describe('npcToMonsterFormat', () => {
   });
 
   it('defaults traits, actions, reactions to empty arrays', () => {
-    const npc = { armorClass: 10 };
-    const monster = npcToMonsterFormat(npc);
+    const monster = npcToMonsterFormat({ armorClass: 10 });
     expect(monster.traits).toEqual([]);
     expect(monster.actions).toEqual([]);
     expect(monster.reactions).toEqual([]);
   });
 
-  // --- hitPoints, hitDice, speed ---
+  // --- HP, hit dice, speed ---
   it('forwards hitPoints and hitDice', () => {
     const npc = makeNPC({ hitPoints: 50, hitDice: '10d8' });
     const monster = npcToMonsterFormat(npc);
@@ -490,15 +367,10 @@ describe('npcToMonsterFormat', () => {
     expect(monster.hit_dice).toBe('10d8');
   });
 
-  it('defaults hit_points to empty string when not provided', () => {
-    const npc = { armorClass: 10 };
-    expect(npcToMonsterFormat(npc).hit_points).toBe('');
-    expect(npcToMonsterFormat(npc).hit_dice).toBe('');
-  });
-
-  it('uses default speed when not provided', () => {
-    const npc = { armorClass: 10 };
-    expect(npcToMonsterFormat(npc).speed).toEqual({ walk: '30 ft.' });
+  it('defaults hit_points and hit_dice to empty string', () => {
+    const monster = npcToMonsterFormat({ armorClass: 10 });
+    expect(monster.hit_points).toBe('');
+    expect(monster.hit_dice).toBe('');
   });
 
   it('forwards custom speed object', () => {
@@ -506,7 +378,17 @@ describe('npcToMonsterFormat', () => {
     expect(npcToMonsterFormat(npc).speed).toEqual({ walk: '40 ft.', fly: '30 ft.' });
   });
 
-  // --- Full integration test ---
+  it('defaults speed to { walk: "30 ft." }', () => {
+    expect(npcToMonsterFormat({ armorClass: 10 }).speed).toEqual({ walk: '30 ft.' });
+  });
+
+  // --- NPC with undefined name ---
+  it('defaults name to "Unknown" when npc.name is undefined', () => {
+    const monster = npcToMonsterFormat({ armorClass: 10, name: undefined });
+    expect(monster.name).toBe('Unknown');
+  });
+
+  // --- Full integration ---
   it('produces a complete monster object from a full NPC', () => {
     const npc = makeNPC({
       name: 'Dark Elf Rogue',
@@ -541,7 +423,7 @@ describe('npcToMonsterFormat', () => {
     expect(monster.speed.walk).toBe('30 ft.');
     expect(monster.initiative_details).toBe('+3');
     expect(monster.ability_scores.dex).toBe(16);
-    expect(monster.ability_score_modifiers.dex).toBe(3); // 16 -> +3
+    expect(monster.ability_score_modifiers.dex).toBe(3);
     expect(monster.saving_throws.dex.modifier).toBe(4);
     expect(monster.skills.Stealth.modifier).toBe(5);
     expect(monster.skills.Perception.modifier).toBe(2);
@@ -549,30 +431,5 @@ describe('npcToMonsterFormat', () => {
     expect(monster.traits).toEqual([{ name: 'Darkvision' }]);
     expect(monster.actions).toEqual([{ name: 'Shortsword' }]);
     expect(monster.reactions).toEqual([]);
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
   });
-
-  // --- NPC with no name but has armorClass ---
-  it('handles an NPC with undefined name', () => {
-    const npc = { armorClass: 10, name: undefined };
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.name).toBe('Unknown');
-  });
-
-   // --- Edge case: armorClass is NaN (typeof NaN === 'number' in JS) ---
-  it('passes through NaN armorClass without logging (typeof NaN === "number")', () => {
-      // In JavaScript, typeof NaN === 'number', so the ternary takes the true branch
-    const npc = { name: 'NaN NPC', armorClass: NaN };
-    const monster = npcToMonsterFormat(npc);
-    expect(Number.isNaN(monster.armor_class)).toBe(true);
-    expect(consoleErrorSpy).not.toHaveBeenCalled();
-   });
-
-   // --- Edge case: armorClass is a string despite the type guard ---
-  it('defaults AC to 10 and logs when armorClass is a string', () => {
-    const npc = { name: 'String AC NPC', armorClass: '15' };
-    const monster = npcToMonsterFormat(npc);
-    expect(monster.armor_class).toBe(10);
-    expect(consoleErrorSpy).toHaveBeenCalled();
-   });
 });

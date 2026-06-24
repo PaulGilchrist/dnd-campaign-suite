@@ -15,7 +15,8 @@ export function buildSaveDc(auto, playerStats) {
         const chaBonus = getAbilityModifier(playerStats.abilities, 'CHA');
         return 8 + chaBonus + prof;
     }
-    return auto.saveDc || 10;
+    if (typeof auto.saveDc === 'number') return auto.saveDc;
+    return 10;
  }
 
 export function createSaveListener(campaignName, config) {

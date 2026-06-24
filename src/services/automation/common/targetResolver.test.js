@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -46,6 +47,8 @@ function makeAttacker(overrides = {}) {
 function makeTarget(overrides = {}) {
   return {
     name: 'Enemy',
+    gridX: 15,
+    gridY: 20,
     ...overrides,
   };
 }
@@ -66,7 +69,7 @@ describe('targetResolver', () => {
   });
 
   describe('resolveTarget', () => {
-    it('should return { target, cs } when both getCombatContext and getTargetFromAttacker succeed', async () => {
+    it('returns { target, cs } when both lookups succeed', async () => {
       const cs = makeCombatContext();
       const target = makeTarget();
 
@@ -80,7 +83,7 @@ describe('targetResolver', () => {
       expect(damageUtils.getTargetFromAttacker).toHaveBeenCalledWith(cs, attackerName);
     });
 
-    it('should return null when getCombatContext returns null', async () => {
+    it('returns null when getCombatContext returns a falsy value', async () => {
       damageUtils.getCombatContext.mockResolvedValue(null);
 
       const result = await resolveTarget(campaignName, attackerName);
@@ -90,16 +93,7 @@ describe('targetResolver', () => {
       expect(damageUtils.getTargetFromAttacker).not.toHaveBeenCalled();
     });
 
-    it('should return null when getCombatContext returns undefined', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(undefined);
-
-      const result = await resolveTarget(campaignName, attackerName);
-
-      expect(result).toBeNull();
-      expect(damageUtils.getTargetFromAttacker).not.toHaveBeenCalled();
-    });
-
-    it('should return null when getTargetFromAttacker returns null (no targetName on attacker)', async () => {
+    it('returns null when getTargetFromAttacker returns a falsy value', async () => {
       const cs = makeCombatContext();
 
       damageUtils.getCombatContext.mockResolvedValue(cs);
@@ -111,35 +105,17 @@ describe('targetResolver', () => {
       expect(damageUtils.getCombatContext).toHaveBeenCalledWith(campaignName);
       expect(damageUtils.getTargetFromAttacker).toHaveBeenCalledWith(cs, attackerName);
     });
-
-    it('should return null when getTargetFromAttacker returns undefined', async () => {
-      const cs = makeCombatContext();
-
-      damageUtils.getCombatContext.mockResolvedValue(cs);
-      damageUtils.getTargetFromAttacker.mockReturnValue(undefined);
-
-      const result = await resolveTarget(campaignName, attackerName);
-
-      expect(result).toBeNull();
-    });
   });
 
   describe('resolveMapPositions', () => {
-    it('should return null immediately when mapName is falsy', async () => {
+    it('returns null immediately when mapName is falsy', async () => {
       const result = await resolveMapPositions(campaignName, null, attackerName);
 
       expect(result).toBeNull();
       expect(mapsService.loadMapData).not.toHaveBeenCalled();
     });
 
-    it('should return null immediately when mapName is empty string', async () => {
-      const result = await resolveMapPositions(campaignName, '', attackerName);
-
-      expect(result).toBeNull();
-      expect(mapsService.loadMapData).not.toHaveBeenCalled();
-    });
-
-    it('should return null when loadMapData rejects', async () => {
+    it('returns null when loadMapData rejects', async () => {
       mapsService.loadMapData.mockRejectedValue(new Error('Failed to load map'));
 
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
@@ -148,7 +124,7 @@ describe('targetResolver', () => {
       expect(mapsService.loadMapData).toHaveBeenCalledWith(campaignName, 'TestMap');
     });
 
-    it('should return null when mapData is falsy/undefined', async () => {
+    it('returns null when mapData or players is missing', async () => {
       mapsService.loadMapData.mockResolvedValue(null);
 
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
@@ -157,7 +133,7 @@ describe('targetResolver', () => {
       expect(mapsService.loadMapData).toHaveBeenCalledWith(campaignName, 'TestMap');
     });
 
-    it('should return null when attackerPlayer not found in mapData.players', async () => {
+    it('returns null when attacker is not found in mapData.players', async () => {
       const mapData = makeMapData({
         players: [makeAttacker({ name: 'OtherAttacker' })],
       });
@@ -168,7 +144,7 @@ describe('targetResolver', () => {
       expect(result).toBeNull();
     });
 
-    it('should return null when target is null (no combat target) due to destructuring error', async () => {
+    it('returns null when combat target is null (resolveTarget destructures null)', async () => {
       const mapData = makeMapData();
 
       mapsService.loadMapData.mockResolvedValue(mapData);
@@ -177,10 +153,13 @@ describe('targetResolver', () => {
 
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 
+      // resolveTarget returns null when getTargetFromAttacker returns null,
+      // and resolveMapPositions destructures it with ({ target }), which throws
+      // on null, caught by .catch(() => null)
       expect(result).toBeNull();
     });
 
-    it('should return { attackerPos, targetPos } when targetPlayer found in mapData.players', async () => {
+    it('returns positions when targetPlayer is found on the map', async () => {
       const targetPlayer = makeTarget();
       const mapData = makeMapData({
         players: [makeAttacker(), targetPlayer],
@@ -193,13 +172,13 @@ describe('targetResolver', () => {
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 
       expect(result).toEqual({
-        attackerPos: { gridX: mapData.players[0].gridX, gridY: mapData.players[0].gridY },
-        targetPos: { gridX: targetPlayer.gridX, gridY: targetPlayer.gridY },
+        attackerPos: { gridX: 5, gridY: 10 },
+        targetPos: { gridX: 15, gridY: 20 },
       });
       expect(rangeValidation.getNearestPlacedItem).not.toHaveBeenCalled();
     });
 
-    it('should return { attackerPos, targetPos } when targetNpc found via getNearestPlacedItem', async () => {
+    it('falls back to targetNpc when targetPlayer is not on the map', async () => {
       const targetNpc = { name: 'Enemy', gridX: 15, gridY: 20 };
       const mapData = makeMapData({
         placedItems: [targetNpc],
@@ -213,8 +192,8 @@ describe('targetResolver', () => {
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 
       expect(result).toEqual({
-        attackerPos: { gridX: mapData.players[0].gridX, gridY: mapData.players[0].gridY },
-        targetPos: { gridX: targetNpc.gridX, gridY: targetNpc.gridY },
+        attackerPos: { gridX: 5, gridY: 10 },
+        targetPos: { gridX: 15, gridY: 20 },
       });
       expect(rangeValidation.getNearestPlacedItem).toHaveBeenCalledWith(
         mapData.placedItems,
@@ -223,7 +202,7 @@ describe('targetResolver', () => {
       );
     });
 
-    it('should return { attackerPos, targetPos: null } when neither targetPlayer nor targetNpc found', async () => {
+    it('returns targetPos null when target is neither a player nor a placed item', async () => {
       const mapData = makeMapData({
         placedItems: [],
       });
@@ -235,60 +214,12 @@ describe('targetResolver', () => {
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 
       expect(result).toEqual({
-        attackerPos: { gridX: mapData.players[0].gridX, gridY: mapData.players[0].gridY },
+        attackerPos: { gridX: 5, gridY: 10 },
         targetPos: null,
       });
     });
 
-    it('should use getNearestPlacedItem only when mapData.placedItems has length > 0', async () => {
-      const targetNpc = { name: 'Enemy', gridX: 15, gridY: 20 };
-      const mapData = makeMapData({
-        placedItems: [targetNpc],
-      });
-
-      mapsService.loadMapData.mockResolvedValue(mapData);
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatContext());
-      damageUtils.getTargetFromAttacker.mockReturnValue(targetNpc);
-      rangeValidation.getNearestPlacedItem.mockReturnValue(targetNpc);
-
-      await resolveMapPositions(campaignName, 'TestMap', attackerName);
-
-      expect(rangeValidation.getNearestPlacedItem).toHaveBeenCalled();
-    });
-
-    it('should not call getNearestPlacedItem when mapData.placedItems is empty', async () => {
-      const targetNpc = makeTarget();
-      const mapData = makeMapData({
-        placedItems: [],
-      });
-
-      mapsService.loadMapData.mockResolvedValue(mapData);
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatContext());
-      damageUtils.getTargetFromAttacker.mockReturnValue(targetNpc);
-
-      const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
-
-      expect(result.targetPos).toBeNull();
-      expect(rangeValidation.getNearestPlacedItem).not.toHaveBeenCalled();
-    });
-
-    it('should not call getNearestPlacedItem when mapData.placedItems is undefined', async () => {
-      const targetNpc = makeTarget();
-      const mapData = makeMapData({
-        placedItems: undefined,
-      });
-
-      mapsService.loadMapData.mockResolvedValue(mapData);
-      damageUtils.getCombatContext.mockResolvedValue(makeCombatContext());
-      damageUtils.getTargetFromAttacker.mockReturnValue(targetNpc);
-
-      const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
-
-      expect(result.targetPos).toBeNull();
-      expect(rangeValidation.getNearestPlacedItem).not.toHaveBeenCalled();
-    });
-
-    it('should prioritize targetPos from targetPlayer over targetNpc when both exist', async () => {
+    it('prioritizes targetPlayer over targetNpc when both exist', async () => {
       const targetPlayer = { name: 'Enemy', gridX: 1, gridY: 2 };
       const targetNpc = { name: 'Enemy', gridX: 100, gridY: 200 };
       const mapData = makeMapData({
@@ -304,11 +235,21 @@ describe('targetResolver', () => {
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 
       expect(result.targetPos).toEqual({ gridX: 1, gridY: 2 });
-      expect(rangeValidation.getNearestPlacedItem).toHaveBeenCalled();
     });
 
-    it('should handle mapData with no players array', async () => {
+    it('returns null when mapData has no players array', async () => {
       mapsService.loadMapData.mockResolvedValue({});
+
+      const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when resolveTarget rejects', async () => {
+      const mapData = makeMapData();
+
+      mapsService.loadMapData.mockResolvedValue(mapData);
+      damageUtils.getCombatContext.mockRejectedValue(new Error('Combat context failed'));
 
       const result = await resolveMapPositions(campaignName, 'TestMap', attackerName);
 

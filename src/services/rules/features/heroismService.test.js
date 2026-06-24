@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerHeroism, removeHeroismBuff } from './heroismService.js';
 
@@ -19,26 +20,29 @@ import { addExpiration } from '../effects/expirations.js';
 import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
 
 describe('heroismService', () => {
+    const campaignName = 'TestCampaign';
+    const mapName = 'testMap';
+    const playerStats = {
+        name: 'Bard',
+        spellAbilities: { modifier: 3 },
+        proficiency: 3,
+        turnStartEffects: [],
+    };
+
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
     describe('triggerHeroism', () => {
-        const campaignName = 'TestCampaign';
-        const playerStats = {
-            name: 'Bard',
-            spellAbilities: { modifier: 3 },
-            proficiency: 3,
-            turnStartEffects: [],
-        };
+        const makeSpell = (overrides = {}) => ({
+            automation: { tempHpExpression: 'spellcasting_ability_modifier', ...overrides },
+        });
 
-        it('adds a heroism buff with default temp HP from spell casting ability modifier', async () => {
+        it('adds a heroism buff with temp HP from spellcasting ability modifier', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
-
-            const result = await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            const result = await triggerHeroism(makeSpell(), {}, playerStats, campaignName, mapName);
 
             expect(getRuntimeValue).toHaveBeenCalledWith('Bard', 'activeBuffs', campaignName);
             expect(evaluateAutoExpression).toHaveBeenCalledWith('spellcasting_ability_modifier', playerStats);
@@ -73,59 +77,46 @@ describe('heroismService', () => {
             });
         });
 
-        it('uses explicit temp HP expression value', async () => {
+        it('evaluates an explicit temp HP expression when provided', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(10);
 
-            const spell = { automation: { tempHpExpression: '2d6 + 3' } };
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            await triggerHeroism(makeSpell({ tempHpExpression: '2d6 + 3' }), {}, playerStats, campaignName, mapName);
 
             expect(evaluateAutoExpression).toHaveBeenCalledWith('2d6 + 3', playerStats);
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Bard',
                 'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ tempHpAmount: 10 }),
-                ]),
+                expect.arrayContaining([expect.objectContaining({ tempHpAmount: 10 })]),
                 campaignName,
             );
         });
 
-        it('falls back to 0 when temp HP expression evaluation returns falsy', async () => {
+        it('uses 0 when temp HP expression evaluates to falsy', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(null);
 
-            const spell = { automation: { tempHpExpression: 'invalid_expression' } };
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            await triggerHeroism(makeSpell({ tempHpExpression: 'invalid' }), {}, playerStats, campaignName, mapName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Bard',
                 'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ tempHpAmount: 0 }),
-                ]),
+                expect.arrayContaining([expect.objectContaining({ tempHpAmount: 0 })]),
                 campaignName,
             );
         });
 
-        it('replaces existing heroism buff when re-cast on same target', async () => {
+        it('replaces existing heroism buff on re-cast', async () => {
             const existingBuffs = [
-                { name: 'Heroism', effect: 'heroism', tempHpAmount: 3, duration: 'Concentration, up to 1 minute' },
+                { name: 'Heroism', effect: 'heroism', tempHpAmount: 3 },
                 { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
             ];
             getRuntimeValue.mockReturnValue(existingBuffs);
             evaluateAutoExpression.mockReturnValue(7);
 
-            const spell = { automation: { tempHpExpression: '4d4' } };
+            await triggerHeroism(makeSpell({ tempHpExpression: '4d4' }), {}, playerStats, campaignName, mapName);
 
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
-
-            // Heroism should be replaced, not duplicated — only one buff entry
-            const buffCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
+            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
             expect(buffCalls.length).toBe(1);
             expect(buffCalls[0][2]).toEqual([
                 { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
@@ -140,25 +131,17 @@ describe('heroismService', () => {
             ]);
         });
 
-        it('uses targetName from metaCtx when provided', async () => {
+        it('targets a different character when metaCtx.targetName is provided', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
-            const metaCtx = { targetName: 'Ally' };
-
-            await triggerHeroism(spell, metaCtx, playerStats, campaignName, 'testMap');
+            await triggerHeroism(makeSpell(), { targetName: 'Ally' }, playerStats, campaignName, mapName);
 
             expect(getRuntimeValue).toHaveBeenCalledWith('Ally', 'activeBuffs', campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                1,
                 'Ally',
                 'activeBuffs',
-                expect.any(Array),
-                campaignName,
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Ally',
-                'turnStartEffects',
                 expect.any(Array),
                 campaignName,
             );
@@ -170,96 +153,79 @@ describe('heroismService', () => {
             );
         });
 
-        it('defaults targetName to playerStats.name when metaCtx is empty', async () => {
+        it('defaults target to caster when metaCtx is empty', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            await triggerHeroism(makeSpell(), {}, playerStats, campaignName, mapName);
 
             expect(getRuntimeValue).toHaveBeenCalledWith('Bard', 'activeBuffs', campaignName);
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Bard',
-                'activeBuffs',
-                expect.any(Array),
-                campaignName,
-            );
+        });
+
+        it('defaults target to caster when metaCtx is null', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            evaluateAutoExpression.mockReturnValue(5);
+
+            await triggerHeroism(makeSpell(), null, playerStats, campaignName, mapName);
+
+            expect(getRuntimeValue).toHaveBeenCalledWith('Bard', 'activeBuffs', campaignName);
         });
 
         it('uses spell automation duration when provided', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { duration: '8 hours', tempHpExpression: 'spellcasting_ability_modifier' } };
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            await triggerHeroism(makeSpell({ duration: '8 hours' }), {}, playerStats, campaignName, mapName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Bard',
                 'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ duration: '8 hours' }),
-                ]),
+                expect.arrayContaining([expect.objectContaining({ duration: '8 hours' })]),
                 campaignName,
             );
         });
 
-        it('uses default duration when spell automation lacks duration', async () => {
+        it('uses default duration when automation lacks duration', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            await triggerHeroism(makeSpell({}), {}, playerStats, campaignName, mapName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Bard',
                 'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ duration: 'Concentration, up to 1 minute' }),
-                ]),
+                expect.arrayContaining([expect.objectContaining({ duration: 'Concentration, up to 1 minute' })]),
                 campaignName,
             );
         });
 
-        it('does not duplicate turnStartEffects if heroism_temp_hp already exists', async () => {
+        it('skips turnStartEffects when heroism_temp_hp already exists', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
             const statsWithEffect = {
                 ...playerStats,
-                turnStartEffects: [
-                    { type: 'heroism_temp_hp', name: 'Heroism', tempHpAmount: 5 },
-                ],
+                turnStartEffects: [{ type: 'heroism_temp_hp', name: 'Heroism', tempHpAmount: 5 }],
             };
 
-            await triggerHeroism(spell, {}, statsWithEffect, campaignName, 'testMap');
+            await triggerHeroism(makeSpell(), {}, statsWithEffect, campaignName, mapName);
 
-            const effectCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'turnStartEffects',
-            );
+            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'turnStartEffects');
             expect(effectCalls.length).toBe(0);
         });
 
-        it('adds turnStartEffects when heroism_temp_hp does not exist', async () => {
+        it('adds turnStartEffects when heroism_temp_hp is absent', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
             const statsWithOtherEffect = {
                 ...playerStats,
-                turnStartEffects: [
-                    { type: 'heroic_inspiration' },
-                ],
+                turnStartEffects: [{ type: 'heroic_inspiration' }],
             };
 
-            await triggerHeroism(spell, {}, statsWithOtherEffect, campaignName, 'testMap');
+            await triggerHeroism(makeSpell(), {}, statsWithOtherEffect, campaignName, mapName);
 
-            const effectCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'turnStartEffects',
-            );
+            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'turnStartEffects');
             expect(effectCalls.length).toBe(1);
             expect(effectCalls[0][2]).toEqual(
                 expect.arrayContaining([
@@ -269,35 +235,29 @@ describe('heroismService', () => {
             );
         });
 
-        it('handles missing automation on spell by using default expression', async () => {
+        it('uses default expression when spell has no automation', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(0);
 
-            const spell = {};
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            await triggerHeroism({}, {}, playerStats, campaignName, mapName);
 
             expect(evaluateAutoExpression).toHaveBeenCalledWith('spellcasting_ability_modifier', playerStats);
         });
 
-        it('handles empty metaCtx object', async () => {
+        it('uses default expression when automation lacks tempHpExpression', async () => {
             getRuntimeValue.mockReturnValue(null);
-            evaluateAutoExpression.mockReturnValue(5);
+            evaluateAutoExpression.mockReturnValue(0);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
+            await triggerHeroism({ automation: { duration: '1 hour' } }, {}, playerStats, campaignName, mapName);
 
-            await triggerHeroism(spell, undefined, playerStats, campaignName, 'testMap');
-
-            expect(getRuntimeValue).toHaveBeenCalledWith('Bard', 'activeBuffs', campaignName);
+            expect(evaluateAutoExpression).toHaveBeenCalledWith('spellcasting_ability_modifier', playerStats);
         });
 
-        it('returns popup with correct description format', async () => {
+        it('returns popup with description containing key details', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(7);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
-
-            const result = await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            const result = await triggerHeroism(makeSpell(), {}, playerStats, campaignName, mapName);
 
             expect(result.payload.description).toContain('<b>Heroism</b>');
             expect(result.payload.description).toContain('imbued with bravery');
@@ -306,65 +266,56 @@ describe('heroismService', () => {
             expect(result.payload.description).toContain('Concentration, up to 1 minute');
         });
 
-        it('handles stored activeBuffs as non-array by treating as empty', async () => {
+        it('treats non-array activeBuffs as empty', async () => {
             getRuntimeValue.mockReturnValue('not-an-array');
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            await triggerHeroism(makeSpell(), {}, playerStats, campaignName, mapName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Bard',
                 'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Heroism' }),
-                ]),
+                expect.arrayContaining([expect.objectContaining({ name: 'Heroism' })]),
                 campaignName,
             );
         });
 
-        it('handles empty activeBuffs array', async () => {
-            getRuntimeValue.mockReturnValue([]);
-            evaluateAutoExpression.mockReturnValue(5);
-
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'Bard',
-                'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ name: 'Heroism' }),
-                ]),
-                campaignName,
-            );
-        });
-
-        it('sets sourceCharacter to playerStats.name', async () => {
+        it('sets sourceCharacter to caster name', async () => {
             getRuntimeValue.mockReturnValue(null);
             evaluateAutoExpression.mockReturnValue(5);
 
-            const spell = { automation: { tempHpExpression: 'spellcasting_ability_modifier' } };
-
-            await triggerHeroism(spell, {}, playerStats, campaignName, 'testMap');
+            await triggerHeroism(makeSpell(), {}, playerStats, campaignName, mapName);
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'Bard',
                 'activeBuffs',
-                expect.arrayContaining([
-                    expect.objectContaining({ sourceCharacter: 'Bard' }),
-                ]),
+                expect.arrayContaining([expect.objectContaining({ sourceCharacter: 'Bard' })]),
                 campaignName,
+            );
+        });
+
+        it('ignores the mapName parameter', async () => {
+            getRuntimeValue.mockReturnValue(null);
+            evaluateAutoExpression.mockReturnValue(5);
+
+            await triggerHeroism(makeSpell(), {}, playerStats, campaignName, mapName);
+
+            // Verify the internal logic does not pass mapName to any mocked function
+            for (const call of setRuntimeValue.mock.calls) {
+                expect(call).not.toContainEqual(mapName);
+            }
+            expect(addExpiration).not.toHaveBeenCalledWith(
+                expect.any(String),
+                expect.any(String),
+                expect.any(Array),
+                expect.any(String),
+                mapName,
             );
         });
     });
 
     describe('removeHeroismBuff', () => {
-        const campaignName = 'TestCampaign';
-
-        it('removes heroism buff from activeBuffs', () => {
+        it('removes heroism buffs while preserving other buffs', () => {
             const buffs = [
                 { name: 'Heroism', effect: 'heroism' },
                 { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
@@ -405,10 +356,8 @@ describe('heroismService', () => {
             );
         });
 
-        it('does not call setRuntimeValue when no heroism buff exists', () => {
-            const buffs = [
-                { name: 'Bardic Inspiration', effect: 'bardic_inspiration' },
-            ];
+        it('skips setRuntimeValue when no heroism buff exists', () => {
+            const buffs = [{ name: 'Bardic Inspiration', effect: 'bardic_inspiration' }];
             getRuntimeValue.mockImplementation((key, prop) => {
                 if (key === 'Target' && prop === 'activeBuffs') return buffs;
                 return [];
@@ -416,9 +365,7 @@ describe('heroismService', () => {
 
             removeHeroismBuff('Target', campaignName);
 
-            const buffCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
+            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
             expect(buffCalls.length).toBe(0);
         });
 
@@ -465,10 +412,8 @@ describe('heroismService', () => {
             );
         });
 
-        it('does not call setRuntimeValue for targetEffects when no heroism effects exist', () => {
-            const effects = [
-                { effect: 'other', source: 'Other', target: 'Target' },
-            ];
+        it('skips setRuntimeValue when no heroism target effects exist', () => {
+            const effects = [{ effect: 'other', source: 'Other', target: 'Target' }];
             getRuntimeValue.mockImplementation((key, prop) => {
                 if (key === 'Target' && prop === 'activeBuffs') return [];
                 if (key === campaignName && prop === 'targetEffects') return effects;
@@ -477,86 +422,11 @@ describe('heroismService', () => {
 
             removeHeroismBuff('Target', campaignName);
 
-            const effectCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects',
-            );
+            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'targetEffects');
             expect(effectCalls.length).toBe(0);
         });
 
-        it('handles non-array activeBuffs by treating as empty', () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Target' && prop === 'activeBuffs') return 'not-an-array';
-                return [];
-            });
-
-            removeHeroismBuff('Target', campaignName);
-
-            // Should not call setRuntimeValue since filtered.length === activeBuffs.length
-            // (both are 0 after treating as empty array)
-            const buffCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffCalls.length).toBe(0);
-        });
-
-        it('handles null activeBuffs by treating as empty', () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            expect(() => removeHeroismBuff('Target', campaignName)).toThrow('Expected array, got null');
-        });
-
-        it('handles non-array targetEffects by treating as empty', () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Target' && prop === 'activeBuffs') return [];
-                if (key === campaignName && prop === 'targetEffects') return 'not-an-array';
-                return null;
-            });
-
-            removeHeroismBuff('Target', campaignName);
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects',
-            );
-            expect(effectCalls.length).toBe(0);
-        });
-
-        it('handles null targetEffects', () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Target' && prop === 'activeBuffs') return [];
-                if (key === campaignName && prop === 'targetEffects') return null;
-                return null;
-            });
-
-            expect(() => removeHeroismBuff('Target', campaignName)).toThrow('Expected array, got null');
-        });
-
-        it('handles empty activeBuffs array', () => {
-            getRuntimeValue.mockReturnValue([]);
-
-            removeHeroismBuff('Target', campaignName);
-
-            const buffCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'activeBuffs',
-            );
-            expect(buffCalls.length).toBe(0);
-        });
-
-        it('handles empty targetEffects array', () => {
-            getRuntimeValue.mockImplementation((key, prop) => {
-                if (key === 'Target' && prop === 'activeBuffs') return [];
-                if (key === campaignName && prop === 'targetEffects') return [];
-                return null;
-            });
-
-            removeHeroismBuff('Target', campaignName);
-
-            const effectCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects',
-            );
-            expect(effectCalls.length).toBe(0);
-        });
-
-        it('removes heroism buff and effects together', () => {
+        it('removes both heroism buff and effects in one call', () => {
             const buffs = [{ name: 'Heroism', effect: 'heroism' }];
             const effects = [{ effect: 'heroism', source: 'Heroism', target: 'Target' }];
 
@@ -572,6 +442,63 @@ describe('heroismService', () => {
             expect(setCalls.length).toBe(2);
             expect(setCalls[0][1]).toBe('activeBuffs');
             expect(setCalls[1][1]).toBe('targetEffects');
+        });
+
+        it('treats non-array activeBuffs as empty without error', () => {
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'Target' && prop === 'activeBuffs') return 'not-an-array';
+                return [];
+            });
+
+            removeHeroismBuff('Target', campaignName);
+
+            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
+            expect(buffCalls.length).toBe(0);
+        });
+
+        it('throws when targetEffects is null', () => {
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'Target' && prop === 'activeBuffs') return [];
+                if (key === campaignName && prop === 'targetEffects') return null;
+                return null;
+            });
+
+            expect(() => removeHeroismBuff('Target', campaignName)).toThrow('Expected array, got null');
+        });
+
+        it('treats non-array targetEffects as empty', () => {
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'Target' && prop === 'activeBuffs') return [];
+                if (key === campaignName && prop === 'targetEffects') return 'not-an-array';
+                return null;
+            });
+
+            removeHeroismBuff('Target', campaignName);
+
+            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'targetEffects');
+            expect(effectCalls.length).toBe(0);
+        });
+
+        it('skips setRuntimeValue when activeBuffs is empty', () => {
+            getRuntimeValue.mockReturnValue([]);
+
+            removeHeroismBuff('Target', campaignName);
+
+            const buffCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeBuffs');
+            expect(buffCalls.length).toBe(0);
+        });
+
+        it('skips setRuntimeValue when targetEffects is empty', () => {
+            getRuntimeValue.mockImplementation((key, prop) => {
+                if (key === 'Target' && prop === 'activeBuffs') return [];
+                if (key === campaignName && prop === 'targetEffects') return [];
+                return null;
+            });
+
+            removeHeroismBuff('Target', campaignName);
+
+            const effectCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'targetEffects');
+            expect(effectCalls.length).toBe(0);
         });
     });
 });

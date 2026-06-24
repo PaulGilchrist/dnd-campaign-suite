@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { handle } from './createThrallTempHpHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
@@ -50,7 +51,7 @@ describe('createThrallTempHpHandler', () => {
     });
 
     describe('handle', () => {
-        it('should return null when Create Thrall feature not present', async () => {
+        it('should return null when Create Thrall feature not present in class features', async () => {
             const playerStats = {
                 name: 'TestWarlock',
                 level: 5,
@@ -62,8 +63,23 @@ describe('createThrallTempHpHandler', () => {
             expect(result).toBeNull();
         });
 
-        it('should check both class and subclass features', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
+        it('should return null when Create Thrall feature not present in subclass features', async () => {
+            const playerStats = {
+                name: 'TestWarlock',
+                level: 14,
+                class: {
+                    class_levels: [{ features: [] }],
+                    subclass: { class_levels: [{ features: [] }] },
+                },
+            };
+
+            const result = await handle(makeAction(), playerStats, 'campaign');
+
+            expect(result).toBeNull();
+        });
+
+        it('should find Create Thrall in subclass features when not in class features', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Aberrant Spirit' }],
             });
 
@@ -81,39 +97,62 @@ describe('createThrallTempHpHandler', () => {
 
             const result = await handle(makeAction(), playerStats, 'campaign');
 
-            expect(result).not.toBeNull();
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Aberrant Spirit');
+            expect(result.payload.description).toContain('Temporary Hit Points');
         });
 
-        it('should return null when tempHp is zero or negative', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
+        it('should return null when temp HP expression evaluates to zero', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Aberrant Spirit' }],
             });
 
-            const playerStats = {
-                name: 'TestWarlock',
-                level: 1,
-                class: { class_levels: [{ features: [{ name: 'Create Thrall' }] }] },
+            const playerStats = makePlayerStats({
                 abilities: [
                     { name: 'Charisma', bonus: -10 },
                 ],
-            };
+            });
 
             const result = await handle(makeAction({ tempHpExpression: 'warlock level + CHA modifier' }), playerStats, 'campaign');
 
             expect(result).toBeNull();
         });
 
-        it('should return null when no combat context', async () => {
-            damageUtils.getCombatContext.mockReturnValue(null);
+        it('should return null when temp HP expression evaluates to negative', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Aberrant Spirit' }],
+            });
+
+            const playerStats = makePlayerStats({
+                abilities: [
+                    { name: 'Charisma', bonus: -20 },
+                ],
+            });
+
+            const result = await handle(makeAction({ tempHpExpression: 'warlock level + CHA modifier' }), playerStats, 'campaign');
+
+            expect(result).toBeNull();
+        });
+
+        it('should return null when no combat context available', async () => {
+            damageUtils.getCombatContext.mockResolvedValue(null);
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign');
 
             expect(result).toBeNull();
         });
 
-        it('should return null when no companion found', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
-                creatures: [{ name: 'Goblin' }],
+        it('should return null when combat context has no creatures', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({ creatures: [] });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign');
+
+            expect(result).toBeNull();
+        });
+
+        it('should return null when no companion matching aberration found', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Goblin' }, { name: 'Skeleton' }],
             });
 
             const result = await handle(makeAction(), makePlayerStats(), 'campaign');
@@ -121,8 +160,8 @@ describe('createThrallTempHpHandler', () => {
             expect(result).toBeNull();
         });
 
-        it('should apply temp HP when companion found', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
+        it('should apply temp HP and return popup when companion found', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Aberrant Spirit Companion' }],
             });
 
@@ -131,7 +170,10 @@ describe('createThrallTempHpHandler', () => {
             const result = await handle(makeAction({ tempHpExpression: '10' }), makePlayerStats(), 'campaign');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Temporary Hit Points');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Create Thrall');
+            expect(result.payload.description).toContain('Aberrant Spirit Companion');
+            expect(result.payload.description).toContain('10 Temporary Hit Points');
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
                 'Aberrant Spirit Companion',
                 '_Aberrant_Spirit_Companion_tempHp',
@@ -140,8 +182,21 @@ describe('createThrallTempHpHandler', () => {
             );
         });
 
-        it('should add campaign log entry', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
+        it('should use default expression when tempHpExpression is not provided', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Aberrant Spirit' }],
+            });
+
+            runtimeState.getRuntimeValue.mockReturnValue(0);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('13 Temporary Hit Points');
+        });
+
+        it('should add campaign log entry with correct details', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Aberration Companion' }],
             });
 
@@ -153,11 +208,13 @@ describe('createThrallTempHpHandler', () => {
                 type: 'ability_use',
                 characterName: 'TestWarlock',
                 abilityName: 'Create Thrall',
+                description: 'Create Thrall: Aberration Companion gains 5 Temporary Hit Points.',
+                timestamp: expect.any(Number),
             }));
         });
 
         it('should evaluate expression with warlock level and CHA modifier', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
+            damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Aberrant Spirit' }],
             });
 
@@ -165,23 +222,26 @@ describe('createThrallTempHpHandler', () => {
 
             const result = await handle(makeAction({ tempHpExpression: 'warlock level + CHA modifier' }), makePlayerStats(), 'campaign');
 
-            expect(result).not.toBeNull();
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('13 Temporary Hit Points');
         });
 
         it('should fall back to dice rolling when expression evaluation fails', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
+            damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Aberrant Spirit' }],
             });
 
             runtimeState.getRuntimeValue.mockReturnValue(0);
 
-            await handle(makeAction({ tempHpExpression: 'invalid expression !!!' }), makePlayerStats(), 'campaign');
+            const result = await handle(makeAction({ tempHpExpression: 'invalid expression !!!' }), makePlayerStats(), 'campaign');
 
             expect(diceRoller.rollExpression).toHaveBeenCalledWith('invalid expression !!!');
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('5 Temporary Hit Points');
         });
 
         it('should accumulate temp HP on existing value', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
+            damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Aberrant Spirit' }],
             });
 
@@ -197,8 +257,8 @@ describe('createThrallTempHpHandler', () => {
             );
         });
 
-        it('should handle companion name with special characters', async () => {
-            damageUtils.getCombatContext.mockReturnValue({
+        it('should handle companion name with special characters in tempHpKey', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
                 creatures: [{ name: "Aberration's Spirit" }],
             });
 
@@ -206,7 +266,53 @@ describe('createThrallTempHpHandler', () => {
 
             const result = await handle(makeAction({ tempHpExpression: '5' }), makePlayerStats(), 'campaign');
 
-            expect(result).not.toBeNull();
+            expect(result.type).toBe('popup');
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                "Aberration's Spirit",
+                "_Aberration's_Spirit_tempHp",
+                5,
+                'campaign'
+            );
+        });
+
+        it('should return null when dice rolling also fails', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Aberrant Spirit' }],
+            });
+
+            runtimeState.getRuntimeValue.mockReturnValue(0);
+            diceRoller.rollExpression.mockReturnValue(undefined);
+
+            const result = await handle(makeAction({ tempHpExpression: 'invalid !!!' }), makePlayerStats(), 'campaign');
+
+            expect(result).toBeNull();
+        });
+
+        it('should handle missing class and subclass gracefully', async () => {
+            const playerStats = {
+                name: 'TestWarlock',
+                level: 14,
+            };
+
+            const result = await handle(makeAction(), playerStats, 'campaign');
+
+            expect(result).toBeNull();
+        });
+
+        it('should handle missing abilities array gracefully', async () => {
+            damageUtils.getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'Aberrant Spirit' }],
+            });
+
+            runtimeState.getRuntimeValue.mockReturnValue(0);
+
+            const playerStats = makePlayerStats({
+                abilities: undefined,
+            });
+
+            const result = await handle(makeAction(), playerStats, 'campaign');
+
+            expect(result.type).toBe('popup');
         });
     });
 });

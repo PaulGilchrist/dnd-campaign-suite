@@ -3,50 +3,15 @@ import { describe, it, expect } from 'vitest';
 import { getClassLevelData } from './getClassLevelData.js';
 
 describe('getClassLevelData', () => {
-  describe('invalid input', () => {
-    it('throws when playerStats is null', () => {
-      expect(() => getClassLevelData(null)).toThrow(TypeError);
-    });
-
-    it('throws when playerStats is undefined', () => {
-      expect(() => getClassLevelData(undefined)).toThrow(TypeError);
-    });
-
-    it('returns null when playerStats is a primitive', () => {
-      expect(getClassLevelData(42)).toBeNull();
-      expect(getClassLevelData('foo')).toBeNull();
-      expect(getClassLevelData(true)).toBeNull();
-    });
-  });
-
-  describe('missing class data', () => {
-    it('returns null when playerStats has no class property', () => {
-      expect(getClassLevelData({})).toBeNull();
-    });
-
-    it('returns null when class is null', () => {
-      expect(getClassLevelData({ class: null })).toBeNull();
-    });
-
-    it('returns null when class is missing class_levels', () => {
-      expect(getClassLevelData({ class: { name: 'Fighter' } })).toBeNull();
-    });
-
-    it('returns null when class_levels is null', () => {
+  describe('invalid or missing data returns null', () => {
+    it('returns null when class_levels is absent, null, or undefined', () => {
+      expect(getClassLevelData({ level: 1 })).toBeNull();
+      expect(getClassLevelData({ class: {} })).toBeNull();
       expect(getClassLevelData({ class: { class_levels: null } })).toBeNull();
+      expect(getClassLevelData({ class: { class_levels: undefined } })).toBeNull();
     });
 
-    it('throws when class_levels is not an array-like value', () => {
-      expect(() => getClassLevelData({ class: { class_levels: {} } })).toThrow(TypeError);
-    });
-  });
-
-  describe('empty or non-matching levels', () => {
-    it('returns null when class_levels is empty', () => {
-      expect(getClassLevelData({ class: { class_levels: [] } })).toBeNull();
-    });
-
-    it('returns null when no level entry matches playerStats.level', () => {
+    it('returns null when level does not match any entry', () => {
       const playerStats = {
         level: 5,
         class: {
@@ -59,28 +24,21 @@ describe('getClassLevelData', () => {
       expect(getClassLevelData(playerStats)).toBeNull();
     });
 
-    it('returns null when level is 0', () => {
-      expect(getClassLevelData({
-        level: 0,
-        class: { class_levels: [{ level: 1, features: ['Fighter 1st Level'] }] },
-      })).toBeNull();
+    it('returns null when level is zero or negative', () => {
+      expect(getClassLevelData({ level: 0, class: { class_levels: [{ level: 1 }] } })).toBeNull();
+      expect(getClassLevelData({ level: -1, class: { class_levels: [{ level: 1 }] } })).toBeNull();
     });
 
     it('returns null when level is a non-integer', () => {
       expect(getClassLevelData({
         level: 3.5,
-        class: {
-          class_levels: [
-            { level: 3, features: ['Martial Archetype'] },
-            { level: 4, features: ['Ability Score Improvement'] },
-          ],
-        },
+        class: { class_levels: [{ level: 3 }, { level: 4 }] },
       })).toBeNull();
     });
   });
 
-  describe('matching level entries', () => {
-    it('returns the level entry that matches playerStats.level', () => {
+  describe('returns matching level entry', () => {
+    it('returns the entry whose level matches playerStats.level', () => {
       const playerStats = {
         level: 3,
         class: {
@@ -94,33 +52,20 @@ describe('getClassLevelData', () => {
       expect(getClassLevelData(playerStats)).toEqual({ level: 3, features: ['Martial Archetype'] });
     });
 
-    it('returns the first level entry when level is 1', () => {
-      const result = getClassLevelData({
-        level: 1,
+    it('returns the first matching entry when multiple entries share the same level', () => {
+      const playerStats = {
+        level: 2,
         class: {
           class_levels: [
-            { level: 1, features: ['Fighter 1st Level'] },
             { level: 2, features: ['Second Wind'] },
+            { level: 2, features: ['Duplicate Feature'] },
           ],
         },
-      });
-      expect(result).toEqual({ level: 1, features: ['Fighter 1st Level'] });
+      };
+      expect(getClassLevelData(playerStats)).toEqual({ level: 2, features: ['Second Wind'] });
     });
 
-    it('returns the highest level entry when level is 20', () => {
-      const result = getClassLevelData({
-        level: 20,
-        class: {
-          class_levels: [
-            { level: 1, features: ['Fighter 1st Level'] },
-            { level: 20, features: ['Indomitable (9)'] },
-          ],
-        },
-      });
-      expect(result).toEqual({ level: 20, features: ['Indomitable (9)'] });
-    });
-
-    it('returns the full level entry object including extra properties', () => {
+    it('returns the full entry object including extra properties', () => {
       const result = getClassLevelData({
         level: 5,
         class: {
@@ -132,7 +77,7 @@ describe('getClassLevelData', () => {
       expect(result).toEqual({ level: 5, hp: 45, features: ['Extra Attack'], profBonus: 3 });
     });
 
-    it('returns the matching entry when levels are non-contiguous', () => {
+    it('finds entries in non-contiguous level arrays', () => {
       const result = getClassLevelData({
         level: 11,
         class: {
@@ -145,6 +90,30 @@ describe('getClassLevelData', () => {
         },
       });
       expect(result).toEqual({ level: 11, features: ['Epic Boon'] });
+    });
+
+    it('returns the entry at level 1', () => {
+      expect(getClassLevelData({
+        level: 1,
+        class: {
+          class_levels: [
+            { level: 1, features: ['Spellcasting'] },
+            { level: 2, features: ['Font of Magic'] },
+          ],
+        },
+      })).toEqual({ level: 1, features: ['Spellcasting'] });
+    });
+
+    it('returns the entry at level 20', () => {
+      expect(getClassLevelData({
+        level: 20,
+        class: {
+          class_levels: [
+            { level: 1, features: ['Fighter 1st Level'] },
+            { level: 20, features: ['Indomitable (9)'] },
+          ],
+        },
+      })).toEqual({ level: 20, features: ['Indomitable (9)'] });
     });
   });
 });

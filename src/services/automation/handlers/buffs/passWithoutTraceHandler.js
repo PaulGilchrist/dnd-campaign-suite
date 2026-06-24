@@ -56,10 +56,10 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
 export function getPassWithoutTraceStealthBonus(playerName, campaignName) {
     const stored = getRuntimeValue(playerName, STEALTH_BONUS_KEY, campaignName);
-    return typeof stored === 'number' ? stored : 0;
+    return typeof stored === 'number' && !isNaN(stored) ? stored : 0;
 }
 
 export function isPassWithoutTraceActive(playerName, campaignName) {
-    const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
-    return activeBuffs.some(b => b.name === 'Pass Without Trace' && b.effect === 'pass_without_trace');
+    const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName);
+    return Array.isArray(activeBuffs) && activeBuffs.some(b => b.name === 'Pass Without Trace' && b.effect === 'pass_without_trace');
 }

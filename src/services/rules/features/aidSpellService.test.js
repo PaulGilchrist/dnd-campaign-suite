@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerAidSpell, confirmAidSpell } from './aidSpellService.js';
 import { executeHandler, applyAidEffect } from '../../automation/index.js';
@@ -7,87 +8,46 @@ vi.mock('../../automation/index.js', () => ({
     applyAidEffect: vi.fn(),
 }));
 
+const campaignName = 'TestCampaign';
+const mapName = 'testMap';
+const playerStats = { name: 'Cleric', proficiency: 4 };
+
 describe('aidSpellService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    const campaignName = 'TestCampaign';
-    const mapName = 'testMap';
-    const playerStats = { name: 'Cleric', proficiency: 4 };
-
     describe('triggerAidSpell', () => {
-        it('returns null for non-Aid spells', async () => {
-            const result = await triggerAidSpell(
-                { name: 'Cure Wounds', level: 1 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
+        it('returns null when spell name is missing', async () => {
+            const result = await triggerAidSpell({}, {}, playerStats, campaignName, mapName);
             expect(result).toBeNull();
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns result and calls executeHandler for "Aid" spell', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
-
-            const result = await triggerAidSpell(
-                { name: 'Aid', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    name: 'Aid',
-                    automation: expect.objectContaining({
-                        type: 'aid',
-                        maxTargets: 3,
-                        hpMaxIncreaseExpression: '5 + ((spellSlotLevel - 2) * 5)',
-                    }),
-                    spellSlotLevel: 2,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
+        it('returns null when spell name is null', async () => {
+            const result = await triggerAidSpell({ name: null }, {}, playerStats, campaignName, mapName);
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('handles lowercase "aid" spell name', async () => {
+        it('returns null for non-Aid spells', async () => {
+            const result = await triggerAidSpell({ name: 'Cure Wounds', level: 1 }, {}, playerStats, campaignName, mapName);
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('matches spell names case-insensitively', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
+            const names = ['aid', 'Aid', 'AID', 'AiD'];
 
-            const result = await triggerAidSpell(
-                { name: 'aid', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
+            for (const name of names) {
+                await triggerAidSpell({ name, level: 2 }, {}, playerStats, campaignName, mapName);
+                expect(executeHandler).toHaveBeenCalled();
+                vi.clearAllMocks();
+            }
         });
 
-        it('handles mixed-case "AID" spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerAidSpell(
-                { name: 'AID', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
-        });
-
-        it('uses slotLevel from metaCtx when provided', async () => {
+        it('passes spellSlotLevel from metaCtx.slotLevel when provided', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerAidSpell(
@@ -125,7 +85,7 @@ describe('aidSpellService', () => {
             );
         });
 
-        it('defaults to level 2 when neither metaCtx.slotLevel nor spell.level are available', async () => {
+        it('defaults to level 2 when neither slotLevel nor spell.level are available', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerAidSpell(
@@ -144,79 +104,15 @@ describe('aidSpellService', () => {
             );
         });
 
-        it('returns result from executeHandler on success', async () => {
-            const expectedResult = {
-                type: 'popup',
-                payload: { type: 'automation_info', name: 'Aid', description: 'Aid affects...' },
-            };
-            executeHandler.mockResolvedValue(expectedResult);
-
-            const result = await triggerAidSpell(
-                { name: 'Aid', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBe(expectedResult);
-        });
-
-        it('returns null when executeHandler returns null', async () => {
-            executeHandler.mockResolvedValue(null);
-
-            const result = await triggerAidSpell(
-                { name: 'Aid', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
-        });
-
-        it('returns null when executeHandler throws an error', async () => {
-            executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-            const result = await triggerAidSpell(
-                { name: 'Aid', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(result).toBeNull();
-        });
-
-        it('passes the spell object into the action', async () => {
+        it('passes the spell object and range to the action', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Aid', level: 2, school: 'Abjuration' };
+            const spell = { name: 'Aid', level: 2, school: 'Abjuration', range: '60 feet' };
 
             await triggerAidSpell(spell, {}, playerStats, campaignName, mapName);
 
             expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('sets range from spell.range property', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerAidSpell(
-                { name: 'Aid', level: 2, range: '60 feet' },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
+                    spell,
                     automation: expect.objectContaining({ range: '60 feet' }),
                 }),
                 playerStats,
@@ -246,28 +142,7 @@ describe('aidSpellService', () => {
             );
         });
 
-        it('builds action with maxTargets of 3', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerAidSpell(
-                { name: 'Aid', level: 2 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ maxTargets: 3 }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('builds action with correct hpMaxIncreaseExpression', async () => {
+        it('builds action with correct automation defaults', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerAidSpell(
@@ -281,6 +156,8 @@ describe('aidSpellService', () => {
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
                     automation: expect.objectContaining({
+                        type: 'aid',
+                        maxTargets: 3,
                         hpMaxIncreaseExpression: '5 + ((spellSlotLevel - 2) * 5)',
                     }),
                 }),
@@ -290,22 +167,29 @@ describe('aidSpellService', () => {
             );
         });
 
-        it('handles undefined spell name gracefully', async () => {
+        it('returns handler result on success', async () => {
+            const expectedResult = {
+                type: 'popup',
+                payload: { type: 'automation_info', name: 'Aid', description: 'Aid affects...' },
+            };
+            executeHandler.mockResolvedValue(expectedResult);
+
             const result = await triggerAidSpell(
-                {},
+                { name: 'Aid', level: 2 },
                 {},
                 playerStats,
                 campaignName,
                 mapName,
             );
 
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+            expect(result).toEqual(expectedResult);
         });
 
-        it('handles null spell name gracefully', async () => {
+        it('returns null when handler returns null', async () => {
+            executeHandler.mockResolvedValue(null);
+
             const result = await triggerAidSpell(
-                { name: null },
+                { name: 'Aid', level: 2 },
                 {},
                 playerStats,
                 campaignName,
@@ -313,7 +197,26 @@ describe('aidSpellService', () => {
             );
 
             expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
+        });
+
+        it('catches handler errors, logs them, and returns null', async () => {
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+            executeHandler.mockRejectedValue(new Error('Handler failed'));
+
+            const result = await triggerAidSpell(
+                { name: 'Aid', level: 2 },
+                {},
+                playerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(result).toBeNull();
+            expect(consoleSpy).toHaveBeenCalledWith(
+                '[aidSpell] Failed to execute Aid handler:',
+                expect.any(Error),
+            );
+            consoleSpy.mockRestore();
         });
     });
 
@@ -325,25 +228,24 @@ describe('aidSpellService', () => {
         };
         const targetNames = ['Gromp', 'Liala', 'Kaelen'];
 
-        it('calls applyAidEffect with correct arguments', async () => {
-            applyAidEffect.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
-
-            const result = await confirmAidSpell(action, playerStats, campaignName, mapName, targetNames);
-
-            expect(applyAidEffect).toHaveBeenCalledWith(action, playerStats, campaignName, mapName, targetNames);
-            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
-        });
-
-        it('returns the result from applyAidEffect on success', async () => {
+        it('returns the effect application result on success', async () => {
             const expectedResult = { type: 'popup', payload: { type: 'automation_info', name: 'Aid Applied' } };
             applyAidEffect.mockResolvedValue(expectedResult);
 
             const result = await confirmAidSpell(action, playerStats, campaignName, mapName, targetNames);
 
-            expect(result).toBe(expectedResult);
+            expect(result).toEqual(expectedResult);
         });
 
-        it('returns null when applyAidEffect returns null', async () => {
+        it('passes all arguments through to applyAidEffect', async () => {
+            applyAidEffect.mockResolvedValue({ type: 'popup' });
+
+            await confirmAidSpell(action, playerStats, campaignName, mapName, targetNames);
+
+            expect(applyAidEffect).toHaveBeenCalledWith(action, playerStats, campaignName, mapName, targetNames);
+        });
+
+        it('returns null when effect application returns null', async () => {
             applyAidEffect.mockResolvedValue(null);
 
             const result = await confirmAidSpell(action, playerStats, campaignName, mapName, targetNames);
@@ -351,24 +253,21 @@ describe('aidSpellService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when applyAidEffect throws an error', async () => {
+        it('catches effect errors, logs them, and returns null', async () => {
+            const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
             applyAidEffect.mockRejectedValue(new Error('Aid effect failed'));
 
             const result = await confirmAidSpell(action, playerStats, campaignName, mapName, targetNames);
 
             expect(result).toBeNull();
+            expect(consoleSpy).toHaveBeenCalledWith(
+                '[aidSpell] Failed to apply Aid effect:',
+                expect.any(Error),
+            );
+            consoleSpy.mockRestore();
         });
 
-        it('passes targetNames correctly with multiple targets', async () => {
-            applyAidEffect.mockResolvedValue({ type: 'popup' });
-            const manyTargets = ['A', 'B', 'C', 'D'];
-
-            await confirmAidSpell(action, playerStats, campaignName, mapName, manyTargets);
-
-            expect(applyAidEffect).toHaveBeenCalledWith(action, playerStats, campaignName, mapName, manyTargets);
-        });
-
-        it('handles empty targetNames array', async () => {
+        it('passes empty targetNames array through to effect application', async () => {
             applyAidEffect.mockResolvedValue({ type: 'popup' });
 
             await confirmAidSpell(action, playerStats, campaignName, mapName, []);

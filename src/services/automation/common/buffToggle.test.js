@@ -6,15 +6,36 @@ import { toggleBuff, getActiveBuffs, isBuffActive } from './buffToggle.js';
 // ── Helpers ─────────────────────────────────────────────────────
 
 function resetRuntime() {
-    const keys = [...storeKeys];
-    for (const k of keys) { clearRuntimeState(k); }
-    storeKeys.clear();
+    clearRuntimeState('fighter');
+    clearRuntimeState('paladin');
+    clearRuntimeState('wizard');
+    clearRuntimeState('ally-char');
+    clearRuntimeState('rogue');
+    clearRuntimeState('bard');
+    clearRuntimeState('full-buff-char');
+    clearRuntimeState('cleric');
+    clearRuntimeState('minimal-char');
+    clearRuntimeState('monk');
+    clearRuntimeState('bard2');
+    clearRuntimeState('similar-names');
+    clearRuntimeState('broken');
+    clearRuntimeState('null-buffs');
+    clearRuntimeState('never-initialized');
+    clearRuntimeState('empty-string');
+    clearRuntimeState('numeric');
+    clearRuntimeState('empty-char');
+    clearRuntimeState('buffed-char');
+    clearRuntimeState('bad-buffs');
+    clearRuntimeState('obj-buffs');
+    clearRuntimeState('num-buffs');
+    clearRuntimeState('check-char');
+    clearRuntimeState('miss-char');
+    clearRuntimeState('none-char');
+    clearRuntimeState('case-char');
+    clearRuntimeState('corrupted-char');
+    clearRuntimeState('multi-char');
     localStorage.clear();
 }
-
-function trackKey(k) { storeKeys.add(k); }
-
-const storeKeys = new Set();
 
 function makeAuto(overrides = {}) {
     return {
@@ -52,8 +73,8 @@ describe('toggleBuff', () => {
     const campaign = 'TestCampaign';
 
     describe('activation', () => {
-        it('returns result with isActive true and wasActive false when buff is not yet active', () => {
-            trackKey('fighter');
+        it('returns isActive=true wasActive=false when buff is not yet active', () => {
+            clearRuntimeState('fighter');
             const auto = makeAuto({ effect: '+2 AC', duration: 'concentration' });
             const result = toggleBuff('fighter', 'Shield', auto, campaign);
 
@@ -62,8 +83,8 @@ describe('toggleBuff', () => {
             expect(result.targetName).toBe('fighter');
         });
 
-        it('stores the buff in runtime state', () => {
-            trackKey('paladin');
+        it('stores the buff in runtime state under the player key', () => {
+            clearRuntimeState('paladin');
             const auto = makeAuto({ effect: '+2 AC' });
             toggleBuff('paladin', 'Divine Shield', auto, campaign);
 
@@ -73,7 +94,7 @@ describe('toggleBuff', () => {
         });
 
         it('preserves existing buffs when adding a new one', () => {
-            trackKey('wizard');
+            clearRuntimeState('wizard');
             const auto1 = makeAuto({ effect: 'invisibility' });
             toggleBuff('wizard', 'Invisibility', auto1, campaign);
 
@@ -86,8 +107,8 @@ describe('toggleBuff', () => {
             expect(names).toContain('Haste');
         });
 
-        it('uses targetName when provided instead of playerName', () => {
-            trackKey('ally-char');
+        it('uses targetName instead of playerName when provided', () => {
+            clearRuntimeState('ally-char');
             const auto = makeAuto({ effect: 'bless' });
             const result = toggleBuff('caster', 'Bless', auto, campaign, 'ally-char');
 
@@ -97,7 +118,7 @@ describe('toggleBuff', () => {
         });
 
         it('defaults target to playerName when targetName is undefined', () => {
-            trackKey('rogue');
+            clearRuntimeState('rogue');
             const auto = makeAuto({ effect: 'stealth' });
             const result = toggleBuff('rogue', 'Cunning Action', auto, campaign);
 
@@ -105,16 +126,16 @@ describe('toggleBuff', () => {
         });
 
         it('defaults target to playerName when targetName is empty string', () => {
-            trackKey('bard');
+            clearRuntimeState('bard');
             const auto = makeAuto({ effect: 'inspire' });
             const result = toggleBuff('bard', 'Inspiration', auto, campaign, '');
 
             expect(result.targetName).toBe('bard');
         });
 
-        it('stores all buff fields from the auto object', () => {
-            trackKey('full-buff-char');
-            const auto = makeAuto({
+        it('stores all buff fields from the auto object with correct key mapping', () => {
+            clearRuntimeState('full-buff-char');
+            const auto = {
                 effect: '+3 to saves',
                 duration: '1 hour',
                 enemies_disadvantage_saves: ['str', 'dex'],
@@ -129,8 +150,7 @@ describe('toggleBuff', () => {
                 resistanceTypes: ['fire', 'cold'],
                 acBonus: 3,
                 saveBonus: 2,
-                sourceCharacter: undefined,
-            });
+            };
             toggleBuff('full-buff-char', 'Full Buff', auto, campaign);
 
             const buff = getActiveBuffs('full-buff-char', campaign)[0];
@@ -152,7 +172,7 @@ describe('toggleBuff', () => {
         });
 
         it('sets sourceCharacter to the playerName that triggered the toggle', () => {
-            trackKey('cleric');
+            clearRuntimeState('cleric');
             const auto = makeAuto({ effect: 'heal' });
             toggleBuff('cleric', 'Cure Wounds', auto, campaign);
 
@@ -160,7 +180,7 @@ describe('toggleBuff', () => {
         });
 
         it('defaults missing optional fields to safe values', () => {
-            trackKey('minimal-char');
+            clearRuntimeState('minimal-char');
             const auto = { effect: 'hex', duration: '1 hour' };
             toggleBuff('minimal-char', 'Hex', auto, campaign);
 
@@ -181,8 +201,8 @@ describe('toggleBuff', () => {
     });
 
     describe('deactivation', () => {
-        it('returns result with isActive false and wasActive true when buff is toggled off', () => {
-            trackKey('monk');
+        it('returns isActive=false wasActive=true when toggling off an active buff', () => {
+            clearRuntimeState('monk');
             const auto = makeAuto({ effect: 'stunned' });
             toggleBuff('monk', 'Stunning Strike', auto, campaign);
             const result = toggleBuff('monk', 'Stunning Strike', auto, campaign);
@@ -193,7 +213,7 @@ describe('toggleBuff', () => {
         });
 
         it('deactivating one buff leaves others intact', () => {
-            trackKey('bard2');
+            clearRuntimeState('bard2');
             const auto1 = makeAuto({ effect: 'a' });
             const auto2 = makeAuto({ effect: 'b' });
             toggleBuff('bard2', 'BuffA', auto1, campaign);
@@ -205,8 +225,8 @@ describe('toggleBuff', () => {
             expect(result.buffs[0].name).toBe('BuffB');
         });
 
-        it('removes only the matching buff name, not similarly named ones', () => {
-            trackKey('similar-names');
+        it('removes only the exact matching buff name, not similarly named ones', () => {
+            clearRuntimeState('similar-names');
             const auto1 = makeAuto({ effect: 'a' });
             const auto2 = makeAuto({ effect: 'b' });
             toggleBuff('similar-names', 'Shield', auto1, campaign);
@@ -219,58 +239,33 @@ describe('toggleBuff', () => {
         });
     });
 
-    describe('edge cases', () => {
-        it('treats non-array stored value as empty array and starts fresh', () => {
-            trackKey('broken');
-            setRuntimeProp('broken', 'activeBuffs', 'not-an-array', campaign);
+    describe('edge cases — corrupted stored state', () => {
+        const corruptValues = [
+            { label: 'string', value: 'not-an-array' },
+            { label: 'null', value: null },
+            { label: 'undefined (never set)', value: undefined },
+            { label: 'empty string', value: '' },
+            { label: 'number', value: 42 },
+            { label: 'object', value: { name: 'foo' } },
+        ];
 
-            const auto = makeAuto({ effect: 'fix' });
-            const result = toggleBuff('broken', 'FixIt', auto, campaign);
+        for (const { label, value } of corruptValues) {
+            it(`treats ${label} stored value as empty array`, () => {
+                const charKey = `corrupt-${label.replace(/\s+/g, '-')}`;
+                clearRuntimeState(charKey);
+                if (value !== undefined) {
+                    setRuntimeProp(charKey, 'activeBuffs', value, campaign);
+                }
 
-            expect(result.buffs).toHaveLength(1);
-            expect(result.buffs[0].name).toBe('FixIt');
-            expect(result.buffs[0].effect).toBe('fix');
-        });
+                const auto = makeAuto({ effect: 'fix' });
+                const result = toggleBuff(charKey, 'FixIt', auto, campaign);
 
-        it('treats null stored value as empty array and starts fresh', () => {
-            trackKey('null-buffs');
-            setRuntimeProp('null-buffs', 'activeBuffs', null, campaign);
-
-            const auto = makeAuto({ effect: 'repair' });
-            const result = toggleBuff('null-buffs', 'Repair', auto, campaign);
-
-            expect(result.buffs).toHaveLength(1);
-            expect(result.buffs[0].name).toBe('Repair');
-        });
-
-        it('handles undefined stored value as empty array', () => {
-            // No prior call to setRuntimeProp — the key was never initialized
-            const auto = makeAuto({ effect: 'new' });
-            const result = toggleBuff('never-initialized', 'NewBuff', auto, campaign);
-
-            expect(result.buffs).toHaveLength(1);
-            expect(result.isActive).toBe(true);
-        });
-
-        it('handles empty string stored value as empty array', () => {
-            trackKey('empty-string');
-            setRuntimeProp('empty-string', 'activeBuffs', '', campaign);
-
-            const auto = makeAuto({ effect: 'new' });
-            const result = toggleBuff('empty-string', 'NewBuff', auto, campaign);
-
-            expect(result.buffs).toHaveLength(1);
-        });
-
-        it('handles numeric stored value as empty array', () => {
-            trackKey('numeric');
-            setRuntimeProp('numeric', 'activeBuffs', 42, campaign);
-
-            const auto = makeAuto({ effect: 'new' });
-            const result = toggleBuff('numeric', 'NewBuff', auto, campaign);
-
-            expect(result.buffs).toHaveLength(1);
-        });
+                expect(result.buffs).toHaveLength(1);
+                expect(result.buffs[0].name).toBe('FixIt');
+                expect(result.buffs[0].effect).toBe('fix');
+                expect(result.isActive).toBe(true);
+            });
+        }
     });
 });
 
@@ -278,12 +273,12 @@ describe('getActiveBuffs', () => {
     const campaign = 'TestCampaign';
 
     it('returns empty array when no buffs stored for the character', () => {
-        trackKey('empty-char');
+        clearRuntimeState('empty-char');
         expect(getActiveBuffs('empty-char', campaign)).toEqual([]);
     });
 
-    it('returns the stored buffs array', () => {
-        trackKey('buffed-char');
+    it('returns the stored buffs array with correct structure', () => {
+        clearRuntimeState('buffed-char');
         setRuntimeProp('buffed-char', 'activeBuffs', [
             { name: 'Bless', effect: '+1 saves' },
             { name: 'Haste', effect: '+speed' },
@@ -295,32 +290,20 @@ describe('getActiveBuffs', () => {
         expect(buffs[1].name).toBe('Haste');
     });
 
-    it('returns empty array when stored value is not an array (string)', () => {
-        trackKey('bad-buffs');
-        setRuntimeProp('bad-buffs', 'activeBuffs', 'corrupted', campaign);
-        expect(getActiveBuffs('bad-buffs', campaign)).toEqual([]);
-    });
+    it('returns empty array for any non-array stored value', () => {
+        const nonArrayValues = [
+            { label: 'string', value: 'corrupted' },
+            { label: 'object', value: { name: 'Foo' } },
+            { label: 'null', value: null },
+            { label: 'number', value: 42 },
+        ];
 
-    it('returns empty array when stored value is an object (not array)', () => {
-        trackKey('obj-buffs');
-        setRuntimeProp('obj-buffs', 'activeBuffs', { name: 'Foo' }, campaign);
-        expect(getActiveBuffs('obj-buffs', campaign)).toEqual([]);
-    });
-
-    it('returns empty array when stored value is null', () => {
-        trackKey('null-buffs');
-        setRuntimeProp('null-buffs', 'activeBuffs', null, campaign);
-        expect(getActiveBuffs('null-buffs', campaign)).toEqual([]);
-    });
-
-    it('returns empty array when stored value is undefined (key never set)', () => {
-        expect(getActiveBuffs('never-set', campaign)).toEqual([]);
-    });
-
-    it('returns empty array when stored value is a number', () => {
-        trackKey('num-buffs');
-        setRuntimeProp('num-buffs', 'activeBuffs', 42, campaign);
-        expect(getActiveBuffs('num-buffs', campaign)).toEqual([]);
+        for (const { label, value } of nonArrayValues) {
+            const charKey = `bad-${label}`;
+            clearRuntimeState(charKey);
+            setRuntimeProp(charKey, 'activeBuffs', value, campaign);
+            expect(getActiveBuffs(charKey, campaign)).toEqual([]);
+        }
     });
 });
 
@@ -328,7 +311,7 @@ describe('isBuffActive', () => {
     const campaign = 'TestCampaign';
 
     it('returns true when buff name matches an active buff', () => {
-        trackKey('check-char');
+        clearRuntimeState('check-char');
         setRuntimeProp('check-char', 'activeBuffs', [
             { name: 'Bless', effect: '+1' },
         ], campaign);
@@ -337,7 +320,7 @@ describe('isBuffActive', () => {
     });
 
     it('returns false when buff name does not match any active buff', () => {
-        trackKey('miss-char');
+        clearRuntimeState('miss-char');
         setRuntimeProp('miss-char', 'activeBuffs', [
             { name: 'Haste', effect: '+speed' },
         ], campaign);
@@ -346,12 +329,12 @@ describe('isBuffActive', () => {
     });
 
     it('returns false when no buffs are active', () => {
-        trackKey('none-char');
+        clearRuntimeState('none-char');
         expect(isBuffActive('none-char', 'AnyBuff', campaign)).toBe(false);
     });
 
     it('is case-sensitive for buff name matching', () => {
-        trackKey('case-char');
+        clearRuntimeState('case-char');
         setRuntimeProp('case-char', 'activeBuffs', [
             { name: 'bless', effect: '+1' },
         ], campaign);
@@ -361,13 +344,13 @@ describe('isBuffActive', () => {
     });
 
     it('returns false when stored value is not an array', () => {
-        trackKey('corrupted-char');
+        clearRuntimeState('corrupted-char');
         setRuntimeProp('corrupted-char', 'activeBuffs', 'not-an-array', campaign);
         expect(isBuffActive('corrupted-char', 'Foo', campaign)).toBe(false);
     });
 
-    it('handles multiple buffs and finds the correct one', () => {
-        trackKey('multi-char');
+    it('finds the correct buff among many active buffs', () => {
+        clearRuntimeState('multi-char');
         setRuntimeProp('multi-char', 'activeBuffs', [
             { name: 'Haste', effect: '+speed' },
             { name: 'Bless', effect: '+1' },

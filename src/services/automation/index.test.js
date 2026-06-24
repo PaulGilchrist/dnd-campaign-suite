@@ -1,79 +1,108 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports ───────────────────────────────────────
-
-vi.mock('./handlers/combat/saveOnlyHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/saveAttackHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/healing/healingHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/buffs/buffHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/buffs/conditionHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/resources/sorceryHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/spells/spellCastHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/initiativeHandler.js', () => ({ handle: vi.fn() }));
-
-vi.mock('./handlers/resources/resourcePoolHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/resources/fontOfMagicHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/healing/healingPoolHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/spells/spellModifierHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/combatStanceHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/reactions/reactionDamageHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/reactions/reactionDebuffHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/attackRiderHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/buffs/tempHpBuffHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/weaponMasteryHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/buffs/buffAllyHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/healing/revivificationHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/class-bard/bardicInspirationHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/autoRerollHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/class-bard/bardicInspirationUseHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/reactions/reactionBonusHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/postCastRiderHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/class-bard/bardicInspirationDefenseHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/class-bard/bardicInspirationOffenseHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/class-cleric-paladin/divineSparkHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/bonusActionAttackHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/combat/extraActionHandler.js', () => ({ handle: vi.fn() }));
-vi.mock('./handlers/spells/eyebiteHandler.js', () => ({ handle: vi.fn() }));
-
-// ── Imports ────────────────────────────────────────────────────
-
 import { executeHandler } from './index.js';
-import * as saveOnlyHandler from './handlers/combat/saveOnlyHandler.js';
-import * as saveAttackHandler from './handlers/combat/saveAttackHandler.js';
-import * as healingHandler from './handlers/healing/healingHandler.js';
-import * as buffHandler from './handlers/buffs/buffHandler.js';
-import * as conditionHandler from './handlers/buffs/conditionHandler.js';
-import * as sorceryHandler from './handlers/resources/sorceryHandler.js';
-import * as spellCastHandler from './handlers/spells/spellCastHandler.js';
-import * as initiativeHandler from './handlers/combat/initiativeHandler.js';
 
-import * as resourcePoolHandler from './handlers/resources/resourcePoolHandler.js';
-import * as fontOfMagicHandler from './handlers/resources/fontOfMagicHandler.js';
-import * as healingPoolHandler from './handlers/healing/healingPoolHandler.js';
-import * as spellModifierHandler from './handlers/spells/spellModifierHandler.js';
-import * as combatStanceHandler from './handlers/combat/combatStanceHandler.js';
-import * as reactionDamageHandler from './handlers/reactions/reactionDamageHandler.js';
-import * as reactionDebuffHandler from './handlers/reactions/reactionDebuffHandler.js';
-import * as attackRiderHandler from './handlers/combat/attackRiderHandler.js';
-import * as tempHpBuffHandler from './handlers/buffs/tempHpBuffHandler.js';
-import * as weaponMasteryHandler from './handlers/combat/weaponMasteryHandler.js';
-import * as buffAllyHandler from './handlers/buffs/buffAllyHandler.js';
-import * as revivificationHandler from './handlers/healing/revivificationHandler.js';
-import * as bardicInspirationHandler from './handlers/class-bard/bardicInspirationHandler.js';
-import * as autoRerollHandler from './handlers/combat/autoRerollHandler.js';
-import * as bardicInspirationUseHandler from './handlers/class-bard/bardicInspirationUseHandler.js';
-import * as reactionBonusHandler from './handlers/reactions/reactionBonusHandler.js';
-import * as postCastRiderHandler from './handlers/combat/postCastRiderHandler.js';
-import * as bardicInspirationDefenseHandler from './handlers/class-bard/bardicInspirationDefenseHandler.js';
-import * as bardicInspirationOffenseHandler from './handlers/class-bard/bardicInspirationOffenseHandler.js';
-import * as divineSparkHandler from './handlers/class-cleric-paladin/divineSparkHandler.js';
-import * as divineInterventionHandler from './handlers/class-cleric-paladin/divineInterventionHandler.js';
-import * as bonusActionAttackHandler from './handlers/combat/bonusActionAttackHandler.js';
-import * as extraActionHandler from './handlers/combat/extraActionHandler.js';
-import * as eyebiteHandler from './handlers/spells/eyebiteHandler.js';
+// ── Module-level mocks (must use inline factories due to hoisting) ─
 
-// ── Helpers ────────────────────────────────────────────────────
+vi.mock('./handlers/combat/saveOnlyHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'save_only' }),
+}));
+vi.mock('./handlers/combat/saveAttackHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'save_attack' }),
+}));
+vi.mock('./handlers/healing/healingHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'shared_healing' }),
+}));
+vi.mock('./handlers/buffs/buffHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'buff' }),
+}));
+vi.mock('./handlers/buffs/conditionHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'condition' }),
+}));
+vi.mock('./handlers/resources/sorceryHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'shared_sorcery' }),
+}));
+vi.mock('./handlers/spells/spellCastHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'spell_cast' }),
+}));
+vi.mock('./handlers/combat/initiativeHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'initiative' }),
+}));
+vi.mock('./handlers/resources/resourcePoolHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'resource_pool' }),
+}));
+vi.mock('./handlers/resources/fontOfMagicHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'font_of_magic' }),
+}));
+vi.mock('./handlers/healing/healingPoolHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'healing_pool' }),
+}));
+vi.mock('./handlers/spells/spellModifierHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'spell_modifier' }),
+}));
+vi.mock('./handlers/combat/combatStanceHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'combat_stance' }),
+}));
+vi.mock('./handlers/combat/attackRiderHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'attack_rider' }),
+}));
+vi.mock('./handlers/buffs/tempHpBuffHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'temp_hp' }),
+}));
+vi.mock('./handlers/combat/autoRerollHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'auto_reroll' }),
+}));
+vi.mock('./handlers/reactions/reactionDamageHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'reaction_damage' }),
+}));
+vi.mock('./handlers/reactions/reactionDebuffHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'reaction_debuff' }),
+}));
+vi.mock('./handlers/combat/weaponMasteryHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'weapon_mastery' }),
+}));
+vi.mock('./handlers/buffs/buffAllyHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'buff_ally' }),
+}));
+vi.mock('./handlers/healing/revivificationHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'revivification' }),
+}));
+vi.mock('./handlers/class-bard/bardicInspirationHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'bardic_inspiration' }),
+}));
+vi.mock('./handlers/combat/bonusActionAttackHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'bonus_action_attack' }),
+}));
+vi.mock('./handlers/class-bard/bardicInspirationUseHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'bardic_inspiration_use' }),
+}));
+vi.mock('./handlers/reactions/reactionBonusHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'reaction_bonus' }),
+}));
+vi.mock('./handlers/combat/postCastRiderHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'post_cast_rider' }),
+}));
+vi.mock('./handlers/class-bard/bardicInspirationDefenseHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'bardic_inspiration_defense' }),
+}));
+vi.mock('./handlers/class-bard/bardicInspirationOffenseHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'bardic_inspiration_offense' }),
+}));
+vi.mock('./handlers/class-cleric-paladin/divineSparkHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'divine_spark' }),
+}));
+vi.mock('./handlers/class-cleric-paladin/divineInterventionHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'divine_intervention' }),
+}));
+vi.mock('./handlers/combat/extraActionHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'extra_action' }),
+}));
+vi.mock('./handlers/spells/eyebiteHandler.js', () => ({
+  handle: vi.fn().mockResolvedValue({ result: 'eyebite' }),
+}));
+
+// ── Helpers ─────────────────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
 const mapName = 'TestMap';
@@ -83,23 +112,16 @@ function makePlayerStats(overrides = {}) {
     name: 'TestHero',
     level: 3,
     proficiencyBonus: 2,
-    abilities: [
-      { name: 'Strength', bonus: 2 },
-    ],
+    abilities: [{ name: 'Strength', bonus: 2 }],
     ...overrides,
   };
 }
 
 function makeAction(automation = {}) {
-  return {
-    name: 'Test Action',
-    automation: {
-      ...automation,
-    },
-  };
+  return { name: 'Test Action', automation: { ...automation } };
 }
 
-// ── Tests ──────────────────────────────────────────────────────
+// ── Tests ───────────────────────────────────────────────────────
 
 describe('executeHandler', () => {
   beforeEach(() => {
@@ -108,354 +130,145 @@ describe('executeHandler', () => {
 
   describe('null/early returns', () => {
     it('returns null when action is null', async () => {
-      const result = await executeHandler(null, makePlayerStats(), campaignName, mapName);
-      expect(result).toBeNull();
+      expect(await executeHandler(null, makePlayerStats(), campaignName, mapName)).toBeNull();
     });
 
     it('returns null when action is undefined', async () => {
-      const result = await executeHandler(undefined, makePlayerStats(), campaignName, mapName);
-      expect(result).toBeNull();
+      expect(await executeHandler(undefined, makePlayerStats(), campaignName, mapName)).toBeNull();
     });
 
-    it('returns null when action.automation is missing', async () => {
-      const action = { name: 'No Automation' };
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-      expect(result).toBeNull();
+    it('returns null when action is an object with no automation property', async () => {
+      expect(await executeHandler({}, makePlayerStats(), campaignName, mapName)).toBeNull();
+    });
+
+    it('returns null when action.automation is null', async () => {
+      expect(await executeHandler({ automation: null }, makePlayerStats(), campaignName, mapName)).toBeNull();
     });
 
     it('returns null when action.automation.type is not in HANDLER_MAP', async () => {
-      const action = makeAction({ type: 'unknown_type' });
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+      const result = await executeHandler(
+        makeAction({ type: 'nonexistent_type' }),
+        makePlayerStats(),
+        campaignName,
+        mapName,
+      );
       expect(result).toBeNull();
     });
   });
 
   describe('handler routing', () => {
-    it('calls the correct handler for save_only type', async () => {
-      const action = makeAction({ type: 'save_only' });
-      saveOnlyHandler.handle.mockResolvedValue({ result: 'saved' });
+    it.each([
+      ['save_only', './handlers/combat/saveOnlyHandler.js'],
+      ['save_attack', './handlers/combat/saveAttackHandler.js'],
+      ['healing', './handlers/healing/healingHandler.js'],
+      ['self_healing', './handlers/healing/healingHandler.js'],
+      ['temp_buff', './handlers/buffs/buffHandler.js'],
+      ['set_condition', './handlers/buffs/conditionHandler.js'],
+      ['sorcery_aura', './handlers/resources/sorceryHandler.js'],
+      ['sorcery_incarnate', './handlers/resources/sorceryHandler.js'],
+      ['free_spell', './handlers/spells/spellCastHandler.js'],
+      ['initiative_action', './handlers/combat/initiativeHandler.js'],
+      ['resource_pool', './handlers/resources/resourcePoolHandler.js'],
+      ['font_of_magic', './handlers/resources/fontOfMagicHandler.js'],
+      ['healing_pool', './handlers/healing/healingPoolHandler.js'],
+      ['spell_modifier', './handlers/spells/spellModifierHandler.js'],
+      ['combat_stance', './handlers/combat/combatStanceHandler.js'],
+      ['attack_rider', './handlers/combat/attackRiderHandler.js'],
+      ['temp_hp_buff', './handlers/buffs/tempHpBuffHandler.js'],
+      ['auto_reroll', './handlers/combat/autoRerollHandler.js'],
+      ['reaction_damage', './handlers/reactions/reactionDamageHandler.js'],
+      ['reaction_debuff', './handlers/reactions/reactionDebuffHandler.js'],
+      ['mastery_rider', './handlers/combat/weaponMasteryHandler.js'],
+      ['buff_ally', './handlers/buffs/buffAllyHandler.js'],
+      ['revivification', './handlers/healing/revivificationHandler.js'],
+      ['bardic_inspiration', './handlers/class-bard/bardicInspirationHandler.js'],
+      ['bardic_inspiration_use', './handlers/class-bard/bardicInspirationUseHandler.js'],
+      ['reaction_bonus', './handlers/reactions/reactionBonusHandler.js'],
+      ['post_cast_rider', './handlers/combat/postCastRiderHandler.js'],
+      ['bardic_inspiration_defense', './handlers/class-bard/bardicInspirationDefenseHandler.js'],
+      ['bardic_inspiration_offense', './handlers/class-bard/bardicInspirationOffenseHandler.js'],
+      ['divine_spark', './handlers/class-cleric-paladin/divineSparkHandler.js'],
+      ['divine_intervention', './handlers/class-cleric-paladin/divineInterventionHandler.js'],
+      ['bonus_action_attack', './handlers/combat/bonusActionAttackHandler.js'],
+      ['extra_action', './handlers/combat/extraActionHandler.js'],
+      ['eyebite', './handlers/spells/eyebiteHandler.js'],
+    ])('routes "%s" to its handler with all 4 arguments and returns the handler result', async (type, _modulePath) => {
+      const expectedReturn = { type, handled: true };
 
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+      // Capture the mock from the imported module via dynamic import
+      const mockModule = await import(_modulePath);
 
-      expect(saveOnlyHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'saved' });
+      mockModule.handle.mockResolvedValue(expectedReturn);
+
+      const action = makeAction({ type });
+      const playerStats = makePlayerStats();
+
+      const result = await executeHandler(action, playerStats, campaignName, mapName);
+
+      expect(mockModule.handle).toHaveBeenCalledTimes(1);
+      expect(mockModule.handle).toHaveBeenCalledWith(action, playerStats, campaignName, mapName);
+      expect(result).toBe(expectedReturn);
+    });
+  });
+
+  describe('shared handler mapping', () => {
+    it('routes both "healing" and "self_healing" to the same handler', async () => {
+      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
+      const expectedReturn = { result: 'healed' };
+      healingHandle.mockResolvedValue(expectedReturn);
+
+      await executeHandler(makeAction({ type: 'healing' }), makePlayerStats(), campaignName, mapName);
+      await executeHandler(makeAction({ type: 'self_healing' }), makePlayerStats(), campaignName, mapName);
+
+      expect(healingHandle).toHaveBeenCalledTimes(2);
+      expect(healingHandle).toHaveBeenNthCalledWith(1, expect.objectContaining({ automation: { type: 'healing' } }), expect.any(Object), campaignName, mapName);
+      expect(healingHandle).toHaveBeenNthCalledWith(2, expect.objectContaining({ automation: { type: 'self_healing' } }), expect.any(Object), campaignName, mapName);
     });
 
-    it('calls the correct handler for save_attack type', async () => {
-      const action = makeAction({ type: 'save_attack' });
-      saveAttackHandler.handle.mockResolvedValue({ result: 'saved_attack' });
+    it('routes both "sorcery_aura" and "sorcery_incarnate" to the same handler', async () => {
+      const { handle: sorceryHandle } = await import('./handlers/resources/sorceryHandler.js');
+      const expectedReturn = { result: 'sorcery' };
+      sorceryHandle.mockResolvedValue(expectedReturn);
 
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
+      await executeHandler(makeAction({ type: 'sorcery_aura' }), makePlayerStats(), campaignName, mapName);
+      await executeHandler(makeAction({ type: 'sorcery_incarnate' }), makePlayerStats(), campaignName, mapName);
 
-      expect(saveAttackHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'saved_attack' });
+      expect(sorceryHandle).toHaveBeenCalledTimes(2);
     });
-
-    it('calls the correct handler for healing type', async () => {
-      const action = makeAction({ type: 'healing' });
-      healingHandler.handle.mockResolvedValue({ result: 'healed' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(healingHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'healed' });
-    });
-
-    it('calls the correct handler for self_healing type (same as healing)', async () => {
-      const action = makeAction({ type: 'self_healing' });
-      healingHandler.handle.mockResolvedValue({ result: 'self_healed' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(healingHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'self_healed' });
-    });
-
-    it('calls the correct handler for set_condition type', async () => {
-      const action = makeAction({ type: 'set_condition' });
-      conditionHandler.handle.mockResolvedValue({ result: 'conditioned' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(conditionHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'conditioned' });
-    });
-
-    it('calls the correct handler for buff_ally type', async () => {
-      const action = makeAction({ type: 'buff_ally' });
-      buffAllyHandler.handle.mockResolvedValue({ result: 'buffed_ally' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(buffAllyHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'buffed_ally' });
-    });
-
-    it('calls the correct handler for divine_spark type', async () => {
-      const action = makeAction({ type: 'divine_spark' });
-      divineSparkHandler.handle.mockResolvedValue({ result: 'divine_spark_result' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(divineSparkHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'divine_spark_result' });
-    });
-
-    it('calls the correct handler for divine_intervention type', async () => {
-      const action = makeAction({ type: 'divine_intervention' });
-      divineInterventionHandler.handle.mockResolvedValue({ result: 'intervention' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(divineInterventionHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'intervention' });
-    });
-
-    it('calls the correct handler for temp_buff type', async () => {
-      const action = makeAction({ type: 'temp_buff' });
-      buffHandler.handle.mockResolvedValue({ result: 'buffed' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(buffHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'buffed' });
-    });
-
-    it('calls the correct handler for sorcery_aura type', async () => {
-      const action = makeAction({ type: 'sorcery_aura' });
-      sorceryHandler.handle.mockResolvedValue({ result: 'aura' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(sorceryHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'aura' });
-    });
-
-    it('calls the correct handler for sorcery_incarnate type', async () => {
-      const action = makeAction({ type: 'sorcery_incarnate' });
-      sorceryHandler.handle.mockResolvedValue({ result: 'incarnate' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(sorceryHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'incarnate' });
-    });
-
-    it('calls the correct handler for free_spell type', async () => {
-      const action = makeAction({ type: 'free_spell' });
-      spellCastHandler.handle.mockResolvedValue({ result: 'spell_cast' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(spellCastHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'spell_cast' });
-    });
-
-    it('calls the correct handler for initiative_action type', async () => {
-      const action = makeAction({ type: 'initiative_action' });
-      initiativeHandler.handle.mockResolvedValue({ result: 'initiative' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(initiativeHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'initiative' });
-    });
-
-    it('calls the correct handler for resource_pool type', async () => {
-      const action = makeAction({ type: 'resource_pool' });
-      resourcePoolHandler.handle.mockResolvedValue({ result: 'resource_used' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(resourcePoolHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'resource_used' });
-    });
-
-    it('calls the correct handler for font_of_magic type', async () => {
-      const action = makeAction({ type: 'font_of_magic' });
-      fontOfMagicHandler.handle.mockResolvedValue({ result: 'font_used' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(fontOfMagicHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'font_used' });
-    });
-
-    it('calls the correct handler for healing_pool type', async () => {
-      const action = makeAction({ type: 'healing_pool' });
-      healingPoolHandler.handle.mockResolvedValue({ result: 'pool_heal' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(healingPoolHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'pool_heal' });
-    });
-
-    it('calls the correct handler for combat_stance type', async () => {
-      const action = makeAction({ type: 'combat_stance' });
-      combatStanceHandler.handle.mockResolvedValue({ result: 'stance' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(combatStanceHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'stance' });
-    });
-
-    it('calls the correct handler for attack_rider type', async () => {
-      const action = makeAction({ type: 'attack_rider' });
-      attackRiderHandler.handle.mockResolvedValue({ result: 'rider' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(attackRiderHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'rider' });
-    });
-
-    it('calls the correct handler for spell_modifier type', async () => {
-      const action = makeAction({ type: 'spell_modifier' });
-      spellModifierHandler.handle.mockResolvedValue({ result: 'modified' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(spellModifierHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'modified' });
-    });
-
-    it('calls the correct handler for temp_hp_buff type', async () => {
-      const action = makeAction({ type: 'temp_hp_buff' });
-      tempHpBuffHandler.handle.mockResolvedValue({ result: 'temp_hp' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(tempHpBuffHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'temp_hp' });
-    });
-
-    it('calls the correct handler for auto_reroll type', async () => {
-      const action = makeAction({ type: 'auto_reroll' });
-      autoRerollHandler.handle.mockResolvedValue({ result: 'rerolled' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(autoRerollHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'rerolled' });
-    });
-
-    it('calls the correct handler for reaction_damage type', async () => {
-      const action = makeAction({ type: 'reaction_damage' });
-      reactionDamageHandler.handle.mockResolvedValue({ result: 'damage' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(reactionDamageHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'damage' });
-    });
-
-    it('calls the correct handler for reaction_debuff type', async () => {
-      const action = makeAction({ type: 'reaction_debuff' });
-      reactionDebuffHandler.handle.mockResolvedValue({ result: 'debuff' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(reactionDebuffHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'debuff' });
-    });
-
-    it('calls the correct handler for mastery_rider type', async () => {
-      const action = makeAction({ type: 'mastery_rider' });
-      weaponMasteryHandler.handle.mockResolvedValue({ result: 'mastery' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(weaponMasteryHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'mastery' });
-    });
-
-    it('calls the correct handler for revivification type', async () => {
-      const action = makeAction({ type: 'revivification' });
-      revivificationHandler.handle.mockResolvedValue({ result: 'revived' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(revivificationHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'revived' });
-    });
-
-    it('calls the correct handler for bardic_inspiration type', async () => {
-      const action = makeAction({ type: 'bardic_inspiration' });
-      bardicInspirationHandler.handle.mockResolvedValue({ result: 'inspiration' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(bardicInspirationHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'inspiration' });
-    });
-
-    it('calls the correct handler for bardic_inspiration_use type', async () => {
-      const action = makeAction({ type: 'bardic_inspiration_use' });
-      bardicInspirationUseHandler.handle.mockResolvedValue({ result: 'inspiration_used' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(bardicInspirationUseHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'inspiration_used' });
-    });
-
-    it('calls the correct handler for reaction_bonus type', async () => {
-      const action = makeAction({ type: 'reaction_bonus' });
-      reactionBonusHandler.handle.mockResolvedValue({ result: 'bonus' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(reactionBonusHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'bonus' });
-    });
-
-    it('calls the correct handler for post_cast_rider type', async () => {
-      const action = makeAction({ type: 'post_cast_rider' });
-      postCastRiderHandler.handle.mockResolvedValue({ result: 'post_cast' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(postCastRiderHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'post_cast' });
-    });
-
-    it('calls the correct handler for bardic_inspiration_defense type', async () => {
-      const action = makeAction({ type: 'bardic_inspiration_defense' });
-      bardicInspirationDefenseHandler.handle.mockResolvedValue({ result: 'defense' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(bardicInspirationDefenseHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'defense' });
-    });
-
-    it('calls the correct handler for bardic_inspiration_offense type', async () => {
-      const action = makeAction({ type: 'bardic_inspiration_offense' });
-      bardicInspirationOffenseHandler.handle.mockResolvedValue({ result: 'offense' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(bardicInspirationOffenseHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'offense' });
-    });
-
-    it('calls the correct handler for bonus_action_attack type', async () => {
-      const action = makeAction({ type: 'bonus_action_attack' });
-      bonusActionAttackHandler.handle.mockResolvedValue({ result: 'bonus_attack' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(bonusActionAttackHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'bonus_attack' });
+  });
+
+  describe('unmapped types', () => {
+    it.each([
+      'bonus_attacks',
+      'damage_aura',
+      'damage_modifier',
+      'conditional_disadvantage',
+      'conditional_advantage',
+      'passive_rule',
+      'post_cast_self_heal',
+      'unknown_type',
+    ])('returns null for unmapped type "%s"', async (type) => {
+      const result = await executeHandler(makeAction({ type }), makePlayerStats(), campaignName, mapName);
+      expect(result).toBeNull();
     });
   });
 
   describe('error handling', () => {
-    it('returns error popup when handler throws an exception', async () => {
+    let originalConsoleError;
+
+    beforeEach(() => {
+      originalConsoleError = console.error;
+      console.error = vi.fn();
+    });
+
+    afterEach(() => {
+      console.error = originalConsoleError;
+    });
+
+    it('returns a popup when handler throws', async () => {
+      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
       const action = makeAction({ type: 'healing' });
-      healingHandler.handle.mockRejectedValue(new Error('handler failed'));
+      healingHandle.mockRejectedValue(new Error('boom'));
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
@@ -463,148 +276,50 @@ describe('executeHandler', () => {
       expect(result.payload.type).toBe('automation_info');
     });
 
-    it('error popup includes action.name in description', async () => {
+    it('includes action.name in the error popup description', async () => {
+      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
       const action = makeAction({ type: 'healing' });
       action.name = 'Cure Wounds';
-      healingHandler.handle.mockRejectedValue(new Error('handler failed'));
+      healingHandle.mockRejectedValue(new Error('boom'));
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
       expect(result.payload.description).toBe('Failed to execute Cure Wounds');
     });
 
-    it('error popup has type popup with automation_info payload', async () => {
-      const action = makeAction({ type: 'save_only' });
-      saveOnlyHandler.handle.mockRejectedValue(new Error('fail'));
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-    });
-
-    it('passes all 4 arguments to handler', async () => {
+    it('logs the error to console.error', async () => {
+      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
       const action = makeAction({ type: 'healing' });
-      const ps = makePlayerStats();
-      healingHandler.handle.mockResolvedValue({ result: 'ok' });
+      healingHandle.mockRejectedValue(new Error('boom'));
 
-      await executeHandler(action, ps, campaignName, mapName);
+      await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(healingHandler.handle).toHaveBeenCalledWith(action, ps, campaignName, mapName);
+      expect(console.error).toHaveBeenCalledWith(
+        '[automation] Handler healing/undefined failed:',
+        expect.any(Error),
+      );
     });
 
-    it('passes result from matched handler through', async () => {
+    it('passes the original action object to the handler', async () => {
+      const { handle: healingHandle } = await import('./handlers/healing/healingHandler.js');
+      const action = makeAction({ type: 'healing' });
+      const playerStats = makePlayerStats();
+      healingHandle.mockResolvedValue({ ok: true });
+
+      await executeHandler(action, playerStats, campaignName, mapName);
+
+      expect(healingHandle).toHaveBeenCalledWith(action, playerStats, campaignName, mapName);
+    });
+
+    it('returns the handler result unchanged on success', async () => {
+      const { handle: buffAllyHandle } = await import('./handlers/buffs/buffAllyHandler.js');
       const action = makeAction({ type: 'buff_ally' });
-      const expected = { type: 'modal', modalName: 'buffModal', payload: { duration: 1 } };
-      buffAllyHandler.handle.mockResolvedValue(expected);
+      const expectedReturn = { type: 'modal', modalName: 'buffModal', payload: { duration: 1 } };
+      buffAllyHandle.mockResolvedValue(expectedReturn);
 
       const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
 
-      expect(result).toBe(expected);
-    });
-  });
-
-  describe('handler mapping verification', () => {
-    it('sorcery_aura and sorcery_incarnate both map to same handler', async () => {
-      const ps = makePlayerStats();
-      sorceryHandler.handle.mockResolvedValue({ result: 'sorcery' });
-
-      await executeHandler(makeAction({ type: 'sorcery_aura' }), ps, campaignName, mapName);
-      const firstCall = sorceryHandler.handle.mock.calls[0];
-
-      await executeHandler(makeAction({ type: 'sorcery_incarnate' }), ps, campaignName, mapName);
-      const secondCall = sorceryHandler.handle.mock.calls[1];
-
-      expect(firstCall).toHaveLength(secondCall.length);
-    });
-
-    it('healing and self_healing both map to same handler', async () => {
-      const ps = makePlayerStats();
-      healingHandler.handle.mockResolvedValue({ result: 'heal' });
-
-      await executeHandler(makeAction({ type: 'healing' }), ps, campaignName, mapName);
-      const firstCall = healingHandler.handle.mock.calls[0];
-
-      await executeHandler(makeAction({ type: 'self_healing' }), ps, campaignName, mapName);
-      const secondCall = healingHandler.handle.mock.calls[1];
-
-      expect(firstCall).toHaveLength(secondCall.length);
-    });
-
-    it('bonus_attacks has no handler and returns null', async () => {
-      const action = makeAction({ type: 'bonus_attacks' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('extra_action maps to extraAction handler', async () => {
-      const action = makeAction({ type: 'extra_action' });
-      extraActionHandler.handle.mockResolvedValue({ result: 'extra' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(extraActionHandler.handle).toHaveBeenCalled();
-      expect(result).toEqual({ result: 'extra' });
-    });
-
-    it('calls the correct handler for eyebite type', async () => {
-      const action = makeAction({ type: 'eyebite' });
-      eyebiteHandler.handle.mockResolvedValue({ result: 'eyebite' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(eyebiteHandler.handle).toHaveBeenCalledWith(action, expect.any(Object), campaignName, mapName);
-      expect(result).toEqual({ result: 'eyebite' });
-    });
-
-    it('damage_aura has no handler and returns null', async () => {
-      const action = makeAction({ type: 'damage_aura' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('damage_modifier has no handler and returns null', async () => {
-      const action = makeAction({ type: 'damage_modifier' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('conditional_disadvantage has no handler and returns null', async () => {
-      const action = makeAction({ type: 'conditional_disadvantage' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('conditional_advantage has no handler and returns null', async () => {
-      const action = makeAction({ type: 'conditional_advantage' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('passive_rule has no handler and returns null', async () => {
-      const action = makeAction({ type: 'passive_rule' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
-    });
-
-    it('post_cast_self_heal has no handler and returns null', async () => {
-      const action = makeAction({ type: 'post_cast_self_heal' });
-
-      const result = await executeHandler(action, makePlayerStats(), campaignName, mapName);
-
-      expect(result).toBeNull();
+      expect(result).toBe(expectedReturn);
     });
   });
 });

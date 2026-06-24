@@ -1,55 +1,111 @@
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './bewitchingMagicHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    setRuntimeValue: vi.fn(),
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(async () => {}),
 }));
 
-const makeAction = (overrides = {}) => ({
-    name: 'Bewitching Magic',
-    automation: { type: 'bewitching_magic', ...overrides },
+const campaignName = 'test-campaign';
+const playerName = 'TestWarlock';
+
+beforeEach(() => {
+    vi.clearAllMocks();
 });
 
-const makePlayerStats = (overrides = {}) => ({
-    name: 'TestWarlock',
-    ...overrides,
-});
+function makeAction(overrides = {}) {
+    return {
+        name: 'Bewitching Magic',
+        automation: { type: 'bewitching_magic', ...overrides },
+    };
+}
+
+function makePlayerStats(overrides = {}) {
+    return {
+        name: playerName,
+        ...overrides,
+    };
+}
 
 describe('bewitchingMagicHandler', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-    });
-
-    describe('handle', () => {
-        it('should set freeCastKey to Misty Step', async () => {
-            await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+    describe('runtime state', () => {
+        it('sets freeCastKey to Misty Step for the correct player', async () => {
+            await handle(makeAction(), makePlayerStats(), campaignName, 'map');
 
             expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-                'TestWarlock',
+                playerName,
                 '_Bewitching_Magic_freeCast',
                 ['Misty Step'],
-                'campaign'
+                campaignName
             );
         });
 
-        it('should return popup with Misty Step description', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+        it('uses custom player name from stats', async () => {
+            const playerStats = { name: 'CustomWarlock' };
+
+            await handle(makeAction(), playerStats, campaignName, 'map');
+
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                'CustomWarlock',
+                '_Bewitching_Magic_freeCast',
+                ['Misty Step'],
+                campaignName
+            );
+        });
+
+        it('passes campaign name to setRuntimeValue', async () => {
+            await handle(makeAction(), makePlayerStats(), 'my-campaign', 'map');
+
+            expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+                playerName,
+                '_Bewitching_Magic_freeCast',
+                ['Misty Step'],
+                'my-campaign'
+            );
+        });
+    });
+
+    describe('popup result', () => {
+        it('returns popup with automation_info type', async () => {
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'map');
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
+        });
+
+        it('includes the action name in the popup', async () => {
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'map');
+
             expect(result.payload.name).toBe('Bewitching Magic');
+        });
+
+        it('uses custom action name when provided', async () => {
+            const action = makeAction({});
+            action.name = 'Custom Feature';
+
+            const result = await handle(action, makePlayerStats(), campaignName, 'map');
+
+            expect(result.payload.name).toBe('Custom Feature');
+        });
+
+        it('includes Misty Step spell name in description', async () => {
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'map');
+
             expect(result.payload.description).toContain('Misty Step');
         });
 
-        it('should return popup with cast without slot description', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'campaign', 'map');
+        it('includes "without expending a spell slot" in description', async () => {
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'map');
 
             expect(result.payload.description).toContain('without expending a spell slot');
         });
 
-        it('should work with custom action name', async () => {
-            const action = { name: 'Custom Feature', automation: { type: 'bewitching_magic' } };
-            await handle(action, makePlayerStats(), 'campaign', 'map');
+        it('includes action type reference in description', async () => {
+            const result = await handle(makeAction(), makePlayerStats(), campaignName, 'map');
+
+            expect(result.payload.description).toContain('same action');
         });
     });
 });

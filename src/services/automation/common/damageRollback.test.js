@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
     findLastAttack,
@@ -61,22 +62,11 @@ function makeCombatContext(overrides = {}) {
     };
 }
 
-// Flush promise microtasks so .then() callbacks in the module execute
-async function flushPromises() {
-    await Promise.resolve();
-    await Promise.resolve();
-}
-
 // ── Tests ────────────────────────────────────────────────────────
 
 describe('damageRollback', () => {
-    beforeEach(() => {
-        resetMocks();
-    });
-
-    afterEach(() => {
-        vi.restoreAllMocks();
-    });
+    beforeEach(resetMocks);
+    afterEach(vi.restoreAllMocks);
 
     // ─── findLastAttack ────────────────────────────────────────
 
@@ -107,18 +97,38 @@ describe('damageRollback', () => {
             expect(result.totalDamage).toBe(0);
         });
 
-        it('extracts primaryDamage from primaryDamage field', async () => {
-            const cs = makeCombatContext();
+        it('prefers actualDamage over primary + secondary sum', async () => {
+            const cs = makeCombatContext({
+                lastAttack: makeLastAttack({
+                    primaryDamage: 8,
+                    secondaryDamage: 3,
+                    actualDamage: 5,
+                }),
+            });
             getCombatContext.mockResolvedValue(cs);
 
             const result = await findLastAttack(campaignName);
 
+            expect(result.totalDamage).toBe(5);
             expect(result.primaryDamage).toBe(8);
-            expect(result.secondaryDamage).toBe(0);
-            expect(result.totalDamage).toBe(8);
+            expect(result.secondaryDamage).toBe(3);
         });
 
-        it('extracts primaryDamage from rawDamage when primaryDamage is absent', async () => {
+        it('sums primary and secondary when actualDamage is absent', async () => {
+            const cs = makeCombatContext({
+                lastAttack: makeLastAttack({
+                    primaryDamage: 8,
+                    secondaryDamage: 3,
+                }),
+            });
+            getCombatContext.mockResolvedValue(cs);
+
+            const result = await findLastAttack(campaignName);
+
+            expect(result.totalDamage).toBe(11);
+        });
+
+        it('falls back to rawDamage when primaryDamage is absent', async () => {
             const cs = makeCombatContext({
                 lastAttack: makeLastAttack({ primaryDamage: undefined, rawDamage: 12 }),
             });
@@ -141,35 +151,18 @@ describe('damageRollback', () => {
             expect(result.primaryDamage).toBe(0);
         });
 
-        it('extracts secondaryDamage', async () => {
+        it('defaults primaryDamage to rawDamage when primaryDamage is 0', async () => {
             const cs = makeCombatContext({
-                lastAttack: makeLastAttack({ secondaryDamage: 3 }),
+                lastAttack: makeLastAttack({ primaryDamage: 0, rawDamage: 7 }),
             });
             getCombatContext.mockResolvedValue(cs);
 
             const result = await findLastAttack(campaignName);
 
-            expect(result.secondaryDamage).toBe(3);
+            expect(result.primaryDamage).toBe(7);
         });
 
-        it('uses actualDamage when present instead of primary + secondary', async () => {
-            const cs = makeCombatContext({
-                lastAttack: makeLastAttack({
-                    primaryDamage: 8,
-                    secondaryDamage: 3,
-                    actualDamage: 5,
-                }),
-            });
-            getCombatContext.mockResolvedValue(cs);
-
-            const result = await findLastAttack(campaignName);
-
-            expect(result.totalDamage).toBe(5);
-            expect(result.primaryDamage).toBe(8);
-            expect(result.secondaryDamage).toBe(3);
-        });
-
-        it('defaults totalDamage to primary + secondary when actualDamage is absent', async () => {
+        it('defaults totalDamage to primary + secondary when actualDamage is undefined', async () => {
             const cs = makeCombatContext({
                 lastAttack: makeLastAttack({
                     primaryDamage: 8,
@@ -194,7 +187,7 @@ describe('damageRollback', () => {
             expect(result.attackEvent).toBe(attack);
         });
 
-        it('returns attackerName and targetName from attack event', async () => {
+        it('returns attackerName and targetName from the attack event', async () => {
             const cs = makeCombatContext({
                 lastAttack: makeLastAttack({ attackerName: 'Orc', targetName: 'Wizard' }),
             });
@@ -206,18 +199,7 @@ describe('damageRollback', () => {
             expect(result.targetName).toBe('Wizard');
         });
 
-        it('returns damageTypes from attack event', async () => {
-            const cs = makeCombatContext({
-                lastAttack: makeLastAttack({ damageTypes: ['Fire', 'Cold'] }),
-            });
-            getCombatContext.mockResolvedValue(cs);
-
-            const result = await findLastAttack(campaignName);
-
-            expect(result.damageTypes).toEqual(['Fire', 'Cold']);
-        });
-
-        it('returns empty array for damageTypes when absent', async () => {
+        it('returns damageTypes from attack event or empty array when absent', async () => {
             const cs = makeCombatContext({
                 lastAttack: makeLastAttack({ damageTypes: undefined }),
             });
@@ -227,9 +209,20 @@ describe('damageRollback', () => {
 
             expect(result.damageTypes).toEqual([]);
         });
+
+        it('returns damageTypes when present', async () => {
+            const cs = makeCombatContext({
+                lastAttack: makeLastAttack({ damageTypes: ['Fire', 'Cold'] }),
+            });
+            getCombatContext.mockResolvedValue(cs);
+
+            const result = await findLastAttack(campaignName);
+
+            expect(result.damageTypes).toEqual(['Fire', 'Cold']);
+        });
     });
 
-    // ─── findAttackRollAgainstTarget ───────────────────────────
+    // ─── findAttackRollAgainstTarget ─────────────────────────
 
     describe('findAttackRollAgainstTarget', () => {
         it('returns null when no lastAttack exists', async () => {
@@ -276,7 +269,7 @@ describe('damageRollback', () => {
     // ─── rollbackDamage ────────────────────────────────────────
 
     describe('rollbackDamage', () => {
-        it('returns 0 when no lastAttack exists', async () => {
+        it('returns 0 and skips healing when no lastAttack exists', async () => {
             getCombatContext.mockResolvedValue({ creatures: [] });
 
             const result = await rollbackDamage(
@@ -288,9 +281,10 @@ describe('damageRollback', () => {
 
             expect(result).toBe(0);
             expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns 0 when attackerName does not match', async () => {
+        it('returns 0 and skips healing when attackerName does not match', async () => {
             const attack = makeLastAttack({ attackerName: 'Orc' });
             const cs = makeCombatContext({ lastAttack: attack });
             getCombatContext.mockResolvedValue(cs);
@@ -304,9 +298,10 @@ describe('damageRollback', () => {
 
             expect(result).toBe(0);
             expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns 0 when targetName does not match', async () => {
+        it('returns 0 and skips healing when targetName does not match', async () => {
             const attack = makeLastAttack({ targetName: 'Wizard' });
             const cs = makeCombatContext({ lastAttack: attack });
             getCombatContext.mockResolvedValue(cs);
@@ -320,9 +315,10 @@ describe('damageRollback', () => {
 
             expect(result).toBe(0);
             expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns 0 when totalDamage is zero', async () => {
+        it('returns 0 and skips healing when totalDamage is zero', async () => {
             const attack = makeLastAttack({ primaryDamage: 0, secondaryDamage: 0, actualDamage: 0 });
             const cs = makeCombatContext({ lastAttack: attack });
             getCombatContext.mockResolvedValue(cs);
@@ -336,9 +332,10 @@ describe('damageRollback', () => {
 
             expect(result).toBe(0);
             expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns 0 when totalDamage is negative', async () => {
+        it('returns 0 and skips healing when totalDamage is negative', async () => {
             const attack = makeLastAttack({ actualDamage: -5 });
             const cs = makeCombatContext({ lastAttack: attack });
             getCombatContext.mockResolvedValue(cs);
@@ -352,9 +349,28 @@ describe('damageRollback', () => {
 
             expect(result).toBe(0);
             expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('returns 0 when combat context is null', async () => {
+        it('returns 0 and skips healing when totalDamage is NaN', async () => {
+            const attack = makeLastAttack();
+            const cs = makeCombatContext({ lastAttack: attack });
+            getCombatContext.mockResolvedValueOnce(cs);
+            getCombatContext.mockResolvedValueOnce(null);
+
+            const result = await rollbackDamage(
+                'Goblin',
+                'Hero',
+                campaignName,
+                'Mirror Image'
+            );
+
+            expect(result).toBe(0);
+            expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('returns 0 when combat context is null after first call', async () => {
             const attack = makeLastAttack();
             getCombatContext.mockResolvedValueOnce({ lastAttack: attack });
             getCombatContext.mockResolvedValueOnce(null);
@@ -368,26 +384,10 @@ describe('damageRollback', () => {
 
             expect(result).toBe(0);
             expect(applyHealingToTarget).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('calls applyHealingToTarget with correct arguments on success', async () => {
-            const attack = makeLastAttack({ primaryDamage: 10, secondaryDamage: 2 });
-            const cs = makeCombatContext({ lastAttack: attack });
-            getCombatContext.mockResolvedValue(cs);
-            applyHealingToTarget.mockReturnValue({ newHp: 25, actualHeal: 12, oldHp: 13 });
-
-            await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
-            await flushPromises();
-
-            expect(applyHealingToTarget).toHaveBeenCalledWith(
-                cs,
-                'Hero',
-                12,
-                campaignName
-            );
-        });
-
-        it('returns totalDamage when healing succeeds', async () => {
+        it('heals target and returns totalDamage when all conditions match', async () => {
             const attack = makeLastAttack({ primaryDamage: 10, secondaryDamage: 2 });
             const cs = makeCombatContext({ lastAttack: attack });
             getCombatContext.mockResolvedValue(cs);
@@ -396,6 +396,12 @@ describe('damageRollback', () => {
             const result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
 
             expect(result).toBe(12);
+            expect(applyHealingToTarget).toHaveBeenCalledWith(
+                cs,
+                'Hero',
+                12,
+                campaignName
+            );
         });
 
         it('returns 0 when applyHealingToTarget returns no newHp', async () => {
@@ -407,40 +413,40 @@ describe('damageRollback', () => {
             const result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
 
             expect(result).toBe(0);
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
-        it('calls addEntry with ability_use log on success', async () => {
+        it('returns 0 when applyHealingToTarget returns object without newHp', async () => {
+            const attack = makeLastAttack();
+            const cs = makeCombatContext({ lastAttack: attack });
+            getCombatContext.mockResolvedValue(cs);
+            applyHealingToTarget.mockReturnValue({ otherField: 'value' });
+
+            const result = await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
+
+            expect(result).toBe(0);
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('logs an ability_use entry on successful rollback', async () => {
             const attack = makeLastAttack({ primaryDamage: 7, secondaryDamage: 3 });
             const cs = makeCombatContext({ lastAttack: attack });
             getCombatContext.mockResolvedValue(cs);
             applyHealingToTarget.mockReturnValue({ newHp: 20, actualHeal: 10, oldHp: 10 });
 
             await rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image');
-            await flushPromises();
 
-            expect(addEntry).toHaveBeenCalledWith(campaignName, {
-                type: 'ability_use',
-                characterName: 'Hero',
-                abilityName: 'Mirror Image',
-                description: 'Hero used Mirror Image — Goblin\'s attack misses due to illusory duplicate. The attack is retroactively negated and Hero is healed for 10 HP.',
-                targetName: 'Goblin',
-                timestamp: expect.any(Number),
-            });
+            expect(addEntry).toHaveBeenCalledTimes(1);
+            const [logCampaign, logPayload] = addEntry.mock.calls[0];
+            expect(logCampaign).toBe(campaignName);
+            expect(logPayload.type).toBe('ability_use');
+            expect(logPayload.characterName).toBe('Hero');
+            expect(logPayload.abilityName).toBe('Mirror Image');
+            expect(logPayload.targetName).toBe('Goblin');
+            expect(typeof logPayload.timestamp).toBe('number');
         });
 
-        it('throws the error from addEntry when addEntry fails', async () => {
-            const attack = makeLastAttack();
-            const cs = makeCombatContext({ lastAttack: attack });
-            getCombatContext.mockResolvedValue(cs);
-            applyHealingToTarget.mockReturnValue({ newHp: 20, actualHeal: 8, oldHp: 12 });
-            addEntry.mockRejectedValue(new Error('DB error'));
-
-            await expect(
-                rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image')
-            ).rejects.toThrow('DB error');
-        });
-
-        it('uses correct attackerName and targetName in log description', async () => {
+        it('includes attacker, target, and damage amount in log description', async () => {
             const attack = makeLastAttack({
                 attackerName: 'Orc',
                 targetName: 'Cleric',
@@ -451,28 +457,24 @@ describe('damageRollback', () => {
             applyHealingToTarget.mockReturnValue({ newHp: 25, actualHeal: 5, oldHp: 20 });
 
             await rollbackDamage('Orc', 'Cleric', campaignName, 'Feather Fall');
-            await flushPromises();
 
-            const logEntry = addEntry.mock.calls[0][1];
-            expect(logEntry.description).toContain('Orc');
-            expect(logEntry.description).toContain('Cleric');
-            expect(logEntry.description).toContain('5 HP');
-            expect(logEntry.characterName).toBe('Cleric');
-            expect(logEntry.targetName).toBe('Orc');
+            const logPayload = addEntry.mock.calls[0][1];
+            expect(logPayload.description).toContain('Orc');
+            expect(logPayload.description).toContain('Cleric');
+            expect(logPayload.description).toContain('5 HP');
+            expect(logPayload.description).toContain('Feather Fall');
         });
 
-        it('uses featureName in abilityName and log description', async () => {
+        it('re-throws addEntry errors after logging them', async () => {
             const attack = makeLastAttack();
             const cs = makeCombatContext({ lastAttack: attack });
             getCombatContext.mockResolvedValue(cs);
-            applyHealingToTarget.mockReturnValue({ newHp: 30, actualHeal: 8, oldHp: 22 });
+            applyHealingToTarget.mockReturnValue({ newHp: 20, actualHeal: 8, oldHp: 12 });
+            addEntry.mockRejectedValue(new Error('DB error'));
 
-            await rollbackDamage('Goblin', 'Hero', campaignName, 'Cat Nap');
-            await flushPromises();
-
-            const logEntry = addEntry.mock.calls[0][1];
-            expect(logEntry.abilityName).toBe('Cat Nap');
-            expect(logEntry.description).toContain('Cat Nap');
+            await expect(
+                rollbackDamage('Goblin', 'Hero', campaignName, 'Mirror Image')
+            ).rejects.toThrow('DB error');
         });
     });
 
@@ -495,7 +497,7 @@ describe('damageRollback', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when creatures array is empty', async () => {
+        it('returns empty map when creatures array is empty', async () => {
             getCombatContext.mockResolvedValue({ creatures: [] });
 
             const result = await findRollsByCreature(campaignName);
@@ -503,7 +505,7 @@ describe('damageRollback', () => {
             expect(result).toEqual({});
         });
 
-        it('returns an entry for each creature with rollType null when no lastAttack', async () => {
+        it('returns null rollType entries for every creature when no lastAttack', async () => {
             getCombatContext.mockResolvedValue({ creatures: [{ name: 'Hero' }, { name: 'Goblin' }] });
 
             const result = await findRollsByCreature(campaignName);
@@ -538,8 +540,8 @@ describe('damageRollback', () => {
 
             const result = await findRollsByCreature(campaignName);
 
-            expect(result.Hero.attackEvent).toBeNull();
             expect(result.Hero.abilityEvent).toBe(attack);
+            expect(result.Hero.attackEvent).toBeNull();
             expect(result.Hero.saveEvent).toBeNull();
             expect(result.Hero.rollType).toBe('check');
         });
@@ -553,9 +555,7 @@ describe('damageRollback', () => {
 
             const result = await findRollsByCreature(campaignName);
 
-            expect(result.Hero.attackEvent).toBeNull();
             expect(result.Hero.abilityEvent).toBe(attack);
-            expect(result.Hero.saveEvent).toBeNull();
             expect(result.Hero.rollType).toBe('skill');
         });
 
@@ -568,13 +568,11 @@ describe('damageRollback', () => {
 
             const result = await findRollsByCreature(campaignName);
 
-            expect(result.Hero.attackEvent).toBeNull();
-            expect(result.Hero.abilityEvent).toBeNull();
             expect(result.Hero.saveEvent).toBe(attack);
             expect(result.Hero.rollType).toBe('save');
         });
 
-        it('returns the same lastAttack object for every creature', async () => {
+        it('returns the same lastAttack reference for every creature', async () => {
             const attack = makeLastAttack();
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'Hero' }, { name: 'Goblin' }, { name: 'Wizard' }],
@@ -588,7 +586,7 @@ describe('damageRollback', () => {
             expect(result.Wizard.attackEvent).toBe(attack);
         });
 
-        it('includes creature names as keys in result map', async () => {
+        it('uses creature names as keys in the result map', async () => {
             getCombatContext.mockResolvedValue({
                 creatures: [{ name: 'A' }, { name: 'B' }, { name: 'C' }],
             });

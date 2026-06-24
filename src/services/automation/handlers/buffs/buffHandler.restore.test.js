@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -12,9 +13,9 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
 import { restoreAdrenalineRushUses } from './buffHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 
-// ── Helpers ────────────────────────────────────────────────────
+// ── Constants ──────────────────────────────────────────────────
 
-const campaignName = 'TestCampaign';
+const USES_KEY = 'adrenalineRushUses';
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -23,36 +24,69 @@ describe('restoreAdrenalineRushUses', () => {
     vi.clearAllMocks();
   });
 
-  it('should call setRuntimeValue with the adrenalineRushUses key and null value', () => {
-    restoreAdrenalineRushUses('TestHero', campaignName);
+  it('should reset adrenalineRushUses to null for the player', () => {
+    const playerName = 'TestHero';
+    const campaignName = 'TestCampaign';
 
+    const result = restoreAdrenalineRushUses(playerName, campaignName);
+
+    expect(result).toBeUndefined();
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'TestHero',
-      'adrenalineRushUses',
+      playerName,
+      USES_KEY,
       null,
       campaignName
     );
   });
 
-  it('should use the correct campaignName', () => {
-    restoreAdrenalineRushUses('TestHero', 'OtherCampaign');
+  it('should use the correct campaign name in the call', () => {
+    restoreAdrenalineRushUses('TestHero', 'MyCampaign');
 
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
       'TestHero',
-      'adrenalineRushUses',
+      USES_KEY,
       null,
-      'OtherCampaign'
+      'MyCampaign'
     );
   });
 
-  it('should use the correct playerName', () => {
-    restoreAdrenalineRushUses('AnotherHero', campaignName);
+  it('should pass playerName as the first argument to setRuntimeValue', () => {
+    restoreAdrenalineRushUses('RogueOne', 'CampaignA');
 
     expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-      'AnotherHero',
-      'adrenalineRushUses',
+      'RogueOne',
+      USES_KEY,
       null,
-      campaignName
+      'CampaignA'
+    );
+  });
+
+  it('should be synchronous and not return a promise', () => {
+    const result = restoreAdrenalineRushUses('TestHero', 'TestCampaign');
+
+    expect(result).toBeUndefined();
+    expect(result).not.toBeInstanceOf(Promise);
+  });
+
+  it('should still call setRuntimeValue with empty playerName', () => {
+    restoreAdrenalineRushUses('', 'TestCampaign');
+
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      '',
+      USES_KEY,
+      null,
+      'TestCampaign'
+    );
+  });
+
+  it('should still call setRuntimeValue when campaignName contains special characters', () => {
+    restoreAdrenalineRushUses('Hero', 'Campaign/With:Special');
+
+    expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+      'Hero',
+      USES_KEY,
+      null,
+      'Campaign/With:Special'
     );
   });
 });

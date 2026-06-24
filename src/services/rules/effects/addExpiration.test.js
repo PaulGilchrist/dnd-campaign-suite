@@ -1,13 +1,15 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
   setRuntimeValue: vi.fn(),
+  getAllStoreKeys: vi.fn(() => []),
 }));
 
 vi.mock('../../ui/utils.js', () => ({
   default: {
-    getName: vi.fn(),
+    getName: vi.fn((val) => String(val)),
   },
 }));
 
@@ -18,14 +20,36 @@ vi.mock('../../ui/storage.js', () => ({
 }));
 
 vi.mock('../../encounters/combatData.js', () => ({
-  getCurrentCombatRound: vi.fn(),
-  getActiveCreatureName: vi.fn(),
+  getCurrentCombatRound: vi.fn(() => 5),
+  getActiveCreatureName: vi.fn(() => 'TestCharacter'),
   getCombatSummary: vi.fn(),
+}));
+
+vi.mock('../../ui/logService.js', () => ({
+  addEntry: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../rules/combat/rangeValidation.js', () => ({
+  getDistanceFeet: vi.fn(() => 10),
+}));
+
+vi.mock('../../automation/handlers/spells/slowHandler.js', () => ({
+  processSlowRepeatSave: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
+  processTashasLaughterRepeatSave: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../combat/automation/automationExpressions.js', () => ({
+  evaluateAutoExpression: vi.fn((expr) => {
+    if (typeof expr === 'number') return expr;
+    return 1;
+  }),
 }));
 
 import { addExpiration } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import utils from '../../ui/utils.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
 
 const KEY = 'pendingExpirations';
@@ -36,81 +60,135 @@ function resetMocks() {
   window.dispatchEvent = vi.fn();
 }
 
-function stubUtilsNameIdentity() {
-  utils.getName.mockImplementation((v) => v);
-}
-
+// ---------------------------------------------------------------------------
+// addExpiration
+// ---------------------------------------------------------------------------
 describe('addExpiration', () => {
   beforeEach(() => {
     resetMocks();
-    stubUtilsNameIdentity();
-    getCurrentCombatRound.mockReturnValue(1);
   });
 
-  it('adds a new expiration entry when no existing list', () => {
-    getRuntimeValue.mockReturnValueOnce([]);
+  describe('early return guards', () => {
+    it('throws when pendingExpirations is not an array', () => {
+      getRuntimeValue.mockReturnValueOnce('not-an-array');
 
-    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 3);
+      expect(() =>
+        addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', 3),
+      ).toThrow('Missing array: pendingExpirations');
+    });
 
-    expect(getRuntimeValue).toHaveBeenCalledWith('Goblin', KEY);
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      KEY,
-      [{ target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 3 }],
-      'MyCampaign'
-    );
+    it('throws when pendingExpirations is null', () => {
+      getRuntimeValue.mockReturnValueOnce(null);
+
+      expect(() =>
+        addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', 3),
+      ).toThrow('Missing array: pendingExpirations');
+    });
+
+    it('throws when rounds is null', () => {
+      getRuntimeValue.mockReturnValueOnce([]);
+
+      expect(() =>
+        addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', null),
+      ).toThrow('rounds is required');
+    });
+
+    it('throws when rounds is undefined', () => {
+      getRuntimeValue.mockReturnValueOnce([]);
+
+      expect(() =>
+        addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', undefined),
+      ).toThrow('rounds is required');
+    });
   });
 
-  it('adds to existing list of expirations', () => {
-    const existingList = [
-      { target: 'Orc', effects: [{ type: 'advantage_on_target' }], appliedRound: 0 },
-    ];
-    getRuntimeValue.mockReturnValueOnce(existingList);
+  describe('creates correct entry structure', () => {
+    it('adds a new expiration entry when no existing list', () => {
+      getRuntimeValue.mockReturnValueOnce([]);
 
-    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 2);
+      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'MyCampaign', 3);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Goblin',
-      KEY,
-      [
-        ...existingList,
-        { target: 'Human', effects: [{ type: 'stunned' }], appliedRound: 1, expiryRounds: 2 },
-      ],
-      'MyCampaign'
-    );
-  });
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Caster',
+        KEY,
+        [
+          {
+            target: 'Target',
+            effects: [{ type: 'stunned' }],
+            appliedRound: 5,
+            expiryRounds: 3,
+          },
+        ],
+        'MyCampaign',
+      );
+    });
 
-  it('preserves the original list reference for spread (does not mutate)', () => {
-    const existingList = [
-      { target: 'Orc', effects: [], appliedRound: 0 },
-    ];
-    getRuntimeValue.mockReturnValueOnce(existingList);
+    it('appends to existing expiration list without mutating the original', () => {
+      const existingList = [
+        {
+          target: 'Orc',
+          effects: [{ type: 'advantage_on_target' }],
+          appliedRound: 0,
+        },
+      ];
+      const originalLength = existingList.length;
+      getRuntimeValue.mockReturnValueOnce(existingList);
 
-    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 1);
+      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'MyCampaign', 2);
 
-    expect(existingList.length).toBe(1);
-  });
+      // Original array should be unchanged (spread creates new array)
+      expect(existingList.length).toBe(originalLength);
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Caster',
+        KEY,
+        expect.arrayContaining([
+          expect.objectContaining({ target: 'Orc' }),
+          expect.objectContaining({ target: 'Target' }),
+        ]),
+        'MyCampaign',
+      );
+    });
 
-  it('uses current combat round from getCurrentCombatRound', () => {
-    getCurrentCombatRound.mockReturnValue(5);
-    getRuntimeValue.mockReturnValueOnce([]);
+    it('uses the campaignName from the call in setRuntimeValue', () => {
+      getRuntimeValue.mockReturnValueOnce([]);
 
-    addExpiration('Goblin', 'Human', [{ type: 'stunned' }], 'MyCampaign', 3);
+      addExpiration('Caster', 'Target', [{ type: 'stunned' }], 'TestCampaign', 3);
 
-    const call = setRuntimeValue.mock.calls[0];
-    expect(call[2][0].appliedRound).toBe(5);
-  });
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Caster',
+        KEY,
+        expect.any(Array),
+        'TestCampaign',
+      );
+    });
 
-  it('passes effects array through unchanged in entry', () => {
-    const effects = [
-      { type: 'stunned', condition: 'speed_halved' },
-      { type: 'advantage_on_target' },
-    ];
-    getRuntimeValue.mockReturnValueOnce([]);
+    it('passes the exact effects array through in the entry', () => {
+      const effects = [
+        { type: 'stunned', condition: 'speed_halved' },
+        { type: 'advantage_on_target' },
+      ];
+      getRuntimeValue.mockReturnValueOnce([]);
 
-    addExpiration('Goblin', 'Human', effects, 'MyCampaign', 5);
+      addExpiration('Caster', 'Target', effects, 'MyCampaign', 5);
 
-    const call = setRuntimeValue.mock.calls[0];
-    expect(call[2][0].effects).toBe(effects);
+      const call = setRuntimeValue.mock.calls[0];
+      expect(call[2][0].effects).toBe(effects);
+    });
+
+    it('uses getCurrentCombatRound for appliedRound', () => {
+      getCurrentCombatRound.mockReturnValue(10);
+      getRuntimeValue.mockReturnValueOnce([]);
+
+      addExpiration('Caster', 'Target', [{ type: 'blinded' }], 'MyCampaign', 3);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Caster',
+        KEY,
+        expect.arrayContaining([
+          expect.objectContaining({ appliedRound: 10 }),
+        ]),
+        'MyCampaign',
+      );
+    });
   });
 });

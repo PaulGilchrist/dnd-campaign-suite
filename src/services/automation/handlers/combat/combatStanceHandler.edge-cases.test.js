@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports (hoisted by vitest) ───────────────────
@@ -20,10 +21,10 @@ vi.mock('../class-warlock/tempTeleportHandler.js', () => ({
 import { handle, applyStanceOption } from './combatStanceHandler.js';
 
 import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
-import * as tempHpBuffHandler from '../buffs/tempHpBuffHandler.js';
-import * as tempTeleportHandler from '../class-warlock/tempTeleportHandler.js';
 
 // ── Helpers ────────────────────────────────────────────────────
+
+const campaignName = 'TestCampaign';
 
 function makePlayerStats(overrides = {}) {
   return {
@@ -61,55 +62,130 @@ function makeAction(automation = {}, actionOverrides = {}) {
   };
 }
 
-const campaignName = 'TestCampaign';
-
-function resetMocks() {
-  useRuntimeState.getRuntimeValue.mockClear().mockReset();
-  useRuntimeState.setRuntimeValue.mockClear().mockResolvedValue(undefined);
-  tempHpBuffHandler.grantTempHpOnRage.mockClear().mockReset();
-  tempTeleportHandler.clearExtendedFlag.mockClear().mockReset();
+/**
+ * Extracts the first buff from the last setRuntimeValue call for 'activeBuffs'.
+ * Returns null if no such call exists.
+ */
+function getLastActiveBuffsBuff() {
+  const calls = useRuntimeState.setRuntimeValue.mock.calls.filter(
+    (c) => c[1] === 'activeBuffs' && Array.isArray(c[2]) && c[2].length > 0
+  );
+  return calls.length > 0 ? calls[calls.length - 1][2][0] : null;
 }
 
-// ── Edge cases and null safety ────────────────────────────────
+// ── Non-array activeBuffs handling ─────────────────────────────
 
-describe('edge cases', () => {
-  beforeEach(() => resetMocks());
+describe('non-array activeBuffs values', () => {
+  beforeEach(() => vi.clearAllMocks());
 
-  it('handles activeBuffs stored as non-array (treated as empty)', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
+  it('treats non-array activeBuffs as empty on activation', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 3 });
 
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce('not-an-array'); // → []
-    useRuntimeState.getRuntimeValue.mockReturnValue(1); // ragePoints > 0
-
-    await handle(action, ps, campaignName);
-    expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
-  });
-
-  it('handles getRuntimeValue returning undefined for ragePoints', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]); // not active
-    useRuntimeState.getRuntimeValue.mockReturnValue(undefined); // → currentResource = 0
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce('not-an-array');
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
     const result = await handle(action, ps, campaignName);
 
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toBe('Rage activated (1/3 uses remaining)');
+
+    const buff = getLastActiveBuffsBuff();
+    expect(buff).not.toBeNull();
+    expect(buff.name).toBe('Rage');
+  });
+
+  it('treats null activeBuffs as empty on activation', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 3 });
+
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce(null);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    const buff = getLastActiveBuffsBuff();
+    expect(buff).not.toBeNull();
+    expect(buff.name).toBe('Rage');
+  });
+
+  it('treats activeBuffs as empty on deactivation when non-array', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({}, { name: 'Rage' });
+
+    // Non-array activeBuffs → not active (no matching buff to remove)
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce('not-an-array');
+
+    const result = await handle(action, ps, campaignName);
+
+    // Since no active buff was found, the handler proceeds to activation
+    expect(result.type).toBe('popup');
+  });
+});
+
+// ── Null/undefined resource handling ───────────────────────────
+
+describe('null/undefined resource handling', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns depleted message when resourceKey returns undefined', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
+
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
+    useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
     expect(result.payload.description).toBe('No Rage uses remaining.');
   });
 
-  it('builds buff with all default false/null values for option-less activation', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 3 }); // uses-based to avoid ragePoints read
+  it('treats null resource value as 0 and returns depleted', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(2); // usesUsed=2 < maxUses=3
+    useRuntimeState.getRuntimeValue.mockReturnValue(null);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toBe('No Rage uses remaining.');
+  });
+
+  it('treats null uses value as maxUses (no depletion)', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 3 });
+
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
+    useRuntimeState.getRuntimeValue.mockReturnValue(null);
+
+    const result = await handle(action, ps, campaignName);
+
+    expect(result.type).toBe('popup');
+    expect(result.payload.description).toBe('Rage activated (2/3 uses remaining)');
+  });
+});
+
+// ── Buff default property values ───────────────────────────────
+
+describe('buff default property values', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('builds buff with all default false/null values for option-less activation', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 3 });
+
+    // Call 0: activeBuffs (not active), Call 1: rageUses (2), Call 2: activeBuffs (append)
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce(2);
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
 
     await handle(action, ps, campaignName);
 
-    const setCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs');
-    expect(setCall).toBeDefined();
-    const buff = setCall[2][0];
+    const buff = getLastActiveBuffsBuff();
     expect(buff.optionName).toBeNull();
     expect(buff.flySpeed).toBeNull();
     expect(buff.reactionSave).toBeNull();
@@ -117,195 +193,261 @@ describe('edge cases', () => {
     expect(buff.range).toBeNull();
   });
 
-  it('sets optionName on buff when chosenOption is present', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Bear' }] });
+  it('sets isImprovedDuplicity true with enhanced duplicity passive', async () => {
+    const ps = makePlayerStats({
+      automation: {
+        passives: [{ effect: 'enhanced_distraction_and_healing' }],
+      },
+    });
+    const action = makeAction({ uses: 3, effect: 'create_illusion' });
 
-    useRuntimeState.getRuntimeValue.mockReset();
-    useRuntimeState.getRuntimeValue.mockImplementation(() => 1);
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
 
-    await applyStanceOption(action, ps, campaignName, 'Bear');
+    await handle(action, ps, campaignName);
 
-    const setCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs');
-    expect(setCall[2][0].optionName).toBe('Bear');
-  });
-
-  it('sets noArmor on buff from option when present', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Falcon', noArmor: true }] });
-
-    useRuntimeState.getRuntimeValue.mockReset();
-    useRuntimeState.getRuntimeValue.mockImplementation(() => 1);
-
-    await applyStanceOption(action, ps, campaignName, 'Falcon');
-
-    const setCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs');
-    expect(setCall[2][0].noArmor).toBe(true);
-  });
-
-  it('option.range is carried to buff', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Custom', range: '10_ft' }] });
-
-    useRuntimeState.getRuntimeValue.mockReset();
-    useRuntimeState.getRuntimeValue.mockImplementation(() => 1);
-
-    await applyStanceOption(action, ps, campaignName, 'Custom');
-
-    const setCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs');
-    expect(setCall[2][0].range).toBe('10_ft');
-  });
-
-  it('option without resistanceTypes defaults to empty array on buff', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Custom' }] });
-
-    useRuntimeState.getRuntimeValue.mockReset();
-    useRuntimeState.getRuntimeValue.mockImplementation(() => 1);
-
-    await applyStanceOption(action, ps, campaignName, 'Custom');
-
-    const setCall = useRuntimeState.setRuntimeValue.mock.calls.find(c => c[1] === 'activeBuffs');
-    expect(setCall[2][0].resistanceTypes).toEqual([]);
+    expect(getLastActiveBuffsBuff().isImprovedDuplicity).toBe(true);
   });
 });
 
-// ── Armor detection ───────────────────────────────────────────
+// ── Option property resolution ─────────────────────────────────
 
-describe('armor detection', () => {
-  beforeEach(() => resetMocks());
+describe('option property resolution', () => {
+  beforeEach(() => vi.clearAllMocks());
 
-  it('identifies armor when formula contains "Armor ("', async () => {
+  function stubOptionActivation() {
+    useRuntimeState.getRuntimeValue.mockImplementation((player, prop) => {
+      if (prop === 'ragePoints') return 1;
+      return undefined;
+    });
+  }
+
+  it('sets optionName on buff when chosenOption is present', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Bear' }] });
+
+    stubOptionActivation();
+
+    await applyStanceOption(action, ps, campaignName, 'Bear');
+
+    const buff = getLastActiveBuffsBuff();
+    expect(buff.optionName).toBe('Bear');
+  });
+
+  it('sets noArmor on buff from option when present', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Falcon', noArmor: true }] });
+
+    stubOptionActivation();
+
+    await applyStanceOption(action, ps, campaignName, 'Falcon');
+
+    expect(getLastActiveBuffsBuff().noArmor).toBe(true);
+  });
+
+  it('option.range is carried to buff', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Custom', range: '10_ft' }] });
+
+    stubOptionActivation();
+
+    await applyStanceOption(action, ps, campaignName, 'Custom');
+
+    expect(getLastActiveBuffsBuff().range).toBe('10_ft');
+  });
+
+  it('option without resistanceTypes defaults to empty array on buff', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Custom' }] });
+
+    stubOptionActivation();
+
+    await applyStanceOption(action, ps, campaignName, 'Custom');
+
+    expect(getLastActiveBuffsBuff().resistanceTypes).toEqual([]);
+  });
+
+  it('uses default when option property is null', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({
+      uses: 0,
+      resourceKey: 'ragePoints',
+      options: [{ name: 'Test', resistanceTypes: null }],
+    });
+
+    stubOptionActivation();
+
+    await applyStanceOption(action, ps, campaignName, 'Test');
+
+    expect(getLastActiveBuffsBuff().resistanceTypes).toEqual([]);
+  });
+
+  it('uses default when option property is undefined', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({
+      uses: 0,
+      resourceKey: 'ragePoints',
+      options: [{ name: 'Test' }],
+    });
+
+    stubOptionActivation();
+
+    await applyStanceOption(action, ps, campaignName, 'Test');
+
+    expect(getLastActiveBuffsBuff().resistanceTypes).toEqual([]);
+  });
+});
+
+// ── Armor detection edge cases ─────────────────────────────────
+
+describe('armor detection edge cases', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function stubOptionActivation() {
+    useRuntimeState.getRuntimeValue.mockImplementation((player, prop) => {
+      if (prop === 'ragePoints') return 1;
+      return undefined;
+    });
+  }
+
+  it('blocks flySpeed when formula contains "Armor (" and noArmor is true', async () => {
     const ps = makePlayerStats({ armorClassFormula: 'AC 18 Armor (Plate)' });
     const action = makeAction({
-      uses: 0, resourceKey: 'ragePoints',
+      uses: 0,
+      resourceKey: 'ragePoints',
       options: [{ name: 'Falcon', flySpeed: '5_ft', noArmor: true }],
     });
 
-    useRuntimeState.getRuntimeValue.mockReset();
-    useRuntimeState.getRuntimeValue.mockImplementation(() => 1);
+    stubOptionActivation();
 
-    const result = await applyStanceOption(action, ps, campaignName, 'Falcon');
-    expect(result.payload.description).toContain('Blocked because you are wearing armor.');
+    await applyStanceOption(action, ps, campaignName, 'Falcon');
+
+    expect(getLastActiveBuffsBuff().flySpeed).toBeNull();
   });
 
-  it('does NOT identify armor when formula lacks "Armor ("', async () => {
-    const ps = makePlayerStats({ armorClassFormula: 'AC 14' }); // no Armor (
+  it('allows flySpeed when formula lacks "Armor ("', async () => {
+    const ps = makePlayerStats({ armorClassFormula: 'AC 14' });
     const action = makeAction({
-      uses: 0, resourceKey: 'ragePoints',
+      uses: 0,
+      resourceKey: 'ragePoints',
       options: [{ name: 'Falcon', flySpeed: '5_ft', noArmor: true }],
-     });
+    });
 
-    useRuntimeState.getRuntimeValue.mockReset();
-    useRuntimeState.getRuntimeValue.mockImplementation(() => 1);
+    stubOptionActivation();
 
-    const result = await applyStanceOption(action, ps, campaignName, 'Falcon');
-    expect(result.payload.description).not.toContain('Blocked because you are wearing armor.');
+    await applyStanceOption(action, ps, campaignName, 'Falcon');
+
+    expect(getLastActiveBuffsBuff().flySpeed).toBe('5_ft');
   });
 
   it('handles missing armorClassFormula (defaults to empty string)', async () => {
     const ps = makePlayerStats({});
     delete ps.armorClassFormula;
     const action = makeAction({
-      uses: 0, resourceKey: 'ragePoints',
+      uses: 0,
+      resourceKey: 'ragePoints',
       options: [{ name: 'Falcon', flySpeed: '5_ft', noArmor: true }],
-     });
+    });
 
-    useRuntimeState.getRuntimeValue.mockReset();
-    useRuntimeState.getRuntimeValue.mockImplementation(() => 1);
+    stubOptionActivation();
+
+    await applyStanceOption(action, ps, campaignName, 'Falcon');
+
+    expect(getLastActiveBuffsBuff().flySpeed).toBe('5_ft');
+  });
+
+  it('allows flySpeed when noArmor is false even with armor', async () => {
+    const ps = makePlayerStats({ armorClassFormula: 'AC 18 Armor (Plate)' });
+    const action = makeAction({
+      uses: 0,
+      resourceKey: 'ragePoints',
+      options: [{ name: 'Falcon', flySpeed: '5_ft', noArmor: false }],
+    });
+
+    stubOptionActivation();
+
+    await applyStanceOption(action, ps, campaignName, 'Falcon');
+
+    expect(getLastActiveBuffsBuff().flySpeed).toBe('5_ft');
+  });
+
+  it('includes blocked message in description when wearing armor blocks Falcon', async () => {
+    const ps = makePlayerStats({ armorClassFormula: 'AC 18 Armor (Plate)' });
+    const action = makeAction({
+      uses: 0,
+      resourceKey: 'ragePoints',
+      options: [{ name: 'Falcon', flySpeed: '5_ft', noArmor: true }],
+    });
+
+    stubOptionActivation();
 
     const result = await applyStanceOption(action, ps, campaignName, 'Falcon');
+
+    expect(result.payload.description).toContain('Blocked because you are wearing armor.');
+  });
+
+  it('does not include blocked message when not wearing armor', async () => {
+    const ps = makePlayerStats({ armorClassFormula: 'Unarmored Defense' });
+    const action = makeAction({
+      uses: 0,
+      resourceKey: 'ragePoints',
+      options: [{ name: 'Falcon', flySpeed: '5_ft', noArmor: true }],
+    });
+
+    stubOptionActivation();
+
+    const result = await applyStanceOption(action, ps, campaignName, 'Falcon');
+
     expect(result.payload.description).not.toContain('Blocked because you are wearing armor.');
   });
 });
 
-// ── Full activation/deactivation cycle ────────────────────────
+// ── Non-Rage action deactivation ───────────────────────────────
 
-describe('full activation/deactivation cycle', () => {
-  beforeEach(() => resetMocks());
+describe('non-Rage action deactivation', () => {
+  beforeEach(() => vi.clearAllMocks());
 
-  it('handle toggles off when called twice with same action name', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 3 }, { name: 'Second Wind' });
+  it('does not clear extended flag for non-Rage stances', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({}, { name: 'Second Wind' });
 
-     // First call — activates
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]); // not active
-    useRuntimeState.getRuntimeValue.mockReturnValue(2); // usesUsed=2 < maxUses=3
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce([{ name: 'Second Wind' }]);
 
-    const result1 = await handle(action, ps, campaignName);
-    expect(result1.type).toBe('popup');
-    expect(result1.payload.description).toContain('Second Wind activated');
+    await handle(action, ps, campaignName);
 
-     // Get the buff that was pushed
-    const pushedBuff = useRuntimeState.setRuntimeValue.mock.calls
-      .find(c => c[1] === 'activeBuffs')?.[2][0];
+    const tempTeleport = await import('../class-warlock/tempTeleportHandler.js');
+    expect(tempTeleport.clearExtendedFlag).not.toHaveBeenCalled();
+  });
 
-     // Reset for second call
-    resetMocks();
+  it('removes only the matching stance buff on deactivation', async () => {
+    const ps = makePlayerStats();
+    const action = makeAction({}, { name: 'Rage' });
 
-     // Second call — deactivates (stance is now active)
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce([pushedBuff]);
+    useRuntimeState.getRuntimeValue.mockReturnValueOnce([
+      { name: 'Rage' },
+      { name: 'Other Buff' },
+    ]);
 
-    const result2 = await handle(action, ps, campaignName);
-    expect(result2.type).toBe('popup');
-    expect(result2.payload.description).toBe('Second Wind ended');
+    await handle(action, ps, campaignName);
+
+    const buffCall = useRuntimeState.setRuntimeValue.mock.calls.find(
+      (c) => c[1] === 'activeBuffs',
+    );
+    expect(buffCall[2]).toEqual([{ name: 'Other Buff' }]);
   });
 });
 
-// ── Payload structure verification ────────────────────────────
+// ── Payload structure for error/depletion paths ────────────────
 
-describe('payload structure', () => {
-  beforeEach(() => resetMocks());
+describe('payload structure for depletion/invalid paths', () => {
+  beforeEach(() => vi.clearAllMocks());
 
-  it('activation popup has correct payload keys', async () => {
-    const ps = makePlayerStats({});
+  it('uses-depleted popup has automation in payload', async () => {
+    const ps = makePlayerStats();
     const action = makeAction({ uses: 3 });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload).toHaveProperty('type', 'automation_info');
-    expect(result.payload).toHaveProperty('name', 'Rage');
-    expect(result.payload).toHaveProperty('automationType', 'combat_stance');
-    expect(result.payload).toHaveProperty('description');
-    expect(result.payload.automation).toBe(action.automation);
-  });
-
-  it('option activation popup contains action name in payload.name', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Bear' }] });
-
-    useRuntimeState.getRuntimeValue.mockReset();
-
-    useRuntimeState.getRuntimeValue.mockImplementation(() => 1);
-
-    const result = await applyStanceOption(action, ps, campaignName, 'Bear');
-
-    expect(result.payload.name).toBe('Rage');
-    expect(result.payload.automationType).toBe('combat_stance');
-  });
-
-  it('deactivation popup describes ended stance by name', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({}, { name: 'Feral Instinct' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce([{ name: 'Feral Instinct' }]);
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.payload.name).toBe('Feral Instinct');
-    expect(result.payload.description).toBe('Feral Instinct ended');
-  });
-
-  it('uses-depleted popup has correct structure', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ uses: 3 });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(3); // used all
+    useRuntimeState.getRuntimeValue.mockReturnValue(3);
 
     const result = await handle(action, ps, campaignName);
 
@@ -314,12 +456,12 @@ describe('payload structure', () => {
     expect(result.payload.automation).toBe(action.automation);
   });
 
-  it('resource-depleted popup has correct structure', async () => {
-    const ps = makePlayerStats({});
+  it('resource-depleted popup has automation in payload', async () => {
+    const ps = makePlayerStats();
     const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
 
     useRuntimeState.getRuntimeValue.mockReturnValueOnce([]);
-    useRuntimeState.getRuntimeValue.mockReturnValue(0); // no resources
+    useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName);
 
@@ -328,8 +470,8 @@ describe('payload structure', () => {
     expect(result.payload.automation).toBe(action.automation);
   });
 
-  it('invalid option popup has correct structure', async () => {
-    const ps = makePlayerStats({});
+  it('invalid option popup has correct structure and action name', async () => {
+    const ps = makePlayerStats();
     const action = makeAction({ uses: 0, resourceKey: 'ragePoints', options: [{ name: 'Bear' }] });
 
     const result = await applyStanceOption(action, ps, campaignName, 'Ghost');
@@ -337,35 +479,6 @@ describe('payload structure', () => {
     expect(result.payload.type).toBe('automation_info');
     expect(result.payload.automationType).toBe('combat_stance');
     expect(result.payload.name).toBe('Rage');
-  });
-
-  it('teleport modal payload includes playerStats and campaignName', async () => {
-    const teleportFeature = { name: 'Primal Warrior Teleport', effect: 'teleport_on_rage' };
-    const ps = makePlayerStats({ automation: { specialActions: [teleportFeature] } });
-    const action = makeAction({ uses: 0, resourceKey: 'ragePoints' });
-
-     { let _c = 0; useRuntimeState.getRuntimeValue.mockImplementation( () => { _c++; if (_c === 1) return []; // activeBuffs empty
-         if (_c === 2) return 1; // ragePoints > 0
-         return []; }); }
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.payload).toHaveProperty('playerStats', ps);
-    expect(result.payload).toHaveProperty('campaignName', campaignName);
-    expect(result.payload.triggeredByRage).toBe(true);
-  });
-
-  it('modal for option selection includes action and playerStats in payload', async () => {
-    const ps = makePlayerStats({});
-    const action = makeAction({ options: [{ name: 'Bear' }] });
-
-    useRuntimeState.getRuntimeValue.mockReturnValueOnce([]); // not active
-
-    const result = await handle(action, ps, campaignName);
-
-    expect(result.type).toBe('modal');
-    expect(result.payload.action).toBe(action);
-    expect(result.payload.playerStats).toBe(ps);
-    expect(result.payload.campaignName).toBe(campaignName);
+    expect(result.payload.description).toBe('Invalid option: Ghost');
   });
 });

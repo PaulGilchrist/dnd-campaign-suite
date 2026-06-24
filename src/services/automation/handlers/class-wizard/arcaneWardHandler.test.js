@@ -1,4 +1,12 @@
-import { handle, onArcaneWardRestore, onArcaneWardDestroy, onArcaneWardLevelUp, onAbjurationSpellCast, onArcaneWardBonusActionRestore } from './arcaneWardHandler.js';
+// @improved-by-ai
+import {
+    handle,
+    onArcaneWardRestore,
+    onArcaneWardDestroy,
+    onArcaneWardLevelUp,
+    onAbjurationSpellCast,
+    onArcaneWardBonusActionRestore,
+} from './arcaneWardHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatSummary } from '../../../encounters/combatData.js';
@@ -21,69 +29,37 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
 }));
 
-const mockPlayerStats = {
-    name: 'TestWizard',
-    rules: '2024',
-    level: 5,
-    abilities: [
-        { name: 'Intelligence', bonus: 3 },
-    ],
-};
+const campaignName = 'test-campaign';
 
-const mockPlayerStatsLevel10 = {
-    name: 'TestWizard',
-    rules: '2024',
-    level: 10,
-    abilities: [
-        { name: 'Intelligence', bonus: 4 },
-    ],
-};
-
-const mockCampaignName = 'test-campaign';
-
-function mockWardActive(hp = 8, maxHp = 13) {
-    getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'arcaneWardActive') return true;
-        if (key === 'arcaneWardHp') return hp;
-        if (key === 'arcaneWardMax') return maxHp;
-        return undefined;
-    });
+function makeWizardStats(name, level, intBonus) {
+    return {
+        name,
+        rules: '2024',
+        level,
+        abilities: [{ name: 'Intelligence', bonus: intBonus }],
+    };
 }
 
-function mockWardInactive() {
-    getRuntimeValue.mockReturnValue(false);
+function setWardMocks(getRuntimeValueImpl) {
+    getRuntimeValue.mockImplementation(getRuntimeValueImpl);
 }
 
-function mockCombatContextNoDamage(targetName) {
+function setCombatMocks(targetName, projectedDamage, currentHp, maxHp) {
     getCombatSummary.mockReturnValue({
         creatures: [
-            { name: 'TestWizard', targetName: targetName },
+            { name: 'TestWizard', targetName },
             { name: targetName },
         ],
         activeCreatureName: 'TestWizard',
     });
     getTargetFromAttacker.mockReturnValue({ name: targetName });
-    getRuntimeValue.mockImplementation((player, key) => {
+    setWardMocks((player, key) => {
         if (key === 'arcaneWardActive') return true;
         if (key === 'arcaneWardHp') return 8;
         if (key === 'arcaneWardMax') return 13;
-        if (player === targetName && key === 'projectedWardDamage') return { rawDamage: 0 };
-        return undefined;
-    });
-}
-
-function mockCombatContextNoTarget() {
-    getCombatSummary.mockReturnValue({
-        creatures: [
-            { name: 'TestWizard' },
-        ],
-        activeCreatureName: 'TestWizard',
-    });
-    getTargetFromAttacker.mockReturnValue(null);
-    getRuntimeValue.mockImplementation((player, key) => {
-        if (key === 'arcaneWardActive') return true;
-        if (key === 'arcaneWardHp') return 8;
-        if (key === 'arcaneWardMax') return 13;
+        if (player === targetName && key === 'projectedWardDamage') return projectedDamage;
+        if (player === targetName && key === 'currentHitPoints') return currentHp;
+        if (player === targetName && key === 'maxHitPoints') return maxHp;
         return undefined;
     });
 }
@@ -95,124 +71,148 @@ describe('arcaneWardHandler', () => {
 
     describe('handle', () => {
         describe('ward not active', () => {
-            it('should return info popup when ward is not active', async () => {
-                mockWardInactive();
+            it('returns info popup directing user to cast an Abjuration spell', async () => {
+                setWardMocks((player, key) => {
+                    if (key === 'arcaneWardActive') return false;
+                    return undefined;
+                });
 
                 const result = await handle(
                     { name: 'Arcane Ward', description: 'Create a magical ward...' },
-                    mockPlayerStats,
-                    mockCampaignName
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.description).toContain('not active');
-                expect(result.payload.description).toContain('Cast an Abjuration spell');
+                expect(result).toEqual({
+                    type: 'popup',
+                    payload: expect.objectContaining({
+                        type: 'automation_info',
+                        name: 'Arcane Ward',
+                        description: expect.stringContaining('not active'),
+                    }),
+                });
             });
         });
 
-        describe('bonus action modal', () => {
-            it('should open modal to choose spell slot level when ward is active', async () => {
-                mockWardActive();
+        describe('bonus action automation type', () => {
+            it('returns modal to choose spell slot level', async () => {
+                setWardMocks((player, key) => {
+                    if (key === 'arcaneWardActive') return true;
+                    return undefined;
+                });
 
                 const result = await handle(
-                    { name: 'Arcane Ward', description: 'Create a magical ward...', automation: { type: 'arcane_ward_bonus_action' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'arcane_ward_bonus_action' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(result.type).toBe('modal');
-                expect(result.modalName).toBe('arcaneWardRestore');
-                expect(result.payload.action.name).toBe('Arcane Ward');
+                expect(result).toEqual({
+                    type: 'modal',
+                    modalName: 'arcaneWardRestore',
+                    payload: { action: expect.objectContaining({ name: 'Arcane Ward' }) },
+                });
             });
         });
 
         describe('projected ward - no combat context', () => {
-            it('should return info popup when no combat summary', async () => {
-                mockWardActive(5, 13);
+            it('returns info popup when there is no combat summary', async () => {
                 getCombatSummary.mockReturnValue(null);
+                setWardMocks((player, key) => {
+                    if (key === 'arcaneWardActive') return true;
+                    if (key === 'arcaneWardHp') return 5;
+                    if (key === 'arcaneWardMax') return 13;
+                    return undefined;
+                });
 
                 const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.description).toContain('active');
+                expect(result.payload.description).toContain('Arcane Ward is active');
                 expect(result.payload.description).toContain('No combat context available');
             });
         });
 
         describe('projected ward - no target', () => {
-            it('should return info popup when no target selected', async () => {
-                mockCombatContextNoTarget();
+            it('returns info popup when no target is selected', async () => {
+                getCombatSummary.mockReturnValue({
+                    creatures: [{ name: 'TestWizard' }],
+                    activeCreatureName: 'TestWizard',
+                });
+                getTargetFromAttacker.mockReturnValue(null);
+                setWardMocks((player, key) => {
+                    if (key === 'arcaneWardActive') return true;
+                    if (key === 'arcaneWardHp') return 8;
+                    if (key === 'arcaneWardMax') return 13;
+                    return undefined;
+                });
 
                 const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
                 expect(result.payload.description).toContain('No target selected');
             });
         });
 
         describe('projected ward - no damage', () => {
-            it('should return info popup when no recent damage on target', async () => {
-                mockCombatContextNoDamage('Goblin');
+            it('returns info when projectedWardDamage is undefined', async () => {
+                setCombatMocks('Goblin', undefined, 5, 10);
 
                 const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
                 expect(result.payload.description).toContain('No recent damage detected');
-                expect(result.payload.description).toContain('Goblin');
             });
 
-            it('should return info popup when rawDamage is null', async () => {
-                getRuntimeValue.mockImplementation((player, key) => {
+            it('returns info when projectedWardDamage.rawDamage is 0', async () => {
+                setCombatMocks('Goblin', { rawDamage: 0 }, 5, 10);
+
+                const result = await handle(
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
+                );
+
+                expect(result.payload.description).toContain('No recent damage detected');
+            });
+
+            it('returns info when projectedWardDamage.rawDamage is null', async () => {
+                getCombatSummary.mockReturnValue({
+                    creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
+                    activeCreatureName: 'TestWizard',
+                });
+                getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+                setWardMocks((player, key) => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 8;
                     if (key === 'arcaneWardMax') return 13;
-                    if (player === 'Goblin' && key === 'projectedWardDamage') return null;
+                    if (player === 'Goblin' && key === 'projectedWardDamage') return { rawDamage: null };
                     return undefined;
                 });
-                getCombatSummary.mockReturnValue({
-                    creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
-                });
-                getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
 
                 const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
                 expect(result.payload.description).toContain('No recent damage detected');
             });
         });
 
         describe('projected ward - full absorption', () => {
-            it('should absorb all damage when ward has enough HP', async () => {
-                mockWardActive(10, 15);
-                getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Goblin' },
-                        { name: 'Goblin' },
-                    ],
-                });
-                getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                getRuntimeValue.mockImplementation((player, key) => {
+            it('absorbs all damage and restores target HP to max', async () => {
+                setCombatMocks('Goblin', { rawDamage: 7 }, 5, 10);
+                setWardMocks((player, key) => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 10;
                     if (key === 'arcaneWardMax') return 15;
@@ -223,29 +223,24 @@ describe('arcaneWardHandler', () => {
                 });
 
                 const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 10, mockCampaignName);
-                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 3, mockCampaignName);
-                expect(result.type).toBe('popup');
-                expect(result.payload.type).toBe('automation_info');
-                expect(result.payload.description).toContain('absorbed 7');
+                expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 10, campaignName);
+                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 3, campaignName);
                 expect(result.payload.description).toContain('All damage absorbed');
+                expect(result.payload.description).toContain('absorbed 7');
             });
 
-            it('should not restore target HP beyond max HP', async () => {
-                mockWardActive(10, 15);
+            it('caps target HP at maxHitPoints when restoration would exceed it', async () => {
                 getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Goblin' },
-                        { name: 'Goblin' },
-                    ],
+                    creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
+                    activeCreatureName: 'TestWizard',
                 });
                 getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                getRuntimeValue.mockImplementation((player, key) => {
+                setWardMocks((player, key) => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 10;
                     if (key === 'arcaneWardMax') return 15;
@@ -256,57 +251,24 @@ describe('arcaneWardHandler', () => {
                 });
 
                 await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 10, mockCampaignName);
-                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 2, mockCampaignName);
-            });
-
-            it('should not reduce ward HP when absorbed is 0', async () => {
-                mockWardActive(0, 13);
-                getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Goblin' },
-                        { name: 'Goblin' },
-                    ],
-                });
-                getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                getRuntimeValue.mockImplementation((player, key) => {
-                    if (key === 'arcaneWardActive') return true;
-                    if (key === 'arcaneWardHp') return 0;
-                    if (key === 'arcaneWardMax') return 13;
-                    if (player === 'Goblin' && key === 'projectedWardDamage') return { rawDamage: 5 };
-                    if (player === 'Goblin' && key === 'currentHitPoints') return 8;
-                    if (player === 'Goblin' && key === 'maxHitPoints') return 10;
-                    return undefined;
-                });
-
-                const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
-                );
-
-                expect(setRuntimeValue).not.toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', expect.any(Number), mockCampaignName);
-                expect(result.payload.description).toContain('absorbed 0');
-                expect(result.payload.description).toContain('5 remaining damage');
+                expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 10, campaignName);
+                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 2, campaignName);
             });
         });
 
         describe('projected ward - partial absorption', () => {
-            it('should absorb what ward can and let rest through', async () => {
-                mockWardActive(5, 13);
+            it('absorbs what ward has and lets the rest through', async () => {
                 getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Ogre' },
-                        { name: 'Ogre' },
-                    ],
+                    creatures: [{ name: 'TestWizard', targetName: 'Ogre' }, { name: 'Ogre' }],
+                    activeCreatureName: 'TestWizard',
                 });
                 getTargetFromAttacker.mockReturnValue({ name: 'Ogre' });
-                getRuntimeValue.mockImplementation((player, key) => {
+                setWardMocks((player, key) => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 5;
                     if (key === 'arcaneWardMax') return 13;
@@ -317,29 +279,26 @@ describe('arcaneWardHandler', () => {
                 });
 
                 const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(setRuntimeValue).toHaveBeenCalledWith('Ogre', 'currentHitPoints', 13, mockCampaignName);
-                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 0, mockCampaignName);
+                expect(setRuntimeValue).toHaveBeenCalledWith('Ogre', 'currentHitPoints', 13, campaignName);
+                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 0, campaignName);
                 expect(result.payload.description).toContain('absorbed 5');
                 expect(result.payload.description).toContain('7 remaining damage');
             });
         });
 
         describe('projected ward - ward depleted', () => {
-            it('should set ward HP to 0 when fully consumed', async () => {
-                mockWardActive(3, 13);
+            it('sets ward HP to 0 when fully consumed', async () => {
                 getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Goblin' },
-                        { name: 'Goblin' },
-                    ],
+                    creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
+                    activeCreatureName: 'TestWizard',
                 });
                 getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                getRuntimeValue.mockImplementation((player, key) => {
+                setWardMocks((player, key) => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 3;
                     if (key === 'arcaneWardMax') return 13;
@@ -350,28 +309,24 @@ describe('arcaneWardHandler', () => {
                 });
 
                 const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 0, mockCampaignName);
-                expect(result.payload.description).toContain('0 HP');
+                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 0, campaignName);
                 expect(result.payload.description).toContain('All damage absorbed');
             });
         });
 
-        describe('projected ward - target HP null', () => {
-            it('should skip target HP restoration when currentHitPoints is null', async () => {
-                mockWardActive(5, 13);
+        describe('projected ward - null target HP', () => {
+            it('skips target HP restoration when currentHitPoints is null', async () => {
                 getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Goblin' },
-                        { name: 'Goblin' },
-                    ],
+                    creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
+                    activeCreatureName: 'TestWizard',
                 });
                 getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                getRuntimeValue.mockImplementation((player, key) => {
+                setWardMocks((player, key) => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 5;
                     if (key === 'arcaneWardMax') return 13;
@@ -381,29 +336,25 @@ describe('arcaneWardHandler', () => {
                     return undefined;
                 });
 
-                const result = await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                await handle(
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'currentHitPoints', expect.any(Number), mockCampaignName);
-                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 1, mockCampaignName);
-                expect(result.payload.description).toContain('absorbed 4');
+                expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'currentHitPoints', expect.any(Number), campaignName);
+                expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 1, campaignName);
             });
         });
 
-        describe('projected ward - ward max HP null', () => {
-            it('should cap target HP when maxHitPoints is null', async () => {
-                mockWardActive(5, 13);
+        describe('projected ward - null maxHitPoints', () => {
+            it('caps target HP at currentHitPoints + absorbed when maxHitPoints is null', async () => {
                 getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Goblin' },
-                        { name: 'Goblin' },
-                    ],
+                    creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
+                    activeCreatureName: 'TestWizard',
                 });
                 getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                getRuntimeValue.mockImplementation((player, key) => {
+                setWardMocks((player, key) => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 5;
                     if (key === 'arcaneWardMax') return 13;
@@ -414,62 +365,24 @@ describe('arcaneWardHandler', () => {
                 });
 
                 await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
-                // When maxHitPoints is null, the fallback is targetHp + absorbed = 8 + 4 = 12
-                expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 12, mockCampaignName);
+                // maxHitPoints is null, fallback is targetHp + absorbed = 8 + 4 = 12
+                expect(setRuntimeValue).toHaveBeenCalledWith('Goblin', 'currentHitPoints', 12, campaignName);
             });
         });
 
-        describe('logging', () => {
-            it('should log ability_use entry', async () => {
-                mockWardActive(5, 13);
+        describe('projected ward - logging', () => {
+            it('logs ability_use and ward_absorbed entries', async () => {
                 getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Goblin' },
-                        { name: 'Goblin' },
-                    ],
+                    creatures: [{ name: 'TestWizard', targetName: 'Goblin' }, { name: 'Goblin' }],
+                    activeCreatureName: 'TestWizard',
                 });
                 getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                getRuntimeValue.mockImplementation((player, key) => {
-                    if (key === 'arcaneWardActive') return true;
-                    if (key === 'arcaneWardHp') return 5;
-                    if (key === 'arcaneWardMax') return 13;
-                    if (player === 'Goblin' && key === 'projectedWardDamage') return { rawDamage: 5 };
-                    if (player === 'Goblin' && key === 'currentHitPoints') return 6;
-                    if (player === 'Goblin' && key === 'maxHitPoints') return 10;
-                    return undefined;
-                });
-
-                await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
-                );
-
-                expect(addEntry).toHaveBeenCalledWith(
-                    mockCampaignName,
-                    expect.objectContaining({
-                        type: 'ability_use',
-                        characterName: 'TestWizard',
-                        abilityName: 'Arcane Ward',
-                    })
-                );
-            });
-
-            it('should log ward_absorbed entry', async () => {
-                mockWardActive(5, 13);
-                getCombatSummary.mockReturnValue({
-                    creatures: [
-                        { name: 'TestWizard', targetName: 'Goblin' },
-                        { name: 'Goblin' },
-                    ],
-                });
-                getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-                getRuntimeValue.mockImplementation((player, key) => {
+                setWardMocks((player, key) => {
                     if (key === 'arcaneWardActive') return true;
                     if (key === 'arcaneWardHp') return 5;
                     if (key === 'arcaneWardMax') return 13;
@@ -480,28 +393,36 @@ describe('arcaneWardHandler', () => {
                 });
 
                 await handle(
-                    { name: 'Arcane Ward', description: '...', automation: { type: 'projected_ward' } },
-                    mockPlayerStats,
-                    mockCampaignName
+                    { name: 'Arcane Ward', automation: { type: 'projected_ward' } },
+                    makeWizardStats('TestWizard', 5, 3),
+                    campaignName,
                 );
 
                 expect(addEntry).toHaveBeenCalledWith(
-                    mockCampaignName,
+                    campaignName,
+                    expect.objectContaining({
+                        type: 'ability_use',
+                        characterName: 'TestWizard',
+                        abilityName: 'Arcane Ward',
+                    }),
+                );
+                expect(addEntry).toHaveBeenCalledWith(
+                    campaignName,
                     expect.objectContaining({
                         type: 'ward_absorbed',
                         targetName: 'Goblin',
                         damage: 3,
                         wizardName: 'TestWizard',
                         remainingWardHp: 2,
-                    })
+                    }),
                 );
             });
         });
     });
 
     describe('onArcaneWardRestore', () => {
-        it('should restore ward HP using spell slot level', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('restores ward HP based on spell slot level', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 13;
@@ -510,23 +431,17 @@ describe('arcaneWardHandler', () => {
 
             const result = await onArcaneWardRestore(
                 { name: 'Arcane Ward', automation: { type: 'passive_rule' } },
-                mockPlayerStats,
-                2, // spell slot level
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                2,
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                9, // 5 + (2*2) = 9
-                mockCampaignName
-            );
-            expect(result.type).toBe('popup');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 9, campaignName);
             expect(result.payload.description).toContain('restored 4 HP');
         });
 
-        it('should cap ward HP at max', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('caps ward HP at max when restoration would exceed it', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 12;
                 if (key === 'arcaneWardMax') return 13;
@@ -535,21 +450,16 @@ describe('arcaneWardHandler', () => {
 
             await onArcaneWardRestore(
                 { name: 'Arcane Ward', automation: { type: 'passive_rule' } },
-                mockPlayerStats,
-                3, // spell slot level → 6 HP restore
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                3,
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                13, // capped at max
-                mockCampaignName
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 13, campaignName);
         });
 
-        it('should default to spell slot level 1 when invalid value provided', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('defaults to spell slot level 1 when value is invalid', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 13;
@@ -558,21 +468,16 @@ describe('arcaneWardHandler', () => {
 
             await onArcaneWardRestore(
                 { name: 'Arcane Ward', automation: { type: 'passive_rule' } },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'invalid',
-                mockCampaignName
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                7, // 5 + (1*2) = 7
-                mockCampaignName
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 7, campaignName);
         });
 
-        it('should default to 0 when ward HP is not set', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('defaults to 0 when ward HP is not set', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return undefined;
                 if (key === 'arcaneWardMax') return 13;
@@ -581,21 +486,16 @@ describe('arcaneWardHandler', () => {
 
             await onArcaneWardRestore(
                 { name: 'Arcane Ward', automation: { type: 'passive_rule' } },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 1,
-                mockCampaignName
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                2, // 0 + (1*2) = 2
-                mockCampaignName
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 2, campaignName);
         });
 
-        it('should log the ability use', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('logs the ability use', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 13;
@@ -604,25 +504,25 @@ describe('arcaneWardHandler', () => {
 
             await onArcaneWardRestore(
                 { name: 'Arcane Ward', automation: { type: 'passive_rule' } },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 2,
-                mockCampaignName
+                campaignName,
             );
 
             expect(addEntry).toHaveBeenCalledWith(
-                mockCampaignName,
+                campaignName,
                 expect.objectContaining({
                     type: 'ability_use',
                     characterName: 'TestWizard',
                     abilityName: 'Arcane Ward',
-                })
+                }),
             );
         });
     });
 
     describe('onArcaneWardBonusActionRestore', () => {
-        it('should find lowest available spell slot and restore ward HP', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('uses the lowest available spell slot to restore ward HP', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 13;
@@ -634,29 +534,18 @@ describe('arcaneWardHandler', () => {
 
             const result = await onArcaneWardBonusActionRestore(
                 { name: 'Arcane Ward', automation: { type: 'arcane_ward_bonus_action' } },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                9, // 5 + (2*2) = 9, uses level 2 slot
-                mockCampaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'spell_slots_level_2',
-                1, // decremented from 2
-                mockCampaignName
-            );
-            expect(result.type).toBe('popup');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 9, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_2', 1, campaignName);
             expect(result.payload.description).toContain('restored 4 HP');
             expect(result.payload.description).toContain('level 2');
         });
 
-        it('should use level 1 slot when it is the only one available', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('falls back to level 1 when it is the only slot available', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 13;
@@ -668,39 +557,27 @@ describe('arcaneWardHandler', () => {
 
             await onArcaneWardBonusActionRestore(
                 { name: 'Arcane Ward', automation: { type: 'arcane_ward_bonus_action' } },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                7, // 5 + (1*2) = 7
-                mockCampaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'spell_slots_level_1',
-                2,
-                mockCampaignName
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 7, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'spell_slots_level_1', 2, campaignName);
         });
 
-        it('should return info popup when no spell slots available', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('returns info popup when no spell slots are available', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 13;
-                for (let i = 1; i <= 9; i++) {
-                    if (key === `spell_slots_level_${i}`) return 0;
-                }
+                if (key.startsWith('spell_slots_level_')) return 0;
                 return undefined;
             });
 
             const result = await onArcaneWardBonusActionRestore(
                 { name: 'Arcane Ward', automation: { type: 'arcane_ward_bonus_action' } },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
             expect(result.type).toBe('popup');
@@ -708,8 +585,8 @@ describe('arcaneWardHandler', () => {
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('should return info popup when ward is not active', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('returns info popup when ward is not active', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return false;
                 if (key === 'spell_slots_level_1') return 3;
                 return undefined;
@@ -717,8 +594,8 @@ describe('arcaneWardHandler', () => {
 
             const result = await onArcaneWardBonusActionRestore(
                 { name: 'Arcane Ward', automation: { type: 'arcane_ward_bonus_action' } },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
             expect(result.type).toBe('popup');
@@ -726,8 +603,8 @@ describe('arcaneWardHandler', () => {
             expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('should cap ward HP at max', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('caps ward HP at max when restoration would exceed it', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 12;
                 if (key === 'arcaneWardMax') return 13;
@@ -737,20 +614,15 @@ describe('arcaneWardHandler', () => {
 
             await onArcaneWardBonusActionRestore(
                 { name: 'Arcane Ward', automation: { type: 'arcane_ward_bonus_action' } },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                13, // capped at max
-                mockCampaignName
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 13, campaignName);
         });
 
-        it('should log the ability use', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('logs the ability use', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 13;
@@ -760,222 +632,168 @@ describe('arcaneWardHandler', () => {
 
             await onArcaneWardBonusActionRestore(
                 { name: 'Arcane Ward', automation: { type: 'arcane_ward_bonus_action' } },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
             expect(addEntry).toHaveBeenCalledWith(
-                mockCampaignName,
+                campaignName,
                 expect.objectContaining({
                     type: 'ability_use',
                     characterName: 'TestWizard',
                     abilityName: 'Arcane Ward',
-                })
+                }),
             );
         });
     });
 
     describe('onArcaneWardDestroy', () => {
-        it('should destroy the ward', async () => {
+        it('sets ward active to false, HP and max to 0', async () => {
             const result = await onArcaneWardDestroy(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                1,
                 'TestWizard',
                 'arcaneWardActive',
                 false,
-                mockCampaignName
+                campaignName,
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                2,
                 'TestWizard',
                 'arcaneWardHp',
                 0,
-                mockCampaignName
+                campaignName,
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                3,
                 'TestWizard',
                 'arcaneWardMax',
                 0,
-                mockCampaignName
+                campaignName,
             );
-            expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('destroyed');
             expect(result.payload.description).toContain('Long Rest');
         });
     });
 
     describe('onArcaneWardLevelUp', () => {
-        it('should compute correct new max HP for level 5 wizard with INT 3', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('computes correct max HP: 2 × level + INT modifier', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 10;
                 if (key === 'arcaneWardMax') return 13;
                 return undefined;
             });
 
-            const result = await onArcaneWardLevelUp(
+            await onArcaneWardLevelUp(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
-            // Level 5: 2*5 + 3 = 13 (same as before)
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardMax',
-                13,
-                mockCampaignName
-            );
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('13');
+            // 2*5 + 3 = 13
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 13, campaignName);
         });
 
-        it('should scale current HP proportionally when max increased', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('scales current HP proportionally when max increases', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 10;
                 if (key === 'arcaneWardMax') return 13;
                 return undefined;
             });
 
-            // Simulate level up from level 5 (max=13) to level 6 with same INT (max=15)
-            const level6Stats = {
-                name: 'TestWizard',
-                rules: '2024',
-                level: 6,
-                abilities: [{ name: 'Intelligence', bonus: 3 }],
-            };
+            const level6Stats = makeWizardStats('TestWizard', 6, 3);
 
             await onArcaneWardLevelUp(
                 { name: 'Arcane Ward' },
                 level6Stats,
-                mockCampaignName
+                campaignName,
             );
 
-            // ratio = 15/13, newHp = round(10 * 15/13) = round(11.54) = 12
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardMax',
-                15,
-                mockCampaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                12,
-                mockCampaignName
-            );
+            // prevMax=13, newMax=15, ratio=15/13, newHp=round(10*15/13)=round(11.54)=12
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 15, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 12, campaignName);
         });
 
-        it('should not scale if max did not increase', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('does not change current HP when max did not increase', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 10;
                 if (key === 'arcaneWardMax') return 13;
                 return undefined;
             });
 
-            // Same level, same max
             await onArcaneWardLevelUp(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
-            // current stays at 10, max stays at 13
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardMax',
-                13,
-                mockCampaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                10,
-                mockCampaignName
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 13, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 10, campaignName);
         });
 
-        it('should cap new HP at new max', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('caps scaled HP at new max', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 12;
                 if (key === 'arcaneWardMax') return 13;
                 return undefined;
             });
 
-            // Level up from 5 (max=13) to 6 (max=15), current=12
-            const level6Stats = {
-                name: 'TestWizard',
-                rules: '2024',
-                level: 6,
-                abilities: [{ name: 'Intelligence', bonus: 3 }],
-            };
+            const level6Stats = makeWizardStats('TestWizard', 6, 3);
 
-            // ratio = 15/13, newHp = round(12 * 15/13) = round(13.85) = 14
             await onArcaneWardLevelUp(
                 { name: 'Arcane Ward' },
                 level6Stats,
-                mockCampaignName
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                14,
-                mockCampaignName
-            );
+            // ratio=15/13, newHp=round(12*15/13)=round(13.85)=14, capped at 15
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 14, campaignName);
         });
 
-        it('should return info when ward is not active', async () => {
-            getRuntimeValue.mockReturnValue(false);
+        it('returns info popup when ward is not active', async () => {
+            setWardMocks(() => false);
 
             const result = await onArcaneWardLevelUp(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
-                mockCampaignName
+                makeWizardStats('TestWizard', 5, 3),
+                campaignName,
             );
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('not active');
         });
 
-        it('should handle missing Intelligence ability', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('handles missing Intelligence ability by using 0 modifier', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 10;
                 return undefined;
             });
 
-            const noIntStats = {
-                name: 'TestWizard',
-                rules: '2024',
-                level: 5,
-                abilities: [{ name: 'Strength', bonus: 2 }],
-            };
+            const noIntStats = makeWizardStats('TestWizard', 5, 0);
 
             await onArcaneWardLevelUp(
                 { name: 'Arcane Ward' },
                 noIntStats,
-                mockCampaignName
+                campaignName,
             );
 
-            // INT bonus = 0, max = 2*5 + 0 = 10
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardMax',
-                10,
-                mockCampaignName
-            );
+            // 2*5 + 0 = 10
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 10, campaignName);
         });
 
-        it('should handle undefined abilities array', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('handles undefined abilities array by using 0 modifier', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 5;
                 if (key === 'arcaneWardMax') return 10;
@@ -991,116 +809,106 @@ describe('arcaneWardHandler', () => {
             await onArcaneWardLevelUp(
                 { name: 'Arcane Ward' },
                 noAbilitiesStats,
-                mockCampaignName
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardMax',
-                10,
-                mockCampaignName
-            );
+            // 2*5 + 0 = 10
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 10, campaignName);
         });
     });
 
     describe('onAbjurationSpellCast', () => {
-        it('should create new ward when not active', async () => {
-            getRuntimeValue.mockReturnValue(false);
+        it('creates a new ward when one is not active', async () => {
+            setWardMocks(() => false);
 
             const result = await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'Shield',
-                1, // spell slot level
-                mockCampaignName
+                1,
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                1,
                 'TestWizard',
                 'arcaneWardActive',
                 true,
-                mockCampaignName
+                campaignName,
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                2,
                 'TestWizard',
                 'arcaneWardMax',
-                13, // 2*5 + 3
-                mockCampaignName
+                13,
+                campaignName,
             );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            expect(setRuntimeValue).toHaveBeenNthCalledWith(
+                3,
                 'TestWizard',
                 'arcaneWardHp',
                 13,
-                mockCampaignName
+                campaignName,
             );
-            expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('created');
             expect(result.payload.description).toContain('Shield');
         });
 
-        it('should include restore amount in description', async () => {
-            getRuntimeValue.mockReturnValue(false);
+        it('includes restore amount in description for new ward', async () => {
+            setWardMocks(() => false);
 
             const result = await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'Shield',
                 2,
-                mockCampaignName
+                campaignName,
             );
 
             expect(result.payload.description).toContain('Regains 4 HP');
         });
 
-        it('should create ward with correct max HP for level 10 wizard', async () => {
-            getRuntimeValue.mockReturnValue(false);
+        it('creates ward with correct max HP for different wizard levels', async () => {
+            setWardMocks(() => false);
+
+            const level10Stats = makeWizardStats('TestWizard', 10, 4);
 
             await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStatsLevel10,
+                level10Stats,
                 'Mage Armor',
                 1,
-                mockCampaignName
+                campaignName,
             );
 
-            // Level 10: 2*10 + 4 = 24
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardMax',
-                24,
-                mockCampaignName
-            );
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                24,
-                mockCampaignName
-            );
+            // 2*10 + 4 = 24
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardMax', 24, campaignName);
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 24, campaignName);
         });
 
-        it('should log ward creation', async () => {
-            getRuntimeValue.mockReturnValue(false);
+        it('logs ward creation', async () => {
+            setWardMocks(() => false);
 
             await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'Shield',
                 1,
-                mockCampaignName
+                campaignName,
             );
 
             expect(addEntry).toHaveBeenCalledWith(
-                mockCampaignName,
+                campaignName,
                 expect.objectContaining({
                     type: 'ability_use',
                     characterName: 'TestWizard',
                     abilityName: 'Arcane Ward',
-                })
+                }),
             );
         });
 
-        it('should restore ward HP when already active', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('restores ward HP when ward is already active', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 8;
                 if (key === 'arcaneWardMax') return 13;
@@ -1109,24 +917,18 @@ describe('arcaneWardHandler', () => {
 
             const result = await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'Mage Armor',
                 1,
-                mockCampaignName
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                10, // 8 + (1*2) = 10
-                mockCampaignName
-            );
-            expect(result.type).toBe('popup');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 10, campaignName);
             expect(result.payload.description).toContain('restored 2 HP');
         });
 
-        it('should restore more HP with higher spell slot level', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('restores more HP with a higher spell slot level', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 8;
                 if (key === 'arcaneWardMax') return 13;
@@ -1135,23 +937,19 @@ describe('arcaneWardHandler', () => {
 
             const result = await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'Mage Armor',
                 3,
-                mockCampaignName
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                13, // 8 + (3*2) = 14, capped at 13
-                mockCampaignName
-            );
+            // 8 + (3*2) = 14, capped at 13
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 13, campaignName);
             expect(result.payload.description).toContain('restored 6 HP');
         });
 
-        it('should cap restored HP at max when already active', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('caps restored HP at max when already active', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 12;
                 if (key === 'arcaneWardMax') return 13;
@@ -1160,22 +958,17 @@ describe('arcaneWardHandler', () => {
 
             await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'Mage Armor',
                 3,
-                mockCampaignName
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                13, // capped at max
-                mockCampaignName
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 13, campaignName);
         });
 
-        it('should log the restoration', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('logs the restoration with spell name in description', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 8;
                 if (key === 'arcaneWardMax') return 13;
@@ -1184,24 +977,24 @@ describe('arcaneWardHandler', () => {
 
             await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'Shield',
                 1,
-                mockCampaignName
+                campaignName,
             );
 
             expect(addEntry).toHaveBeenCalledWith(
-                mockCampaignName,
+                campaignName,
                 expect.objectContaining({
                     type: 'ability_use',
                     characterName: 'TestWizard',
                     description: expect.stringContaining('Shield'),
-                })
+                }),
             );
         });
 
-        it('should default to spell slot level 1 when invalid', async () => {
-            getRuntimeValue.mockImplementation((player, key) => {
+        it('defaults to spell slot level 1 when value is invalid', async () => {
+            setWardMocks((player, key) => {
                 if (key === 'arcaneWardActive') return true;
                 if (key === 'arcaneWardHp') return 8;
                 if (key === 'arcaneWardMax') return 13;
@@ -1210,18 +1003,13 @@ describe('arcaneWardHandler', () => {
 
             await onAbjurationSpellCast(
                 { name: 'Arcane Ward' },
-                mockPlayerStats,
+                makeWizardStats('TestWizard', 5, 3),
                 'Shield',
                 'invalid',
-                mockCampaignName
+                campaignName,
             );
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestWizard',
-                'arcaneWardHp',
-                10, // 8 + (1*2) = 10
-                mockCampaignName
-            );
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestWizard', 'arcaneWardHp', 10, campaignName);
         });
     });
 });

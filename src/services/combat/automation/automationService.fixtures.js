@@ -1,4 +1,4 @@
-vi.mock('../../rules/attackCalc.js', () => ({
+vi.mock('../../rules/core/attackCalc.js', () => ({
   parseMagicItemName: vi.fn((itemName) => {
     if (itemName && typeof itemName === 'string' && itemName.charAt(0) === '+') {
       const magicBonus = Number(itemName.charAt(1))

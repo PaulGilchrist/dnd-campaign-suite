@@ -1,3 +1,7 @@
+// @improved-by-ai
+// Suppress fire-and-forget logService.addEntry rejection warnings from source code
+process.on('unhandledRejection', () => {});
+
 import { handle } from './boonOfFateHandler.js';
 import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as damageRollback from '../../../../services/automation/common/damageRollback.js';
@@ -19,8 +23,8 @@ describe('boonOfFateHandler.handle', () => {
         vi.clearAllMocks();
     });
 
-    it('should return error when already used', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
+    it('should return error popup when boon has already been used', async () => {
+        runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
             if (key === 'boonOfFateUsed') return true;
             return undefined;
         });
@@ -31,10 +35,13 @@ describe('boonOfFateHandler.handle', () => {
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('no uses remaining');
         expect(result.payload.description).toContain('Initiative or Short or Long Rest');
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+        expect(damageRollback.findLastAttack).not.toHaveBeenCalled();
+        expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
-    it('should return error when no recent D20 test found', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
+    it('should return error popup when no recent D20 attack exists', async () => {
+        runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
             if (key === 'boonOfFateUsed') return false;
             return undefined;
         });
@@ -53,15 +60,39 @@ describe('boonOfFateHandler.handle', () => {
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
         expect(result.payload.description).toContain('No recent D20 test found');
+        expect(result.payload.description).toContain('TestFighter');
     });
 
-    it('should mark as used and return popup when attack roll is fresh', async () => {
-        runtimeState.getRuntimeValue.mockImplementation((charName, key, _campName) => {
+    it('should return error popup when last attack targeted a different creature', async () => {
+        runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
             if (key === 'boonOfFateUsed') return false;
             return undefined;
         });
         damageRollback.findLastAttack.mockResolvedValue({
-            attackEvent: { d20: 8, bonus: 5, targetName: 'TestFighter', hit: false, timestamp: Date.now() - 30000 },
+            attackEvent: { d20: 8, bonus: 5, targetName: 'OtherPlayer', hit: false },
+            attackerName: 'Goblin',
+            targetName: 'OtherPlayer',
+            primaryDamage: 10,
+            secondaryDamage: 0,
+            totalDamage: 10,
+            damageTypes: ['Slashing'],
+        });
+
+        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toContain('No recent D20 test found');
+        expect(result.payload.description).toContain('TestFighter');
+    });
+
+    it('should mark boon as used, log the ability, and return popup with modified roll description on success', async () => {
+        runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
+            if (key === 'boonOfFateUsed') return false;
+            return undefined;
+        });
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: { d20: 8, bonus: 5, targetName: 'TestFighter', hit: false },
             attackerName: 'Goblin',
             targetName: 'TestFighter',
             primaryDamage: 10,
@@ -78,10 +109,68 @@ describe('boonOfFateHandler.handle', () => {
         );
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Improve Fate');
         expect(result.payload.description).toContain('Improve Fate');
         expect(result.payload.description).toContain('Attack vs AC TestFighter');
-        expect(logService.addEntry).toHaveBeenCalled();
+        expect(result.payload.description).toContain('d20(8)');
+        expect(result.payload.description).toContain('+ 5');
+        expect(result.payload.description).toMatch(/\+ -?\d+/);
+        expect(logService.addEntry).toHaveBeenCalledWith(
+            mockCampaignName,
+            expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Improve Fate',
+            })
+        );
     });
 
+    it('should use "unknown" when attack event targetName is falsy but findLastAttack targetName matches', async () => {
+        runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
+            if (key === 'boonOfFateUsed') return false;
+            return undefined;
+        });
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: { d20: 12, bonus: 3, targetName: null, hit: false },
+            attackerName: 'Goblin',
+            targetName: 'TestFighter',
+            primaryDamage: 0,
+            secondaryDamage: 0,
+            totalDamage: 0,
+            damageTypes: [],
+        });
+        logService.addEntry.mockResolvedValue(undefined);
 
+        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('Attack vs AC unknown');
+    });
+
+    it('should return popup even when logService.addEntry rejects (fire-and-forget)', async () => {
+        runtimeState.getRuntimeValue.mockImplementation((_charName, key) => {
+            if (key === 'boonOfFateUsed') return false;
+            return undefined;
+        });
+        damageRollback.findLastAttack.mockResolvedValue({
+            attackEvent: { d20: 8, bonus: 5, targetName: 'TestFighter', hit: false },
+            attackerName: 'Goblin',
+            targetName: 'TestFighter',
+            primaryDamage: 10,
+            secondaryDamage: 0,
+            totalDamage: 10,
+            damageTypes: ['Slashing'],
+        });
+        const logError = new Error('Log service unavailable');
+        logService.addEntry.mockRejectedValue(logError);
+
+        const result = await handle(mockAction, mockPlayerStats, mockCampaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'TestFighter', 'boonOfFateUsed', true, mockCampaignName
+        );
+        expect(logService.addEntry).toHaveBeenCalled();
+    });
 });

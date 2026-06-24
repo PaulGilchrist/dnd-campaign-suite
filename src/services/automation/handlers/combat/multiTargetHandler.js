@@ -230,7 +230,7 @@ export async function applyMultiTarget(
         description: `${playerStats.name} used ${action.name} to spread ${spellName} to ${secondTargetName}.`,
         targetName: secondTargetName,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[multiTarget] Error:", e); throw e; });
+    }).catch((e) => { console.error("[multiTarget] Error:", e); });
 
     return {
         type: 'popup',

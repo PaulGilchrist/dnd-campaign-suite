@@ -1,948 +1,1204 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { getSpellAbilities } from './spellCalc2024.js';
 
-// Reference to mocked classRules (filled in beforeEach)
-let mockGetHighestMajorLevel;
-
+// ── Module-level mocks for all ESM dependencies ──
 vi.mock('../../character/classRules2024.js', () => ({
   default: {
-    getHighestMajorLevel: vi.fn(() => 0),
+    getHighestMajorLevel: vi.fn(() => undefined),
   },
 }));
 
+vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
+  getRuntimeValue: vi.fn((_key, _prop) => null),
+}));
+
+vi.mock('../../automation/handlers/class-other/elfishLineageHandler.js', () => ({
+  getElfisLineageSelection: vi.fn(),
+  getElfisLineageCantrip: vi.fn(),
+  getElfisLineageLevel3Spell: vi.fn(),
+  getElfisLineageLevel5Spell: vi.fn(),
+}));
+
+vi.mock('../../automation/handlers/class-other/gnomishLineageHandler.js', () => ({
+  getGnomishLineageSelection: vi.fn(),
+  getGnomishLineageCantrip: vi.fn(),
+  getGnomishLineageLevel3Spell: vi.fn(),
+  getGnomishLineageLevel5Spell: vi.fn(),
+}));
+
+vi.mock('../../automation/handlers/class-other/fiendishLegacyHandler.js', () => ({
+  getFiendishLegacySelection: vi.fn(),
+  getFiendishLegacyCantrip: vi.fn(),
+  getFiendishLegacyLevel3Spell: vi.fn(),
+  getFiendishLegacyLevel5Spell: vi.fn(),
+}));
+
+vi.mock('../../automation/handlers/feats/magicInitiateHandler.js', () => ({
+  getMagicInitiateCantrips: vi.fn(),
+  getMagicInitiateLevel1Spell: vi.fn(),
+}));
+
+// ── Helpers ──
+
+function makePlayerStats(overrides = {}) {
+  return {
+    name: 'TestCharacter',
+    level: 1,
+    proficiency: 2,
+    class: {
+      name: 'Wizard',
+      class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } }],
+      spell_casting_ability: 'Intelligence',
+      ...overrides.class,
+    },
+    abilities: [
+      { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
+    ],
+    spells: [],
+    automation: {},
+    ...overrides,
+  };
+}
+
+function makeSpell(name, level = 0, extra = {}) {
+  return { name, level, damage: {}, casting_time: '1 action', range: 'Self', ...extra };
+}
+
 describe('spellCalc2024', () => {
+  // References to mocked functions (set in beforeEach via dynamic import)
+  let mockGetHighestMajorLevel;
+  let mockGetRuntimeValue;
+  let mockElfisLineageSelection;
+  let mockElfisLineageCantrip;
+  let mockElfisLineageLevel3Spell;
+  let mockElfisLineageLevel5Spell;
+  let mockGnomishLineageSelection;
+  let mockGnomishLineageCantrip;
+  let mockGnomishLineageLevel3Spell;
+  let mockGnomishLineageLevel5Spell;
+  let mockFiendishLegacySelection;
+  let mockFiendishLegacyCantrip;
+  let mockFiendishLegacyLevel3Spell;
+  let mockFiendishLegacyLevel5Spell;
+  let mockMagicInitiateCantrips;
+  let mockMagicInitiateLevel1Spell;
+
   beforeEach(async () => {
+    vi.resetAllMocks();
     const classRules = await import('../../character/classRules2024.js');
+    const runtimeState = await import('../../../hooks/runtime/useRuntimeState.js');
+    const elfishLineage = await import('../../automation/handlers/class-other/elfishLineageHandler.js');
+    const gnomishLineage = await import('../../automation/handlers/class-other/gnomishLineageHandler.js');
+    const fiendishLegacy = await import('../../automation/handlers/class-other/fiendishLegacyHandler.js');
+    const magicInitiate = await import('../../automation/handlers/feats/magicInitiateHandler.js');
+
     mockGetHighestMajorLevel = classRules.default.getHighestMajorLevel;
-    vi.clearAllMocks();
+    mockGetRuntimeValue = runtimeState.getRuntimeValue;
+    mockElfisLineageSelection = elfishLineage.getElfisLineageSelection;
+    mockElfisLineageCantrip = elfishLineage.getElfisLineageCantrip;
+    mockElfisLineageLevel3Spell = elfishLineage.getElfisLineageLevel3Spell;
+    mockElfisLineageLevel5Spell = elfishLineage.getElfisLineageLevel5Spell;
+    mockGnomishLineageSelection = gnomishLineage.getGnomishLineageSelection;
+    mockGnomishLineageCantrip = gnomishLineage.getGnomishLineageCantrip;
+    mockGnomishLineageLevel3Spell = gnomishLineage.getGnomishLineageLevel3Spell;
+    mockGnomishLineageLevel5Spell = gnomishLineage.getGnomishLineageLevel5Spell;
+    mockFiendishLegacySelection = fiendishLegacy.getFiendishLegacySelection;
+    mockFiendishLegacyCantrip = fiendishLegacy.getFiendishLegacyCantrip;
+    mockFiendishLegacyLevel3Spell = fiendishLegacy.getFiendishLegacyLevel3Spell;
+    mockFiendishLegacyLevel5Spell = fiendishLegacy.getFiendishLegacyLevel5Spell;
+    mockMagicInitiateCantrips = magicInitiate.getMagicInitiateCantrips;
+    mockMagicInitiateLevel1Spell = magicInitiate.getMagicInitiateLevel1Spell;
   });
 
   describe('getSpellAbilities', () => {
-    it('should return null when no spellcasting is available', () => {
-      const allSpells = [];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Fighter',
-          class_levels: [{ level: 1 }],
-        },
-        abilities: [],
-      };
+    // ── Null / no spellcasting paths ──
 
-      const result = getSpellAbilities(allSpells, playerStats);
-
+    it('returns null when player has no class_levels', () => {
+      const stats = makePlayerStats({ class: { class_levels: [] } });
+      const result = getSpellAbilities([], stats);
       expect(result).toBeNull();
     });
 
-    it('should return spell abilities from class level spellcasting', () => {
-      const allSpells = [{ name: 'Fire Bolt', level: 0, damage: { damage_type: 'Fire' }, casting_time: '1 action', range: '120 feet' }];
-      const playerStats = {
-        level: 1,
+    it('returns null when class level has no spellcasting and getHighestMajorLevel returns nothing', () => {
+      mockGetHighestMajorLevel.mockReturnValue(undefined);
+
+      const stats = makePlayerStats({
+        class: { class_levels: [{ level: 1 }] },
+      });
+      const result = getSpellAbilities([], stats);
+      expect(result).toBeNull();
+    });
+
+    it('returns null when required_major does not match major name', () => {
+      const stats = makePlayerStats({
         class: {
-          name: 'Wizard',
           class_levels: [{
             level: 1,
-            spellcasting: {
-              cantrips_known: 3,
-              spell_slots: { '1': 2 },
-              spell_known: 0,
-            },
+            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 }, required_major: 'Evoker' },
           }],
-          spell_casting_ability: 'Intelligence',
+          major: { name: 'Necromancer' },
         },
-        abilities: [
-          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-        ],
-        spells: ['Fire Bolt'],
-        proficiency: 2,
-      };
+      });
+      const result = getSpellAbilities([], stats);
+      expect(result).toBeNull();
+    });
 
-      const result = getSpellAbilities(allSpells, playerStats);
+    it('returns null when required_major does not match legacy subclass name', () => {
+      const stats = makePlayerStats({
+        class: {
+          class_levels: [{
+            level: 1,
+            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 }, required_major: 'Life' },
+          }],
+          subclass: { name: 'Death' },
+        },
+      });
+      const result = getSpellAbilities([], stats);
+      expect(result).toBeNull();
+    });
+
+    // ── Successful spellcasting resolution ──
+
+    it('returns spell abilities from class level spellcasting', () => {
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+
+      const result = getSpellAbilities([makeSpell('Fire Bolt')], stats);
 
       expect(result).not.toBeNull();
       expect(result.cantrips_known).toBe(3);
       expect(result.spell_slots).toEqual({ '1': 2 });
       expect(result.spellCastingAbility).toBe('Intelligence');
       expect(result.modifier).toBe(3);
-      expect(result.toHit).toBe(5); // 3 + 2
-      expect(result.saveDc).toBe(13); // 8 + 3 + 2
+      expect(result.toHit).toBe(5);
+      expect(result.saveDc).toBe(13);
+      expect(result.spells).toHaveLength(1);
+      expect(result.spells[0].name).toBe('Fire Bolt');
     });
 
-    it('should return null when required_major does not match', () => {
-      const playerStats = {
-        level: 1,
+    it('returns spell abilities when required_major matches major name', () => {
+      const stats = makePlayerStats({
         class: {
-          name: 'Wizard',
           class_levels: [{
             level: 1,
-            spellcasting: {
-              cantrips_known: 3,
-              spell_slots: { '1': 2 },
-              required_major: 'Evoker',
-            },
-          }],
-          major: { name: 'Necromancer' },
-          spell_casting_ability: 'Intelligence',
-        },
-        abilities: [
-          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-        ],
-        spells: [],
-        proficiency: 2,
-      };
-
-      const result = getSpellAbilities([], playerStats);
-
-      expect(result).toBeNull();
-    });
-
-    it('should return spell abilities when required_major matches', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 3,
-              spell_slots: { '1': 2 },
-              required_major: 'Evoker',
-            },
+            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 }, required_major: 'Evoker' },
           }],
           major: { name: 'Evoker' },
           spell_casting_ability: 'Intelligence',
         },
-        abilities: [
-          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-        ],
-        spells: [],
-        proficiency: 2,
-      };
-
-      const result = getSpellAbilities([], playerStats);
+      });
+      const result = getSpellAbilities([], stats);
 
       expect(result).not.toBeNull();
+      expect(result.spellCastingAbility).toBe('Intelligence');
+    });
+
+    it('falls back to getHighestMajorLevel when class_levels lack spellcasting', () => {
+      mockGetHighestMajorLevel.mockReturnValue({
+        spellcasting: { cantrips_known: 2, spell_slots: { '1': 1 } },
+      });
+
+      const stats = makePlayerStats({
+        class: {
+          class_levels: [{ level: 1 }],
+          major: { name: 'Evoker', spellcasting: { cantrips_known: 2, spell_slots: { '1': 1 } } },
+        },
+      });
+      const result = getSpellAbilities([], stats);
+
+      expect(mockGetHighestMajorLevel).toHaveBeenCalledWith(stats);
+      expect(result).not.toBeNull();
+      expect(result.cantrips_known).toBe(2);
+    });
+
+    it('falls back to class.major.spellcasting when class_levels and getHighestMajorLevel have none', () => {
+      const stats = makePlayerStats({
+        class: {
+          class_levels: [{ level: 1 }],
+          major: { spell_casting_ability: 'Intelligence', spellcasting: { cantrips_known: 1, spell_slots: {} } },
+        },
+      });
+      const result = getSpellAbilities([], stats);
+
+      expect(result).not.toBeNull();
+      expect(result.cantrips_known).toBe(1);
+    });
+
+    // ── Class order bonuses ──
+
+    it('grants +1 cantrip for Divine Order Thaumaturge Cleric', () => {
+      const stats = makePlayerStats({
+        class: {
+          name: 'Cleric',
+          divineOrder: 'Thaumaturge',
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: {} } }],
+        },
+      });
+      const result = getSpellAbilities([], stats);
+
+      expect(result.cantrips_known).toBe(4);
+    });
+
+    it('does not grant Thaumaturge bonus to non-Cleric', () => {
+      const stats = makePlayerStats({
+        class: {
+          name: 'Wizard',
+          divineOrder: 'Thaumaturge',
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: {} } }],
+        },
+      });
+      const result = getSpellAbilities([], stats);
+
       expect(result.cantrips_known).toBe(3);
     });
 
-    it('should fall back to getHighestMajorLevel when class_levels have no spellcasting', () => {
-      // getHighestMajorLevel returns a number (0 by default), so .spellcasting on it is undefined.
-      // This means the fallback doesn't work in practice. The function returns null.
-      const playerStats = {
-        level: 1,
+    it('grants +1 cantrip for Primal Order Magician Druid', () => {
+      const stats = makePlayerStats({
         class: {
-          name: 'Wizard',
-          class_levels: [{ level: 1 }], // no spellcasting here
-          major: { name: 'Evoker', features: [{ level: 1 }] },
+          name: 'Druid',
+          primalOrder: 'Magician',
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 2, spell_slots: {} } }],
+        },
+      });
+      const result = getSpellAbilities([], stats);
+
+      expect(result.cantrips_known).toBe(3);
+    });
+
+    // ── Arcane Trickster ──
+
+    it('adds Mage Hand and +3 cantrips for Arcane Trickster', () => {
+      const stats = makePlayerStats({
+        class: {
+          name: 'Rogue',
+          major: { name: 'Arcane Trickster' },
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: {}, spells: [] } }],
           spell_casting_ability: 'Intelligence',
         },
-        abilities: [
-          { name: 'Intelligence', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 },
-        ],
+        abilities: [{ name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
+        spells: ['Mage Hand'],
+      });
+      const result = getSpellAbilities([], stats);
+
+      expect(result.cantrips_known).toBe(6);
+      const mageHand = result.spells.find(s => s.name === 'Mage Hand');
+      expect(mageHand).toBeDefined();
+    });
+
+    it('adds +3 cantrips for Arcane Trickster even with empty known spells array', () => {
+      const stats = makePlayerStats({
+        class: {
+          name: 'Rogue',
+          major: { name: 'Arcane Trickster' },
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: {}, spells: [] } }],
+          spell_casting_ability: 'Intelligence',
+        },
+        abilities: [{ name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
         spells: [],
-        proficiency: 2,
-      };
+      });
+      const result = getSpellAbilities([], stats);
 
-      const result = getSpellAbilities([], playerStats);
-
-      expect(result).toBeNull();
-      expect(mockGetHighestMajorLevel).toHaveBeenCalledWith(playerStats);
+      // Source checks `if (playerStats.spells)` which is truthy for [], so +3 is always added
+      expect(result.cantrips_known).toBe(6);
+      expect(result.spells).toHaveLength(0);
     });
 
-    it('should return empty spells array when player has no spells property', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 3,
-              spell_slots: { '1': 2 },
-            },
-          }],
-          spell_casting_ability: 'Intelligence',
-        },
-        abilities: [
-          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-        ],
-        proficiency: 2,
-      };
+    // ── Spell mapping and sorting ──
 
-      const result = getSpellAbilities([], playerStats);
-
-      expect(result).not.toBeNull();
-      expect(result.spells).toEqual([]);
-    });
-
-    it('should handle missing spell ability (no matching ability in array)', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 3,
-              spell_slots: { '1': 2 },
-            },
-          }],
-          spell_casting_ability: 'Intelligence',
-        },
-        abilities: [
-          { name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-        ],
-        spells: [],
-        proficiency: 2,
-      };
-
-      const result = getSpellAbilities([], playerStats);
-
-      expect(result).not.toBeNull();
-      expect(result.modifier).toBe(0);
-      expect(result.toHit).toBe(2); // proficiency only
-      expect(result.saveDc).toBe(10); // 8 + proficiency
-    });
-
-    it('should map spell names to spell details from allSpells', () => {
+    it('maps spell names to spell details with prepared=Always for all levels', () => {
       const allSpells = [
-        { name: 'Fire Bolt', level: 0, damage: { damage_type: 'Fire' }, casting_time: '1 action', range: '120 feet' },
-        { name: 'Magic Missile', level: 1, damage: { damage_type: 'Force' }, casting_time: '1 action', range: '120 feet' },
+        makeSpell('Fire Bolt', 0, { damage_type: 'Fire' }),
+        makeSpell('Magic Missile', 1, { damage_type: 'Force' }),
       ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 2,
-              spell_slots: { '1': 2 },
-            },
-          }],
-          spell_casting_ability: 'Intelligence',
-        },
-        abilities: [
-          { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-        ],
-        spells: ['Fire Bolt', 'Magic Missile'],
-        proficiency: 2,
-      };
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt', 'Magic Missile'];
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities(allSpells, stats);
 
       expect(result.spells).toHaveLength(2);
-      // Cantrip (level 0) should have prepared = 'Always'
       const fireBolt = result.spells.find(s => s.name === 'Fire Bolt');
       expect(fireBolt.prepared).toBe('Always');
       expect(fireBolt.level).toBe(0);
-
       const magicMissile = result.spells.find(s => s.name === 'Magic Missile');
       expect(magicMissile.prepared).toBe('Always');
       expect(magicMissile.level).toBe(1);
     });
 
-    it('should sort spells by level then alphabetically', () => {
+    it('sorts spells by level ascending then name alphabetically', () => {
       const allSpells = [
-        { name: 'Acid Splash', level: 0, damage: { damage_type: 'Acid' }, casting_time: '1 action', range: '60 feet' },
-        { name: 'Fire Bolt', level: 0, damage: { damage_type: 'Fire' }, casting_time: '1 action', range: '120 feet' },
-        { name: 'Shield', level: 1, damage: { damage_type: 'Force' }, casting_time: '1 reaction', range: 'Self' },
-        { name: 'Magic Missile', level: 1, damage: { damage_type: 'Force' }, casting_time: '1 action', range: '120 feet' },
+        makeSpell('Acid Splash', 0),
+        makeSpell('Fire Bolt', 0),
+        makeSpell('Shield', 1),
+        makeSpell('Magic Missile', 1),
       ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 2,
-              spell_slots: { '1': 2 },
-            },
-          }],
-          spell_casting_ability: 'Intelligence',
-        },
-        abilities: [
-          { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-        ],
-        spells: ['Shield', 'Fire Bolt', 'Magic Missile', 'Acid Splash'],
-        proficiency: 2,
-      };
+      const stats = makePlayerStats();
+      stats.spells = ['Shield', 'Fire Bolt', 'Magic Missile', 'Acid Splash'];
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities(allSpells, stats);
 
-      expect(result.spells).toHaveLength(4);
-      // Sorted: level 0 alphabetically, then level 1 alphabetically
-      expect(result.spells[0].name).toBe('Acid Splash');
-      expect(result.spells[1].name).toBe('Fire Bolt');
-      expect(result.spells[2].name).toBe('Magic Missile');
-      expect(result.spells[3].name).toBe('Shield');
+      expect(result.spells.map(s => s.name)).toEqual(['Acid Splash', 'Fire Bolt', 'Magic Missile', 'Shield']);
     });
 
-    it('should handle subclass (legacy format) matching required_major', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Cleric',
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 3,
-              spell_slots: { '1': 2 },
-              required_major: 'Life',
-            },
-          }],
-          subclass: { name: 'Life' },
-          spell_casting_ability: 'Wisdom',
-        },
-        abilities: [
-          { name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-        ],
-        spells: [],
-        proficiency: 2,
-      };
+    it('uses missing ability fallback values (modifier=0, toHit=proficiency, saveDc=8+proficiency)', () => {
+      const stats = makePlayerStats({
+        abilities: [{ name: 'Strength', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 }],
+      });
 
-      const result = getSpellAbilities([], playerStats);
+      const result = getSpellAbilities([], stats);
 
-      expect(result).not.toBeNull();
-      expect(result.spellCastingAbility).toBe('Wisdom');
-      expect(result.modifier).toBe(3);
+      expect(result.modifier).toBe(0);
+      expect(result.toHit).toBe(2);
+      expect(result.saveDc).toBe(10);
     });
 
-    it('should handle spell not found in allSpells gracefully', () => {
-      const allSpells = [{ name: 'Fire Bolt', level: 0, damage: { damage_type: 'Fire' }, casting_time: '1 action', range: '120 feet' }];
-      const playerStats = {
-        level: 1,
+    it('handles missing playerStats.spells as empty array', () => {
+      const stats = makePlayerStats({ spells: undefined });
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spells).toEqual([]);
+    });
+
+    // ── Subclass (major) spells ──
+
+    it('adds subclass spells when level > 2 and level >= spell level', () => {
+      const stats = makePlayerStats({
+        level: 3,
         class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 2,
-              spell_slots: { '1': 2 },
-             },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: ['Unknown Spell'],
-        proficiency: 2,
-       };
-
-      const result = getSpellAbilities(allSpells, playerStats);
-
-      expect(result.spells).toHaveLength(1);
-      expect(result.spells[0].name).toBe('Unknown Spell');
-      expect(result.spells[0].prepared).toBe('Always');
-     });
-
-    // ── Automation: passive_rule / always_prepared_spells ──
-
-    it('should add always_prepared_spells from automation passives', () => {
-      const allSpells = [
-        { name: 'Fire Bolt', level: 0, damage: { damage_type: 'Fire' }, casting_time: '1 action', range: '120 feet' },
-        { name: 'Light', level: 0, damage: {}, casting_time: '1 action', range: 'Self' },
-       ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 2,
-              spell_slots: { '1': 2 },
-             },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: ['Fire Bolt'],
-        proficiency: 2,
-        automation: {
-          passives: [
-            { type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Light'] },
-           ],
-         },
-       };
-
-      const result = getSpellAbilities(allSpells, playerStats);
-
-      expect(result.spells).toHaveLength(2);
-      expect(result.spells.find(s => s.name === 'Light')).toBeDefined();
-     });
-
-    it('should add always_prepared_spells from automation actions', () => {
-      const allSpells = [
-         { name: 'Sanctuary', level: 1, damage: {}, casting_time: '1 bonus action', range: 'Touch' },
-        ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Cleric',
-          major: { name: 'Knowledge' },
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 3,
-              spell_slots: { '1': 2 },
-              },
-            }],
-          spell_casting_ability: 'Wisdom',
-          },
-        abilities: [
-            { name: 'Wisdom', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 },
+          class_levels: [
+            { level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 2, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 3, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4, '2': 2 } } },
           ],
-        spells: [],
-        proficiency: 2,
-        automation: {
-          actions: [
-             { type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Sanctuary'] },
+          spell_casting_ability: 'Intelligence',
+          major: {
+            name: 'School of Evocation',
+            spells: [
+              { name: 'Lightning Bolt', level: 3 },
+              { name: 'Mage Hand', level: 1 },
             ],
           },
-        };
+        },
+      });
+      stats.spells = [];
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities([], stats);
 
-      expect(result.spells).toHaveLength(1);
-      expect(result.spells[0].name).toBe('Sanctuary');
-     });
+      const names = result.spells.map(s => s.name);
+      // Both are added because level 3 >= level 3 (Lightning Bolt) and level 3 >= level 1 (Mage Hand)
+      expect(names).toContain('Mage Hand');
+      expect(names).toContain('Lightning Bolt');
+    });
 
-    it('should add always_prepared_spells from automation bonusActions', () => {
-      const allSpells = [
-          { name: 'Healing Word', level: 1, damage: {}, casting_time: '1 bonus action', range: '60 feet' },
-        ];
-      const playerStats = {
-        level: 1,
+    it('adds subclass spells unlocked at current level', () => {
+      const stats = makePlayerStats({
+        level: 3,
+        class: {
+          class_levels: [
+            { level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 2, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 3, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4, '2': 2 } } },
+          ],
+          spell_casting_ability: 'Intelligence',
+          major: {
+            name: 'School of Evocation',
+            spells: [
+              { name: 'Mage Hand', level: 1 },
+              { name: 'Flaming Sphere', level: 2 },
+            ],
+          },
+        },
+      });
+      stats.spells = [];
+
+      const result = getSpellAbilities([], stats);
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Mage Hand');
+      expect(names).toContain('Flaming Sphere');
+    });
+
+    it('does not add subclass spells when level <= 2', () => {
+      const stats = makePlayerStats({
+        level: 2,
+        class: {
+          class_levels: [
+            { level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 2, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+          ],
+          spell_casting_ability: 'Intelligence',
+          major: {
+            name: 'School of Evocation',
+            spells: [{ name: 'Mage Hand', level: 1 }],
+          },
+        },
+      });
+      stats.spells = [];
+
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spells).toHaveLength(0);
+    });
+
+    it('supports legacy subclassSpell.spell.name format', () => {
+      const stats = makePlayerStats({
+        level: 3,
+        class: {
+          class_levels: [
+            { level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 2, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 3, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4, '2': 2 } } },
+          ],
+          spell_casting_ability: 'Intelligence',
+          major: {
+            name: 'School of Evocation',
+            spells: [{ spell: { name: 'Mage Hand' }, level: 1 }],
+          },
+        },
+      });
+      stats.spells = [];
+
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spells.map(s => s.name)).toContain('Mage Hand');
+    });
+
+    it('does not duplicate subclass spells already in known list', () => {
+      const stats = makePlayerStats({
+        level: 3,
+        class: {
+          class_levels: [
+            { level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 2, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } },
+            { level: 3, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4, '2': 2 } } },
+          ],
+          spell_casting_ability: 'Intelligence',
+          major: {
+            name: 'School of Evocation',
+            spells: [{ name: 'Fire Bolt', level: 1 }],
+          },
+        },
+      });
+      stats.spells = ['Fire Bolt'];
+
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
+    });
+
+    // ── Automation: passive_rule (always_prepared_spells) ──
+
+    it('adds always_prepared_spells from automation passives', () => {
+      const allSpells = [makeSpell('Light', 0)];
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+      stats.automation = {
+        passives: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Light'] }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt', 'Light']);
+    });
+
+    it('adds always_prepared_spells from automation actions', () => {
+      const allSpells = [makeSpell('Sanctuary', 1)];
+      const stats = makePlayerStats({
         class: {
           name: 'Cleric',
-          major: { name: 'Life' },
-          class_levels: [{
-            level: 1,
-            spellcasting: {
-              cantrips_known: 3,
-              spell_slots: { '1': 2 },
-              },
-            }],
-        spell_casting_ability: 'Wisdom',
-          },
-        abilities: [
-             { name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-           ],
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } }],
+          spell_casting_ability: 'Wisdom',
+        },
+        abilities: [{ name: 'Wisdom', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 }],
         spells: [],
-        proficiency: 2,
-        automation: {
-          bonusActions: [
-              { type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Healing Word'] },
-            ],
-         },
-       };
+      });
+      stats.automation = {
+        actions: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Sanctuary'] }],
+      };
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities(allSpells, stats);
 
-      expect(result.spells).toHaveLength(1);
-      expect(result.spells[0].name).toBe('Healing Word');
-     });
-
-    it('should not duplicate spells already known when always_prepared_spells is present', () => {
-      const allSpells = [
-        { name: 'Fire Bolt', level: 0, damage: { damage_type: 'Fire' }, casting_time: '1 action', range: '120 feet' },
-       ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: ['Fire Bolt'], // already known
-        proficiency: 2,
-        automation: {
-          passives: [
-            { type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Fire Bolt'] },
-           ],
-         },
-       };
-
-      const result = getSpellAbilities(allSpells, playerStats);
-
-      // Fire Bolt should appear only once
-      expect(result.spells).toHaveLength(1);
+      expect(result.spells.map(s => s.name)).toContain('Sanctuary');
     });
 
-    it('should skip passive_rule when effect is not always_prepared_spells', () => {
-      const allSpells = [
-        { name: 'Ghost Sound', level: 0, damage: {}, casting_time: '1 action', range: '60 feet' },
-       ];
-      const playerStats = {
-        level: 1,
+    it('adds always_prepared_spells from automation bonusActions', () => {
+      const allSpells = [makeSpell('Healing Word', 1)];
+      const stats = makePlayerStats({
         class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
+          name: 'Cleric',
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } }],
+          spell_casting_ability: 'Wisdom',
+        },
+        abilities: [{ name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
         spells: [],
-        proficiency: 2,
-        automation: {
-          passives: [
-            { type: 'passive_rule', effect: 'some_other_effect', spells: ['Ghost Sound'] },
-           ],
-         },
-       };
+      });
+      stats.automation = {
+        bonusActions: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Healing Word'] }],
+      };
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities(allSpells, stats);
 
-      expect(result.spells).toHaveLength(0);
-     });
+      expect(result.spells.map(s => s.name)).toContain('Healing Word');
+    });
 
-    it('should skip passive_rule when spells array is missing', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: [],
-        proficiency: 2,
-        automation: {
-          passives: [
-            { type: 'passive_rule', effect: 'always_prepared_spells' }, // no spells array
-           ],
-         },
-       };
+    it('does not duplicate a spell already in the known list from always_prepared_spells', () => {
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+      stats.automation = {
+        passives: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Fire Bolt'] }],
+      };
 
-      const result = getSpellAbilities([], playerStats);
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
+    });
+
+    it('skips passive_rule when effect is not always_prepared_spells', () => {
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'passive_rule', effect: 'some_other_effect', spells: ['Ghost Sound'] }],
+      };
+
+      const result = getSpellAbilities([], stats);
 
       expect(result.spells).toHaveLength(0);
     });
 
-    // ── Automation: free_spell ──
+    it('skips passive_rule when spells array is missing', () => {
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'passive_rule', effect: 'always_prepared_spells' }],
+      };
 
-    it('should add a free_spell from automation passives', () => {
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spells).toHaveLength(0);
+    });
+
+    // ── Automation: free_spell and fey_reinforcements ──
+
+    it('adds a free_spell from automation passives', () => {
+      const allSpells = [makeSpell('Prestidigitation', 0)];
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'free_spell', spell: 'Prestidigitation' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result.spells.map(s => s.name)).toContain('Prestidigitation');
+    });
+
+    it('adds fey_reinforcement spells the same way as free_spell', () => {
+      const allSpells = [makeSpell('Shield', 1)];
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'fey_reinforcements', spell: 'Shield' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result.spells.map(s => s.name)).toContain('Shield');
+    });
+
+    it('does not duplicate a free_spell already known', () => {
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+      stats.automation = {
+        passives: [{ type: 'free_spell', spell: 'Fire Bolt' }],
+      };
+
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
+    });
+
+    it('adds multiple spells from an array free_spell', () => {
       const allSpells = [
-        { name: 'Prestidigitation', level: 0, damage: {}, casting_time: '1 action', range: 'Touch' },
-       ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Sorcerer',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 4, spell_known: 2, spell_slots: {} },
-           }],
-          spell_casting_ability: 'Charisma',
-         },
-        abilities: [
-           { name: 'Charisma', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 2 },
-         ],
-        spells: [],
-        proficiency: 2,
-        automation: {
-          passives: [
-            { type: 'free_spell', spell: 'Prestidigitation' },
-           ],
-         },
-       };
-
-      const result = getSpellAbilities(allSpells, playerStats);
-
-      expect(result.spells).toHaveLength(1);
-      expect(result.spells[0].name).toBe('Prestidigitation');
-     });
-
-    it('should not duplicate a free_spell already known', () => {
-      const allSpells = [
-        { name: 'Fire Bolt', level: 0, damage: { damage_type: 'Fire' }, casting_time: '1 action', range: '120 feet' },
-       ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: ['Fire Bolt'], // already known
-        proficiency: 2,
-        automation: {
-          actions: [
-            { type: 'free_spell', spell: 'Fire Bolt' },
-           ],
-         },
-       };
-
-      const result = getSpellAbilities(allSpells, playerStats);
-
-      expect(result.spells).toHaveLength(1);
-     });
-
-    it('should add multiple spells from an array free_spell', () => {
-      const allSpells = [
-        { name: 'Shield of Faith', level: 1, damage: {}, casting_time: '1 bonus action', range: '60 feet' },
-        { name: 'Spiritual Weapon', level: 2, damage: {}, casting_time: '1 bonus action', range: '60 feet' },
-       ];
-      const playerStats = {
-        level: 1,
+        makeSpell('Shield of Faith', 1),
+        makeSpell('Spiritual Weapon', 2),
+      ];
+      const stats = makePlayerStats({
         class: {
           name: 'Cleric',
           class_levels: [{ level: 1, spellcasting: { cantrips_known: 4, spell_slots: { '1': 4 } } }],
           spell_casting_ability: 'Wisdom',
-         },
+        },
         abilities: [{ name: 'Wisdom', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
-        spells: [],
         proficiency: 3,
-        automation: {
-          passives: [
-            { type: 'free_spell', spell: ['Shield of Faith', 'Spiritual Weapon'] },
-           ],
-         },
-       };
+      });
+      stats.automation = {
+        passives: [{ type: 'free_spell', spell: ['Shield of Faith', 'Spiritual Weapon'] }],
+      };
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities(allSpells, stats);
 
-      expect(result.spells).toHaveLength(2);
-      expect(result.spells[0].name).toBe('Shield of Faith');
-      expect(result.spells[1].name).toBe('Spiritual Weapon');
-     });
+      expect(result.spells.map(s => s.name)).toEqual(['Shield of Faith', 'Spiritual Weapon']);
+    });
 
-    it('should skip free_spell when spell property is missing', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: [],
-        proficiency: 2,
-        automation: {
-          bonusActions: [
-            { type: 'free_spell' }, // no spell property
-           ],
-         },
-       };
+    it('skips free_spell when spell property is missing', () => {
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'free_spell' }],
+      };
 
-      const result = getSpellAbilities([], playerStats);
+      const result = getSpellAbilities([], stats);
 
       expect(result.spells).toHaveLength(0);
     });
 
-    // ── Automation: combined features and missing sub-arrays ──
+    // ── Automation: spell_breaker ──
 
-    it('should handle automation with missing actions/bonusActions arrays', () => {
-      const allSpells = [
-        { name: 'Light', level: 0, damage: {}, casting_time: '1 action', range: 'Self' },
-       ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: [],
-        proficiency: 2,
-        automation: {
-          // actions and bonusActions are missing, only passives provided
-          passives: [
-            { type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Light'] },
-           ],
-         },
-       };
+    it('adds alwaysPreparedSpells from spell_breaker', () => {
+      const allSpells = [makeSpell('Shield', 1)];
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'spell_breaker', alwaysPreparedSpells: ['Shield'] }],
+      };
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities(allSpells, stats);
 
-      expect(result.spells).toHaveLength(1);
-      expect(result.spells[0].name).toBe('Light');
-     });
-
-    it('should handle automation with empty sub-arrays', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: [],
-        proficiency: 2,
-        automation: {
-          actions: [],
-          bonusActions: [],
-          passives: [],
-         },
-       };
-
-      const result = getSpellAbilities([], playerStats);
-
-      expect(result.spells).toHaveLength(0);
-    });
-
-    it('should handle mixed automation features in all three arrays', () => {
-      const allSpells = [
-          { name: 'Shield', level: 1, damage: {}, casting_time: '1 reaction', range: 'Self' },
-          { name: 'Minor Illusion', level: 1, damage: {}, casting_time: '1 action', range: 'Self' },
-          { name: 'Light', level: 0, damage: {}, casting_time: '1 action', range: 'Self' },
-        ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          major: { name: 'Order' },
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } },
-             }],
-        spell_casting_ability: 'Intelligence',
-          },
-      abilities: [
-           { name: 'Intelligence', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 },
-            ],
-        spells: [],
-        proficiency: 2,
-        automation: {
-          actions: [{ type: 'free_spell', spell: 'Shield' }],
-          bonusActions: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Minor Illusion'] }],
-          passives: [
-              { type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Light'] },
-              { type: 'other_feature_type' }, // should be skipped
-             ],
-           },
-         };
-
-      const result = getSpellAbilities(allSpells, playerStats);
-
-      expect(result.spells).toHaveLength(3);
       expect(result.spells.map(s => s.name)).toContain('Shield');
+    });
+
+    it('does not duplicate spell_breaker spells already known', () => {
+      const stats = makePlayerStats();
+      stats.spells = ['Shield'];
+      stats.automation = {
+        passives: [{ type: 'spell_breaker', alwaysPreparedSpells: ['Shield'] }],
+      };
+
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spells.filter(s => s.name === 'Shield').length).toBe(1);
+    });
+
+    // ── Automation: cantrip_spellcasting_ability ──
+
+    it('attempts to update cantrip spellCastingAbility from cantrip_spellcasting_ability feature', () => {
+      const allSpells = [makeSpell('Fire Bolt', 0)];
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+      stats.automation = {
+        actions: [{ type: 'cantrip_spellcasting_ability', cantripName: 'Fire Bolt', spellcastingAbility: 'Charisma' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      // The automation handler sets spellCastingAbility on the spell entry,
+      // but the final map overwrites with spellDetail (which lacks it).
+      const fireBolt = result.spells.find(s => s.name === 'Fire Bolt');
+      expect(fireBolt.spellCastingAbility).toBeUndefined();
+    });
+
+    it('ignores cantrip_spellcasting_ability when cantripName not in spell list', () => {
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+      stats.automation = {
+        actions: [{ type: 'cantrip_spellcasting_ability', cantripName: 'Light', spellcastingAbility: 'Charisma' }],
+      };
+
+      const result = getSpellAbilities([], stats);
+
+      const light = result.spells.find(s => s.name === 'Light');
+      expect(light).toBeUndefined();
+    });
+
+    // ── Automation: elfish_lineage ──
+
+    it('adds elfish lineage cantrip, level 3, and level 5 spells when lineage matches', () => {
+      const allSpells = [
+        makeSpell('Blade Ward', 0),
+        makeSpell('Burning Hands', 1),
+        makeSpell('Crown of Madness', 1),
+      ];
+      mockElfisLineageSelection.mockReturnValue('Shadow Magic');
+      mockElfisLineageCantrip.mockReturnValue('Blade Ward');
+      mockElfisLineageLevel3Spell.mockReturnValue('Burning Hands');
+      mockElfisLineageLevel5Spell.mockReturnValue('Crown of Madness');
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{
+          type: 'elfish_lineage',
+          options: [{ name: 'Shadow Magic', spellcastingAbility: 'Charisma' }],
+        }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Blade Ward');
+      expect(names).toContain('Burning Hands');
+      expect(names).toContain('Crown of Madness');
+    });
+
+    it('does not add elfish lineage spells when lineage does not match', () => {
+      mockElfisLineageSelection.mockReturnValue('Nonexistent');
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{
+          type: 'elfish_lineage',
+          options: [{ name: 'Shadow Magic', spellcastingAbility: 'Charisma' }],
+        }],
+      };
+
+      const result = getSpellAbilities([], stats, { campaignName: 'TestCampaign' });
+
+      expect(result.spells).toHaveLength(0);
+    });
+
+    // ── Automation: gnomish_lineage ──
+
+    it('adds gnomish lineage spells when lineage matches', () => {
+      const allSpells = [
+        makeSpell('Friends', 0),
+        makeSpell('Web', 1),
+        makeSpell('Hold Monster', 1),
+      ];
+      mockGnomishLineageSelection.mockReturnValue('Deep Gnome');
+      mockGnomishLineageCantrip.mockReturnValue('Friends');
+      mockGnomishLineageLevel3Spell.mockReturnValue('Web');
+      mockGnomishLineageLevel5Spell.mockReturnValue('Hold Monster');
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{
+          type: 'gnomish_lineage',
+          options: [{ name: 'Deep Gnome', spellcastingAbility: 'Intelligence' }],
+        }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Friends');
+      expect(names).toContain('Web');
+      expect(names).toContain('Hold Monster');
+    });
+
+    // ── Automation: fiendish_legacy ──
+
+    it('adds fiendish legacy spells when legacy matches', () => {
+      const allSpells = [
+        makeSpell('Infestation', 0),
+        makeSpell('Scorching Ray', 1),
+        makeSpell('Dominate Person', 1),
+      ];
+      mockFiendishLegacySelection.mockReturnValue('Fiend');
+      mockFiendishLegacyCantrip.mockReturnValue('Infestation');
+      mockFiendishLegacyLevel3Spell.mockReturnValue('Scorching Ray');
+      mockFiendishLegacyLevel5Spell.mockReturnValue('Dominate Person');
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{
+          type: 'fiendish_legacy',
+          options: [{ name: 'Fiend', spellcastingAbility: 'Charisma' }],
+        }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Infestation');
+      expect(names).toContain('Scorching Ray');
+      expect(names).toContain('Dominate Person');
+    });
+
+    // ── Automation: magic_initiate ──
+
+    it('adds magic initiate cantrips and level 1 spell', () => {
+      const allSpells = [
+        makeSpell('Minor Illusion', 0),
+        makeSpell('Shield', 1),
+      ];
+      mockMagicInitiateCantrips.mockReturnValue(['Minor Illusion']);
+      mockMagicInitiateLevel1Spell.mockReturnValue('Shield');
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        actions: [{ type: 'magic_initiate' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Minor Illusion');
+      expect(names).toContain('Shield');
+    });
+
+    it('handles magic_initiate with multiple cantrips', () => {
+      const allSpells = [
+        makeSpell('Minor Illusion', 0),
+        makeSpell('Thaumaturgy', 0),
+      ];
+      mockMagicInitiateCantrips.mockReturnValue(['Minor Illusion', 'Thaumaturgy']);
+      mockMagicInitiateLevel1Spell.mockReturnValue(null);
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        actions: [{ type: 'magic_initiate' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Minor Illusion');
+      expect(names).toContain('Thaumaturgy');
+    });
+
+    // ── Automation: Spell Mastery ──
+
+    it('adds Spell Mastery level 1 and level 2 spells from runtime state', () => {
+      const allSpells = [
+        makeSpell('Shield', 1),
+        makeSpell('Web', 1),
+      ];
+      mockGetRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === 'SpellMastery_level1') return 'Shield';
+        if (prop === 'SpellMastery_level2') return 'Web';
+        return null;
+      });
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'spell_mastery' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Shield');
+      expect(names).toContain('Web');
+    });
+
+    it('does not duplicate Spell Mastery spells already known', () => {
+      mockGetRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === 'SpellMastery_level1') return 'Fire Bolt';
+        return null;
+      });
+
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+      stats.automation = {
+        passives: [{ type: 'spell_mastery' }],
+      };
+
+      const result = getSpellAbilities([], stats, { campaignName: 'TestCampaign' });
+
+      expect(result.spells.filter(s => s.name === 'Fire Bolt').length).toBe(1);
+    });
+
+    // ── Automation: Savant features ──
+
+    it('adds Abjuration Savant spells from runtime state', () => {
+      const allSpells = [makeSpell('Shield', 1)];
+      mockGetRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === '_Abjuration_Savant_selection') return ['Shield'];
+        return null;
+      });
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'abjuration_savant' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      expect(result.spells.map(s => s.name)).toContain('Shield');
+    });
+
+    it('adds Divination Savant spells from runtime state', () => {
+      const allSpells = [makeSpell('Detect Magic', 1)];
+      mockGetRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === '_Divination_Savant_selection') return ['Detect Magic'];
+        return null;
+      });
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'divination_savant' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      expect(result.spells.map(s => s.name)).toContain('Detect Magic');
+    });
+
+    it('adds Illusion Savant spells from runtime state', () => {
+      const allSpells = [makeSpell('Minor Illusion', 0)];
+      mockGetRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === '_Illusion_Savant_selection') return ['Minor Illusion'];
+        return null;
+      });
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'illusion_savant' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
       expect(result.spells.map(s => s.name)).toContain('Minor Illusion');
+    });
+
+    // ── Automation: Signature Spells ──
+
+    it('adds Signature Spells from runtime state', () => {
+      const allSpells = [makeSpell('Shield', 1)];
+      mockGetRuntimeValue.mockImplementation((_key, prop) => {
+        if (prop === 'SignatureSpells_selection') return ['Shield'];
+        return null;
+      });
+
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'signature_spells' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats, { campaignName: 'TestCampaign' });
+
+      expect(result.spells.map(s => s.name)).toContain('Shield');
+    });
+
+    // ── Automation: Phantasmal Creatures ──
+
+    it('adds phantasmal creatures always prepared spells', () => {
+      const allSpells = [
+        makeSpell('Summon Beast', 1),
+        makeSpell('Summon Fey', 1),
+      ];
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [
+          { type: 'phantasmal_creatures', alwaysPreparedSpells: ['Summon Beast', 'Summon Fey'] },
+        ],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Summon Beast');
+      expect(names).toContain('Summon Fey');
+    });
+
+    // ── Automation: Improved Illusions ──
+
+    it('adds Minor Illusion from Improved Illusions when not already known', () => {
+      const allSpells = [makeSpell('Minor Illusion', 0, { casting_time: '1 action' })];
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'improved_illusions' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      const minorIllusion = result.spells.find(s => s.name === 'Minor Illusion');
+      expect(minorIllusion).toBeDefined();
+      expect(minorIllusion.casting_time).toBe('1 action');
+    });
+
+    it('attempts to override Minor Illusion casting time but final map overwrites it', () => {
+      const allSpells = [makeSpell('Minor Illusion', 0, { casting_time: '1 action' })];
+      const stats = makePlayerStats();
+      stats.spells = ['Minor Illusion'];
+      stats.automation = {
+        passives: [{ type: 'improved_illusions' }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      const minorIllusion = result.spells.find(s => s.name === 'Minor Illusion');
+      // The automation handler sets casting_time to '1 bonus action',
+      // but the final map spreads spellDetail which has '1 action'.
+      expect(minorIllusion.casting_time).toBe('1 action');
+    });
+
+    // ── Automation: Ritual Adept ──
+
+    it('adds ritual-tagged spells from spellbook when Ritual Adept is present', () => {
+      const allSpells = [
+        makeSpell('Fire Bolt', 0, { ritual: false }),
+        makeSpell('Alarm', 1, { ritual: true }),
+        makeSpell('Find Familiar', 1, { ritual: true }),
+        makeSpell('Detect Magic', 1, { ritual: true, classes: ['Bard', 'Cleric'] }),
+      ];
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+      stats.automation = {
+        ritualSpells: [{ type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Adept', hasAutomation: true }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      const names = result.spells.map(s => s.name);
+      expect(names).toContain('Fire Bolt');
+      expect(names).toContain('Alarm');
+      expect(names).toContain('Find Familiar');
+      expect(names).toContain('Detect Magic');
+    });
+
+    it('does not duplicate ritual spells already in known list', () => {
+      const allSpells = [makeSpell('Alarm', 1, { ritual: true })];
+      const stats = makePlayerStats();
+      stats.spells = ['Alarm'];
+      stats.automation = {
+        ritualSpells: [{ type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Adept', hasAutomation: true }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result.spells.filter(s => s.name === 'Alarm').length).toBe(1);
+    });
+
+    it('does not add ritual spells when ritualSpells array is empty', () => {
+      const allSpells = [
+        makeSpell('Fire Bolt', 0, { ritual: false }),
+        makeSpell('Alarm', 1, { ritual: true }),
+      ];
+      const stats = makePlayerStats();
+      stats.spells = ['Fire Bolt'];
+      stats.automation = { ritualSpells: [] };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      const names = result.spells.map(s => s.name);
+      expect(names).not.toContain('Alarm');
+    });
+
+    // ── Automation: missing sub-arrays and null safety ──
+
+    it('handles automation with missing actions/bonusActions arrays', () => {
+      const allSpells = [makeSpell('Light', 0)];
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Light'] }],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
       expect(result.spells.map(s => s.name)).toContain('Light');
     });
 
-    it('should handle automation with no matching features', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: [],
-        proficiency: 2,
-        automation: {
-          passives: [
-            { type: 'some_other_type', effect: 'something' },
-           ],
-         },
-       };
+    it('handles automation with empty sub-arrays', () => {
+      const stats = makePlayerStats();
+      stats.automation = {
+        actions: [],
+        bonusActions: [],
+        passives: [],
+      };
 
-      const result = getSpellAbilities([], playerStats);
+      const result = getSpellAbilities([], stats);
 
       expect(result.spells).toHaveLength(0);
     });
 
-    it('should skip automation block when automation is undefined', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: [],
-        proficiency: 2,
-        // automation is intentionally omitted
-       };
+    it('handles automation with no matching feature types', () => {
+      const stats = makePlayerStats();
+      stats.automation = {
+        passives: [{ type: 'some_other_type', effect: 'something' }],
+      };
 
-      const result = getSpellAbilities([], playerStats);
+      const result = getSpellAbilities([], stats);
 
       expect(result.spells).toHaveLength(0);
     });
 
-    it('should skip automation block when automation is null', () => {
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 2, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 0 },
-         ],
-        spells: [],
-        proficiency: 2,
-        automation: null,
-       };
+    it('skips automation block when automation is undefined', () => {
+      const stats = makePlayerStats({ automation: undefined });
 
-      const result = getSpellAbilities([], playerStats);
+      const result = getSpellAbilities([], stats);
 
       expect(result.spells).toHaveLength(0);
     });
 
-    it('should add ritual-tagged spells from spellbook when Ritual Adept passive is present', () => {
-      const allSpells = [
-        { name: 'Fire Bolt', level: 0, ritual: false, casting_time: '1 action' },
-        { name: 'Alarm', level: 1, ritual: true, casting_time: '1 minute or Ritual', classes: ['Ranger', 'Wizard'] },
-        { name: 'Find Familiar', level: 1, ritual: true, casting_time: '1 action', classes: ['Wizard'] },
-        { name: 'Detect Magic', level: 1, ritual: true, casting_time: '1 action', classes: ['Bard', 'Cleric'] },
-      ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 1 },
-         ],
-        spells: ['Fire Bolt'],
-        proficiency: 2,
-        automation: {
-          ritualSpells: [
-            { type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Adept', hasAutomation: true }
-          ]
-        },
-       };
+    it('skips automation block when automation is null', () => {
+      const stats = makePlayerStats({ automation: null });
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities([], stats);
 
-      const spellNames = result.spells.map(s => s.name);
-      // Fire Bolt is in the known list
-      expect(spellNames).toContain('Fire Bolt');
-      // All ritual-tagged spells should be added
-      expect(spellNames).toContain('Alarm');
-      expect(spellNames).toContain('Find Familiar');
-      expect(spellNames).toContain('Detect Magic');
-      // Non-ritual spells not in known list should NOT be added
-      expect(result.spells.find(s => s.name === 'Fire Bolt')).toBeTruthy();
+      expect(result.spells).toHaveLength(0);
     });
 
-    it('should not duplicate ritual spells already in the known list', () => {
+    // ── Mixed automation ──
+
+    it('handles mixed automation features across all three arrays', () => {
       const allSpells = [
-        { name: 'Alarm', level: 1, ritual: true, casting_time: '1 minute or Ritual', classes: ['Wizard'] },
+        makeSpell('Shield', 1),
+        makeSpell('Minor Illusion', 1),
+        makeSpell('Light', 0),
       ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 1 },
-         ],
-        spells: ['Alarm'],
-        proficiency: 2,
-        automation: {
-          ritualSpells: [
-            { type: 'passive_rule', effect: 'ritual_spells', name: 'Ritual Adept', hasAutomation: true }
-          ]
-        },
-       };
+      const stats = makePlayerStats();
+      stats.class.major = { name: 'Order' };
+      stats.automation = {
+        actions: [{ type: 'free_spell', spell: 'Shield' }],
+        bonusActions: [{ type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Minor Illusion'] }],
+        passives: [
+          { type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Light'] },
+          { type: 'other_feature_type' },
+        ],
+      };
 
-      const result = getSpellAbilities(allSpells, playerStats);
+      const result = getSpellAbilities(allSpells, stats);
 
-      const alarmCount = result.spells.filter(s => s.name === 'Alarm').length;
-      expect(alarmCount).toBe(1);
+      expect(result).not.toBeNull();
+      expect(result.spells.map(s => s.name)).toEqual(['Light', 'Minor Illusion', 'Shield']);
     });
 
-    it('should not add ritual spells when Ritual Adept is not present', () => {
-      const allSpells = [
-        { name: 'Fire Bolt', level: 0, ritual: false, casting_time: '1 action' },
-        { name: 'Alarm', level: 1, ritual: true, casting_time: '1 minute or Ritual', classes: ['Wizard'] },
-      ];
-      const playerStats = {
-        level: 1,
-        class: {
-          name: 'Wizard',
-          class_levels: [{
-            level: 1,
-            spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } },
-           }],
-          spell_casting_ability: 'Intelligence',
-         },
-        abilities: [
-           { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 1 },
-         ],
-        spells: ['Fire Bolt'],
-        proficiency: 2,
-        automation: {
-          ritualSpells: []
-        },
-       };
+    // ── Unknown spell handling ──
 
-      const result = getSpellAbilities(allSpells, playerStats);
+    it('handles spell not found in allSpells gracefully (no detail to merge)', () => {
+      const allSpells = [makeSpell('Fire Bolt', 0)];
+      const stats = makePlayerStats();
+      stats.spells = ['Unknown Spell'];
 
-      const spellNames = result.spells.map(s => s.name);
-       expect(spellNames).not.toContain('Alarm');
-     });
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result.spells).toHaveLength(1);
+      expect(result.spells[0].name).toBe('Unknown Spell');
     });
+
+    // ── Casting ability from major ──
+
+    it('uses major.spell_casting_ability when class does not have one', () => {
+      const stats = makePlayerStats({
+        class: {
+          class_levels: [{ level: 1, spellcasting: { cantrips_known: 3, spell_slots: { '1': 2 } } }],
+          spell_casting_ability: undefined,
+          major: { spell_casting_ability: 'Charisma' },
+        },
+        abilities: [{ name: 'Charisma', baseScore: 16, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0, bonus: 3 }],
+      });
+
+      const result = getSpellAbilities([], stats);
+
+      expect(result.spellCastingAbility).toBe('Charisma');
+      expect(result.modifier).toBe(3);
+    });
+
+    // ── Final sort after automation adds spells ──
+
+    it('sorts spells correctly after automation adds spells at various levels', () => {
+      const allSpells = [
+        makeSpell('Fire Bolt', 0),
+        makeSpell('Light', 0),
+        makeSpell('Shield', 1),
+        makeSpell('Magic Missile', 1),
+      ];
+      const stats = makePlayerStats();
+      stats.spells = ['Magic Missile', 'Fire Bolt'];
+      stats.automation = {
+        passives: [
+          { type: 'passive_rule', effect: 'always_prepared_spells', spells: ['Light'] },
+          { type: 'free_spell', spell: 'Shield' },
+        ],
+      };
+
+      const result = getSpellAbilities(allSpells, stats);
+
+      expect(result.spells.map(s => s.name)).toEqual(['Fire Bolt', 'Light', 'Magic Missile', 'Shield']);
+    });
+  });
 });

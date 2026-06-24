@@ -72,7 +72,6 @@ describe('handle — Mantle of Inspiration detection', () => {
 
     expect(result.type).toBe('popup');
     expect(result.payload.description).toContain('Gained 8 temporary hit points');
-    expect(result.type).not.toBe('roll');
   });
 
   it('does NOT delegate when expression contains bardic_inspiration_die but no bonusMovement', async () => {
@@ -86,7 +85,7 @@ describe('handle — Mantle of Inspiration detection', () => {
     const result = await handle(action, ps, campaignName);
 
     expect(result.type).toBe('popup');
-    expect(result.type).not.toBe('roll');
+    expect(result.payload.description).toContain('Gained 10 temporary hit points');
   });
 });
 
@@ -125,7 +124,7 @@ describe('handleMantleOfInspiration — no uses remaining', () => {
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('delegates to Cha modifier when class_levels has no bardic_inspiration_uses', async () => {
+  it('falls back to Cha modifier for usesMax when class_levels entry has no bardic_inspiration_uses', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -177,15 +176,16 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
 
     expect(result.type).toBe('roll');
     expect(result.payload.name).toBe('Second Wind');
-    expect(result.payload.tempHp).toBeDefined();
+    expect(typeof result.payload.tempHp).toBe('number');
     expect(result.payload.targets).toEqual([]);
     expect(result.payload.description).toContain('no targets in range');
     expect(result.payload.description).toContain('Rolled');
 
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
+    expect(mapsService.loadMapData).not.toHaveBeenCalled();
   });
 
-  it('increments bardicInspirationUses when usesMax > 0', async () => {
+  it('decrements bardicInspirationUses when usesMax > 0', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -209,7 +209,7 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
     expect(setCall[2]).toBe(1);
   });
 
-  it('does NOT increment bardicInspirationUses when usesMax === 0', async () => {
+  it('does NOT decrement bardicInspirationUses when usesMax === 0', async () => {
     const ps = makePlayerStats({
       level: 1,
       class: {
@@ -353,6 +353,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
       c => c[0] === 'Ally1' && c[1] === 'inspiringMovementNoOA',
     );
     expect(movementCall).toBeDefined();
+    expect(movementCall[2]).toBe(true);
   });
 
   it('calls addExpiration for each target', async () => {
@@ -578,7 +579,7 @@ describe('handleMantleOfInspiration — roll result payload', () => {
     expect(result.payload.description).not.toContain('Reaction');
   });
 
-  it('tempHp is doubled die roll (2 * diceRoll)', async () => {
+  it('tempHp equals 2 times the die roll', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -589,10 +590,10 @@ describe('handleMantleOfInspiration — roll result payload', () => {
 
     const result = await handle(action, ps, campaignName, null);
 
-    expect(result.payload.tempHp % 2).toBe(0);
+    expect(result.payload.tempHp).toBe(result.payload.result * 2);
   });
 
-  it('bardicDieSize from classLevels overrides default 6', async () => {
+  it('uses bardic_die from classLevels entry matching current level', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die * 2',
@@ -603,9 +604,9 @@ describe('handleMantleOfInspiration — roll result payload', () => {
         name: 'Bard',
         class_levels: [
           { level: 1, bardic_die: 6 },
-          { level: 10, bardic_die: 8 },
-          { level: 15, bardic_die: 10 },
-          { level: 20, bardic_die: 12 },
+          { level: 5, bardic_die: 8 },
+          { level: 10, bardic_die: 10 },
+          { level: 15, bardic_die: 12 },
         ],
       },
     });
@@ -614,7 +615,7 @@ describe('handleMantleOfInspiration — roll result payload', () => {
 
     const result = await handle(action, ps, campaignName, null);
 
-    expect(result.payload.roll).toBe('1d6');
+    expect(result.payload.roll).toBe('1d8');
   });
 
   it('uses default bardic_die of 6 when classLevels has no entry at current level', async () => {

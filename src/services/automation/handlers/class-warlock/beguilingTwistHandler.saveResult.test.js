@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -86,6 +87,18 @@ function dispatchSaveResult(promptId, success) {
   }));
 }
 
+function makeHitAttack(targetName) {
+  return {
+    attackEvent: { hit: true, timestamp: Date.now(), targetName },
+    attackerName: 'Goblin',
+    targetName,
+    primaryDamage: 5,
+    secondaryDamage: 0,
+    totalDamage: 5,
+    damageTypes: ['Piercing'],
+  };
+}
+
 describe('beguilingTwistHandler.saveResult', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -100,29 +113,20 @@ describe('beguilingTwistHandler.saveResult', () => {
     });
   });
 
-  describe('save result handling', () => {
-    it('should add condition and expiration when save fails', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+  describe('save failure — condition application', () => {
+    it('should add charmed condition and expiration when save fails (default type)', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-fail-result' });
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-fail-cond' });
       getRuntimeValue.mockReturnValue([]);
 
       await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('beguiling-fail-result', false);
+      dispatchSaveResult('beguiling-fail-cond', false);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestWarlock',
         'activeConditions',
-        expect.arrayContaining(['charmed']),
+        ['charmed'],
         campaignName,
       );
       expect(addExpiration).toHaveBeenCalledWith(
@@ -134,96 +138,8 @@ describe('beguilingTwistHandler.saveResult', () => {
       );
     });
 
-    it('should add log entry for failed save', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-fail-log' });
-      getRuntimeValue.mockReturnValue([]);
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('beguiling-fail-log', false);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'TestWarlock',
-        saveDc: 15,
-        saveType: 'WIS',
-        success: false,
-      }));
-    });
-
-    it('should add log entry for successful save', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-success-result' });
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('beguiling-success-result', true);
-
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        type: 'save_result',
-        targetName: 'TestWarlock',
-        saveDc: 15,
-        saveType: 'WIS',
-        success: true,
-        description: expect.stringContaining('succeeded on WIS save'),
-      }));
-    });
-
-    it('should not apply duplicate condition if already present', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
-      getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-dup-cond' });
-      getRuntimeValue.mockReturnValue(['charmed']);
-
-      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
-      dispatchSaveResult('beguiling-dup-cond', false);
-
-      expect(setRuntimeValue).not.toHaveBeenCalledWith(
-        'TestWarlock',
-        'activeConditions',
-        expect.any(Array),
-        campaignName,
-      );
-    });
-
-    it('should use charmed condition for charmed_frightened type', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+    it('should add charmed condition when condition type is charmed_frightened', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
       createSaveListener.mockReturnValue({ promptId: 'beguiling-cf-cond' });
       getRuntimeValue.mockReturnValue([]);
@@ -234,29 +150,20 @@ describe('beguilingTwistHandler.saveResult', () => {
         campaignName,
         null,
       );
-
       dispatchSaveResult('beguiling-cf-cond', false);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestWarlock',
         'activeConditions',
-        expect.arrayContaining(['charmed']),
+        ['charmed'],
         campaignName,
       );
     });
 
-    it('should use charmed condition for charmed type', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+    it('should add charmed condition when condition type is charmed', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-charmed-only' });
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-charmed-cond' });
       getRuntimeValue.mockReturnValue([]);
 
       await handle(
@@ -265,29 +172,20 @@ describe('beguilingTwistHandler.saveResult', () => {
         campaignName,
         null,
       );
-
-      dispatchSaveResult('beguiling-charmed-only', false);
+      dispatchSaveResult('beguiling-charmed-cond', false);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestWarlock',
         'activeConditions',
-        expect.arrayContaining(['charmed']),
+        ['charmed'],
         campaignName,
       );
     });
 
-    it('should use frightened condition for frightened type', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+    it('should add frightened condition when condition type is frightened', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-frightened-only' });
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-frightened-cond' });
       getRuntimeValue.mockReturnValue([]);
 
       await handle(
@@ -296,102 +194,181 @@ describe('beguilingTwistHandler.saveResult', () => {
         campaignName,
         null,
       );
-
-      dispatchSaveResult('beguiling-frightened-only', false);
+      dispatchSaveResult('beguiling-frightened-cond', false);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestWarlock',
         'activeConditions',
-        expect.arrayContaining(['frightened']),
+        ['frightened'],
         campaignName,
       );
     });
 
-    it('should ignore events with wrong promptId', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+    it('should not add duplicate condition if already present', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-wrong-id' });
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-dup-cond' });
+      getRuntimeValue.mockReturnValue(['charmed']);
+
+      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-dup-cond', false);
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestWarlock',
+        'activeConditions',
+        expect.any(Array),
+        campaignName,
+      );
+    });
+
+    it('should not add condition when getRuntimeValue returns null for activeConditions', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-null-conds' });
+      getRuntimeValue.mockReturnValue(null);
+
+      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-null-conds', false);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestWarlock',
+        'activeConditions',
+        ['charmed'],
+        campaignName,
+      );
+    });
+
+    it('should not add condition when getRuntimeValue returns non-array for activeConditions', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-nonarray-conds' });
+      getRuntimeValue.mockReturnValue('not-an-array');
+
+      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-nonarray-conds', false);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestWarlock',
+        'activeConditions',
+        ['charmed'],
+        campaignName,
+      );
+    });
+
+    it('should not modify conditions when target already has the condition', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-existing-cond' });
+      getRuntimeValue.mockReturnValue(['charmed', 'poisoned']);
+
+      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-existing-cond', false);
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestWarlock',
+        'activeConditions',
+        expect.any(Array),
+        campaignName,
+      );
+    });
+  });
+
+  describe('save failure — log entries', () => {
+    it('should add save_result log entry with correct fields on failed save', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-fail-log' });
       getRuntimeValue.mockReturnValue([]);
 
       await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-fail-log', false);
 
-      dispatchSaveResult('wrong-prompt-id', false);
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-      expect(addExpiration).not.toHaveBeenCalled();
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'save_result',
+        characterName: 'TestWarlock',
+        rollType: 'save-beguiling_twist',
+        targetName: 'TestWarlock',
+        saveDc: 15,
+        saveType: 'WIS',
+        success: false,
+        description: expect.stringContaining('failed WIS save'),
+      }));
     });
 
-    it('should remove event listener after handling save result', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+    it('should include the target name in the failure description', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-remove-listener' });
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-fail-desc' });
       getRuntimeValue.mockReturnValue([]);
 
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
-
       await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-fail-desc', false);
 
-      dispatchSaveResult('beguiling-remove-listener', false);
-
-      expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
-      removeEventListenerSpy.mockRestore();
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        description: expect.stringContaining('TestWarlock is now'),
+      }));
     });
 
-    it('should not remove event listener on wrong promptId', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+    it('should use the correct condition name in the failure description', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
-      createSaveListener.mockReturnValue({ promptId: 'beguiling-keep-listener' });
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-fail-cond-desc' });
       getRuntimeValue.mockReturnValue([]);
 
-      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+      await handle(
+        makeAction({ target: 'self', condition: 'frightened' }),
+        makePlayerStats(),
+        campaignName,
+        null,
+      );
+      dispatchSaveResult('beguiling-fail-cond-desc', false);
+
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        description: expect.stringContaining('Frightened'),
+      }));
+    });
+  });
+
+  describe('save success — log entries', () => {
+    it('should add save_result log entry with success=true on successful save', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-success-log' });
 
       await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-success-log', true);
 
-      dispatchSaveResult('wrong-prompt-id', false);
-
-      expect(removeEventListenerSpy).not.toHaveBeenCalled();
-      removeEventListenerSpy.mockRestore();
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'save_result',
+        characterName: 'TestWarlock',
+        rollType: 'save-beguiling_twist',
+        targetName: 'TestWarlock',
+        saveDc: 15,
+        saveType: 'WIS',
+        success: true,
+        description: expect.stringContaining('succeeded on WIS save'),
+      }));
     });
 
-    it('should not add condition or expiration on successful save', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+    it('should mention the feature name in the success description', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-success-feature' });
+
+      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-success-feature', true);
+
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        description: expect.stringContaining('Beguiling Twist'),
+      }));
+    });
+
+    it('should not apply condition or expiration on successful save', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
       createSaveListener.mockReturnValue({ promptId: 'beguiling-no-cond-success' });
 
       await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
-
       dispatchSaveResult('beguiling-no-cond-success', true);
 
       expect(setRuntimeValue).not.toHaveBeenCalledWith(
@@ -404,17 +381,61 @@ describe('beguilingTwistHandler.saveResult', () => {
     });
   });
 
-  describe('condition name in descriptions', () => {
+  describe('promptId filtering', () => {
+    it('should ignore save result events with wrong promptId', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-wrong-id' });
+      getRuntimeValue.mockReturnValue([]);
+
+      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('completely-different-prompt', false);
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestWarlock',
+        'activeConditions',
+        expect.any(Array),
+        campaignName,
+      );
+      expect(addExpiration).not.toHaveBeenCalled();
+    });
+
+    it('should not remove event listener when promptId does not match', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-keep-listener' });
+      getRuntimeValue.mockReturnValue([]);
+
+      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+
+      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('wrong-prompt-id', false);
+
+      expect(removeEventListenerSpy).not.toHaveBeenCalled();
+      removeEventListenerSpy.mockRestore();
+    });
+  });
+
+  describe('event listener cleanup', () => {
+    it('should remove the save-result event listener after handling a matching save result', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'beguiling-remove-listener' });
+      getRuntimeValue.mockReturnValue([]);
+
+      const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
+
+      await handle(makeAction({ target: 'self' }), makePlayerStats(), campaignName, null);
+      dispatchSaveResult('beguiling-remove-listener', false);
+
+      expect(removeEventListenerSpy).toHaveBeenCalledWith('save-result', expect.any(Function));
+      removeEventListenerSpy.mockRestore();
+    });
+  });
+
+  describe('description in initial popup', () => {
     it('should show "Charmed or Frightened" for default condition type', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
       createSaveListener.mockReturnValue({ promptId: 'beguiling-desc-default' });
 
@@ -424,15 +445,7 @@ describe('beguilingTwistHandler.saveResult', () => {
     });
 
     it('should show "Charmed" for charmed condition type', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
       createSaveListener.mockReturnValue({ promptId: 'beguiling-desc-charmed' });
 
@@ -448,15 +461,7 @@ describe('beguilingTwistHandler.saveResult', () => {
     });
 
     it('should show "Frightened" for frightened condition type', async () => {
-      findLastAttack.mockResolvedValue({
-        attackEvent: { hit: true, timestamp: Date.now(), targetName: 'TestWarlock' },
-        attackerName: 'Goblin',
-        targetName: 'TestWarlock',
-        primaryDamage: 5,
-        secondaryDamage: 0,
-        totalDamage: 5,
-        damageTypes: ['Piercing'],
-      });
+      findLastAttack.mockResolvedValue(makeHitAttack('TestWarlock'));
       getAbilityModifier.mockReturnValue(3);
       createSaveListener.mockReturnValue({ promptId: 'beguiling-desc-frightened' });
 

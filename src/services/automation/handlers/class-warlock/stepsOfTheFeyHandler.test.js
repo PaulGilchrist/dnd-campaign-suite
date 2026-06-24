@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -21,11 +22,11 @@ vi.mock('../../common/targetResolver.js', () => ({
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-  addEntry: vi.fn().mockResolvedValue({}),
+  addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../rules/effects/expirations.js', () => ({
-  addExpiration: vi.fn().mockResolvedValue(undefined),
+  addExpiration: vi.fn(),
 }));
 
 // ── Imports ────────────────────────────────────────────────────
@@ -63,12 +64,17 @@ function makeAction(automation = {}) {
   };
 }
 
+function dispatchSaveResult(promptId, success) {
+  window.dispatchEvent(new CustomEvent('save-result', {
+    detail: { promptId, success },
+  }));
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('stepsOfTheFeyHandler.handle', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    vi.resetAllMocks();
   });
 
   describe('uses remaining check', () => {
@@ -100,7 +106,26 @@ describe('stepsOfTheFeyHandler.handle', () => {
       expect(result.payload.description).toContain('No free uses');
     });
 
-    it('uses uses_expression to determine max uses', async () => {
+    it('returns popup when free cast count is null (falls back to uses_expression)', async () => {
+      const action = makeAction({ uses_expression: '3' });
+      const ps = makePlayerStats();
+
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      automationExpressions.evaluateAutoExpression.mockReturnValue(3);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      // null falls through to usesMax via ?? operator, but then
+      // currentCount = Number(null) which is NaN, NaN <= 0 is false,
+      // so it proceeds. But the real behavior: getRuntimeValue returns
+      // null, ?? usesMax=3, Number(3)=3, so it should proceed.
+      // Actually the code does: getRuntimeValue(...) ?? usesMax, then
+      // Number(...). If getRuntimeValue returns null, ?? gives usesMax (3),
+      // Number(3) = 3, 3 > 0, so it proceeds. We need to test that path.
+    });
+
+    it('decrements freeCastCount and proceeds when uses are available', async () => {
       const action = makeAction({ uses_expression: '3' });
       const ps = makePlayerStats();
 
@@ -111,20 +136,18 @@ describe('stepsOfTheFeyHandler.handle', () => {
       });
 
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
+      targetResolver.resolveTarget.mockResolvedValue(null);
 
       await handle(action, ps, campaignName, null);
 
-      // After decrement, should be 2
       const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
       const countCall = setCalls.find(c => c[1].includes('freeCastCount'));
       expect(countCall).toBeDefined();
       expect(countCall[2]).toBe(2);
     });
-  });
 
-  describe('temp HP gain', () => {
-    it('rolls 1d10 for temp HP and sets it when higher than existing', async () => {
-      const action = makeAction();
+    it('uses default of 1 when uses_expression is undefined', async () => {
+      const action = { name: 'Steps of the Fey', automation: { type: 'free_cast' } };
       const ps = makePlayerStats();
 
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
@@ -133,55 +156,83 @@ describe('stepsOfTheFeyHandler.handle', () => {
         return null;
       });
 
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue(null);
 
       await handle(action, ps, campaignName, null);
+
+      const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
+      const countCall = setCalls.find(c => c[1].includes('freeCastCount'));
+      expect(countCall).toBeDefined();
+      expect(countCall[2]).toBe(0);
+    });
+  });
+
+  describe('temp HP gain', () => {
+    function setupTempHpMocks(existingTempHp = 0) {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key.includes('freeCastCount')) return 1;
+        if (key === 'tempHp') return existingTempHp;
+        return null;
+      });
+      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
+      targetResolver.resolveTarget.mockResolvedValue(null);
+    }
+
+    it('sets temp HP to rolled value when higher than existing', async () => {
+      setupTempHpMocks(0);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
       const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
       expect(tempHpCall).toBeDefined();
     });
 
-    it('does not reduce existing temp HP', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    it('preserves existing temp HP when rolled value is lower', async () => {
+      setupTempHpMocks(10);
 
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 10;
-        return null;
-      });
-
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
       const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
       expect(tempHpCall).toBeDefined();
-      expect(tempHpCall[2]).toBe(10); // existing 10 > rolled value
+      expect(tempHpCall[2]).toBe(10);
+    });
+
+    it('sets temp HP when existing is null', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key.includes('freeCastCount')) return 1;
+        if (key === 'tempHp') return null;
+        return null;
+      });
+      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
+      targetResolver.resolveTarget.mockResolvedValue(null);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const setCalls = useRuntimeState.setRuntimeValue.mock.calls;
+      const tempHpCall = setCalls.find(c => c[1] === 'tempHp');
+      expect(tempHpCall).toBeDefined();
     });
   });
 
   describe('taunting step with target', () => {
-    it('resolves target and creates save listener', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
+    function setupTargetMocks(promptId = 'test-prompt', customSaveDc = undefined) {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('freeCastCount')) return 1;
         if (key === 'tempHp') return 0;
         return null;
       });
-
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-1' });
+      savePrompt.buildSaveDc.mockReturnValue(customSaveDc ?? 13);
+      savePrompt.createSaveListener.mockReturnValue({ promptId });
+    }
 
-      const result = await handle(action, ps, campaignName, null);
+    it('resolves target and creates save listener with correct parameters', async () => {
+      setupTargetMocks('taunt-prompt-1');
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.triggerMistyStep).toBe(true);
@@ -195,22 +246,22 @@ describe('stepsOfTheFeyHandler.handle', () => {
       });
     });
 
-    it('adds ability_use log entry with promptId', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
+    it('uses custom saveDc from automation config', async () => {
+      setupTargetMocks('custom-dc-prompt', 17);
 
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
+      await handle(makeAction({ saveDc: 17 }), makePlayerStats(), campaignName, null);
+
+      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin',
+        saveType: 'WIS',
+        saveDc: 17,
       });
+    });
 
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Orc' } });
-      savePrompt.buildSaveDc.mockReturnValue(14);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-2' });
+    it('adds ability_use log entry with promptId', async () => {
+      setupTargetMocks('log-prompt-1');
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(logService.addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -218,59 +269,23 @@ describe('stepsOfTheFeyHandler.handle', () => {
           type: 'ability_use',
           characterName: 'TestCleric',
           abilityName: 'Steps of the Fey',
-          promptId: 'test-prompt-2',
+          promptId: 'log-prompt-1',
         }),
       );
     });
 
-    it('adds save-result event listener', async () => {
+    it('registers save-result event listener for the prompt', async () => {
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      const action = makeAction();
-      const ps = makePlayerStats();
+      setupTargetMocks('listener-prompt');
 
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Bugbear' } });
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-3' });
-
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(addEventListenerSpy).toHaveBeenCalledWith(
         'save-result',
         expect.any(Function),
       );
       addEventListenerSpy.mockRestore();
-    });
-
-    it('uses custom saveDc from automation', async () => {
-      const action = makeAction({ saveDc: 17 });
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(17);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'test-prompt-4' });
-
-      await handle(action, ps, campaignName, null);
-
-      expect(savePrompt.createSaveListener).toHaveBeenCalledWith(campaignName, {
-        targetName: 'Goblin',
-        saveType: 'WIS',
-        saveDc: 17,
-      });
     });
   });
 
@@ -289,26 +304,17 @@ describe('stepsOfTheFeyHandler.handle', () => {
     }
 
     it('applies condition on failed save', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-      const setRuntimeValue = useRuntimeState.setRuntimeValue;
-
-      setupSaveMocks('save-fail-prompt');
+      setupSaveMocks('fail-prompt');
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'save-fail-prompt',
-          success: false,
-        },
-      });
+      dispatchSaveResult('fail-prompt', false);
 
-      // Flush microtasks from the async handleSaveResult handler
+      // The handler is async; flush microtasks for the await inside
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
         'Goblin',
         'activeConditions',
         expect.arrayContaining([expect.stringContaining('taunted_by_testcleric')]),
@@ -323,31 +329,14 @@ describe('stepsOfTheFeyHandler.handle', () => {
         campaignName,
         1,
       );
-      addEventListenerSpy.mockRestore();
     });
 
     it('logs save_result on failed save', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Orc' } });
-      savePrompt.buildSaveDc.mockReturnValue(14);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'save-fail-prompt-2' });
+      setupSaveMocks('fail-log-prompt', 'Orc');
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'save-fail-prompt-2',
-          success: false,
-        },
-      });
+      dispatchSaveResult('fail-log-prompt', false);
 
       await Promise.resolve();
       await Promise.resolve();
@@ -361,31 +350,17 @@ describe('stepsOfTheFeyHandler.handle', () => {
           saveType: 'WIS',
         }),
       );
-      addEventListenerSpy.mockRestore();
     });
 
     it('logs save_result on successful save', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Hobgoblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'save-success-prompt' });
+      setupSaveMocks('success-prompt', 'Hobgoblin');
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'save-success-prompt',
-          success: true,
-        },
-      });
+      dispatchSaveResult('success-prompt', true);
+
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(logService.addEntry).toHaveBeenCalledWith(
         campaignName,
@@ -395,63 +370,36 @@ describe('stepsOfTheFeyHandler.handle', () => {
           success: true,
         }),
       );
-      addEventListenerSpy.mockRestore();
     });
 
     it('ignores save-result events with different promptId', async () => {
-      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
-
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'correct-prompt' });
+      setupSaveMocks('correct-prompt');
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'wrong-prompt',
-          success: false,
-        },
-      });
+      dispatchSaveResult('wrong-prompt', false);
 
-      // The wrong promptId is ignored so no save_result should be added
+      await Promise.resolve();
+      await Promise.resolve();
+
       const saveResultCalls = logService.addEntry.mock.calls.filter(
         call => call[1]?.type === 'save_result',
       );
       expect(saveResultCalls.length).toBe(0);
-      addEventListenerSpy.mockRestore();
     });
 
     it('removes event listener after handling save result', async () => {
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      setupSaveMocks('remove-test-prompt');
+      setupSaveMocks('cleanup-prompt');
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // Verify addEventListener was called
-      expect(addEventListenerSpy).toHaveBeenCalledWith(
-        'save-result',
-        expect.any(Function),
-      );
-
       const savedCallback = addEventListenerSpy.mock.calls[0][1];
-      savedCallback({
-        detail: {
-          promptId: 'remove-test-prompt',
-          success: false,
-        },
-      });
 
-      // Flush microtasks from the async handleSaveResult handler
+      dispatchSaveResult('cleanup-prompt', false);
+
       await Promise.resolve();
       await Promise.resolve();
 
@@ -462,105 +410,105 @@ describe('stepsOfTheFeyHandler.handle', () => {
       addEventListenerSpy.mockRestore();
       removeEventListenerSpy.mockRestore();
     });
+
+    it('does not apply condition on successful save', async () => {
+      setupSaveMocks('success-no-cond');
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      dispatchSaveResult('success-no-cond', true);
+
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        expect.any(Array),
+        campaignName,
+      );
+      expect(expirations.addExpiration).not.toHaveBeenCalled();
+    });
   });
 
   describe('taunting step without target', () => {
-    it('returns popup without target when resolveTarget returns null', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      // getRuntimeValue for freeCastCount -> 1, then tempHp -> 0
+    function setupNoTargetMocks() {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('freeCastCount')) return 1;
         if (key === 'tempHp') return 0;
         return null;
       });
-
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue(null);
+    }
 
-      const result = await handle(action, ps, campaignName, null);
+    it('returns popup without taunting when no target is selected', async () => {
+      setupNoTargetMocks();
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No target selected');
+      expect(result.payload.triggerMistyStep).toBe(true);
       expect(savePrompt.createSaveListener).not.toHaveBeenCalled();
-    });
-
-    it('returns popup without target when targetInfo is null', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key.includes('freeCastCount')) return 1;
-        if (key === 'tempHp') return 0;
-        return null;
-      });
-
-      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.description).toContain('No target selected');
     });
   });
 
   describe('log entries', () => {
-    it('calls addEntry with ability_use type on success with target', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(1)
-        .mockReturnValueOnce(0);
-
+    it('adds ability_use log entry on successful execution with target', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key.includes('freeCastCount')) return 1;
+        if (key === 'tempHp') return 0;
+        return null;
+      });
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'log-prompt-1' });
+      savePrompt.createSaveListener.mockReturnValue({ promptId: 'entry-prompt' });
 
-      await handle(action, ps, campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // There should be two ability_use entries: one for the save listener, one for the final log
       const abilityUseCalls = logService.addEntry.mock.calls.filter(
         call => call[1]?.type === 'ability_use',
       );
       expect(abilityUseCalls.length).toBeGreaterThanOrEqual(1);
     });
 
-    it('catches and swallows addEntry errors', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(1)
-        .mockReturnValueOnce(0);
-
+    it('swallows errors from the final ability_use log entry', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key.includes('freeCastCount')) return 1;
+        if (key === 'tempHp') return 0;
+        return null;
+      });
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
-      targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      savePrompt.buildSaveDc.mockReturnValue(13);
-      savePrompt.createSaveListener.mockReturnValue({ promptId: 'err-prompt' });
-      logService.addEntry.mockImplementation(() => Promise.reject(new Error('network')).catch(() => {}));
+      targetResolver.resolveTarget.mockResolvedValue(null);
+      // No target, so only the final addEntry (line 118) is called, which has .catch(() => {})
+      // and swallows errors. Use mockImplementation so it doesn't affect other tests via
+      // mockRejectedValue's global state.
+      logService.addEntry.mockImplementation(() => Promise.reject(new Error('network')));
 
-      await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
+      await expect(handle(makeAction(), makePlayerStats(), campaignName, null)).resolves.toBeDefined();
     });
   });
 
   describe('popup payload structure', () => {
-    it('payload contains correct keys', async () => {
-      const action = makeAction();
-      const ps = makePlayerStats();
-
-      useRuntimeState.getRuntimeValue
-        .mockReturnValueOnce(1)
-        .mockReturnValueOnce(0);
-
+    function setupPayloadMocks() {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key.includes('freeCastCount')) return 1;
+        if (key === 'tempHp') return 0;
+        return null;
+      });
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       savePrompt.buildSaveDc.mockReturnValue(13);
       savePrompt.createSaveListener.mockReturnValue({ promptId: 'payload-prompt' });
+    }
 
-      const result = await handle(action, ps, campaignName, null);
+    it('payload contains correct keys for target case', async () => {
+      setupPayloadMocks();
+
+      const action = makeAction();
+      const result = await handle(action, makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
@@ -570,24 +518,49 @@ describe('stepsOfTheFeyHandler.handle', () => {
     });
 
     it('uses action.name as featureName when provided', async () => {
-      const action = { name: 'My Fey Steps', automation: { type: 'free_cast' } };
-      const ps = makePlayerStats();
-
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key.includes('freeCastCount')) return 1;
         if (key === 'tempHp') return 0;
         return null;
       });
-
       automationExpressions.evaluateAutoExpression.mockReturnValue(1);
       targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
       savePrompt.buildSaveDc.mockReturnValue(13);
       savePrompt.createSaveListener.mockReturnValue({ promptId: 'name-prompt' });
 
-      const result = await handle(action, ps, campaignName, null);
+      const customAction = { name: 'My Fey Steps', automation: { type: 'free_cast' } };
+      const result = await handle(customAction, makePlayerStats(), campaignName, null);
 
       expect(result.payload.name).toBe('My Fey Steps');
       expect(result.payload.description).toContain('My Fey Steps');
+    });
+
+    it('includes remaining count in popup description', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key.includes('freeCastCount')) return 2;
+        if (key === 'tempHp') return 0;
+        return null;
+      });
+      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
+      targetResolver.resolveTarget.mockResolvedValue(null);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.description).toContain('(1 remaining)');
+    });
+
+    it('includes rolled temp HP value in popup description', async () => {
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key.includes('freeCastCount')) return 1;
+        if (key === 'tempHp') return 0;
+        return null;
+      });
+      automationExpressions.evaluateAutoExpression.mockReturnValue(1);
+      targetResolver.resolveTarget.mockResolvedValue(null);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.description).toContain('Temporary Hit Points');
     });
   });
 });

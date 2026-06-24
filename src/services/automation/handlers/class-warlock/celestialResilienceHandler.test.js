@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, grantCelestialResilience } from './celestialResilienceHandler.js';
@@ -5,35 +6,69 @@ import { handle, grantCelestialResilience } from './celestialResilienceHandler.j
 // ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(() => null),
-    setRuntimeValue: vi.fn(async () => {}),
+    getRuntimeValue: vi.fn(),
+    setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
-    evaluateAutoExpression: vi.fn((_expr) => 5),
+    evaluateAutoExpression: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(async () => {}),
+    addEntry: vi.fn(() => Promise.resolve()),
 }));
 
 vi.mock('../../../maps/mapsService.js', () => ({
-    loadMapData: vi.fn(async () => null),
+    loadMapData: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-    getDistanceFeet: vi.fn(() => 10),
-    rangeToFeet: vi.fn((r) => {
-        const m = String(r).match(/^(\d+)_ft$/);
-        return m ? parseInt(m[1], 10) : null;
-    }),
+    getDistanceFeet: vi.fn(),
+    rangeToFeet: vi.fn(),
 }));
 
-// ── Re-import after mocking ────────────────────────────────────
+// ── Re-import mocks after mocking ──────────────────────────────
 
-import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
+import { addEntry } from '../../../ui/logService.js';
+import { loadMapData } from '../../../maps/mapsService.js';
+import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 
 // ── Helpers ────────────────────────────────────────────────────
+
+const CAMPAIGN = 'test-campaign';
+const MAP = 'test-map';
+
+function makeCelestialStats(overrides = {}) {
+    return {
+        name: 'TestHero',
+        proficiency: 3,
+        class: { major: { name: 'Celestial Patron' }, subclass: { name: 'Celestial Patron' } },
+        characterAdvancement: [
+            {
+                name: 'Celestial Resilience',
+                automation: {
+                    tempHpExpression: 'warlock level + CHA modifier',
+                    allyTempHpExpression: 'floor(warlock level / 2) + CHA modifier',
+                    maxAllies: 5,
+                    range: '60_ft',
+                },
+            },
+        ],
+        ...overrides,
+    };
+}
+
+function makeNonCelestialStats(overrides = {}) {
+    return {
+        name: 'TestHero',
+        proficiency: 3,
+        class: { major: { name: 'Other Patron' } },
+        characterAdvancement: [],
+        ...overrides,
+    };
+}
 
 function makeAction(overrides = {}) {
     return {
@@ -50,28 +85,6 @@ function makeAction(overrides = {}) {
     };
 }
 
-function makeCelestialPlayerStats(overrides = {}) {
-    return {
-        name: 'TestHero',
-        proficiency: 3,
-        class: { major: { name: 'Celestial Patron' }, subclass: { name: 'Celestial Patron' } },
-        characterAdvancement: [
-            { name: 'Celestial Resilience', automation: { tempHpExpression: 'warlock level + CHA modifier', allyTempHpExpression: 'floor(warlock level / 2) + CHA modifier', maxAllies: 5, range: '60_ft' } },
-        ],
-        ...overrides,
-    };
-}
-
-function makeNonCelestialPlayerStats(overrides = {}) {
-    return {
-        name: 'TestHero',
-        proficiency: 3,
-        class: { major: { name: 'Other Patron' } },
-        characterAdvancement: [],
-        ...overrides,
-    };
-}
-
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('celestialResilienceHandler', () => {
@@ -80,68 +93,632 @@ describe('celestialResilienceHandler', () => {
     });
 
     describe('grantCelestialResilience', () => {
-        it('should return null for non-celestial patron', async () => {
-            const result = await grantCelestialResilience(makeNonCelestialPlayerStats(), 'campaign', 'magical_cunning', 'map');
+        it('returns null for non-celestial patron', async () => {
+            const result = await grantCelestialResilience(
+                makeNonCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
             expect(result).toBe(null);
+            expect(evaluateAutoExpression).not.toHaveBeenCalled();
+            expect(setRuntimeValue).not.toHaveBeenCalled();
         });
 
-        it('should return null when Celestial Resilience feature is missing', async () => {
-            const stats = makeCelestialPlayerStats({ characterAdvancement: [] });
-            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
+        it('returns null when Celestial Resilience feature is missing', async () => {
+            const stats = makeCelestialStats({ characterAdvancement: [] });
+            const result = await grantCelestialResilience(stats, CAMPAIGN, 'magical_cunning', MAP);
             expect(result).toBe(null);
+            expect(evaluateAutoExpression).not.toHaveBeenCalled();
         });
 
-        it('should return null when automation is missing', async () => {
-            const stats = makeCelestialPlayerStats({
+        it('returns null when feature automation is null', async () => {
+            const stats = makeCelestialStats({
                 characterAdvancement: [{ name: 'Celestial Resilience', automation: null }],
             });
-            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
+            const result = await grantCelestialResilience(stats, CAMPAIGN, 'magical_cunning', MAP);
             expect(result).toBe(null);
         });
 
-        it('should set temp HP and return result when valid', async () => {
+        it('returns null when feature automation is undefined', async () => {
+            const stats = makeCelestialStats({
+                characterAdvancement: [{ name: 'Celestial Resilience' }],
+            });
+            const result = await grantCelestialResilience(stats, CAMPAIGN, 'magical_cunning', MAP);
+            expect(result).toBe(null);
+        });
+
+        it('returns null when self temp HP expression evaluates to zero', async () => {
+            evaluateAutoExpression.mockReturnValue(0);
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+            expect(result).toBe(null);
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+        });
+
+        it('returns null when self temp HP expression evaluates to negative', async () => {
+            evaluateAutoExpression.mockReturnValue(-3);
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+            expect(result).toBe(null);
+        });
+
+        it('returns null when self temp HP expression returns non-number', async () => {
+            evaluateAutoExpression.mockReturnValue('invalid');
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+            expect(result).toBe(null);
+        });
+
+        it('grants self temp HP and returns result when valid', async () => {
+            evaluateAutoExpression.mockReturnValue(7);
             getRuntimeValue.mockReturnValue(0);
-            const stats = makeCelestialPlayerStats();
-            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
 
             expect(result).not.toBe(null);
-            expect(result.selfTempHp).toBe(5);
-            expect(result.message).toContain('5 temporary hit points');
+            expect(result.selfTempHp).toBe(7);
+            expect(result.message).toContain('7 temporary hit points');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                'tempHp',
+                7,
+                CAMPAIGN,
+            );
         });
 
-        it('should add to existing temp HP', async () => {
-            getRuntimeValue.mockReturnValue(3);
-            const stats = makeCelestialPlayerStats();
-            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
-
-            expect(result.selfTempHp).toBe(5);
-        });
-
-        it('should return null when temp HP expression evaluates to non-positive', async () => {
-            vi.mocked(await import('../../../combat/automation/automationService.js')).evaluateAutoExpression.mockReturnValue(0);
-            const stats = makeCelestialPlayerStats();
-            const result = await grantCelestialResilience(stats, 'campaign', 'magical_cunning', 'map');
-            expect(result).toBe(null);
-        });
-
-        it('should not add ally temp HP when source is not magical_cunning', async () => {
-            const { evaluateAutoExpression } = await import('../../../combat/automation/automationService.js');
+        it('adds new temp HP to existing temp HP', async () => {
             evaluateAutoExpression.mockReturnValue(5);
-            getRuntimeValue.mockImplementation((_name, _key, _campaign) => 0);
-            const stats = makeCelestialPlayerStats();
-            const result = await grantCelestialResilience(stats, 'campaign', 'other_source', 'map');
+            getRuntimeValue.mockReturnValue(3);
+
+            await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                'tempHp',
+                8,
+                CAMPAIGN,
+            );
+        });
+
+        it('treats falsy existing temp HP as zero', async () => {
+            evaluateAutoExpression.mockReturnValue(4);
+            getRuntimeValue.mockReturnValue(null);
+
+            await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestHero',
+                'tempHp',
+                4,
+                CAMPAIGN,
+            );
+        });
+
+        it('does not grant ally temp HP when source is not magical_cunning', async () => {
+            evaluateAutoExpression.mockReturnValue(5);
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'other_source',
+                MAP,
+            );
 
             expect(result).not.toBe(null);
             expect(result.selfTempHp).toBe(5);
             expect(result.allyTempHp).toBeUndefined();
+            expect(rangeToFeet).not.toHaveBeenCalled();
+            expect(getDistanceFeet).not.toHaveBeenCalled();
+            expect(loadMapData).not.toHaveBeenCalled();
+        });
+
+        it('grants ally temp HP when source is magical_cunning', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(3);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(60);
+            loadMapData.mockResolvedValue({
+                players: [
+                    { name: 'TestHero', gridX: 10, gridY: 10 },
+                    { name: 'Ally1', gridX: 12, gridY: 12 },
+                    { name: 'Ally2', gridX: 20, gridY: 20 },
+                ],
+            });
+            getDistanceFeet.mockReturnValue(10);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.allyTempHp).toBe(3);
+            expect(result.maxAllies).toBe(5);
+            expect(result.allies).toContain('Ally1');
+            expect(result.allyMessage).toContain('Ally1');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'Ally1',
+                'tempHp',
+                3,
+                CAMPAIGN,
+            );
+        });
+
+        it('limits ally count to maxAllies', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(100);
+            loadMapData.mockResolvedValue({
+                players: [
+                    { name: 'TestHero', gridX: 0, gridY: 0 },
+                    { name: 'Ally1', gridX: 1, gridY: 1 },
+                    { name: 'Ally2', gridX: 2, gridY: 2 },
+                    { name: 'Ally3', gridX: 3, gridY: 3 },
+                    { name: 'Ally4', gridX: 4, gridY: 4 },
+                    { name: 'Ally5', gridX: 5, gridY: 5 },
+                    { name: 'Ally6', gridX: 6, gridY: 6 },
+                ],
+            });
+            getDistanceFeet.mockReturnValue(10);
+
+            const stats = makeCelestialStats({
+                characterAdvancement: [
+                    {
+                        name: 'Celestial Resilience',
+                        automation: {
+                            tempHpExpression: '10',
+                            allyTempHpExpression: '2',
+                            maxAllies: 3,
+                            range: '100_ft',
+                        },
+                    },
+                ],
+            });
+
+            const result = await grantCelestialResilience(stats, CAMPAIGN, 'magical_cunning', MAP);
+
+            expect(result.allies.length).toBe(3);
+            expect(result.allies).toEqual(['Ally1', 'Ally2', 'Ally3']);
+        });
+
+        it('filters allies by range', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(20);
+            loadMapData.mockResolvedValue({
+                players: [
+                    { name: 'TestHero', gridX: 0, gridY: 0 },
+                    { name: 'NearAlly', gridX: 2, gridY: 2 },
+                    { name: 'FarAlly', gridX: 10, gridY: 10 },
+                ],
+            });
+            getDistanceFeet.mockImplementation((a, b) => {
+                const dx = b.gridX - a.gridX;
+                const dy = b.gridY - a.gridY;
+                return Math.sqrt(dx * dx + dy * dy) * 5;
+            });
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.allies).toContain('NearAlly');
+            expect(result.allies).not.toContain('FarAlly');
+        });
+
+        it('skips self when selecting allies', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(100);
+            loadMapData.mockResolvedValue({
+                players: [
+                    { name: 'TestHero', gridX: 0, gridY: 0 },
+                ],
+            });
+            getDistanceFeet.mockReturnValue(10);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.allies).toEqual([]);
+        });
+
+        it('returns empty allies when map data is missing', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+            loadMapData.mockResolvedValue(null);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.allyTempHp).toBe(2);
+            expect(result.allies).toEqual([]);
+        });
+
+        it('returns empty allies when attacker not found on map', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+            loadMapData.mockResolvedValue({
+                players: [
+                    { name: 'OtherPlayer', gridX: 5, gridY: 5 },
+                ],
+            });
+            getDistanceFeet.mockReturnValue(10);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.allyTempHp).toBe(2);
+            expect(result.allies).toEqual([]);
+        });
+
+        it('returns empty allies when no map name provided', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                null,
+            );
+
+            expect(result.allyTempHp).toBe(2);
+            expect(result.allies).toEqual([]);
+        });
+
+        it('returns empty allies when range conversion fails', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(null);
+            loadMapData.mockResolvedValue({
+                players: [{ name: 'TestHero', gridX: 0, gridY: 0 }],
+            });
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.allyTempHp).toBe(2);
+            expect(result.allies).toEqual([]);
+            expect(getDistanceFeet).not.toHaveBeenCalled();
+        });
+
+        it('uses default ally temp HP expression when missing', async () => {
+            evaluateAutoExpression.mockReturnValueOnce(5);
+            getRuntimeValue.mockReturnValue(0);
+
+            const stats = makeCelestialStats({
+                characterAdvancement: [
+                    {
+                        name: 'Celestial Resilience',
+                        automation: {
+                            tempHpExpression: '10',
+                            maxAllies: 5,
+                            range: '60_ft',
+                        },
+                    },
+                ],
+            });
+
+            await grantCelestialResilience(stats, CAMPAIGN, 'magical_cunning', MAP);
+
+            expect(evaluateAutoExpression).toHaveBeenCalledWith(
+                'floor(warlock level / 2) + CHA modifier',
+                expect.any(Object),
+            );
+        });
+
+        it('uses default self temp HP expression when missing', async () => {
+            evaluateAutoExpression.mockReturnValue(7);
+            getRuntimeValue.mockReturnValue(0);
+
+            const stats = makeCelestialStats({
+                characterAdvancement: [
+                    {
+                        name: 'Celestial Resilience',
+                        automation: {
+                            allyTempHpExpression: '2',
+                            maxAllies: 5,
+                            range: '60_ft',
+                        },
+                    },
+                ],
+            });
+
+            const result = await grantCelestialResilience(
+                stats,
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.selfTempHp).toBe(7);
+            expect(evaluateAutoExpression).toHaveBeenCalledWith(
+                'warlock level + CHA modifier',
+                expect.any(Object),
+            );
+        });
+
+        it('uses default maxAllies when missing', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(60);
+            loadMapData.mockResolvedValue({
+                players: [
+                    { name: 'TestHero', gridX: 0, gridY: 0 },
+                    { name: 'Ally1', gridX: 1, gridY: 1 },
+                ],
+            });
+            getDistanceFeet.mockReturnValue(10);
+
+            const stats = makeCelestialStats({
+                characterAdvancement: [
+                    {
+                        name: 'Celestial Resilience',
+                        automation: {
+                            tempHpExpression: '10',
+                            allyTempHpExpression: '2',
+                            range: '60_ft',
+                        },
+                    },
+                ],
+            });
+
+            const result = await grantCelestialResilience(stats, CAMPAIGN, 'magical_cunning', MAP);
+
+            expect(result.maxAllies).toBe(5);
+        });
+
+        it('does not grant ally temp HP when ally expression evaluates to zero', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(0);
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.selfTempHp).toBe(5);
+            expect(result.allyTempHp).toBeUndefined();
+            expect(result.allies).toBeUndefined();
+        });
+
+        it('does not grant ally temp HP when ally expression returns non-number', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce('bad');
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.selfTempHp).toBe(5);
+            expect(result.allyTempHp).toBeUndefined();
+        });
+
+        it('recognizes subclass as celestial patron', async () => {
+            evaluateAutoExpression.mockReturnValue(5);
+            getRuntimeValue.mockReturnValue(0);
+
+            const stats = makeCelestialStats({
+                class: { major: { name: 'Other Patron' }, subclass: { name: 'Celestial Patron' } },
+            });
+
+            const result = await grantCelestialResilience(
+                stats,
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result).not.toBe(null);
+            expect(result.selfTempHp).toBe(5);
+        });
+
+        it('does not grant ally temp HP when only subclass is celestial', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(2);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(60);
+            loadMapData.mockResolvedValue({
+                players: [{ name: 'TestHero', gridX: 0, gridY: 0 }],
+            });
+
+            const stats = makeCelestialStats({
+                class: { major: { name: 'Other Patron' }, subclass: { name: 'Celestial Patron' } },
+            });
+
+            const result = await grantCelestialResilience(
+                stats,
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.selfTempHp).toBe(5);
+            expect(result.allyTempHp).toBe(2);
+        });
+
+        it('handles ally message with no targets in range', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(3);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(10);
+            loadMapData.mockResolvedValue({
+                players: [
+                    { name: 'TestHero', gridX: 0, gridY: 0 },
+                    { name: 'DistantAlly', gridX: 50, gridY: 50 },
+                ],
+            });
+            getDistanceFeet.mockReturnValue(100);
+
+            const result = await grantCelestialResilience(
+                makeCelestialStats(),
+                CAMPAIGN,
+                'magical_cunning',
+                MAP,
+            );
+
+            expect(result.allyMessage).toContain('may gain');
+            expect(result.allies).toEqual([]);
         });
     });
 
     describe('handle', () => {
-        it('should return null when grantCelestialResilience returns null', async () => {
-            const stats = makeNonCelestialPlayerStats();
-            const result = await handle(makeAction(), stats, 'campaign', 'map');
+        it('returns null when grantCelestialResilience returns null', async () => {
+            const result = await handle(
+                makeAction(),
+                makeNonCelestialStats(),
+                CAMPAIGN,
+                MAP,
+            );
             expect(result).toBe(null);
+        });
+
+        it('returns popup with automation info on success', async () => {
+            evaluateAutoExpression.mockReturnValue(7);
+            getRuntimeValue.mockReturnValue(0);
+
+            const result = await handle(makeAction(), makeCelestialStats(), CAMPAIGN, MAP);
+
+            expect(result).not.toBe(null);
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Celestial Resilience');
+            expect(result.payload.description).toContain('7 temporary hit points');
+            expect(result.payload.automation).toEqual(makeAction().automation);
+        });
+
+        it('logs ability use on success', async () => {
+            evaluateAutoExpression.mockReturnValue(7);
+            getRuntimeValue.mockReturnValue(0);
+
+            await handle(makeAction(), makeCelestialStats(), CAMPAIGN, MAP);
+
+            expect(addEntry).toHaveBeenCalledWith(
+                CAMPAIGN,
+                expect.objectContaining({
+                    type: 'ability_use',
+                    characterName: 'TestHero',
+                    abilityName: 'Celestial Resilience',
+                    description: expect.stringContaining('7 temporary hit points'),
+                }),
+            );
+        });
+
+        it('includes ally message in popup description when allies granted', async () => {
+            evaluateAutoExpression
+                .mockReturnValueOnce(5)
+                .mockReturnValueOnce(3);
+            getRuntimeValue.mockReturnValue(0);
+            rangeToFeet.mockReturnValue(60);
+            loadMapData.mockResolvedValue({
+                players: [
+                    { name: 'TestHero', gridX: 0, gridY: 0 },
+                    { name: 'Ally1', gridX: 1, gridY: 1 },
+                ],
+            });
+            getDistanceFeet.mockReturnValue(10);
+
+            const result = await handle(makeAction(), makeCelestialStats(), CAMPAIGN, MAP);
+
+            expect(result.payload.description).toContain('temporary hit points');
+            expect(result.payload.description).toContain('Ally1');
+        });
+
+        it('uses custom action name in log entry', async () => {
+            evaluateAutoExpression.mockReturnValue(7);
+            getRuntimeValue.mockReturnValue(0);
+
+            const action = {
+                name: 'Custom Celestial Resilience',
+                automation: makeAction().automation,
+            };
+
+            await handle(action, makeCelestialStats(), CAMPAIGN, MAP);
+
+            expect(addEntry).toHaveBeenCalledWith(
+                CAMPAIGN,
+                expect.objectContaining({
+                    abilityName: 'Custom Celestial Resilience',
+                }),
+            );
         });
     });
 });

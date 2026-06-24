@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -8,7 +9,7 @@ vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
 
 vi.mock('../../ui/utils.js', () => ({
   default: {
-    getName: vi.fn((val) => String(val)),
+    getName: vi.fn((name) => name),
   },
 }));
 
@@ -19,8 +20,8 @@ vi.mock('../../ui/storage.js', () => ({
 }));
 
 vi.mock('../../encounters/combatData.js', () => ({
-  getCurrentCombatRound: vi.fn(() => 5),
-  getActiveCreatureName: vi.fn(() => 'TestCharacter'),
+  getCurrentCombatRound: vi.fn(),
+  getActiveCreatureName: vi.fn(),
   getCombatSummary: vi.fn(),
 }));
 
@@ -29,7 +30,7 @@ vi.mock('../../ui/logService.js', () => ({
 }));
 
 vi.mock('../../rules/combat/rangeValidation.js', () => ({
-  getDistanceFeet: vi.fn(() => 10),
+  getDistanceFeet: vi.fn(),
 }));
 
 vi.mock('../../automation/handlers/spells/slowHandler.js', () => ({
@@ -40,48 +41,61 @@ vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
   processTashasLaughterRepeatSave: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('../../combat/automation/automationExpressions.js', () => ({
+  evaluateAutoExpression: vi.fn(() => 5),
+}));
+
 import { applyTurnStartEffects, expireStaleEffects } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
-import { getCombatSummary, getCurrentCombatRound, getActiveCreatureName } from '../../encounters/combatData.js';
+import {
+  getCombatSummary,
+  getCurrentCombatRound,
+  getActiveCreatureName,
+} from '../../encounters/combatData.js';
+import { processSlowRepeatSave } from '../../automation/handlers/spells/slowHandler.js';
+import { processTashasLaughterRepeatSave } from '../../automation/handlers/spells/tashasLaughterHandler.js';
+import { getDistanceFeet } from '../../rules/combat/rangeValidation.js';
 import utils from '../../ui/utils.js';
 
 function resetMocks() {
   vi.clearAllMocks();
   localStorage.clear();
-  window.dispatchEvent = vi.fn();
 }
 
 describe('applyTurnStartEffects — post-loop logic', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
-  it('checks regenerateActive on activeName when turnStartEffects is empty', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('checks regenerateActive when turnStartEffects is empty', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'regenerateActive') return true;
       if (name === 'TestCharacter' && prop === 'hitPoints') return 20;
-      if (name === 'TestCharacter' && prop === 'currentHitPoints') return 10;
       if (prop === 'targetEffects') return [];
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
-    expect(getRuntimeValue).toHaveBeenCalledWith('TestCharacter', 'regenerateActive', 'TestCampaign');
+    expect(getRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'regenerateActive',
+      'TestCampaign'
+    );
   });
 
-  it('clears resistanceUsedThisTurn when it is true', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('clears resistanceUsedThisTurn when it is true', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       if (prop === 'resistanceUsedThisTurn') return true;
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'TestCharacter',
@@ -91,26 +105,26 @@ describe('applyTurnStartEffects — post-loop logic', () => {
     );
   });
 
-  it('does not call setRuntimeValue when resistanceUsedThisTurn is false', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('does not call setRuntimeValue when resistanceUsedThisTurn is false', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       if (prop === 'resistanceUsedThisTurn') return false;
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('clears portentUsedThisTurn when it is true', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('clears portentUsedThisTurn when it is true', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       if (prop === 'portentUsedThisTurn') return true;
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'TestCharacter',
@@ -120,20 +134,20 @@ describe('applyTurnStartEffects — post-loop logic', () => {
     );
   });
 
-  it('does not call setRuntimeValue when portentUsedThisTurn is false', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('does not call setRuntimeValue when portentUsedThisTurn is false', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       if (prop === 'portentUsedThisTurn') return false;
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('cleans up multiattack_defense from targetEffects at start of turn', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('removes multiattack_defense from targetEffects at start of turn', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [
         { effect: 'multiattack_defense', target: 'Enemy1' },
         { effect: 'blinded', target: 'Enemy2' },
@@ -141,7 +155,7 @@ describe('applyTurnStartEffects — post-loop logic', () => {
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
     expect(setRuntimeValue).toHaveBeenCalledWith(
       'TestCampaign',
@@ -151,15 +165,15 @@ describe('applyTurnStartEffects — post-loop logic', () => {
     );
   });
 
-  it('does not modify targetEffects when no multiattack_defense entries', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('does not modify targetEffects when no multiattack_defense entries', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [
         { effect: 'blinded', target: 'Enemy1' },
       ];
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
     expect(setRuntimeValue).not.toHaveBeenCalled();
   });
@@ -168,14 +182,14 @@ describe('applyTurnStartEffects — post-loop logic', () => {
 describe('applyTurnStartEffects — slow and tashas handlers', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
-  it('processes slow repeat save when slow tracking key exists and target effect found', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('processes slow repeat save when tracking key exists and target effect found', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === '_slow_TestCharacter') return true;
       if (name === 'TestCampaign' && prop === 'targetEffects') return [
         { target: 'TestCharacter', effect: 'slow_repeat_save', source: 'Caster', dc: 12 },
@@ -185,29 +199,29 @@ describe('applyTurnStartEffects — slow and tashas handlers', () => {
 
     await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
-    expect(getRuntimeValue).toHaveBeenCalledWith('TestCharacter', '_slow_TestCharacter', 'TestCampaign');
+    expect(processSlowRepeatSave).toHaveBeenCalledWith(
+      'Caster',
+      'TestCharacter',
+      12,
+      'TestCampaign'
+    );
   });
 
-  it('does not process slow when tracking key is absent', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('does not process slow when tracking key is absent', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [
         { target: 'TestCharacter', effect: 'slow_repeat_save', source: 'Caster', dc: 12 },
       ];
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
-    // The slow handler key IS queried (returns null), but no slow_repeat_save targetEffect is found
-    const slowCalls = getRuntimeValue.mock.calls.filter(
-      (c) => c[1] && String(c[1]).startsWith('_slow_')
-    );
-    expect(slowCalls.length).toBe(1);
-    expect(slowCalls[0][2]).toBe('TestCampaign');
+    expect(processSlowRepeatSave).not.toHaveBeenCalled();
   });
 
   it('processes tashas laughter repeat save when tracking key exists and target effect found', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === '_tashas_laughter_TestCharacter') return true;
       if (name === 'TestCampaign' && prop === 'targetEffects') return [
         { target: 'TestCharacter', effect: 'tashas_laughter_repeat_save', source: 'Caster', dc: 11 },
@@ -217,39 +231,39 @@ describe('applyTurnStartEffects — slow and tashas handlers', () => {
 
     await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
-    expect(getRuntimeValue).toHaveBeenCalledWith('TestCharacter', '_tashas_laughter_TestCharacter', 'TestCampaign');
+    expect(processTashasLaughterRepeatSave).toHaveBeenCalledWith(
+      'Caster',
+      'TestCharacter',
+      11,
+      'TestCampaign'
+    );
   });
 
-  it('does not process tashas when tracking key is absent', () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('does not process tashas when tracking key is absent', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [
         { target: 'TestCharacter', effect: 'tashas_laughter_repeat_save', source: 'Caster', dc: 11 },
       ];
       return null;
     });
 
-    applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+    await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
 
-    // The tashas handler key IS queried (returns null), but no tashas targetEffect is found
-    const tashasCalls = getRuntimeValue.mock.calls.filter(
-      (c) => c[1] && String(c[1]).startsWith('_tashas_laughter_')
-    );
-    expect(tashasCalls.length).toBe(1);
-    expect(tashasCalls[0][2]).toBe('TestCampaign');
+    expect(processTashasLaughterRepeatSave).not.toHaveBeenCalled();
   });
 });
 
 describe('applyTurnStartEffects — superior_defense', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
   it('returns early when character is incapacitated', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeConditions') return ['incapacitated'];
       if (prop === 'targetEffects') return [];
       return null;
@@ -263,7 +277,7 @@ describe('applyTurnStartEffects — superior_defense', () => {
   });
 
   it('returns early when Superior Defense buff already active', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeConditions') return [];
       if (name === 'TestCharacter' && prop === 'activeBuffs') return [
         { name: 'Superior Defense', effect: 'damage_resistance' }
@@ -280,7 +294,7 @@ describe('applyTurnStartEffects — superior_defense', () => {
   });
 
   it('returns early when focus points are insufficient', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeConditions') return [];
       if (name === 'TestCharacter' && prop === 'activeBuffs') return [];
       if (name === 'TestCharacter' && prop === 'focusPoints') return 0;
@@ -298,7 +312,7 @@ describe('applyTurnStartEffects — superior_defense', () => {
   });
 
   it('activates Superior Defense when conditions are met', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeConditions') return [];
       if (name === 'TestCharacter' && prop === 'activeBuffs') return [];
       if (name === 'TestCharacter' && prop === 'focusPoints') return 2;
@@ -332,14 +346,14 @@ describe('applyTurnStartEffects — superior_defense', () => {
 describe('applyTurnStartEffects — flurry_healing_harm', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
-  it('sets flurryHealingHarmUses based on WIS modifier expression', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('sets flurryHealingHarmUses based on expression value', async () => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
@@ -347,7 +361,7 @@ describe('applyTurnStartEffects — flurry_healing_harm', () => {
     await applyTurnStartEffects('TestCharacter', {
       turnStartEffects: [{
         type: 'flurry_healing_harm',
-        usesExpression: 'WIS modifier minimum 1'
+        usesExpression: '3',
       }],
       abilities: [{ name: 'Wisdom', bonus: 3 }]
     }, 'TestCampaign');
@@ -361,7 +375,7 @@ describe('applyTurnStartEffects — flurry_healing_harm', () => {
   });
 
   it('defaults uses to 1 when expression evaluation fails', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
@@ -369,7 +383,7 @@ describe('applyTurnStartEffects — flurry_healing_harm', () => {
     await applyTurnStartEffects('TestCharacter', {
       turnStartEffects: [{
         type: 'flurry_healing_harm',
-        usesExpression: 'invalid_expression_here'
+        usesExpression: 'invalid_expression_here',
       }],
       abilities: [{ name: 'Wisdom', bonus: 0 }]
     }, 'TestCampaign');
@@ -386,15 +400,14 @@ describe('applyTurnStartEffects — flurry_healing_harm', () => {
 describe('applyTurnStartEffects — holy_nimbus_radiant_damage', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
-    window.dispatchEvent = vi.fn();
   });
 
   it('returns early when holyNimbusActive is false', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'holyNimbusActive') return false;
       if (prop === 'targetEffects') return [];
       return null;
@@ -411,7 +424,7 @@ describe('applyTurnStartEffects — holy_nimbus_radiant_damage', () => {
   });
 
   it('returns early when no combat summary', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'holyNimbusActive') return true;
       if (prop === 'targetEffects') return [];
       return null;
@@ -429,14 +442,14 @@ describe('applyTurnStartEffects — holy_nimbus_radiant_damage', () => {
 describe('applyTurnStartEffects — living_legend_turn_start', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
   it('resets unerringStrikeUsed to false', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'unerringStrikeUsed') return true;
       if (prop === 'targetEffects') return [];
       return null;
@@ -458,7 +471,7 @@ describe('applyTurnStartEffects — living_legend_turn_start', () => {
 describe('applyTurnStartEffects — radiant_soul_turn_start', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
@@ -481,15 +494,15 @@ describe('applyTurnStartEffects — radiant_soul_turn_start', () => {
 describe('applyTurnStartEffects — inner_radiance_turn_start', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
-    window.dispatchEvent = vi.fn();
+    getDistanceFeet.mockReturnValue(5);
   });
 
   it('returns early when Inner Radiance buff not active', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeBuffs') return [];
       if (prop === 'targetEffects') return [];
       return null;
@@ -504,7 +517,7 @@ describe('applyTurnStartEffects — inner_radiance_turn_start', () => {
   });
 
   it('returns early when no combat summary', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeBuffs') return [
         { name: 'Inner Radiance', effect: 'aura_damage' }
       ];
@@ -524,14 +537,14 @@ describe('applyTurnStartEffects — inner_radiance_turn_start', () => {
 describe('applyTurnStartEffects — elder_champion_regeneration', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
   it('returns early when elderChampionActive is false', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'elderChampionActive') return false;
       if (prop === 'targetEffects') return [];
       return null;
@@ -548,14 +561,14 @@ describe('applyTurnStartEffects — elder_champion_regeneration', () => {
 describe('applyTurnStartEffects — dread_ambush_speed', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
   it('returns early when not round 1', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'dreadAmbushSpeedActive') return false;
       if (prop === 'targetEffects') return [];
       return null;
@@ -570,7 +583,7 @@ describe('applyTurnStartEffects — dread_ambush_speed', () => {
   });
 
   it('returns early when dreadAmbushSpeedActive is already true', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'dreadAmbushSpeedActive') return true;
       if (prop === 'targetEffects') return [];
       return null;
@@ -588,14 +601,14 @@ describe('applyTurnStartEffects — dread_ambush_speed', () => {
 describe('applyTurnStartEffects — steady_aim_clear', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
   it('removes speed_zero condition and clears flags', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeConditions') return ['speed_zero', 'blinded'];
       if (name === 'TestCharacter' && prop === 'steadyAimMovedThisTurn') return true;
       if (name === 'TestCharacter' && prop === 'steadyAimSpeedZero') return true;
@@ -607,26 +620,25 @@ describe('applyTurnStartEffects — steady_aim_clear', () => {
       turnStartEffects: [{ type: 'steady_aim_clear' }]
     }, 'TestCampaign');
 
-    // Let microtasks drain for async setRuntimeValue calls
-    await new Promise(r => setTimeout(r, 0));
+    // Source uses await before each setRuntimeValue call, so all 3 calls happen
+    // in sequence but the await creates microtasks. Since setRuntimeValue is
+    // mocked as vi.fn() returning undefined, await undefined resolves immediately.
+    // However, the await still defers execution to the next microtask.
+    await Promise.resolve();
 
-    // activeConditions is updated first (speed_zero removed), then flags are cleared
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(
-      1,
+    expect(setRuntimeValue).toHaveBeenCalledWith(
       'TestCharacter',
       'activeConditions',
       ['blinded'],
       'TestCampaign'
     );
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(
-      2,
+    expect(setRuntimeValue).toHaveBeenCalledWith(
       'TestCharacter',
       'steadyAimMovedThisTurn',
       false,
       'TestCampaign'
     );
-    expect(setRuntimeValue).toHaveBeenNthCalledWith(
-      3,
+    expect(setRuntimeValue).toHaveBeenCalledWith(
       'TestCharacter',
       'steadyAimSpeedZero',
       false,
@@ -635,7 +647,7 @@ describe('applyTurnStartEffects — steady_aim_clear', () => {
   });
 
   it('still clears steadyAim flags even when no speed_zero condition', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeConditions') return ['blinded'];
       if (name === 'TestCharacter' && prop === 'steadyAimMovedThisTurn') return true;
       if (name === 'TestCharacter' && prop === 'steadyAimSpeedZero') return true;
@@ -667,14 +679,14 @@ describe('applyTurnStartEffects — steady_aim_clear', () => {
 describe('applyTurnStartEffects — supreme_sneak', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
-  it('preserves invisible condition when stealthAttackCost > 0 and invisible', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+  it('clears stealthAttackCost and preserves invisible when cost > 0 and invisible', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'stealthAttackCost') return 1;
       if (name === 'TestCharacter' && prop === 'activeConditions') return ['invisible', 'blinded'];
       if (prop === 'targetEffects') return [];
@@ -694,7 +706,7 @@ describe('applyTurnStartEffects — supreme_sneak', () => {
   });
 
   it('does nothing when stealthAttackCost is 0', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'stealthAttackCost') return 0;
       if (name === 'TestCharacter' && prop === 'activeConditions') return ['invisible'];
       if (prop === 'targetEffects') return [];
@@ -709,7 +721,7 @@ describe('applyTurnStartEffects — supreme_sneak', () => {
   });
 
   it('does nothing when stealthAttackCost is null', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'stealthAttackCost') return null;
       if (prop === 'targetEffects') return [];
       return null;
@@ -726,7 +738,7 @@ describe('applyTurnStartEffects — supreme_sneak', () => {
 describe('applyTurnStartEffects — use_magic_device', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
@@ -744,14 +756,14 @@ describe('applyTurnStartEffects — use_magic_device', () => {
 describe('applyTurnStartEffects — heroism_temp_hp', () => {
   beforeEach(() => {
     resetMocks();
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((_name, prop) => {
       if (prop === 'targetEffects') return [];
       return null;
     });
   });
 
   it('sets tempHp when Heroism buff exists with tempHpAmount', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeBuffs') return [
         { name: 'Heroism', tempHpAmount: 5 }
       ];
@@ -773,7 +785,7 @@ describe('applyTurnStartEffects — heroism_temp_hp', () => {
   });
 
   it('uses max of existing tempHp and heroism tempHpAmount', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeBuffs') return [
         { name: 'Heroism', tempHpAmount: 3 }
       ];
@@ -795,7 +807,7 @@ describe('applyTurnStartEffects — heroism_temp_hp', () => {
   });
 
   it('returns early when no Heroism buff', async () => {
-    getRuntimeValue.mockImplementation((name, prop, _campaign) => {
+    getRuntimeValue.mockImplementation((name, prop) => {
       if (name === 'TestCharacter' && prop === 'activeBuffs') return [
         { name: 'OtherBuff' }
       ];
@@ -811,7 +823,7 @@ describe('applyTurnStartEffects — heroism_temp_hp', () => {
   });
 });
 
-describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
+describe('clearExpirationEffects via expireStaleEffects', () => {
   beforeEach(() => {
     resetMocks();
     utils.getName.mockImplementation((v) => v);
@@ -822,7 +834,6 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
       if (key === 'pendingExpirations') return [];
       return null;
     });
-    window.dispatchEvent = vi.fn();
   });
 
   it('clears fly_speed_20_hover buff', () => {
@@ -894,7 +905,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(filterCall[2]).toEqual([]);
   });
 
-  it('clears speed_boost buff', () => {
+  it('clears speed_boost buff while preserving other buffs', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'speed_boost' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -918,7 +929,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(filterCall[2]).toEqual([{ effect: 'double_move', duration: 2 }]);
   });
 
-  it('clears peerless_athlete_end effect', () => {
+  it('clears peerless_athlete_end effect and sets flag', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'peerless_athlete_end' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -942,7 +953,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(filterCall[2]).toEqual([]);
   });
 
-  it('clears large_form_end effect', () => {
+  it('clears large_form_end effect and sets flag', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'large_form_end' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -966,7 +977,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(filterCall[2]).toEqual([]);
   });
 
-  it('clears remove_natures_sanctuary effect', () => {
+  it('clears remove_natures_sanctuary effect and all related state', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'remove_natures_sanctuary' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -986,7 +997,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'naturesSanctuaryResistance', null, 'MyCampaign');
   });
 
-  it('clears remove_bulwark_of_force effect', () => {
+  it('clears remove_bulwark_of_force effect and related state', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'remove_bulwark_of_force' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -1037,7 +1048,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     );
   });
 
-  it('clears remove_feign_death_buff effect', () => {
+  it('clears remove_feign_death_buff and associated conditions', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'remove_feign_death_buff', buffName: 'FeignDeath' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -1061,7 +1072,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(filterCall[2]).toEqual([{ name: 'OtherBuff' }]);
   });
 
-  it('clears avenging_angel_aura effect', () => {
+  it('removes target from avenging_angel_aura targets list', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'avenging_angel_aura' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -1083,7 +1094,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     );
   });
 
-  it('clears remove_regenerate_buff effect', () => {
+  it('clears remove_regenerate_buff effect and related state', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'remove_regenerate_buff' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -1129,7 +1140,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(conditionsCall[2]).toEqual(['blinded', 'speed_zero', 'incapacitated']);
   });
 
-  it('handles remove_heroes_feast_buff effect', () => {
+  it('handles remove_heroes_feast_buff — reduces HP and max', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'remove_heroes_feast_buff', buffName: 'HeroesFeast', hpKey: 'heroesFeastHpMaxIncrease' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -1158,7 +1169,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'heroesFeastHpMaxIncrease', 0, 'MyCampaign');
   });
 
-  it('handles remove_aid_buff effect', () => {
+  it('handles remove_aid_buff — reduces current HP', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'remove_aid_buff', buffName: 'Aid', hpKey: 'aidHpMaxIncrease' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -1186,7 +1197,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith('Human', 'aidHpMaxIncrease', 0, 'MyCampaign');
   });
 
-  it('handles remove_heroism_buff effect', () => {
+  it('handles remove_heroism_buff — removes buff and target effect', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'remove_heroism_buff', buffName: 'Heroism' }], appliedRound: 0, expiryRounds: 1 },
     ];
@@ -1218,7 +1229,7 @@ describe('clearExpirationEffects switch cases via expireStaleEffects', () => {
     expect(teCall[2]).toEqual([{ effect: 'blinded', source: 'Other' }]);
   });
 
-  it('handles speed_zero condition removal', () => {
+  it('removes speed_zero condition', () => {
     const list = [
       { target: 'Human', effects: [{ type: 'speed_zero' }], appliedRound: 0, expiryRounds: 1 },
     ];

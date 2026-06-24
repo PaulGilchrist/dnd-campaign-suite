@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { triggerHypnoticPattern } from './hypnoticPatternService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -6,25 +7,30 @@ vi.mock('../../automation/index.js', () => ({
     executeHandler: vi.fn(),
 }));
 
+// Silence console.error during tests (the service logs errors before throwing)
+const originalError = console.error;
+beforeAll(() => { console.error = () => {}; });
+afterAll(() => { console.error = originalError; });
+
 describe('hypnoticPatternService', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('triggerHypnoticPattern', () => {
-        const campaignName = 'TestCampaign';
-        const mapName = 'testMap';
-        const playerStats = {
-            name: 'Wizard',
-            spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Intelligence', toHit: 9 },
-            proficiency: 4,
-        };
+    const campaignName = 'TestCampaign';
+    const mapName = 'testMap';
+    const defaultPlayerStats = {
+        name: 'Wizard',
+        spellAbilities: { saveDc: 15, modifier: 4, spellCastingAbility: 'Intelligence', toHit: 9 },
+        proficiency: 4,
+    };
 
-        it('returns null for non-Hypnotic Pattern spells', async () => {
+    describe('early returns', () => {
+        it('returns null for non-matching spell name', async () => {
             const result = await triggerHypnoticPattern(
                 { name: 'Fire Bolt', level: 0 },
                 {},
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
@@ -32,81 +38,60 @@ describe('hypnoticPatternService', () => {
             expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('returns null when spell name is "hypnotic pattern" case-insensitive and executes handler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup', payload: { type: 'automation_info' } });
-
+        it('returns null when spell name is missing', async () => {
             const result = await triggerHypnoticPattern(
-                { name: 'Hypnotic Pattern', level: 3 },
                 {},
-                playerStats,
+                {},
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    name: 'Hypnotic Pattern',
-                    automation: expect.objectContaining({
-                        type: 'hypnotic_pattern',
-                        saveDc: 15,
-                        saveType: 'WIS',
-                    }),
-                    spellSlotLevel: 3,
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toEqual({ type: 'popup', payload: { type: 'automation_info' } });
+            expect(result).toBeNull();
+            expect(executeHandler).not.toHaveBeenCalled();
         });
 
-        it('handles lowercase "hypnotic pattern" spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerHypnoticPattern(
-                { name: 'hypnotic pattern', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
+        it('throws when spell object is null', async () => {
+            await expect(
+                triggerHypnoticPattern(
+                    null,
+                    {},
+                    defaultPlayerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow("Cannot read properties of null (reading 'name')");
         });
 
-        it('handles mixed-case "HYPNOTIC PATTERN" spell name', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            const result = await triggerHypnoticPattern(
-                { name: 'HYPNOTIC PATTERN', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalled();
-            expect(result).toEqual({ type: 'popup' });
+        it('throws when spell object is undefined', async () => {
+            await expect(
+                triggerHypnoticPattern(
+                    undefined,
+                    {},
+                    defaultPlayerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow("Cannot read properties of undefined (reading 'name')");
         });
+    });
 
-        it('uses spellSaveDc from metaCtx when provided', async () => {
+    describe('save DC resolution', () => {
+        it('uses metaCtx spellSaveDc when provided', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
             await triggerHypnoticPattern(
                 { name: 'Hypnotic Pattern', level: 3 },
                 { spellSaveDc: 18, slotLevel: 5 },
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 18 }),
-                    spellSlotLevel: 5,
+                    automation: { type: 'hypnotic_pattern', saveDc: 18, saveType: 'WIS' },
                 }),
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
@@ -118,22 +103,22 @@ describe('hypnoticPatternService', () => {
             await triggerHypnoticPattern(
                 { name: 'Hypnotic Pattern', level: 3 },
                 {},
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 15 }),
+                    automation: { type: 'hypnotic_pattern', saveDc: 15, saveType: 'WIS' },
                 }),
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
         });
 
-        it('computes saveDc from proficiency when no spellAbilities.saveDc', async () => {
+        it('computes saveDc from proficiency when spellAbilities is missing', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
             const stats = { name: 'Wizard', proficiency: 3 };
 
@@ -147,7 +132,7 @@ describe('hypnoticPatternService', () => {
 
             expect(executeHandler).toHaveBeenCalledWith(
                 expect.objectContaining({
-                    automation: expect.objectContaining({ saveDc: 11 }),
+                    automation: { type: 'hypnotic_pattern', saveDc: 11, saveType: 'WIS' },
                 }),
                 stats,
                 campaignName,
@@ -155,8 +140,7 @@ describe('hypnoticPatternService', () => {
             );
         });
 
-        it('throws when proficiency is not available', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
+        it('throws when proficiency is missing', async () => {
             const stats = { name: 'Wizard' };
 
             await expect(
@@ -167,10 +151,237 @@ describe('hypnoticPatternService', () => {
                     campaignName,
                     mapName,
                 )
-            ).rejects.toThrow('playerStats.proficiency is required');
+            ).rejects.toThrow('playerStats.proficiency is required for hypnotic pattern');
         });
 
-        it('returns result from executeHandler on success', async () => {
+        it('throws when proficiency is null', async () => {
+            const stats = { name: 'Wizard', proficiency: null };
+
+            await expect(
+                triggerHypnoticPattern(
+                    { name: 'Hypnotic Pattern', level: 3 },
+                    {},
+                    stats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('playerStats.proficiency is required for hypnotic pattern');
+        });
+
+        it('throws when proficiency is undefined', async () => {
+            const stats = { name: 'Wizard', proficiency: undefined };
+
+            await expect(
+                triggerHypnoticPattern(
+                    { name: 'Hypnotic Pattern', level: 3 },
+                    {},
+                    stats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('playerStats.proficiency is required for hypnotic pattern');
+        });
+
+        it('treats proficiency 0 as a valid value (saveDc = 8)', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+            const stats = { name: 'Wizard', proficiency: 0 };
+
+            await triggerHypnoticPattern(
+                { name: 'Hypnotic Pattern', level: 3 },
+                {},
+                stats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    automation: { type: 'hypnotic_pattern', saveDc: 8, saveType: 'WIS' },
+                }),
+                stats,
+                campaignName,
+                mapName,
+            );
+        });
+    });
+
+    describe('slot level resolution', () => {
+        it('uses metaCtx slotLevel when provided', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerHypnoticPattern(
+                { name: 'Hypnotic Pattern', level: 3 },
+                { slotLevel: 5 },
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spellSlotLevel: 5 }),
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('falls back to spell.level when metaCtx lacks slotLevel', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerHypnoticPattern(
+                { name: 'Hypnotic Pattern', level: 5 },
+                { spellSaveDc: 17 },
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spellSlotLevel: 5 }),
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('throws when neither metaCtx.slotLevel nor spell.level is available', async () => {
+            await expect(
+                triggerHypnoticPattern(
+                    { name: 'Hypnotic Pattern' },
+                    {},
+                    defaultPlayerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('slot level is required for hypnotic pattern');
+        });
+
+        it('throws when spell.level is null', async () => {
+            await expect(
+                triggerHypnoticPattern(
+                    { name: 'Hypnotic Pattern', level: null },
+                    {},
+                    defaultPlayerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('slot level is required for hypnotic pattern');
+        });
+
+        it('throws when spell.level is undefined', async () => {
+            await expect(
+                triggerHypnoticPattern(
+                    { name: 'Hypnotic Pattern', level: undefined },
+                    {},
+                    defaultPlayerStats,
+                    campaignName,
+                    mapName,
+                )
+            ).rejects.toThrow('slot level is required for hypnotic pattern');
+        });
+    });
+
+    describe('case-insensitive matching', () => {
+        it('matches lowercase spell name', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            const result = await triggerHypnoticPattern(
+                { name: 'hypnotic pattern', level: 3 },
+                {},
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalled();
+            expect(result).toEqual({ type: 'popup' });
+        });
+
+        it('matches uppercase spell name', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            const result = await triggerHypnoticPattern(
+                { name: 'HYPNOTIC PATTERN', level: 3 },
+                {},
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalled();
+            expect(result).toEqual({ type: 'popup' });
+        });
+
+        it('matches mixed-case spell name', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            const result = await triggerHypnoticPattern(
+                { name: 'HyPnOtIc PaTtErN', level: 3 },
+                {},
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalled();
+            expect(result).toEqual({ type: 'popup' });
+        });
+    });
+
+    describe('delegation to executeHandler', () => {
+        it('passes spell object as "spell" property in action', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+            const spell = { name: 'Hypnotic Pattern', level: 3, school: 'Illusion' };
+
+            await triggerHypnoticPattern(spell, {}, defaultPlayerStats, campaignName, mapName);
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.objectContaining({ spell }),
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('passes campaignName and mapName unchanged', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerHypnoticPattern(
+                { name: 'Hypnotic Pattern', level: 3 },
+                {},
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.any(Object),
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('passes playerStats unchanged', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            await triggerHypnoticPattern(
+                { name: 'Hypnotic Pattern', level: 3 },
+                {},
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalledWith(
+                expect.any(Object),
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+        });
+
+        it('returns the result from executeHandler', async () => {
             const expectedResult = {
                 type: 'popup',
                 payload: { type: 'automation_info', name: 'Hypnotic Pattern', description: 'Hypnotic Pattern affects...' },
@@ -180,7 +391,7 @@ describe('hypnoticPatternService', () => {
             const result = await triggerHypnoticPattern(
                 { name: 'Hypnotic Pattern', level: 3 },
                 {},
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
@@ -194,7 +405,7 @@ describe('hypnoticPatternService', () => {
             const result = await triggerHypnoticPattern(
                 { name: 'Hypnotic Pattern', level: 3 },
                 {},
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
@@ -202,152 +413,65 @@ describe('hypnoticPatternService', () => {
             expect(result).toBeNull();
         });
 
-        it('returns null when executeHandler throws an error', async () => {
+        it('returns null when executeHandler throws', async () => {
             executeHandler.mockRejectedValue(new Error('Handler failed'));
 
             const result = await triggerHypnoticPattern(
                 { name: 'Hypnotic Pattern', level: 3 },
                 {},
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(result).toBeNull();
         });
+    });
 
-        it('passes the spell object into the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-            const spell = { name: 'Hypnotic Pattern', level: 3, school: 'Illusion' };
-
-            await triggerHypnoticPattern(spell, {}, playerStats, campaignName, mapName);
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spell }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('uses spell.level as fallback when metaCtx has no slotLevel', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerHypnoticPattern(
-                { name: 'Hypnotic Pattern', level: 5 },
-                { spellSaveDc: 17 },
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({ spellSlotLevel: 5 }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('throws when slot level is not available', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await expect(
-                triggerHypnoticPattern(
-                    { name: 'Hypnotic Pattern' },
-                    {},
-                    playerStats,
-                    campaignName,
-                    mapName,
-                )
-            ).rejects.toThrow('slot level is required');
-        });
-
-        it('handles undefined spell name gracefully', async () => {
-            const result = await triggerHypnoticPattern(
-                {},
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-            expect(result).toBeNull();
-            expect(executeHandler).not.toHaveBeenCalled();
-        });
-
-        it('includes saveType WIS in the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerHypnoticPattern(
-                { name: 'Hypnotic Pattern', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ saveType: 'WIS' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('includes automation type hypnotic_pattern in the action', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerHypnoticPattern(
-                { name: 'Hypnotic Pattern', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.objectContaining({
-                    automation: expect.objectContaining({ type: 'hypnotic_pattern' }),
-                }),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
-        it('passes campaignName and mapName to executeHandler', async () => {
-            executeHandler.mockResolvedValue({ type: 'popup' });
-
-            await triggerHypnoticPattern(
-                { name: 'Hypnotic Pattern', level: 3 },
-                {},
-                playerStats,
-                campaignName,
-                mapName,
-            );
-
-            expect(executeHandler).toHaveBeenCalledWith(
-                expect.any(Object),
-                playerStats,
-                campaignName,
-                mapName,
-            );
-        });
-
+    describe('metaCtx handling', () => {
         it('handles undefined metaCtx gracefully', async () => {
             executeHandler.mockResolvedValue({ type: 'popup' });
 
-            await triggerHypnoticPattern(
+            const result = await triggerHypnoticPattern(
                 { name: 'Hypnotic Pattern', level: 3 },
                 undefined,
-                playerStats,
+                defaultPlayerStats,
                 campaignName,
                 mapName,
             );
 
             expect(executeHandler).toHaveBeenCalled();
+            expect(result).toEqual({ type: 'popup' });
+        });
+
+        it('handles null metaCtx gracefully', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            const result = await triggerHypnoticPattern(
+                { name: 'Hypnotic Pattern', level: 3 },
+                null,
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalled();
+            expect(result).toEqual({ type: 'popup' });
+        });
+
+        it('handles empty metaCtx object gracefully', async () => {
+            executeHandler.mockResolvedValue({ type: 'popup' });
+
+            const result = await triggerHypnoticPattern(
+                { name: 'Hypnotic Pattern', level: 3 },
+                {},
+                defaultPlayerStats,
+                campaignName,
+                mapName,
+            );
+
+            expect(executeHandler).toHaveBeenCalled();
+            expect(result).toEqual({ type: 'popup' });
         });
     });
 });
