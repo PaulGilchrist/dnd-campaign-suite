@@ -1,9 +1,9 @@
-import { useDiceRollPopup } from './DiceRollContext.js'
 import { rollD20 } from '../../services/dice/diceRoller.js'
+import usePopup from './usePopup.js'
 import './useDiceRoll.css'
 
 export default function useDiceRoll() {
-  const { popupHtml, setPopupHtml } = useDiceRollPopup();
+  const { popupHtml, setPopupHtml } = usePopup(() => null);
 
   // Internal helper to trigger a d20 roll with its counterpart for adv/disadv
   const triggerD20Roll = (name, bonus, type) => {

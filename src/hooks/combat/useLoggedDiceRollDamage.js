@@ -71,9 +71,10 @@ export function createLogDamageAndShow(deps) {
             modifier,
             damageType: context?.damageType,
             targetName: context?.targetName,
-            finalDamage: 0,
-            note: 'Shield: Immune to Magic Missile',
-        });
+             finalDamage: 0,
+             note: 'Shield: Immune to Magic Missile',
+             isCrit: context?.isAutoCrit || false,
+         });
         setPopupHtml({
             type: 'damage',
             name,
@@ -120,9 +121,10 @@ export function createLogDamageAndShow(deps) {
                     total: halfDamage,
                     modifier: damageResult.modifier,
                     damageType: context?.damageType,
-                    targetName: context?.targetName,
-                    isPotentCantrip: true,
-                });
+                     targetName: context?.targetName,
+                     isPotentCantrip: true,
+                     isCrit: context?.isAutoCrit || false,
+                 });
                 setPopupHtml({
                     type: 'save-damage',
                     name,
@@ -158,6 +160,7 @@ export function createLogDamageAndShow(deps) {
             damageType: context?.damageType,
             targetName: context?.targetName,
             rangeReason: context?.rangeReason,
+            isCrit: context?.isAutoCrit || false,
         });
         setPopupHtml({
             type: 'auto-miss',
@@ -342,9 +345,10 @@ export function createLogDamageAndShow(deps) {
             saveBonus: saveResult.bonus,
             saveRawRolls: saveResult.rawRolls,
             mode: disadvantage ? 'disadvantage' : 'normal',
-            finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
-            note: 'combined_save_damage_roll',
-        };
+             finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
+             note: 'combined_save_damage_roll',
+             isCrit: context?.isAutoCrit || false,
+         };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;
             logEntryData.secondaryFormula = secondaryResult.formula;
@@ -499,9 +503,10 @@ export function createLogDamageAndShow(deps) {
                     saveBonus: twinSaveResult.bonus,
                     saveRawRolls: twinSaveResult.rawRolls,
                     mode: twinDisadvantage ? 'disadvantage' : 'normal',
-                    finalDamage: null,
-                    note: 'twin_save_damage_roll_before_apply',
-                });
+                     finalDamage: null,
+                     note: 'twin_save_damage_roll_before_apply',
+                     isCrit: context?.isAutoCrit || false,
+                 });
 
                 await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -552,9 +557,10 @@ export function createLogDamageAndShow(deps) {
                         saveBonus: multiSaveResult.bonus,
                         saveRawRolls: multiSaveResult.rawRolls,
                         mode: 'normal',
-                        finalDamage: null,
-                        note: 'multi_save_damage_roll_before_apply',
-                    });
+                         finalDamage: null,
+                         note: 'multi_save_damage_roll_before_apply',
+                         isCrit: context?.isAutoCrit || false,
+                     });
 
                     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -582,10 +588,11 @@ export function createLogDamageAndShow(deps) {
                         total,
                         modifier,
                         damageType,
-                        targetName: multiTarget.name,
-                        finalDamage: null,
-                        note: 'multi_plain_damage_roll_before_apply',
-                    });
+                         targetName: multiTarget.name,
+                         finalDamage: null,
+                         note: 'multi_plain_damage_roll_before_apply',
+                         isCrit: context?.isAutoCrit || false,
+                     });
 
                     await new Promise(resolve => setTimeout(resolve, 500));
 
@@ -900,6 +907,7 @@ export function createLogDamageAndShow(deps) {
             targetName: target?.name,
             finalDamage: applyResult?.finalDamage ?? reducedTotal,
             note: 'combined_damage_roll',
+            isCrit: context?.isAutoCrit || false,
         };
         if (secondaryResult) {
             logEntryData.secondaryName = secondaryResult.name;

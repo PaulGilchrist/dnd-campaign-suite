@@ -63,7 +63,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
     monsterName,
     campaignName,
     {
-      autoDamageRoll: (autoDamage, isCrit) => {
+       autoDamageRoll: (autoDamage, isCrit) => {
         const result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
         if (result) {
           const context = {
@@ -73,6 +73,7 @@ function MonsterCardModal({ monster, onClose, campaignName, creatures, creatureN
               autoDamageSecondaryFormula: autoDamage.secondaryFormula,
               autoDamageSecondaryName: autoDamage.secondaryName,
               autoDamageSecondaryDamageType: autoDamage.secondaryDamageType,
+              isAutoCrit: isCrit,
             };
           if (autoDamage.saveDc) {
             context.saveDc = autoDamage.saveDc;
