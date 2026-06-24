@@ -5,9 +5,13 @@ import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 import { createSaves } from './useLoggedDiceRollSaves.js';
 import { setupEventListeners } from './useLoggedDiceRollEventHandlers.js';
+import { useDiceRollPopup } from './DiceRollContext.js';
 
 export default function useLoggedDiceRoll(characterName, campaignName, options = {}) {
-  const { popupHtml, setPopupHtml } = useDiceRoll();
+  const { popupHtml: contextPopupHtml, setPopupHtml: contextSetPopupHtml, _isShared } = useDiceRollPopup();
+  const { popupHtml: internalPopupHtml, setPopupHtml: internalSetPopupHtml } = useDiceRoll();
+  const setPopupHtml = _isShared ? contextSetPopupHtml : internalSetPopupHtml;
+  const activePopupHtml = _isShared ? contextPopupHtml : internalPopupHtml;
   const { autoDamageRoll, characters } = options;
   const autoDamageRollRef = useRef(null);
   autoDamageRollRef.current = autoDamageRoll || null;
@@ -30,14 +34,14 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
   });
 
   useEffect(() => {
-    if (popupHtml?.hit === true && popupHtml?.autoDamage && autoDamageRollRef.current) {
+    if (activePopupHtml?.hit === true && activePopupHtml?.autoDamage && autoDamageRollRef.current) {
       const timer = setTimeout(() => {
-        const { autoDamage } = popupHtml;
-        autoDamageRollRef.current(autoDamage, popupHtml.isCrit);
+        const { autoDamage } = activePopupHtml;
+        autoDamageRollRef.current(autoDamage, activePopupHtml.isCrit);
       }, SHOW_DICE_ROLL_DELAY);
       return () => clearTimeout(timer);
     }
-  }, [popupHtml]);
+  }, [activePopupHtml]);
 
   const logAndShow = createLogAndShow({
     characterName, campaignName, characters, setPopupHtml, logEntry,
@@ -52,7 +56,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
   });
 
   return {
-    popupHtml,
+    popupHtml: internalPopupHtml,
     setPopupHtml,
     rollAbilityCheck: (name, bonus, context) => logAndShow(name, bonus, 'check', context),
     rollSavingThrow: (name, saveBonus, context) => logAndShow(name, saveBonus, 'save', context),

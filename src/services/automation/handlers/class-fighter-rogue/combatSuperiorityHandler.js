@@ -1862,6 +1862,10 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
         const riposteTarget = lastAttack?.attackerName || targetName;
         console.log('[Riposte] loadCombatSummary result', { cs: !!cs, lastAttackAttacker: lastAttack?.attackerName, riposteTarget, lastAttack });
 
+        if (riposteTarget && riposteTarget !== targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'ac_bonus_and_swap' && maneuver.effect !== 'damage_reduction') {
+            description = description.replace(`Target: ${targetName}.`, `Target: ${riposteTarget}.`);
+        }
+
         const meleeAttacks = (playerStats.attacks || []).filter(a => {
             if (a.weaponType === 'melee' || a.attackType === 'melee') return true;
             if (a.range === 5 || a.range === '5' || a.range === '5 ft' || a.range === '5_ft') return a.type === 'Action' || a.actionType === 'Action';

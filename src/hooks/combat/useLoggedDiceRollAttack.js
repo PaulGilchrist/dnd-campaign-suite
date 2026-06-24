@@ -227,6 +227,7 @@ export function createLogAndShow(deps) {
             overchannelSpellLevel: context.overchannelSpellLevel,
             secondaryFormula: context.autoDamageSecondaryFormula,
             secondaryDamageType: context.autoDamageSecondaryDamageType,
+            ripostePopup: context.ripostePopup,
         } : undefined;
 
         console.log('[logAndShow] About to logEntry and setPopupHtml', { name, rollType, hit, isCrit, autoDamage: !!autoDamage, autoDamageFormula: context?.autoDamageFormula });
