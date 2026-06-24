@@ -828,27 +828,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     );
                 })()}
                 <div className='half-line'></div>
-                {popupHtml && (
-                    <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                        {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
-                            popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
-                                popupHtml.type === 'empowered_spell' ?
-                                    <EmpoweredSpellPopup
-                                        state={popupHtml}
-                                        onReroll={(lastEvent, chaMod) => {
-                                            executeEmpoweredReroll({ campaignName, playerStats, lastEvent, chaMod, characters }).then(result => {
-                                                if (!result) return;
-                                                if (result.popupState) setPopupHtml(result.popupState);
-                                                if (result.logEntries) {
-                                                    result.logEntries.forEach(e => addEntry(campaignName, e).catch(() => {}));
-                                                }
-                                            });
-                                        }}
-                                        onClose={() => setPopupHtml && setPopupHtml(null)}
-                                    /> :
-                                    <DiceRollResult {...popupHtml} onQuickRoll={popupHtml.waitingForPlayerSave ? () => quickRollPlayerSave(popupHtml.promptId, popupHtml.targetName, popupHtml.saveType, popupHtml.saveDc) : undefined} onCounterAttack={popupHtml.gloriousDefenseBonus > 0 && !popupHtml.hit && popupHtml.targetName ? triggerGloriousDefenseCounterAttack : undefined} />}
-                    </Popup>
-                )}
                 <CharActionModals
                     playerStats={playerStats}
                     campaignName={campaignName}

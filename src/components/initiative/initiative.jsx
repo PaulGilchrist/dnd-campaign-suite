@@ -50,7 +50,7 @@ import {
 } from '../../services/encounters/combatLoggingService.js'
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx'
 import Subscriber from '../common/Subscriber.jsx'
-import Popup from '../common/Popup.jsx'
+import Popup from '../common/popup.jsx'
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx'
 import CreatureCard from './CreatureCard.jsx'
 import ConditionPicker from './ConditionPicker.jsx'

@@ -5,7 +5,7 @@ import { getClassFeatures } from '../../../services/character/classFeatures.js';
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../../services/automation/index.js';
 import { applyPortentChoice } from '../../../services/automation/handlers/class-wizard/portentHandler.js';
-import Popup from '../../common/Popup.jsx';
+import Popup from '../../common/popup.jsx';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];

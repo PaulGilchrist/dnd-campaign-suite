@@ -4,7 +4,7 @@ import { cloneDeep } from 'lodash';
 import useActionPopup from '../../../hooks/combat/useActionPopup.js'
 import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../../hooks/combat/DiceRollContext.js'
-import Popup from '../../common/Popup.jsx'
+import Popup from '../../common/popup.jsx'
 import DiceRollResult from '../DiceRollResult.jsx'
 import MetamagicPopup from '../popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './SpellDetailPopup.jsx'
@@ -377,12 +377,6 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
 return (
         <div className="char-spells">
             {(playerStats.spellAbilities && playerStats.spellAbilities.spells.length > 0) && <div className="spell-popup-parent">
-                    {popupHtml && !selectedSpell && (
-                        <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                            {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                             <DiceRollResult {...popupHtml} />}
-                        </Popup>
-                    )}
                     {selectedSpell && (
                         <Popup onClickOrKeyDown={() => setSelectedSpell(null)}>
                             <SpellDetailPopup

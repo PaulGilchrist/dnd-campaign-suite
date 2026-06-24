@@ -2,7 +2,7 @@ import { useMemo, useCallback, useEffect, useRef, useState } from 'react';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import Popup from '../common/Popup.jsx';
+import Popup from '../common/popup.jsx';
 import DiceRollResult from '../char-sheet/DiceRollResult.jsx';
 import { extractDamageTypes, formatDamageTypes, getTargetFromAttacker, getResistanceNotice } from '../../services/rules/combat/damageUtils.js';
 import { getCombatContext } from '../../services/rules/combat/damageUtils.js';

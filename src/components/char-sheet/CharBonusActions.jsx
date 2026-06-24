@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import Popup from '../common/popup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'

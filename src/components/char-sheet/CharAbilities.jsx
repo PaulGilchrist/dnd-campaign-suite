@@ -1,8 +1,6 @@
 
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
-import Popup from '../common/Popup.jsx'
-import DiceRollResult from './DiceRollResult.jsx'
 import { buildAbilityDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -188,12 +186,6 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
 
     return (
         <div className='abilities-popup-parent'>
-                {popupHtml && (
-                    <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
-                        {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> : 
-                          <DiceRollResult {...popupHtml} onReroll={onReroll} onStrokeOfLuck={onStrokeOfLuck} />}
-                    </Popup>
-                )}
             <div className='abilities'>
                 <div className='left'><b>Ability</b></div>
                 <div><b>Score</b></div>

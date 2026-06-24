@@ -1,7 +1,7 @@
  
 
 import usePopup from '../../hooks/combat/usePopup.js'
-import Popup from '../common/Popup.jsx'
+import Popup from '../common/popup.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
 import './CharInventory.css'

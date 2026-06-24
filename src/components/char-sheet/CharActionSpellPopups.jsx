@@ -1,4 +1,4 @@
-import Popup from '../common/Popup.jsx'
+import Popup from '../common/popup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import AidTargetPopup from './popups/AidTargetPopup.jsx'
 import GreaterRestorationPopup from './popups/GreaterRestorationPopup.jsx'

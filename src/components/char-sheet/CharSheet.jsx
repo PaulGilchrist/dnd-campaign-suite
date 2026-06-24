@@ -4,8 +4,8 @@ import { getRuntimeValue, setRuntimeValue, useRuntimeValue } from '../../hooks/r
 import rulesFactory from '../../services/rules/rulesFactory.js'
 import useSharedPopup from '../../hooks/combat/useSharedPopup.js'
 import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js'
-import Popup from './common/Popup.jsx'
-import DiceRollResult from './common/DiceRollResult.jsx'
+import Popup from '../common/popup.jsx'
+import DiceRollResult from './DiceRollResult.jsx'
 import { sanitizeHtml } from '../../services/ui/sanitize.js'
 import CharAbilities from './CharAbilities.jsx'
 import CharActions from './CharActions.jsx'
@@ -517,6 +517,45 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
             <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
         </div>}
     </React.Fragment>
+        {popupHtml && (
+            <Popup onClickOrKeyDown={() => setPopupHtml(null)}>
+                {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
+                    popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
+                        popupHtml.type === 'empowered_spell' ?
+                                <div className="dice-roll-result">
+                                    <div className="dice-roll-header">
+                                        <i className="fa-solid fa-wand-magic-sparkles"></i>{popupHtml.name}
+                                    </div>
+                                    <div className="dice-roll-breakdown">
+                                        SP: {popupHtml.currentSP}/{popupHtml.maxSP} | Cha Mod: +{popupHtml.chaMod}
+                                    </div>
+                                    {popupHtml.lastEvent && (
+                                        <div className="dice-roll-breakdown">
+                                            {popupHtml.lastEvent.damageInfo?.map((d, i) => (
+                                                <div key={i}>{d.formula}: {d.rolls.join(', ')} = {d.total} {d.type}</div>
+                                            ))}
+                                        </div>
+                                    )}
+                                    {popupHtml.error ? (
+                                        <div className="dice-roll-crit dice-roll-crit-miss">{popupHtml.error}</div>
+                                    ) : popupHtml.lastEvent && !popupHtml.error ? (
+                                        <div className="dice-roll-reroll">
+                                            <button className="dice-roll-reroll-btn" onClick={() => {
+                                                setPopupHtml({
+                                                    ...popupHtml,
+                                                    lastEvent: { ...popupHtml.lastEvent, completed: true }
+                                                });
+                                            }}>
+                                                <i className="fa-solid fa-check"></i> Apply Reroll
+                                            </button>
+                                        </div>
+                                    ) : null}
+                                    <div className="dice-roll-hint">click to dismiss</div>
+                                </div> :
+                            <DiceRollResult {...popupHtml} />
+                }
+            </Popup>
+        )}
         </Provider>)
 }
 

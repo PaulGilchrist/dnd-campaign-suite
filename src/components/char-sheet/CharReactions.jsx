@@ -1,4 +1,5 @@
 import React from 'react'
+import Popup from '../common/popup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
