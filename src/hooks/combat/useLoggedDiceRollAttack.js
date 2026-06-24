@@ -38,9 +38,7 @@ export function createLogAndShow(deps) {
         const explicitTargetName = context?.targetName;
         let target;
         if (explicitTargetName) {
-            console.log('[logAndShow] Explicit target requested', { explicitTargetName, characterName, combatSummaryExists: !!combatSummary });
             const explicitTarget = findCreatureByName(combatSummary, explicitTargetName);
-            console.log('[logAndShow] findCreatureByName result', { found: !!explicitTarget, targetName: explicitTarget?.name });
             if (explicitTarget) {
                 target = explicitTarget;
             } else {
@@ -62,8 +60,6 @@ export function createLogAndShow(deps) {
         } else {
             targetAc = target?.ac;
         }
-
-        console.log('[logAndShow] Target AC resolved', { targetName: target?.name, targetType: target?.type, targetAc, targetKeys: target ? Object.keys(target) : null });
 
         if (target && typeof targetAc !== 'number') {
             throw new Error(`[AC] Target "${target.name}" has no AC defined.`);
@@ -230,8 +226,6 @@ export function createLogAndShow(deps) {
             ripostePopup: context.ripostePopup,
         } : undefined;
 
-        console.log('[logAndShow] About to logEntry and setPopupHtml', { name, rollType, hit, isCrit, autoDamage: !!autoDamage, autoDamageFormula: context?.autoDamageFormula });
-
         logEntry({
             type: 'roll',
             characterName,
@@ -255,7 +249,6 @@ export function createLogAndShow(deps) {
             coverAcBonus: context?.coverAcBonus,
             coverReason: context?.coverReason,
         });
-        console.log('[logAndShow] Calling setPopupHtml with d20', { type: 'd20', name, rollType, hit });
         setPopupHtml({
             type: 'd20',
             rollType,

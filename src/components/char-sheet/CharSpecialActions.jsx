@@ -30,7 +30,6 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
         characters,
         autoDamageRoll: async (autoDamage, isCrit) => {
-            console.log('[CharSpecialActions] autoDamageRoll called', { formula: autoDamage.formula, isCrit, rollDamageType: typeof rollDamage });
             const formula = autoDamage.formula;
             let result;
             const superiorityMatch = formula.match(/\+ (\d+)\s*\[Superiority\]$/);
@@ -44,17 +43,14 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                         rolls: [...baseResult.rolls, superiorityValue],
                         modifier: baseResult.modifier,
                     };
-                    console.log('[CharSpecialActions] Base + Superiority damage', { baseFormula, baseResult, superiorityValue, total: result.total });
                 }
             } else {
                 const match = formula.match(/^(\d+)\s*\[Superiority\]$/);
                 if (match) {
                     const dieValue = parseInt(match[1], 10);
                     result = { total: dieValue, rolls: [dieValue], modifier: 0 };
-                    console.log('[CharSpecialActions] Superiority die (flat value)', { dieValue });
                 } else {
                     result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
-                    console.log('[CharSpecialActions] rollExpression result', { result, formula });
                 }
             }
             if (result) {
@@ -63,16 +59,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     targetName: autoDamage.targetName,
                     attackerName: autoDamage.attackerName,
                 };
-                console.log('[CharSpecialActions] calling rollDamage', { name: autoDamage.name, formula: autoDamage.formula, total: result.total });
-                console.log('[CharSpecialActions] rollDamage context', { context: JSON.stringify(context) });
                 rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
-                console.log('[CharSpecialActions] rollDamage returned');
                 if (autoDamage.ripostePopup) {
                     const payload = autoDamage.ripostePopup;
                     const html = typeof payload === 'string'
                         ? payload
                         : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
-                    console.log('[CharSpecialActions] Scheduling Riposte popup after damage', { name: payload?.name });
                     setTimeout(() => {
                         setPopupHtml(html);
                     }, SHOW_DICE_ROLL_DELAY);
@@ -161,11 +153,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
             if (result?.type === 'attack_roll' && rollAttack) {
                 const { attack, targetName } = result.payload;
                 const superiorityDieValue = result.context?.superiorityDieValue || 0;
-                const superiorityDieSize = result.context?.superiorityDieSize || 6;
                 const totalHitBonus = attack.hitBonus + superiorityDieValue;
                 const baseFormula = result.context?.baseDamageFormula || attack.damageFormula;
                 const combinedFormula = superiorityDieValue > 0 && baseFormula ? `${baseFormula} + ${superiorityDieValue} [Superiority]` : (baseFormula || null);
-                console.log('[CharSpecialActions] Firing attack_roll', { attackName: attack.name, hitBonus: attack.hitBonus, superiorityDieValue, superiorityDieSize, totalHitBonus, targetName, damageFormula: combinedFormula, baseFormula });
                 rollAttack(attack.name, totalHitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true, autoDamageFormula: combinedFormula, autoDamageName: `${attack.name} (Riposte)`, damageType: attack.damageType || 'Slashing', autoDamageRollResult: null, superiorityDieValue, ripostePopup: result.popup });
             }
             return;
@@ -194,11 +184,9 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         if (result?.type === 'attack_roll' && rollAttack) {
             const { attack, targetName } = result.payload;
             const superiorityDieValue = result.context?.superiorityDieValue || 0;
-            const superiorityDieSize = result.context?.superiorityDieSize || 6;
             const totalHitBonus = attack.hitBonus + superiorityDieValue;
             const baseFormula = result.context?.baseDamageFormula || attack.damageFormula;
             const combinedFormula = superiorityDieValue > 0 && baseFormula ? `${baseFormula} + ${superiorityDieValue} [Superiority]` : (baseFormula || null);
-            console.log('[CharSpecialActions] Firing attack_roll', { attackName: attack.name, hitBonus: attack.hitBonus, superiorityDieValue, superiorityDieSize, totalHitBonus, targetName, damageFormula: combinedFormula, baseFormula });
             rollAttack(attack.name, totalHitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true, autoDamageFormula: combinedFormula, autoDamageName: `${attack.name} (Riposte)`, damageType: attack.damageType || 'Slashing', autoDamageRollResult: null, superiorityDieValue });
         }
     }, [combatSuperiorityModal, playerStats, campaignName, rollAttack, setPopupHtml]);
