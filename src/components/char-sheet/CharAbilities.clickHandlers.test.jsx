@@ -3,34 +3,16 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const mockFn = vi.fn(() => ({
-    popupHtml: null,
-    setPopupHtml: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(),
     rollSkillCheck: vi.fn(),
   }));
   return { default: mockFn };
 });
-
-vi.mock('../common/Popup.jsx', () => ({
-  default: ({ children, onClickOrKeyDown }) => (
-    <div data-testid="popup" onClick={onClickOrKeyDown}>
-      {children}
-    </div>
-  ),
-}));
-
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: ({ onReroll, onStrokeOfLuck }) => (
-    <div data-testid="dice-roll-result">
-      <button onClick={onReroll}>Reroll</button>
-      <button onClick={onStrokeOfLuck}>Stroke of Luck</button>
-    </div>
-  ),
-}));
 
 const mockStore = new Map();
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -86,9 +68,15 @@ describe('CharAbilities click handlers', () => {
 
   describe('basic click handlers', () => {
     it('calls setPopupHtml when an ability name is clicked', () => {
-      render(<CharAbilities {...defaultProps} />);
+      const mockSetPopupHtml = vi.fn();
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+      render(<CharAbilities {...defaultProps} />, { wrapper });
       fireEvent.click(screen.getByText('Strength'));
-      expect(vi.mocked(useLoggedDiceRoll).mock.results[0].value.setPopupHtml).toHaveBeenCalled();
+      expect(mockSetPopupHtml).toHaveBeenCalled();
     });
 
     it('calls rollAbilityCheck when an ability bonus is clicked', () => {

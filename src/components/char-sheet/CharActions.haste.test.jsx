@@ -122,6 +122,7 @@ vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
 const basePlayerStats = {
   name: 'TestCharacter', rules: '5e', level: 5, attacks: [], actions: [], spellAbilities: { spells: [] },
@@ -136,7 +137,7 @@ function renderWithHaste(stats, props = {}) {
     if (key === 'activeBuffs') return [{ effect: 'haste', name: 'Haste' }];
     return null;
   });
-  return render(<CharActions playerStats={stats} {...props} />);
+  return render(<CharActions playerStats={stats} {...props} />, props.wrapper ? { wrapper: props.wrapper } : undefined);
 }
 
 function renderWithHasteUsed(stats, props = {}) {
@@ -145,7 +146,7 @@ function renderWithHasteUsed(stats, props = {}) {
     if (key === 'hasteExtraActionUsed') return true;
     return null;
   });
-  return render(<CharActions playerStats={stats} {...props} />);
+  return render(<CharActions playerStats={stats} {...props} />, props.wrapper ? { wrapper: props.wrapper } : undefined);
 }
 
 describe('CharActions haste extra action', () => {
@@ -301,7 +302,12 @@ describe('CharActions haste extra action', () => {
       useLoggedDiceRoll.mockReturnValue({
         popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
       });
-      await act(async () => { renderWithHaste(createStats()); });
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+      await act(async () => { renderWithHaste(createStats(), { wrapper }); });
 
       const attackBtn = screen.getByText('Attack');
       await act(async () => { fireEvent.click(attackBtn); });
@@ -320,7 +326,12 @@ describe('CharActions haste extra action', () => {
         useLoggedDiceRoll.mockReturnValue({
           popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
         });
-        await act(async () => { renderWithHaste(createStats()); });
+        const wrapper = ({ children }) => (
+          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+            {children}
+          </DiceRollContext.Provider>
+        );
+        await act(async () => { renderWithHaste(createStats(), { wrapper }); });
 
         const btn = screen.getByText(actionName);
         await act(async () => { fireEvent.click(btn); });

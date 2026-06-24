@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import CharActionSpellPopups from './CharActionSpellPopups.jsx';
 
-vi.mock('../common/Popup.jsx', () => ({
+vi.mock('../common/popup.jsx', () => ({
   default: function TestPopup({ children, onClickOrKeyDown }) {
     return (
       <div data-testid="popup" onClick={onClickOrKeyDown}>

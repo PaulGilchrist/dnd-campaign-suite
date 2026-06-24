@@ -181,6 +181,7 @@ vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import useCharActionModals from './useCharActionModals.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
@@ -257,7 +258,14 @@ describe('CharActions click handlers', () => {
         }],
       });
 
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+      await act(async () => {
+        const wrapper = ({ children }) => (
+          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+            {children}
+          </DiceRollContext.Provider>
+        );
+        render(<CharActions playerStats={stats} />, { wrapper });
+      });
       const restoreBtn = screen.getByText(/Restore with Rage/);
       await act(async () => { fireEvent.click(restoreBtn); });
 
@@ -441,7 +449,13 @@ describe('CharActions click handlers', () => {
         actions: [{ name: 'Smite', description: 'Strike with divine power.', automation: { type: 'auto_effect' } }],
       });
 
-      await renderWithFetch(<CharActions playerStats={stats} />);
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+
+      await renderWithFetch(<CharActions playerStats={stats} />, { wrapper });
       const actionName = screen.getByText(/Smite:/);
       await act(async () => { fireEvent.click(actionName); });
       await waitFor(() => {
@@ -551,7 +565,13 @@ describe('CharActions click handlers', () => {
         actions: [{ name: 'Flurry of Blows', description: 'Make two attacks.', automation: { type: 'auto_effect' } }],
       });
 
-      await renderWithFetch(<CharActions playerStats={stats} />);
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+
+      await renderWithFetch(<CharActions playerStats={stats} />, { wrapper });
       const actionName = screen.getByText(/Flurry of Blows:/);
       await act(async () => { fireEvent.click(actionName); });
 

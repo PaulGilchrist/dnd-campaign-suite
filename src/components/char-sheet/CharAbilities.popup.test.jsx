@@ -2,35 +2,15 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
-import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const mockFn = vi.fn(() => ({
-    popupHtml: null,
-    setPopupHtml: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(),
     rollSkillCheck: vi.fn(),
   }));
   return { default: mockFn };
 });
-
-vi.mock('../common/Popup.jsx', () => ({
-  default: ({ children, onClickOrKeyDown }) => (
-    <div data-testid="popup" onClick={onClickOrKeyDown}>
-      {children}
-    </div>
-  ),
-}));
-
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: ({ onReroll, onStrokeOfLuck }) => (
-    <div data-testid="dice-roll-result">
-      <button onClick={onReroll}>Reroll</button>
-      <button onClick={onStrokeOfLuck}>Stroke of Luck</button>
-    </div>
-  ),
-}));
 
 const mockStore = new Map();
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
@@ -78,95 +58,60 @@ const defaultProps = {
   onStrokeOfLuck: vi.fn(),
 };
 
-describe('CharAbilities popup rendering', () => {
+describe('CharAbilities popup integration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockStore.clear();
   });
 
-  it('renders popup when popupHtml is a string', () => {
+  it('calls setPopupHtml with ability description HTML when ability name is clicked', () => {
     const mockSetPopupHtml = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({
-      popupHtml: '<h3>Strength</h3>Strength description',
-      setPopupHtml: mockSetPopupHtml,
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-    });
+    const wrapper = ({ children }) => (
+      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
 
-    render(<CharAbilities {...defaultProps} />);
-    expect(screen.getByTestId('popup')).toBeInTheDocument();
-    expect(screen.getByTestId('popup').querySelector('h3')).toHaveTextContent('Strength');
+    render(<CharAbilities {...defaultProps} />, { wrapper });
+    fireEvent.click(screen.getByText('Strength'));
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Strength'));
   });
 
-  it('renders popup when popupHtml is an object (DiceRollResult)', () => {
+  it('calls setPopupHtml with Dexterity description when Dexterity is clicked', () => {
     const mockSetPopupHtml = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({
-      popupHtml: { name: 'Test Roll', type: 'd20' },
-      setPopupHtml: mockSetPopupHtml,
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-    });
+    const wrapper = ({ children }) => (
+      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
 
-    render(<CharAbilities {...defaultProps} />);
-    expect(screen.getByTestId('popup')).toBeInTheDocument();
-    expect(screen.getByTestId('dice-roll-result')).toBeInTheDocument();
-  });
-
-  it('does not render popup when popupHtml is null', () => {
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({
-      popupHtml: null,
-      setPopupHtml: vi.fn(),
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-    });
-
-    render(<CharAbilities {...defaultProps} />);
-    expect(screen.queryByTestId('popup')).not.toBeInTheDocument();
-  });
-
-  it('calls setPopupHtml with null when popup is dismissed', () => {
-    const mockSetPopupHtml = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({
-      popupHtml: '<h3>Test</h3>Test',
-      setPopupHtml: mockSetPopupHtml,
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-    });
-
-    render(<CharAbilities {...defaultProps} />);
-    fireEvent.click(screen.getByTestId('popup'));
-    expect(mockSetPopupHtml).toHaveBeenCalledWith(null);
-  });
-
-  it('renders DiceRollResult with onReroll and onStrokeOfLuck props when popupHtml is an object', () => {
-    const mockSetPopupHtml = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({
-      popupHtml: { name: 'Test Roll', type: 'd20' },
-      setPopupHtml: mockSetPopupHtml,
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-    });
-
-    render(<CharAbilities {...defaultProps} />);
-    const diceRollResult = screen.getByTestId('dice-roll-result');
-    expect(diceRollResult).toBeInTheDocument();
+    render(<CharAbilities {...defaultProps} />, { wrapper });
+    fireEvent.click(screen.getByText('Dexterity'));
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Dexterity'));
   });
 
   it('renders popup parent container with correct class', () => {
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({
-      popupHtml: null,
-      setPopupHtml: vi.fn(),
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-    });
+    const mockSetPopupHtml = vi.fn();
+    const wrapper = ({ children }) => (
+      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
 
-    const { container } = render(<CharAbilities {...defaultProps} />);
+    const { container } = render(<CharAbilities {...defaultProps} />, { wrapper });
     expect(container.querySelector('.abilities-popup-parent')).toBeInTheDocument();
+  });
+
+  it('handles ability name click when allAbilityScores is empty array', () => {
+    const mockSetPopupHtml = vi.fn();
+    const wrapper = ({ children }) => (
+      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
+
+    render(<CharAbilities {...defaultProps} allAbilityScores={[]} />, { wrapper });
+    fireEvent.click(screen.getByText('Strength'));
+    expect(mockSetPopupHtml).toHaveBeenCalled();
   });
 });

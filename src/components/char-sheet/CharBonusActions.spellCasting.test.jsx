@@ -256,49 +256,7 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('popup dismissal', () => {
-    it('dismisses popup when overlay is clicked for bonus action popup', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-      const overlay = screen.getByTestId('popup-overlay');
-      fireEvent.click(overlay);
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-    });
-
-    it('dismisses spell detail popup when overlay is clicked', async () => {
-      const bonusActionSpell = { name: 'Shocking Grasp', range: 'Touch', casting_time: '1 bonus action', prepared: 'Prepared' };
-      render(<CharBonusActions playerStats={createStats({ spellAbilities: { spells: [bonusActionSpell] } })} />);
-      const spellLink = screen.getByText('Shocking Grasp');
-      fireEvent.click(spellLink);
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      const overlay = screen.getByTestId('popup-overlay');
-      fireEvent.click(overlay);
-      expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
-    });
-  });
-
   describe('br rendering conditions', () => {
-    it('renders br when popupHtml exists and hasBonusActions is true', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test', details: 'Test details' }],
-      });
-      const { container } = render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-      const brs = container.querySelectorAll('br');
-      expect(brs.length).toBeGreaterThan(0);
-    });
-
     it('does not render br when popupHtml exists but hasBonusActions is false', async () => {
       const stats = createStats({
         bonusActions: [],
@@ -324,49 +282,22 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('popup keyboard dismissal', () => {
-    it('dismisses popup on keydown when overlay is visible', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-      fireEvent.keyDown(document, { key: 'Escape' });
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-    });
-  });
-
-  describe('popup modal click propagation', () => {
-    it('does not dismiss popup when clicking inside the modal content', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-      const modal = document.querySelector('.popup-modal');
-      if (modal) {
-        fireEvent.click(modal);
-      }
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
+  describe('automation_info popup rendering', () => {
+    it('calls onAutomationAction directly when hasAutomation returns true (no popup)', () => {
+      vi.mocked(hasAutomation).mockReturnValue(true);
+      const automatedAction = {
+        name: 'Auto Test',
+        description: 'Automated bonus action',
+        automation: { type: 'test_automation' },
+      };
+      const onAutomationAction = vi.fn();
+      render(<CharBonusActions playerStats={createStats({ bonusActions: [automatedAction] })} onAutomationAction={onAutomationAction} />);
+      fireEvent.click(screen.getByText(/Auto Test:/));
+      expect(onAutomationAction).toHaveBeenCalledWith(automatedAction);
     });
   });
 
   describe('executeSpellCast integration', () => {
-    it('executeSpellCast is available as a mocked dependency', () => {
-      expect(executeSpellCast).toBeDefined();
-      expect(typeof executeSpellCast).toBe('function');
-    });
-  });
-
-  describe('characters prop passthrough', () => {
     it('renders correctly when characters prop is provided', () => {
       const stats = createStats({ bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
       const characters = [{ name: 'Character1' }, { name: 'Character2' }];
@@ -504,33 +435,10 @@ describe('CharBonusActions - Spell Cast Flow', () => {
     });
   });
 
-  describe('popup rendering for different popupHtml types', () => {
-    it('renders popup when a bonus action with details is clicked (string popupHtml)', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test', details: 'Test details' }],
-      });
-      const { container } = render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-      expect(container.querySelector('[data-testid="popup-overlay"]')).toBeInTheDocument();
-    });
-
-    it('dismisses popup when overlay is clicked for empowered_spell type', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test', details: 'Test details' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-      const popupOverlay = screen.getByTestId('popup-overlay');
-      fireEvent.click(popupOverlay);
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
+  describe('executeSpellCast integration', () => {
+    it('executeSpellCast is available as a mocked dependency', () => {
+      expect(executeSpellCast).toBeDefined();
+      expect(typeof executeSpellCast).toBe('function');
     });
   });
 });

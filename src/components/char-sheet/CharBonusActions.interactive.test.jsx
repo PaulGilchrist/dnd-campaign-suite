@@ -129,40 +129,6 @@ describe('CharBonusActions - Interactive', () => {
     localStorage.clear();
   });
 
-  describe('bonus action click behavior', () => {
-    it('opens a popup when a bonus action with details is clicked', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test Feature', description: 'Test description', details: 'Test details' }],
-      });
-
-      render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test Feature:/);
-      fireEvent.click(actionName);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-    });
-
-    it('dismisses the popup when the overlay is clicked', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Dismiss Test', description: 'Test', details: 'Details' }],
-      });
-
-      render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Dismiss Test:/);
-      fireEvent.click(actionName);
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      const popupOverlay = screen.getByTestId('popup-overlay');
-      fireEvent.click(popupOverlay);
-
-      expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-    });
-  });
 
   describe('automation handling', () => {
     const automatedBonusAction = {
@@ -258,22 +224,6 @@ describe('CharBonusActions - Interactive', () => {
       });
     });
 
-    it('shows error popup when no rage remaining to restore', async () => {
-      hasAutomation.mockReturnValue(true);
-      isExhausted.mockReturnValue(true);
-      vi.mocked(getRuntimeValue).mockImplementation((_name, key) => {
-        if (key === 'ragePoints') return 0;
-        return null;
-      });
-
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageBonusAction] })} />);
-      const restoreBtn = screen.getByText(/Restore with Rage/);
-      fireEvent.click(restoreBtn);
-
-      await waitFor(() => {
-        expect(screen.getByText(/No Rage remaining/)).toBeInTheDocument();
-      });
-    });
   });
 
   describe('attack and damage click handlers', () => {
@@ -427,18 +377,6 @@ describe('CharBonusActions - Interactive', () => {
       const lastMasteryCell = masteryCells[masteryCells.length - 1];
       fireEvent.click(lastMasteryCell);
       expect(showWeaponMasteryPopup).toHaveBeenCalledWith('Piercing', expect.any(Function));
-    });
-  });
-
-  describe('br rendering between popup and bonusActions', () => {
-    it('renders a br element when both popup is open and hasBonusActions is true', () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test', details: 'Test details' }],
-      });
-      const { container } = render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      expect(container.querySelectorAll('br').length).toBeGreaterThan(0);
     });
   });
 

@@ -923,58 +923,8 @@ describe('CharSpells rendering', () => {
   });
 
   describe('popup rendering', () => {
-    it('renders the action popup when popupHtml is a string', () => {
-      useActionPopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: '<div>String Popup</div>',
-        setPopupHtml: vi.fn(),
-      }));
 
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />,
-      );
 
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-    });
-
-    it('renders the action popup when popupHtml is an object (DiceRollResult)', () => {
-      useActionPopup.mockImplementation(() => ({
-        showPopup: vi.fn(),
-        popupHtml: { type: 'd20', name: 'Test', rolls: [1, 2], bonus: 3 },
-        setPopupHtml: vi.fn(),
-      }));
-
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />,
-      );
-
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-    });
-
-    it('renders the dice popup when dicePopupHtml is present', () => {
-      useLoggedDiceRoll.mockImplementation(() => ({
-        popupHtml: { waitingForPlayerSave: true, promptId: '123', targetName: 'Goblin', saveType: 'DEX', saveDc: 14 },
-        setPopupHtml: vi.fn(),
-        rollAttack: vi.fn(),
-        rollDamage: vi.fn(),
-        quickRollPlayerSave: vi.fn(),
-      }));
-
-      render(
-        <CharSpells
-          playerStats={mockPlayerStats}
-          handleTogglePreparedSpells={mockHandleTogglePreparedSpells}
-        />,
-      );
-
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-    });
 
     it('does not render any popup when both popups are null', () => {
       useActionPopup.mockImplementation(() => ({

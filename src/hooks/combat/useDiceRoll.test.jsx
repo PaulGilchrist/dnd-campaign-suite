@@ -1,7 +1,9 @@
 // @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
+import React from 'react';
 import useDiceRoll from './useDiceRoll.js';
+import { DiceRollContext } from './DiceRollContext.js';
 
 vi.mock('../../services/dice/diceRoller.js', () => ({
   rollD20: vi.fn(() => 15),
@@ -10,13 +12,22 @@ vi.mock('../../services/dice/diceRoller.js', () => ({
 import { rollD20 } from '../../services/dice/diceRoller.js';
 
 describe('useDiceRoll', () => {
+  const UseDiceRollWrapper = ({ children }) => {
+    const [popupHtml, setPopupHtml] = React.useState(null);
+    return (
+      <DiceRollContext.Provider value={{ popupHtml, setPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
+  };
+
   beforeEach(() => {
     rollD20.mockReturnValue(15);
   });
 
   describe('initial state', () => {
     it('should return popupHtml, setPopupHtml, and roll functions', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       expect(result.current.popupHtml).toBeNull();
       expect(typeof result.current.setPopupHtml).toBe('function');
       expect(typeof result.current.rollAbilityCheck).toBe('function');
@@ -36,7 +47,7 @@ describe('useDiceRoll', () => {
       ['rollAttack', 'rollAttack', 'attack', 'Longsword', 6],
     ])('should set popupHtml with type %s when calling %s', (_, fnName, rollType, name, bonus) => {
       rollD20.mockReturnValue(15);
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current[fnName](name, bonus);
       });
@@ -51,7 +62,7 @@ describe('useDiceRoll', () => {
 
     it('should set popupHtml with type initiative when calling rollInitiative', () => {
       rollD20.mockReturnValue(15);
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollInitiative(4);
       });
@@ -67,7 +78,7 @@ describe('useDiceRoll', () => {
     it('should use different roll values when rollD20 returns different values', () => {
       rollD20.mockReturnValue(15);
       rollD20.mockReturnValueOnce(10).mockReturnValueOnce(20);
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollAttack('Spear', 2);
       });
@@ -77,7 +88,7 @@ describe('useDiceRoll', () => {
     it('should call rollD20 twice per d20 roll', () => {
       rollD20.mockReturnValue(15);
       rollD20.mockClear();
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollAbilityCheck('Athletics', 0);
       });
@@ -87,7 +98,7 @@ describe('useDiceRoll', () => {
 
   describe('damage rolls', () => {
     it('should set popupHtml with type damage', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollDamage('Longsword', '1d8+3', 7, [4, 3], 3);
       });
@@ -102,7 +113,7 @@ describe('useDiceRoll', () => {
     });
 
     it('should have bonus of 0 for damage rolls', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollDamage('Fireball', '8d6', 20, [3, 4, 5, 2, 3, 3], 0);
       });
@@ -112,7 +123,7 @@ describe('useDiceRoll', () => {
 
   describe('bonus value handling', () => {
     it('should handle zero bonus values', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollAbilityCheck('Acrobatics', 0);
       });
@@ -120,7 +131,7 @@ describe('useDiceRoll', () => {
     });
 
     it('should handle negative bonus values', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollSavingThrow('Constitution', -2);
       });
@@ -128,7 +139,7 @@ describe('useDiceRoll', () => {
     });
 
     it('should handle large bonus values', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollAttack('Greatsword', 15);
       });
@@ -138,7 +149,7 @@ describe('useDiceRoll', () => {
 
   describe('edge cases', () => {
     it('should handle empty name in roll functions', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollAbilityCheck('', 0);
       });
@@ -146,7 +157,7 @@ describe('useDiceRoll', () => {
     });
 
     it('should handle rollDamage with empty rolls array', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollDamage('Test', '0', 0, [], 0);
       });
@@ -154,7 +165,7 @@ describe('useDiceRoll', () => {
     });
 
     it('should handle rollDamage with single roll value', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollDamage('Test', '1d4', 3, [3], 0);
       });
@@ -162,7 +173,7 @@ describe('useDiceRoll', () => {
     });
 
     it('should handle different roll types in sequence', () => {
-      const { result } = renderHook(() => useDiceRoll());
+      const { result } = renderHook(() => useDiceRoll(), { wrapper: UseDiceRollWrapper });
       act(() => {
         result.current.rollAttack('Sword', 5);
       });

@@ -4,16 +4,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
-import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
   default: vi.fn(() => ({
     popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
   })),
@@ -283,49 +282,6 @@ describe('CharActions base actions & popups', () => {
       await waitFor(() => {
         expect(screen.getByText(/Base Actions:/)).toBeInTheDocument();
       });
-    });
-  });
-
-  describe('popup rendering types', () => {
-    it('renders a string popupHtml via dangerouslySetInnerHTML', async () => {
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: '<b>Test</b> popup content', setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-      const stats = createStats();
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Test')).toBeInTheDocument();
-      expect(screen.getByText('popup content')).toBeInTheDocument();
-    });
-
-    it('renders an automation_info popup with name and description', async () => {
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: { type: 'automation_info', name: 'Test Info', description: 'Some description' }, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-      const stats = createStats();
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByText('Test Info')).toBeInTheDocument();
-      expect(screen.getByText('Some description')).toBeInTheDocument();
-    });
-
-    it('renders an empowered_spell popup component', async () => {
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: { type: 'empowered_spell', name: 'Empowered', currentSP: 5, maxSP: 10 }, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-      const stats = createStats();
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      expect(screen.getByTestId('empowered-spell-popup')).toBeInTheDocument();
-    });
-
-    it('dismisses the popup when the overlay is clicked', async () => {
-      const mockSetPopupHtml = vi.fn();
-      useLoggedDiceRoll.mockReturnValue({
-        popupHtml: '<b>Test</b>', setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-      });
-      const stats = createStats();
-      await act(async () => { render(<CharActions playerStats={stats} />); });
-      const overlay = screen.getByTestId('popup-overlay');
-      await act(async () => { fireEvent.click(overlay); });
-      expect(mockSetPopupHtml).toHaveBeenCalledWith(null);
     });
   });
 

@@ -3,7 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
-import * as useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js';
+import { DiceRollContext } from '../../../hooks/combat/DiceRollContext.js';
 
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
 vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
@@ -31,7 +31,6 @@ vi.mock('../../../hooks/combat/useActionPopup.js', () => ({
     showBackgroundPopup: vi.fn(),
 }));
 
-vi.mock('../../../hooks/combat/useLoggedDiceRoll.js', () => ({
     default: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn(), rollInitiative: vi.fn() })),
 }));
 
@@ -791,12 +790,12 @@ describe('CharSummary - Popup and Modal Behaviors', () => {
     describe('armor class formula popup', () => {
         it('opens popup with armor class formula when AC is clicked', () => {
             const mockSetPopupHtml = vi.fn();
-            vi.spyOn(useLoggedDiceRoll, 'default').mockReturnValue({
-                popupHtml: null,
-                setPopupHtml: mockSetPopupHtml,
-                rollInitiative: vi.fn(),
-            });
-            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+            const wrapper = ({ children }) => (
+                <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+                    {children}
+                </DiceRollContext.Provider>
+            );
+            render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />, { wrapper });
             fireEvent.click(screen.getByText('Armor Class:'));
             expect(mockSetPopupHtml).toHaveBeenCalledWith('Armor Class (18) = 16 + 2 (shield)');
         });

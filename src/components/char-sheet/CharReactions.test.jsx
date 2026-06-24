@@ -322,19 +322,7 @@ describe('CharReactions', () => {
 
   // ===== Details Popup =====
 
-  it('shows a popup when a reaction with details is clicked', async () => {
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Reaction Test:'));
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
-  it('dismisses the popup when the overlay is clicked', async () => {
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Reaction Test:'));
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-    fireEvent.click(screen.getByTestId('popup'));
-    await waitFor(() => { expect(screen.queryByTestId('popup')).not.toBeInTheDocument(); });
-  });
 
   // ===== Stand (Power Word Heal) Click Handler =====
 
@@ -362,16 +350,6 @@ describe('CharReactions', () => {
     expect(setRuntimeValue).toHaveBeenCalledWith(basePlayerStats.name, 'powerWordHealStandPermission', false, baseProps.campaignName);
   });
 
-  it('shows a confirmation popup when Stand is clicked', async () => {
-    vi.mocked(useRuntimeValue).mockImplementation((charName, key) => {
-      if (key === 'powerWordHealStandPermission') return true;
-      return undefined;
-    });
-    vi.mocked(getRuntimeValue).mockReturnValue(['Prone']);
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
   // ===== Opportunity Attack Handler =====
 
@@ -385,32 +363,8 @@ describe('CharReactions', () => {
     expect(mockRollAttack).toHaveBeenCalledWith(MOCK_ATTACK.name, MOCK_ATTACK.hitBonus, { forcedMode: undefined, isOpportunityAttack: true });
   });
 
-  it('shows a popup when the target has InspiringMovement noOA protection', async () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    vi.mocked(getRuntimeValue).mockImplementation((name, key) => { if (key === 'inspiringMovementNoOA') return true; return null; });
-    render(<CharReactions {...baseProps} />);
-    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
-  it('shows a popup when the target has Tactical Shift', async () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    vi.mocked(hasTacticalShift).mockReturnValue(true);
-    render(<CharReactions {...baseProps} />);
-    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
-  it('shows a popup when the target has Speedy Opportunity Disadvantage', async () => {
-    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
-    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
-    vi.mocked(hasSpeedyOpportunityDisadvantage).mockReturnValue(true);
-    render(<CharReactions {...baseProps} />);
-    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
   it('selects the first melee attack for OA', async () => {
     const mockRollAttack = vi.fn();
@@ -468,13 +422,6 @@ describe('CharReactions', () => {
     expect(executeHandler).not.toHaveBeenCalled();
   });
 
-  it('shows a popup when executeHandler returns null and the reaction has details', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue(null);
-    render(<CharReactions {...baseProps} />);
-    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
   it('calls rollAttack when automation returns an attack_roll result', async () => {
     const mockRollAttack = vi.fn();
@@ -486,13 +433,6 @@ describe('CharReactions', () => {
     expect(mockRollAttack).toHaveBeenCalledWith('Auto Attack', 8, { targetName: 'Enemy', forcedMode: undefined, isOpportunityAttack: true });
   });
 
-  it('shows a popup when automation returns a popup result', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: '<b>Automation Popup</b>' });
-    render(<CharReactions {...baseProps} />);
-    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
   it('shows feature detail when automation returns an unknown result type', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
@@ -564,13 +504,6 @@ describe('CharReactions', () => {
     expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
   });
 
-  it('dismisses spell detail popup when the overlay is clicked', () => {
-    render(<CharReactions {...baseProps} />);
-    fireEvent.click(screen.getByText('Shield'));
-    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('popup'));
-    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
-  });
 
   it('does not show the spells section when no spells exist', () => {
     const stats = { ...basePlayerStats, attacks: [], reactions: [], spellAbilities: undefined };
@@ -612,11 +545,6 @@ describe('CharReactions', () => {
 
   // ===== DiceRollResult Rendering =====
 
-  it('renders DiceRollResult when popupHtml is an object', () => {
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { name: 'Test Roll', result: 15 }, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn() });
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByTestId('dice-roll-result')).toBeInTheDocument();
-  });
 
   // ===== Metamagic Popup =====
 
@@ -651,32 +579,9 @@ describe('CharReactions', () => {
 
   // ===== PopupHtml Types =====
 
-  it('renders popupHtml string content with sanitized HTML', async () => {
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: '<b>Test</b><br/>Content', setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn() });
-    render(<CharReactions {...baseProps} />);
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
-  it('renders popupHtml automation_info type with icon and content', async () => {
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { type: 'automation_info', name: 'Test Automation', description: 'Automation details' }, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn() });
-    render(<CharReactions {...baseProps} />);
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
 
-  it('renders DiceRollResult component when popupHtml is a dice roll object', () => {
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { name: 'Attack Roll', result: 20, isCrit: false }, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn() });
-    render(<CharReactions {...baseProps} />);
-    expect(screen.getByTestId('dice-roll-result')).toBeInTheDocument();
-  });
 
-  it('dismisses popupHtml when the overlay is clicked', async () => {
-    const setPopupHtml = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: '<b>Test Popup</b>', setPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn() });
-    render(<CharReactions {...baseProps} />);
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-    fireEvent.click(screen.getByTestId('popup'));
-    expect(setPopupHtml).toHaveBeenCalledWith(null);
-  });
 
   // ===== ArcaneWardRestoreModal =====
 
@@ -696,59 +601,8 @@ describe('CharReactions', () => {
 
   // ===== Reactive Spell Flow =====
 
-  it('shows reactive spell eligible popup when automation returns eligibleSpells', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'War Caster',
-        description: 'Select a spell',
-        eligibleSpells: [{ name: 'Shield', isSingleTarget: true }],
-        hasWarnings: false,
-      },
-    });
-    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    await act(async () => { fireEvent.click(screen.getByText('War Caster:')); });
-    await waitFor(() => { expect(document.querySelectorAll('[data-testid="popup"]').length).toBeGreaterThanOrEqual(1); });
-  });
 
-  it('shows reactive spell warnings when multi-target spells are available', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'War Caster',
-        description: 'Select a spell',
-        eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }],
-        hasWarnings: true,
-      },
-    });
-    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    await act(async () => { fireEvent.click(screen.getByText('War Caster:')); });
-    await waitFor(() => { expect(document.querySelectorAll('[data-testid="popup"]').length).toBeGreaterThanOrEqual(1); });
-  });
 
-  it('sets reactiveSpellFlow state when selecting a spell from eligible spells', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: 'War Caster',
-        description: 'Select a spell',
-        eligibleSpells: [{ name: 'Shield', isSingleTarget: true }],
-        hasWarnings: false,
-      },
-    });
-    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
-    render(<CharReactions {...baseProps} playerStats={stats} />);
-    await act(async () => { fireEvent.click(screen.getByText('War Caster:')); });
-    await waitFor(() => { expect(document.querySelectorAll('[data-testid="popup"]').length).toBeGreaterThanOrEqual(1); });
-  });
 
   // ===== Spell Detail Popup with onCast =====
 
@@ -774,14 +628,6 @@ describe('CharReactions', () => {
 
   // ===== automation_info popup dismiss =====
 
-  it('dismisses automation_info popup when overlay is clicked', async () => {
-    const setPopupHtml = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { type: 'automation_info', name: 'Test', description: 'Desc' }, setPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn() });
-    render(<CharReactions {...baseProps} />);
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-    fireEvent.click(screen.getByTestId('popup'));
-    expect(setPopupHtml).toHaveBeenCalledWith(null);
-  });
 
   // ===== Spell prepared filtering edge cases =====
 

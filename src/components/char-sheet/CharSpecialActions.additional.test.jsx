@@ -2,6 +2,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
+
+const renderWithDiceRollContext = (component, options = {}) => {
+  const wrapper = ({ children }) => (
+    <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
+      {children}
+    </DiceRollContext.Provider>
+  );
+  return render(component, { wrapper, ...options });
+};
 
 // Mock executeHandler
 vi.mock('../../services/automation/index.js', () => ({
@@ -125,172 +135,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
     vi.clearAllMocks();
   });
 
-  describe('popup HTML content formatting', () => {
-    it('formats popup HTML with icon when payload is an object with name', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
 
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Signature Spells', description: 'You can now cast Fireball and Haste.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Signature Spells/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      // Check that the popup HTML contains the magic icon
-      const popupContent = screen.getByTestId('popup-overlay').parentElement;
-      expect(popupContent.querySelector('i.fa-solid.fa-magic')).toBeInTheDocument();
-      expect(popupContent).toHaveTextContent('Signature Spells');
-      expect(popupContent).toHaveTextContent('You can now cast Fireball and Haste.');
-    });
-
-    it('formats popup HTML with icon when payload is a string', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'spellMastery',
-        payload: {
-          action: { name: 'Spell Mastery' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level1Options: ['Mage Armor', 'Shield'],
-          level2Options: ['Web', 'Misty Step'],
-          currentLevel1: '',
-          currentLevel2: '',
-        },
-      });
-
-      onSpellMasterySelected.mockResolvedValue({
-        type: 'popup',
-        payload: '<b>Custom popup message</b>',
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Spell Mastery', description: 'Choose level 1 and 2 spells.', automation: { type: 'spell_mastery' } },
-        ],
-      });
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(container.querySelector('b.clickable'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      const popupContent = screen.getByTestId('popup-overlay').parentElement;
-      expect(popupContent).toHaveTextContent('Custom popup message');
-    });
-
-    it('uses default name when popup payload object has no name', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
-
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { description: 'No name here.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Signature Spells/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      const popupContent = screen.getByTestId('popup-overlay').parentElement;
-      expect(popupContent).toHaveTextContent('Signature Spells');
-    });
-
-    it('uses default description when popup payload object has no description', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
-
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Signature Spells' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Signature Spells/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      const popupContent = screen.getByTestId('popup-overlay').parentElement;
-      expect(popupContent).toHaveTextContent('Signature Spells');
-    });
-  });
 
   describe('modal close behaviors', () => {
     it('closes signature spells modal when close button is clicked', async () => {
@@ -311,7 +156,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Signature Spells/));
 
       await waitFor(() => {
@@ -345,7 +190,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Spell Mastery', description: 'Choose level 1 and 2 spells.', automation: { type: 'spell_mastery' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Spell Mastery/));
 
       await waitFor(() => {
@@ -377,7 +222,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Evocation Savant', description: 'Choose two evocation spells.', automation: { type: 'passive_rule', effect: 'evocation_savant' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Evocation Savant/));
 
       await waitFor(() => {
@@ -405,7 +250,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Misty Step', description: 'Teleport 30 ft.', automation: { type: 'teleport', distance: '30 ft' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={true} />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={true} />);
       fireEvent.click(screen.getByText(/Misty Step/));
 
       await waitFor(() => {
@@ -419,7 +264,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'temp_buff', effect: 'bonus_teleport' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={true} />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={true} />);
       // Non-interactive actions are not clickable regardless of cannotAct
       expect(screen.getByText(/Blink Steps/)).not.toHaveClass('clickable');
     });
@@ -430,7 +275,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Second Wind', description: 'Regain hit points.' },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={false} />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" cannotAct={false} />);
       expect(screen.getByText(/Second Wind/)).toBeInTheDocument();
       expect(screen.getByText(/Second Wind/)).not.toHaveClass('clickable');
     });
@@ -453,7 +298,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Teleport', description: 'Teleport somewhere.', automation: { type: 'teleport', distance: '30 ft' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Teleport:/));
 
       await waitFor(() => {
@@ -467,7 +312,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Second Wind', description: 'Regain hit points.' },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Second Wind/));
 
       await waitFor(() => {
@@ -495,7 +340,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Illusion Savant', description: 'Choose two illusion spells.', automation: { type: 'passive_rule', effect: 'illusion_savant' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Illusion Savant/));
 
       await waitFor(() => {
@@ -504,90 +349,6 @@ describe('CharSpecialActions - Additional Coverage', () => {
     });
   });
 
-  describe('Popup dismiss behavior', () => {
-    it('dismisses popup when clicking the overlay', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
-
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Signature Spells', description: 'You can now cast Fireball and Haste.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Signature Spells/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByTestId('popup-overlay'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      });
-    });
-
-    it('shows popup with dice-roll-hint class for dismissal hint', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
-
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Signature Spells', description: 'You can now cast Fireball and Haste.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Signature Spells/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      const popupContent = screen.getByTestId('popup-overlay').parentElement;
-      expect(popupContent).toHaveTextContent('click to dismiss');
-    });
-  });
 
   describe('Savant modal name matching', () => {
     it('matches divinationSavant modal name', async () => {
@@ -607,7 +368,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Divination Savant', description: 'Choose two divination spells.', automation: { type: 'passive_rule', effect: 'divination_savant' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Divination Savant/));
 
       await waitFor(() => {
@@ -632,7 +393,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Evocation Savant', description: 'Choose two evocation spells.', automation: { type: 'passive_rule', effect: 'evocation_savant' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Evocation Savant/));
 
       await waitFor(() => {
@@ -648,7 +409,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Second Wind', description: 'Regain hit points.' },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       // The name is in a <b> tag followed by ":" and then the description
       expect(screen.getByText(/Second Wind:/)).toBeInTheDocument();
       expect(screen.getByText(/Regain hit points/)).toBeInTheDocument();
@@ -660,7 +421,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(screen.getByText(/Blink Steps:/)).toBeInTheDocument();
       expect(screen.getByText(/Blink Steps:/)).toHaveClass('clickable');
     });
@@ -671,7 +432,7 @@ describe('CharSpecialActions - Additional Coverage', () => {
           { name: 'Second Wind', description: 'Regain hit points.' },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(screen.getByText(/Second Wind:/)).toBeInTheDocument();
       expect(screen.getByText(/Second Wind:/)).not.toHaveClass('clickable');
     });
@@ -680,13 +441,13 @@ describe('CharSpecialActions - Additional Coverage', () => {
   describe('sectionHeader rendering', () => {
     it('renders the sectionHeader div', () => {
       const playerStats = createPlayerStats({});
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      const { container } = renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(container.querySelector('.sectionHeader')).toBeInTheDocument();
     });
 
     it('wraps content in a div', () => {
       const playerStats = createPlayerStats({});
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      const { container } = renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(container.querySelector('div')).toBeInTheDocument();
     });
   });
@@ -697,19 +458,19 @@ describe('CharSpecialActions - Additional Coverage', () => {
       // We can't directly trigger this since the modal state is internal, but we can verify
       // the component renders and handles the normal flow without crashing
       const playerStats = createPlayerStats({});
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(screen.getByText('Special Actions')).toBeInTheDocument();
     });
 
     it('does not crash when spellMasteryModal is null on confirm', async () => {
       const playerStats = createPlayerStats({});
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(screen.getByText('Special Actions')).toBeInTheDocument();
     });
 
     it('does not crash when savantModal is null on confirm', async () => {
       const playerStats = createPlayerStats({});
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       expect(screen.getByText('Special Actions')).toBeInTheDocument();
     });
   });

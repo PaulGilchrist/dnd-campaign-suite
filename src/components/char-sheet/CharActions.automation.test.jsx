@@ -8,6 +8,7 @@ import { executeHandler } from '../../services/automation/index.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import useCharActionModals from './useCharActionModals.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
@@ -318,7 +319,12 @@ describe('CharActions automation', () => {
       const stats = createStats({
         actions: [{ name: 'Metamagic', description: 'Modify spells.', automation: { type: 'spell_modifier' } }],
       });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+      await act(async () => { render(<CharActions playerStats={stats} />, { wrapper }); });
       const empoweredEl = screen.getByText(/Empowered Spell:/);
       await act(async () => { fireEvent.click(empoweredEl); });
       expect(mockSetPopupHtml).toHaveBeenCalled();
@@ -336,7 +342,12 @@ describe('CharActions automation', () => {
       const stats = createStats({
         actions: [{ name: 'War Magic', description: 'Cast cantrip then attack.', automation: { type: 'auto_effect', trigger: 'after_casting_action_spell' } }],
       });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+      await act(async () => { render(<CharActions playerStats={stats} />, { wrapper }); });
       const actionName = screen.getByText(/War Magic:/);
       await act(async () => { fireEvent.click(actionName); });
       await waitFor(() => {

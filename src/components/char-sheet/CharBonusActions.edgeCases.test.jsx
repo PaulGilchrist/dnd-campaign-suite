@@ -313,30 +313,6 @@ describe('CharBonusActions - Edge Cases', () => {
   });
 
   describe('popup rendering edge cases', () => {
-    it('renders popupHtml object as DiceRollResult component', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test', details: 'Test details' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-    });
-
-    it('renders empowered_spell popup type with correct structure', async () => {
-      const stats = createStats({
-        bonusActions: [{ name: 'Test', description: 'Test', details: 'Test details' }],
-      });
-      render(<CharBonusActions playerStats={stats} />);
-      const actionName = screen.getByText(/Test:/);
-      fireEvent.click(actionName);
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-    });
-
     it('renders automation_info popup with icon and content', async () => {
       const automatedAction = {
         name: 'Auto Test',

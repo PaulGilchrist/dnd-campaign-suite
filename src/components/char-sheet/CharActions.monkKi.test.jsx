@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharActions from './CharActions.jsx';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import { executeHandler } from '../../services/automation/index.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import useCharActionModals from './useCharActionModals.js';
@@ -382,7 +383,13 @@ describe('CharActions monk ki', () => {
         actions: [{ name: 'Flurry of Blows', description: 'No FP.', automation: { type: 'auto_effect' } }],
       });
 
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+      await act(async () => { render(<CharActions playerStats={stats} />, { wrapper }); });
       const actionName = screen.getByText(/Flurry of Blows:/);
       await act(async () => { fireEvent.click(actionName); });
       await waitFor(() => {
@@ -408,7 +415,12 @@ describe('CharActions monk ki', () => {
         actions: [{ name: 'Flurry of Blows', description: 'No ki.', automation: { type: 'auto_effect' } }],
       });
 
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+      const wrapper = ({ children }) => (
+        <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+          {children}
+        </DiceRollContext.Provider>
+      );
+      await act(async () => { render(<CharActions playerStats={stats} />, { wrapper }); });
       const actionName = screen.getByText(/Flurry of Blows:/);
       await act(async () => { fireEvent.click(actionName); });
       await waitFor(() => {

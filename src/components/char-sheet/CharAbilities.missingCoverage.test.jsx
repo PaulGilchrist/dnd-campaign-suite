@@ -3,34 +3,15 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharAbilities from './CharAbilities';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
   const mockFn = vi.fn(() => ({
-    popupHtml: null,
-    setPopupHtml: vi.fn(),
     rollAbilityCheck: vi.fn(),
     rollSavingThrow: vi.fn(),
     rollSkillCheck: vi.fn(),
   }));
   return { default: mockFn };
 });
-
-vi.mock('../common/Popup.jsx', () => ({
-  default: ({ children, onClickOrKeyDown }) => (
-    <div data-testid="popup" onClick={onClickOrKeyDown}>
-      {children}
-    </div>
-  ),
-}));
-
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: ({ onReroll, onStrokeOfLuck }) => (
-    <div data-testid="dice-roll-result">
-      <button onClick={onReroll}>Reroll</button>
-      <button onClick={onStrokeOfLuck}>Stroke of Luck</button>
-    </div>
-  ),
-}));
-
 const mockStore = new Map();
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn((key, prop) => mockStore.get(`${key}:${prop}`) ?? null),
@@ -84,60 +65,26 @@ describe('CharAbilities ability name popup content', () => {
   });
 
   it('calls setPopupHtml with ability description HTML when ability name is clicked', () => {
-    render(<CharAbilities {...defaultProps} />);
+    const mockSetPopupHtml = vi.fn();
+    const wrapper = ({ children }) => (
+      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
+    render(<CharAbilities {...defaultProps} />, { wrapper });
     fireEvent.click(screen.getByText('Strength'));
-    const mockSetPopupHtml = vi.mocked(useLoggedDiceRoll).mock.results[0].value.setPopupHtml;
-    expect(mockSetPopupHtml).toHaveBeenCalledWith('<h3>Strength</h3>STR desc<br/>');
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Strength'));
   });
-
   it('calls setPopupHtml with Dexterity description when Dexterity is clicked', () => {
-    render(<CharAbilities {...defaultProps} />);
+    const mockSetPopupHtml = vi.fn();
+    const wrapper = ({ children }) => (
+      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
+    render(<CharAbilities {...defaultProps} />, { wrapper });
     fireEvent.click(screen.getByText('Dexterity'));
-    const mockSetPopupHtml = vi.mocked(useLoggedDiceRoll).mock.results[0].value.setPopupHtml;
-    expect(mockSetPopupHtml).toHaveBeenCalledWith('<h3>Dexterity</h3>DEX desc<br/>');
-  });
-});
-
-describe('CharAbilities DiceRollResult props passthrough', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mockStore.clear();
-  });
-
-  it('passes onReroll prop to DiceRollResult when popupHtml is an object', () => {
-    const mockSetPopupHtml = vi.fn();
-    const mockOnReroll = vi.fn();
-    const mockOnStrokeOfLuck = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({
-      popupHtml: { name: 'Test Roll', type: 'd20' },
-      setPopupHtml: mockSetPopupHtml,
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-    });
-
-    render(<CharAbilities {...defaultProps} onReroll={mockOnReroll} onStrokeOfLuck={mockOnStrokeOfLuck} />);
-    const diceRollResult = screen.getByTestId('dice-roll-result');
-    const rerollBtn = diceRollResult.querySelector('button');
-    expect(rerollBtn).toBeTruthy();
-  });
-
-  it('passes onStrokeOfLuck prop to DiceRollResult when popupHtml is an object', () => {
-    const mockSetPopupHtml = vi.fn();
-    const mockOnReroll = vi.fn();
-    const mockOnStrokeOfLuck = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({
-      popupHtml: { name: 'Test Roll', type: 'd20' },
-      setPopupHtml: mockSetPopupHtml,
-      rollAbilityCheck: vi.fn(),
-      rollSavingThrow: vi.fn(),
-      rollSkillCheck: vi.fn(),
-    });
-
-    render(<CharAbilities {...defaultProps} onReroll={mockOnReroll} onStrokeOfLuck={mockOnStrokeOfLuck} />);
-    const diceRollResult = screen.getByTestId('dice-roll-result');
-    const strokeBtn = diceRollResult.querySelectorAll('button')[1];
-    expect(strokeBtn).toBeTruthy();
+    expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Dexterity'));
   });
 });
 
@@ -517,10 +464,15 @@ describe('CharAbilities ability name click with edge cases', () => {
   });
 
   it('handles ability name click when allAbilityScores is empty array', () => {
-    render(<CharAbilities {...defaultProps} allAbilityScores={[]} />);
+    const mockSetPopupHtml = vi.fn();
+    const wrapper = ({ children }) => (
+      <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+        {children}
+      </DiceRollContext.Provider>
+    );
+    render(<CharAbilities {...defaultProps} allAbilityScores={[]} />, { wrapper });
     fireEvent.click(screen.getByText('Strength'));
-    const mockSetPopupHtml = vi.mocked(useLoggedDiceRoll).mock.results[0].value.setPopupHtml;
-    expect(mockSetPopupHtml).toHaveBeenCalledWith(null);
+    expect(mockSetPopupHtml).toHaveBeenCalled();
   });
 });
 

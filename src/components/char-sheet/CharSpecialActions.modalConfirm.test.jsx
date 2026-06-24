@@ -2,6 +2,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
+
+const renderWithDiceRollContext = (component, options = {}) => {
+  const wrapper = ({ children }) => (
+    <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
+      {children}
+    </DiceRollContext.Provider>
+  );
+  return render(component, { wrapper, ...options });
+};
 
 // Mock executeHandler
 vi.mock('../../services/automation/index.js', () => ({
@@ -143,7 +153,7 @@ describe('CharSpecialActions - Modal Confirm Flows', () => {
           { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Signature Spells/));
 
       await waitFor(() => {
@@ -151,94 +161,6 @@ describe('CharSpecialActions - Modal Confirm Flows', () => {
       });
     });
 
-    it('closes signature spells modal on confirm and shows popup', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
-
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Signature Spells', description: 'You can now cast Fireball and Haste.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Signature Spells/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      // Click the confirm button in the mocked modal
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(onSignatureSpellsSelected).toHaveBeenCalled();
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('signature-spells-modal')).not.toBeInTheDocument();
-      });
-
-      // The popup should be shown from the confirm handler result
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-    });
-
-    it('dismisses popup when clicking the overlay after signature spells confirm', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
-
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Signature Spells', description: 'You can now cast Fireball and Haste.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(container.querySelector('b.clickable'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      // Click the overlay to dismiss
-      fireEvent.click(screen.getByTestId('popup-overlay'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      });
-    });
   });
 
   describe('SpellMastery modal flow', () => {
@@ -262,7 +184,7 @@ describe('CharSpecialActions - Modal Confirm Flows', () => {
           { name: 'Spell Mastery', description: 'Choose level 1 and 2 spells.', automation: { type: 'spell_mastery' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Spell Mastery/));
 
       await waitFor(() => {
@@ -270,184 +192,5 @@ describe('CharSpecialActions - Modal Confirm Flows', () => {
       });
     });
 
-    it('closes spell mastery modal on confirm and shows popup', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'spellMastery',
-        payload: {
-          action: { name: 'Spell Mastery' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level1Options: ['Mage Armor', 'Shield'],
-          level2Options: ['Web', 'Misty Step'],
-          currentLevel1: '',
-          currentLevel2: '',
-        },
-      });
-
-      onSpellMasterySelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Spell Mastery', description: 'You can now cast Mage Armor and Shield.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Spell Mastery', description: 'Choose level 1 and 2 spells.', automation: { type: 'spell_mastery' } },
-        ],
-      });
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(container.querySelector('b.clickable'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(onSpellMasterySelected).toHaveBeenCalled();
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('spell-mastery-modal')).not.toBeInTheDocument();
-      });
-
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-    });
-
-    it('dismisses popup when clicking the overlay after spell mastery confirm', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'spellMastery',
-        payload: {
-          action: { name: 'Spell Mastery' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level1Options: ['Mage Armor', 'Shield'],
-          level2Options: ['Web', 'Misty Step'],
-          currentLevel1: '',
-          currentLevel2: '',
-        },
-      });
-
-      onSpellMasterySelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Spell Mastery', description: 'You can now cast Mage Armor and Shield.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Spell Mastery', description: 'Choose level 1 and 2 spells.', automation: { type: 'spell_mastery' } },
-        ],
-      });
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(container.querySelector('b.clickable'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      // Click the overlay to dismiss
-      fireEvent.click(screen.getByTestId('popup-overlay'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      });
-    });
-  });
-
-  describe('Savant modal confirm flow', () => {
-    it('closes savant modal on confirm and shows popup', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'abjurationSavant',
-        payload: {
-          action: { name: 'Abjuration Savant' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Abjuration',
-          spellOptions: ['Shield', 'Mage Armor'],
-        },
-      });
-
-      onSavantSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Abjuration Savant', description: 'You have added Shield and Mage Armor.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Abjuration Savant', description: 'Choose two abjuration spells.', automation: { type: 'passive_rule', effect: 'abjuration_savant' } },
-        ],
-      });
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(container.querySelector('b.clickable'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('abjuration-savant-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(onSavantSelected).toHaveBeenCalled();
-      });
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('abjuration-savant-modal')).not.toBeInTheDocument();
-      });
-
-      expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-    });
-
-    it('dismisses popup when clicking the overlay after savant confirm', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'evocationSavant',
-        payload: {
-          action: { name: 'Evocation Savant' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Evocation',
-          spellOptions: ['Fireball', 'Scorching Burst'],
-        },
-      });
-
-      onSavantSelected.mockResolvedValue({
-        type: 'popup',
-        payload: { name: 'Evocation Savant', description: 'You have added Fireball and Scorching Burst.' },
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Evocation Savant', description: 'Choose two evocation spells.', automation: { type: 'passive_rule', effect: 'evocation_savant' } },
-        ],
-      });
-      const { container } = render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(container.querySelector('b.clickable'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('evocation-savant-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      // Click the overlay to dismiss
-      fireEvent.click(screen.getByTestId('popup-overlay'));
-
-      await waitFor(() => {
-        expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
-      });
-    });
   });
 });

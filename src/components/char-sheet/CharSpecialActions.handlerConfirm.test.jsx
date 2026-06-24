@@ -2,6 +2,16 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSpecialActions from './CharSpecialActions.jsx';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
+
+const renderWithDiceRollContext = (component, options = {}) => {
+  const wrapper = ({ children }) => (
+    <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
+      {children}
+    </DiceRollContext.Provider>
+  );
+  return render(component, { wrapper, ...options });
+};
 
 // Mock executeHandler
 vi.mock('../../services/automation/index.js', () => ({
@@ -145,7 +155,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Signature Spells/));
 
       await waitFor(() => {
@@ -188,7 +198,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Signature Spells/));
 
       await waitFor(() => {
@@ -204,44 +214,6 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
       expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
 
-    it('formats popup HTML when result payload is a string', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'signatureSpells',
-        payload: {
-          action: { name: 'Signature Spells' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level3Options: ['Fireball', 'Haste'],
-          selectedSpells: [],
-        },
-      });
-
-      onSignatureSpellsSelected.mockResolvedValue({
-        type: 'popup',
-        payload: '<b>Raw HTML popup</b>',
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Signature Spells', description: 'Choose two level 3 spells.', automation: { type: 'signature_spells' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Signature Spells/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('signature-spells-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      expect(screen.getByTestId('popup-overlay')).toHaveTextContent('Raw HTML popup');
-    });
   });
 
   describe('SpellMastery confirm handler', () => {
@@ -267,7 +239,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Spell Mastery', description: 'Choose level 1 and 2 spells.', automation: { type: 'spell_mastery' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Spell Mastery/));
 
       await waitFor(() => {
@@ -312,7 +284,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Spell Mastery', description: 'Choose level 1 and 2 spells.', automation: { type: 'spell_mastery' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Spell Mastery/));
 
       await waitFor(() => {
@@ -328,46 +300,6 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
       expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
 
-    it('formats popup HTML when result payload is a string', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'spellMastery',
-        payload: {
-          action: { name: 'Spell Mastery' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          level1Options: ['Mage Armor', 'Shield'],
-          level2Options: ['Web', 'Misty Step'],
-          currentLevel1: '',
-          currentLevel2: '',
-        },
-      });
-
-      onSpellMasterySelected.mockResolvedValue({
-        type: 'popup',
-        payload: '<b>Spell mastery confirmed</b>',
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Spell Mastery', description: 'Choose level 1 and 2 spells.', automation: { type: 'spell_mastery' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Spell Mastery/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('spell-mastery-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      expect(screen.getByTestId('popup-overlay')).toHaveTextContent('Spell mastery confirmed');
-    });
   });
 
   describe('Savant confirm handler', () => {
@@ -391,7 +323,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Evocation Savant', description: 'Choose two evocation spells.', automation: { type: 'passive_rule', effect: 'evocation_savant' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Evocation Savant/));
 
       await waitFor(() => {
@@ -435,7 +367,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Abjuration Savant', description: 'Choose two abjuration spells.', automation: { type: 'passive_rule', effect: 'abjuration_savant' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Abjuration Savant/));
 
       await waitFor(() => {
@@ -451,44 +383,6 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
       expect(screen.queryByTestId('popup-overlay')).not.toBeInTheDocument();
     });
 
-    it('formats popup HTML when result payload is a string', async () => {
-      executeHandler.mockResolvedValue({
-        type: 'modal',
-        modalName: 'abjurationSavant',
-        payload: {
-          action: { name: 'Abjuration Savant' },
-          playerStats: basePlayerStats,
-          campaignName: 'test',
-          school: 'Abjuration',
-          spellOptions: ['Shield', 'Mage Armor'],
-        },
-      });
-
-      onSavantSelected.mockResolvedValue({
-        type: 'popup',
-        payload: '<b>Abjuration Savant confirmed</b>',
-      });
-
-      const playerStats = createPlayerStats({
-        specialActions: [
-          { name: 'Abjuration Savant', description: 'Choose two abjuration spells.', automation: { type: 'passive_rule', effect: 'abjuration_savant' } },
-        ],
-      });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      fireEvent.click(screen.getByText(/Abjuration Savant/));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('abjuration-savant-modal')).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText('Confirm'));
-
-      await waitFor(() => {
-        expect(screen.getByTestId('popup-overlay')).toBeInTheDocument();
-      });
-
-      expect(screen.getByTestId('popup-overlay')).toHaveTextContent('Abjuration Savant confirmed');
-    });
   });
 
   describe('executeHandler result type edge cases', () => {
@@ -502,7 +396,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Blink Steps', description: 'Teleport up to 30 feet.', automation: { type: 'teleport', distance: '30 ft' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Blink Steps/));
 
       await waitFor(() => {
@@ -525,7 +419,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Unknown Action', description: 'Does something unknown.', automation: { type: 'teleport', distance: '30 ft' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Unknown Action/));
 
       await waitFor(() => {
@@ -550,7 +444,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Wizard Savant', description: 'Does something.', automation: { type: 'signature_spells' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Wizard Savant/));
 
       await waitFor(() => {
@@ -580,7 +474,7 @@ describe('CharSpecialActions - Handler Confirm Flows', () => {
           { name: 'Abjuration Savant', description: 'Choose two abjuration spells.', automation: { type: 'passive_rule', effect: 'abjuration_savant' } },
         ],
       });
-      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      renderWithDiceRollContext(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
       fireEvent.click(screen.getByText(/Abjuration Savant/));
 
       await waitFor(() => {

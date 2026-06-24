@@ -392,16 +392,6 @@ describe('CharReactions - Edge Cases', () => {
     expect(screen.queryByText('Shield')).not.toBeInTheDocument();
   });
 
-  // ===== Reaction with automation but executeHandler returns popup without eligibleSpells =====
-
-  it('shows popup when automation returns popup without eligibleSpells', async () => {
-    vi.mocked(hasAutomation).mockReturnValue(true);
-    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: '<b>Some info</b>' });
-    render(<CharReactions {...baseProps} />);
-    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-  });
-
   // ===== Reaction with automation but executeHandler returns modal with non-arcaneWardRestore =====
 
   it('shows feature detail popup when automation returns unknown modal type', async () => {
@@ -424,15 +414,6 @@ describe('CharReactions - Edge Cases', () => {
   });
 
   // ===== Popup dismissal for various types =====
-
-  it('dismisses DiceRollResult popup when overlay is clicked', async () => {
-    const setPopupHtml = vi.fn();
-    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: { name: 'Attack', result: 20 }, setPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn() });
-    render(<CharReactions {...baseProps} />);
-    await waitFor(() => { expect(screen.getByTestId('popup')).toBeInTheDocument(); });
-    fireEvent.click(screen.getByTestId('popup'));
-    expect(setPopupHtml).toHaveBeenCalledWith(null);
-  });
 
   // ===== Spell detail popup with onCast handler =====
 
