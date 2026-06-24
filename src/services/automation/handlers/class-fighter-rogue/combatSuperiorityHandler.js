@@ -3,7 +3,7 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
-import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
+import { getCurrentCombatRound, loadCombatSummary } from '../../../../services/encounters/combatData.js';
 import { loadManeuvers } from '../../../ui/dataLoader.js';
 import { loadMapData } from '../../../maps/mapsService.js';
 import { addEntry } from '../../../ui/logService.js';
@@ -1272,9 +1272,13 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
     if (maneuver.effect === 'melee_attack_reaction') {
         await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', dieValue, campaignName);
 
-        const meleeAttacks = (playerStats.attacks || []).filter(
-            a => a.type === 'Action' && a.range === '5 ft'
-        );
+        const meleeAttacks = (playerStats.attacks || []).filter(a => {
+            if (a.weaponType === 'melee' || a.attackType === 'melee') return true;
+            if (a.range === 5 || a.range === '5' || a.range === '5 ft' || a.range === '5_ft') return a.type === 'Action' || a.actionType === 'Action';
+            if (a.isRanged === false) return true;
+            if (Array.isArray(a.properties) && a.properties.some(p => String(p).toLowerCase() === 'melee')) return true;
+            return false;
+        });
         const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
 
         if (!attack) {
@@ -1569,9 +1573,11 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
 }
 
 export async function executeManeuver(action, playerStats, campaignName, maneuverName) {
+    console.log('[Riposte] executeManeuver called', { maneuverName, rules: playerStats.rules, hasAction: !!action });
     const auto = action.automation;
     const allManeuvers = await loadManeuvers(playerStats.rules || '2024');
     const maneuver = allManeuvers.find(m => m.name === maneuverName);
+    console.log('[Riposte] Maneuver lookup', { found: !!maneuver, totalManeuvers: allManeuvers.length, names: allManeuvers.map(m => m.name) });
 
     if (!maneuver) {
         return {
@@ -1847,14 +1853,27 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     }
 
     if (maneuver.effect === 'melee_attack_reaction') {
+        console.log('[Riposte] Executing Riposte maneuver', { dieValue, targetName });
         await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', dieValue, campaignName);
+        console.log('[Riposte] pendingRiposteDieValue set to', dieValue);
 
-        const meleeAttacks = (playerStats.attacks || []).filter(
-            a => a.type === 'Action' && a.range === '5 ft'
-        );
+        const cs = await loadCombatSummary(campaignName);
+        const lastAttack = cs?.lastAttack;
+        const riposteTarget = lastAttack?.attackerName || targetName;
+        console.log('[Riposte] loadCombatSummary result', { cs: !!cs, lastAttackAttacker: lastAttack?.attackerName, riposteTarget, lastAttack });
+
+        const meleeAttacks = (playerStats.attacks || []).filter(a => {
+            if (a.weaponType === 'melee' || a.attackType === 'melee') return true;
+            if (a.range === 5 || a.range === '5' || a.range === '5 ft' || a.range === '5_ft') return a.type === 'Action' || a.actionType === 'Action';
+            if (a.isRanged === false) return true;
+            if (Array.isArray(a.properties) && a.properties.some(p => String(p).toLowerCase() === 'melee')) return true;
+            return false;
+        });
         const attack = meleeAttacks.length > 0 ? meleeAttacks[0] : (playerStats.attacks || [])[0];
+        console.log('[Riposte] Found attack', { attackName: attack?.name, hitBonus: attack?.hitBonus, meleeAttackCount: meleeAttacks.length, totalAttacks: (playerStats.attacks || []).length, attackObject: attack });
 
         if (!attack) {
+            console.log('[Riposte] No melee attack available, returning popup');
             return {
                 type: 'popup',
                 payload: {
@@ -1866,12 +1885,33 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
             };
         }
 
+        console.log('[Riposte] Returning attack_roll result');
+        const logEntry = {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description,
+        };
+        const popupPayload = {
+            type: 'automation_info',
+            name: maneuver.name,
+            description,
+            automation: auto,
+        };
         return {
             type: 'attack_roll',
             payload: {
                 attack,
-                targetName,
+                targetName: riposteTarget,
             },
+            context: {
+                superiorityDieValue: dieValue,
+                superiorityDieSize: superiorityDieSize,
+                baseDamageFormula: attack.damage,
+                baseDamageType: attack.damageType,
+            },
+            logEntries: [logEntry],
+            popup: popupPayload,
         };
     }
 

@@ -19,6 +19,7 @@ vi.mock('../../../rules/effects/expirations.js', () => ({
 
 vi.mock('../../../../services/encounters/combatData.js', () => ({
     getCurrentCombatRound: vi.fn(() => 1),
+    loadCombatSummary: vi.fn(),
 }));
 
 vi.mock('../../../dice/diceRoller.js', () => ({

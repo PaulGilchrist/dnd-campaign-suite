@@ -24,6 +24,7 @@ vi.mock('../../services/ui/storage.js', () => ({
 
 vi.mock('../../services/rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
+    findCreatureByName: vi.fn(() => null),
 }));
 
 vi.mock('../../services/rules/combat/applyDamage.js', () => ({

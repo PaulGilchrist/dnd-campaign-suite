@@ -643,15 +643,26 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction, characters]);
 
     const handleCombatSuperiorityConfirm = React.useCallback(async (selectedManeuverNames, singleUseManeuverName) => {
+        console.log('[Riposte] handleCombatSuperiorityConfirm called', { selectedManeuverNames, singleUseManeuverName, hasAction: !!combatSuperiorityModal?.action });
         const action = combatSuperiorityModal?.action;
-        if (!action) return;
+        if (!action) {
+            console.log('[Riposte] No action found, returning early');
+            return;
+        }
 
         const result = await onCombatSuperioritySelected(action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
+        console.log('[Riposte] onCombatSuperioritySelected result', result);
         setCombatSuperiorityModal(null);
         if (result?.type === 'popup') {
+            console.log('[Riposte] Showing popup');
             setPopupHtml(result.payload);
         }
-    }, [combatSuperiorityModal, playerStats, campaignName, setCombatSuperiorityModal, setPopupHtml]);
+        if (result?.type === 'attack_roll') {
+            const { attack, targetName } = result.payload;
+            console.log('[Riposte] Firing attack roll', { attackName: attack.name, hitBonus: attack.hitBonus, targetName });
+            rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true });
+        }
+    }, [combatSuperiorityModal, playerStats, campaignName, setCombatSuperiorityModal, setPopupHtml, rollAttack]);
 
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {

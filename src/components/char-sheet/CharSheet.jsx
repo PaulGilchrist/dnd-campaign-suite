@@ -505,7 +505,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
 }<hr />
             <CharInventory playerStats={playerStats}></CharInventory><hr />
-            <CharSpecialActions playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct}></CharSpecialActions><hr />
+            <CharSpecialActions playerStats={playerStats} campaignName={campaignName} cannotAct={cannotAct} characters={characters}></CharSpecialActions><hr />
             <div className='no-print'><CharCharacterAdvancement playerStats={playerStats} campaignName={campaignName}></CharCharacterAdvancement></div>
         </div>}
     </React.Fragment>)

@@ -1,7 +1,9 @@
+import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import Popup from '../common/Popup.jsx'
+import DiceRollResult from './DiceRollResult.jsx'
 import { getCategories } from '../../services/character/featureCategories.js'
-import { renderMarkdownInline } from '../../services/ui/sanitize.js';
+import { renderMarkdownInline, sanitizeHtml } from '../../services/ui/sanitize.js';
 import { getFightingStyle } from '../../services/character/fightingStyles.js'
 import { executeHandler } from '../../services/automation/index.js';
 import { isInteractiveAutomation } from '../../services/combat/automation/automationService.js';
@@ -17,14 +19,57 @@ import { onCombatSuperioritySelected, executeManeuver } from '../../services/aut
 import { addEntry } from '../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
+import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 
-function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
-    const [popupHtml, setPopupHtml] = useState(null);
+function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }) {
     const [teleportModal, setTeleportModal] = useState(null);
     const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
     const [spellMasteryModal, setSpellMasteryModal] = useState(null);
     const [savantModal, setSavantModal] = useState(null);
     const [combatSuperiorityModal, setCombatSuperiorityModal] = useState(null);
+    const { rollAttack, rollDamage, popupHtml, setPopupHtml } = useLoggedDiceRoll(playerStats?.name, campaignName, {
+        characters,
+        autoDamageRoll: async (autoDamage, isCrit) => {
+            console.log('[CharSpecialActions] autoDamageRoll called', { formula: autoDamage.formula, isCrit, rollDamageType: typeof rollDamage });
+            const formula = autoDamage.formula;
+            let result;
+            const superiorityMatch = formula.match(/\+ (\d+)\s*\[Superiority\]$/);
+            if (superiorityMatch) {
+                const baseFormula = formula.replace(/\+ \d+\s*\[Superiority\]/, '');
+                const superiorityValue = parseInt(superiorityMatch[1], 10);
+                const baseResult = isCrit ? rollExpressionDoubled(baseFormula) : rollExpression(baseFormula);
+                if (baseResult) {
+                    result = {
+                        total: baseResult.total + superiorityValue,
+                        rolls: [...baseResult.rolls, superiorityValue],
+                        modifier: baseResult.modifier,
+                    };
+                    console.log('[CharSpecialActions] Base + Superiority damage', { baseFormula, baseResult, superiorityValue, total: result.total });
+                }
+            } else {
+                const match = formula.match(/^(\d+)\s*\[Superiority\]$/);
+                if (match) {
+                    const dieValue = parseInt(match[1], 10);
+                    result = { total: dieValue, rolls: [dieValue], modifier: 0 };
+                    console.log('[CharSpecialActions] Superiority die (flat value)', { dieValue });
+                } else {
+                    result = isCrit ? rollExpressionDoubled(autoDamage.formula) : rollExpression(autoDamage.formula);
+                    console.log('[CharSpecialActions] rollExpression result', { result, formula });
+                }
+            }
+            if (result) {
+                const context = {
+                    damageType: autoDamage.damageType,
+                    targetName: autoDamage.targetName,
+                    attackerName: autoDamage.attackerName,
+                };
+                console.log('[CharSpecialActions] calling rollDamage', { name: autoDamage.name, formula: autoDamage.formula, total: result.total });
+                console.log('[CharSpecialActions] rollDamage context', { context: JSON.stringify(context) });
+                rollDamage(autoDamage.name, autoDamage.formula, result.total, result.rolls, result.modifier, context);
+                console.log('[CharSpecialActions] rollDamage returned');
+            }
+        },
+    });
 
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
@@ -56,7 +101,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 : `<b><i class="fa-solid fa-magic"></i> ${payload.name || 'Signature Spells'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);
         }
-    }, [signatureSpellsModal, playerStats, campaignName]);
+    }, [signatureSpellsModal, playerStats, campaignName, setPopupHtml]);
 
     const handleSpellMasteryConfirm = useCallback(async (spell1, spell2) => {
         if (!spellMasteryModal) return;
@@ -69,7 +114,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 : `<b><i class="fa-solid fa-magic"></i> ${payload.name || 'Spell Mastery'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);
         }
-    }, [spellMasteryModal, playerStats, campaignName]);
+    }, [spellMasteryModal, playerStats, campaignName, setPopupHtml]);
 
     const handleSavantConfirm = useCallback(async (spell1, spell2) => {
         if (!savantModal) return;
@@ -82,14 +127,15 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 : `<b><i class="fa-solid fa-magic"></i> ${payload.name || savantModal.school} Savant</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);
         }
-    }, [savantModal, playerStats, campaignName]);
+    }, [savantModal, playerStats, campaignName, setPopupHtml]);
 
     const handleCombatSuperiorityConfirm = useCallback(async (selectedManeuverNames, singleUseManeuverName) => {
         if (!combatSuperiorityModal) return;
         setCombatSuperiorityModal(null);
 
+        let result;
         if (singleUseManeuverName) {
-            const result = await executeManeuver(combatSuperiorityModal.action, playerStats, campaignName, singleUseManeuverName);
+            result = await executeManeuver(combatSuperiorityModal.action, playerStats, campaignName, singleUseManeuverName);
             if (result?.logEntries) {
                 for (const entry of result.logEntries) {
                     await addEntry(campaignName, entry).catch(() => {});
@@ -102,10 +148,25 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                     : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
                 setPopupHtml(html);
             }
+            if (result?.type === 'attack_roll' && rollAttack) {
+                const { attack, targetName } = result.payload;
+                const superiorityDieValue = result.context?.superiorityDieValue || 0;
+                const superiorityDieSize = result.context?.superiorityDieSize || 6;
+                const totalHitBonus = attack.hitBonus + superiorityDieValue;
+                const baseFormula = result.context?.baseDamageFormula || attack.damageFormula;
+                const combinedFormula = superiorityDieValue > 0 && baseFormula ? `${baseFormula} + ${superiorityDieValue}[Superiority]` : (baseFormula || null);
+                console.log('[CharSpecialActions] Firing attack_roll', { attackName: attack.name, hitBonus: attack.hitBonus, superiorityDieValue, superiorityDieSize, totalHitBonus, targetName, damageFormula: combinedFormula, baseFormula });
+                rollAttack(attack.name, totalHitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true, autoDamageFormula: combinedFormula, autoDamageName: `${attack.name} (Riposte)`, damageType: attack.damageType || 'Slashing', autoDamageRollResult: null, superiorityDieValue });
+            }
             return;
         }
 
-        const result = await onCombatSuperioritySelected(combatSuperiorityModal.action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
+        result = await onCombatSuperioritySelected(combatSuperiorityModal.action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
+        if (result?.logEntries) {
+            for (const entry of result.logEntries) {
+                await addEntry(campaignName, entry).catch(() => {});
+            }
+        }
         if (result?.type === 'popup') {
             const payload = result.payload;
             const html = typeof payload === 'string'
@@ -113,7 +174,24 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                 : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
             setPopupHtml(html);
         }
-    }, [combatSuperiorityModal, playerStats, campaignName]);
+        if (result?.popup) {
+            const payload = result.popup;
+            const html = typeof payload === 'string'
+                ? payload
+                : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
+            setPopupHtml(html);
+        }
+        if (result?.type === 'attack_roll' && rollAttack) {
+            const { attack, targetName } = result.payload;
+            const superiorityDieValue = result.context?.superiorityDieValue || 0;
+            const superiorityDieSize = result.context?.superiorityDieSize || 6;
+            const totalHitBonus = attack.hitBonus + superiorityDieValue;
+            const baseFormula = result.context?.baseDamageFormula || attack.damageFormula;
+            const combinedFormula = superiorityDieValue > 0 && baseFormula ? `${baseFormula} + ${superiorityDieValue}[Superiority]` : (baseFormula || null);
+            console.log('[CharSpecialActions] Firing attack_roll', { attackName: attack.name, hitBonus: attack.hitBonus, superiorityDieValue, superiorityDieSize, totalHitBonus, targetName, damageFormula: combinedFormula, baseFormula });
+            rollAttack(attack.name, totalHitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true, autoDamageFormula: combinedFormula, autoDamageName: `${attack.name} (Riposte)`, damageType: attack.damageType || 'Slashing', autoDamageRollResult: null, superiorityDieValue });
+        }
+    }, [combatSuperiorityModal, playerStats, campaignName, rollAttack, setPopupHtml]);
 
     const handleCombatSuperiorityReopenSelection = useCallback(async () => {
         if (!combatSuperiorityModal || !combatSuperiorityModal.action) return;
@@ -229,7 +307,12 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
     return (
            <div>
                <div className='sectionHeader'>Special Actions</div>
-            {popupHtml && <Popup html={popupHtml} onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)} />}
+              {popupHtml && <Popup onClickOrKeyDown={() => setPopupHtml && setPopupHtml(null)}>
+                {typeof popupHtml === 'string' ? <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml) }}></div> :
+                    popupHtml.type === 'd20' ? <DiceRollResult {...popupHtml} /> :
+                        popupHtml.type === 'automation_info' ? <div className="dice-roll-result"><div className="dice-roll-header"><i className="fa-solid fa-info-circle"></i>{popupHtml.name}</div><div dangerouslySetInnerHTML={{ __html: sanitizeHtml(popupHtml.description) }}></div><div className="dice-roll-hint">click to dismiss</div></div> :
+                            null}
+            </Popup>}
             {teleportModal && (
                 <TeleportModal
                     action={teleportModal.action}

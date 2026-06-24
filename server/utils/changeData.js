@@ -58,11 +58,11 @@ export const saveFile = () => {
         if (!fs.existsSync(dir)) {
             fs.mkdirSync(dir, { recursive: true });
         }
-        fs.writeFile(filePath, JSON.stringify(data), (err) => {
-            if (err) {
-                console.error(`Failed to save character change data for campaign ${campaign}:`, err.message);
-            }
-        });
+        try {
+            fs.writeFileSync(filePath, JSON.stringify(data));
+        } catch (err) {
+            console.error(`Failed to save character change data for campaign ${campaign}:`, err.message);
+        }
     }
 }
 

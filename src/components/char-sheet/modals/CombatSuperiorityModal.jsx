@@ -100,7 +100,7 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
                 return attackContext.attackerName === playerName && attackContext.hit === false;
             }
             if (m.trigger === 'melee_attack_miss') {
-                return attackContext.attackerName === playerName && (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike) && attackContext.hit === false;
+                return attackContext.targetName === playerName && (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike) && attackContext.hit === false;
             }
             if (m.trigger === 'melee_damage_taken') {
                 return attackContext.targetName === playerName && (attackContext.weaponType === 'melee' || attackContext.isUnarmedStrike);
