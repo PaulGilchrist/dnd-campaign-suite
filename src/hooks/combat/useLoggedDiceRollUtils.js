@@ -17,7 +17,7 @@ export async function readAoeContext(campaignName, overlayId) {
     if (!campaignName || !overlayId) return null;
     try {
         const overlayRes = await fetch(`/spell-overlay?campaign=${encodeURIComponent(campaignName)}`);
-        if (!overlayRes.ok) { console.log('[readAoeContext] overlayRes not ok'); return null; }
+        if (!overlayRes.ok) return null;
         const { overlays } = await overlayRes.json();
         const overlay = overlays?.find(o => o.id === overlayId);
         if (!overlay) return null;

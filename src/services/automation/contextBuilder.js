@@ -18,7 +18,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
     const playerName = playerStats.name;
 
     return buildBaseAttackContext(playerName, campaignName, attack.damageType).then(({ target, targetName, resistanceNotice }) => {
-        console.log('[buildAttackContextSync] playerName:', playerName, 'targetName:', targetName);
 
         // Hunter's Lore: reveal full IRV info for Hunter's Mark target
         let hunterLoreNotice = null;

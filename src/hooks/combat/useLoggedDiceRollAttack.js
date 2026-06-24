@@ -360,7 +360,6 @@ export function createLogAndShow(deps) {
                 },
                 timestamp: Date.now(),
             }, campaignName);
-            console.log('[useLoggedDiceRollAttack] pendingCombatSuperiorityPrompt set:', { hit, isCrit, weaponType: context?.damageType === 'ranged' ? 'ranged' : 'melee', targetName });
 
             const ps = context?.playerStats;
             const isSoulknife = ps?.class?.name === 'Rogue' && ps?.class?.major?.name === 'Soulknife';
@@ -482,7 +481,6 @@ export function createLogAndShow(deps) {
                     const combatSummary2 = await loadCombatSummary(campaignName);
                     const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, context?.damageType)) || false;
                     const applyResult = applyDamageToTarget(combatSummary2, targetName, halfDamage, [context?.damageType], campaignName, characters, ignoreResistance, context.attackerName || characterName);
-                    console.log('[PotentCantrip] stored rawTotal=', storedDamageResult.total, 'adjustedPotentTotal=', adjustedStoredTotal, 'halfDamage=', halfDamage, 'finalDamage=', applyResult?.finalDamage, 'damageReduced=', applyResult?.damageReduced, 'damageReducedByFeature=', applyResult?.damageReducedByFeature, 'wardAbsorbed=', applyResult?.wardAbsorbed);
                     const missTargetMaxHp = target?.type === 'player'
                         ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
                         : target?.maxHp ?? 0;
@@ -564,9 +562,6 @@ export function createLogAndShow(deps) {
                             isPotentCantrip: true,
                         });
                     }
-                    else {
-                        console.log('[PotentCantrip] rollExpression returned null for formula=', finalFormula);
-                    }
                 }
             }
             else if (isAutoMiss && context?.saveDc) {
@@ -622,16 +617,7 @@ export function createLogAndShow(deps) {
                         isPotentCantrip: true,
                     });
                 }
-                else {
-                    console.log('[PotentCantrip] rollExpression returned null for auto-miss formula=', finalFormula);
-                }
             }
-            else {
-                console.log('[PotentCantrip] isAutoMiss but no saveDc, skipping');
-            }
-        }
-        else {
-            console.log('[PotentCantrip] condition not met');
         }
 
         if (rollType === 'check' || rollType === 'skill') {

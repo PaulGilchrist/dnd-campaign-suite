@@ -177,7 +177,7 @@ export function createLogDamageAndShow(deps) {
         const overlayId = context?.targetName?.startsWith('overlay-') ? context.targetName.slice('overlay-'.length) : null;
         const aoeCtx = overlayId ? await readAoeContext(campaignName, overlayId) : null;
         const combatSummary = await loadCombatSummary(campaignName);
-        if (!aoeCtx || !combatSummary) { console.log('[handleAoeDamage] early return — aoeCtx:', !!aoeCtx, 'combatSummary:', !!combatSummary); return; }
+        if (!aoeCtx || !combatSummary) return;
 
         const { overlay, players, npcs } = aoeCtx;
         const affected = getAffectedCreatures(overlay, players, npcs, combatSummary);
