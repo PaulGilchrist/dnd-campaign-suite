@@ -8,6 +8,7 @@ import CharacterCreationWizard from './components/character-creation/CharacterCr
 import Sidebar from './components/sidebar/Sidebar.jsx';
 import Map from './components/map/Map.jsx';
 import MapsManager from './components/maps-manager/MapsManager.jsx';
+import { loadCombatSummary, setCombatSummaryCache } from './services/encounters/combatData.js';
 import EncounterBuilder from './components/encounter/EncounterBuilder.jsx';
 import * as mapsService from './services/maps/mapsService.js';
 import useAppData from './hooks/runtime/useAppData.js';
@@ -38,20 +39,27 @@ function App() {
   const charMgmtRef = useRef();
   const campaignRef = useRef();
   const wizardRef = useRef();
+  const campaignNameRef = useRef(null);
   useEffect(() => { charMgmtRef.current = charMgmt; campaignRef.current = campaignMgmt; wizardRef.current = wizard; }, [charMgmt, campaignMgmt, wizard]);
+  useEffect(() => { campaignNameRef.current = campaignMgmt.campaignName; }, [campaignMgmt.campaignName]);
 
   useEffect(() => {
     wizardRef.current.setCharacterCallbacks({ setCharacters: charMgmtRef.current.setCharacters, setActiveCharacter: charMgmtRef.current.setActiveCharacter });
   }, []);
 
   useEffect(() => {
-    campaignRef.current.setCampaignSelectCallback((_, loaded) => {
+    campaignRef.current.setCampaignSelectCallback(async (_, loaded) => {
       charMgmtRef.current.setCharacters(loaded);
       if (loaded.length > 0) {
         charMgmtRef.current.setActiveCharacter(cloneDeep(loaded[0]));
         setActiveView('charSheet');
       } else {
         wizardRef.current.handleAddCharacter();
+      }
+      // Pre-load combatSummary for the selected campaign so attack rider maneuvers work immediately
+      const cs = await loadCombatSummary(campaignNameRef.current);
+      if (cs) {
+        setCombatSummaryCache(cs, campaignNameRef.current);
       }
     });
     campaignRef.current.setDeleteCampaignCallback(() => { charMgmtRef.current.setCharacters([]); charMgmtRef.current.setActiveCharacter(null); });
