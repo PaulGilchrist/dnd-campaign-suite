@@ -13,7 +13,7 @@ import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
-import { onCombatSuperioritySelected, executeAttackRiderManeuver } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { onCombatSuperioritySelected, executeManeuver } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
@@ -89,14 +89,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
         setCombatSuperiorityModal(null);
 
         if (singleUseManeuverName) {
-            const attackContext = combatSuperiorityModal.payload?.attackContext;
-            const action = { automation: {} };
-            const attackInfo = {
-                weaponType: attackContext?.weaponType || null,
-                isUnarmedStrike: attackContext?.isUnarmedStrike || false,
-                targetName: attackContext?.targetName || null,
-            };
-            const result = await executeAttackRiderManeuver(action, playerStats, campaignName, singleUseManeuverName, attackInfo);
+            const result = await executeManeuver(combatSuperiorityModal.action, playerStats, campaignName, singleUseManeuverName);
             if (result?.logEntries) {
                 for (const entry of result.logEntries) {
                     await addEntry(campaignName, entry).catch(() => {});
@@ -108,9 +101,6 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct }) {
                     ? payload
                     : `<b><i class="fa-solid fa-bolt"></i> ${payload.name || 'Combat Superiority'}</b><br/>${payload.description || ''}<br/><span class="dice-roll-hint">click to dismiss</span>`;
                 setPopupHtml(html);
-            }
-            if (result?.type === 'modal' && result.modalName === 'sweepingAttackTarget') {
-                window.dispatchEvent(new CustomEvent('sweeping-attack-modal-show', { detail: result.payload }));
             }
             return;
         }

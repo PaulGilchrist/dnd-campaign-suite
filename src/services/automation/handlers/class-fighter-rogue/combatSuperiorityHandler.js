@@ -826,7 +826,7 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
 
     let description = `<b>${maneuver.name}</b> (Bonus Action)<br/>${dieDescription}`;
 
-    if (targetName) {
+    if (targetName && maneuver.effect !== 'ac_bonus_disengage') {
         description += ` Target: ${targetName}.`;
     }
 
@@ -854,6 +854,12 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
 
     if (maneuver.effect === 'ac_bonus_disengage') {
         description += ` You take the Disengage action and gain +${dieValue} AC until the start of your next turn.`;
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchActive', true, campaignName);
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchBonus', dieValue, campaignName);
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
+        await addExpiration(playerStats.name, playerStats.name, [
+            { type: 'bait_and_switch_clear' }
+        ], campaignName, 1);
     }
 
     if (maneuver.effect === 'advantage_and_damage') {
@@ -1548,7 +1554,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
     };
 }
 
-async function executeManeuver(action, playerStats, campaignName, maneuverName) {
+export async function executeManeuver(action, playerStats, campaignName, maneuverName) {
     const auto = action.automation;
     const allManeuvers = await loadManeuvers(playerStats.rules || '2024');
     const maneuver = allManeuvers.find(m => m.name === maneuverName);
@@ -1628,7 +1634,7 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
 
     let description = `${maneuver.name}: ${dieDescription}`;
 
-    if (targetName) {
+    if (targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'ac_bonus_and_swap') {
         description += ` Target: ${targetName}.`;
     }
 
@@ -1751,10 +1757,22 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
 
     if (maneuver.effect === 'ac_bonus_and_swap') {
         description += ` You or the ally gains +${dieValue} AC until the start of your next turn.`;
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchActive', true, campaignName);
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchBonus', dieValue, campaignName);
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
+        await addExpiration(playerStats.name, playerStats.name, [
+            { type: 'bait_and_switch_clear' }
+        ], campaignName, 1);
     }
 
     if (maneuver.effect === 'ac_bonus_disengage') {
         description += ` You take the Disengage action and gain +${dieValue} AC until the start of your next turn.`;
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchActive', true, campaignName);
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchBonus', dieValue, campaignName);
+        await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
+        await addExpiration(playerStats.name, playerStats.name, [
+            { type: 'bait_and_switch_clear' }
+        ], campaignName, 1);
     }
 
     if (maneuver.effect === 'advantage_and_damage') {
@@ -1841,6 +1859,13 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
         description += ` Add ${dieValue} to the ability check.`;
     }
 
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuver.name,
+        description,
+    };
+
     return {
         type: 'popup',
         payload: {
@@ -1849,5 +1874,6 @@ async function executeManeuver(action, playerStats, campaignName, maneuverName) 
             description,
             automation: auto,
         },
+        logEntries: [logEntry],
     };
 }

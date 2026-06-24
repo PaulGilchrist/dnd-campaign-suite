@@ -47,7 +47,9 @@ export function seedTrackedResources(characterKey, trackedEntries) {
 
 function notify(characterKey) {
   const set = listeners.get(characterKey);
-  if (set) set.forEach(fn => fn());
+  if (set) {
+    set.forEach(fn => fn());
+  }
 }
 
 export function addStorageChangeListener(characterKey, listener) {
@@ -71,7 +73,6 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
     return;
   }
   store.set(propertyName, value);
-  // console.log(`[SSE] setRuntimeValue ${characterKey}.${propertyName}:`, existing, '->', value);
 
   const obj = Object.fromEntries(store);
 
@@ -102,7 +103,6 @@ export function setRuntimeObject(characterKey, fullObject, campaignName, skipSyn
     }
   }
   if (changed) {
-    // console.log(`[SSE] setRuntimeObject ${characterKey}: keys [${changedKeys.join(', ')}] changed`);
     if (campaignName && !skipSync) {
       fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${encodeURIComponent(characterKey)}`, {
         method: 'POST',

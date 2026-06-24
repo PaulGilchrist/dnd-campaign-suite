@@ -429,7 +429,7 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.payload.description).toContain('5');
     });
 
-    it('describes ac_bonus_and_swap effect', async () => {
+    it('describes ac_bonus_and_swap effect and applies AC bonus', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Bait and Switch', effect: 'ac_bonus_and_swap' },
         ]);
@@ -444,9 +444,12 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
 
         expect(result.payload.description).toContain('+5 AC');
         expect(result.payload.description).toContain('next turn');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchActive', true, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchBonus', 5, 'test-campaign');
+        expect(result.payload.description).not.toContain('Target:');
     });
 
-    it('describes ac_bonus_disengage effect', async () => {
+    it('describes ac_bonus_disengage effect and applies AC bonus', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Evasive Footwork', effect: 'ac_bonus_disengage' },
         ]);
@@ -461,6 +464,9 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
 
         expect(result.payload.description).toContain('Disengage action');
         expect(result.payload.description).toContain('+5 AC');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchActive', true, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchBonus', 5, 'test-campaign');
+        expect(result.payload.description).not.toContain('Target:');
     });
 
     it('describes advantage_and_damage effect', async () => {

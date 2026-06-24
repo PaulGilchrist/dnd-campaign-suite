@@ -27,6 +27,14 @@ function ensureArray(value, name) {
 export function applyTurnStartEffects(activeName, playerStats, campaignName) {
     if (!activeName || !playerStats) return;
 
+    // Clear Bait and Switch (Evasive Footwork) AC bonus at start of character's next turn
+    const wasActive = getRuntimeValue(activeName, 'baitAndSwitchActive');
+    if (wasActive) {
+        setRuntimeValue(activeName, 'baitAndSwitchActive', null, campaignName);
+        setRuntimeValue(activeName, 'baitAndSwitchBonus', null, campaignName);
+        setRuntimeValue(activeName, 'baitAndSwitchSource', null, campaignName);
+    }
+
     const turnStartEffects = ensureArray(playerStats.turnStartEffects, 'turnStartEffects');
     for (const effect of turnStartEffects) {
         if (effect.type === 'heroic_inspiration') {
@@ -76,6 +84,11 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         }
         if (effect.type === 'steady_aim_clear') {
             applySteadyAimClearTurnStart(activeName, playerStats, effect, campaignName);
+        }
+        if (effect.type === 'bait_and_switch_clear') {
+            setRuntimeValue(activeName, 'baitAndSwitchActive', null, campaignName);
+            setRuntimeValue(activeName, 'baitAndSwitchBonus', null, campaignName);
+            setRuntimeValue(activeName, 'baitAndSwitchSource', null, campaignName);
         }
         if (effect.type === 'supreme_sneak') {
             applySupremeSneakTurnStart(activeName, playerStats, effect, campaignName);
@@ -709,14 +722,22 @@ export function addExpiration(attackerName, targetName, effects, campaignName, r
      ], campaignName);
 }
 
-export function clearAllExpirationEffects(characterName, campaignName) {
+ export function clearAllExpirationEffects(characterName, campaignName) {
     if (!characterName || !campaignName) return;
 
      // Clear all active buffs (Innate Sorcery, Reckless Attack, etc.)
-    setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
-    setRuntimeValue(characterName, 'mantleOfMajestyActive', null, campaignName);
+     setRuntimeValue(characterName, 'activeBuffs', [], campaignName);
+     setRuntimeValue(characterName, 'mantleOfMajestyActive', null, campaignName);
 
-    const charLower = characterName.toLowerCase();
+      // Clear Bait and Switch (Evasive Footwork) AC bonus
+      const wasActive = getRuntimeValue(characterName, 'baitAndSwitchActive');
+      if (wasActive) {
+          setRuntimeValue(characterName, 'baitAndSwitchActive', null, campaignName);
+          setRuntimeValue(characterName, 'baitAndSwitchBonus', null, campaignName);
+          setRuntimeValue(characterName, 'baitAndSwitchSource', null, campaignName);
+      }
+
+     const charLower = characterName.toLowerCase();
 
      // --- "From me": clear all effects I have on other targets ---
     const myList = getRuntimeValue(characterName, KEY);
@@ -1113,6 +1134,16 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
             case 'remove_regenerate_buff': {
                 setRuntimeValue(targetName, 'regenerateActive', null, campaignName);
                 setRuntimeValue(targetName, 'regenerateSource', null, campaignName);
+                break;
+            }
+
+            case 'bait_and_switch_clear': {
+                const wasActive = getRuntimeValue(targetName, 'baitAndSwitchActive');
+                if (wasActive) {
+                    setRuntimeValue(targetName, 'baitAndSwitchActive', null, campaignName);
+                    setRuntimeValue(targetName, 'baitAndSwitchBonus', null, campaignName);
+                    setRuntimeValue(targetName, 'baitAndSwitchSource', null, campaignName);
+                }
                 break;
             }
 
