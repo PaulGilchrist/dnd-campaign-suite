@@ -352,7 +352,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             { automation: { secondaryTargetName: sweepingAttackTargetModal.selectedTarget } },
             sweepingAttackTargetModal.playerStats,
             sweepingAttackTargetModal.campaignName,
-            null
+            sweepingAttackTargetModal.selectedTarget
         );
         if (result.payload) {
             setPopupHtml(result.payload);

@@ -699,43 +699,50 @@ export async function executeAttackRiderManeuver(action, playerStats, campaignNa
     if (maneuver.effect === 'secondary_damage') {
         const cs = await getCombatContext(campaignName);
         if (cs && cs.creatures && targetName) {
-            const primaryTarget = cs.creatures.find(c => c.name === targetName);
-            if (primaryTarget?.position) {
+            const targetIndex = cs.creatures.findIndex(c => c.name === targetName);
+            let secondaryTargets = [];
+
+            if (targetIndex >= 0 && cs.creatures[targetIndex]?.position) {
                 const rangeFt = rangeToFeet(maneuver.range || '8_ft') || 8;
-                const secondaryCandidates = cs.creatures
-                    .filter(c => c.name !== targetName && c.position)
+                secondaryTargets = cs.creatures
+                    .filter((c, i) => i !== targetIndex && c.position)
                     .map(c => ({
                         creature: c,
-                        distance: getDistanceFeet(primaryTarget.position, c.position),
+                        distance: getDistanceFeet(cs.creatures[targetIndex].position, c.position),
                     }))
-                    .filter(t => t.distance != null && t.distance <= rangeFt);
+                    .filter(t => t.distance != null && t.distance <= rangeFt)
+                    .map(t => t.creature);
 
-                if (secondaryCandidates.length === 0) {
+                if (secondaryTargets.length === 0) {
                     description += ` No valid secondary targets within 5 feet of ${targetName}.`;
-                } else {
-                    setRuntimeValue(playerStats.name, 'pendingSweepingAttack', {
-                        dieValue,
-                        damageType: attackInfo?.damageType || 'bludgeoning',
-                        weaponType: attackInfo?.weaponType || 'melee',
-                        isUnarmedStrike: attackInfo?.isUnarmedStrike || false,
-                        targetName,
-                        secondaryTargets: secondaryCandidates.map(t => t.creature),
-                        primaryTargetPos: primaryTarget.position,
-                    }, campaignName);
-
-                    return {
-                        type: 'modal',
-                        modalName: 'sweepingAttackTarget',
-                        payload: {
-                            playerStats,
-                            campaignName,
-                            secondaryTargets: secondaryCandidates.map(t => t.creature),
-                            primaryTarget: targetName,
-                            dieValue,
-                        },
-                        logEntries: [logEntry],
-                    };
                 }
+            } else if (targetIndex >= 0) {
+                secondaryTargets = cs.creatures.filter((c, i) => i !== targetIndex);
+            }
+
+            if (secondaryTargets.length > 0) {
+                setRuntimeValue(playerStats.name, 'pendingSweepingAttack', {
+                    dieValue,
+                    damageType: attackInfo?.damageType || 'bludgeoning',
+                    weaponType: attackInfo?.weaponType || 'melee',
+                    isUnarmedStrike: attackInfo?.isUnarmedStrike || false,
+                    targetName,
+                    secondaryTargets,
+                    primaryTargetPos: targetIndex >= 0 ? cs.creatures[targetIndex]?.position : null,
+                }, campaignName);
+
+                return {
+                    type: 'modal',
+                    modalName: 'sweepingAttackTarget',
+                    payload: {
+                        playerStats,
+                        campaignName,
+                        secondaryTargets,
+                        primaryTarget: targetName,
+                        dieValue,
+                    },
+                    logEntries: [logEntry],
+                };
             }
         }
         description += ` A second creature within 5 feet of the target takes ${dieValue} damage (same type as the original attack).`;
@@ -1047,17 +1054,28 @@ export async function executeSweepingAttack(action, playerStats, campaignName, s
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
 
-    await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', null, campaignName);
-
     const logEntry = {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: 'Sweeping Attack',
         description: `Sweeping Attack: ${secondaryTargetName} takes ${dieValue} ${damageType} damage (same type as original attack against ${targetName}).`,
     };
+
+    let actualDamage = dieValue;
+    const cs = await getCombatContext(campaignName);
+    const characters = getRuntimeValue('characters', 'characters', campaignName) || [];
+    if (cs) {
+        const result = applyDamageToTarget(cs, secondaryTargetName, dieValue, [damageType], campaignName, characters, false, playerStats.name);
+        if (result.finalDamage > 0) {
+            actualDamage = result.finalDamage;
+            logEntry.description = `Sweeping Attack: ${secondaryTargetName} takes ${actualDamage} ${damageType} damage (same type as original attack against ${targetName}).`;
+        }
+    }
+
+    await setRuntimeValue(playerStats.name, 'pendingSweepingAttack', null, campaignName);
     await addEntry(campaignName, logEntry).catch(() => {});
 
-    const description = `<b>Sweeping Attack</b><br/>${secondaryTargetName} takes ${dieValue} ${damageType} damage (same type as the original attack).`;
+    const description = `<b>Sweeping Attack</b><br/>${secondaryTargetName} takes ${actualDamage} ${damageType} damage (same type as the original attack).`;
 
     return {
         type: 'popup',
