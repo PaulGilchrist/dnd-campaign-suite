@@ -701,13 +701,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction, characters]);
 
 
-    const getWeaponMastery = (weaponName) => {
+    const getWeaponMastery = (weaponName, attack) => {
         if (playerStats.rules !== '2024') {
             return null;
         }
 
         const available = collectWeaponMastery(weaponName, playerStats);
-        return available.baseMastery || null;
+        return available.baseMastery || attack?.mastery || null;
     };
 
     const { buildUpcastLevels } = useSpellUpcastFlow(playerStats, campaignName);
@@ -808,7 +808,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             }}>{attack.damage}</div>
 
                             <div className='left'>{attack.damageType}</div>
-                            {is2024Rules && <div className={getWeaponMastery(attack.name) ? "clickable" : ""} onClick={() => { const mastery = getWeaponMastery(attack.name); if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{getWeaponMastery(attack.name) || ''}</div>}
+                            {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
                         </React.Fragment>;
                     })}
                     {actionSpells.map((spell) => {

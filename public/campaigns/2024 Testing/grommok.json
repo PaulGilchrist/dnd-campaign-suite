@@ -82,15 +82,16 @@
       "Grappling Hook",
       "Playing Card Set",
       "Rations (5 days)",
-      "Rope, Silk (50 feet)",
+      "Rope",
+      "Silk (50 feet)",
       "String",
       "Waterskin"
     ],
     "equipped": [
       "Longbow",
-      "Longsword",
+      "+1 Longsword",
       "Shield",
-      "Plate"
+      "Plate Armor"
     ],
     "gold": 10,
     "magicItems": []
