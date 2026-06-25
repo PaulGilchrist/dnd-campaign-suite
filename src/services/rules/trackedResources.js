@@ -120,7 +120,7 @@ export function computeTrackedResources(playerStats) {
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name
     const isBattleMaster = majorName === 'Battle Master'
     if (isBattleMaster) {
-      maxSD = is2024 ? 4 : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4))
+      maxSD = is2024 ? (classLevel?.superiority_dice || 0) : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4))
     }
   }
   resources.superiorityDice = { current: maxSD, max: maxSD }

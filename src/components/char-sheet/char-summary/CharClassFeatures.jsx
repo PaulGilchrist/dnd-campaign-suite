@@ -208,7 +208,7 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName }) 
           ? (playerStats.level >= 17 ? 2 : (playerStats.level >= 2 ? 1 : 0))
           : (classLevel?.class_specific?.action_surges || 0);
 
-    const superiorityDiceMax = !isBattleMaster ? 0 : (playerStats.rules === '2024' ? 4 : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4)));
+    const superiorityDiceMax = !isBattleMaster ? 0 : (playerStats._trackedResources?.superiorityDice?.max || 0);
 
     const superiorityDieType = !isBattleMaster ? 0 : (playerStats.level >= 18 ? 12 : (playerStats.level >= 10 ? 10 : 8));
 

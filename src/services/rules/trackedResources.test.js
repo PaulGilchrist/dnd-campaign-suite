@@ -408,15 +408,44 @@ describe('computeTrackedResources', () => {
       expect(result.superiorityDice).toEqual({ current: 4, max: 4 });
     });
 
-    it('2024: Battle Master gives 4 dice at any level', () => {
+    it('2024: Battle Master gives 4 dice at level 3-6', () => {
       const stats = basePlayerStats({
         rules: '2024',
-        class: { ...basePlayerStats().class, name: 'Fighter', major: { name: 'Battle Master' } },
+        class: { ...basePlayerStats().class, name: 'Fighter', major: { name: 'Battle Master' }, class_levels: [{ level: 5, superiority_dice: 4 }] },
         level: 5,
-        class_levels: [{ level: 5 }],
       });
       const result = computeTrackedResources(stats);
       expect(result.superiorityDice).toEqual({ current: 4, max: 4 });
+    });
+
+    it('2024: Battle Master gives 5 dice at level 7-14', () => {
+      const stats = basePlayerStats({
+        rules: '2024',
+        class: { ...basePlayerStats().class, name: 'Fighter', major: { name: 'Battle Master' }, class_levels: [{ level: 10, superiority_dice: 5 }] },
+        level: 10,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.superiorityDice).toEqual({ current: 5, max: 5 });
+    });
+
+    it('2024: Battle Master gives 6 dice at level 15-20', () => {
+      const stats = basePlayerStats({
+        rules: '2024',
+        class: { ...basePlayerStats().class, name: 'Fighter', major: { name: 'Battle Master' }, class_levels: [{ level: 15, superiority_dice: 6 }] },
+        level: 15,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.superiorityDice).toEqual({ current: 6, max: 6 });
+    });
+
+    it('2024: Battle Master gives 0 dice at level 1-2', () => {
+      const stats = basePlayerStats({
+        rules: '2024',
+        class: { ...basePlayerStats().class, name: 'Fighter', major: { name: 'Battle Master' }, class_levels: [{ level: 2, superiority_dice: 0 }] },
+        level: 2,
+      });
+      const result = computeTrackedResources(stats);
+      expect(result.superiorityDice).toEqual({ current: 0, max: 0 });
     });
 
     it('non-Battle Master Fighter has 0 dice', () => {
