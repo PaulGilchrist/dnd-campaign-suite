@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
@@ -100,6 +100,10 @@ vi.mock('./popups/MetamagicPopup.jsx', () => ({
   default: vi.fn((props) => <div data-testid="metamagic-popup">{props.spell?.name || 'MetamagicPopup'}</div>),
 }));
 
+vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
+  useDiceRollPopup: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
+}));
+
 vi.mock('./char-spells/SpellDetailPopup.jsx', () => ({
   default: vi.fn((props) => <div data-testid="spell-detail-popup"><div data-testid="spell-name">{props.spell?.name}</div><div data-testid="upcast-levels">{JSON.stringify(props.upcastLevels)}</div></div>),
 }));
@@ -111,6 +115,7 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
+import { addEntry } from '../../services/ui/logService.js';
 import * as mapsService from '../../services/maps/mapsService.js';
 import * as damageUtils from '../../services/rules/combat/damageUtils.js';
 
@@ -390,28 +395,39 @@ describe('CharBonusActions - Spell Cast Flow', () => {
   describe('cannotAct behavior on damage clicks', () => {
     const bonusActionAttack = { name: 'Main Gauche', range: 5, hitBonus: 5, damage: '1d4+3', damageType: 'Piercing', type: 'Bonus Action' };
 
-    it('does not call onDamageClick when cannotAct is true', () => {
-      const mockOnDamageClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} cannotAct onDamageClick={mockOnDamageClick} />);
+    it('does not call handleSimpleDamageRoll when cannotAct is true', () => {
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" cannotAct />);
       const damageElement = screen.getByText('1d4+3');
       fireEvent.click(damageElement);
-      expect(mockOnDamageClick).not.toHaveBeenCalled();
+      expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
     });
 
-    it('calls onDamageClick when cannotAct is false', () => {
-      const mockOnDamageClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} cannotAct={false} onDamageClick={mockOnDamageClick} />);
+    it('calls handleSimpleDamageRoll when cannotAct is false', async () => {
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" cannotAct={false} />);
       const damageElement = screen.getByText('1d4+3');
       fireEvent.click(damageElement);
-      expect(mockOnDamageClick).toHaveBeenCalledWith(bonusActionAttack);
+      await act(async () => { await Promise.resolve(); });
+      expect(vi.mocked(addEntry)).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        type: 'roll',
+        rollType: 'damage',
+        name: 'Main Gauche',
+        formula: '1d4+3',
+        note: 'Direct damage roll (no target)',
+      }));
     });
 
-    it('does not call onDamageClick when cannotAct is undefined', () => {
-      const mockOnDamageClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} onDamageClick={mockOnDamageClick} />);
+    it('calls handleSimpleDamageRoll when cannotAct is undefined', async () => {
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" />);
       const damageElement = screen.getByText('1d4+3');
       fireEvent.click(damageElement);
-      expect(mockOnDamageClick).toHaveBeenCalledWith(bonusActionAttack);
+      await act(async () => { await Promise.resolve(); });
+      expect(vi.mocked(addEntry)).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        type: 'roll',
+        rollType: 'damage',
+        name: 'Main Gauche',
+        formula: '1d4+3',
+        note: 'Direct damage roll (no target)',
+      }));
     });
   });
 

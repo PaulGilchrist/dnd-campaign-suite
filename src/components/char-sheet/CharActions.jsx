@@ -321,13 +321,43 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
     }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName]);
 
+    // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
+    // Direct damage click only logs a simple die roll — no targeting, no riders, no damage application.
+    // This is the ONLY way to apply damage to a selected target: successful To Hit → auto-damage.
+    const handleSimpleDamageRoll = React.useCallback(async (attack) => {
+        const result = rollExpression(attack.damage);
+        if (!result) return;
+        if (popupHtml) setPopupHtml(null);
+        await addEntry(campaignName, {
+            type: 'roll',
+            characterName: playerStats.name,
+            rollType: 'damage',
+            name: attack.name,
+            formula: attack.damage,
+            rolls: result.rolls,
+            total: result.total,
+            modifier: result.modifier,
+            damageType: attack.damageType,
+            note: 'Direct damage roll (no target)',
+        });
+        setPopupHtml({
+            type: 'damage',
+            name: attack.name,
+            formula: attack.damage,
+            rolls: result.rolls,
+            total: result.total,
+            modifier: result.modifier,
+            damageType: attack.damageType,
+            note: 'Direct damage roll (no target)',
+        });
+    }, [playerStats.name, campaignName, popupHtml, setPopupHtml]);
+
     const {
         pendingActionMetamagic,
         handleActionMetamagicConfirm,
         handleActionMetamagicSkip,
         handleActionSpellDamageClick,
         handleSpellAttackClick,
-        handleSpellDamageClick,
     } = useActionSpellMetamagic({
         playerStats,
         campaignName,
@@ -815,8 +845,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             <div className={attack.damage ? "clickable" : ""} onClick={() => {
                                 if (cannotAct) return;
                                 if (attack.saveDc) { handleActionSpellDamageClick(attack); return; }
-                                const isSpell = playerStats.spellAbilities?.spells?.some(s => s.name === attack.name);
-                                isSpell ? handleSpellDamageClick(attack) : handleDamageClick(attack);
+                                // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
+                                // Direct damage click only logs a simple die roll — no targeting, no riders.
+                                handleSimpleDamageRoll(attack);
                             }}>{attack.damage}</div>
 
                             <div className='left'>{attack.damageType}</div>
@@ -1038,6 +1069,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 mapName={mapName}
                 onAttackClick={handleAttackClick}
                 onDamageClick={handleDamageClick}
+                onActionSpellDamageClick={handleActionSpellDamageClick}
                 onAutomationAction={handleAutomationAction}
                 getWeaponMastery={getWeaponMastery}
                 rollAttack={rollAttack}

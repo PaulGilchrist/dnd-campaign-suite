@@ -17,6 +17,8 @@ import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidatio
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
+import { rollExpression } from '../../services/dice/diceRoller.js';
+import { addEntry } from '../../services/ui/logService.js';
 import './CharActions.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -51,7 +53,7 @@ function isActionSpell(castingTime) {
     return actionCastingTimes.includes(ct);
 }
 
-function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
+function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, conditionAttackMode, cannotAct, mapName, characters, onAttackClick, onActionSpellDamageClick, onAutomationAction, getWeaponMastery, rollAttack, rollDamage, getTargetInfo }) {
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
     const [selectedBonusSpell, setSelectedBonusSpell] = useState(null);
 
@@ -64,6 +66,37 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
         if (!spell) return;
         setSelectedBonusSpell(spell);
      };
+
+    // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
+    // Direct damage click only logs a simple die roll — no targeting, no riders, no damage application.
+    // This is the ONLY way to apply damage to a selected target: successful To Hit → auto-damage.
+    const handleSimpleDamageRoll = React.useCallback(async (attack) => {
+        const result = rollExpression(attack.damage);
+        if (!result) return;
+        if (popupHtml) setPopupHtml(null);
+        await addEntry(campaignName, {
+            type: 'roll',
+            characterName: playerStats.name,
+            rollType: 'damage',
+            name: attack.name,
+            formula: attack.damage,
+            rolls: result.rolls,
+            total: result.total,
+            modifier: result.modifier,
+            damageType: attack.damageType,
+            note: 'Direct damage roll (no target)',
+        });
+        setPopupHtml({
+            type: 'damage',
+            name: attack.name,
+            formula: attack.damage,
+            rolls: result.rolls,
+            total: result.total,
+            modifier: result.modifier,
+            damageType: attack.damageType,
+            note: 'Direct damage roll (no target)',
+        });
+    }, [playerStats.name, campaignName, popupHtml, setPopupHtml]);
 
     const cachedBonusCastPosRef = React.useRef(null);
 
@@ -171,7 +204,13 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                                 {attack.saveDc
                                     ? <div className="save-dc-display">DC {attack.saveDc + displaySaveDcBonus} {attack.saveType}</div>
                                   : <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' || cannotAct ? " stat--penalized" : "") + (cannotAct ? " disabled-attack" : "")} onClick={() => onAttackClick(attack)}>{signFormatter.format(attack.hitBonus - exhaustionPenalty)}</div>}
-                              <div className={attack.damage ? "clickable" : ""} onClick={() => !cannotAct && onDamageClick(attack)}>{attack.damage}</div>
+                               <div className={attack.damage ? "clickable" : ""} onClick={() => {
+                                   if (cannotAct) return;
+                                   if (attack.saveDc) { onActionSpellDamageClick(attack); return; }
+                                   // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
+                                   // Direct damage click only logs a simple die roll — no targeting, no riders.
+                                   handleSimpleDamageRoll(attack);
+                               }}>{attack.damage}</div>
                               <div className='left'>{attack.damageType}</div>
                                {is2024Rules && (() => { const mastery = getWeaponMastery(attack.name, attack); return <div className={mastery ? "clickable" : ""} onClick={() => { if (mastery) showWeaponMasteryPopup(mastery, setPopupHtml); }}>{mastery}</div>; })()}
                           </React.Fragment>;
@@ -182,7 +221,12 @@ function CharBonusActions({ playerStats, campaignName, exhaustionPenalty, condit
                               <div className='left'>Horde Breaker</div>
                                <div>{formatRange(hordeBreakerAttack.range)}</div>
                               <div className={"clickable" + (exhaustionPenalty > 0 || conditionAttackMode === 'disadvantage' ? " stat--penalized" : "")} onClick={() => onAttackClick(hordeBreakerAttack)}>{signFormatter.format(hordeBreakerAttack.hitBonus - exhaustionPenalty)}</div>
-                              <div className={hordeBreakerAttack.damage ? "clickable" : ""} onClick={() => !cannotAct && onDamageClick(hordeBreakerAttack)}>{hordeBreakerAttack.damage}</div>
+                               <div className={hordeBreakerAttack.damage ? "clickable" : ""} onClick={() => {
+                                   if (cannotAct) return;
+                                   // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
+                                   // Direct damage click only logs a simple die roll — no targeting, no riders.
+                                   handleSimpleDamageRoll(hordeBreakerAttack);
+                               }}>{hordeBreakerAttack.damage}</div>
                               <div className='left'>{hordeBreakerAttack.damageType}</div>
                               {is2024Rules && <div></div>}
                           </React.Fragment>

@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharBonusActions from './CharBonusActions.jsx';
 
@@ -92,6 +92,10 @@ vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   }),
 }));
 
+vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
+  useDiceRollPopup: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
+}));
+
 vi.mock('./DiceRollResult.jsx', () => ({
   default: vi.fn((props) => <div data-testid="dice-roll-result">{props.name || 'DiceRollResult'}</div>),
 }));
@@ -109,6 +113,8 @@ import { hasAutomation } from '../../services/combat/automation/automationServic
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { showWeaponMasteryPopup } from '../../hooks/combat/useActionPopup.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -237,20 +243,34 @@ describe('CharBonusActions - Interactive', () => {
       expect(mockOnAttackClick).toHaveBeenCalledWith(bonusActionAttack);
     });
 
-    it('calls onDamageClick when damage is clicked', () => {
-      const mockOnDamageClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} onDamageClick={mockOnDamageClick} />);
+    it('logs a simple damage roll when damage is clicked for to-hit bonus action attacks (no targeting or riders)', async () => {
+      const mockSetPopupHtml = vi.fn();
+      vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
+
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" />);
       const damageElement = screen.getByText('1d4+3');
       fireEvent.click(damageElement);
-      expect(mockOnDamageClick).toHaveBeenCalledWith(bonusActionAttack);
+      await act(async () => { await Promise.resolve(); });
+      expect(vi.mocked(addEntry)).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+        type: 'roll',
+        rollType: 'damage',
+        name: 'Main Gauche',
+        formula: '1d4+3',
+        note: 'Direct damage roll (no target)',
+      }));
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'damage',
+        name: 'Main Gauche',
+        formula: '1d4+3',
+        note: 'Direct damage roll (no target)',
+      }));
     });
 
-    it('does not call onDamageClick when cannotAct is true', () => {
-      const mockOnDamageClick = vi.fn();
-      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} cannotAct onDamageClick={mockOnDamageClick} />);
+    it('does not call handleSimpleDamageRoll when cannotAct is true', () => {
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} campaignName="test-campaign" cannotAct />);
       const damageElement = screen.getByText('1d4+3');
       fireEvent.click(damageElement);
-      expect(mockOnDamageClick).not.toHaveBeenCalled();
+      expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
     });
   });
 
@@ -323,17 +343,25 @@ describe('CharBonusActions - Interactive', () => {
       expect(mockOnAttackClick).toHaveBeenCalledWith(hordeBreakerAttack);
     });
 
-    it('calls onDamageClick when Horde Breaker damage is clicked', () => {
-      const mockOnDamageClick = vi.fn();
+    it('logs a simple damage roll when Horde Breaker damage is clicked (no targeting or riders)', async () => {
+      const mockSetPopupHtml = vi.fn();
+      vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
       getRuntimeValue.mockReturnValueOnce(null)
         .mockReturnValueOnce('Horde Breaker')
         .mockReturnValueOnce(0)
         .mockReturnValue(null);
-      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} onDamageClick={mockOnDamageClick} campaignName="test" />);
+      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" />);
       expect(screen.getByText('Horde Breaker')).toBeInTheDocument();
       const damageElement = screen.getByText('1d8+3');
       fireEvent.click(damageElement);
-      expect(mockOnDamageClick).toHaveBeenCalledWith(hordeBreakerAttack);
+      await act(async () => { await Promise.resolve(); });
+      expect(vi.mocked(addEntry)).toHaveBeenCalledWith('test', expect.objectContaining({
+        type: 'roll',
+        rollType: 'damage',
+        name: 'Horde Breaker',
+        formula: '1d8+3',
+        note: 'Direct damage roll (no target)',
+      }));
     });
 
     it('does not show Horde Breaker when cannotAct is true', () => {

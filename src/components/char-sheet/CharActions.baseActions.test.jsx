@@ -5,18 +5,23 @@ import CharActions from './CharActions.jsx';
 import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
-import useCharActionModals from './useCharActionModals.js';
+import { addEntry } from '../../services/ui/logService.js';
+import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 
 vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(() => null),
   setRuntimeValue: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => ({
-  default: vi.fn(() => ({
-    popupHtml: null, setPopupHtml: vi.fn(), rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
-  })),
-}));
+vi.mock('../../hooks/combat/useLoggedDiceRoll.js', () => {
+  const mockSetPopupHtml = vi.fn();
+  return {
+    default: vi.fn(() => ({
+      popupHtml: null, setPopupHtml: mockSetPopupHtml, rollAttack: vi.fn(), rollDamage: vi.fn(), quickRollPlayerSave: vi.fn(),
+    })),
+    _mockSetPopupHtml: mockSetPopupHtml,
+  };
+});
 
 vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
@@ -302,20 +307,36 @@ describe('CharActions base actions & popups', () => {
       expect(mockHandleActionSpellDamageClick).toHaveBeenCalledWith(stats.attacks[0]);
     });
 
-    it('calls handleDamageClick for non-save-DC attacks', async () => {
-      const mockHandleDamageClick = vi.fn();
-      useCharActionModals.mockReturnValue({
-        ...useCharActionModals(),
-        handleDamageClick: mockHandleDamageClick,
-      });
+    it('logs a simple damage roll for non-save-DC attacks (no targeting or riders)', async () => {
+      const mockSetPopupHtml = vi.fn();
 
       const stats = createStats({
         attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
       });
-      await act(async () => { render(<CharActions playerStats={stats} />); });
+      await act(async () => {
+        const wrapper = ({ children }) => (
+          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+            {children}
+          </DiceRollContext.Provider>
+        );
+        render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper });
+      });
       const damageEl = screen.getByText('1d8+3');
       await act(async () => { fireEvent.click(damageEl); });
-      expect(mockHandleDamageClick).toHaveBeenCalledWith(stats.attacks[0]);
+      await act(async () => { await Promise.resolve(); });
+      expect(vi.mocked(addEntry)).toHaveBeenCalledWith('my-campaign', expect.objectContaining({
+        type: 'roll',
+        rollType: 'damage',
+        name: 'Longsword',
+        formula: '1d8+3',
+        note: 'Direct damage roll (no target)',
+      }));
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'damage',
+        name: 'Longsword',
+        formula: '1d8+3',
+        note: 'Direct damage roll (no target)',
+      }));
     });
   });
 });

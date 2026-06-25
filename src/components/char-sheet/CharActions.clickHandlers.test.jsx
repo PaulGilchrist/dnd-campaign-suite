@@ -180,13 +180,13 @@ vi.mock('../../hooks/combat/useActionSpellMetamagic.js', () => ({
 
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
-import useCharActionModals from './useCharActionModals.js';
 import { DiceRollContext } from '../../hooks/combat/DiceRollContext.js';
 import { hasAutomation } from '../../services/combat/automation/automationService.js';
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { executeHandler } from '../../services/automation/index.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 const basePlayerStats = {
   name: 'TestCharacter',
@@ -386,19 +386,39 @@ describe('CharActions click handlers', () => {
       expect(mockHandleActionSpellDamageClick).toHaveBeenCalledWith(stats.attacks[0]);
     });
 
-    it('should call handleDamageClick for non-save-DC weapon attacks', async () => {
+    it('should log a simple damage roll for non-save-DC weapon attacks (no targeting or riders)', async () => {
       vi.mocked(getInnateSorceryBonus).mockReturnValue({ saveDcBonus: 0 });
-      const mockHandleDamageClick = vi.fn();
-      vi.mocked(useCharActionModals).mockReturnValue({ handleDamageClick: mockHandleDamageClick });
+      const mockSetPopupHtml = vi.fn();
 
       const stats = createStats({
         attacks: [{ name: 'Longsword', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing', type: 'Action' }],
       });
 
-      await renderWithFetch(<CharActions playerStats={stats} />);
+      await act(async () => {
+        const wrapper = ({ children }) => (
+          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: mockSetPopupHtml }}>
+            {children}
+          </DiceRollContext.Provider>
+        );
+        render(<CharActions playerStats={stats} campaignName="my-campaign" />, { wrapper });
+      });
       const damageElement = screen.getByText('1d8+3');
       await act(async () => { fireEvent.click(damageElement); });
-      expect(mockHandleDamageClick).toHaveBeenCalledWith(stats.attacks[0]);
+      await act(async () => { await Promise.resolve(); });
+      expect(vi.mocked(addEntry)).toHaveBeenCalledWith('my-campaign', expect.objectContaining({
+        type: 'roll',
+        rollType: 'damage',
+        name: 'Longsword',
+        formula: '1d8+3',
+        total: 5,
+        note: 'Direct damage roll (no target)',
+      }));
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'damage',
+        name: 'Longsword',
+        formula: '1d8+3',
+        note: 'Direct damage roll (no target)',
+      }));
     });
   });
 
