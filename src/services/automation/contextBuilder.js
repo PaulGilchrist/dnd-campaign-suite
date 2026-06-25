@@ -66,6 +66,15 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
                 forcedMode = 'disadvantage';
             }
         }
+        if (forcedMode === undefined) {
+            const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+            const sapEffect = storedEffects.find(
+                te => te.effect === 'disadvantage_next_attack' && te.target === playerName
+            );
+            if (sapEffect) {
+                forcedMode = 'disadvantage';
+            }
+        }
         if (hasSaveAdvantage && forcedMode === undefined) {
             forcedMode = 'advantage';
           }
