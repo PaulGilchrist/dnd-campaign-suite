@@ -99,7 +99,7 @@ function PartyMarkerLayer({ position, HEX_SIZE, hexCols, hexRows, onPositionChan
                 const menuX = cx + 15;
                 const menuY = cy - 15;
                 return (
-                    <g className="party-context-menu">
+                    <g className="party-context-menu" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                         <rect x={menuX} y={menuY} width={menuW} height={menuH} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
                         <rect x={menuX} y={menuY} width={menuW} height={menuH} rx="4" fill="transparent" className="party-menu-hit" onClick={handleStartEncounter} />
                         <text
@@ -122,7 +122,7 @@ function PartyMarkerLayer({ position, HEX_SIZE, hexCols, hexRows, onPositionChan
                 const menuX = cx + 15;
                 const menuY = cy - 35;
                 return (
-                    <g className="party-context-menu">
+                    <g className="party-context-menu" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
                         <rect x={menuX} y={menuY} width={menuW} height={menuH} rx="4" fill="#2a2a2a" stroke="#FFD700" strokeWidth="1" />
                         <rect x={menuX} y={menuY} width={menuW} height={menuH / 2 - 2} rx="4" fill="transparent" className="party-menu-hit" onClick={handleAdvance} />
                         <text

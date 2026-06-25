@@ -380,20 +380,22 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         onDrop={handleDrop}
                         onContextMenu={(e) => e.preventDefault()}
                         onClick={(e) => {
-                            setSelectedPoiMenu(null);
-                            setShowRename(null);
-                            setPartyContextMenu(null);
-                            if (tool === TOOL_ROAD) {
-                                setRoadStartPoiId(null);
-                            } else if (tool === TOOL_TRAVEL && partyPosition) {
-                                const hex = getHexFromEvent(e);
-                                if (!hex) return;
-                                if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
-                                if (hex.q === partyPosition.q && hex.r === partyPosition.r) return;
-                                if (!travelMgmt.isTravelActive) {
-                                    travelMgmt.startPlanning();
+                            if (e.button === 0) {
+                                setSelectedPoiMenu(null);
+                                setShowRename(null);
+                                setPartyContextMenu(null);
+                                if (tool === TOOL_ROAD) {
+                                    setRoadStartPoiId(null);
+                                } else if (tool === TOOL_TRAVEL && partyPosition) {
+                                    const hex = getHexFromEvent(e);
+                                    if (!hex) return;
+                                    if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
+                                    if (hex.q === partyPosition.q && hex.r === partyPosition.r) return;
+                                    if (!travelMgmt.isTravelActive) {
+                                        travelMgmt.startPlanning();
+                                    }
+                                    travelMgmt.setDestinationAndPath(hex);
                                 }
-                                travelMgmt.setDestinationAndPath(hex);
                             }
                         }}
                         style={{

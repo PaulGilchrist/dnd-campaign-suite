@@ -41,7 +41,7 @@ function POIContextMenu({ selectedPoi, pois, showRename, onToggleVisibility, onD
     };
 
     return (
-        <g className="poi-context-menu" onClick={(e) => e.stopPropagation()}>
+        <g className="poi-context-menu" onPointerDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
             <g>
                 <rect x={menuX} y={menuY} width={menuWidth} height={menuHeight} rx="4" fill="#2a2a2a" stroke="#555" strokeWidth="1" />
 
