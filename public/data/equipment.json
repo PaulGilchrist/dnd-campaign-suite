@@ -3047,8 +3047,8 @@
     "weight": 0.25
   },
   {
-    "index": "plate",
-    "name": "Plate",
+    "index": "plate-armor",
+    "name": "Plate Armor",
     "equipment_category": "Armor",
     "armor_category": "Heavy",
     "armor_class": {
@@ -4034,8 +4034,8 @@
     "weight": 5
   },
   {
-    "index": "splint",
-    "name": "Splint",
+    "index": "splint-armor",
+    "name": "Splint Armor",
     "equipment_category": "Armor",
     "armor_category": "Heavy",
     "armor_class": {
