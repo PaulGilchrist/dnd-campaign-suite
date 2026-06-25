@@ -858,7 +858,7 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
 
     let description = `<b>${maneuver.name}</b> (Bonus Action)<br/>${dieDescription}`;
 
-    if (targetName && maneuver.effect !== 'ac_bonus_disengage') {
+    if (targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'dash_and_damage') {
         description += ` Target: ${targetName}.`;
     }
 
@@ -913,7 +913,8 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
     }
 
     if (maneuver.effect === 'dash_and_damage') {
-        description += ` You take the Dash action. If you move 5+ feet in a straight line before a melee hit this turn, add ${dieValue} to the damage roll.`;
+        await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', dieValue, campaignName);
+        description += ` You take the Dash action. Add ${dieValue} to the damage roll of your next melee hit this turn.`;
     }
 
     return {
@@ -1703,7 +1704,7 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
 
     let description = `${maneuver.name}: ${dieDescription}`;
 
-    if (targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'ac_bonus_and_swap' && maneuver.effect !== 'damage_reduction') {
+    if (targetName && maneuver.effect !== 'ac_bonus_disengage' && maneuver.effect !== 'ac_bonus_and_swap' && maneuver.effect !== 'damage_reduction' && maneuver.effect !== 'dash_and_damage') {
         description += ` Target: ${targetName}.`;
     }
 
@@ -1919,7 +1920,8 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     }
 
     if (maneuver.effect === 'dash_and_damage') {
-        description += ` You take the Dash action. If you move 5+ feet in a straight line before a melee hit this turn, add ${dieValue} to the damage roll.`;
+        await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', dieValue, campaignName);
+        description += ` You take the Dash action. Add ${dieValue} to the damage roll of your next melee hit this turn.`;
     }
 
     if (maneuver.effect === 'temp_hp') {

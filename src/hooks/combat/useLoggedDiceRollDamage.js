@@ -1179,6 +1179,17 @@ export function createLogDamageAndShow(deps) {
             setRuntimeValue(characterName, 'commanderStrikeSource', null, campaignName);
         }
 
+        // Apply Lunging Attack superiority die damage bonus (melee hit only)
+        const lungingDieValue = getRuntimeValue(characterName, 'lungingAttackDieValue');
+        if (lungingDieValue && Number(lungingDieValue) > 0) {
+            const lungingVal = Number(lungingDieValue);
+            const dmgType = context?.damageType || 'same_as_weapon';
+            formula += ` + ${lungingVal} [${dmgType}]`;
+            total += lungingVal;
+            rolls = [...rolls, lungingVal];
+            setRuntimeValue(characterName, 'lungingAttackDieValue', null, campaignName);
+        }
+
         const { saveDc, saveType, damageType, isAutoMiss } = context || {};
         const adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
 

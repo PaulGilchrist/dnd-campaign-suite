@@ -123,6 +123,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 }
                 rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
 
+                // Clear Lunging Attack and Commander's Strike bonuses after auto-damage is rolled
+                const lungingDie = getRuntimeValue(playerStats.name, 'lungingAttackDieValue', campaignName);
+                if (lungingDie && Number(lungingDie) > 0) {
+                    await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', null, campaignName);
+                }
+                const csBonus = getRuntimeValue(playerStats.name, 'commanderStrikeBonus', campaignName);
+                if (csBonus && Number(csBonus) > 0) {
+                    await setRuntimeValue(playerStats.name, 'commanderStrikeBonus', null, campaignName);
+                    await setRuntimeValue(playerStats.name, 'commanderStrikeActive', null, campaignName);
+                    await setRuntimeValue(playerStats.name, 'commanderStrikeSource', null, campaignName);
+                }
+
                 if (isOverchannel && overchannelUseCount > 1) {
                     const dicePerLevel = 2 + (overchannelUseCount - 1);
                     const totalDice = dicePerLevel * overchannelSpellLevel;

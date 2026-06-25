@@ -147,7 +147,7 @@ const WizardStepInventory = React.memo(function WizardStepInventory({ formData, 
         'Equipped Items',
         tempInventory.equipped,
         'equipped',
-        'Enter items separated by commas (e.g., Longsword, Chain mail, Shield) or use Search Equipment'
+        'Enter items separated by commas (e.g., Longsword, Chain mail, Shield) or use Search Equipment. First weapon will be in main hand, and second weapon will be in offhand.'
       )}
 
       <EquipmentSearchModal

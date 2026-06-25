@@ -749,7 +749,7 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         );
 
         expect(result.payload.description).toContain('Dash action');
-        expect(result.payload.description).toContain('5+ feet');
+        expect(result.payload.description).toContain('next melee hit this turn');
         expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
     });
 
