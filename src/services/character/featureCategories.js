@@ -211,8 +211,7 @@ const categories2024 = {
         "Pact Magic",
         "Second-Storywork",
         "Slippery Mind",
-        "Somatic Components",
-        "Weapon Mastery"
+        "Somatic Components"
     ]
 };
 

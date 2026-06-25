@@ -11,8 +11,8 @@ async function loadWeapons() {
     return weaponsCache;
 }
 
-function WeaponKindMasteryModal({ action, playerStats, campaignName, meleeOnly, onClose }) {
-    const [selected, setSelected] = useState([]);
+function WeaponKindMasteryModal({ action, playerStats, campaignName, meleeOnly, onClose, existing }) {
+    const [selected, setSelected] = useState(existing || []);
     const [result, setResult] = useState(null);
     const [weapons, setWeapons] = useState([]);
     const [maxKinds, setMaxKinds] = useState(2);

@@ -73,6 +73,7 @@ describe('weaponKindMasteryHandler', () => {
         playerStats,
         campaignName,
         meleeOnly: false,
+        existing: [],
       });
     });
 
@@ -126,46 +127,33 @@ describe('weaponKindMasteryHandler', () => {
       );
     });
 
-    it('returns popup with pre-existing selection as array', async () => {
+    it('returns modal with pre-existing selection as array', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(['Greataxe', 'Handaxe']);
       const action = makeAction();
 
       const result = await handle(action, makePlayerStats(), campaignName, mapName);
 
-      expect(result.type).toBe('popup');
-      expect(result.payload.type).toBe('automation_info');
-      expect(result.payload.name).toBe('Weapon Mastery');
-      expect(result.payload.description).toBe(
-        'Weapon kinds: Greataxe, Handaxe. Click to change selection.',
-      );
+      expect(result.type).toBe('modal');
+      expect(result.modalName).toBe('weaponKindMastery');
+      expect(result.payload.existing).toEqual(['Greataxe', 'Handaxe']);
     });
 
-    it('returns popup with pre-existing selection and calls setRuntimeValue', async () => {
+    it('returns modal with pre-existing selection (does not auto-reapply)', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(['Longsword', 'Shortbow']);
       const action = makeAction();
 
       await handle(action, makePlayerStats(), campaignName, mapName);
 
-      expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'TestHero',
-        WEAPON_KIND_KEY,
-        ['Longsword', 'Shortbow'],
-        campaignName,
-      );
+      expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('logs ability_use when reapplying existing selection', async () => {
+    it('returns modal with existing selection (does not auto-log)', async () => {
       runtimeState.getRuntimeValue.mockReturnValue(['Maul']);
       const action = makeAction();
 
       await handle(action, makePlayerStats(), campaignName, mapName);
 
-      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
-        type: 'ability_use',
-        characterName: 'TestHero',
-        abilityName: 'Weapon Mastery - Weapon Kinds',
-        description: 'Weapon kinds: Maul (previously selected)',
-      });
+      expect(logService.addEntry).not.toHaveBeenCalled();
     });
 
     it('treats empty array as no existing selection (shows modal)', async () => {

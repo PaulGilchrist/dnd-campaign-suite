@@ -10,6 +10,8 @@ import SignatureSpellsModal from './modals/arcane/SignatureSpellsModal.jsx';
 import SpellMasteryModal from './modals/arcane/SpellMasteryModal.jsx';
 import SavantModal from './modals/arcane/SavantModal.jsx';
 import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx';
+import WeaponKindMasteryModal from './modals/WeaponKindMasteryModal.jsx';
+import WeaponMasteryChoiceModal from './modals/WeaponMasteryChoiceModal.jsx';
 import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
 import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
 import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
@@ -24,6 +26,8 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [signatureSpellsModal, setSignatureSpellsModal] = useState(null);
     const [spellMasteryModal, setSpellMasteryModal] = useState(null);
     const [savantModal, setSavantModal] = useState(null);
+    const [weaponKindMasteryModal, setWeaponKindMasteryModal] = useState(null);
+    const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
         characters,
@@ -94,6 +98,10 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                 setSavantModal(result.payload);
             } else if (result.modalName === 'combatSuperiority') {
                 setCombatSuperiorityModal(result.payload);
+            } else if (result.modalName === 'weaponKindMastery') {
+                setWeaponKindMasteryModal(result.payload);
+            } else if (result.modalName === 'weaponMasteryChoice') {
+                setWeaponMasteryChoiceModal(result.payload);
             }
         }
     }, [playerStats, campaignName, cannotAct, setCombatSuperiorityModal]);
@@ -208,6 +216,23 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
                     onConfirm={handleCombatSuperiorityConfirm}
                     onReopenSelection={handleCombatSuperiorityReopenSelection}
                     onClose={() => setCombatSuperiorityModal(null)}
+                />
+            )}
+            {weaponKindMasteryModal && (
+                <WeaponKindMasteryModal
+                    {...weaponKindMasteryModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setWeaponKindMasteryModal(null)}
+                />
+            )}
+            {weaponMasteryChoiceModal && (
+                <WeaponMasteryChoiceModal
+                    {...weaponMasteryChoiceModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setWeaponMasteryChoiceModal(null)}
+                    onConfirm={() => setWeaponMasteryChoiceModal(null)}
                 />
             )}
             {uniqueActions.map((specialAction, index) => {

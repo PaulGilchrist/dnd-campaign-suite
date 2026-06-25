@@ -11,10 +11,6 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const existing = getRuntimeValue(playerStats.name, WEAPON_KIND_KEY, campaignName);
 
-    if (existing && Array.isArray(existing) && existing.length > 0) {
-        return handleExistingSelection(action, playerStats, campaignName, existing, meleeOnly);
-    }
-
     return {
         type: 'modal',
         modalName: 'weaponKindMastery',
@@ -23,6 +19,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             playerStats,
             campaignName,
             meleeOnly,
+            existing: (existing && Array.isArray(existing)) ? existing : [],
         },
     };
 }
@@ -51,22 +48,4 @@ export async function applySelections(weaponNames, playerStats, campaignName) {
     };
 }
 
-async function handleExistingSelection(action, playerStats, campaignName, existingWeapons) {
-    await setRuntimeValue(playerStats.name, WEAPON_KIND_KEY, existingWeapons, campaignName);
 
-    addEntry(campaignName, {
-        type: 'ability_use',
-        characterName: playerStats.name,
-        abilityName: 'Weapon Mastery - Weapon Kinds',
-        description: `Weapon kinds: ${existingWeapons.join(', ')} (previously selected)`,
-    }).catch(() => {});
-
-    return {
-        type: 'popup',
-        payload: {
-            type: 'automation_info',
-            name: 'Weapon Mastery',
-            description: `Weapon kinds: ${existingWeapons.join(', ')}. Click to change selection.`,
-        },
-    };
-}

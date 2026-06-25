@@ -177,8 +177,7 @@ describe('featureCategories2024', () => {
         'Pact Magic',
         'Second-Storywork',
         'Slippery Mind',
-        'Somatic Components',
-        'Weapon Mastery'
+        'Somatic Components'
       ];
 
       for (const item of expectedItems) {
@@ -186,8 +185,8 @@ describe('featureCategories2024', () => {
       }
     });
 
-    it('should have exactly 17 items', () => {
-      expect(characterAdvancement).toHaveLength(17);
+    it('should have exactly 16 items', () => {
+      expect(characterAdvancement).toHaveLength(16);
     });
 
     it('should contain no duplicate entries', () => {

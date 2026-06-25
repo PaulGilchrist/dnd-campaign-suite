@@ -16,6 +16,8 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'signature_spells',
     'spell_mastery',
     'combat_superiority',
+    'weapon_kind_mastery',
+    'weapon_mastery_choice',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

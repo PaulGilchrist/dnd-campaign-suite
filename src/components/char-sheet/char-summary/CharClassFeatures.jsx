@@ -6,8 +6,9 @@ import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../../hook
 import { executeHandler } from '../../../services/automation/index.js';
 import { applyPortentChoice } from '../../../services/automation/handlers/class-wizard/portentHandler.js';
 import Popup from '../../common/popup.jsx';
+import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
 /* ─── Barbarian ─── */
-const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName }) {
+const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const is2024 = playerStats.rules === '2024';
     const [rageActive, setRageActive] = React.useState(false);
@@ -66,8 +67,8 @@ const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName
                  {rageActive && <span className="automation-badge">BPS Resist, STR Adv, +{rageDamage} dmg</span>}
              </div>
              <TrackedResourceInput label="Rage Points" resourceKey="ragePoints" playerName={playerStats.name} getMax={() => rageCount} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-             <div><b>Weapon Mastery: </b>{weaponMastery}</div>
-         </div>
+            <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{weaponMastery}</span></div>
+        </div>
     );
 };
 
@@ -196,7 +197,7 @@ const DruidFeatures = function DruidFeatures({ playerStats, campaignName }) {
 };
 
 /* ─── Fighter ─── */
-const FighterFeatures = function FighterFeatures({ playerStats, campaignName }) {
+const FighterFeatures = function FighterFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
     const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
@@ -231,8 +232,8 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName }) 
                   <div><b>Superiority Die: </b>d{superiorityDieType}</div>
                   </>
                )}
-              <div><b>Weapon Mastery: </b>{classLevel.weapon_mastery}</div>
-          </div>
+            <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{classLevel.weapon_mastery}</span></div>
+        </div>
       );
 };
 
@@ -564,6 +565,16 @@ const CLASS_COMPONENTS = {
 function CharClassFeatures({ playerStats, campaignName }) {
     const Cmp = CLASS_COMPONENTS[playerStats?.class?.name];
     const hasAdrenalineRush = (playerStats?.automation?.specialActions ?? []).some(a => a.effect === 'bonus_action_dash');
+    const [weaponKindMasteryModal, setWeaponKindMasteryModal] = React.useState(null);
+
+    const handleWeaponMasteryClick = () => {
+        const existing = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons', campaignName);
+        setWeaponKindMasteryModal({
+            action: { automation: { maxKinds: 'class_level_scaling', meleeOnly: false } },
+            meleeOnly: false,
+            existing: (existing && Array.isArray(existing)) ? existing : [],
+        });
+    };
 
     if (!Cmp && !hasAdrenalineRush) return null;
 
@@ -572,7 +583,15 @@ function CharClassFeatures({ playerStats, campaignName }) {
             {hasAdrenalineRush && (
                 <TrackedResourceInput label="Adrenaline Rush" resourceKey="adrenalineRushUses" playerName={playerStats.name} getMax={() => playerStats.proficiency || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
             )}
-            {Cmp && <Cmp playerStats={playerStats} campaignName={campaignName} />}
+            {Cmp && <Cmp playerStats={playerStats} campaignName={campaignName} onWeaponMasteryClick={handleWeaponMasteryClick} />}
+            {weaponKindMasteryModal && (
+                <WeaponKindMasteryModal
+                    {...weaponKindMasteryModal}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onClose={() => setWeaponKindMasteryModal(null)}
+                />
+            )}
         </>
     );
 }
