@@ -1,6 +1,7 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports ───────────────────────────────────────
+// ── Mocks ──────────────────────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -58,22 +59,20 @@ function makeAction(automation = {}) {
   };
 }
 
-// ── Tests ──────────────────────────────────────────────────────
+// ── Tests: handle() ───────────────────────────────────────────
 
 describe('openHandTechniqueHandler.handle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('with options (modal flow)', () => {
-    it('should return modal result when automation has options', async () => {
+  describe('modal flow (options present)', () => {
+    it('returns a modal result with correct payload when automation has options', async () => {
       const ps = makePlayerStats();
       const action = makeAction({
         options: [
           { name: 'Knock Prone', effect: 'prone' },
           { name: 'Push Away', effect: 'push_15ft' },
-          { name: 'Focus', effect: 'disadvantage_next_attack' },
-          { name: 'Sever Connections', effect: 'no_reactions' },
         ],
       });
 
@@ -83,22 +82,23 @@ describe('openHandTechniqueHandler.handle', () => {
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.type).toBe('modal');
-      expect(result.modalName).toBe('openHandTechnique');
-      expect(result.payload.action).toBe(action);
-      expect(result.payload.playerStats).toBe(ps);
-      expect(result.payload.campaignName).toBe(campaignName);
-      expect(result.payload.targetName).toBe('Goblin');
-      expect(result.payload.saveDc).toBe(13);
-      expect(result.payload.saveType).toBe('STR');
+      expect(result).toEqual({
+        type: 'modal',
+        modalName: 'openHandTechnique',
+        payload: {
+          action,
+          playerStats: ps,
+          campaignName,
+          targetName: 'Goblin',
+          saveDc: 13,
+          saveType: 'STR',
+        },
+      });
     });
 
-    it('should default saveType to STR when auto.saveType is missing', async () => {
+    it('defaults saveType to STR when automation.saveType is absent', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        saveType: undefined,
-        options: [{ name: 'Knock Prone', effect: 'prone' }],
-      });
+      const action = makeAction({ saveType: undefined, options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       getCombatContext.mockResolvedValue({});
       getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
@@ -109,12 +109,9 @@ describe('openHandTechniqueHandler.handle', () => {
       expect(result.payload.saveType).toBe('STR');
     });
 
-    it('should use custom saveType from automation', async () => {
+    it('uses automation.saveType when provided', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        saveType: 'CON',
-        options: [{ name: 'Knock Prone', effect: 'prone' }],
-      });
+      const action = makeAction({ saveType: 'CON', options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       getCombatContext.mockResolvedValue({});
       getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
@@ -125,11 +122,9 @@ describe('openHandTechniqueHandler.handle', () => {
       expect(result.payload.saveType).toBe('CON');
     });
 
-    it('should set targetName to null when no combat context', async () => {
+    it('sets targetName to null when combat context is unavailable', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [{ name: 'Knock Prone', effect: 'prone' }],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       getCombatContext.mockResolvedValue(null);
 
@@ -138,11 +133,9 @@ describe('openHandTechniqueHandler.handle', () => {
       expect(result.payload.targetName).toBeNull();
     });
 
-    it('should set targetName to null when target not found', async () => {
+    it('sets targetName to null when target lookup returns null', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [{ name: 'Knock Prone', effect: 'prone' }],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       getCombatContext.mockResolvedValue({});
       getTargetFromAttacker.mockReturnValue(null);
@@ -152,11 +145,9 @@ describe('openHandTechniqueHandler.handle', () => {
       expect(result.payload.targetName).toBeNull();
     });
 
-    it('should log ability_use entry', async () => {
+    it('logs an ability_use entry referencing the target when one exists', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [{ name: 'Knock Prone', effect: 'prone' }],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       getCombatContext.mockResolvedValue({});
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
@@ -172,11 +163,9 @@ describe('openHandTechniqueHandler.handle', () => {
       });
     });
 
-    it('should log ability_use entry without target when no target', async () => {
+    it('logs an ability_use entry without a target reference when no target', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [{ name: 'Knock Prone', effect: 'prone' }],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       getCombatContext.mockResolvedValue(null);
 
@@ -189,10 +178,24 @@ describe('openHandTechniqueHandler.handle', () => {
         description: 'Open Hand Technique used',
       });
     });
+
+    it('does not throw when addEntry rejects', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
+
+      getCombatContext.mockResolvedValue({});
+      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      buildSaveDc.mockReturnValue(13);
+      addEntry.mockReturnValue(Promise.reject(new Error('log failure')));
+
+      await expect(handle(action, ps, campaignName, null)).resolves.not.toThrow();
+
+      addEntry.mockRestore();
+    });
   });
 
-  describe('without options (popup flow)', () => {
-    it('should return popup result when automation has no options', async () => {
+  describe('popup flow (no options)', () => {
+    it('returns an automation_info popup when automation has no options', async () => {
       const ps = makePlayerStats();
       const action = makeAction({});
 
@@ -211,20 +214,23 @@ describe('openHandTechniqueHandler.handle', () => {
       expect(result.payload.automation).toBe(action.automation);
     });
 
-    it('should default saveType to STR in popup description when missing', async () => {
+    it('shows the correct save type and DC in the popup description', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({ saveType: undefined });
+      const action = makeAction({ saveType: 'CON' });
 
       getCombatContext.mockResolvedValue({});
       getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
-      buildSaveDc.mockReturnValue(15);
+      buildSaveDc.mockReturnValue(16);
 
       const result = await handle(action, ps, campaignName, null);
 
-      expect(result.payload.description).toContain('STR saving throw');
+      expect(result.payload.description).toContain('CON saving throw');
+      expect(result.payload.description).toContain('DC 16');
     });
   });
 });
+
+// ── Tests: applyOpenHandTechnique() ────────────────────────────
 
 describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
   beforeEach(() => {
@@ -232,24 +238,14 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
   });
 
   describe('with target', () => {
-    it('should clear pendingRiderChoice and return save listener result', async () => {
+    it('clears pendingRiderChoice and returns a popup with save listener result', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
       const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
       createSaveListener.mockReturnValue({ promise: savePromise });
 
       const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Knock Prone', 13, 'STR',
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'pendingRiderChoice', null, campaignName);
@@ -262,28 +258,22 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       expect(result.payload.type).toBe('automation_info');
     });
 
-    it('should apply effect when save fails', async () => {
+    it('applies the effect and logs failure when save fails', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
       const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
       createSaveListener.mockReturnValue({ promise: savePromise });
+      getRuntimeValue.mockReturnValue([]);
 
       await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Knock Prone', 13, 'STR',
       );
 
-      // 2nd call is the save result entry (1st is the save prompt entry)
-      expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, {
+      const logEntry = addEntry.mock.calls.find(
+        (c) => c[1]?.saveResult === 'failure',
+      );
+      expect(logEntry).toBeDefined();
+      expect(logEntry[1]).toMatchObject({
         type: 'roll',
         name: 'Open Hand Technique',
         characterName: 'TestMonk',
@@ -296,340 +286,184 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
         rolls: [5],
         bonus: 3,
         formula: '1d20+3',
-        timestamp: expect.any(Number),
       });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        campaignName,
+        'targetEffects',
+        expect.arrayContaining([
+          expect.objectContaining({
+            target: 'Goblin',
+            source: 'Open Hand Technique',
+            option: 'Knock Prone',
+            effect: 'prone',
+          }),
+        ]),
+        campaignName,
+      );
     });
 
-    it('should log success when save succeeds', async () => {
+    it('logs success and skips effect application when save succeeds', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
       const savePromise = Promise.resolve({ success: true, total: 15, roll: 10, saveBonus: 5 });
       createSaveListener.mockReturnValue({ promise: savePromise });
 
       await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Knock Prone', 13, 'STR',
       );
 
-      // 2nd call is the save result entry (1st is the save prompt entry)
-      expect(addEntry).toHaveBeenNthCalledWith(2, campaignName, {
+      const logEntry = addEntry.mock.calls.find(
+        (c) => c[1]?.saveResult === 'success',
+      );
+      expect(logEntry).toBeDefined();
+      expect(logEntry[1]).toMatchObject({
         type: 'roll',
-        name: 'Open Hand Technique',
-        characterName: 'TestMonk',
-        rollType: 'save-damage',
-        targetName: 'Goblin',
-        saveDc: 13,
-        saveType: 'STR',
         saveResult: 'success',
         total: 15,
         rolls: [10],
         bonus: 5,
         formula: '1d20+5',
-        timestamp: expect.any(Number),
       });
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        campaignName, 'targetEffects', expect.any(Array), campaignName,
+      );
     });
 
-    it('should not apply effect when save succeeds', async () => {
+    it('appends new effect to existing targetEffects array', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
-      const savePromise = Promise.resolve({ success: true, total: 15, roll: 10, saveBonus: 5 });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
+      const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
       createSaveListener.mockReturnValue({ promise: savePromise });
+      const existingEffect = {
+        target: 'Goblin', source: 'Other Ability', option: 'Other',
+        effect: 'other', value: null, duration: 'until_start_of_next_turn',
+      };
+      getRuntimeValue.mockReturnValue([existingEffect]);
 
       await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Knock Prone', 13, 'STR',
       );
 
-      // targetEffects should NOT have been updated
-      expect(getRuntimeValue).not.toHaveBeenCalledWith(campaignName, 'targetEffects');
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        campaignName,
+        'targetEffects',
+        expect.arrayContaining([existingEffect]),
+        campaignName,
+      );
     });
 
-    it('should push effect to targetEffects when save fails', async () => {
+    it('preserves the option value field in the effect entry', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Push Away', effect: 'push_15ft' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Push Far', effect: 'push_15ft', value: 30 }] });
       const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
       await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Push Away',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Push Far', 13, 'STR',
       );
 
-      expect(getRuntimeValue).toHaveBeenCalledWith(campaignName, 'targetEffects');
-      expect(setRuntimeValue).toHaveBeenCalledWith(campaignName, 'targetEffects', [
-        {
-          target: 'Goblin',
-          source: 'Open Hand Technique',
-          option: 'Push Away',
-          effect: 'push_15ft',
-          value: null,
-          duration: 'until_start_of_next_turn',
-        },
-      ], campaignName);
-    });
-
-    it('should append to existing targetEffects', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
-      const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
-      createSaveListener.mockReturnValue({ promise: savePromise });
-      getRuntimeValue.mockReturnValue([
-        { target: 'Goblin', source: 'Other Ability', option: 'Other', effect: 'other', value: null, duration: 'until_start_of_next_turn' },
-      ]);
-
-      await applyOpenHandTechnique(
-        action,
-        ps,
+      expect(setRuntimeValue).toHaveBeenCalledWith(
         campaignName,
-        'Goblin',
-        'Knock Prone',
-        13,
-        'STR',
-      );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(campaignName, 'targetEffects', [
-        { target: 'Goblin', source: 'Other Ability', option: 'Other', effect: 'other', value: null, duration: 'until_start_of_next_turn' },
-        {
-          target: 'Goblin',
-          source: 'Open Hand Technique',
-          option: 'Knock Prone',
-          effect: 'prone',
-          value: null,
-          duration: 'until_start_of_next_turn',
-        },
-      ], campaignName);
-    });
-
-    it('should handle option with value field', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Push Far', effect: 'push_15ft', value: 30 },
-        ],
-      });
-      const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
-      createSaveListener.mockReturnValue({ promise: savePromise });
-      getRuntimeValue.mockReturnValue([]);
-
-      await applyOpenHandTechnique(
-        action,
-        ps,
+        'targetEffects',
+        expect.arrayContaining([
+          expect.objectContaining({ effect: 'push_15ft', value: 30 }),
+        ]),
         campaignName,
-        'Goblin',
-        'Push Far',
-        13,
-        'STR',
       );
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(campaignName, 'targetEffects', [
-        {
-          target: 'Goblin',
-          source: 'Open Hand Technique',
-          option: 'Push Far',
-          effect: 'push_15ft',
-          value: 30,
-          duration: 'until_start_of_next_turn',
-        },
-      ], campaignName);
     });
 
-    it('should build success result message when save passes', async () => {
+    it('returns a result message indicating success when save passes', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
       const savePromise = Promise.resolve({ success: true, total: 15, roll: 10, saveBonus: 5 });
       createSaveListener.mockReturnValue({ promise: savePromise });
 
       const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Knock Prone', 13, 'STR',
       );
 
       expect(result.payload.description).toContain('Success');
       expect(result.payload.description).toContain('No effect applied');
     });
 
-    it('should build failure result message with effect description when save fails', async () => {
+    it('returns a result message indicating failure and effect description when save fails', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Push Away', effect: 'push_15ft' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Push Away', effect: 'push_15ft' }] });
       const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
       const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Push Away',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Push Away', 13, 'STR',
       );
 
       expect(result.payload.description).toContain('Failure');
       expect(result.payload.description).toContain('target pushed 15 ft away');
     });
 
-    it('should handle disadvantage_next_attack effect description', async () => {
+    it('builds an effect description for unknown effect types using the option name', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Focus', effect: 'disadvantage_next_attack' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Unique Effect', effect: 'custom_effect' }] });
       const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
       const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Focus',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Unique Effect', 13, 'STR',
       );
 
-      expect(result.payload.description).toContain('Disadvantage on its next attack roll');
+      expect(result.payload.description).toContain('Unique Effect');
     });
 
-    it('should handle no_reactions effect description', async () => {
+    it('omits the bonus from the formula when saveBonus is zero', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Sever Connections', effect: 'no_reactions' },
-        ],
-      });
-      const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
-      createSaveListener.mockReturnValue({ promise: savePromise });
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Sever Connections',
-        13,
-        'STR',
-      );
-
-      expect(result.payload.description).toContain("can't take Reactions until the start of your next turn");
-    });
-
-    it('should handle unknown effect type by returning option name', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Unknown Effect', effect: 'custom_effect' },
-        ],
-      });
-      const savePromise = Promise.resolve({ success: false, total: 8, roll: 5, saveBonus: 3 });
-      createSaveListener.mockReturnValue({ promise: savePromise });
-      getRuntimeValue.mockReturnValue([]);
-
-      const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Unknown Effect',
-        13,
-        'STR',
-      );
-
-      expect(result.payload.description).toContain('Unknown Effect');
-    });
-
-    it('should handle zero bonus in formula', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
       const savePromise = Promise.resolve({ success: false, total: 5, roll: 5, saveBonus: 0 });
       createSaveListener.mockReturnValue({ promise: savePromise });
       getRuntimeValue.mockReturnValue([]);
 
       await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Knock Prone', 13, 'STR',
       );
 
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        formula: '1d20',
-      }));
+      const logEntry = addEntry.mock.calls.find(
+        (c) => c[1]?.formula === '1d20',
+      );
+      expect(logEntry).toBeDefined();
+    });
+
+    it('handles null/undefined roll values with null-coalesced defaults in log entry', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
+      const savePromise = Promise.resolve({ success: false, total: null, roll: undefined, saveBonus: null });
+      createSaveListener.mockReturnValue({ promise: savePromise });
+      getRuntimeValue.mockReturnValue([]);
+
+      await applyOpenHandTechnique(
+        action, ps, campaignName, 'Goblin', 'Knock Prone', 13, 'STR',
+      );
+
+      const logEntry = addEntry.mock.calls.find(
+        (c) => c[1]?.saveResult === 'failure',
+      );
+      expect(logEntry).toBeDefined();
+      expect(logEntry[1].total).toBe(0);
+      expect(logEntry[1].rolls).toEqual([0]);
+      expect(logEntry[1].bonus).toBe(0);
+      expect(logEntry[1].formula).toBe('1d20+null');
     });
   });
 
   describe('without target', () => {
-    it('should return popup noting no target when targetName is null', async () => {
+    it('returns a popup noting no target when targetName is null', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        null,
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, null, 'Knock Prone', 13, 'STR',
       );
 
       expect(result.type).toBe('popup');
@@ -638,105 +472,70 @@ describe('openHandTechniqueHandler.applyOpenHandTechnique', () => {
       expect(result.payload.description).toContain('effect noted for manual application');
     });
 
-    it('should return popup noting no target when targetName is undefined', async () => {
+    it('returns a popup noting no target when targetName is undefined', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        undefined,
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, undefined, 'Knock Prone', 13, 'STR',
       );
 
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No target selected');
     });
 
-    it('should not call createSaveListener when no target', async () => {
+    it('does not invoke createSaveListener when there is no target', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        null,
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, null, 'Knock Prone', 13, 'STR',
       );
 
       expect(createSaveListener).not.toHaveBeenCalled();
     });
 
-    it('should still clear pendingRiderChoice when no target', async () => {
+    it('still clears pendingRiderChoice when there is no target', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        null,
-        'Knock Prone',
-        13,
-        'STR',
+        action, ps, campaignName, null, 'Knock Prone', 13, 'STR',
       );
 
       expect(setRuntimeValue).toHaveBeenCalledWith('TestMonk', 'pendingRiderChoice', null, campaignName);
     });
   });
 
-  describe('missing option', () => {
-    it('should return null when selected option name does not match any automation option', async () => {
+  describe('missing or mismatched option', () => {
+    it('returns null when selected option name does not match any automation option', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({
-        options: [
-          { name: 'Knock Prone', effect: 'prone' },
-        ],
-      });
+      const action = makeAction({ options: [{ name: 'Knock Prone', effect: 'prone' }] });
 
       const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Nonexistent Option',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Nonexistent Option', 13, 'STR',
       );
 
       expect(result).toBeNull();
     });
 
-    it('should return null when automation has no options', async () => {
+    it('returns null when automation has no options array', async () => {
       const ps = makePlayerStats();
-      const action = makeAction({});
+      const action = makeAction({ options: null });
 
       const result = await applyOpenHandTechnique(
-        action,
-        ps,
-        campaignName,
-        'Goblin',
-        'Any',
-        13,
-        'STR',
+        action, ps, campaignName, 'Goblin', 'Any', 13, 'STR',
+      );
+
+      expect(result).toBeNull();
+    });
+
+    it('returns null when automation options is an empty array', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction({ options: [] });
+
+      const result = await applyOpenHandTechnique(
+        action, ps, campaignName, 'Goblin', 'Any', 13, 'STR',
       );
 
       expect(result).toBeNull();

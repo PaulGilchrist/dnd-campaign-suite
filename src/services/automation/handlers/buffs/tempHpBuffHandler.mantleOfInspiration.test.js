@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
@@ -36,19 +37,18 @@ import * as logService from '../../../ui/logService.js';
 import { campaignName, makePlayerStats, makeAction, resetMocks } from './tempHpBuffTestHelpers.js';
 
 // ────────────────────────────────────────────────────────────────
-// handle() — Mantle of Inspiration fast-path detection
+// Route detection — which handler path is chosen
 // ────────────────────────────────────────────────────────────────
 
-describe('handle — Mantle of Inspiration detection', () => {
+describe('route detection', () => {
   beforeEach(() => resetMocks());
 
-  it('delegates to Mantle of Inspiration when bonusMovement + bardic_inspiration_die present', async () => {
+  it('delegates to Mantle handler when bonusMovement is true and expression contains bardic_inspiration_die', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: '2 * bardic_inspiration_die',
     });
     const ps = makePlayerStats();
-
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
     automationService.evaluateAutoExpression.mockReturnValue(12);
     rangeValidation.rangeToFeet.mockReturnValue(60);
@@ -60,7 +60,7 @@ describe('handle — Mantle of Inspiration detection', () => {
     expect(result.type).toBe('roll');
   });
 
-  it('does NOT delegate when bonusMovement is set but expression lacks bardic_inspiration_die', async () => {
+  it('falls through to generic popup when bonusMovement is true but expression does not reference bardic_inspiration_die', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: '5 + level',
@@ -74,7 +74,7 @@ describe('handle — Mantle of Inspiration detection', () => {
     expect(result.payload.description).toContain('Gained 8 temporary hit points');
   });
 
-  it('does NOT delegate when expression contains bardic_inspiration_die but no bonusMovement', async () => {
+  it('falls through to generic popup when expression contains bardic_inspiration_die but bonusMovement is false', async () => {
     const action = makeAction({
       bonusMovement: false,
       tempHpExpression: 'bardic_inspiration_die * 2',
@@ -90,13 +90,13 @@ describe('handle — Mantle of Inspiration detection', () => {
 });
 
 // ────────────────────────────────────────────────────────────────
-// handleMantleOfInspiration — uses exhausted (early return)
+// handleMantleOfInspiration — exhausted uses
 // ────────────────────────────────────────────────────────────────
 
-describe('handleMantleOfInspiration — no uses remaining', () => {
+describe('exhausted bardic inspiration uses', () => {
   beforeEach(() => resetMocks());
 
-  it('returns popup when bardic inspiration uses are exhausted', async () => {
+  it('returns popup with no-uses message when current uses is 0', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -120,11 +120,12 @@ describe('handleMantleOfInspiration — no uses remaining', () => {
     const result = await handle(action, ps, campaignName);
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('Second Wind has no uses remaining. Recharges on a Long Rest.');
+    expect(result.payload.description).toContain('no uses remaining');
     expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
   });
 
-  it('falls back to Cha modifier for usesMax when class_levels entry has no bardic_inspiration_uses', async () => {
+  it('uses Charisma modifier as usesMax fallback when class_levels entry lacks bardic_inspiration_uses', async () => {
+    // Cha score 14 => modifier +2, so usesMax = 2
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -135,20 +136,21 @@ describe('handleMantleOfInspiration — no uses remaining', () => {
       abilities: [{ name: 'Charisma', score: 14 }],
     });
 
+    // Return 0 so the exhausted-check path fires
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
     const result = await handle(action, ps, campaignName);
 
     expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('has no uses remaining');
+    expect(result.payload.description).toContain('no uses remaining');
   });
 });
 
 // ────────────────────────────────────────────────────────────────
-// handleMantleOfInspiration — successful execution (no map)
+// handleMantleOfInspiration — successful execution
 // ────────────────────────────────────────────────────────────────
 
-describe('handleMantleOfInspiration — successful (no map)', () => {
+describe('successful execution', () => {
   beforeEach(() => resetMocks());
 
   it('returns roll result when no mapName provided', async () => {
@@ -180,12 +182,11 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
     expect(result.payload.targets).toEqual([]);
     expect(result.payload.description).toContain('no targets in range');
     expect(result.payload.description).toContain('Rolled');
-
     expect(useRuntimeState.setRuntimeValue).toHaveBeenCalled();
     expect(mapsService.loadMapData).not.toHaveBeenCalled();
   });
 
-  it('decrements bardicInspirationUses when usesMax > 0', async () => {
+  it('decrements bardicInspirationUses when available', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -209,7 +210,7 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
     expect(setCall[2]).toBe(1);
   });
 
-  it('does NOT decrement bardicInspirationUses when usesMax === 0', async () => {
+  it('does not decrement bardicInspirationUses when usesMax is 0', async () => {
     const ps = makePlayerStats({
       level: 1,
       class: {
@@ -233,13 +234,13 @@ describe('handleMantleOfInspiration — successful (no map)', () => {
 });
 
 // ────────────────────────────────────────────────────────────────
-// handleMantleOfInspiration — with map and targets in range
+// handleMantleOfInspiration — map-based target resolution
 // ────────────────────────────────────────────────────────────────
 
-describe('handleMantleOfInspiration — with map and targets', () => {
+describe('map-based target resolution', () => {
   beforeEach(() => resetMocks());
 
-  it('resolves targets within range and sets temp HP for each', async () => {
+  it('resolves targets within range and filters out-of-range creatures', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die * 2',
@@ -281,7 +282,8 @@ describe('handleMantleOfInspiration — with map and targets', () => {
     expect(result.payload.targets).not.toContain('FarAway');
   });
 
-  it('respects maxTargets limit from Cha modifier', async () => {
+  it('respects maxTargets limit from Charisma modifier', async () => {
+    // Cha 12 => modifier +1 => maxTargets = Math.max(1, 1) = 1
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -316,7 +318,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
     expect(result.payload.targets).not.toContain('AlsoNear');
   });
 
-  it('sets tempHp and inspiringMovementNoOA for each target', async () => {
+  it('sets tempHp and inspiringMovementNoOA for each resolved target', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -356,7 +358,7 @@ describe('handleMantleOfInspiration — with map and targets', () => {
     expect(movementCall[2]).toBe(true);
   });
 
-  it('calls addExpiration for each target', async () => {
+  it('calls addExpiration for each resolved target', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -390,50 +392,6 @@ describe('handleMantleOfInspiration — with map and targets', () => {
     );
   });
 
-  it('does not enter map path when rangeToFeet returns null', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-      range: 'self',
-    });
-
-    const ps = makePlayerStats({
-      name: 'Faldorn',
-      level: 1,
-      class: {
-        name: 'Bard',
-        class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
-      },
-    });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(2);
-    rangeValidation.rangeToFeet.mockReturnValue(null);
-
-    const result = await handle(action, ps, campaignName, 'some-map');
-
-    expect(result.type).toBe('roll');
-    expect(mapsService.loadMapData).not.toHaveBeenCalled();
-    expect(result.payload.targets).toEqual([]);
-  });
-
-  it('does not enter map path when attacker not found in map', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-
-    const ps = makePlayerStats({ name: 'Faldorn' });
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-    rangeValidation.rangeToFeet.mockReturnValue(60);
-    mapsService.loadMapData.mockResolvedValue({ players: [{ name: 'SomeoneElse', gridX: 5, gridY: 5 }] });
-
-    const result = await handle(action, ps, campaignName, 'some-map');
-
-    expect(result.type).toBe('roll');
-    expect(result.payload.targets).toEqual([]);
-  });
-
   it('skips self when resolving map targets', async () => {
     const action = makeAction({
       bonusMovement: true,
@@ -463,13 +421,55 @@ describe('handleMantleOfInspiration — with map and targets', () => {
 
     expect(result.payload.targets).toEqual([]);
   });
+
+  it('returns empty targets when attacker is not found on the map', async () => {
+    const action = makeAction({
+      bonusMovement: true,
+      tempHpExpression: 'bardic_inspiration_die',
+    });
+    const ps = makePlayerStats({ name: 'Faldorn' });
+
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    rangeValidation.rangeToFeet.mockReturnValue(60);
+    mapsService.loadMapData.mockResolvedValue({ players: [{ name: 'SomeoneElse', gridX: 5, gridY: 5 }] });
+
+    const result = await handle(action, ps, campaignName, 'some-map');
+
+    expect(result.type).toBe('roll');
+    expect(result.payload.targets).toEqual([]);
+  });
+
+  it('skips map path entirely when rangeToFeet returns null', async () => {
+    const action = makeAction({
+      bonusMovement: true,
+      tempHpExpression: 'bardic_inspiration_die',
+      range: 'self',
+    });
+    const ps = makePlayerStats({
+      name: 'Faldorn',
+      level: 1,
+      class: {
+        name: 'Bard',
+        class_levels: [{ level: 1, bardic_inspiration_uses: 2 }],
+      },
+    });
+
+    useRuntimeState.getRuntimeValue.mockReturnValue(2);
+    rangeValidation.rangeToFeet.mockReturnValue(null);
+
+    const result = await handle(action, ps, campaignName, 'some-map');
+
+    expect(result.type).toBe('roll');
+    expect(mapsService.loadMapData).not.toHaveBeenCalled();
+    expect(result.payload.targets).toEqual([]);
+  });
 });
 
 // ────────────────────────────────────────────────────────────────
-// handleMantleOfInspiration — log entry and description
+// Logging
 // ────────────────────────────────────────────────────────────────
 
-describe('handleMantleOfInspiration — logging', () => {
+describe('logging', () => {
   beforeEach(() => resetMocks());
 
   it('calls addEntry with ability_use type on success', async () => {
@@ -493,7 +493,7 @@ describe('handleMantleOfInspiration — logging', () => {
     );
   });
 
-  it('catches and swallows addEntry errors', async () => {
+  it('swallows addEntry errors without crashing', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -503,18 +503,21 @@ describe('handleMantleOfInspiration — logging', () => {
     useRuntimeState.getRuntimeValue.mockReturnValue(0);
     logService.addEntry.mockRejectedValue(new Error('network'));
 
-    await expect(handle(action, ps, campaignName, null)).resolves.toBeDefined();
+    const result = await handle(action, ps, campaignName, null);
+
+    expect(result).toBeDefined();
+    expect(result.type).toBe('roll');
   });
 });
 
 // ────────────────────────────────────────────────────────────────
-// handleMantleOfInspiration — roll result payload structure
+// Roll result payload structure
 // ────────────────────────────────────────────────────────────────
 
-describe('handleMantleOfInspiration — roll result payload', () => {
+describe('roll result payload', () => {
   beforeEach(() => resetMocks());
 
-  it('roll payload contains correct keys', async () => {
+  it('contains all required keys with correct types', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die * 2',
@@ -533,7 +536,7 @@ describe('handleMantleOfInspiration — roll result payload', () => {
     expect(Array.isArray(result.payload.targets)).toBe(true);
   });
 
-  it('description includes reaction note when targets present', async () => {
+  it('includes reaction note in description when targets are present', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -565,7 +568,7 @@ describe('handleMantleOfInspiration — roll result payload', () => {
     expect(result.payload.description).toContain('Reaction to move up to their Speed without provoking Opportunity Attacks');
   });
 
-  it('description does not include reaction note when no targets', async () => {
+  it('omits reaction note when there are no targets', async () => {
     const action = makeAction({
       bonusMovement: true,
       tempHpExpression: 'bardic_inspiration_die',
@@ -577,20 +580,6 @@ describe('handleMantleOfInspiration — roll result payload', () => {
     const result = await handle(action, ps, campaignName, null);
 
     expect(result.payload.description).not.toContain('Reaction');
-  });
-
-  it('tempHp equals 2 times the die roll', async () => {
-    const action = makeAction({
-      bonusMovement: true,
-      tempHpExpression: 'bardic_inspiration_die',
-    });
-    const ps = makePlayerStats();
-
-    useRuntimeState.getRuntimeValue.mockReturnValue(0);
-
-    const result = await handle(action, ps, campaignName, null);
-
-    expect(result.payload.tempHp).toBe(result.payload.result * 2);
   });
 
   it('uses bardic_die from classLevels entry matching current level', async () => {

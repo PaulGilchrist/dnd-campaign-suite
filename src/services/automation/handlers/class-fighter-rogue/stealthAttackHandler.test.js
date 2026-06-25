@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyStealthAttack } from './stealthAttackHandler.js';
 
@@ -44,18 +45,25 @@ function makeAction(overrides = {}) {
 
 describe('stealthAttackHandler', () => {
     describe('handle', () => {
-        it('returns modal when enough sneak attack dice', async () => {
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        it('returns modal with correct payload when sneak attack dice cover the cost', async () => {
+            const stats = makePlayerStats({
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
+            });
+            const action = makeAction();
+            const campaignName = 'test-campaign';
+
+            const result = await handle(action, stats, campaignName);
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('stealthAttack');
             expect(result.payload.costD6).toBe(1);
-            expect(result.payload.availableDice).toBe(2);
-            expect(result.payload.action).toEqual(makeAction());
-            expect(result.payload.campaignName).toBe('test-campaign');
+            expect(result.payload.availableDice).toBe(3);
+            expect(result.payload.action).toBe(action);
+            expect(result.payload.playerStats).toBe(stats);
+            expect(result.payload.campaignName).toBe(campaignName);
         });
 
-        it('parses custom cost from automation', async () => {
+        it('parses custom cost from automation cost field', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 5 }] },
             });
@@ -68,9 +76,10 @@ describe('stealthAttackHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.payload.costD6).toBe(3);
+            expect(result.payload.availableDice).toBe(5);
         });
 
-        it('defaults cost to 1d6', async () => {
+        it('defaults cost to 1d6 when automation has no cost', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
             });
@@ -85,7 +94,21 @@ describe('stealthAttackHandler', () => {
             expect(result.payload.costD6).toBe(1);
         });
 
-        it('returns error when not enough sneak attack dice', async () => {
+        it('throws when automation is undefined', async () => {
+            const stats = makePlayerStats({
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
+            });
+
+            await expect(
+                handle(
+                    makeAction({ automation: undefined }),
+                    stats,
+                    'test-campaign'
+                )
+            ).rejects.toThrow();
+        });
+
+        it('returns error popup when sneak attack dice are insufficient', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 1 }] },
             });
@@ -98,11 +121,13 @@ describe('stealthAttackHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Stealth Attack');
             expect(result.payload.description).toContain('Not enough Sneak Attack dice');
             expect(result.payload.description).toContain('Need 2d6, have 1d6');
+            expect(result.payload.automation).toEqual({ cost: '2d6' });
         });
 
-        it('handles missing class_levels gracefully', async () => {
+        it('treats missing or null class_levels as zero dice', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: null },
             });
@@ -110,10 +135,19 @@ describe('stealthAttackHandler', () => {
             const result = await handle(makeAction(), stats, 'test-campaign');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Not enough Sneak Attack dice');
+            expect(result.payload.description).toContain('Need 1d6, have 0d6');
         });
 
-        it('handles zero sneak attack dice', async () => {
+        it('treats undefined class as zero dice', async () => {
+            const stats = makePlayerStats({ class: undefined });
+
+            const result = await handle(makeAction(), stats, 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('Need 1d6, have 0d6');
+        });
+
+        it('treats zero sneak attack dice as insufficient', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 0 }] },
             });
@@ -124,7 +158,7 @@ describe('stealthAttackHandler', () => {
             expect(result.payload.description).toContain('Need 1d6, have 0d6');
         });
 
-        it('handles undefined sneak_attack_num_d6', async () => {
+        it('treats missing sneak_attack_num_d6 as zero dice', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1 }] },
             });
@@ -135,7 +169,7 @@ describe('stealthAttackHandler', () => {
             expect(result.payload.description).toContain('Need 1d6, have 0d6');
         });
 
-        it('costD6 must be <= available dice to return modal', async () => {
+        it('allows cost equal to available dice', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
             });
@@ -150,10 +184,40 @@ describe('stealthAttackHandler', () => {
             expect(result.payload.costD6).toBe(2);
             expect(result.payload.availableDice).toBe(2);
         });
+
+        it('falls back to cost 1 when cost string is malformed', async () => {
+            const stats = makePlayerStats({
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
+            });
+
+            const result = await handle(
+                makeAction({ automation: { cost: '2d8' } }),
+                stats,
+                'test-campaign'
+            );
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.costD6).toBe(1);
+        });
+
+        it('falls back to cost 1 when cost string is empty', async () => {
+            const stats = makePlayerStats({
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 2 }] },
+            });
+
+            const result = await handle(
+                makeAction({ automation: { cost: '' } }),
+                stats,
+                'test-campaign'
+            );
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.costD6).toBe(1);
+        });
     });
 
     describe('applyStealthAttack', () => {
-        it('returns error when not enough dice', async () => {
+        it('returns error popup when sneak attack dice are insufficient', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 1 }] },
             });
@@ -161,10 +225,14 @@ describe('stealthAttackHandler', () => {
             const result = await applyStealthAttack(makeAction(), stats, 'test-campaign', 2);
 
             expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Stealth Attack');
             expect(result.payload.description).toContain('Not enough Sneak Attack dice');
+            expect(result.payload.description).toContain('Need 2d6, have 1d6');
+            expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
-        it('sets stealthAttackCost runtime value', async () => {
+        it('sets stealthAttackCost runtime value on success', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
             });
@@ -180,7 +248,7 @@ describe('stealthAttackHandler', () => {
             );
         });
 
-        it('logs the ability use', async () => {
+        it('logs an ability_use entry on success', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
             });
@@ -194,7 +262,7 @@ describe('stealthAttackHandler', () => {
             }));
         });
 
-        it('returns popup with success description', async () => {
+        it('returns success popup with expected fields', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
             });
@@ -204,21 +272,13 @@ describe('stealthAttackHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.name).toBe('Stealth Attack');
+            expect(result.payload.automationType).toBe('stealth_attack');
             expect(result.payload.description).toContain('Stealth Attack active');
             expect(result.payload.description).toContain('2d6 Sneak Attack dice');
+            expect(result.payload.automation).toEqual(makeAction().automation);
         });
 
-        it('includes automationType in payload', async () => {
-            const stats = makePlayerStats({
-                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
-            });
-
-            const result = await applyStealthAttack(makeAction(), stats, 'test-campaign', 1);
-
-            expect(result.payload.automationType).toBe('stealth_attack');
-        });
-
-        it('handles cost equal to available dice', async () => {
+        it('succeeds when cost equals available dice', async () => {
             const stats = makePlayerStats({
                 class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
             });
@@ -233,6 +293,46 @@ describe('stealthAttackHandler', () => {
                 'test-campaign',
                 true
             );
+        });
+
+        it('succeeds with cost of 0 dice', async () => {
+            const stats = makePlayerStats({
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
+            });
+
+            const result = await applyStealthAttack(makeAction(), stats, 'test-campaign', 0);
+
+            expect(result.type).toBe('popup');
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestRogue',
+                'stealthAttackCost',
+                0,
+                'test-campaign',
+                true
+            );
+        });
+
+        it('does not call setRuntimeValue or addEntry on failure', async () => {
+            const stats = makePlayerStats({
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 1 }] },
+            });
+
+            await applyStealthAttack(makeAction(), stats, 'test-campaign', 5);
+
+            expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
+        });
+
+        it('swallows addEntry errors without throwing', async () => {
+            const stats = makePlayerStats({
+                class: { class_levels: [{ level: 1, sneak_attack_num_d6: 3 }] },
+            });
+
+            addEntry.mockRejectedValue(new Error('network error'));
+
+            const result = await applyStealthAttack(makeAction(), stats, 'test-campaign', 1);
+
+            expect(result.type).toBe('popup');
         });
     });
 });

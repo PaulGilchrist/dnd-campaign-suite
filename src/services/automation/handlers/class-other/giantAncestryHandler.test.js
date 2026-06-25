@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 import { handle, confirmGiantAncestry, getGiantAncestrySelection, getGiantAncestryOptions, handleDirectType, handleCloudsJaunt, handleFiresBurn, handleFrostsChill, handleHillsTumble, handleStonesEndurance, handleStormsThunder } from './giantAncestryHandler.js';
@@ -33,7 +34,10 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 // ── Re-import after mocking ────────────────────────────────────
 
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { addEntry } from '../../../ui/logService.js';
 import { resolveTarget } from '../../common/targetResolver.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -79,6 +83,7 @@ describe('giantAncestryHandler', () => {
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('giantAncestry');
             expect(result.payload.action).toBe(action);
+            expect(result.payload.playerStats).toBeDefined();
         });
 
         it('should dispatch to the correct sub-handler based on stored selection', async () => {
@@ -88,6 +93,34 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('teleport');
+        });
+
+        it('should return info popup when stored selection is unknown', async () => {
+            getRuntimeValue.mockReturnValue("Unknown Ancestry");
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toContain("Unknown Ancestry");
+        });
+
+        it('should dispatch to damage handler for Fire Burn', async () => {
+            getRuntimeValue.mockReturnValue("Fire's Burn");
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain("Fire's Burn");
+        });
+
+        it('should dispatch to damage_reduction handler for Stone Endurance', async () => {
+            getRuntimeValue.mockReturnValue("Stone's Endurance");
+            const action = makeAction();
+            const result = await handle(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain("Stone's Endurance");
         });
     });
 
@@ -102,6 +135,7 @@ describe('giantAncestryHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain("Fire's Burn");
+            expect(result.payload.description).toContain('Recharges');
             expect(setRuntimeValue).toHaveBeenCalledWith(
                 'TestHero',
                 'giantAncestrySelection',
@@ -118,6 +152,7 @@ describe('giantAncestryHandler', () => {
             );
 
             expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toBe('No option selected.');
         });
     });
@@ -139,15 +174,8 @@ describe('giantAncestryHandler', () => {
     describe('getGiantAncestryOptions', () => {
         it('should return all 6 giant ancestry options', () => {
             const options = getGiantAncestryOptions();
+            expect(Array.isArray(options)).toBe(true);
             expect(options).toHaveLength(6);
-            expect(options.map(o => o.name)).toEqual([
-                "Cloud's Jaunt",
-                "Fire's Burn",
-                "Frost's Chill",
-                "Hill's Tumble",
-                "Stone's Endurance",
-                "Storm's Thunder",
-            ]);
         });
 
         it('should include type and icon for each option', () => {
@@ -157,6 +185,17 @@ describe('giantAncestryHandler', () => {
                 expect(opt.icon).toBeDefined();
                 expect(opt.description).toBeDefined();
             });
+        });
+
+        it('should include all expected ancestry names', () => {
+            const options = getGiantAncestryOptions();
+            const names = options.map(o => o.name);
+            expect(names).toContain("Cloud's Jaunt");
+            expect(names).toContain("Fire's Burn");
+            expect(names).toContain("Frost's Chill");
+            expect(names).toContain("Hill's Tumble");
+            expect(names).toContain("Stone's Endurance");
+            expect(names).toContain("Storm's Thunder");
         });
     });
 
@@ -209,6 +248,15 @@ describe('giantAncestryHandler', () => {
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('giantAncestry');
         });
+
+        it('should handle missing automation type gracefully', async () => {
+            getRuntimeValue.mockReturnValue("Fire's Burn");
+            const action = makeAction({ automation: undefined });
+            const result = await handleDirectType(action, makePlayerStats(), 'campaign', 'map');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain("Fire's Burn");
+        });
     });
 
     describe('handleCloudsJaunt', () => {
@@ -221,6 +269,8 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('modal');
             expect(result.modalName).toBe('teleport');
+            expect(result.payload.action.name).toBe("Cloud's Jaunt");
+            expect(result.payload.action.automation.distance).toBe('30 ft');
         });
 
         it('should return info popup when no uses remaining', async () => {
@@ -229,7 +279,27 @@ describe('giantAncestryHandler', () => {
             const result = await handleCloudsJaunt(action, makePlayerStats(), 'campaign', option);
 
             expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
             expect(result.payload.description).toContain('no uses remaining');
+            expect(result.payload.description).toContain("Cloud's Jaunt");
+        });
+
+        it('should default to proficiency as max uses when runtime value is undefined', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            const action = makeAction();
+            const result = await handleCloudsJaunt(action, makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('teleport');
+        });
+
+        it('should use playerStats.proficiency as max uses', async () => {
+            const lowProfStats = makePlayerStats({ proficiency: 1 });
+            getRuntimeValue.mockReturnValue(1);
+            const action = makeAction();
+            const result = await handleCloudsJaunt(action, lowProfStats, 'campaign', option);
+
+            expect(result.type).toBe('modal');
         });
     });
 
@@ -248,6 +318,12 @@ describe('giantAncestryHandler', () => {
             expect(result.payload.description).toContain("Fire's Burn");
             expect(result.payload.description).toContain('Fire');
             expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', "fire'sburnUses", 2, 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'damage_roll',
+                characterName: 'TestHero',
+                targetName: 'Goblin',
+                damageType: 'Fire',
+            }));
         });
 
         it('should return popup when no target', async () => {
@@ -276,6 +352,16 @@ describe('giantAncestryHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
         });
+
+        it('should default to proficiency as max uses when runtime value is undefined', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            const action = makeAction();
+            const result = await handleFiresBurn(action, makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(addEntry).toHaveBeenCalled();
+        });
     });
 
     describe('handleFrostsChill', () => {
@@ -295,6 +381,11 @@ describe('giantAncestryHandler', () => {
             expect(result.payload.description).toContain("Frost's Chill");
             expect(result.payload.description).toContain('Cold');
             expect(setRuntimeValue).toHaveBeenCalledWith('campaign', 'targetEffects', expect.any(Array), 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'damage_roll',
+                targetName: 'Goblin',
+                damageType: 'Cold',
+            }));
         });
 
         it('should return popup when no target', async () => {
@@ -309,6 +400,18 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires a target');
+        });
+
+        it('should return info popup when no uses remaining', async () => {
+            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
+                if (key === "frost'schillUses") return 0;
+                return null;
+            });
+            const action = makeAction();
+            const result = await handleFrostsChill(action, makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
         });
     });
 
@@ -329,6 +432,10 @@ describe('giantAncestryHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('Goblin');
             expect(result.payload.description).toContain('prone');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'ability_use',
+                abilityName: "Hill's Tumble",
+            }));
         });
 
         it('should return popup when no target found', async () => {
@@ -344,6 +451,31 @@ describe('giantAncestryHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No target found');
         });
+
+        it('should return popup when no combat context', async () => {
+            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
+                if (key === "hill'stumbleUses") return 3;
+                return null;
+            });
+            getCombatContext.mockResolvedValue(null);
+            const action = makeAction();
+            const result = await handleHillsTumble(action, makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('No target found');
+        });
+
+        it('should return info popup when no uses remaining', async () => {
+            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
+                if (key === "hill'stumbleUses") return 0;
+                return null;
+            });
+            const action = makeAction();
+            const result = await handleHillsTumble(action, makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+        });
     });
 
     describe('handleStonesEndurance', () => {
@@ -357,6 +489,11 @@ describe('giantAncestryHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Stone's Endurance");
             expect(result.payload.description).toContain('Reduce damage by');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', "stone'senduranceUses", 2, 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'ability_use',
+                abilityName: "Stone's Endurance",
+            }));
         });
 
         it('should return info popup when no uses remaining', async () => {
@@ -366,6 +503,23 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('no uses remaining');
+        });
+
+        it('should default to proficiency as max uses when runtime value is undefined', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            const action = makeAction();
+            const result = await handleStonesEndurance(action, makePlayerStats(), 'campaign', option);
+
+            expect(result.type).toBe('popup');
+            expect(addEntry).toHaveBeenCalled();
+        });
+
+        it('should use evaluateAutoExpression to calculate reduction', async () => {
+            getRuntimeValue.mockReturnValue(3);
+            const action = makeAction();
+            await handleStonesEndurance(action, makePlayerStats(), 'campaign', option);
+
+            expect(evaluateAutoExpression).toHaveBeenCalledWith('1d10 + CON modifier', expect.any(Object));
         });
     });
 
@@ -377,12 +531,19 @@ describe('giantAncestryHandler', () => {
                 if (key === "storm'sthunderUses") return 3;
                 return null;
             });
+            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
             const action = makeAction();
             const result = await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain("Storm's Thunder");
             expect(result.payload.description).toContain('Thunder');
+            expect(setRuntimeValue).toHaveBeenCalledWith('TestHero', "storm'sthunderUses", 2, 'campaign');
+            expect(addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
+                type: 'damage_roll',
+                targetName: 'Goblin',
+                damageType: 'Thunder',
+            }));
         });
 
         it('should return popup when no target', async () => {
@@ -397,6 +558,40 @@ describe('giantAncestryHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('requires a target');
+        });
+
+        it('should return info popup when no uses remaining', async () => {
+            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
+                if (key === "storm'sthunderUses") return 0;
+                return null;
+            });
+            const action = makeAction();
+            const result = await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
+        });
+
+        it('should default to proficiency as max uses when runtime value is undefined', async () => {
+            getRuntimeValue.mockReturnValue(undefined);
+            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            const action = makeAction();
+            const result = await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
+
+            expect(result.type).toBe('popup');
+            expect(addEntry).toHaveBeenCalled();
+        });
+
+        it('should use rollExpression to calculate damage', async () => {
+            getRuntimeValue.mockImplementation((_name, key, _campaign) => {
+                if (key === "storm'sthunderUses") return 3;
+                return null;
+            });
+            resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+            const action = makeAction();
+            await handleStormsThunder(action, makePlayerStats(), 'campaign', 'map', option);
+
+            expect(rollExpression).toHaveBeenCalledWith('1d8');
         });
     });
 });

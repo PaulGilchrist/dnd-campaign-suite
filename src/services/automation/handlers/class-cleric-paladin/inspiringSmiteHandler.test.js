@@ -1,312 +1,625 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { handle } from './inspiringSmiteHandler.js';
+
+// ── Mocks BEFORE imports ───────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(async () => {}),
+  getRuntimeValue: vi.fn(),
+  setRuntimeValue: vi.fn(),
 }));
 
 vi.mock('../../../combat/automation/automationService.js', () => ({
-    resolveDiceExpression: vi.fn((expr, stats) => '2d8 + ' + stats.level),
+  resolveDiceExpression: vi.fn(),
 }));
 
 vi.mock('../../../dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(() => ({ total: 18 })),
+  rollExpression: vi.fn(),
 }));
 
 vi.mock('../../../maps/mapsService.js', () => ({
-    loadMapData: vi.fn(),
+  loadMapData: vi.fn(),
 }));
 
 vi.mock('../../../rules/combat/rangeValidation.js', () => ({
-    getDistanceFeet: vi.fn(),
-    rangeToFeet: vi.fn((v) => parseInt(v) || 30),
+  getDistanceFeet: vi.fn(),
+  rangeToFeet: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
+  addEntry: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
-const { resolveDiceExpression } = await import('../../../combat/automation/automationService.js');
-const { rollExpression } = await import('../../../dice/diceRoller.js');
-const { loadMapData } = await import('../../../maps/mapsService.js');
-const { getDistanceFeet, rangeToFeet } = await import('../../../rules/combat/rangeValidation.js');
-const { addEntry } = await import('../../../ui/logService.js');
+// ── Imports ────────────────────────────────────────────────────
 
-beforeEach(() => {
-    vi.clearAllMocks();
-});
+import { handle } from './inspiringSmiteHandler.js';
+import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as automationService from '../../../combat/automation/automationService.js';
+import * as diceRoller from '../../../dice/diceRoller.js';
+import * as mapsService from '../../../maps/mapsService.js';
+import * as rangeValidation from '../../../rules/combat/rangeValidation.js';
+import * as logService from '../../../ui/logService.js';
+
+const campaignName = 'TestCampaign';
+const mapName = 'TestMap';
+
+// ── Helpers ────────────────────────────────────────────────────
 
 function makePlayerStats(overrides = {}) {
-    return {
-        name: 'TestPaladin',
-        level: 8,
-        class: {
-            class_levels: [{ level: 8, channel_divinity: 2 }],
-            ...overrides.class,
-        },
-        ...overrides,
-    };
+  return {
+    name: 'TestPaladin',
+    level: 8,
+    class: {
+      class_levels: [{ level: 8, channel_divinity: 2 }],
+      ...overrides.class,
+    },
+    ...overrides,
+  };
 }
 
 function makeAction(overrides = {}) {
-    return {
-        name: 'Inspiring Smite',
-        automation: {
-            type: 'inspiring_smite',
-            range: '30 ft',
-            ...overrides.automation,
-        },
-        ...overrides,
-    };
+  return {
+    name: 'Inspiring Smite',
+    automation: {
+      type: 'inspiring_smite',
+      range: '30 ft',
+      ...overrides.automation,
+    },
+    ...overrides,
+  };
 }
 
-describe('inspiringSmiteHandler', () => {
-    describe('channel divinity charge checks', () => {
-        it('returns error when no channel divinity charges remaining', async () => {
-            getRuntimeValue.mockReturnValue(0);
+// ── Tests ──────────────────────────────────────────────────────
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+describe('inspiringSmiteHandler.handle', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.type).toBe('automation_info');
-            expect(result.payload.description).toContain('No Channel Divinity charges remaining');
-        });
+  // ── Charge checks ───────────────────────────────────────────
 
-        it('proceeds when 1 charge available', async () => {
-            getRuntimeValue.mockReturnValue(1);
+  describe('channel divinity charge checks', () => {
+    it('returns popup when no charges remaining (storedCharges = 0)', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(0);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('roll');
-        });
-
-        it('defaults to max charges when no stored value', async () => {
-            getRuntimeValue.mockReturnValue(null);
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('roll');
-            expect(result.payload.description).not.toContain('No Channel Divinity charges remaining');
-        });
-
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.name).toBe('Inspiring Smite');
+      expect(result.payload.description).toBe('Inspiring Smite: No Channel Divinity charges remaining.');
+      expect(result.payload.automation).toEqual(makeAction().automation);
+      expect(useRuntimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    describe('temp HP calculation', () => {
-        it('returns error when temp HP calculation fails', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            rollExpression.mockReturnValue(null);
+    it('returns popup when storedCharges is negative', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(-1);
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Could not calculate temp HP');
-        });
-
-        it('returns error when temp HP is zero or negative', async () => {
-            getRuntimeValue.mockReturnValue(null);
-            rollExpression.mockReturnValue({ total: 0 });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Could not calculate temp HP');
-        });
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No Channel Divinity charges remaining');
     });
 
-    describe('target finding', () => {
-        it('finds targets within range on map', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 15 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(25);
-            rangeToFeet.mockReturnValue(30);
-            loadMapData.mockResolvedValue({
-                players: [
-                    { name: 'TestPaladin', gridX: 1, gridY: 1 },
-                    { name: 'Ally1', gridX: 2, gridY: 2 },
-                    { name: 'Ally2', gridX: 10, gridY: 10 },
-                ],
-            });
+    it('uses stored charges when available (storedCharges = 1)', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(1);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
 
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(loadMapData).toHaveBeenCalledWith('test-campaign', 'test-map');
-            expect(result.type).toBe('roll');
-            expect(result.payload.name).toBe('Inspiring Smite');
-            expect(result.payload.tempHp).toBe(15);
-        });
-
-        it('caps targets at 10', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 10 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(10);
-            rangeToFeet.mockReturnValue(30);
-
-            const manyPlayers = [{ name: 'TestPaladin', gridX: 1, gridY: 1 }];
-            for (let i = 0; i < 15; i++) {
-                manyPlayers.push({ name: `Ally${i}`, gridX: 2, gridY: 2 });
-            }
-            loadMapData.mockResolvedValue({ players: manyPlayers });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(result.payload.targets.length).toBeLessThanOrEqual(10);
-        });
-
-        it('skips attacker in target list', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 10 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(10);
-            rangeToFeet.mockReturnValue(30);
-            loadMapData.mockResolvedValue({
-                players: [
-                    { name: 'TestPaladin', gridX: 1, gridY: 1 },
-                    { name: 'Ally1', gridX: 2, gridY: 2 },
-                ],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(result.payload.targets).not.toContain('TestPaladin');
-        });
-
-        it('handles missing mapName gracefully', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 10 });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.payload.targets).toEqual([]);
-            expect(result.payload.description).toContain('no targets in range');
-        });
-
-        it('handles attacker not found on map', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 10 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            loadMapData.mockResolvedValue({ players: [{ name: 'OtherPlayer', gridX: 1, gridY: 1 }] });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(result.payload.targets).toEqual([]);
-        });
-
-        it('excludes targets beyond range', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 10 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(40);
-            rangeToFeet.mockReturnValue(30);
-            loadMapData.mockResolvedValue({
-                players: [
-                    { name: 'TestPaladin', gridX: 1, gridY: 1 },
-                    { name: 'Ally1', gridX: 8, gridY: 8 },
-                ],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(result.payload.targets).toEqual([]);
-        });
+      expect(result.type).toBe('roll');
+      expect(result.payload.tempHp).toBe(10);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'channelDivinityCharges',
+        0,
+        campaignName,
+      );
     });
 
-    describe('execution', () => {
-        it('distributes temp HP to targets', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 12 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(10);
-            rangeToFeet.mockReturnValue(30);
-            loadMapData.mockResolvedValue({
-                players: [
-                    { name: 'TestPaladin', gridX: 1, gridY: 1 },
-                    { name: 'Ally1', gridX: 2, gridY: 2 },
-                    { name: 'Ally2', gridX: 3, gridY: 3 },
-                ],
-            });
+    it('uses stored charges (storedCharges = 3)', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(3);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
 
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith('Ally1', 'tempHp', 12, 'test-campaign');
-            expect(setRuntimeValue).toHaveBeenCalledWith('Ally2', 'tempHp', 12, 'test-campaign');
-        });
-
-        it('expend channel divinity charge', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 10 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(10);
-            rangeToFeet.mockReturnValue(30);
-            loadMapData.mockResolvedValue({
-                players: [
-                    { name: 'TestPaladin', gridX: 1, gridY: 1 },
-                ],
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(setRuntimeValue).toHaveBeenCalledWith('TestPaladin', 'channelDivinityCharges', 1, 'test-campaign');
-        });
-
-        it('logs the ability use', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 10 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(10);
-            rangeToFeet.mockReturnValue(30);
-            loadMapData.mockResolvedValue({
-                players: [
-                    { name: 'TestPaladin', gridX: 1, gridY: 1 },
-                ],
-            });
-
-            await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
-                type: 'ability_use',
-                characterName: 'TestPaladin',
-                abilityName: 'Inspiring Smite',
-            }));
-        });
-
-        it('returns roll result with correct payload', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 14 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(10);
-            rangeToFeet.mockReturnValue(30);
-            loadMapData.mockResolvedValue({
-                players: [
-                    { name: 'TestPaladin', gridX: 1, gridY: 1 },
-                ],
-            });
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(result.type).toBe('roll');
-            expect(result.payload.roll).toBe('2d8 + 8');
-            expect(result.payload.result).toBe(14);
-            expect(result.payload.name).toBe('Inspiring Smite');
-            expect(result.payload.tempHp).toBe(14);
-        });
-
-        it('uses default range when not specified', async () => {
-            getRuntimeValue.mockReturnValue(2);
-            rollExpression.mockReturnValue({ total: 10 });
-            resolveDiceExpression.mockReturnValue('2d8 + 8');
-            getDistanceFeet.mockReturnValue(10);
-            rangeToFeet.mockReturnValue(30);
-            loadMapData.mockResolvedValue({
-                players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
-            });
-
-            await handle(makeAction({ automation: {} }), makePlayerStats(), 'test-campaign', 'test-map');
-
-            expect(rangeToFeet).toHaveBeenCalledWith('30 ft');
-        });
+      expect(result.type).toBe('roll');
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'channelDivinityCharges',
+        2,
+        campaignName,
+      );
     });
+
+    it('defaults to maxCharges when storedCharges is null', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('roll');
+      // maxCharges from class_levels[7].channel_divinity = 2, newCharges = 1
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'channelDivinityCharges',
+        1,
+        campaignName,
+      );
+    });
+
+    it('defaults to maxCharges when storedCharges is undefined', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('roll');
+    });
+
+    it('defaults to 2 when class_levels data is missing', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
+
+      const ps = makePlayerStats({ class: { class_levels: undefined } });
+
+      const result = await handle(makeAction(), ps, campaignName, null);
+
+      expect(result.type).toBe('roll');
+      // maxCharges defaults to 2, newCharges = 1
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'channelDivinityCharges',
+        1,
+        campaignName,
+      );
+    });
+
+    it('uses channel_divinity from class_levels for maxCharges', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
+
+      const ps = makePlayerStats({
+        level: 3,
+        class: {
+          class_levels: [undefined, undefined, { channel_divinity: 3 }],
+        },
+      });
+
+      await handle(makeAction(), ps, campaignName, null);
+
+      // maxCharges = 3, newCharges = 2
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'channelDivinityCharges',
+        2,
+        campaignName,
+      );
+    });
+
+    it('uses class_specific.channel_divinity_charges as fallback for maxCharges', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
+
+      const ps = makePlayerStats({
+        level: 5,
+        class: {
+          class_levels: [
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            {
+              channel_divinity: 0,
+              class_specific: { channel_divinity_charges: 4 },
+            },
+          ],
+        },
+      });
+
+      await handle(makeAction(), ps, campaignName, null);
+
+      // channel_divinity is 0 (falsy), falls back to class_specific = 4, newCharges = 3
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'channelDivinityCharges',
+        3,
+        campaignName,
+      );
+    });
+
+    it('defaults to level 1 index when playerStats.level is missing', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
+
+      const ps = makePlayerStats({ level: undefined });
+
+      const result = await handle(makeAction(), ps, campaignName, null);
+
+      expect(result.type).toBe('roll');
+    });
+  });
+
+  // ── Temp HP calculation ─────────────────────────────────────
+
+  describe('temp HP calculation', () => {
+    it('returns popup when rollExpression returns null', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue(null);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toBe('Inspiring Smite: Could not calculate temp HP.');
+    });
+
+    it('returns popup when temp HP is zero', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 0 });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Could not calculate temp HP');
+    });
+
+    it('returns popup when temp HP is negative', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: -5 });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Could not calculate temp HP');
+    });
+
+    it('uses resolved dice expression from automationService', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
+      diceRoller.rollExpression.mockReturnValue({ total: 12 });
+      mapsService.loadMapData.mockResolvedValue({ players: [] });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(automationService.resolveDiceExpression).toHaveBeenCalledWith(
+        '2d8 + paladin level',
+        expect.objectContaining({ level: 8 }),
+      );
+    });
+  });
+
+  // ── Target finding ──────────────────────────────────────────
+
+  describe('target finding', () => {
+    it('finds targets within range on map', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 15 });
+      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(25);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [
+          { name: 'TestPaladin', gridX: 1, gridY: 1 },
+          { name: 'Ally1', gridX: 2, gridY: 2 },
+          { name: 'Ally2', gridX: 10, gridY: 10 },
+        ],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(mapsService.loadMapData).toHaveBeenCalledWith(campaignName, mapName);
+      expect(result.type).toBe('roll');
+      expect(result.payload.tempHp).toBe(15);
+      expect(result.payload.targets).toEqual(['Ally1', 'Ally2']);
+    });
+
+    it('excludes the attacker from target list', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(10);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [
+          { name: 'TestPaladin', gridX: 1, gridY: 1 },
+          { name: 'Ally1', gridX: 2, gridY: 2 },
+        ],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets).not.toContain('TestPaladin');
+      expect(result.payload.targets).toContain('Ally1');
+    });
+
+    it('caps targets at 10', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(10);
+
+      const manyPlayers = [{ name: 'TestPaladin', gridX: 1, gridY: 1 }];
+      for (let i = 0; i < 15; i++) {
+        manyPlayers.push({ name: `Ally${i}`, gridX: 2, gridY: 2 });
+      }
+      mapsService.loadMapData.mockResolvedValue({ players: manyPlayers });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets.length).toBe(10);
+    });
+
+    it('returns empty targets when mapName is null', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.targets).toEqual([]);
+      expect(result.payload.description).toContain('no targets in range');
+    });
+
+    it('returns empty targets when attacker not found on map', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({
+        players: [{ name: 'OtherPlayer', gridX: 1, gridY: 1 }],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets).toEqual([]);
+    });
+
+    it('returns empty targets when map data has no players array', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({});
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets).toEqual([]);
+    });
+
+    it('excludes targets beyond range', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(40);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [
+          { name: 'TestPaladin', gridX: 1, gridY: 1 },
+          { name: 'Ally1', gridX: 8, gridY: 8 },
+        ],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets).toEqual([]);
+    });
+
+    it('skips targets when getDistanceFeet returns null', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(null);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [
+          { name: 'TestPaladin', gridX: 1, gridY: 1 },
+          { name: 'Ally1', gridX: 2, gridY: 2 },
+        ],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets).toEqual([]);
+    });
+
+    it('uses default range "30 ft" when automation.range is undefined', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
+      });
+
+      await handle(makeAction({ automation: {} }), makePlayerStats(), campaignName, mapName);
+
+      expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('30 ft');
+    });
+
+    it('uses automation.range when provided', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      rangeValidation.rangeToFeet.mockReturnValue(60);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
+      });
+
+      await handle(
+        makeAction({ automation: { range: '60 ft' } }),
+        makePlayerStats(),
+        campaignName,
+        mapName,
+      );
+
+      expect(rangeValidation.rangeToFeet).toHaveBeenCalledWith('60 ft');
+    });
+
+    it('returns empty targets when loadMapData returns null', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue(null);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets).toEqual([]);
+    });
+
+    it('returns empty targets when loadMapData returns undefined', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue(undefined);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets).toEqual([]);
+    });
+  });
+
+  // ── Execution ───────────────────────────────────────────────
+
+  describe('execution', () => {
+    it('distributes temp HP to each target', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 12 });
+      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(10);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [
+          { name: 'TestPaladin', gridX: 1, gridY: 1 },
+          { name: 'Ally1', gridX: 2, gridY: 2 },
+          { name: 'Ally2', gridX: 3, gridY: 3 },
+        ],
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Ally1', 'tempHp', 12, campaignName);
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith('Ally2', 'tempHp', 12, campaignName);
+    });
+
+    it('does not call setRuntimeValue for tempHp when no targets', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 12 });
+      mapsService.loadMapData.mockResolvedValue({
+        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      const tempHpCalls = useRuntimeState.setRuntimeValue.mock.calls.filter(
+        (call) => call[1] === 'tempHp',
+      );
+      expect(tempHpCalls).toHaveLength(0);
+    });
+
+    it('expend channel divinity charge', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({
+        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
+        'TestPaladin',
+        'channelDivinityCharges',
+        1,
+        campaignName,
+      );
+    });
+
+    it('calls addEntry with correct ability_use data', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      mapsService.loadMapData.mockResolvedValue({
+        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(logService.addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'TestPaladin',
+        abilityName: 'Inspiring Smite',
+        description: expect.stringContaining('Inspiring Smite'),
+      });
+    });
+
+    it('includes target names in log description', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(10);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [
+          { name: 'TestPaladin', gridX: 1, gridY: 1 },
+          { name: 'Ally1', gridX: 2, gridY: 2 },
+        ],
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(logService.addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          description: expect.stringContaining('Ally1'),
+        }),
+      );
+    });
+
+    it('handles addEntry rejection gracefully', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 10 });
+      logService.addEntry.mockRejectedValue(new Error('log failure'));
+      mapsService.loadMapData.mockResolvedValue({
+        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.type).toBe('roll');
+      expect(result.payload.tempHp).toBe(10);
+    });
+
+    it('returns roll result with correct payload fields', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 14 });
+      automationService.resolveDiceExpression.mockReturnValue('2d8 + 8');
+      mapsService.loadMapData.mockResolvedValue({
+        players: [{ name: 'TestPaladin', gridX: 1, gridY: 1 }],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.type).toBe('roll');
+      expect(result.payload.roll).toBe('2d8 + 8');
+      expect(result.payload.result).toBe(14);
+      expect(result.payload.name).toBe('Inspiring Smite');
+      expect(result.payload.tempHp).toBe(14);
+      expect(result.payload.targets).toEqual([]);
+      expect(result.payload.description).toContain('Inspiring Smite');
+    });
+
+    it('includes targets in roll payload when found', async () => {
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+      diceRoller.rollExpression.mockReturnValue({ total: 14 });
+      rangeValidation.rangeToFeet.mockReturnValue(30);
+      rangeValidation.getDistanceFeet.mockReturnValue(10);
+      mapsService.loadMapData.mockResolvedValue({
+        players: [
+          { name: 'TestPaladin', gridX: 1, gridY: 1 },
+          { name: 'Ally1', gridX: 2, gridY: 2 },
+          { name: 'Ally2', gridX: 3, gridY: 3 },
+        ],
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+      expect(result.payload.targets).toEqual(['Ally1', 'Ally2']);
+    });
+  });
 });

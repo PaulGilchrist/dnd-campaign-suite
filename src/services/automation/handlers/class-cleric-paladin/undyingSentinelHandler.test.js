@@ -1,4 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+import { handle, isUndyingSentinelUsed, setUndyingSentinelUsed } from './undyingSentinelHandler.js';
+import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import { postLogEntry } from '../../../shared/logPoster.js';
+import storage from '../../../ui/storage.js';
+
+// ── Mocks ────────────────────────────────────────────────────────
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
   getRuntimeValue: vi.fn(),
@@ -20,11 +29,7 @@ vi.mock('../../../ui/storage.js', () => ({
   },
 }));
 
-import { handle, isUndyingSentinelUsed, setUndyingSentinelUsed } from './undyingSentinelHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
-import { postLogEntry } from '../../../shared/logPoster.js';
-import storage from '../../../ui/storage.js';
+// ── Helpers ──────────────────────────────────────────────────────
 
 const campaignName = 'TestCampaign';
 
@@ -32,7 +37,7 @@ function makePlayerStats(overrides = {}) {
   return {
     name: 'TestCleric',
     level: 5,
-    class: { class_levels: [{ level: 5, focus_points: 10 }] },
+    class: { class_levels: [{ level: 5 }] },
     ...overrides,
   };
 }
@@ -44,234 +49,285 @@ function makeAction(automation = {}) {
   };
 }
 
-describe('undyingSentinelHandler.handle', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+function makePlayerTarget(name = 'DownedAlly', hp = 0) {
+  return { name, type: 'player', currentHitPoints: hp };
+}
 
-  it('should return popup when already used this long rest', async () => {
-    getRuntimeValue.mockReturnValue(true);
+function makeNPCTarget(name = 'Goblin', hp = 0) {
+  return { name, type: 'npc', currentHp: hp };
+}
 
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+// ── beforeEach / afterEach ───────────────────────────────────────
 
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toContain('already been used');
-  });
+let dispatchEventSpy;
+let dateNowSpy;
 
-  it('should return popup when no combat context', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue(null);
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('No combat active.');
-  });
-
-  it('should return popup when no target selected', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue(null);
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('Select a target in the combat tracker first.');
-  });
-
-  it('should return popup when target is not at 0 HP', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue({ name: 'DownedAlly', type: 'player' });
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 5;
-      return null;
-    });
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(result.payload.description).toBe('DownedAlly is not at 0 Hit Points.');
-  });
-
-  it('should heal player target and return success', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue({ name: 'DownedAlly', type: 'player' });
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 0;
-      if (key === 'hitPoints') return 50;
-      return null;
-    });
-
-    const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(result.type).toBe('popup');
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'undyingSentinelUsed', true, campaignName);
-    expect(setRuntimeValue).toHaveBeenCalledWith('DownedAlly', 'currentHitPoints', 16, campaignName);
-    expect(result.payload.description).toContain('survive');
-    expect(result.payload.description).toContain('16 HP');
-  });
-
-  it('should heal NPC target by setting currentHp directly', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({ creatures: [] });
-    const target = { name: 'Goblin', type: 'npc', currentHp: 0 };
-    getTargetFromAttacker.mockReturnValue(target);
-
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(target.currentHp).toBe(16);
-  });
-
-  it('should save combatSummary to storage when healing NPC', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({ creatures: [] });
-    const target = { name: 'Goblin', type: 'npc', currentHp: 0 };
-    getTargetFromAttacker.mockReturnValue(target);
-
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(storage.set).toHaveBeenCalledWith('combatSummary', { creatures: [] }, campaignName);
-  });
-
-  it('should dispatch combat-summary-updated event', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue({ name: 'DownedAlly', type: 'player' });
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 0;
-      if (key === 'hitPoints') return 50;
-      return null;
-    });
-
-    const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(dispatchEventSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'combat-summary-updated' }));
-    dispatchEventSpy.mockRestore();
-  });
-
-  it('should post log entry on success', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue({ name: 'DownedAlly', type: 'player' });
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 0;
-      if (key === 'hitPoints') return 50;
-      return null;
-    });
-
-    const now = Date.now();
-    vi.spyOn(Date, 'now').mockReturnValue(now);
-
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
-      type: 'heal',
-      characterName: 'TestCleric',
-      targetName: 'DownedAlly',
-      amount: 16,
-      abilityName: 'Undying Sentinel',
-      timestamp: now,
-    });
-  });
-
-  it('should cap heal at max HP', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue({ name: 'DownedAlly', type: 'player' });
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 0;
-      if (key === 'hitPoints') return 10;
-      return null;
-    });
-
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('DownedAlly', 'currentHitPoints', 10, campaignName);
-  });
-
-  it('should calculate heal amount as paladinLevel * 3', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue({ name: 'DownedAlly', type: 'player' });
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 0;
-      if (key === 'hitPoints') return 100;
-      return null;
-    });
-    const ps = makePlayerStats({ level: 7 });
-
-    await handle(makeAction(), ps, campaignName, null);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('DownedAlly', 'currentHitPoints', 22, campaignName);
-  });
-
-  it('should use playerStats.level as fallback for paladinLevel', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue({ name: 'DownedAlly', type: 'player' });
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 0;
-      if (key === 'hitPoints') return 100;
-      return null;
-    });
-    const ps = makePlayerStats({
-      level: 5,
-      class: { class_levels: [{ level: 10 }] },
-    });
-
-    await handle(makeAction(), ps, campaignName, null);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('DownedAlly', 'currentHitPoints', 16, campaignName);
-  });
-
-  it('should handle undefined hitPoints with default of 100', async () => {
-    getRuntimeValue.mockReturnValue(null);
-    getCombatContext.mockResolvedValue({});
-    getTargetFromAttacker.mockReturnValue({ name: 'DownedAlly', type: 'player' });
-    getRuntimeValue.mockImplementation((name, key) => {
-      if (key === 'currentHitPoints') return 0;
-      return null;
-    });
-
-    await handle(makeAction(), makePlayerStats(), campaignName, null);
-
-    expect(setRuntimeValue).toHaveBeenCalledWith('DownedAlly', 'currentHitPoints', 16, campaignName);
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+  dateNowSpy = vi.spyOn(Date, 'now').mockReturnValue(1700000000000);
 });
 
-describe('undyingSentinelHandler.isUndyingSentinelUsed', () => {
-  it('should return true when used', () => {
-    getRuntimeValue.mockReturnValue(true);
-
-    expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(true);
-  });
-
-  it('should return false when not used', () => {
-    getRuntimeValue.mockReturnValue(null);
-
-    expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(false);
-  });
-
-  it('should return false when used is false', () => {
-    getRuntimeValue.mockReturnValue(false);
-
-    expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(false);
-  });
+afterEach(() => {
+  dispatchEventSpy.mockRestore();
+  dateNowSpy.mockRestore();
 });
 
-describe('undyingSentinelHandler.setUndyingSentinelUsed', () => {
-  it('should set used to true', async () => {
-    await setUndyingSentinelUsed('TestCleric', campaignName, true);
+// ── Tests ────────────────────────────────────────────────────────
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'undyingSentinelUsed', true, campaignName);
+describe('undyingSentinelHandler', () => {
+  describe('handle', () => {
+    describe('guard clauses', () => {
+      it('returns popup when ability already used this long rest', async () => {
+        getRuntimeValue.mockReturnValue(true);
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result).toEqual({
+          type: 'popup',
+          payload: expect.objectContaining({
+            type: 'automation_info',
+            name: 'Undying Sentinel',
+            description: expect.stringContaining('already been used'),
+          }),
+        });
+      });
+
+      it('returns popup when no combat is active', async () => {
+        getRuntimeValue.mockReturnValue(false);
+        getCombatContext.mockResolvedValue(null);
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result).toEqual({
+          type: 'popup',
+          payload: expect.objectContaining({
+            type: 'automation_info',
+            description: 'No combat active.',
+          }),
+        });
+      });
+
+      it('returns popup when no target is selected in combat', async () => {
+        getRuntimeValue.mockReturnValue(false);
+        getCombatContext.mockResolvedValue({});
+        getTargetFromAttacker.mockReturnValue(null);
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result).toEqual({
+          type: 'popup',
+          payload: expect.objectContaining({
+            type: 'automation_info',
+            description: 'Select a target in the combat tracker first.',
+          }),
+        });
+      });
+
+      it('returns popup when target is not at 0 HP', async () => {
+        getRuntimeValue
+          .mockReturnValueOnce(false)
+          .mockImplementation((name, key) => {
+            if (key === 'currentHitPoints' && name === 'DownedAlly') return 5;
+            return null;
+          });
+        getCombatContext.mockResolvedValue({});
+        getTargetFromAttacker.mockReturnValue(makePlayerTarget('DownedAlly', 5));
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result).toEqual({
+          type: 'popup',
+          payload: expect.objectContaining({
+            type: 'automation_info',
+            description: 'DownedAlly is not at 0 Hit Points.',
+          }),
+        });
+      });
+    });
+
+    describe('successful heal — player target', () => {
+      function setupPlayerHeal(targetName = 'DownedAlly', maxHp = 50) {
+        getRuntimeValue
+          .mockReturnValueOnce(false)
+          .mockImplementation((name, key) => {
+            if (key === 'currentHitPoints' && name === targetName) return 0;
+            if (key === 'hitPoints' && name === 'TestCleric') return maxHp;
+            return null;
+          });
+        getCombatContext.mockResolvedValue({});
+        getTargetFromAttacker.mockReturnValue(makePlayerTarget(targetName, 0));
+      }
+
+      it('heals target and marks ability as used', async () => {
+        setupPlayerHeal();
+        const stats = makePlayerStats({ level: 5 });
+
+        const result = await handle(makeAction(), stats, campaignName, null);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'TestCleric',
+          'undyingSentinelUsed',
+          true,
+          campaignName,
+        );
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'DownedAlly',
+          'currentHitPoints',
+          16,
+          campaignName,
+        );
+        expect(result.payload.description).toContain('survive');
+        expect(result.payload.description).toContain('16 HP');
+      });
+
+      it('caps healed HP at target maximum HP', async () => {
+        setupPlayerHeal('DownedAlly', 10);
+
+        await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'DownedAlly',
+          'currentHitPoints',
+          10,
+          campaignName,
+        );
+      });
+
+      it('uses level 7 paladin to heal 21 HP (capped at max HP)', async () => {
+        setupPlayerHeal('DownedAlly', 100);
+
+        await handle(makeAction(), makePlayerStats({ level: 7 }), campaignName, null);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'DownedAlly',
+          'currentHitPoints',
+          22,
+          campaignName,
+        );
+      });
+
+      it('defaults to 100 max HP when hitPoints is undefined', async () => {
+        getRuntimeValue
+          .mockReturnValueOnce(false)
+          .mockImplementation((name, key) => {
+            if (key === 'currentHitPoints' && name === 'DownedAlly') return 0;
+            return null;
+          });
+        getCombatContext.mockResolvedValue({});
+        getTargetFromAttacker.mockReturnValue(makePlayerTarget('DownedAlly', 0));
+
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'DownedAlly',
+          'currentHitPoints',
+          16,
+          campaignName,
+        );
+      });
+
+      it('posts a heal log entry', async () => {
+        setupPlayerHeal();
+
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(postLogEntry).toHaveBeenCalledWith(campaignName, {
+          type: 'heal',
+          characterName: 'TestCleric',
+          targetName: 'DownedAlly',
+          amount: 16,
+          abilityName: 'Undying Sentinel',
+          timestamp: 1700000000000,
+        });
+      });
+
+      it('dispatches combat-summary-updated event', async () => {
+        setupPlayerHeal();
+
+        await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(dispatchEventSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'combat-summary-updated' }),
+        );
+      });
+    });
+
+    describe('successful heal — NPC target', () => {
+      function setupNPCHeal(target = makeNPCTarget()) {
+        getRuntimeValue
+          .mockReturnValueOnce(false)
+          .mockReturnValue(null);
+        getCombatContext.mockResolvedValue({ creatures: [] });
+        getTargetFromAttacker.mockReturnValue(target);
+      }
+
+      it('sets currentHp directly on NPC target', async () => {
+        const target = makeNPCTarget('Goblin', 0);
+        setupNPCHeal(target);
+
+        await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
+
+        expect(target.currentHp).toBe(16);
+      });
+
+      it('saves updated combatSummary to storage', async () => {
+        const target = makeNPCTarget('Goblin', 0);
+        const cs = { creatures: [target] };
+        getRuntimeValue
+          .mockReturnValueOnce(false)
+          .mockReturnValue(null);
+        getCombatContext.mockResolvedValue(cs);
+        getTargetFromAttacker.mockReturnValue(target);
+
+        await handle(makeAction(), makePlayerStats({ level: 5 }), campaignName, null);
+
+        expect(storage.set).toHaveBeenCalledWith('combatSummary', cs, campaignName);
+      });
+    });
   });
 
-  it('should set used to false', async () => {
-    await setUndyingSentinelUsed('TestCleric', campaignName, false);
+  describe('isUndyingSentinelUsed', () => {
+    it('returns true when runtime value is true', () => {
+      getRuntimeValue.mockReturnValue(true);
 
-    expect(setRuntimeValue).toHaveBeenCalledWith('TestCleric', 'undyingSentinelUsed', false, campaignName);
+      expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(true);
+    });
+
+    it('returns false when runtime value is null', () => {
+      getRuntimeValue.mockReturnValue(null);
+
+      expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(false);
+    });
+
+    it('returns false when runtime value is false', () => {
+      getRuntimeValue.mockReturnValue(false);
+
+      expect(isUndyingSentinelUsed('TestCleric', campaignName)).toBe(false);
+    });
+  });
+
+  describe('setUndyingSentinelUsed', () => {
+    it('sets used to true', async () => {
+      await setUndyingSentinelUsed('TestCleric', campaignName, true);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCleric',
+        'undyingSentinelUsed',
+        true,
+        campaignName,
+      );
+    });
+
+    it('sets used to false', async () => {
+      await setUndyingSentinelUsed('TestCleric', campaignName, false);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCleric',
+        'undyingSentinelUsed',
+        false,
+        campaignName,
+      );
+    });
   });
 });

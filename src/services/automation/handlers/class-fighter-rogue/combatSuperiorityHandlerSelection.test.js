@@ -1,45 +1,16 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { onCombatSuperioritySelected } from './combatSuperiorityHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { rollExpression } from '../../../dice/diceRoller.js';
-import * as savePrompt from '../../../automation/common/savePrompt.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import * as dataLoader from '../../../../services/ui/dataLoader.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
     setRuntimeValue: vi.fn(),
 }));
 
-vi.mock('../../common/targetResolver.js', () => ({
-    resolveTarget: vi.fn(async () => ({ target: { name: 'Goblin' } })),
-}));
-
-vi.mock('../../../dice/diceRoller.js', () => ({
-    rollExpression: vi.fn(),
-}));
-
-vi.mock('../../../../services/encounters/combatData.js', () => ({
-    getCurrentCombatRound: vi.fn(() => 1),
-}));
-
 vi.mock('../../../../services/ui/dataLoader.js', () => ({
-    loadManeuvers: vi.fn(async () => [
-        { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
-        { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
-        { name: 'Rally', effect: 'temp_hp' },
-    ]),
-}));
-
-vi.mock('../../../automation/common/savePrompt.js', () => ({
-    buildSaveDc: vi.fn(),
-    createSaveListener: vi.fn(),
-}));
-
-vi.mock('../../../ui/logService.js', () => ({
-    addEntry: vi.fn(() => Promise.resolve()),
-}));
-
-vi.mock('../../../rules/combat/damageUtils.js', () => ({
-    getCombatContext: vi.fn(),
+    loadManeuvers: vi.fn(),
 }));
 
 const makeAction = (auto = {}) => ({
@@ -71,132 +42,197 @@ const makePlayerStats = (overrides = {}) => ({
     ...overrides,
 });
 
-describe('combatSuperiorityHandler.onCombatSuperioritySelected - selection', () => {
+const allManeuvers = [
+    { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
+    { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
+    { name: 'Rally', effect: 'temp_hp' },
+];
+
+describe('onCombatSuperioritySelected - selection', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
-            return undefined;
+        dataLoader.loadManeuvers.mockResolvedValue(allManeuvers);
+    });
+
+    describe('empty or cleared selection', () => {
+        it('returns info popup when selectedManeuverNames is an empty array', async () => {
+            const result = await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                []
+            );
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Combat Superiority');
+            expect(result.payload.description).toBe('Combat Superiority selection cleared.');
         });
-        rollExpression.mockReturnValue({ total: 5 });
-        savePrompt.buildSaveDc.mockReturnValue(15);
-        savePrompt.createSaveListener.mockReturnValue({
-            promise: Promise.resolve({ success: false }),
+    });
+
+    describe('invalid maneuver filtering', () => {
+        it('filters out maneuver names not in the loaded maneuver list', async () => {
+            await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                ['Trip Attack', 'Invalid Maneuver', 'Pushing Attack']
+            );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter',
+                'BattleMasterManeuvers_selection',
+                ['Trip Attack', 'Pushing Attack'],
+                'test-campaign',
+                true
+            );
+        });
+
+        it('saves only valid maneuver names when all are valid', async () => {
+            await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                ['Trip Attack', 'Pushing Attack', 'Rally']
+            );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter',
+                'BattleMasterManeuvers_selection',
+                ['Trip Attack', 'Pushing Attack', 'Rally'],
+                'test-campaign',
+                true
+            );
+        });
+
+        it('saves empty array when all selected names are invalid', async () => {
+            await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                ['Unknown 1', 'Unknown 2']
+            );
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'TestFighter',
+                'BattleMasterManeuvers_selection',
+                [],
+                'test-campaign',
+                true
+            );
         });
     });
 
-    it('returns popup when empty array selected', async () => {
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            []
-        );
+    describe('popup response for selection', () => {
+        it('includes valid maneuver names in the popup description', async () => {
+            const result = await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                ['Trip Attack', 'Rally']
+            );
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toBe('Combat Superiority selection cleared.');
-    });
-
-    it('filters out invalid maneuver names', async () => {
-        await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            ['Trip Attack', 'Invalid Maneuver', 'Pushing Attack']
-        );
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter',
-            'BattleMasterManeuvers_selection',
-            ['Trip Attack', 'Pushing Attack'],
-            'test-campaign',
-            true
-        );
-    });
-
-    it('returns info popup with selected maneuver names', async () => {
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            ['Trip Attack', 'Pushing Attack']
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('Trip Attack');
-        expect(result.payload.description).toContain('Pushing Attack');
-        expect(result.payload.description).toContain('Combat Superiority');
-    });
-
-    it('saves selection via setRuntimeValue', async () => {
-        await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'my-campaign',
-            ['Rally']
-        );
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter',
-            'BattleMasterManeuvers_selection',
-            ['Rally'],
-            'my-campaign',
-            true
-        );
-    });
-
-    it('returns popup when null selectedManeuverNames and no singleUseManeuverName', async () => {
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('No maneuver selected.');
-    });
-
-    it('delegates to executeManeuver when singleUseManeuverName is provided', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
-            return undefined;
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe('Combat Superiority');
+            expect(result.payload.description).toContain('Trip Attack');
+            expect(result.payload.description).toContain('Rally');
+            expect(result.payload.description).toContain('Combat Superiority');
         });
-        rollExpression.mockReturnValue({ total: 6 });
 
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Trip Attack'
-        );
+        it('includes automation config in popup payload', async () => {
+            const result = await onCombatSuperioritySelected(
+                makeAction({ maxOptions: 5 }),
+                makePlayerStats(),
+                'test-campaign',
+                ['Trip Attack']
+            );
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.name).toBe('Trip Attack');
-        expect(result.payload.description).toContain('Trip Attack');
+            expect(result.payload.automation).toEqual({
+                type: 'combat_superiority',
+                saveType: 'WIS',
+                saveDc: 'ability',
+                dieExpression: 'superiority_die',
+                uses_max: 4,
+                maxOptions: 5,
+            });
+        });
     });
 
-    it('loads maneuvers with correct ruleset from playerStats', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
-            return undefined;
+    describe('no maneuver selected', () => {
+        it('returns info popup when selectedManeuverNames is null', async () => {
+            const result = await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                null
+            );
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toBe('No maneuver selected.');
         });
-        rollExpression.mockReturnValue({ total: 6 });
-        const { loadManeuvers } = await import('../../../../services/ui/dataLoader.js');
-        loadManeuvers.mockResolvedValue([
-            { name: 'Trip Attack', effect: 'knock_prone', saveType: 'STR' },
-        ]);
 
-        await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats({ rules: '5e' }),
-            'test-campaign',
-            null,
-            'Trip Attack'
-        );
+        it('returns info popup when selectedManeuverNames is undefined', async () => {
+            const result = await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats(),
+                'test-campaign',
+                undefined
+            );
 
-        expect(loadManeuvers).toHaveBeenCalledWith('5e');
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.description).toBe('No maneuver selected.');
+        });
+    });
+
+    describe('ruleset handling', () => {
+        it('loads maneuvers for 5e ruleset from playerStats', async () => {
+            await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats({ rules: '5e' }),
+                'test-campaign',
+                ['Trip Attack']
+            );
+
+            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('5e');
+        });
+
+        it('loads maneuvers for 2024 ruleset by default', async () => {
+            await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats({ rules: '2024' }),
+                'test-campaign',
+                ['Trip Attack']
+            );
+
+            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
+        });
+
+        it('defaults to 2024 ruleset when playerStats.rules is null', async () => {
+            await onCombatSuperioritySelected(
+                makeAction(),
+                makePlayerStats({ rules: null }),
+                'test-campaign',
+                ['Trip Attack']
+            );
+
+            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
+        });
+
+        it('defaults to 2024 ruleset when playerStats.rules is undefined', async () => {
+            const playerStats = makePlayerStats();
+            delete playerStats.rules;
+
+            await onCombatSuperioritySelected(
+                makeAction(),
+                playerStats,
+                'test-campaign',
+                ['Trip Attack']
+            );
+
+            expect(dataLoader.loadManeuvers).toHaveBeenCalledWith('2024');
+        });
     });
 });

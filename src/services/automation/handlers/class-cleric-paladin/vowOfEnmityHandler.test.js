@@ -1,18 +1,8 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
-    getRuntimeValue: vi.fn(),
-    setRuntimeValue: vi.fn(),
-}));
-
-vi.mock('../../../rules/combat/damageUtils.js', () => ({
-    getCombatContext: vi.fn(),
-    getTargetFromAttacker: vi.fn(),
-}));
-
 import { handle, applyTargetChoice } from './vowOfEnmityHandler.js';
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
+import * as runtimeState from '../../../../hooks/runtime/useRuntimeState.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
 
 const campaignName = 'TestCampaign';
 
@@ -30,11 +20,20 @@ function makePlayerStats(overrides = {}) {
     };
 }
 
-function makeAction(automation = {}) {
+function makeAction(overrides = {}) {
     return {
         name: 'Vow of Enmity',
-        automation: { type: 'vow_of_enmity', ...automation },
+        automation: { type: 'vow_of_enmity', ...overrides.automation },
+        ...(overrides.name ? { name: overrides.name } : {}),
     };
+}
+
+function mockRuntimeValues(getters) {
+    vi.spyOn(runtimeState, 'getRuntimeValue').mockImplementation((target, key) => {
+        if (key in getters) return getters[key];
+        return null;
+    });
+    vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
 }
 
 // ─── handle ───
@@ -44,45 +43,56 @@ describe('vowOfEnmityHandler.handle', () => {
         vi.clearAllMocks();
     });
 
-    it('returns info popup when vow is already active', async () => {
-        getRuntimeValue.mockReturnValue('Goblin');
+    it('returns info popup when vow is already active against a target', async () => {
+        mockRuntimeValues({ vowOfEnmityTarget: 'Goblin' });
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
         expect(result.type).toBe('popup');
         expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Vow of Enmity');
+        expect(result.payload.automationType).toBe('vow_of_enmity');
         expect(result.payload.description).toContain('already active against Goblin');
+        expect(result.payload.automation).toEqual({ type: 'vow_of_enmity' });
     });
 
-    it('returns no charges popup when channel divinity is depleted', async () => {
-        getRuntimeValue.mockReturnValueOnce(null); // no existing vow
-        getRuntimeValue.mockReturnValueOnce(0); // 0 charges
+    it('does not consume charges or mutate state when vow is already active', async () => {
+        mockRuntimeValues({ vowOfEnmityTarget: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('returns info popup when vow is already active with no charges remaining', async () => {
+        mockRuntimeValues({
+            vowOfEnmityTarget: 'Goblin',
+            channelDivinityCharges: 0,
+        });
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
         expect(result.type).toBe('popup');
-        expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
+        expect(result.payload.description).toContain('already active against Goblin');
     });
 
-    it('returns modal when no combat target and no existing vow', async () => {
-        getRuntimeValue.mockReturnValueOnce(null); // no existing vow
-        getRuntimeValue.mockReturnValueOnce(2); // 2 charges
-        getCombatContext.mockResolvedValue(null);
+    it('returns no-charges popup when channel divinity is depleted', async () => {
+        mockRuntimeValues({ channelDivinityCharges: 0 });
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
-        expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('vowOfEnmityTarget');
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.description).toBe('No Channel Divinity charges remaining.');
+        expect(runtimeState.setRuntimeValue).not.toHaveBeenCalled();
     });
 
-    it('activates vow when combat target exists', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce(null) // no existing vow
-            .mockReturnValueOnce(2); // 2 charges
-        getCombatContext.mockResolvedValue({
+    it('defaults to max charges when stored charges is null', async () => {
+        mockRuntimeValues({});
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
@@ -90,18 +100,49 @@ describe('vowOfEnmityHandler.handle', () => {
         expect(result.payload.description).toContain('activated against Goblin');
     });
 
-    it('consumes a channel divinity charge on activation', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce(null)
-            .mockReturnValueOnce(2);
-        getCombatContext.mockResolvedValue({
+    it('uses class_specific.channel_divinity_charges fallback for max charges', async () => {
+        mockRuntimeValues({});
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
 
-        await handle(makeAction(), makePlayerStats(), campaignName);
+        const ps = makePlayerStats({
+            level: 3,
+            class: {
+                class_levels: [
+                    undefined, undefined, { channel_divinity: 0, class_specific: { channel_divinity_charges: 3 } },
+                ],
+            },
+        });
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(
+        await handle(makeAction(), ps, campaignName);
+
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Paladin1',
+            'channelDivinityCharges',
+            2,
+            campaignName,
+        );
+    });
+
+    it('defaults to 2 charges when no channel_divinity metadata exists', async () => {
+        mockRuntimeValues({});
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [{ name: 'Goblin' }],
+        });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
+
+        const ps = makePlayerStats({
+            level: 3,
+            class: {
+                class_levels: [undefined, undefined, {}],
+            },
+        });
+
+        await handle(makeAction(), ps, campaignName);
+
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Paladin1',
             'channelDivinityCharges',
             1,
@@ -109,114 +150,157 @@ describe('vowOfEnmityHandler.handle', () => {
         );
     });
 
-    it('stores the vow target', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce(null)
-            .mockReturnValueOnce(2);
-        getCombatContext.mockResolvedValue({
+    it('returns modal when combat context is null', async () => {
+        mockRuntimeValues({});
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue(null);
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('vowOfEnmityTarget');
+    });
+
+    it('returns modal when combat has no creatures', async () => {
+        mockRuntimeValues({});
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({ creatures: [] });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('vowOfEnmityTarget');
+    });
+
+    it('returns modal when getTargetFromAttacker returns null', async () => {
+        mockRuntimeValues({});
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue(null);
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('vowOfEnmityTarget');
+    });
+
+    it('activates vow with combat target, consuming one charge', async () => {
+        mockRuntimeValues({ channelDivinityCharges: 2 });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [{ name: 'Goblin' }],
+        });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('activated against Goblin');
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
+            'Paladin1',
+            'channelDivinityCharges',
+            1,
+            campaignName,
+        );
+    });
+
+    it('stores the vow target and adds the buff', async () => {
+        mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [{ name: 'Goblin' }],
+        });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
 
         await handle(makeAction(), makePlayerStats(), campaignName);
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Paladin1',
             'vowOfEnmityTarget',
             'Goblin',
             campaignName,
         );
-    });
-
-    it('adds vow_of_enmity buff to activeBuffs', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce(null)
-            .mockReturnValueOnce(2)
-            .mockReturnValueOnce([]);
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'Goblin' }],
-        });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
-
-        await handle(makeAction(), makePlayerStats(), campaignName);
-
-        const buffsCall = setRuntimeValue.mock.calls.find(
+        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
             (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
         );
         expect(buffsCall).toBeDefined();
-        expect(buffsCall[2][0].effect).toBe('vow_of_enmity');
-        expect(buffsCall[2][0].target).toBe('Goblin');
+        expect(buffsCall[2][0]).toEqual({
+            name: 'Vow of Enmity',
+            effect: 'vow_of_enmity',
+            duration: '1_minute',
+            target: 'Goblin',
+        });
+    });
+
+    it('preserves existing buffs when adding vow_of_enmity', async () => {
+        mockRuntimeValues({
+            channelDivinityCharges: 2,
+            activeBuffs: [{ effect: 'divine_shield', target: 'Paladin1' }],
+        });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
+            creatures: [{ name: 'Goblin' }],
+        });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
+            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        );
+        expect(buffsCall[2]).toHaveLength(2);
+        expect(buffsCall[2][0].effect).toBe('divine_shield');
+        expect(buffsCall[2][1].effect).toBe('vow_of_enmity');
     });
 
     it('uses automation duration when provided', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce(null)
-            .mockReturnValueOnce(2)
-            .mockReturnValueOnce([]);
-        getCombatContext.mockResolvedValue({
+        mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
 
-        await handle(makeAction({ duration: '1_hour' }), makePlayerStats(), campaignName);
+        await handle(makeAction({ automation: { duration: '1_hour' } }), makePlayerStats(), campaignName);
 
-        const buffsCall = setRuntimeValue.mock.calls.find(
+        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
             (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
         );
         expect(buffsCall[2][0].duration).toBe('1_hour');
     });
 
     it('defaults duration to 1_minute when not provided', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce(null)
-            .mockReturnValueOnce(2)
-            .mockReturnValueOnce([]);
-        getCombatContext.mockResolvedValue({
+        mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
 
         await handle(makeAction(), makePlayerStats(), campaignName);
 
-        const buffsCall = setRuntimeValue.mock.calls.find(
+        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
             (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
         );
         expect(buffsCall[2][0].duration).toBe('1_minute');
     });
 
-    it('uses class level from playerStats for channel divinity charges', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce(null)
-            .mockReturnValueOnce(null); // null charges → defaults to maxCharges
-        getCombatContext.mockResolvedValue({
+    it('includes automation object in activation popup payload', async () => {
+        mockRuntimeValues({ channelDivinityCharges: 2, activeBuffs: [] });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue({
             creatures: [{ name: 'Goblin' }],
         });
-        getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue({ name: 'Goblin' });
 
-        const ps = makePlayerStats({ level: 7 });
+        const result = await handle(makeAction({ automation: { duration: '1_hour' } }), makePlayerStats(), campaignName);
 
-        await handle(makeAction(), ps, campaignName);
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'Paladin1',
-            'channelDivinityCharges',
-            1,
-            campaignName,
-        );
+        expect(result.payload.automation).toEqual({ type: 'vow_of_enmity', duration: '1_hour' });
     });
 
-    it('returns modal when targetName is null from combat context', async () => {
-        getRuntimeValue.mockReturnValueOnce(null);
-        getRuntimeValue.mockReturnValueOnce(2);
-        getCombatContext.mockResolvedValue({
-            creatures: [],
-        });
-        getTargetFromAttacker.mockReturnValue(null);
+    it('passes action, playerStats, and campaignName in modal payload', async () => {
+        mockRuntimeValues({});
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue(null);
 
         const result = await handle(makeAction(), makePlayerStats(), campaignName);
 
         expect(result.type).toBe('modal');
-        expect(result.modalName).toBe('vowOfEnmityTarget');
+        expect(result.payload.action.automation.type).toBe('vow_of_enmity');
+        expect(result.payload.playerStats.name).toBe('Paladin1');
+        expect(result.payload.campaignName).toBe('TestCampaign');
     });
 });
 
@@ -227,17 +311,26 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
         vi.clearAllMocks();
     });
 
-    it('returns info popup when no chosenTargetName provided', async () => {
+    it('returns info popup with "No target selected" when chosenTargetName is null', async () => {
         const result = await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, null);
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Vow of Enmity');
+        expect(result.payload.description).toBe('No target selected.');
+        expect(result.payload.automationType).toBe('vow_of_enmity');
+        expect(result.payload.automation).toEqual({ type: 'vow_of_enmity' });
+    });
+
+    it('returns info popup when chosenTargetName is empty string', async () => {
+        const result = await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, '');
 
         expect(result.type).toBe('popup');
         expect(result.payload.description).toBe('No target selected.');
     });
 
     it('activates vow with chosen target', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce([])
-            .mockReturnValueOnce([]);
+        mockRuntimeValues({ activeBuffs: [] });
 
         const result = await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, 'Orc');
 
@@ -246,13 +339,11 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
     });
 
     it('stores the chosen target', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce([])
-            .mockReturnValueOnce([]);
+        mockRuntimeValues({ activeBuffs: [] });
 
         await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, 'Orc');
 
-        expect(setRuntimeValue).toHaveBeenCalledWith(
+        expect(runtimeState.setRuntimeValue).toHaveBeenCalledWith(
             'Paladin1',
             'vowOfEnmityTarget',
             'Orc',
@@ -261,27 +352,36 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
     });
 
     it('adds vow_of_enmity buff with chosen target', async () => {
-        getRuntimeValue
-            .mockReturnValueOnce([])
-            .mockReturnValueOnce([]);
+        mockRuntimeValues({ activeBuffs: [] });
 
         await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, 'Orc');
 
-        const buffsCall = setRuntimeValue.mock.calls.find(
+        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
             (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
         );
         expect(buffsCall[2][0].target).toBe('Orc');
+        expect(buffsCall[2][0].effect).toBe('vow_of_enmity');
     });
 
-    it('includes action.automation.type in info popup for null target', async () => {
-        const result = await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, null);
+    it('uses default duration when no automation duration provided', async () => {
+        mockRuntimeValues({ activeBuffs: [] });
 
-        expect(result.payload.automationType).toBe('vow_of_enmity');
+        await applyTargetChoice(makeAction(), makePlayerStats(), campaignName, 'Orc');
+
+        const buffsCall = vi.mocked(runtimeState.setRuntimeValue).mock.calls.find(
+            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        );
+        expect(buffsCall[2][0].duration).toBe('1_minute');
     });
 
-    it('includes automation in info popup for null target', async () => {
-        const result = await applyTargetChoice(makeAction({ custom: 'val' }), makePlayerStats(), campaignName, null);
+    it('includes custom automation fields in the null-target popup', async () => {
+        const result = await applyTargetChoice(
+            makeAction({ automation: { customField: 'customVal' } }),
+            makePlayerStats(),
+            campaignName,
+            null,
+        );
 
-        expect(result.payload.automation).toEqual({ type: 'vow_of_enmity', custom: 'val' });
+        expect(result.payload.automation).toEqual({ type: 'vow_of_enmity', customField: 'customVal' });
     });
 });

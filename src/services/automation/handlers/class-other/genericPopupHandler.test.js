@@ -1,15 +1,9 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-// ── Mocks BEFORE imports ───────────────────────────────────────
-vi.mock('../../../shared/popupResponse.js', () => ({
-  automationInfoPopup: vi.fn(),
-}));
-
-// ── Imports ────────────────────────────────────────────────────
 import { handle } from './genericPopupHandler.js';
 import * as popupResponse from '../../../shared/popupResponse.js';
 
-// ── Helpers ────────────────────────────────────────────────────
 function makeAction(overrides = {}) {
   return {
     name: 'Generic Action',
@@ -20,67 +14,104 @@ function makeAction(overrides = {}) {
   };
 }
 
-// ── Tests ──────────────────────────────────────────────────────
 describe('genericPopupHandler.handle', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
-  it('should call automationInfoPopup with the provided action and return its result', async () => {
+  it('should delegate to automationInfoPopup with the action and return its result', async () => {
+    const spy = vi.spyOn(popupResponse, 'automationInfoPopup');
     const action = makeAction();
-    const expectedResult = {
+
+    const result = await handle(action);
+
+    expect(spy).toHaveBeenCalledWith(action);
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: 'Generic Action',
+        automationType: 'generic_popup',
+        description: '',
+        automation: { type: 'generic_popup' },
+      },
+    });
+  });
+
+  it('should return the full popup object produced by automationInfoPopup', async () => {
+    const spy = vi.spyOn(popupResponse, 'automationInfoPopup');
+    spy.mockImplementation((action) => ({
       type: 'popup',
       payload: {
         type: 'automation_info',
         name: action.name,
-        description: 'Generic info message',
+        automationType: action.automation.type,
+        description: action.description || '',
+        automation: action.automation,
       },
-    };
-
-    popupResponse.automationInfoPopup.mockReturnValue(expectedResult);
+    }));
+    const action = makeAction({ description: 'Test description' });
 
     const result = await handle(action);
 
-    expect(popupResponse.automationInfoPopup).toHaveBeenCalledWith(action);
-    expect(result).toEqual(expectedResult);
+    expect(result.type).toBe('popup');
+    expect(result.payload.type).toBe('automation_info');
+    expect(result.payload.name).toBe('Generic Action');
+    expect(result.payload.automationType).toBe('generic_popup');
+    expect(result.payload.description).toBe('Test description');
+    expect(result.payload.automation).toEqual({ type: 'generic_popup' });
   });
 
-  it('should return the result even if action properties are missing', async () => {
-    const action = {}; // Minimal/invalid action object
-    const expectedResult = {
-      type: 'popup',
-      payload: {
-        type: 'automation_info',
-        name: undefined,
-        description: 'Missing info',
-      },
-    };
-
-    popupResponse.automationInfoPopup.mockReturnValue(expectedResult);
-
-    const result = await handle(action);
-
-    expect(popupResponse.automationInfoPopup).toHaveBeenCalledWith(action);
-    expect(result).toEqual(expectedResult);
-  });
-
-  it('should return null if automationInfoPopup returns null', async () => {
+  it('should pass through null when automationInfoPopup returns null', async () => {
+    vi.spyOn(popupResponse, 'automationInfoPopup').mockReturnValue(null);
     const action = makeAction();
-    popupResponse.automationInfoPopup.mockReturnValue(null);
 
     const result = await handle(action);
 
     expect(result).toBeNull();
   });
 
-  it('should handle asynchronous resolution of automationInfoPopup', async () => {
-    const action = makeAction();
-    const expectedResult = { type: 'popup', payload: {} };
-    
-    popupResponse.automationInfoPopup.mockImplementation(async () => expectedResult);
+  it('should handle actions with minimal properties', async () => {
+    const spy = vi.spyOn(popupResponse, 'automationInfoPopup');
+    spy.mockImplementation((action) => ({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: action.name,
+        automationType: action.automation.type,
+        description: action.description || '',
+        automation: action.automation,
+      },
+    }));
+    const action = makeAction({ name: undefined, description: undefined });
 
     const result = await handle(action);
 
-    expect(result).toEqual(expectedResult);
+    expect(spy).toHaveBeenCalledWith(action);
+    expect(result.payload.name).toBeUndefined();
+    expect(result.payload.description).toBe('');
+  });
+
+  it('should handle actions with extra properties', async () => {
+    const spy = vi.spyOn(popupResponse, 'automationInfoPopup');
+    spy.mockImplementation((action) => ({
+      type: 'popup',
+      payload: {
+        type: 'automation_info',
+        name: action.name,
+        automationType: action.automation.type,
+        description: action.description || '',
+        automation: action.automation,
+        extra: action.extra,
+      },
+    }));
+    const action = makeAction({ extra: 'custom data', automation: { type: 'generic_popup', detail: 'value' } });
+
+    const result = await handle(action);
+
+    expect(spy).toHaveBeenCalledWith(action);
+    expect(result.payload.extra).toBe('custom data');
+    expect(result.payload.automation.detail).toBe('value');
   });
 });

@@ -1,7 +1,7 @@
 import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
-    const auto = action.automation;
+    const auto = action.automation || {};
     const playerName = playerStats.name;
     const range = auto.range || '30';
 

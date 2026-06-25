@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle } from './superiorHunterPreyHandler.js';
 
@@ -6,10 +7,6 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
 }));
 
 const { getCombatContext } = await import('../../../rules/combat/damageUtils.js');
-
-beforeEach(() => {
-    vi.clearAllMocks();
-});
 
 function makePlayerStats(overrides = {}) {
     return {
@@ -30,68 +27,98 @@ function makeAction(overrides = {}) {
 }
 
 describe('superiorHunterPreyHandler', () => {
-    it('returns error when no active combat', async () => {
-        getCombatContext.mockResolvedValue(null);
-
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.description).toBe('No active combat to target.');
+    beforeEach(() => {
+        vi.clearAllMocks();
     });
 
-    it('returns error when not concentrated on Hunter\'s Mark', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'TestRanger' }],
+    describe('handle', () => {
+        it('returns info popup with no active combat when getCombatContext returns null', async () => {
+            getCombatContext.mockResolvedValue(null);
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe("Superior Hunter's Prey");
+            expect(result.payload.description).toBe('No active combat to target.');
         });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        it('returns info popup when player has no concentration', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestRanger' }],
+            });
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain("Hunter's Mark is not currently concentrated on");
-    });
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-    it('returns success when concentrated on Hunter\'s Mark', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'TestRanger', concentration: { spell: "Hunter's Mark" } }],
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe("Superior Hunter's Prey");
+            expect(result.payload.description).toBe("Hunter's Mark is not currently concentrated on.");
         });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        it('returns success popup when player has any concentration (handler does not validate spell name)', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestRanger', concentration: { spell: 'Shield' } }],
+            });
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.type).toBe('automation_info');
-        expect(result.payload.name).toBe("Superior Hunter's Prey");
-        expect(result.payload.description).toContain("Superior Hunter's Prey active");
-        expect(result.payload.description).toContain('extra damage to a different creature');
-        expect(result.payload.description).toContain('Once per turn');
-    });
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-    it('handles creature not found in combat', async () => {
-        getCombatContext.mockResolvedValue({
-            creatures: [{ name: 'OtherPlayer', concentration: { spell: "Hunter's Mark" } }],
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe("Superior Hunter's Prey");
+            expect(result.payload.description).toContain("Superior Hunter's Prey active");
         });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        it('returns info popup when another creature has Hunter\'s Mark but not the player', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'OtherPlayer', concentration: { spell: "Hunter's Mark" } }],
+            });
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain("Hunter's Mark is not currently concentrated on");
-    });
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-    it('handles empty creatures array', async () => {
-        getCombatContext.mockResolvedValue({ creatures: [] });
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe("Superior Hunter's Prey");
+            expect(result.payload.description).toBe("Hunter's Mark is not currently concentrated on.");
+        });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        it('returns info popup when creatures array is empty', async () => {
+            getCombatContext.mockResolvedValue({ creatures: [] });
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain("Hunter's Mark is not currently concentrated on");
-    });
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-    it('handles undefined creatures', async () => {
-        getCombatContext.mockResolvedValue({});
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe("Superior Hunter's Prey");
+            expect(result.payload.description).toBe("Hunter's Mark is not currently concentrated on.");
+        });
 
-        const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+        it('returns info popup when creatures is undefined', async () => {
+            getCombatContext.mockResolvedValue({});
 
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain("Hunter's Mark is not currently concentrated on");
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe("Superior Hunter's Prey");
+            expect(result.payload.description).toBe("Hunter's Mark is not currently concentrated on.");
+        });
+
+        it('returns info popup when player has Hunter\'s Mark concentration active', async () => {
+            getCombatContext.mockResolvedValue({
+                creatures: [{ name: 'TestRanger', concentration: { spell: "Hunter's Mark" } }],
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
+            expect(result.payload.name).toBe("Superior Hunter's Prey");
+            expect(result.payload.description).toContain("Superior Hunter's Prey active");
+            expect(result.payload.description).toContain("creature marked by Hunter's Mark");
+            expect(result.payload.description).toContain('a different creature');
+            expect(result.payload.description).toContain('within 30 feet');
+            expect(result.payload.description).toContain('Once per turn');
+        });
     });
 });

@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -16,12 +17,18 @@ vi.mock('../../../rules/combat/damageUtils.js', () => ({
   getTargetFromAttacker: vi.fn(),
 }));
 
+vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
+  setRuntimeValue: vi.fn(),
+  getRuntimeValue: vi.fn(),
+}));
+
 // ── Imports ────────────────────────────────────────────────────
 
 import { handle } from './counterSpellHandler.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { addEntry } from '../../../ui/logService.js';
+import { setRuntimeValue, getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 
 // ── Helpers ────────────────────────────────────────────────────
 
@@ -48,17 +55,20 @@ function makeAction(automation = {}) {
   };
 }
 
-const baseCombatContext = {
-  creatures: [
-    { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-    { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-    { name: 'TestCaster', gridX: 5, gridY: 10 },
-  ],
-  players: [
-    { name: 'TestCaster', gridX: 5, gridY: 10 },
-  ],
-  placedItems: [],
-};
+function makeCombatContext(overrides = {}) {
+  return {
+    creatures: [
+      { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7, targetName: 'Orc' },
+      { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
+      { name: 'TestCaster', gridX: 5, gridY: 10 },
+    ],
+    players: [
+      { name: 'TestCaster', gridX: 5, gridY: 10 },
+    ],
+    placedItems: [],
+    ...overrides,
+  };
+}
 
 // ── Tests ──────────────────────────────────────────────────────
 
@@ -81,6 +91,7 @@ describe('counterSpellHandler.handle', () => {
       expect(result.payload.name).toBe('Counterspell');
       expect(result.payload.description).toContain('requires an active combat');
       expect(result.payload.description).toContain('Select a creature in combat');
+      expect(result.payload.automation).toEqual(action.automation);
     });
 
     it('should return popup when combat context has no creatures', async () => {
@@ -103,7 +114,7 @@ describe('counterSpellHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue(null);
 
       const result = await handle(action, ps, campaignName, null);
@@ -114,6 +125,21 @@ describe('counterSpellHandler.handle', () => {
       expect(result.payload.description).toContain('requires a target');
       expect(result.payload.description).toContain('Select a creature in combat');
     });
+
+    it('should pass combat context and player name to getTargetFromAttacker', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+
+      getCombatContext.mockResolvedValue(makeCombatContext());
+      getTargetFromAttacker.mockReturnValue(null);
+
+      await handle(action, ps, campaignName, null);
+
+      expect(getTargetFromAttacker).toHaveBeenCalledWith(
+        expect.objectContaining({ creatures: expect.any(Array) }),
+        'TestCaster',
+      );
+    });
   });
 
   describe('successful counterspell', () => {
@@ -121,7 +147,7 @@ describe('counterSpellHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({ promptId: 'test-prompt-1' });
@@ -134,13 +160,14 @@ describe('counterSpellHandler.handle', () => {
       expect(result.payload.targetName).toBe('Goblin');
       expect(result.payload.description).toContain('Goblin must make a CON saving throw');
       expect(result.payload.description).toContain('DC 15');
+      expect(result.payload.automation).toEqual(action.automation);
     });
 
-    it('should call buildSaveDc with action and playerStats', async () => {
+    it('should call buildSaveDc with action automation and playerStats', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
       buildSaveDc.mockReturnValue(13);
       createSaveListener.mockReturnValue({ promptId: 'test-prompt-2' });
@@ -154,7 +181,7 @@ describe('counterSpellHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Bugbear' });
       buildSaveDc.mockReturnValue(14);
       createSaveListener.mockReturnValue({ promptId: 'test-prompt-3' });
@@ -172,7 +199,7 @@ describe('counterSpellHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Hobgoblin' });
       buildSaveDc.mockReturnValue(16);
       createSaveListener.mockReturnValue({ promptId: 'test-prompt-4' });
@@ -193,7 +220,7 @@ describe('counterSpellHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Kobold' });
       buildSaveDc.mockReturnValue(12);
       createSaveListener.mockReturnValue({ promptId: 'test-prompt-5' });
@@ -211,7 +238,7 @@ describe('counterSpellHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ saveType: 'WIS' });
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({ promptId: 'test-prompt-6' });
@@ -236,7 +263,7 @@ describe('counterSpellHandler.handle', () => {
       const ps = makePlayerStats();
       const action = { name: 'My Counterspell', automation: { type: 'counterspell', saveType: 'CON' } };
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({ promptId: 'test-prompt-7' });
@@ -258,14 +285,13 @@ describe('counterSpellHandler.handle', () => {
     it('should log save_result entry on failed save', async () => {
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({ promptId: 'save-test-prompt' });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // Simulate the save-result event
       const savedCallback = addEventListenerSpy.mock.calls[0][1];
       savedCallback({
         detail: {
@@ -290,14 +316,13 @@ describe('counterSpellHandler.handle', () => {
     it('should log save_result entry on successful save', async () => {
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Orc' });
       buildSaveDc.mockReturnValue(14);
       createSaveListener.mockReturnValue({ promptId: 'save-test-prompt-2' });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // Simulate the save-result event
       const savedCallback = addEventListenerSpy.mock.calls[0][1];
       savedCallback({
         detail: {
@@ -322,14 +347,13 @@ describe('counterSpellHandler.handle', () => {
     it('should ignore save-result events with different promptId', async () => {
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({ promptId: 'correct-prompt' });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // Simulate the save-result event with wrong promptId
       const savedCallback = addEventListenerSpy.mock.calls[0][1];
       savedCallback({
         detail: {
@@ -338,8 +362,6 @@ describe('counterSpellHandler.handle', () => {
         },
       });
 
-      // The wrong promptId is ignored so no additional save_result should be added
-      // Only the ability_use entry should exist (no save_result entries at all)
       const saveResultCalls = addEntry.mock.calls.filter(
         call => call[1]?.type === 'save_result',
       );
@@ -351,14 +373,13 @@ describe('counterSpellHandler.handle', () => {
       const removeEventListenerSpy = vi.spyOn(window, 'removeEventListener');
       const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({ promptId: 'remove-test-prompt' });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      // Simulate the save-result event
       const savedCallback = addEventListenerSpy.mock.calls[0][1];
       savedCallback({
         detail: {
@@ -381,7 +402,7 @@ describe('counterSpellHandler.handle', () => {
       const ps = makePlayerStats();
       const action = makeAction({ customField: 'customValue' });
 
-      getCombatContext.mockResolvedValue(baseCombatContext);
+      getCombatContext.mockResolvedValue(makeCombatContext());
       getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
       buildSaveDc.mockReturnValue(15);
       createSaveListener.mockReturnValue({ promptId: 'test-prompt-8' });
@@ -392,6 +413,130 @@ describe('counterSpellHandler.handle', () => {
         type: 'counterspell',
         saveType: 'CON',
         customField: 'customValue',
+      });
+    });
+  });
+
+  describe('spell_breaker passive', () => {
+    async function runSpellBreakerTest(config) {
+      const {
+        ps,
+        action,
+        runtimeValue,
+        mockPromptId,
+        eventSuccess,
+        expectRestore,
+      } = config;
+
+      getRuntimeValue.mockReturnValue(runtimeValue);
+
+      getCombatContext.mockResolvedValue(makeCombatContext());
+      getTargetFromAttacker.mockReturnValue({ name: 'Goblin' });
+      buildSaveDc.mockReturnValue(15);
+      createSaveListener.mockReturnValue({ promptId: mockPromptId });
+
+      const addEventListenerSpy = vi.spyOn(window, 'addEventListener');
+
+      await handle(action, ps, campaignName, null);
+
+      const savedCallback = addEventListenerSpy.mock.calls[0][1];
+      savedCallback({
+        detail: {
+          promptId: mockPromptId,
+          success: eventSuccess,
+        },
+      });
+
+      if (expectRestore) {
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'TestCaster',
+          'spell_slots_level_3',
+          expectRestore,
+          campaignName,
+        );
+      } else {
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+      }
+
+      addEventListenerSpy.mockRestore();
+    }
+
+    it('should restore a spell slot when spell_breaker passive succeeds on Counterspell', async () => {
+      await runSpellBreakerTest({
+        ps: makePlayerStats({
+          automation: {
+            passives: [
+              { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
+            ],
+          },
+        }),
+        action: makeAction(),
+        runtimeValue: 3,
+        mockPromptId: 'spellbreaker-prompt',
+        eventSuccess: true,
+        expectRestore: 4,
+      });
+    });
+
+    it('should not restore a spell slot when spell_breaker passive is missing', async () => {
+      await runSpellBreakerTest({
+        ps: makePlayerStats(),
+        action: makeAction(),
+        runtimeValue: 3,
+        mockPromptId: 'nospellbreaker-prompt',
+        eventSuccess: true,
+        expectRestore: false,
+      });
+    });
+
+    it('should not restore a spell slot when spell_breaker does not include Counterspell', async () => {
+      await runSpellBreakerTest({
+        ps: makePlayerStats({
+          automation: {
+            passives: [
+              { type: 'spell_breaker', slotRetentionSpells: ['Shield'] },
+            ],
+          },
+        }),
+        action: makeAction(),
+        runtimeValue: 3,
+        mockPromptId: 'partialmatch-prompt',
+        eventSuccess: true,
+        expectRestore: false,
+      });
+    });
+
+    it('should not restore a spell slot on failed save even with spell_breaker', async () => {
+      await runSpellBreakerTest({
+        ps: makePlayerStats({
+          automation: {
+            passives: [
+              { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
+            ],
+          },
+        }),
+        action: makeAction(),
+        runtimeValue: 3,
+        mockPromptId: 'failspellbreaker-prompt',
+        eventSuccess: false,
+        expectRestore: false,
+      });
+    });
+
+    it('should not restore a spell slot when slot value is null', async () => {
+      await runSpellBreakerTest({
+        ps: makePlayerStats({
+          automation: {
+            passives: [
+              { type: 'spell_breaker', slotRetentionSpells: ['Counterspell'] },
+            ],
+          },
+        }),
+        action: makeAction(),
+        runtimeValue: null,
+        mockPromptId: 'nullslot-prompt',
+        eventSuccess: true,
+        expectRestore: false,
       });
     });
   });

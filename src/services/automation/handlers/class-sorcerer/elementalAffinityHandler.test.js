@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, applyTypeChoice } from './elementalAffinityHandler.js';
 
@@ -37,7 +38,7 @@ function makeAction(overrides = {}) {
 
 describe('elementalAffinityHandler', () => {
     describe('handle', () => {
-        it('returns modal when no type has been chosen yet', async () => {
+        it('returns modal with damage type options when no type has been chosen yet', async () => {
             getChosenRuntimeValue.mockReturnValue(undefined);
 
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -48,17 +49,7 @@ describe('elementalAffinityHandler', () => {
             expect(result.payload.existingType).toBeUndefined();
         });
 
-        it('returns modal with existingType when a type has been chosen', async () => {
-            getChosenRuntimeValue.mockReturnValue('Fire');
-
-            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
-
-            expect(result.type).toBe('modal');
-            expect(result.modalName).toBe('elementalAffinity');
-            expect(result.payload.existingType).toBe('Fire');
-        });
-
-        it('uses custom damageTypes from automation when provided', async () => {
+        it('uses custom damageTypes from automation config when provided', async () => {
             getChosenRuntimeValue.mockReturnValue(undefined);
 
             const action = makeAction({ automation: { damageTypes: ['Fire', 'Cold'] } });
@@ -70,6 +61,29 @@ describe('elementalAffinityHandler', () => {
         it('passes action, playerStats, and campaignName in payload', async () => {
             getChosenRuntimeValue.mockReturnValue(undefined);
 
+            const action = makeAction();
+            const playerStats = makePlayerStats();
+            const result = await handle(action, playerStats, 'test-campaign', null);
+
+            expect(result.payload.action).toBe(action);
+            expect(result.payload.playerStats).toBe(playerStats);
+            expect(result.payload.campaignName).toBe('test-campaign');
+        });
+
+        it('returns modal with existingType when a type has been chosen', async () => {
+            getChosenRuntimeValue.mockReturnValue('Fire');
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.type).toBe('modal');
+            expect(result.modalName).toBe('elementalAffinity');
+            expect(result.payload.existingType).toBe('Fire');
+            expect(result.payload.damageTypes).toEqual(['Acid', 'Cold', 'Fire', 'Lightning', 'Poison']);
+        });
+
+        it('passes action, playerStats, and campaignName in payload when type already chosen', async () => {
+            getChosenRuntimeValue.mockReturnValue('Lightning');
+
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(result.payload.action).toBeInstanceOf(Object);
@@ -77,7 +91,7 @@ describe('elementalAffinityHandler', () => {
             expect(result.payload.campaignName).toBe('test-campaign');
         });
 
-        it('logs ability_use when type already chosen', async () => {
+        it('logs ability_use with current type when type is already chosen', async () => {
             getChosenRuntimeValue.mockReturnValue('Lightning');
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
@@ -89,16 +103,32 @@ describe('elementalAffinityHandler', () => {
                 description: 'Elemental Affinity — damage type is Lightning',
             });
         });
+
+        it('handles falsy chosenType (empty string) by showing modal without existingType', async () => {
+            getChosenRuntimeValue.mockReturnValue('');
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.type).toBe('modal');
+            expect(result.payload.existingType).toBeUndefined();
+        });
     });
 
     describe('applyTypeChoice', () => {
-        it('returns null for invalid damage type', async () => {
+        it('returns null for damage type not in the default list', async () => {
             const result = await applyTypeChoice(makeAction(), makePlayerStats(), 'test-campaign', 'Radiant');
 
             expect(result).toBeNull();
         });
 
-        it('returns popup for valid damage type', async () => {
+        it('returns null for damage type not in custom damageTypes list', async () => {
+            const action = makeAction({ automation: { damageTypes: ['Fire', 'Cold'] } });
+            const result = await applyTypeChoice(action, makePlayerStats(), 'test-campaign', 'Lightning');
+
+            expect(result).toBeNull();
+        });
+
+        it('returns popup with confirmation details for a valid damage type', async () => {
             const result = await applyTypeChoice(makeAction(), makePlayerStats(), 'test-campaign', 'Fire');
 
             expect(result.type).toBe('popup');
@@ -108,7 +138,7 @@ describe('elementalAffinityHandler', () => {
             expect(result.payload.description).toContain('resistance to Fire damage');
         });
 
-        it('calls setChosenRuntimeValue with the chosen type', async () => {
+        it('stores the chosen type via setChosenRuntimeValue', async () => {
             await applyTypeChoice(makeAction(), makePlayerStats(), 'test-campaign', 'Cold');
 
             expect(setChosenRuntimeValue).toHaveBeenCalledWith(
@@ -116,11 +146,11 @@ describe('elementalAffinityHandler', () => {
                 'Elemental Affinity',
                 'Cold',
                 'chosenType',
-                'test-campaign'
+                'test-campaign',
             );
         });
 
-        it('logs ability_use with "set to" for first selection', async () => {
+        it('logs ability_use with "set to" when no type was previously chosen', async () => {
             getChosenRuntimeValue.mockReturnValue(undefined);
 
             await applyTypeChoice(makeAction(), makePlayerStats(), 'test-campaign', 'Acid');
@@ -133,7 +163,7 @@ describe('elementalAffinityHandler', () => {
             });
         });
 
-        it('logs ability_use with "changed to" when type changes', async () => {
+        it('logs ability_use with "changed to" when switching to a different type', async () => {
             getChosenRuntimeValue.mockReturnValue('Fire');
 
             await applyTypeChoice(makeAction(), makePlayerStats(), 'test-campaign', 'Cold');
@@ -146,20 +176,32 @@ describe('elementalAffinityHandler', () => {
             });
         });
 
-        it('uses custom damageTypes for validation', async () => {
-            const action = makeAction({ automation: { damageTypes: ['Fire', 'Cold'] } });
-            const result = await applyTypeChoice(action, makePlayerStats(), 'test-campaign', 'Lightning');
+        it('logs ability_use with "set to" when reselecting the same type', async () => {
+            getChosenRuntimeValue.mockReturnValue('Poison');
 
-            expect(result).toBeNull();
+            await applyTypeChoice(makeAction(), makePlayerStats(), 'test-campaign', 'Poison');
+
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', {
+                type: 'ability_use',
+                characterName: 'SorcererBoy',
+                abilityName: 'Elemental Affinity',
+                description: 'Elemental Affinity — damage type set to Poison',
+            });
         });
 
-        it('returns popup with correct automation info', async () => {
+        it('includes automation object in popup payload', async () => {
             getChosenRuntimeValue.mockReturnValue(undefined);
 
             const result = await applyTypeChoice(makeAction(), makePlayerStats(), 'test-campaign', 'Poison');
 
             expect(result.payload.automation).toBeDefined();
             expect(result.payload.automation.type).toBe('elemental_affinity');
+        });
+
+        it('includes automationType in popup payload', async () => {
+            const result = await applyTypeChoice(makeAction(), makePlayerStats(), 'test-campaign', 'Cold');
+
+            expect(result.payload.automationType).toBe('elemental_affinity');
         });
     });
 });

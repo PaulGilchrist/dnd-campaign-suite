@@ -32,7 +32,7 @@ export async function handle(action, playerStats, campaignName) {
     }
 
     await setRuntimeValue(playerName, usesKey, currentUses - 1, campaignName);
-    await setRuntimeValue(playerName, 'activeConditions', currentConditions.filter(c => !conditionsToRemove.includes(c)), campaignName);
+    await setRuntimeValue(playerName, 'activeConditions', Array.isArray(currentConditions) ? currentConditions.filter(c => !conditionsToRemove.includes(c)) : [], campaignName);
 
     const removedList = conditionsToRemove.length > 0 ? conditionsToRemove.join(' and ') : 'none';
 

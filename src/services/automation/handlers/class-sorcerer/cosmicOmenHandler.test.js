@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { handle, clearCosmicOmenEffect } from './cosmicOmenHandler.js';
 
@@ -46,22 +47,37 @@ function makeAction(overrides = {}) {
 }
 
 describe('cosmicOmenHandler', () => {
-    describe('uses checks', () => {
-        it('skips uses check when usesMax is 0', async () => {
+    describe('uses check', () => {
+        it('skips uses check when usesMax is 0 and no uses_expression, proceeds to star map', async () => {
             getRuntimeValue.mockReturnValue(0);
+            rollExpression.mockImplementation((expr) => {
+                if (expr === '1d20') return { total: 10 };
+                if (expr === '1d6') return { total: 4 };
+                return null;
+            });
 
             const action = makeAction({ automation: { usesMax: 0 } });
             const result = await handle(action, makePlayerStats(), 'test-campaign');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).not.toContain('no uses remaining');
+            expect(result.payload.cosmicOmenResult).toBeDefined();
+        });
+
+        it('returns "no uses remaining" when usesMax > 0 but runtime uses is 0', async () => {
+            getRuntimeValue.mockReturnValue(0);
+
+            const action = makeAction({ automation: { usesMax: 3 } });
+            const result = await handle(action, makePlayerStats(), 'test-campaign');
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.description).toContain('no uses remaining');
         });
 
         it('evaluates uses_expression when usesMax is 0', async () => {
             evaluateAutoExpression.mockReturnValue(2);
             getRuntimeValue.mockReturnValue(null);
 
-            const action = makeAction({ automation: { uses_expression: '2d4' } });
+            const action = makeAction({ automation: { usesMax: 0, uses_expression: '2d4' } });
             const result = await handle(action, makePlayerStats(), 'test-campaign');
 
             expect(evaluateAutoExpression).toHaveBeenCalledWith('2d4', expect.any(Object));
@@ -78,19 +94,44 @@ describe('cosmicOmenHandler', () => {
             expect(evaluateAutoExpression).toHaveBeenCalledWith('1d6', expect.any(Object));
         });
 
-        it('uses usesMax directly when provided', async () => {
+        it('proceeds when usesMax > 0 and runtime uses is positive', async () => {
             getRuntimeValue.mockReturnValue(1);
+            rollExpression.mockImplementation((expr) => {
+                if (expr === '1d20') return { total: 10 };
+                if (expr === '1d6') return { total: 4 };
+                return null;
+            });
 
             const action = makeAction({ automation: { usesMax: 3 } });
             const result = await handle(action, makePlayerStats(), 'test-campaign');
 
-            expect(evaluateAutoExpression).not.toHaveBeenCalled();
             expect(result.type).toBe('popup');
+            expect(result.payload.cosmicOmenResult).toBeDefined();
+        });
+
+        it('uses evaluated uses_expression result when positive', async () => {
+            evaluateAutoExpression.mockReturnValue(3);
+            getRuntimeValue.mockReturnValue(3);
+            rollExpression.mockImplementation((expr) => {
+                if (expr === '1d20') return { total: 10 };
+                if (expr === '1d6') return { total: 4 };
+                return null;
+            });
+
+            const action = makeAction({ automation: { uses_expression: '3d6' } });
+            await handle(action, makePlayerStats(), 'test-campaign');
+
+            expect(evaluateAutoExpression).toHaveBeenCalledWith('3d6', expect.any(Object));
+            const usesCall = setRuntimeValue.mock.calls.find(
+                (call) => call[1] === 'cosmicomenUses'
+            );
+            expect(usesCall).toBeDefined();
+            expect(usesCall[2]).toBe(2);
         });
     });
 
     describe('star map roll', () => {
-        it('returns error when roll fails', async () => {
+        it('returns error when 1d20 roll fails', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockReturnValue(null);
 
@@ -100,7 +141,7 @@ describe('cosmicOmenHandler', () => {
             expect(result.payload.description).toContain('Star Map roll failed');
         });
 
-        it('generates even result (Weal)', async () => {
+        it('generates Weal result for even star map roll', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockImplementation((expr) => {
                 if (expr === '1d20') return { total: 10 };
@@ -119,7 +160,7 @@ describe('cosmicOmenHandler', () => {
             expect(result.payload.description).toContain('Allies add 4');
         });
 
-        it('generates odd result (Woe)', async () => {
+        it('generates Woe result for odd star map roll', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockImplementation((expr) => {
                 if (expr === '1d20') return { total: 7 };
@@ -136,7 +177,7 @@ describe('cosmicOmenHandler', () => {
             expect(result.payload.description).toContain('Enemies subtract 3');
         });
 
-        it('handles d6Roll returning null', async () => {
+        it('handles d6Roll returning null by defaulting d6Value to 0', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockImplementation((expr) => {
                 if (expr === '1d20') return { total: 12 };
@@ -146,11 +187,70 @@ describe('cosmicOmenHandler', () => {
             const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
             expect(result.payload.cosmicOmenResult.d6Value).toBe(0);
+            expect(result.payload.description).toContain('Allies add 0');
+        });
+
+        it('uses lowest even number (2) for Weal', async () => {
+            getRuntimeValue.mockReturnValue(1);
+            rollExpression.mockImplementation((expr) => {
+                if (expr === '1d20') return { total: 2 };
+                if (expr === '1d6') return { total: 1 };
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.payload.cosmicOmenResult.isEven).toBe(true);
+            expect(result.payload.description).toContain('Allies add 1');
+        });
+
+        it('uses lowest odd number (1) for Woe', async () => {
+            getRuntimeValue.mockReturnValue(1);
+            rollExpression.mockImplementation((expr) => {
+                if (expr === '1d20') return { total: 1 };
+                if (expr === '1d6') return { total: 1 };
+                return null;
+            });
+
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign');
+
+            expect(result.payload.cosmicOmenResult.isEven).toBe(false);
+            expect(result.payload.description).toContain('Enemies subtract 1');
         });
     });
 
     describe('state updates', () => {
-        it('sets cosmicOmenEffect runtime value', async () => {
+        it('decrements runtime uses when usesMax > 0', async () => {
+            getRuntimeValue.mockReturnValue(3);
+            rollExpression.mockImplementation((expr) => {
+                if (expr === '1d20') return { total: 10 };
+                if (expr === '1d6') return { total: 5 };
+                return null;
+            });
+
+            await handle(makeAction({ automation: { usesMax: 3 } }), makePlayerStats(), 'test-campaign');
+
+            const usesCall = setRuntimeValue.mock.calls.find(
+                (call) => call[1] === 'cosmicomenUses'
+            );
+            expect(usesCall).toBeDefined();
+            expect(usesCall[2]).toBe(2);
+        });
+
+        it('does not decrement uses when usesMax is 0', async () => {
+            getRuntimeValue.mockReturnValue(0);
+            evaluateAutoExpression.mockReturnValue(0);
+            rollExpression.mockReturnValue({ total: 10 });
+
+            await handle(makeAction({ automation: { usesMax: 0 } }), makePlayerStats(), 'test-campaign');
+
+            const usesCalls = setRuntimeValue.mock.calls.filter(
+                (call) => call[1] === 'cosmicomenUses'
+            );
+            expect(usesCalls).toHaveLength(0);
+        });
+
+        it('sets cosmicOmenEffect runtime value with correct result data', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockImplementation((expr) => {
                 if (expr === '1d20') return { total: 8 };
@@ -160,15 +260,18 @@ describe('cosmicOmenHandler', () => {
 
             await handle(makeAction(), makePlayerStats(), 'test-campaign');
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'TestSorcerer',
-                'cosmicOmenEffect',
-                expect.stringContaining('"type":"Weal"'),
-                'test-campaign'
+            const effectCall = setRuntimeValue.mock.calls.find(
+                (call) => call[1] === 'cosmicOmenEffect'
             );
+            expect(effectCall).toBeDefined();
+            const effectData = JSON.parse(effectCall[2]);
+            expect(effectData.type).toBe('Weal');
+            expect(effectData.d6Value).toBe(5);
+            expect(effectData.isEven).toBe(true);
+            expect(effectData.starMapRoll).toBe(8);
         });
 
-        it('adds expiration effect', async () => {
+        it('adds expiration effect with correct parameters', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockReturnValue({ total: 10 });
 
@@ -182,7 +285,6 @@ describe('cosmicOmenHandler', () => {
                 100
             );
         });
-
     });
 
     describe('result format', () => {
@@ -211,7 +313,7 @@ describe('cosmicOmenHandler', () => {
             expect(result.payload.name).toBe('Cosmic Omen');
         });
 
-        it('uses default feature name when action name missing', async () => {
+        it('uses default feature name when action name is missing', async () => {
             getRuntimeValue.mockReturnValue(1);
             rollExpression.mockReturnValue({ total: 10 });
 
@@ -226,7 +328,7 @@ describe('cosmicOmenHandler', () => {
     });
 
     describe('clearCosmicOmenEffect', () => {
-        it('clears cosmicOmenEffect', async () => {
+        it('clears cosmicOmenEffect for given player and campaign', async () => {
             await clearCosmicOmenEffect('TestSorcerer', 'test-campaign');
 
             expect(setRuntimeValue).toHaveBeenCalledWith(
@@ -234,6 +336,17 @@ describe('cosmicOmenHandler', () => {
                 'cosmicOmenEffect',
                 null,
                 'test-campaign'
+            );
+        });
+
+        it('works with different player and campaign names', async () => {
+            await clearCosmicOmenEffect('OtherPlayer', 'other-campaign');
+
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'OtherPlayer',
+                'cosmicOmenEffect',
+                null,
+                'other-campaign'
             );
         });
     });

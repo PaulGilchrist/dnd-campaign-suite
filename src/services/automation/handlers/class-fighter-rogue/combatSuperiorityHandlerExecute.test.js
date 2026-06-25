@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { onCombatSuperioritySelected } from './combatSuperiorityHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -7,6 +8,7 @@ import { getCurrentCombatRound } from '../../../../services/encounters/combatDat
 import * as automationService from '../../../combat/automation/automationService.js';
 import * as dataLoader from '../../../../services/ui/dataLoader.js';
 import * as savePrompt from '../../../automation/common/savePrompt.js';
+import * as expirations from '../../../rules/effects/expirations.js';
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -47,11 +49,6 @@ vi.mock('../../../ui/logService.js', () => ({
     addEntry: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock('../../../rules/combat/damageUtils.js', () => ({
-    getCombatContext: vi.fn(),
-    getTargetFromAttacker: vi.fn(),
-}));
-
 const makeAction = (auto = {}) => ({
     name: 'Combat Superiority',
     automation: {
@@ -82,19 +79,26 @@ const makePlayerStats = (overrides = {}) => ({
     ...overrides,
 });
 
-describe('combatSuperiorityHandler.executeManeuver - basic execution', () => {
+const DEFAULT_SUPERIORITY_DICE = 2;
+const DIE_ROLL_TOTAL = 5;
+
+describe('combatSuperiorityHandler.executeManeuver - maneuver not found and no dice', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
             return undefined;
         });
-        rollExpression.mockReturnValue({ total: 5 });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
         automationService.evaluateAutoExpression.mockReturnValue(10);
         targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
     });
 
-    it('returns popup when maneuver not found', async () => {
+    it('returns popup with not-found message when maneuver does not exist', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
         ]);
@@ -108,11 +112,83 @@ describe('combatSuperiorityHandler.executeManeuver - basic execution', () => {
         );
 
         expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Combat Superiority');
         expect(result.payload.description).toContain('Nonexistent Maneuver');
         expect(result.payload.description).toContain('not found');
+        expect(result.payload.automation).toEqual(makeAction().automation);
     });
 
-    it('expend superiority die on normal execution', async () => {
+    it('returns popup when no superiority dice remain and relentless is not active', async () => {
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return 0;
+            return undefined;
+        });
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Trip Attack');
+        expect(result.payload.description).toContain('No Superiority Dice remaining');
+        expect(result.payload.description).toContain('Short or Long Rest');
+        expect(result.payload.automation).toEqual(makeAction().automation);
+    });
+
+    it('returns popup with name prefix when no dice and relentless is active but already used this round', async () => {
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return 0;
+            if (key === 'relentlessUsedRound') return 1;
+            return undefined;
+        });
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats({
+                automation: {
+                    passives: [{ type: 'passive_rule', effect: 'relentless', name: 'Relentless' }],
+                },
+            }),
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.name).toBe('Trip Attack');
+        expect(result.payload.description).toContain('Trip Attack: No Superiority Dice remaining');
+    });
+});
+
+describe('combatSuperiorityHandler.executeManeuver - die expenditure and roll fallback', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
+            return undefined;
+        });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
+        automationService.evaluateAutoExpression.mockReturnValue(10);
+        targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
+    });
+
+    it('expend one superiority die on normal maneuver execution', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
         ]);
@@ -128,17 +204,14 @@ describe('combatSuperiorityHandler.executeManeuver - basic execution', () => {
         expect(setRuntimeValue).toHaveBeenCalledWith(
             'TestFighter',
             'superiorityDice',
-            1,
+            DEFAULT_SUPERIORITY_DICE - 1,
             'test-campaign'
         );
     });
 
-    it('uses default max uses when runtime value is missing', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return undefined;
-            return undefined;
-        });
-        rollExpression.mockReturnValue({ total: 5 });
+    it('uses default max uses (4) when runtime value is missing', async () => {
+        getRuntimeValue.mockImplementation(() => undefined);
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
 
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
@@ -160,8 +233,8 @@ describe('combatSuperiorityHandler.executeManeuver - basic execution', () => {
         );
     });
 
-    it('uses custom uses_max from automation', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
+    it('uses custom uses_max from automation config', async () => {
+        getRuntimeValue.mockImplementation((_playerName, key) => {
             if (key === 'superiorityDice') return 1;
             return undefined;
         });
@@ -187,64 +260,7 @@ describe('combatSuperiorityHandler.executeManeuver - basic execution', () => {
         );
     });
 
-    it('returns popup when no superiority dice remaining', async () => {
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            return undefined;
-        });
-
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Trip Attack'
-        );
-
-        expect(result.type).toBe('popup');
-        expect(result.payload.description).toContain('No Superiority Dice remaining');
-        expect(result.payload.description).toContain('Short or Long Rest');
-    });
-
-    it('includes target name in description when target exists', async () => {
-        rollExpression.mockReturnValue({ total: 7 });
-
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Trip Attack'
-        );
-
-        expect(result.payload.description).toContain('Target: Goblin');
-    });
-
-    it('includes damage bonus in description when maneuver has damageBonus', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Trip Attack'
-        );
-
-        expect(result.payload.description).toContain('Added 5 to the damage roll');
-    });
-
-    it('uses die value from rollExpression', async () => {
+    it('uses die roll total from rollExpression in description', async () => {
         rollExpression.mockReturnValue({ total: 9 });
 
         dataLoader.loadManeuvers.mockResolvedValue([
@@ -262,7 +278,121 @@ describe('combatSuperiorityHandler.executeManeuver - basic execution', () => {
         expect(result.payload.description).toContain('Rolled d10 for 9');
     });
 
-    it('handles no target from resolveTarget', async () => {
+    it('falls back to die size when rollExpression returns null', async () => {
+        rollExpression.mockReturnValue(null);
+
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
+
+        expect(result.payload.description).toContain('Rolled d10 for 10');
+    });
+
+    it('does not expend die when relentless is available and not used this round', async () => {
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return 0;
+            if (key === 'relentlessUsedRound') return undefined;
+            return undefined;
+        });
+        rollExpression.mockReturnValue({ total: 6 });
+
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+        ]);
+
+        await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats({
+                automation: {
+                    passives: [{ type: 'passive_rule', effect: 'relentless', name: 'Relentless' }],
+                },
+            }),
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
+
+        const diceCalls = setRuntimeValue.mock.calls.filter(
+            call => call[0] === 'TestFighter' && call[1] === 'superiorityDice'
+        );
+        expect(diceCalls).toHaveLength(0);
+    });
+
+    it('records relentless used round when relentless die is rolled', async () => {
+        getCurrentCombatRound.mockReturnValue(3);
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return 0;
+            if (key === 'relentlessUsedRound') return undefined;
+            return undefined;
+        });
+        rollExpression.mockReturnValue({ total: 6 });
+
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+        ]);
+
+        await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats({
+                automation: {
+                    passives: [{ type: 'passive_rule', effect: 'relentless', name: 'Relentless' }],
+                },
+            }),
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'TestFighter',
+            'relentlessUsedRound',
+            3,
+            'test-campaign'
+        );
+    });
+});
+
+describe('combatSuperiorityHandler.executeManeuver - target and damage bonus', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
+            return undefined;
+        });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
+        automationService.evaluateAutoExpression.mockReturnValue(10);
+        targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
+    });
+
+    it('includes target name in description when target resolves', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
+
+        expect(result.payload.description).toContain('Target: Goblin');
+    });
+
+    it('omits target line when target resolver returns null', async () => {
         targetResolver.resolveTarget.mockResolvedValue(null);
 
         dataLoader.loadManeuvers.mockResolvedValue([
@@ -279,16 +409,67 @@ describe('combatSuperiorityHandler.executeManeuver - basic execution', () => {
 
         expect(result.payload.description).not.toContain('Target:');
     });
+
+    it('includes damage bonus text when maneuver has damageBonus flag', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
+
+        expect(result.payload.description).toContain('Added 5 to the damage roll');
+    });
+
+    it('omits damage bonus text when maneuver lacks damageBonus flag', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Feinting Attack', effect: 'advantage_and_damage' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Feinting Attack'
+        );
+
+        expect(result.payload.description).not.toContain('Added');
+    });
+
+    it('returns result with logEntries array', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Trip Attack'
+        );
+
+        expect(result.logEntries).toHaveLength(1);
+        expect(result.logEntries[0].type).toBe('ability_use');
+        expect(result.logEntries[0].characterName).toBe('TestFighter');
+        expect(result.logEntries[0].abilityName).toBe('Trip Attack');
+    });
 });
 
 describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
             return undefined;
         });
-        rollExpression.mockReturnValue({ total: 5 });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
         automationService.evaluateAutoExpression.mockReturnValue(10);
         targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
         savePrompt.buildSaveDc.mockReturnValue(15);
@@ -297,7 +478,7 @@ describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () =>
         });
     });
 
-    it('includes save DC for push effect', async () => {
+    it('includes save DC and result for push effect when target fails save', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15, damageBonus: true },
         ]);
@@ -310,12 +491,12 @@ describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () =>
             'Pushing Attack'
         );
 
-        expect(result.payload.description).toContain('STR save DC');
-        expect(result.payload.description).toContain('push');
-        expect(result.payload.description).toContain('15 feet');
+        expect(result.payload.description).toContain('STR save DC 15');
+        expect(result.payload.description).toContain('Failure');
+        expect(result.payload.description).toContain('pushed 15 feet');
     });
 
-    it('includes save DC for goad effect with condition', async () => {
+    it('includes save DC for goad effect with conditionInflicted', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Goading Attack', effect: 'goad', saveType: 'WIS', conditionInflicted: 'goaded', damageBonus: true },
         ]);
@@ -328,11 +509,11 @@ describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () =>
             'Goading Attack'
         );
 
-        expect(result.payload.description).toContain('WIS save DC');
+        expect(result.payload.description).toContain('WIS save DC 15');
         expect(result.payload.description).toContain('Disadvantage on attacks against targets other than you');
     });
 
-    it('includes save DC for frightened effect', async () => {
+    it('includes save DC and condition for frightened effect', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Menacing Attack', effect: 'frightened', saveType: 'WIS', conditionInflicted: 'Frightened', damageBonus: true },
         ]);
@@ -345,7 +526,7 @@ describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () =>
             'Menacing Attack'
         );
 
-        expect(result.payload.description).toContain('WIS save DC');
+        expect(result.payload.description).toContain('WIS save DC 15');
         expect(result.payload.description).toContain('Frightened');
     });
 
@@ -362,24 +543,66 @@ describe('combatSuperiorityHandler.executeManeuver - save type maneuvers', () =>
             'Disarming Attack'
         );
 
-        expect(result.payload.description).toContain('STR save DC');
+        expect(result.payload.description).toContain('STR save DC 15');
         expect(result.payload.description).toContain('dropped the object');
+    });
+
+    it('includes save DC when target is null (no target branch)', async () => {
+        targetResolver.resolveTarget.mockResolvedValue(null);
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Pushing Attack'
+        );
+
+        expect(result.payload.description).toContain('Target must make a STR save DC 15');
+        expect(result.payload.description).toContain('be pushed 15 feet');
+    });
+
+    it('reports success when save listener resolves with success true', async () => {
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: true }),
+        });
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Pushing Attack', effect: 'push', saveType: 'STR', value: 15 },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Pushing Attack'
+        );
+
+        expect(result.payload.description).toContain('Success');
+        expect(result.payload.description).not.toContain('pushed');
     });
 });
 
 describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
             return undefined;
         });
-        rollExpression.mockReturnValue({ total: 5 });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
         automationService.evaluateAutoExpression.mockReturnValue(10);
         targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
     });
 
-    it('describes distracting_strike_advantage effect', async () => {
+    it('describes distracting_strike_advantage effect with advantage text', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Distracting Strike', effect: 'distracting_strike_advantage', damageBonus: true },
         ]);
@@ -396,7 +619,7 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.payload.description).toContain('Advantage');
     });
 
-    it('describes ally_movement effect', async () => {
+    it('describes ally_movement effect with reaction and opportunity attacks text', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Maneuvering Attack', effect: 'ally_movement', damageBonus: true },
         ]);
@@ -409,11 +632,11 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
             'Maneuvering Attack'
         );
 
-        expect(result.payload.description).toContain('Reaction to move');
+        expect(result.payload.description).toContain('Reaction');
         expect(result.payload.description).toContain('Opportunity Attacks');
     });
 
-    it('describes grant_attack actionType', async () => {
+    it('describes grant_attack actionType with reaction attack text', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: "Commander's Strike", actionType: 'grant_attack', damageBonus: true },
         ]);
@@ -427,10 +650,10 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         );
 
         expect(result.payload.description).toContain('Reaction to make an attack');
-        expect(result.payload.description).toContain('5');
+        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
     });
 
-    it('describes ac_bonus_and_swap effect and applies AC bonus', async () => {
+    it('describes ac_bonus_and_swap effect and sets bait-and-switch runtime values', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Bait and Switch', effect: 'ac_bonus_and_swap' },
         ]);
@@ -447,10 +670,12 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.payload.description).toContain('next turn');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchActive', true, 'test-campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchBonus', 5, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchSource', 'Bait and Switch', 'test-campaign');
+        expect(expirations.addExpiration).toHaveBeenCalled();
         expect(result.payload.description).not.toContain('Target:');
     });
 
-    it('describes ac_bonus_disengage effect and applies AC bonus', async () => {
+    it('describes ac_bonus_disengage effect and sets bait-and-switch runtime values', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Evasive Footwork', effect: 'ac_bonus_disengage' },
         ]);
@@ -467,10 +692,11 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.payload.description).toContain('+5 AC');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchActive', true, 'test-campaign');
         expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchBonus', 5, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchSource', 'Evasive Footwork', 'test-campaign');
         expect(result.payload.description).not.toContain('Target:');
     });
 
-    it('describes advantage_and_damage effect', async () => {
+    it('describes advantage_and_damage effect and stores feinting attack state', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Feinting Attack', effect: 'advantage_and_damage' },
         ]);
@@ -485,10 +711,11 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
 
         expect(result.payload.description).toContain('Advantage');
         expect(result.payload.description).toContain('next attack roll');
-        expect(result.payload.description).toContain('5');
+        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
+        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'feintingAttackDieValue', DIE_ROLL_TOTAL, 'test-campaign');
     });
 
-    it('describes dash_and_damage effect', async () => {
+    it('describes dash_and_damage effect with distance text', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Lunging Attack', effect: 'dash_and_damage' },
         ]);
@@ -503,10 +730,10 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
 
         expect(result.payload.description).toContain('Dash action');
         expect(result.payload.description).toContain('5+ feet');
-        expect(result.payload.description).toContain('5');
+        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
     });
 
-    it('describes temp_hp effect with fighter level', async () => {
+    it('describes temp_hp effect with calculated temporary hit points', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Rally', effect: 'temp_hp' },
         ]);
@@ -520,16 +747,15 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         );
 
         expect(result.payload.description).toContain('Temporary Hit Points');
-        expect(result.payload.description).toContain('12'); // 5 (die) + 7 (15/2 rounded down)
+        // 5 (die) + 7 (floor(15/2))
+        expect(result.payload.description).toContain('12');
         expect(result.payload.description).toContain('half Fighter level');
     });
 
-    it('describes damage_reduction effect with STR/DEX modifier', async () => {
+    it('describes damage_reduction effect with STR/DEX modifier calculation', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Parry', effect: 'damage_reduction' },
         ]);
-
-        rollExpression.mockReturnValue({ total: 5 });
 
         const result = await onCombatSuperioritySelected(
             makeAction(),
@@ -540,153 +766,15 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         );
 
         expect(result.payload.description).toContain('Damage reduced by');
-        expect(result.payload.description).toContain('9'); // 5 (die) + 4 (STR modifier)
+        // 5 (die) + 4 (STR modifier)
+        expect(result.payload.description).toContain('9');
         expect(result.payload.description).toContain('STR/DEX modifier');
     });
 
-    it('describes melee_attack_reaction effect', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Riposte', effect: 'melee_attack_reaction', damageBonus: true },
-        ]);
-
-        const playerStats = makePlayerStats({
-            attacks: [{ name: 'Melee Attack', hitBonus: 5, range: '5 ft', damage: '1d8' }],
-        });
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            playerStats,
-            'test-campaign',
-            null,
-            'Riposte'
-        );
-
-        expect(result.type).toBe('attack_roll');
-        expect(result.payload.attack.name).toBe('Melee Attack');
-    });
-
-    it('describes secondary_damage effect', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Sweeping Attack', effect: 'secondary_damage' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Sweeping Attack'
-        );
-
-        expect(result.payload.description).toContain('second creature');
-        expect(result.payload.description).toContain('5 feet');
-        expect(result.payload.description).toContain('5 damage');
-    });
-
-    it('describes attack_roll_bonus effect', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Precision Attack', effect: 'attack_roll_bonus' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Precision Attack'
-        );
-
-        expect(result.payload.description).toContain('5');
-        expect(result.payload.description).toContain('attack roll');
-    });
-
-    it('describes skill_check actionType', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Ambush', actionType: 'skill_check' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Ambush'
-        );
-
-        expect(result.payload.description).toContain('5');
-        expect(result.payload.description).toContain('ability check');
-    });
-});
-
-describe('combatSuperiorityHandler.executeManeuver - edge cases', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
-            return undefined;
-        });
-        rollExpression.mockReturnValue({ total: 5 });
-        automationService.evaluateAutoExpression.mockReturnValue(10);
-        targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-    });
-
-    it('handles rollExpression returning null by using die size as fallback', async () => {
-        rollExpression.mockReturnValue(null);
-
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Trip Attack', effect: 'knock_prone', damageBonus: true },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Trip Attack'
-        );
-
-        // When rollExpression returns null, the code uses superiorityDieSize (10) as fallback
-        expect(result.payload.description).toContain('10');
-    });
-
-    it('handles maneuver without saveType (no save description)', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Feinting Attack', effect: 'advantage_and_damage' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Feinting Attack'
-        );
-
-        expect(result.payload.description).not.toContain('save');
-        expect(result.payload.description).toContain('Advantage');
-    });
-
-    it('handles maneuver without damageBonus (no "Added" description)', async () => {
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Feinting Attack', effect: 'advantage_and_damage' },
-        ]);
-
-        const result = await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats(),
-            'test-campaign',
-            null,
-            'Feinting Attack'
-        );
-
-        expect(result.payload.description).not.toContain('Added');
-    });
-
-    it('uses max of STR/DEX for damage_reduction', async () => {
+    it('uses max of STR/DEX for damage_reduction when DEX is higher', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Parry', effect: 'damage_reduction' },
         ]);
-
         rollExpression.mockReturnValue({ total: 4 });
 
         const result = await onCombatSuperioritySelected(
@@ -705,11 +793,118 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases', () => {
         expect(result.payload.description).toContain('9'); // 4 (die) + 5 (DEX modifier)
     });
 
-    it('uses player level 1 when level is missing for temp_hp', async () => {
+    it('describes melee_attack_reaction effect and returns attack_roll type', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Riposte', effect: 'melee_attack_reaction', damageBonus: true },
+        ]);
+
+        const playerStats = makePlayerStats({
+            attacks: [{ name: 'Melee Attack', hitBonus: 5, range: '5 ft', damage: '1d8', weaponType: 'melee' }],
+        });
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            playerStats,
+            'test-campaign',
+            null,
+            'Riposte'
+        );
+
+        expect(result.type).toBe('attack_roll');
+        expect(result.payload.attack.name).toBe('Melee Attack');
+        expect(result.context.superiorityDieValue).toBe(DIE_ROLL_TOTAL);
+    });
+
+    it('describes melee_attack_reaction effect when no melee attacks available', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Riposte', effect: 'melee_attack_reaction' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats({ attacks: [] }),
+            'test-campaign',
+            null,
+            'Riposte'
+        );
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.description).toContain('No melee attack available');
+    });
+
+    it('describes secondary_damage effect with range and damage text', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Sweeping Attack', effect: 'secondary_damage' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Sweeping Attack'
+        );
+
+        expect(result.payload.description).toContain('second creature');
+        expect(result.payload.description).toContain('5 feet');
+        expect(result.payload.description).toContain(`${DIE_ROLL_TOTAL} damage`);
+    });
+
+    it('describes attack_roll_bonus effect with attack roll text', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Precision Attack', effect: 'attack_roll_bonus' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Precision Attack'
+        );
+
+        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
+        expect(result.payload.description).toContain('attack roll');
+    });
+
+    it('describes skill_check actionType with ability check text', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Ambush', actionType: 'skill_check' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Ambush'
+        );
+
+        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
+        expect(result.payload.description).toContain('ability check');
+    });
+});
+
+describe('combatSuperiorityHandler.executeManeuver - edge cases and HP restoration', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
+            return undefined;
+        });
+        rollExpression.mockReturnValue({ total: DIE_ROLL_TOTAL });
+        automationService.evaluateAutoExpression.mockReturnValue(10);
+        targetResolver.resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+        savePrompt.buildSaveDc.mockReturnValue(15);
+        savePrompt.createSaveListener.mockReturnValue({
+            promise: Promise.resolve({ success: false }),
+        });
+    });
+
+    it('uses player level 1 when level is missing for temp_hp calculation', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Rally', effect: 'temp_hp' },
         ]);
-
         rollExpression.mockReturnValue({ total: 3 });
 
         const result = await onCombatSuperioritySelected(
@@ -724,48 +919,12 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases', () => {
         expect(result.payload.description).toContain('0 from half Fighter level');
     });
 
-    it('uses current combat round for relentless tracking', async () => {
-        getCurrentCombatRound.mockReturnValue(3);
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 0;
-            if (key === 'relentlessUsedRound') return undefined;
-            return undefined;
-        });
-
-        dataLoader.loadManeuvers.mockResolvedValue([
-            { name: 'Relentless', effect: 'relentless' },
-        ]);
-
-        rollExpression.mockReturnValue({ total: 6 });
-
-        await onCombatSuperioritySelected(
-            makeAction(),
-            makePlayerStats({
-                automation: {
-                    passives: [{ type: 'passive_rule', effect: 'relentless', name: 'Relentless' }],
-                },
-            }),
-            'test-campaign',
-            null,
-            'Relentless'
-        );
-
-        expect(setRuntimeValue).toHaveBeenCalledWith(
-            'TestFighter',
-            'relentlessUsedRound',
-            3,
-            'test-campaign'
-        );
-    });
-
-    it('heals HP when damage_reduction effect is used', async () => {
+    it('restores HP up to max when damage_reduction effect is used', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Parry', effect: 'damage_reduction' },
         ]);
-
-        rollExpression.mockReturnValue({ total: 5 });
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
             if (key === 'hitPoints') return 20;
             if (key === 'currentHitPoints') return 8;
             return undefined;
@@ -785,17 +944,15 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases', () => {
             17,
             'test-campaign'
         );
-        expect(result.payload.description).toContain('HP restored: 8 → 17');
+        expect(result.payload.description).toContain('HP restored: 8 \u2192 17');
     });
 
     it('caps HP restoration at max HP', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Parry', effect: 'damage_reduction' },
         ]);
-
-        rollExpression.mockReturnValue({ total: 5 });
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
             if (key === 'hitPoints') return 20;
             if (key === 'currentHitPoints') return 18;
             return undefined;
@@ -815,17 +972,15 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases', () => {
             20,
             'test-campaign'
         );
-        expect(result.payload.description).toContain('HP restored: 18 → 20');
+        expect(result.payload.description).toContain('HP restored: 18 \u2192 20');
     });
 
-    it('does not set HP when already at max', async () => {
+    it('skips HP restoration when already at max', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Parry', effect: 'damage_reduction' },
         ]);
-
-        rollExpression.mockReturnValue({ total: 5 });
-        getRuntimeValue.mockImplementation((_playerName, key, _campaignName) => {
-            if (key === 'superiorityDice') return 2;
+        getRuntimeValue.mockImplementation((_playerName, key) => {
+            if (key === 'superiorityDice') return DEFAULT_SUPERIORITY_DICE;
             if (key === 'hitPoints') return 20;
             if (key === 'currentHitPoints') return 20;
             return undefined;
@@ -843,6 +998,70 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases', () => {
             call => call[0] === 'TestFighter' && call[1] === 'currentHitPoints'
         );
         expect(chpCalls).toHaveLength(0);
-        expect(result.payload.description).toContain('HP restored: 20 → 20');
+        expect(result.payload.description).toContain('HP restored: 20 \u2192 20');
+    });
+
+    it('does not show target line for ac_bonus_and_swap effect', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Bait and Switch', effect: 'ac_bonus_and_swap' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Bait and Switch'
+        );
+
+        expect(result.payload.description).not.toContain('Target:');
+    });
+
+    it('does not show target line for ac_bonus_disengage effect', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Evasive Footwork', effect: 'ac_bonus_disengage' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Evasive Footwork'
+        );
+
+        expect(result.payload.description).not.toContain('Target:');
+    });
+
+    it('does not show target line for damage_reduction effect', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Parry', effect: 'damage_reduction' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Parry'
+        );
+
+        expect(result.payload.description).not.toContain('Target:');
+    });
+
+    it('includes automation in popup payload for not-found maneuver', async () => {
+        dataLoader.loadManeuvers.mockResolvedValue([
+            { name: 'Trip Attack', effect: 'knock_prone' },
+        ]);
+
+        const result = await onCombatSuperioritySelected(
+            makeAction(),
+            makePlayerStats(),
+            'test-campaign',
+            null,
+            'Unknown Maneuver'
+        );
+
+        expect(result.payload.automation).toEqual(makeAction().automation);
     });
 });

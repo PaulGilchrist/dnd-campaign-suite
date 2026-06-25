@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ─────────────────────────────────────────
@@ -99,7 +100,10 @@ describe('resistanceHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
+      expect(result.payload.name).toBe('Resistance');
       expect(result.payload.description).toContain('No combat context found');
+      expect(result.payload.description).toContain('Resistance');
+      expect(result.payload.automation).toEqual(action.automation);
     });
 
     it('filters out the caster from creature targets', async () => {
@@ -153,6 +157,30 @@ describe('resistanceHandler', () => {
       const result = await handle(action, ps, campaignName, null);
 
       expect(result.type).toBe('popup');
+      expect(result.payload.automation).toEqual({});
+    });
+
+    it('handles action with no name property', async () => {
+      const ps = makePlayerStats();
+      const action = {};
+      damageUtils.getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Goblin', type: 'npc' }],
+      });
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.name).toBeUndefined();
+    });
+
+    it('handles action with no name and no automation', async () => {
+      const ps = makePlayerStats();
+      const action = {};
+      damageUtils.getCombatContext.mockResolvedValue(null);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.name).toBeUndefined();
       expect(result.payload.automation).toEqual({});
     });
   });
@@ -393,6 +421,141 @@ describe('resistanceHandler', () => {
       expect(result.payload.description).toContain('Cold');
       expect(result.payload.description).toContain('1d4');
     });
+
+    it('preserves other buffs when replacing Resistance', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      useRuntimeState.getRuntimeValue.mockReturnValue([
+        { name: 'Shield of Faith', effect: 'ac_bonus', acBonus: 2 },
+        { name: 'Bless', effect: 'advantage_on_save' },
+        { name: 'Resistance', effect: 'damage_reduction', resistanceTypes: ['Acid'] },
+      ]);
+
+      await applyResistance(
+        action,
+        ps,
+        campaignName,
+        'Goblin',
+        'fire'
+      );
+
+      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1] === 'activeBuffs'
+      );
+      const buffs = callArgs[2];
+
+      expect(buffs).toHaveLength(3);
+      expect(buffs.find((b) => b.name === 'Shield of Faith')).toBeTruthy();
+      expect(buffs.find((b) => b.name === 'Bless')).toBeTruthy();
+      expect(buffs.find((b) => b.name === 'Resistance').resistanceTypes).toEqual(['Fire']);
+    });
+
+    it('appends Resistance when no existing buffs array', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
+
+      await applyResistance(
+        action,
+        ps,
+        campaignName,
+        'Goblin',
+        'fire'
+      );
+
+      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1] === 'activeBuffs'
+      );
+      const buffs = callArgs[2];
+
+      expect(buffs).toHaveLength(1);
+      expect(buffs[0].name).toBe('Resistance');
+    });
+
+    it('appends Resistance when existing buffs array is empty', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+      useRuntimeState.getRuntimeValue.mockReturnValue([]);
+
+      await applyResistance(
+        action,
+        ps,
+        campaignName,
+        'Goblin',
+        'fire'
+      );
+
+      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1] === 'activeBuffs'
+      );
+      const buffs = callArgs[2];
+
+      expect(buffs).toHaveLength(1);
+      expect(buffs[0].name).toBe('Resistance');
+    });
+
+    it('uses playerStats.name as sourceCharacter in buff', async () => {
+      const ps = makePlayerStats({ name: 'Paladin' });
+      const action = makeAction();
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+
+      await applyResistance(
+        action,
+        ps,
+        campaignName,
+        'Goblin',
+        'fire'
+      );
+
+      const callArgs = useRuntimeState.setRuntimeValue.mock.calls.find(
+        (c) => c[1] === 'activeBuffs'
+      );
+      const buffs = callArgs[2];
+
+      expect(buffs[0].sourceCharacter).toBe('Paladin');
+    });
+
+    it('uses action.name in log entry', async () => {
+      const ps = makePlayerStats({ name: 'Paladin' });
+      const action = { name: 'Arcane Ward', automation: makeAction().automation };
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+
+      await applyResistance(
+        action,
+        ps,
+        campaignName,
+        'Goblin',
+        'fire'
+      );
+
+      expect(logService.addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          abilityName: 'Arcane Ward',
+        })
+      );
+    });
+
+    it('calls addExpiration with correct parameters', async () => {
+      const ps = makePlayerStats({ name: 'Paladin' });
+      const action = makeAction();
+      useRuntimeState.getRuntimeValue.mockReturnValue(null);
+
+      await applyResistance(
+        action,
+        ps,
+        campaignName,
+        'Goblin',
+        'fire'
+      );
+
+      expect(expirations.addExpiration).toHaveBeenCalledWith(
+        'Paladin',
+        'Goblin',
+        expect.any(Array),
+        campaignName
+      );
+    });
   });
 
   describe('getResistanceDamageType', () => {
@@ -410,33 +573,28 @@ describe('resistanceHandler', () => {
   });
 
   describe('isResistanceUsedThisTurn', () => {
-    it('returns true when flag is true', () => {
+    it('returns true when flag is strictly true', () => {
       useRuntimeState.getRuntimeValue.mockReturnValue(true);
 
       expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(true);
     });
 
-    it('returns false when flag is false', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(false);
+    it('returns false for any non-true value', () => {
+      useRuntimeState.getRuntimeValue
+        .mockReturnValueOnce(false)
+        .mockReturnValueOnce(null)
+        .mockReturnValueOnce(undefined)
+        .mockReturnValueOnce('yes')
+        .mockReturnValueOnce(1)
+        .mockReturnValueOnce(0)
+        .mockReturnValueOnce({});
 
       expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
-    });
-
-    it('returns false when flag is null', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(null);
-
       expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
-    });
-
-    it('returns false when flag is undefined', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue(undefined);
-
       expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
-    });
-
-    it('returns false when flag is a non-boolean truthy value', () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue('yes');
-
+      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
+      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
+      expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
       expect(isResistanceUsedThisTurn('Goblin', campaignName)).toBe(false);
     });
   });

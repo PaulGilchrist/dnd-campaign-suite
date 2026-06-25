@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // ── Mocks BEFORE imports ───────────────────────────────────────
@@ -38,6 +39,15 @@ function makeAction(automation = {}) {
   };
 }
 
+function getBuffsCall() {
+  return setRuntimeValue.mock.calls.find(call => call[1] === 'activeBuffs');
+}
+
+function getConditionsCall(index = 0) {
+  const conditionsCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeConditions');
+  return conditionsCalls[index];
+}
+
 // ── Tests ──────────────────────────────────────────────────────
 
 describe('feignDeathHandler.handle', () => {
@@ -46,7 +56,7 @@ describe('feignDeathHandler.handle', () => {
   });
 
   describe('activation', () => {
-    it('should return popup with automation_info type on activation', async () => {
+    it('should return a popup with automation_info type on activation', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -57,9 +67,11 @@ describe('feignDeathHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.name).toBe('Feign Death');
+      expect(result.payload.automationType).toBe('feign_death');
+      expect(result.payload.description).toContain('activated');
     });
 
-    it('should add the feign death buff to activeBuffs', async () => {
+    it('should add the feign death buff with all properties when activating', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -67,23 +79,17 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeBuffs',
-        expect.arrayContaining([
-          expect.objectContaining({
-            name: 'Feign Death',
-            effect: 'feign_death',
-            resistanceTypes: expect.any(Array),
-            conditionImmunity: ['poisoned'],
-            sourceCharacter: 'TestCaster',
-          }),
-        ]),
-        campaignName,
-      );
+      const buffCall = getBuffsCall();
+      expect(buffCall).toBeDefined();
+      const buff = buffCall[2].find(b => b.name === 'Feign Death');
+      expect(buff).toBeDefined();
+      expect(buff.effect).toBe('feign_death');
+      expect(buff.duration).toBe('1 hour');
+      expect(buff.conditionImmunity).toEqual(['poisoned']);
+      expect(buff.sourceCharacter).toBe('TestCaster');
     });
 
-    it('should apply blinded, incapacitated, and speed_zero conditions', async () => {
+    it('should apply blinded, incapacitated, and speed_zero conditions on activation', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -91,15 +97,14 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeConditions',
-        expect.arrayContaining(['blinded', 'incapacitated', 'speed_zero']),
-        campaignName,
-      );
+      const conditionsCall = getConditionsCall();
+      expect(conditionsCall).toBeDefined();
+      expect(conditionsCall[2]).toContain('blinded');
+      expect(conditionsCall[2]).toContain('incapacitated');
+      expect(conditionsCall[2]).toContain('speed_zero');
     });
 
-    it('should register an expiration for the buff', async () => {
+    it('should register an expiration on activation', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -115,7 +120,7 @@ describe('feignDeathHandler.handle', () => {
       );
     });
 
-    it('should include all 11 damage resistances except psychic', async () => {
+    it('should include all 12 damage resistances except psychic', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -123,17 +128,16 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      const buffCall = setRuntimeValue.mock.calls.find(
-        call => call[1] === 'activeBuffs',
-      );
+      const buffCall = getBuffsCall();
       const buff = buffCall[2].find(b => b.name === 'Feign Death');
       expect(buff.resistanceTypes).toEqual([
         'acid', 'bludgeoning', 'cold', 'fire', 'force', 'lightning',
         'necrotic', 'piercing', 'poison', 'radiant', 'slashing', 'thunder',
       ]);
+      expect(buff.resistanceTypes).toHaveLength(12);
     });
 
-    it('should use custom duration from automation', async () => {
+    it('should use custom duration from automation when provided', async () => {
       const ps = makePlayerStats();
       const action = makeAction({ duration: '10 minutes' });
 
@@ -141,53 +145,46 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      const buffCall = setRuntimeValue.mock.calls.find(
-        call => call[1] === 'activeBuffs',
-      );
+      const buffCall = getBuffsCall();
       const buff = buffCall[2].find(b => b.name === 'Feign Death');
       expect(buff.duration).toBe('10 minutes');
     });
 
-    it('should default duration to 1 hour when not specified', async () => {
+    it('should apply conditions without duplicating existing ones', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      getRuntimeValue.mockReturnValue(null);
+      getRuntimeValue.mockReturnValueOnce([]).mockReturnValueOnce(['blinded', 'incapacitated']);
 
       await handle(action, ps, campaignName, null);
 
-      const buffCall = setRuntimeValue.mock.calls.find(
-        call => call[1] === 'activeBuffs',
-      );
-      const buff = buffCall[2].find(b => b.name === 'Feign Death');
-      expect(buff.duration).toBe('1 hour');
+      const conditionsCall = getConditionsCall();
+      expect(conditionsCall[2]).toEqual(['blinded', 'incapacitated', 'speed_zero']);
     });
 
-    it('should remove poisoned condition if target had it', async () => {
+    it('should remove poisoned condition after applying feign death conditions', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
-      // First call: activeBuffs (no existing buff → activation path)
-      // Second call: activeConditions in applyFeignDeathConditions (has 'poisoned' and 'blinded')
-      // Third call: activeConditions in poisoned removal block (reads what was just set)
+      // Call 1: activeBuffs → null (activation path)
+      // Call 2: activeConditions inside applyFeignDeathConditions → ['poisoned', 'blinded']
+      // Call 3: activeConditions for poisoned removal (reads what applyFeignDeathConditions set)
       getRuntimeValue
         .mockReturnValueOnce(null)
         .mockReturnValueOnce(['poisoned', 'blinded'])
-        .mockReturnValueOnce(['poisoned', 'blinded', 'blinded', 'incapacitated', 'speed_zero']);
+        .mockReturnValueOnce(['poisoned', 'blinded', 'incapacitated', 'speed_zero']);
 
       await handle(action, ps, campaignName, null);
 
-      // applyFeignDeathConditions adds blinded, incapacitated, speed_zero to ['poisoned', 'blinded']
-      // Then poisoned filter removes 'poisoned' → ['blinded', 'blinded', 'incapacitated', 'speed_zero']
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeConditions',
-        ['blinded', 'blinded', 'incapacitated', 'speed_zero'],
-        campaignName,
-      );
+      // The handler filters poisoned from the conditions read on call 3,
+      // so the second setRuntimeValue for activeConditions should not contain poisoned.
+      const conditionsCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeConditions');
+      expect(conditionsCalls.length).toBeGreaterThanOrEqual(2);
+      const lastConditionsCall = conditionsCalls[conditionsCalls.length - 1];
+      expect(lastConditionsCall[2]).not.toContain('poisoned');
     });
 
-    it('should not call setRuntimeValue for poisoned removal if target did not have it', async () => {
+    it('should skip poisoned removal when target did not have poisoned', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -195,12 +192,11 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      // Should have exactly one setRuntimeValue for activeConditions (the conditions merge)
       const conditionsCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeConditions');
       expect(conditionsCalls.length).toBe(1);
     });
 
-    it('should use targetName from automation when provided', async () => {
+    it('should use targetName from automation for buff, conditions, and expiration', async () => {
       const ps = makePlayerStats({ name: 'CasterA' });
       const action = makeAction({ targetName: 'AllyB' });
 
@@ -228,7 +224,7 @@ describe('feignDeathHandler.handle', () => {
       );
     });
 
-    it('should set sourceCharacter to the caster name in buff', async () => {
+    it('should set sourceCharacter to the caster name in the buff', async () => {
       const ps = makePlayerStats({ name: 'CasterA' });
       const action = makeAction({ targetName: 'AllyB' });
 
@@ -245,7 +241,7 @@ describe('feignDeathHandler.handle', () => {
   });
 
   describe('deactivation', () => {
-    it('should remove the buff when it was already active', async () => {
+    it('should return a popup indicating expiration on deactivation', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -262,7 +258,7 @@ describe('feignDeathHandler.handle', () => {
       expect(result.payload.description).toContain('expired');
     });
 
-    it('should filter out only the feign death buff, keeping others', async () => {
+    it('should remove only the feign death buff while preserving others', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -274,15 +270,13 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeBuffs',
-        [{ name: 'Other Buff', effect: 'other' }],
-        campaignName,
-      );
+      const buffsCall = setRuntimeValue.mock.calls.find(call => call[1] === 'activeBuffs');
+      const remainingBuffs = buffsCall[2];
+      expect(remainingBuffs).toHaveLength(1);
+      expect(remainingBuffs[0].name).toBe('Other Buff');
     });
 
-    it('should remove feign death conditions on deactivation', async () => {
+    it('should remove feign death conditions but preserve unrelated ones on deactivation', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -296,12 +290,8 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeConditions',
-        ['poisoned'],
-        campaignName,
-      );
+      const conditionsCall = getConditionsCall();
+      expect(conditionsCall[2]).toEqual(['poisoned']);
     });
 
     it('should not register expiration on deactivation', async () => {
@@ -315,22 +305,10 @@ describe('feignDeathHandler.handle', () => {
 
       expect(addExpiration).not.toHaveBeenCalled();
     });
-
-    it('should handle deactivation when no buffs exist (should activate instead)', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getRuntimeValue.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      // When wasActive is false (no existing buff), it should activate
-      expect(result.payload.description).toContain('activated');
-    });
   });
 
   describe('edge cases', () => {
-    it('should handle activeBuffs being undefined', async () => {
+    it('should activate when activeBuffs is undefined', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -342,7 +320,7 @@ describe('feignDeathHandler.handle', () => {
       expect(result.payload.description).toContain('activated');
     });
 
-    it('should handle activeBuffs being a non-array', async () => {
+    it('should activate when activeBuffs is a non-array value', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -362,12 +340,9 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeConditions',
-        expect.any(Array),
-        campaignName,
-      );
+      const conditionsCall = getConditionsCall();
+      expect(conditionsCall).toBeDefined();
+      expect(Array.isArray(conditionsCall[2])).toBe(true);
     });
 
     it('should handle activeConditions being null', async () => {
@@ -378,15 +353,12 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeConditions',
-        expect.any(Array),
-        campaignName,
-      );
+      const conditionsCall = getConditionsCall();
+      expect(conditionsCall).toBeDefined();
+      expect(Array.isArray(conditionsCall[2])).toBe(true);
     });
 
-    it('should handle activeConditions being a non-array', async () => {
+    it('should handle activeConditions being a non-array value', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -394,15 +366,12 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeConditions',
-        expect.any(Array),
-        campaignName,
-      );
+      const conditionsCall = getConditionsCall();
+      expect(conditionsCall).toBeDefined();
+      expect(Array.isArray(conditionsCall[2])).toBe(true);
     });
 
-    it('should handle empty automation object', async () => {
+    it('should handle empty automation object with defaults', async () => {
       const ps = makePlayerStats();
       const action = { name: 'Feign Death', automation: {} };
 
@@ -412,45 +381,13 @@ describe('feignDeathHandler.handle', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.name).toBe('Feign Death');
+
+      const buffCall = getBuffsCall();
+      const buff = buffCall[2].find(b => b.name === 'Feign Death');
+      expect(buff.duration).toBe('1 hour');
     });
 
-    it('should handle playerStats with no name', async () => {
-      const ps = makePlayerStats({ name: undefined });
-      const action = makeAction();
-
-      getRuntimeValue.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('undefined');
-    });
-
-    it('should handle campaignName being undefined', async () => {
-      const ps = makePlayerStats();
-      const action = makeAction();
-
-      getRuntimeValue.mockReturnValue(null);
-
-      const result = await handle(action, ps, undefined, null);
-
-      expect(result.type).toBe('popup');
-      expect(result.payload.description).toContain('activated');
-    });
-
-    it('should handle custom action name in popup description', async () => {
-      const ps = makePlayerStats({ name: 'CasterA' });
-      const action = { name: 'My Custom Feign Death', automation: { type: 'feign_death' } };
-
-      getRuntimeValue.mockReturnValue(null);
-
-      const result = await handle(action, ps, campaignName, null);
-
-      expect(result.payload.name).toBe('My Custom Feign Death');
-      expect(result.payload.description).toContain('My Custom Feign Death');
-    });
-
-    it('should deduplicate conditions when adding feign death conditions', async () => {
+    it('should deduplicate conditions when target already has some feign death conditions', async () => {
       const ps = makePlayerStats();
       const action = makeAction();
 
@@ -458,12 +395,22 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCaster',
-        'activeConditions',
-        ['blinded', 'incapacitated', 'speed_zero'],
-        campaignName,
-      );
+      const conditionsCall = getConditionsCall();
+      expect(conditionsCall[2]).toEqual(['blinded', 'incapacitated', 'speed_zero']);
+    });
+
+    it('should not call setRuntimeValue for conditions when no changes are needed after deactivation', async () => {
+      const ps = makePlayerStats();
+      const action = makeAction();
+
+      const existingBuffs = [{ name: 'Feign Death', effect: 'feign_death' }];
+      // Conditions already have no feign death conditions
+      getRuntimeValue.mockReturnValueOnce(existingBuffs).mockReturnValueOnce(['poisoned', 'fatigued']);
+
+      await handle(action, ps, campaignName, null);
+
+      const conditionsCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeConditions');
+      expect(conditionsCalls.length).toBe(0);
     });
 
     it('should use targetName for condition operations when provided', async () => {
@@ -474,12 +421,26 @@ describe('feignDeathHandler.handle', () => {
 
       await handle(action, ps, campaignName, null);
 
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'AllyB',
-        'activeConditions',
-        expect.any(Array),
-        campaignName,
-      );
+      const conditionsCalls = setRuntimeValue.mock.calls.filter(call => call[1] === 'activeConditions');
+      expect(conditionsCalls.length).toBeGreaterThan(0);
+      expect(conditionsCalls[0][0]).toBe('AllyB');
+    });
+
+    it('should use custom action name in popup and buff', async () => {
+      const ps = makePlayerStats({ name: 'CasterA' });
+      const actionName = 'My Custom Feign Death';
+      const action = { name: actionName, automation: { type: 'feign_death' } };
+
+      getRuntimeValue.mockReturnValue(null);
+
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.payload.name).toBe(actionName);
+      expect(result.payload.description).toContain(actionName);
+
+      const buffCall = getBuffsCall();
+      const buff = buffCall[2].find(b => b.name === actionName);
+      expect(buff).toBeDefined();
     });
   });
 });

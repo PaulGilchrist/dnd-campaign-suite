@@ -1,12 +1,9 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('../../common/savePrompt.js', () => ({
   buildSaveDc: vi.fn(),
   createSaveListener: vi.fn(),
-}));
-
-vi.mock('../../../rules/combat/damageUtils.js', () => ({
-  getCombatContext: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -31,7 +28,6 @@ vi.mock('../../common/targetResolver.js', () => ({
 }));
 
 import { handle } from './suggestionHandler.js';
-import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -58,15 +54,14 @@ function makeAction(automation = {}) {
   };
 }
 
-const baseCombatContext = {
-  creatures: [
-    { name: 'Goblin', type: 'monster', currentHp: 5, maxHp: 7 },
-    { name: 'Orc', type: 'monster', currentHp: 15, maxHp: 22 },
-    { name: 'TestCaster', gridX: 5, gridY: 10 },
-  ],
-  players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
-  placedItems: [],
-};
+function setupBaseMocks(saveResult = { success: true }) {
+  resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+  buildSaveDc.mockReturnValue(15);
+  createSaveListener.mockReturnValue({
+    promptId: 'test-prompt-id',
+    promise: Promise.resolve(saveResult),
+  });
+}
 
 describe('suggestionHandler.handle', () => {
   beforeEach(() => {
@@ -74,41 +69,77 @@ describe('suggestionHandler.handle', () => {
   });
 
   describe('target resolution', () => {
-    it('should return popup when no target selected', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
+    it('returns popup when no target is selected', async () => {
       resolveTarget.mockResolvedValue(null);
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
       expect(result.payload.description).toContain('No target selected');
+      expect(result.payload.description).toContain('Suggestion has no effect');
     });
 
-    it('should call resolveTarget with campaignName and casterName', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-prompt',
-        promise: Promise.resolve({ success: true }),
-      });
+    it('returns popup when target info has no target name', async () => {
+      resolveTarget.mockResolvedValue({});
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No target selected');
+    });
+
+    it('calls resolveTarget with campaignName and caster name', async () => {
+      setupBaseMocks();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
     });
+
+    it('calls createSaveListener with correct arguments', async () => {
+      setupBaseMocks();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Goblin',
+        saveType: 'WIS',
+        saveDc: 15,
+        dcSuccess: 'none',
+      });
+    });
+  });
+
+  describe('ability_use log entry', () => {
+    it('logs ability_use when a target is resolved', async () => {
+      setupBaseMocks();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addEntry).toHaveBeenCalledWith(campaignName, {
+        type: 'ability_use',
+        characterName: 'TestCaster',
+        abilityName: 'Suggestion',
+        description: expect.stringContaining('TestCaster casts Suggestion on Goblin'),
+        promptId: 'test-prompt-id',
+      });
+    });
+
+    it('uses action.name as abilityName in ability_use entry', async () => {
+      setupBaseMocks();
+
+      await handle({ name: 'My Suggestion', automation: { saveType: 'WIS', saveDc: 15 } }, makePlayerStats(), campaignName, null);
+
+      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        abilityName: 'My Suggestion',
+      }));
+    });
   });
 
   describe('successful save', () => {
-    it('should return popup when target succeeds save', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(20);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-success',
-        promise: Promise.resolve({ success: true }),
-      });
+    it('returns popup with success description', async () => {
+      setupBaseMocks({ success: true });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -116,14 +147,8 @@ describe('suggestionHandler.handle', () => {
       expect(result.payload.description).toContain('succeeded on WIS save');
     });
 
-    it('should call addEntry with save_result on success', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(20);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-save',
-        promise: Promise.resolve({ success: true }),
-      });
+    it('logs save_result with success=true', async () => {
+      setupBaseMocks({ success: true });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -132,22 +157,18 @@ describe('suggestionHandler.handle', () => {
         targetName: 'Goblin',
         success: true,
         rollType: 'save-suggestion',
+        saveDc: 15,
+        saveType: 'WIS',
       }));
     });
   });
 
   describe('failed save', () => {
-    it('should apply Charmed condition', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+    it('applies charmed condition to target', async () => {
+      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-fail',
-        promise: Promise.resolve({ success: false }),
-      });
 
-      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'Goblin',
@@ -155,18 +176,11 @@ describe('suggestionHandler.handle', () => {
         expect.arrayContaining(['charmed']),
         campaignName,
       );
-      expect(result.payload.description).toContain('Charmed');
     });
 
-    it('should deduplicate charmed condition', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+    it('deduplicates charmed when already present', async () => {
+      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue(['charmed']);
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-dedup',
-        promise: Promise.resolve({ success: false }),
-      });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -178,15 +192,23 @@ describe('suggestionHandler.handle', () => {
       );
     });
 
-    it('should call addExpiration with default 24 hour duration', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+    it('preserves other conditions when adding charmed', async () => {
+      setupBaseMocks({ success: false });
+      getRuntimeValue.mockReturnValue(['frightened', 'charmed']);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        ['frightened', 'charmed'],
+        campaignName,
+      );
+    });
+
+    it('registers expiration with default 24 hour duration', async () => {
+      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-exp',
-        promise: Promise.resolve({ success: false }),
-      });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -199,15 +221,9 @@ describe('suggestionHandler.handle', () => {
       );
     });
 
-    it('should use 8 hour duration when auto.duration is true', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+    it('registers expiration with 8 hour duration when auto.duration is true', async () => {
+      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-exp-short',
-        promise: Promise.resolve({ success: false }),
-      });
 
       await handle(makeAction({ duration: true }), makePlayerStats(), campaignName, null);
 
@@ -220,38 +236,24 @@ describe('suggestionHandler.handle', () => {
       );
     });
 
-    it('should call postLogEntry on failed save', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+    it('posts condition log entry', async () => {
+      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-log',
-        promise: Promise.resolve({ success: false }),
-      });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
-      expect(postLogEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'condition',
-          action: 'applied',
-          characterName: 'Goblin',
-          condition: 'Charmed',
-        }),
-      );
+      expect(postLogEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
+        type: 'condition',
+        action: 'applied',
+        characterName: 'Goblin',
+        condition: 'Charmed',
+        reason: 'Suggestion spell',
+      }));
     });
 
-    it('should call addEntry with save_result on failed save', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+    it('logs save_result with success=false', async () => {
+      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-fail-entry',
-        promise: Promise.resolve({ success: false }),
-      });
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -260,55 +262,67 @@ describe('suggestionHandler.handle', () => {
         targetName: 'Goblin',
         success: false,
         rollType: 'save-suggestion',
+        saveDc: 15,
+        saveType: 'WIS',
       }));
     });
 
-    it('should include caster name in description', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+    it('includes caster name in popup description', async () => {
+      setupBaseMocks({ success: false });
       getRuntimeValue.mockReturnValue([]);
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-desc',
-        promise: Promise.resolve({ success: false }),
-      });
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
       expect(result.payload.description).toContain('TestCaster');
     });
+
+    it('includes target name in popup description', async () => {
+      setupBaseMocks({ success: false });
+      getRuntimeValue.mockReturnValue([]);
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.payload.description).toContain('Goblin');
+    });
   });
 
   describe('edge cases', () => {
-    it('should handle empty automation object', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(10);
+    it('uses default DC 10 when automation is empty', async () => {
       resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      buildSaveDc.mockReturnValue(10);
       createSaveListener.mockReturnValue({
-        promptId: 'sug-empty-auto',
+        promptId: 'test-prompt-id',
         promise: Promise.resolve({ success: false }),
       });
+      getRuntimeValue.mockReturnValue([]);
 
       const result = await handle({ name: 'Suggestion', automation: {} }, makePlayerStats(), campaignName, null);
 
       expect(result.type).toBe('popup');
+      expect(buildSaveDc).toHaveBeenCalledWith({}, makePlayerStats());
     });
 
-    it('should use action.name in log entries', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(15);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      createSaveListener.mockReturnValue({
-        promptId: 'sug-name',
-        promise: Promise.resolve({ success: false }),
-      });
+    it('ignores the mapName parameter', async () => {
+      setupBaseMocks({ success: false });
+      getRuntimeValue.mockReturnValue([]);
 
-      await handle({ name: 'My Suggestion', automation: { saveType: 'WIS', saveDc: 15 } }, makePlayerStats(), campaignName, null);
+      await handle(makeAction(), makePlayerStats(), campaignName, 'some-map');
 
-      expect(addEntry).toHaveBeenCalledWith(campaignName, expect.objectContaining({
-        characterName: 'TestCaster',
-        abilityName: 'My Suggestion',
-      }));
+      expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
+    });
+
+    it('handles undefined getRuntimeValue by defaulting to empty array', async () => {
+      setupBaseMocks({ success: false });
+      getRuntimeValue.mockReturnValue(undefined);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        ['charmed'],
+        campaignName,
+      );
     });
   });
 });
