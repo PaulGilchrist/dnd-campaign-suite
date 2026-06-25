@@ -1806,13 +1806,34 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     }
 
     if (maneuver.effect === 'ac_bonus_and_swap') {
-        description += ` You or the ally gains +${dieValue} AC until the start of your next turn.`;
-        await setRuntimeValue(playerStats.name, 'baitAndSwitchActive', true, campaignName);
-        await setRuntimeValue(playerStats.name, 'baitAndSwitchBonus', dieValue, campaignName);
-        await setRuntimeValue(playerStats.name, 'baitAndSwitchSource', maneuver.name, campaignName);
-        await addExpiration(playerStats.name, playerStats.name, [
-            { type: 'bait_and_switch_clear' }
-        ], campaignName, 1);
+        description += ` You or an ally gains +${dieValue} AC until the start of your next turn.`;
+        const cs = await getCombatContext(campaignName);
+        const allies = cs?.creatures?.filter(c =>
+            c.name !== playerStats.name
+        ) || [];
+        const options = [
+            { label: `Myself (${playerStats.name})`, value: playerStats.name },
+            ...allies.map(a => ({ label: a.name, value: a.name })),
+        ];
+        const logEntry = {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description,
+        };
+        return {
+            type: 'modal',
+            modalName: 'baitAndSwitchChoice',
+            payload: {
+                playerStats,
+                campaignName,
+                dieValue,
+                maneuverName: maneuver.name,
+                options,
+                description,
+            },
+            logEntries: [logEntry],
+        };
     }
 
     if (maneuver.effect === 'ac_bonus_disengage') {
@@ -1971,6 +1992,48 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
             name: maneuver.name,
             description,
             automation: auto,
+        },
+        logEntries: [logEntry],
+    };
+}
+
+export async function executeBaitAndSwitchChoice(action, playerStats, campaignName, chosenName) {
+    if (!chosenName || !playerStats || !campaignName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Bait and Switch',
+                description: 'No target selected for Bait and Switch AC bonus.',
+            },
+        };
+    }
+
+    const dieValue = action.dieValue;
+    const maneuverName = action.maneuverName || 'Bait and Switch';
+
+    await setRuntimeValue(chosenName, 'baitAndSwitchActive', true, campaignName);
+    await setRuntimeValue(chosenName, 'baitAndSwitchBonus', dieValue, campaignName);
+    await setRuntimeValue(chosenName, 'baitAndSwitchSource', maneuverName, campaignName);
+    await addExpiration(playerStats.name, chosenName, [
+        { type: 'bait_and_switch_clear' }
+    ], campaignName, 1);
+
+    const description = `${maneuverName}: ${chosenName} gains +${dieValue} AC until the start of ${playerStats.name}'s next turn.`;
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuverName,
+        description,
+    };
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: maneuverName,
+            description,
         },
         logEntries: [logEntry],
     };

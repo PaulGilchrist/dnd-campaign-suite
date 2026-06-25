@@ -269,26 +269,60 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityConfirm (single-use
     );
   });
 
-  it('should show popup when onCombatSuperioritySelected returns popup field', async () => {
-    const showPopupMock = vi.fn();
+  it('should dispatch bait-and-switch-modal-show event when executeManeuver returns baitAndSwitchChoice modal', async () => {
+    const mockPlayerStats = { name: 'Thorin', level: 5 };
+    const mockCampaignName = 'test-campaign';
+    const customEventListeners = {};
+
+    window.addEventListener = vi.fn((event, handler) => {
+      customEventListeners[event] = handler;
+    });
+    window.dispatchEvent = vi.fn((event) => {
+      if (customEventListeners[event.type]) {
+        customEventListeners[event.type](event);
+      }
+    });
+
     const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, showPopupMock)
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, null, null)
     );
 
-    onCombatSuperioritySelected.mockResolvedValue({
-      popup: { name: 'Selection', description: 'Done.' },
+    const baitAndSwitchPayload = {
+      playerStats: mockPlayerStats,
+      campaignName: mockCampaignName,
+      dieValue: 6,
+      maneuverName: 'Bait and Switch',
+      options: [
+        { label: 'Myself (Thorin)', value: 'Thorin' },
+        { label: 'Ally (Grog)', value: 'Grog' },
+      ],
+      description: 'Bait and Switch: Rolled d6 for 6.',
+    };
+
+    executeManeuver.mockResolvedValue({
+      type: 'modal',
+      modalName: 'baitAndSwitchChoice',
+      payload: baitAndSwitchPayload,
+      logEntries: [
+        { type: 'ability_use', characterName: 'Thorin', abilityName: 'Bait and Switch', description: 'Bait and Switch used.' },
+      ],
     });
 
     act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Select Maneuvers' } });
+      result.current.setCombatSuperiorityModal({ action: { name: 'Bait and Switch' } });
+    });
+
+    const dispatchedEvents = [];
+    window.dispatchEvent = vi.fn((event) => {
+      dispatchedEvents.push(event);
     });
 
     await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm(['Rally']);
+      await result.current.handleCombatSuperiorityConfirm([], 'Bait and Switch');
     });
 
-    expect(showPopupMock).toHaveBeenCalledWith(
-      '<b><i class="fa-solid fa-bolt"></i> Selection</b><br/>Done.<br/><span class="dice-roll-hint">click to dismiss</span>'
-    );
+    expect(dispatchedEvents.length).toBe(1);
+    expect(dispatchedEvents[0].type).toBe('bait-and-switch-modal-show');
+    expect(dispatchedEvents[0].detail).toEqual(baitAndSwitchPayload);
   });
 });

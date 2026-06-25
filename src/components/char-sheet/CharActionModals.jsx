@@ -130,6 +130,8 @@ export default function CharActionModals({
     handleAttackRiderManeuverUse,
     handleAttackRiderManeuverSkip,
     handleSweepingAttackConfirm,
+    baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
+    handleBaitAndSwitchChoiceConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -575,6 +577,54 @@ export default function CharActionModals({
                                 <i className="fa-solid fa-bolt"></i> Apply Sweeping Attack
                             </button>
                             <button className="sp-dismiss-btn" onClick={() => setSweepingAttackTargetModal(null)}>Skip</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {baitAndSwitchChoiceModal && (
+                <div className="sp-overlay" onClick={() => setBaitAndSwitchChoiceModal(null)}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-shield-halved"></i> Bait and Switch — AC Bonus
+                        </div>
+                        <div className="sp-body">
+                            <p>{baitAndSwitchChoiceModal.description}</p>
+                            <p style={{ opacity: 0.8 }}>Who gains the AC bonus?</p>
+                            <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                                {baitAndSwitchChoiceModal.options.map((option, i) => (
+                                    <label
+                                        key={i}
+                                        style={{
+                                            display: 'block', padding: '8px 12px', margin: '4px 0',
+                                            borderRadius: '6px', cursor: 'pointer',
+                                            background: baitAndSwitchChoiceModal.selectedTarget === option.value ? 'rgba(255,255,255,0.12)' : 'transparent',
+                                            border: baitAndSwitchChoiceModal.selectedTarget === option.value ? '1px solid var(--color-link)' : '1px solid transparent',
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="baitAndSwitchChoice"
+                                            checked={baitAndSwitchChoiceModal.selectedTarget === option.value}
+                                            onChange={() => {
+                                                const updated = { ...baitAndSwitchChoiceModal, selectedTarget: option.value };
+                                                setBaitAndSwitchChoiceModal(updated);
+                                            }}
+                                            style={{ marginRight: '8px' }}
+                                        />
+                                        <strong>{option.label}</strong>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="sp-actions">
+                            <button
+                                className="sp-roll-btn"
+                                disabled={!baitAndSwitchChoiceModal.selectedTarget}
+                                onClick={handleBaitAndSwitchChoiceConfirm}
+                            >
+                                <i className="fa-solid fa-check"></i> Apply AC Bonus
+                            </button>
+                            <button className="sp-dismiss-btn" onClick={() => setBaitAndSwitchChoiceModal(null)}>Cancel</button>
                         </div>
                     </div>
                 </div>

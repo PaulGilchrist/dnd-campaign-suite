@@ -9,6 +9,8 @@ import * as automationService from '../../../combat/automation/automationService
 import * as dataLoader from '../../../../services/ui/dataLoader.js';
 import * as savePrompt from '../../../automation/common/savePrompt.js';
 import * as expirations from '../../../rules/effects/expirations.js';
+import * as damageUtils from '../../../rules/combat/damageUtils.js';
+
 
 vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(),
@@ -43,6 +45,11 @@ vi.mock('../../../../services/ui/dataLoader.js', () => ({
 vi.mock('../../../automation/common/savePrompt.js', () => ({
     buildSaveDc: vi.fn(),
     createSaveListener: vi.fn(),
+}));
+
+vi.mock('../../../rules/combat/damageUtils.js', () => ({
+    getCombatContext: vi.fn(),
+    findCreatureByName: vi.fn(),
 }));
 
 vi.mock('../../../ui/logService.js', () => ({
@@ -96,6 +103,7 @@ describe('combatSuperiorityHandler.executeManeuver - maneuver not found and no d
         savePrompt.createSaveListener.mockReturnValue({
             promise: Promise.resolve({ success: false }),
         });
+        damageUtils.getCombatContext.mockResolvedValue(null);
     });
 
     it('returns popup with not-found message when maneuver does not exist', async () => {
@@ -653,7 +661,7 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
     });
 
-    it('describes ac_bonus_and_swap effect and sets bait-and-switch runtime values', async () => {
+    it('returns modal for ac_bonus_and_swap effect with self and ally options', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Bait and Switch', effect: 'ac_bonus_and_swap' },
         ]);
@@ -666,13 +674,16 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
             'Bait and Switch'
         );
 
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('baitAndSwitchChoice');
+        expect(result.payload.dieValue).toBe(DIE_ROLL_TOTAL);
+        expect(result.payload.maneuverName).toBe('Bait and Switch');
+        expect(result.payload.options).toBeDefined();
+        expect(result.payload.options.length).toBeGreaterThanOrEqual(1);
+        expect(result.payload.options[0].value).toBe('TestFighter');
         expect(result.payload.description).toContain('+5 AC');
-        expect(result.payload.description).toContain('next turn');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchActive', true, 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchBonus', 5, 'test-campaign');
-        expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'baitAndSwitchSource', 'Bait and Switch', 'test-campaign');
-        expect(expirations.addExpiration).toHaveBeenCalled();
         expect(result.payload.description).not.toContain('Target:');
+        expect(setRuntimeValue).not.toHaveBeenCalledWith(expect.any(String), 'baitAndSwitchActive', true, expect.any(String));
     });
 
     it('describes ac_bonus_disengage effect and sets bait-and-switch runtime values', async () => {
@@ -1015,6 +1026,25 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases and HP restorati
         );
 
         expect(result.payload.description).not.toContain('Target:');
+        expect(result.type).toBe('modal');
+    });
+
+    it('executeBaitAndSwitchChoice applies bonus to chosen target', async () => {
+        const { executeBaitAndSwitchChoice } = await import('./combatSuperiorityHandler.js');
+
+        const result = await executeBaitAndSwitchChoice(
+            { dieValue: 5, maneuverName: 'Bait and Switch' },
+            makePlayerStats(),
+            'test-campaign',
+            'AllyName'
+        );
+
+        expect(setRuntimeValue).toHaveBeenCalledWith('AllyName', 'baitAndSwitchActive', true, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('AllyName', 'baitAndSwitchBonus', 5, 'test-campaign');
+        expect(setRuntimeValue).toHaveBeenCalledWith('AllyName', 'baitAndSwitchSource', 'Bait and Switch', 'test-campaign');
+        expect(expirations.addExpiration).toHaveBeenCalledWith('TestFighter', 'AllyName', [{ type: 'bait_and_switch_clear' }], 'test-campaign', 1);
+        expect(result.payload.description).toContain('AllyName gains +5 AC');
+        expect(result.payload.description).toContain('TestFighter\'s next turn');
     });
 
     it('does not show target line for ac_bonus_disengage effect', async () => {

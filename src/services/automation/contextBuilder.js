@@ -256,9 +256,9 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
 
         // Compute Bait and Switch AC bonus (2024 rules)
         let baitAndSwitchBonus = 0;
-        const baitAndSwitchActive = getRuntimeValue(playerName, 'baitAndSwitchActive', campaignName);
+        const baitAndSwitchActive = getRuntimeValue(targetName, 'baitAndSwitchActive', campaignName);
         if (baitAndSwitchActive) {
-            baitAndSwitchBonus = Number(getRuntimeValue(playerName, 'baitAndSwitchBonus', campaignName) || 0);
+            baitAndSwitchBonus = Number(getRuntimeValue(targetName, 'baitAndSwitchBonus', campaignName) || 0);
         }
 
         // Stroke of Luck: check if the player has the passive available

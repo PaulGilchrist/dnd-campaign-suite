@@ -27,14 +27,6 @@ function ensureArray(value, name) {
 export function applyTurnStartEffects(activeName, playerStats, campaignName) {
     if (!activeName || !playerStats) return;
 
-    // Clear Bait and Switch (Evasive Footwork) AC bonus at start of character's next turn
-    const wasActive = getRuntimeValue(activeName, 'baitAndSwitchActive');
-    if (wasActive) {
-        setRuntimeValue(activeName, 'baitAndSwitchActive', null, campaignName);
-        setRuntimeValue(activeName, 'baitAndSwitchBonus', null, campaignName);
-        setRuntimeValue(activeName, 'baitAndSwitchSource', null, campaignName);
-    }
-
     const turnStartEffects = ensureArray(playerStats.turnStartEffects, 'turnStartEffects');
     for (const effect of turnStartEffects) {
         if (effect.type === 'heroic_inspiration') {

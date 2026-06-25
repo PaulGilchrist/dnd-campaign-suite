@@ -255,6 +255,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         combatSuperiorityModal, setCombatSuperiorityModal,
         attackRiderManeuverPrompt, setAttackRiderManeuverPrompt,
         sweepingAttackTargetModal, setSweepingAttackTargetModal,
+        baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
         handleCombatSuperiorityConfirm,
@@ -278,6 +279,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         window.addEventListener('sweeping-attack-modal-show', handler);
         return () => window.removeEventListener('sweeping-attack-modal-show', handler);
     }, [setSweepingAttackTargetModal]);
+
+    useEffect(() => {
+        const handler = (event) => {
+            setBaitAndSwitchChoiceModal(event.detail);
+        };
+        window.addEventListener('bait-and-switch-modal-show', handler);
+        return () => window.removeEventListener('bait-and-switch-modal-show', handler);
+    }, [setBaitAndSwitchChoiceModal]);
 
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
@@ -359,6 +368,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
         setSweepingAttackTargetModal(null);
     }, [sweepingAttackTargetModal, setPopupHtml, setSweepingAttackTargetModal]);
+
+    const handleBaitAndSwitchChoiceConfirm = React.useCallback(async () => {
+        if (!baitAndSwitchChoiceModal?.selectedTarget) return;
+        const { executeBaitAndSwitchChoice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
+        const result = await executeBaitAndSwitchChoice(
+            {
+                dieValue: baitAndSwitchChoiceModal.dieValue,
+                maneuverName: baitAndSwitchChoiceModal.maneuverName,
+            },
+            baitAndSwitchChoiceModal.playerStats,
+            baitAndSwitchChoiceModal.campaignName,
+            baitAndSwitchChoiceModal.selectedTarget
+        );
+        if (result.payload) {
+            setPopupHtml(result.payload);
+        }
+        setBaitAndSwitchChoiceModal(null);
+    }, [baitAndSwitchChoiceModal, setPopupHtml, setBaitAndSwitchChoiceModal]);
 
     async function handleAutomationAction(action) {
         if (cannotAct) return;
@@ -560,6 +587,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                         break;
                     case 'sweepingAttackTarget':
                         setSweepingAttackTargetModal(result.payload);
+                        break;
+                    case 'baitAndSwitchChoice':
+                        setBaitAndSwitchChoiceModal(result.payload);
                         break;
                     case 'arcaneWardRestore':
                         setArcaneWardRestoreModal(result.payload);
@@ -864,6 +894,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     attackRiderManeuverPrompt={attackRiderManeuverPrompt} setAttackRiderManeuverPrompt={setAttackRiderManeuverPrompt}
                     sweepingAttackTargetModal={sweepingAttackTargetModal} setSweepingAttackTargetModal={setSweepingAttackTargetModal}
                     handleSweepingAttackConfirm={handleSweepingAttackConfirm}
+                    baitAndSwitchChoiceModal={baitAndSwitchChoiceModal} setBaitAndSwitchChoiceModal={setBaitAndSwitchChoiceModal}
+                    handleBaitAndSwitchChoiceConfirm={handleBaitAndSwitchChoiceConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
