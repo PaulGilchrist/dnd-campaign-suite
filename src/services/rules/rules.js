@@ -549,7 +549,7 @@ const rules = {
         let armorName = playerStats.inventory.equipped.find(itemName => {
             let item = allEquipment.find((item) => item.name === parseMagicItemName(itemName).baseName);
             if (item) {
-                return item.equipment_category === 'Armor';
+                return item.equipment_category === 'Armor' && item.armor_category !== 'Shield';
              }
             return false;
          });
