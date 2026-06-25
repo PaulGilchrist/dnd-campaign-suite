@@ -568,8 +568,14 @@ describe('useDamageClick', () => {
     // ── Weapon mastery modal ────────────────────────────────────────────
 
     describe('weapon mastery modal', () => {
-        it('opens modal and stores pending damage for melee attacks with mastery', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: { name: 'Mercy' }, extraMasteries: [] });
+        it('applies Sap mastery automatically for melee attacks with mastery', async () => {
+            collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap', extraMasteries: [] });
+            getRuntimeValue.mockReturnValue(null);
+            getCombatContext.mockResolvedValue({
+                name: 'test-campaign',
+                creatures: [{ name: 'Goblin', type: 'npc' }],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', type: 'npc' });
             const { handleDamageClick } = HookFactory(deps);
             const attack = {
                 name: 'Longsword',
@@ -582,19 +588,17 @@ describe('useDamageClick', () => {
             await handleDamageClick(attack);
             await new Promise(r => setTimeout(r, 0));
 
-            expect(deps.setWeaponMasteryModal).toHaveBeenCalledWith({
-                attackName: 'Longsword',
-                baseMastery: { name: 'Mercy' },
-                extraMasteries: [],
-                damageTotal: 5,
-            });
-            expect(deps.pendingDamageRef.current).toEqual(
-                expect.objectContaining({ attack, formula: '1d8+3' }),
+            expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
+            expect(setRuntimeValue).toHaveBeenCalledWith(
+                'test-campaign',
+                '_Sap_appliedTarget',
+                'Goblin',
+                'test-campaign',
             );
         });
 
         it('does not open modal for ranged attacks', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: { name: 'Mercy' }, extraMasteries: [] });
+            collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap', extraMasteries: [] });
             const { handleDamageClick } = HookFactory(deps);
             const attack = {
                 name: 'Longbow',
@@ -627,8 +631,14 @@ describe('useDamageClick', () => {
             expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
         });
 
-        it('opens modal when extraMasteries exist even without baseMastery', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [{ name: 'Extra' }] });
+        it('applies Vex mastery automatically when in extraMasteries', async () => {
+            collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: ['Vex'] });
+            getRuntimeValue.mockReturnValue(null);
+            getCombatContext.mockResolvedValue({
+                name: 'test-campaign',
+                creatures: [{ name: 'Goblin', type: 'npc' }],
+            });
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', type: 'npc' });
             const { handleDamageClick } = HookFactory(deps);
             const attack = {
                 name: 'Longsword',
@@ -641,12 +651,7 @@ describe('useDamageClick', () => {
             await handleDamageClick(attack);
             await new Promise(r => setTimeout(r, 0));
 
-            expect(deps.setWeaponMasteryModal).toHaveBeenCalledWith({
-                attackName: 'Longsword',
-                baseMastery: null,
-                extraMasteries: [{ name: 'Extra' }],
-                damageTotal: 5,
-            });
+            expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
         });
     });
 

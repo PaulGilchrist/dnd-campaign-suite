@@ -17,7 +17,7 @@ function valuesEqual(a, b) {
   return false;
 }
 
-function getStore(characterKey) {
+export function getStore(characterKey) {
   if (!stores.has(characterKey)) {
     stores.set(characterKey, new Map());
   }

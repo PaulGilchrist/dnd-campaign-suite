@@ -17,7 +17,7 @@ import useCampaignManagement from './hooks/management/useCampaignManagement.js';
 import { useCharacterWizard } from './hooks/wizard/useCharacterWizard.js';
 import rulesFactory from './services/rules/rulesFactory.js';
 import Subscriber from './components/common/Subscriber.jsx';
-import { setRuntimeObject, seedTrackedResources } from './hooks/runtime/useRuntimeState.js';
+import { setRuntimeObject, seedTrackedResources, getStore } from './hooks/runtime/useRuntimeState.js';
 import { applyServerOverride, trackedResourcesToStoreEntries } from './services/rules/trackedResources.js';
 import Notes from './components/notes/Notes.jsx';
 import Quests from './components/quests/Quests.jsx';
@@ -134,6 +134,15 @@ function App() {
           const merged = applyServerOverride(stats._trackedResources, charServerData);
           const entries = trackedResourcesToStoreEntries(merged);
           seedTrackedResources(stats.name, entries);
+          // Also seed arbitrary runtime keys (weapon mastery choices, etc.) from server data
+          if (charServerData && typeof charServerData === 'object') {
+            const store = getStore(stats.name);
+            for (const [key, value] of Object.entries(charServerData)) {
+              if (!store.has(key) && value != null) {
+                store.set(key, value);
+              }
+            }
+          }
         }
       })();
     }, [computedCharacters, campaignName]);

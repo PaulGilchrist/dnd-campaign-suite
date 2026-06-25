@@ -69,7 +69,7 @@ export function collectWeaponMastery(weaponName, playerStats) {
             }
         }
         if (passive.type === 'weapon_kind_mastery') {
-            const chosenWeapons = getChosenRuntimeValue(playerStats, passive.name, 'chosenWeapons');
+            const chosenWeapons = getRuntimeValue(playerStats.name, '_Weapon_Kind_Mastery_chosenWeapons');
             if (chosenWeapons && Array.isArray(chosenWeapons) && chosenWeapons.includes(baseName)) {
                 const isMeleeOnly = passive.meleeOnly;
                 if (!isMeleeOnly || weapon?.weapon_range === 'Melee') {
@@ -80,11 +80,10 @@ export function collectWeaponMastery(weaponName, playerStats) {
     }
 
     if (replaceMastery) {
-        baseMastery = null;
         extraMasteries.push(...replaceMastery);
     } else if (!hasKindMasteryMatch) {
         const hasAnyKindMastery = passives.some(p => p.type === 'weapon_kind_mastery');
-        if (hasAnyKindMastery) {
+        if (hasAnyKindMastery && !baseMastery) {
             baseMastery = null;
         }
     }

@@ -326,6 +326,8 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             grazeDamage,
             grazeAbilityName,
             grazeAbilityMod,
+            weaponType: attack.weaponType,
+            weaponName: attack.name,
         };
         });
 }

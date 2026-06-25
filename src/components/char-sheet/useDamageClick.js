@@ -8,11 +8,12 @@ import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js'
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';
 import { getAttackRiderOptions, getAttackRiderOptionsByContext, executeAttackRiderManeuver as executeAttackRiderManeuverService } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { applyMasteryEffect, MASTERY_EFFECTS } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 
 export default function useDamageClick({
     playerStats, campaignName, mapName,
     popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
-    setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal, setAttackRiderModal,
+    setDamageTypeChoice, setDivineFuryChoice, setWeaponMasteryModal: _, setAttackRiderModal,
     setAttackRiderManeuverPrompt,
     setSweepingAttackTargetModal,
     pendingDamageRef,
@@ -1165,19 +1166,36 @@ export default function useDamageClick({
             }
         }
 
-        // Check for weapon mastery properties to activate on hit
+        // Apply weapon mastery properties automatically on hit (Sap, Slow, Vex, Push, Topple, Graze, Cleave, Nick)
         if (attack.weaponType === 'melee') {
             const available = collectWeaponMastery(attack.name, playerStats);
-            const hasMastery = available.baseMastery || available.extraMasteries?.length > 0;
-            if (hasMastery) {
-                pendingDamageRef.current = { attack, formula, total, rolls, modifier };
-                setWeaponMasteryModal({
-                    attackName: attack.name,
-                    baseMastery: available.baseMastery,
-                    extraMasteries: available.extraMasteries,
-                    damageTotal: total,
-                });
-                return;
+            const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+            console.log('[useDamageClick] Mastery: weapon=%s base=%s extra=%o', attack.name, available.baseMastery, allMasteries);
+            const cs = await getCombatContext(campaignName);
+            const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+            const targetName = target?.name || null;
+
+            for (const masteryName of allMasteries) {
+                const mastery = MASTERY_EFFECTS[masteryName];
+                if (!mastery) continue;
+                if (masteryName === 'Graze') continue;
+                if (targetName) {
+                    if (masteryName === 'Cleave' || masteryName === 'Nick') {
+                        const desc = `${playerStats.name} used ${masteryName} on ${targetName}`;
+                        addEntry(campaignName, {
+                            type: 'ability_use',
+                            characterName: playerStats.name,
+                            abilityName: masteryName,
+                            description: desc,
+                            targetName: targetName,
+                        }).catch(() => {});
+                    } else {
+                        const alreadyApplied = getRuntimeValue(campaignName, `_${masteryName}_appliedTarget`, campaignName);
+                        if (alreadyApplied === targetName) { continue; }
+                        setRuntimeValue(campaignName, `_${masteryName}_appliedTarget`, targetName, campaignName);
+                        await applyMasteryEffect(masteryName, playerStats, campaignName, targetName);
+                    }
+                }
             }
         }
 

@@ -253,14 +253,14 @@ describe('collectWeaponMastery', () => {
     expect(result.extraMasteries).toEqual(['push', 'topple'])
   })
 
-  it('replaces baseMastery when replaceMastery is set', () => {
+  it('adds replaceMastery to extraMasteries without clearing baseMastery', () => {
     parseMagicItemName.mockReturnValue({ baseName: 'Longsword', magicBonus: 0 })
     const playerStats = {
       equipment: [{ name: 'Longsword', mastery: 'push' }],
       automation: { passives: [{ replaceMastery: ['topple', 'shove'] }] },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: ['topple', 'shove'] })
+    expect(result).toEqual({ baseMastery: 'push', extraMasteries: ['topple', 'shove'] })
   })
 
   it('handles null passives array', () => {
@@ -343,8 +343,8 @@ describe('collectWeaponMastery', () => {
       },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
-    // replaceMastery clears baseMastery and adds to extraMasteries
-    expect(result.baseMastery).toBeNull()
+    // baseMastery is preserved; extraMasteries accumulates from all sources
+    expect(result.baseMastery).toBe('push')
     expect(result.extraMasteries).toEqual(expect.arrayContaining(['shove', 'trip', 'topple']))
   })
 })
