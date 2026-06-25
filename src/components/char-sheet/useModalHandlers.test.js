@@ -363,7 +363,7 @@ describe('useModalHandlers', () => {
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
                 'Longbow (Cleave)',
-                '1d8+1 + -2[Strength]',
+                '1d8+1 + -2 [Strength]',
                 2,
                 [2],
                 0,

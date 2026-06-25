@@ -144,7 +144,7 @@ describe('useDamageClick - advanced automations', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Overwhelming_Strike_usedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                expect.stringContaining('2d6[force]'),
+                expect.stringContaining('2d6 [force]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -209,7 +209,7 @@ describe('useDamageClick - advanced automations', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                expect.stringContaining('3[Slashing]'),
+                expect.stringContaining('3 [Slashing]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -294,7 +294,7 @@ describe('useDamageClick - advanced automations', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Necrotic_Shroud_usedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                expect.stringContaining('2d8['),
+                expect.stringContaining('2d8 ['),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -409,7 +409,7 @@ describe('useDamageClick - advanced automations', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Fire Bolt',
-                expect.stringContaining('4[Cantrip]'),
+                expect.stringContaining('4 [Cantrip]'),
                 9, expect.any(Array), 0, expect.any(Object)
             );
         });

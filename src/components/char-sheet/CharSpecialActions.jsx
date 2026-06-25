@@ -27,6 +27,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
         characters,
+        autoDamageSource: 'char-special-actions',
         autoDamageRoll: async (autoDamage, isCrit) => {
             const formula = autoDamage.formula;
             let result;

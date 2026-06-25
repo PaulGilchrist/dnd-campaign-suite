@@ -747,7 +747,7 @@ describe('useDamageClick - feats', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
-                expect.stringContaining('+ 1[Piercing]'),
+                expect.stringContaining('+ 1 [Piercing]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -1146,7 +1146,7 @@ describe('useDamageClick - feats', () => {
             expect(rollExpression).toHaveBeenCalledWith('1d4');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
-                expect.stringContaining('1d4[bludgeoning]'),
+                expect.stringContaining('1d4 [bludgeoning]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });

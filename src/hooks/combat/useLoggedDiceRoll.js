@@ -12,9 +12,11 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
   const { popupHtml: internalPopupHtml, setPopupHtml: internalSetPopupHtml } = useDiceRoll();
   const setPopupHtml = _isShared ? contextSetPopupHtml : internalSetPopupHtml;
   const activePopupHtml = _isShared ? contextPopupHtml : internalPopupHtml;
-  const { autoDamageRoll, characters } = options;
+  const { autoDamageRoll, characters, autoDamageSource } = options;
   const autoDamageRollRef = useRef(null);
   autoDamageRollRef.current = autoDamageRoll || null;
+  const autoDamageSourceRef = useRef(autoDamageSource || null);
+  autoDamageSourceRef.current = autoDamageSource || null;
   const charactersRef = useRef(characters);
   charactersRef.current = characters || [];
 
@@ -35,17 +37,17 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
   useEffect(() => {
     if (activePopupHtml?.hit === true && activePopupHtml?.autoDamage && autoDamageRollRef.current) {
-      if (activePopupHtml.autoDamage.source !== characterName) return;
+      if (activePopupHtml.autoDamage.source !== autoDamageSourceRef.current) return;
       const timer = setTimeout(() => {
         const { autoDamage } = activePopupHtml;
         autoDamageRollRef.current(autoDamage, activePopupHtml.isCrit);
       }, SHOW_DICE_ROLL_DELAY);
       return () => clearTimeout(timer);
     }
-  }, [activePopupHtml, characterName]);
+  }, [activePopupHtml]);
 
   const logAndShow = createLogAndShow({
-    characterName, campaignName, characters, setPopupHtml, logEntry,
+    characterName, campaignName, characters, setPopupHtml, logEntry, autoDamageSourceRef,
   });
 
   const logDamageAndShow = createLogDamageAndShow({

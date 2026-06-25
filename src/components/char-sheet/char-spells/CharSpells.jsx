@@ -44,6 +44,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const { popupHtml: dicePopupHtml, setPopupHtml: setDicePopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
+        autoDamageSource: 'char-spells',
         autoDamageRoll: (autoDamage, isCrit) => {
           let autoFormula = autoDamage.formula;
           const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);

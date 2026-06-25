@@ -628,7 +628,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
         if (hasDamage && isSlotLevelValid && metaCtx?.overchannel) {
             overchannelActive = true;
             overchannelUseCount = currentUseCount + 1;
-            overchannelFormula = `${empEvocFormula}[Overchannel Maximize]`;
+            overchannelFormula = `${empEvocFormula} [Overchannel Maximize]`;
             setRuntimeValue(playerStats.name, usesKey, overchannelUseCount, campaignName);
         }
     }

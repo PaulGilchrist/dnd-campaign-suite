@@ -36,7 +36,7 @@ export function useActionSpellMetamagic({
         if (chaMod <= 0) return { formula, total, rolls, modifier };
 
         return {
-            formula: `${formula} + ${chaMod}[${affinityType}]`,
+            formula: `${formula} + ${chaMod} [${affinityType}]`,
             total: total + chaMod,
             rolls: [...rolls],
             modifier,

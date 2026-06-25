@@ -39,7 +39,7 @@ function getSuperiorityDice(characterName, campaignName) {
 }
 
 export function createLogAndShow(deps) {
-    const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
+    const { characterName, campaignName, characters, setPopupHtml, logEntry, autoDamageSourceRef } = deps;
 
     return async function logAndShow(name, bonus, rollType, context) {
         const r1 = rollD20();
@@ -271,7 +271,7 @@ export function createLogAndShow(deps) {
             secondaryFormula: context.autoDamageSecondaryFormula,
             secondaryDamageType: context.autoDamageSecondaryDamageType,
             ripostePopup: context.ripostePopup,
-            source: characterName,
+            source: autoDamageSourceRef?.current || characterName,
         } : undefined;
 
         logEntry({
@@ -464,7 +464,7 @@ export function createLogAndShow(deps) {
                     const grazeAbilityMod = context?.grazeAbilityMod || 0;
                     const grazeDamageAmount = Math.max(0, grazeAbilityMod);
                     const grazeDamageType = context?.damageType || 'Slashing';
-                    const grazeFormula = grazeDamageAmount > 0 ? `${grazeDamageAmount}[Graze]` : '0[Graze]';
+                    const grazeFormula = grazeDamageAmount > 0 ? `${grazeDamageAmount} [Graze]` : '0 [Graze]';
                     if (grazeDamageAmount > 0) {
                         const combatSummary2 = await loadCombatSummary(campaignName);
                         const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, grazeDamageType)) || false;

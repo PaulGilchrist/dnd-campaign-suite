@@ -104,7 +104,7 @@ export default function useModalHandlers({
         if (hit) {
             const negMod = abilityMod < 0 ? abilityMod : 0;
             if (negMod < 0) {
-                damageFormula = `${damage} + ${negMod}[${abilityName}]`;
+                damageFormula = `${damage} + ${negMod} [${abilityName}]`;
             } else {
                 const parts = damage.split(' + ');
                 const filteredParts = parts.filter(part => {
@@ -145,7 +145,7 @@ export default function useModalHandlers({
             return;
         }
         const { attack, formula, total, rolls, modifier, bonusExpr, bonusTotal, bonusRolls } = pending;
-        const newFormula = `${formula} + ${bonusExpr}[${chosenType}]`;
+        const newFormula = `${formula} + ${bonusExpr} [${chosenType}]`;
         const newTotal = total + bonusTotal;
         const newRolls = [...rolls, ...bonusRolls];
         const playerName = playerStats.name;
@@ -175,7 +175,7 @@ export default function useModalHandlers({
             return;
         }
         const { attack, formula, total, rolls, modifier, bonusExpr, bonusTotal, bonusRolls, oncePerTurnKey } = pending;
-        const newFormula = `${formula} + ${bonusExpr}[${chosenType}]`;
+        const newFormula = `${formula} + ${bonusExpr} [${chosenType}]`;
         const newTotal = total + bonusTotal;
         const newRolls = [...rolls, ...bonusRolls];
         if (oncePerTurnKey) {
@@ -243,7 +243,7 @@ export default function useModalHandlers({
             if (chosenOption && chosenOption.effect === 'damage_bonus') {
                 const riderResult = rollExpression(chosenOption.damageExpression);
                 if (riderResult) {
-                    const newFormula = `${formula} + ${chosenOption.damageExpression}[${chosenOption.damageType || 'same_as_weapon'}]`;
+                    const newFormula = `${formula} + ${chosenOption.damageExpression} [${chosenOption.damageType || 'same_as_weapon'}]`;
                     const newTotal = total + riderResult.total;
                     const newRolls = [...rolls, ...riderResult.rolls];
                     const usedKey = `_${_attackRider.name.replace(/\s+/g, '_')}_usedRound`;

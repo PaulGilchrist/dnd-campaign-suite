@@ -85,6 +85,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats.name, campaignName, {
         characters,
+        autoDamageSource: 'char-actions',
         autoDamageRoll: async (autoDamage, isCrit) => {
             let autoFormula = autoDamage.formula;
             const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);

@@ -140,7 +140,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                expect.stringContaining('1d4[radiant]'),
+                expect.stringContaining('1d4 [radiant]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -161,7 +161,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
-                expect.stringContaining('1d4[radiant]'),
+                expect.stringContaining('1d4 [radiant]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -213,7 +213,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
-                expect.stringContaining('1d6[fire]'),
+                expect.stringContaining('1d6 [fire]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -241,7 +241,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Unarmed Strike',
-                expect.stringContaining('1d6[cold]'),
+                expect.stringContaining('1d6 [cold]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -267,7 +267,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
-                expect.stringContaining('1d4[Force]'),
+                expect.stringContaining('1d4 [Force]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -315,7 +315,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
-                expect.stringContaining('1d4[Slashing]'),
+                expect.stringContaining('1d4 [Slashing]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -349,7 +349,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_frenzyUsedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
-                expect.stringContaining('2[necrotic]'),
+                expect.stringContaining('2 [necrotic]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -497,7 +497,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_divineFuryUsedRound', 1, 'test-campaign');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
-                expect.stringContaining('2[radiant]'),
+                expect.stringContaining('2 [radiant]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -612,7 +612,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
-                expect.stringContaining('2d6[Force]'),
+                expect.stringContaining('2d6 [Force]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -638,7 +638,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
-                expect.stringContaining('1d8[radiant]'),
+                expect.stringContaining('1d8 [radiant]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -662,7 +662,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Quarterstaff',
-                expect.stringContaining('1d6[force]'),
+                expect.stringContaining('1d6 [force]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -715,7 +715,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
-                expect.stringContaining('1d6[radiant]'),
+                expect.stringContaining('1d6 [radiant]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -767,7 +767,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Mace',
-                expect.stringContaining('1d8[radiant]'),
+                expect.stringContaining('1d8 [radiant]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
         });
@@ -853,7 +853,7 @@ describe('useDamageClick - automation damage bonuses', () => {
             await tick();
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longbow',
-                expect.stringContaining('1d8[piercing]'),
+                expect.stringContaining('1d8 [piercing]'),
                 expect.any(Number), expect.any(Array), expect.any(Number), expect.any(Object)
             );
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', '_Dread_Ambush_uses', 0, 'test-campaign');

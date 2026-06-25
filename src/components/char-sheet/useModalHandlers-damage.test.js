@@ -103,7 +103,7 @@ describe('useModalHandlers - damage type handlers', () => {
             expect(deps.setDivineFuryChoice).toHaveBeenCalledWith(null);
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 expect.any(Object),
-                '1d8 + 1d8[Radiant]',
+                '1d8 + 1d8 [Radiant]',
                 9,
                 [5, 4],
                 0
@@ -191,7 +191,7 @@ describe('useModalHandlers - damage type handlers', () => {
             );
             expect(deps.proceedWithDamage).toHaveBeenCalledWith(
                 expect.any(Object),
-                '1d8 + 1d8[Thunder]',
+                '1d8 + 1d8 [Thunder]',
                 9,
                 [5, 4],
                 0

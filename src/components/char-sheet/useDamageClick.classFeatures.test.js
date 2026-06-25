@@ -186,7 +186,7 @@ describe('useDamageClick - class features', () => {
             expect(rollExpression).toHaveBeenCalledWith('2d6');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
-                expect.stringContaining('2d6[Sneak Attack]'),
+                expect.stringContaining('2d6 [Sneak Attack]'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -590,7 +590,7 @@ describe('useDamageClick - class features', () => {
             expect(rollExpression).toHaveBeenCalledWith('1d8');
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Rapier',
-                expect.stringContaining('+ 1d8[extra]'),
+                expect.stringContaining('+ 1d8 [extra]'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -727,7 +727,7 @@ describe('useDamageClick - class features', () => {
             );
             expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
                 rollType: 'damage',
-                formula: '1d6[Superior Hunters Prey]',
+                formula: '1d6 [Superior Hunters Prey]',
                 targetName: 'Orc',
             }));
             expect(setRuntimeValue).toHaveBeenCalledWith(

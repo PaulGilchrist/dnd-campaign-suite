@@ -259,7 +259,7 @@ describe('useDamageClick', () => {
 
             expect(deps.rollDamage).toHaveBeenCalledWith(
                 'Handaxe',
-                expect.stringContaining('+ 3[Strength]'),
+                expect.stringContaining('+ 3 [Strength]'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -359,7 +359,7 @@ describe('useDamageClick', () => {
             await new Promise(r => setTimeout(r, 0));
 
             const formulaArg = deps.rollDamage.mock.calls[0][1];
-            const matches = formulaArg.match(/\+ 3\[Strength\]/g);
+            const matches = formulaArg.match(/\+ 3 \[Strength\]/g);
             expect(matches).toHaveLength(1);
         });
     });

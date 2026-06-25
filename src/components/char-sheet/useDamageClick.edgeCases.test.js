@@ -369,7 +369,7 @@ describe('useDamageClick - edge cases', () => {
             await tick();
 
             const formula = mockRollDamage.mock.calls[0][1];
-            expect(formula).not.toContain('+ 1[Piercing]');
+            expect(formula).not.toContain('+ 1 [Piercing]');
         });
 
         it('does not apply Piercer crit bonus when die match fails', async () => {
@@ -389,7 +389,7 @@ describe('useDamageClick - edge cases', () => {
             await tick();
 
             const formula = mockRollDamage.mock.calls[0][1];
-            expect(formula).not.toContain('+ 1[Piercing]');
+            expect(formula).not.toContain('+ 1 [Piercing]');
         });
     });
 
@@ -461,7 +461,7 @@ describe('useDamageClick - edge cases', () => {
 
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Greataxe',
-                expect.stringContaining('2[radiant]'),
+                expect.stringContaining('2 [radiant]'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -491,7 +491,7 @@ describe('useDamageClick - edge cases', () => {
 
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                expect.stringContaining('2d6[Slashing]'),
+                expect.stringContaining('2d6 [Slashing]'),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),
@@ -517,7 +517,7 @@ describe('useDamageClick - edge cases', () => {
 
             expect(mockRollDamage).toHaveBeenCalledWith(
                 'Longsword',
-                expect.stringContaining('2d6['),
+                expect.stringContaining('2d6 ['),
                 expect.any(Number),
                 expect.any(Array),
                 expect.any(Number),

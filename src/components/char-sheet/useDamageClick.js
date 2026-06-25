@@ -127,7 +127,7 @@ export default function useDamageClick({
                 const ability = playerStats.abilities?.find(a => a.name === attack.abilityName);
                 const abilityMod = ability?.bonus || 0;
                 if (abilityMod > 0 && !formula.match(new RegExp(`\\+${abilityMod}\\[${attack.abilityName}\\]`))) {
-                    formula += ` + ${abilityMod}[${attack.abilityName}]`;
+                    formula += ` + ${abilityMod} [${attack.abilityName}]`;
                     total += abilityMod;
                     rolls = [...rolls, abilityMod];
                 }
@@ -141,7 +141,7 @@ export default function useDamageClick({
             const riderResult = rollExpression(te.damageExpression);
             if (riderResult) {
                 const dmgType = te.damageType || attack.damageType || 'same_as_weapon';
-                formula += ` + ${te.damageExpression}[${dmgType}]`;
+                formula += ` + ${te.damageExpression} [${dmgType}]`;
                 total += riderResult.total;
                 rolls = [...rolls, ...riderResult.rolls];
             }
@@ -152,7 +152,7 @@ export default function useDamageClick({
         if (feintDieValue && Number(feintDieValue) > 0) {
             const feintVal = Number(feintDieValue);
             const dmgType = attack.damageType || 'same_as_weapon';
-            formula += ` + ${feintVal}[${dmgType}]`;
+            formula += ` + ${feintVal} [${dmgType}]`;
             total += feintVal;
             rolls = [...rolls, feintVal];
             await setRuntimeValue(playerStats.name, 'feintingAttackDieValue', null, campaignName);
@@ -163,7 +163,7 @@ export default function useDamageClick({
         if (riposteDieValue && Number(riposteDieValue) > 0) {
             const riposteVal = Number(riposteDieValue);
             const dmgType = attack.damageType || 'same_as_weapon';
-            formula += ` + ${riposteVal}[${dmgType}]`;
+            formula += ` + ${riposteVal} [${dmgType}]`;
             total += riposteVal;
             rolls = [...rolls, riposteVal];
             await setRuntimeValue(playerStats.name, 'pendingRiposteDieValue', null, campaignName);
@@ -176,7 +176,7 @@ export default function useDamageClick({
             if (lungingDieValue && Number(lungingDieValue) > 0) {
                 const lungingVal = Number(lungingDieValue);
                 const dmgType = attack.damageType || 'same_as_weapon';
-                formula += ` + ${lungingVal}[${dmgType}]`;
+                formula += ` + ${lungingVal} [${dmgType}]`;
                 total += lungingVal;
                 rolls = [...rolls, lungingVal];
                 await setRuntimeValue(playerStats.name, 'lungingAttackDieValue', null, campaignName);
@@ -188,7 +188,7 @@ export default function useDamageClick({
         if (csBonus && Number(csBonus) > 0) {
             const csVal = Number(csBonus);
             const dmgType = attack.damageType || 'same_as_weapon';
-            formula += ` + ${csVal}[${dmgType}]`;
+            formula += ` + ${csVal} [${dmgType}]`;
             total += csVal;
             rolls = [...rolls, csVal];
             await setRuntimeValue(playerStats.name, 'commanderStrikeBonus', null, campaignName);
@@ -204,7 +204,7 @@ export default function useDamageClick({
             for (const bonus of hitBonuses) {
                 const bonusResult = rollExpression(bonus.damageExpression);
                 if (bonusResult) {
-                    formula += ` + ${bonus.damageExpression}[${bonus.damageType}]`;
+                    formula += ` + ${bonus.damageExpression} [${bonus.damageType}]`;
                     total += bonusResult.total;
                     rolls = [...rolls, ...bonusResult.rolls];
                 }
@@ -219,7 +219,7 @@ export default function useDamageClick({
                 if (bonusResult) {
                     const elemOption = getRuntimeValue(playerStats.name, '_Elemental_Attunement_option', campaignName);
                     const damageType = elemOption ? elemOption.toLowerCase() : 'fire';
-                    formula += ` + ${bonus.damageExpression}[${damageType}]`;
+                    formula += ` + ${bonus.damageExpression} [${damageType}]`;
                     total += bonusResult.total;
                     rolls = [...rolls, ...bonusResult.rolls];
                 }
@@ -239,7 +239,7 @@ export default function useDamageClick({
                         }
                         const bonusResult = rollExpression(bonus.damageExpression);
                         if (bonusResult) {
-                            formula += ` + ${bonus.damageExpression}[${dmgType}]`;
+                            formula += ` + ${bonus.damageExpression} [${dmgType}]`;
                             total += bonusResult.total;
                             rolls = [...rolls, ...bonusResult.rolls];
                         }
@@ -267,7 +267,7 @@ export default function useDamageClick({
                             expr = expr.replace(/rage_damage/g, rageDamage);
                             const bonusResult = rollExpression(expr);
                             if (bonusResult) {
-                                formula += ` + ${expr}[${bonus.damageType}]`;
+                                formula += ` + ${expr} [${bonus.damageType}]`;
                                 total += bonusResult.total;
                                 rolls = [...rolls, ...bonusResult.rolls];
                             }
@@ -307,7 +307,7 @@ export default function useDamageClick({
                                 setDivineFuryChoice(damageType);
                                 return;
                             } else {
-                                formula += ` + ${expr}[${damageType}]`;
+                                formula += ` + ${expr} [${damageType}]`;
                                 total += bonusResult.total;
                                 rolls = [...rolls, ...bonusResult.rolls];
                             }
@@ -324,7 +324,7 @@ export default function useDamageClick({
             for (const rider of hitRiders) {
                 const riderResult = rollExpression(rider.damageExpression);
                 if (riderResult) {
-                    formula += ` + ${rider.damageExpression}[${rider.damageType || 'same_as_weapon'}]`;
+                    formula += ` + ${rider.damageExpression} [${rider.damageType || 'same_as_weapon'}]`;
                     total += riderResult.total;
                     rolls = [...rolls, ...riderResult.rolls];
                 }
@@ -379,7 +379,7 @@ export default function useDamageClick({
                         });
                         return;
                     } else {
-                        formula += ` + ${bonus.damageExpression}[${damageType}]`;
+                    formula += ` + ${bonus.damageExpression} [${damageType}]`;
                         total += bonusResult.total;
                         rolls = [...rolls, ...bonusResult.rolls];
                     }
@@ -418,7 +418,7 @@ export default function useDamageClick({
                     const extraDamageType = bonus.extraDamageType === 'same_as_attack' ? (attack.damageType || '') : (bonus.extraDamageType || bonus.damageType || '');
                     const extraResult = rollExpression(String(extraDamageExpr));
                     if (extraResult) {
-                        formula += ` + ${extraDamageExpr}[${extraDamageType || 'same_as_attack'}]`;
+                        formula += ` + ${extraDamageExpr} [${extraDamageType || 'same_as_attack'}]`;
                         total += extraResult.total;
                         rolls = [...rolls, ...extraResult.rolls];
                     }
@@ -444,7 +444,7 @@ export default function useDamageClick({
                     if (!transformationRider.oncePerTurn || usedRound !== currentRound) {
                         const bonusResult = rollExpression(transformationRider.damageExpression);
                         if (bonusResult) {
-                            formula += ` + ${transformationRider.damageExpression}[${transformationRider.damageType || ''}]`;
+                            formula += ` + ${transformationRider.damageExpression} [${transformationRider.damageType || ''}]`;
                             total += bonusResult.total;
                             rolls = [...rolls, ...bonusResult.rolls];
                         }
@@ -470,7 +470,7 @@ export default function useDamageClick({
                         const bonusResult = rollExpression(assassinateBonus.damageExpression);
                         if (bonusResult) {
                             const damageType = assassinateBonus.damageType || 'Sneak Attack';
-                            formula += ` + ${assassinateBonus.damageExpression}[${damageType}]`;
+                            formula += ` + ${assassinateBonus.damageExpression} [${damageType}]`;
                             total += bonusResult.total;
                             rolls = [...rolls, ...bonusResult.rolls];
                         }
@@ -672,7 +672,7 @@ export default function useDamageClick({
                     if (usedRound !== currentRound) {
                         const colossusResult = rollExpression('1d8');
                         if (colossusResult) {
-                            formula += ` + 1d8[extra]`;
+                            formula += ` + 1d8 [extra]`;
                             total += colossusResult.total;
                             rolls = [...rolls, ...colossusResult.rolls];
                             setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
@@ -698,7 +698,7 @@ export default function useDamageClick({
                     if (superiorUsedRound !== currentRound) {
                         const superiorResult = rollExpression('1d6');
                         if (superiorResult) {
-                            const spreadFormula = `1d6[Superior Hunters Prey]`;
+                            const spreadFormula = `1d6 [Superior Hunters Prey]`;
                             const spreadDamageType = 'Force';
                             const primaryTargetName = cs ? getTargetFromAttacker(cs, playerStats.name)?.name : null;
 
@@ -1027,7 +1027,7 @@ export default function useDamageClick({
                             if (numDice > 0 && dieSize > 0) {
                                 const extraDieSize = dieSize;
                                 const extraDieRoll = Math.floor(Math.random() * extraDieSize) + 1;
-                                formula += ` + 1[${attack.damageType}]`;
+                                formula += ` + 1 [${attack.damageType}]`;
                                 total += extraDieRoll;
                                 rolls = [...rolls, extraDieRoll];
                             }
@@ -1114,7 +1114,7 @@ export default function useDamageClick({
                     const wis = playerStats.abilities?.find(a => a.name === 'Wisdom');
                     const wisMod = Math.max(0, wis?.bonus || 0);
                     if (wisMod > 0) {
-                        formula += ` + ${wisMod}[Cantrip]`;
+                        formula += ` + ${wisMod} [Cantrip]`;
                         total += wisMod;
                     }
                     if (bonus.tempHpExpression) {
@@ -1225,7 +1225,7 @@ export default function useDamageClick({
                     if (chosenOption && chosenOption.effect === 'damage_bonus') {
                         const riderResult = rollExpression(chosenOption.damageExpression);
                         if (riderResult) {
-                            formula += ` + ${chosenOption.damageExpression}[${chosenOption.damageType || 'same_as_weapon'}]`;
+                            formula += ` + ${chosenOption.damageExpression} [${chosenOption.damageType || 'same_as_weapon'}]`;
                             total += riderResult.total;
                             rolls = [...rolls, ...riderResult.rolls];
                         }
@@ -1310,7 +1310,7 @@ export default function useDamageClick({
                     const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
                     const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
                     const dmgType = attack.damageType || 'same_as_weapon';
-                    updatedFormula += ` + ${dieValue}[${dmgType}]`;
+                    updatedFormula += ` + ${dieValue} [${dmgType}]`;
                     updatedTotal += dieValue;
                     updatedRolls = [...updatedRolls, dieValue];
                 }

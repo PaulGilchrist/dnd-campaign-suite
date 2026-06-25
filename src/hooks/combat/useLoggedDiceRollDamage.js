@@ -1160,7 +1160,7 @@ export function createLogDamageAndShow(deps) {
         if (feintDieValue && Number(feintDieValue) > 0) {
             const feintVal = Number(feintDieValue);
             const dmgType = context?.damageType || 'same_as_weapon';
-            formula += ` + ${feintVal}[${dmgType}]`;
+            formula += ` + ${feintVal} [${dmgType}]`;
             total += feintVal;
             rolls = [...rolls, feintVal];
             setRuntimeValue(characterName, 'feintingAttackDieValue', null, campaignName);
@@ -1171,7 +1171,7 @@ export function createLogDamageAndShow(deps) {
         if (csBonus && Number(csBonus) > 0) {
             const csVal = Number(csBonus);
             const dmgType = context?.damageType || 'same_as_weapon';
-            formula += ` + ${csVal}[${dmgType}]`;
+            formula += ` + ${csVal} [${dmgType}]`;
             total += csVal;
             rolls = [...rolls, csVal];
             setRuntimeValue(characterName, 'commanderStrikeBonus', null, campaignName);
