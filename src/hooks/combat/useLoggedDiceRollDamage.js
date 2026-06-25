@@ -1166,6 +1166,19 @@ export function createLogDamageAndShow(deps) {
             setRuntimeValue(characterName, 'feintingAttackDieValue', null, campaignName);
         }
 
+        // Apply Commander's Strike superiority die damage bonus (from ally)
+        const csBonus = getRuntimeValue(characterName, 'commanderStrikeBonus');
+        if (csBonus && Number(csBonus) > 0) {
+            const csVal = Number(csBonus);
+            const dmgType = context?.damageType || 'same_as_weapon';
+            formula += ` + ${csVal}[${dmgType}]`;
+            total += csVal;
+            rolls = [...rolls, csVal];
+            setRuntimeValue(characterName, 'commanderStrikeBonus', null, campaignName);
+            setRuntimeValue(characterName, 'commanderStrikeActive', null, campaignName);
+            setRuntimeValue(characterName, 'commanderStrikeSource', null, campaignName);
+        }
+
         const { saveDc, saveType, damageType, isAutoMiss } = context || {};
         const adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
 

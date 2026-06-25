@@ -648,6 +648,12 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: "Commander's Strike", actionType: 'grant_attack', damageBonus: true },
         ]);
+        damageUtils.getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'TestFighter' },
+                { name: 'AllyRogue' },
+            ],
+        });
 
         const result = await onCombatSuperioritySelected(
             makeAction(),
@@ -657,8 +663,11 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
             "Commander's Strike"
         );
 
-        expect(result.payload.description).toContain('Reaction to make an attack');
-        expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('commanderStrikeChoice');
+        expect(result.payload.dieValue).toBe(DIE_ROLL_TOTAL);
+        expect(result.payload.options.length).toBe(1);
+        expect(result.payload.options[0].value).toBe('AllyRogue');
     });
 
     it('returns modal for ac_bonus_and_swap effect with self and ally options', async () => {

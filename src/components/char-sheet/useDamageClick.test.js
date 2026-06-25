@@ -952,6 +952,7 @@ describe('useDamageClick', () => {
             };
             getRuntimeValue.mockReturnValueOnce(null) // feintingAttackDieValue check
                 .mockReturnValueOnce(null) // lungingAttackDieValue check
+                .mockReturnValueOnce(null) // commanderStrikeBonus check
                 .mockReturnValueOnce(null) // _Divine_Strike_usedRound check -> returns 1
                 .mockReturnValueOnce(null); // optionKey check
             // Actually the code does: getRuntimeValue(playerStats.name, usedKey, campaignName) where usedKey = '_Divine_Strike_usedRound'

@@ -1026,21 +1026,40 @@ export async function executeGrantAttackManeuver(action, playerStats, campaignNa
         await setRuntimeValue(playerStats.name, 'superiorityDice', superiorityDice - 1, campaignName);
     }
 
+    const cs = await getCombatContext(campaignName);
+    const allies = (cs?.creatures || []).filter(c => c.name !== playerStats.name);
+    const options = allies.map(a => ({ label: a.name, value: a.name }));
+
+    if (options.length === 0) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: maneuver.name,
+                description: `${maneuver.name}: No allies available to receive the attack.`,
+            },
+        };
+    }
+
     const logEntry = {
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name}. Superiority die rolled ${dieValue}. An ally can use their Reaction to make an attack, adding ${dieValue} to the damage roll.`,
+        description: `Used ${maneuver.name}. Superiority die rolled ${dieValue}. Choose an ally to add this to their next attack.`,
     };
     await addEntry(campaignName, logEntry).catch(() => {});
 
-    const description = `<b>${maneuver.name}</b><br/>${dieDescription} An ally can use their Reaction to make an attack, adding ${dieValue} to the damage roll.`;
+    const description = `<b>${maneuver.name}</b><br/>${dieDescription} Choose a willing ally to add ${dieValue} to their next attack's damage roll.`;
 
     return {
-        type: 'popup',
+        type: 'modal',
+        modalName: 'commanderStrikeChoice',
         payload: {
-            type: 'automation_info',
-            name: maneuver.name,
+            playerStats,
+            campaignName,
+            dieValue,
+            maneuverName: maneuver.name,
+            options,
             description,
         },
         logEntries: [logEntry],
@@ -1802,7 +1821,42 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
     }
 
     if (maneuver.actionType === 'grant_attack') {
-        description += ` An ally can use its Reaction to make an attack, adding ${dieValue} to the damage roll.`;
+        description += ` Choose a willing ally to add ${dieValue} to their next attack's damage roll.`;
+        const cs = await getCombatContext(campaignName);
+        const allies = (cs?.creatures || []).filter(c => c.name !== playerStats.name);
+        const options = allies.map(a => ({ label: a.name, value: a.name }));
+
+        if (options.length === 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: maneuver.name,
+                    description: `${maneuver.name}: No allies available to receive the attack.`,
+                    automation: auto,
+                },
+            };
+        }
+
+        const logEntry = {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description,
+        };
+        return {
+            type: 'modal',
+            modalName: 'commanderStrikeChoice',
+            payload: {
+                playerStats,
+                campaignName,
+                dieValue,
+                maneuverName: maneuver.name,
+                options,
+                description,
+            },
+            logEntries: [logEntry],
+        };
     }
 
     if (maneuver.effect === 'ac_bonus_and_swap') {
@@ -2020,6 +2074,45 @@ export async function executeBaitAndSwitchChoice(action, playerStats, campaignNa
     ], campaignName, 1);
 
     const description = `${maneuverName}: ${chosenName} gains +${dieValue} AC until the start of ${playerStats.name}'s next turn.`;
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuverName,
+        description,
+    };
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: maneuverName,
+            description,
+        },
+        logEntries: [logEntry],
+    };
+}
+
+export async function executeCommanderStrikeChoice(action, playerStats, campaignName, chosenName) {
+    if (!chosenName || !playerStats || !campaignName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: "Commander's Strike",
+                description: 'No target selected for Commander\'s Strike damage bonus.',
+            },
+        };
+    }
+
+    const dieValue = action.dieValue;
+    const maneuverName = action.maneuverName || "Commander's Strike";
+
+    await setRuntimeValue(chosenName, 'commanderStrikeActive', true, campaignName);
+    await setRuntimeValue(chosenName, 'commanderStrikeBonus', dieValue, campaignName);
+    await setRuntimeValue(chosenName, 'commanderStrikeSource', maneuverName, campaignName);
+
+    const description = `${maneuverName}: ${chosenName} will add ${dieValue} to their next attack's damage roll.`;
 
     const logEntry = {
         type: 'ability_use',

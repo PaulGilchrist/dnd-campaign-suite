@@ -183,6 +183,19 @@ export default function useDamageClick({
             }
         }
 
+        // Apply Commander's Strike superiority die damage bonus (from ally)
+        const csBonus = getRuntimeValue(playerStats.name, 'commanderStrikeBonus', campaignName);
+        if (csBonus && Number(csBonus) > 0) {
+            const csVal = Number(csBonus);
+            const dmgType = attack.damageType || 'same_as_weapon';
+            formula += ` + ${csVal}[${dmgType}]`;
+            total += csVal;
+            rolls = [...rolls, csVal];
+            await setRuntimeValue(playerStats.name, 'commanderStrikeBonus', null, campaignName);
+            await setRuntimeValue(playerStats.name, 'commanderStrikeActive', null, campaignName);
+            await setRuntimeValue(playerStats.name, 'commanderStrikeSource', null, campaignName);
+        }
+
         // Apply any melee_weapon_hit damage bonus automations (e.g. Radiant Strikes)
         if (isMeleeOrUnarmed && playerStats.automation?.actions) {
             const hitBonuses = playerStats.automation.actions.filter(

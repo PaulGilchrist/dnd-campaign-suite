@@ -132,6 +132,8 @@ export default function CharActionModals({
     handleSweepingAttackConfirm,
     baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
     handleBaitAndSwitchChoiceConfirm,
+    commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
+    handleCommanderStrikeChoiceConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -625,6 +627,54 @@ export default function CharActionModals({
                                 <i className="fa-solid fa-check"></i> Apply AC Bonus
                             </button>
                             <button className="sp-dismiss-btn" onClick={() => setBaitAndSwitchChoiceModal(null)}>Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {commanderStrikeChoiceModal && (
+                <div className="sp-overlay" onClick={() => setCommanderStrikeChoiceModal(null)}>
+                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
+                        <div className="sp-header">
+                            <i className="fa-solid fa-bolt"></i> Commander's Strike — Ally Attack
+                        </div>
+                        <div className="sp-body">
+                            <p>{commanderStrikeChoiceModal.description}</p>
+                            <p style={{ opacity: 0.8 }}>Choose an ally to receive the attack bonus:</p>
+                            <div style={{ textAlign: 'left', marginTop: '12px' }}>
+                                {commanderStrikeChoiceModal.options.map((option, i) => (
+                                    <label
+                                        key={i}
+                                        style={{
+                                            display: 'block', padding: '8px 12px', margin: '4px 0',
+                                            borderRadius: '6px', cursor: 'pointer',
+                                            background: commanderStrikeChoiceModal.selectedTarget === option.value ? 'rgba(255,255,255,0.12)' : 'transparent',
+                                            border: commanderStrikeChoiceModal.selectedTarget === option.value ? '1px solid var(--color-link)' : '1px solid transparent',
+                                        }}
+                                    >
+                                        <input
+                                            type="radio"
+                                            name="commanderStrikeChoice"
+                                            checked={commanderStrikeChoiceModal.selectedTarget === option.value}
+                                            onChange={() => {
+                                                const updated = { ...commanderStrikeChoiceModal, selectedTarget: option.value };
+                                                setCommanderStrikeChoiceModal(updated);
+                                            }}
+                                            style={{ marginRight: '8px' }}
+                                        />
+                                        <strong>{option.label}</strong>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="sp-actions">
+                            <button
+                                className="sp-roll-btn"
+                                disabled={!commanderStrikeChoiceModal.selectedTarget}
+                                onClick={handleCommanderStrikeChoiceConfirm}
+                            >
+                                <i className="fa-solid fa-check"></i> Grant Attack
+                            </button>
+                            <button className="sp-dismiss-btn" onClick={() => setCommanderStrikeChoiceModal(null)}>Cancel</button>
                         </div>
                     </div>
                 </div>

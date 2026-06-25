@@ -33,6 +33,10 @@ export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack,
                 window.dispatchEvent(new CustomEvent('bait-and-switch-modal-show', { detail: result.payload }));
                 return;
             }
+            if (result?.type === 'modal' && result.modalName === 'commanderStrikeChoice') {
+                window.dispatchEvent(new CustomEvent('commander-strike-modal-show', { detail: result.payload }));
+                return;
+            }
             if (result?.effect === 'attack_roll_bonus' && result?.dieValue && rollAttack) {
                 const lastAttackRoll = getRuntimeValue(playerStats.name, 'lastAttackRoll', campaignName);
                 const cs = await loadCombatSummary(campaignName);

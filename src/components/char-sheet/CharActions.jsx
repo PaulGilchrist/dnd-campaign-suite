@@ -256,6 +256,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         attackRiderManeuverPrompt, setAttackRiderManeuverPrompt,
         sweepingAttackTargetModal, setSweepingAttackTargetModal,
         baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
+        commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
         handleCombatSuperiorityConfirm,
@@ -287,6 +288,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         window.addEventListener('bait-and-switch-modal-show', handler);
         return () => window.removeEventListener('bait-and-switch-modal-show', handler);
     }, [setBaitAndSwitchChoiceModal]);
+
+    useEffect(() => {
+        const handler = (event) => {
+            setCommanderStrikeChoiceModal(event.detail);
+        };
+        window.addEventListener('commander-strike-modal-show', handler);
+        return () => window.removeEventListener('commander-strike-modal-show', handler);
+    }, [setCommanderStrikeChoiceModal]);
 
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
@@ -386,6 +395,24 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
         setBaitAndSwitchChoiceModal(null);
     }, [baitAndSwitchChoiceModal, setPopupHtml, setBaitAndSwitchChoiceModal]);
+
+    const handleCommanderStrikeChoiceConfirm = React.useCallback(async () => {
+        if (!commanderStrikeChoiceModal?.selectedTarget) return;
+        const { executeCommanderStrikeChoice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
+        const result = await executeCommanderStrikeChoice(
+            {
+                dieValue: commanderStrikeChoiceModal.dieValue,
+                maneuverName: commanderStrikeChoiceModal.maneuverName,
+            },
+            commanderStrikeChoiceModal.playerStats,
+            commanderStrikeChoiceModal.campaignName,
+            commanderStrikeChoiceModal.selectedTarget
+        );
+        if (result.payload) {
+            setPopupHtml(result.payload);
+        }
+        setCommanderStrikeChoiceModal(null);
+    }, [commanderStrikeChoiceModal, setPopupHtml, setCommanderStrikeChoiceModal]);
 
     async function handleAutomationAction(action) {
         if (cannotAct) return;
@@ -896,6 +923,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleSweepingAttackConfirm={handleSweepingAttackConfirm}
                     baitAndSwitchChoiceModal={baitAndSwitchChoiceModal} setBaitAndSwitchChoiceModal={setBaitAndSwitchChoiceModal}
                     handleBaitAndSwitchChoiceConfirm={handleBaitAndSwitchChoiceConfirm}
+                    commanderStrikeChoiceModal={commanderStrikeChoiceModal} setCommanderStrikeChoiceModal={setCommanderStrikeChoiceModal}
+                    handleCommanderStrikeChoiceConfirm={handleCommanderStrikeChoiceConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}
