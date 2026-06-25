@@ -22,7 +22,7 @@ describe('useHexHover', () => {
             getBoundingClientRect: () => ({ left: 0, top: 0, width: 600, height: 300 }),
             viewBox: { baseVal: { x: 0, y: 0, width: 600, height: 300 } },
             getScreenCTM: () => ({ inverse: () => ({ matrixTransform: (pt) => pt }) }),
-            createSVGPoint: () => ({ x: 0, y: 0, matrixTransform: () => ({ x: 0, y: 0 }) }),
+            createSVGPoint: () => ({ x: 0, y: 0, matrixTransform: (pt) => pt }),
             ...mockAttrs,
         };
         ref.current = baseAttrs;

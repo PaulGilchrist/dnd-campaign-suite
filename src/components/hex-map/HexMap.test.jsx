@@ -358,7 +358,7 @@ describe('HexMap', () => {
             expect(zp.handleWheel).toHaveBeenCalled();
         });
 
-        it('clears hovered hex and calls up handlers on pointer leave', () => {
+        it('clears hovered hex on pointer leave', () => {
             const hh = makeHexHover();
             const zp = makeZoomPan();
             const tp = makeTerrainPainting();
@@ -369,10 +369,10 @@ describe('HexMap', () => {
             usePoiManagement.mockReturnValue(pm);
             render(<HexMap campaignName="test" mapName="test-map" />);
             fireEvent.pointerLeave(document.querySelector('.hex-svg'));
-            expect(zp.handlePanEnd).toHaveBeenCalled();
-            expect(tp.handleTerrainPointerUp).toHaveBeenCalled();
-            expect(pm.handlePoiPointerUp).toHaveBeenCalled();
             expect(hh.setHoveredHex).toHaveBeenCalledWith(null);
+            expect(zp.handlePanEnd).not.toHaveBeenCalled();
+            expect(tp.handleTerrainPointerUp).not.toHaveBeenCalled();
+            expect(pm.handlePoiPointerUp).not.toHaveBeenCalled();
         });
     });
 

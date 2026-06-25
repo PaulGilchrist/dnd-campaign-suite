@@ -354,8 +354,10 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                         onPointerDown={(e) => {
                             if (tool === TOOL_PAINT || tool === TOOL_ERASE || tool === TOOL_RIVER) {
                                 handleTerrainPointerDown(e, tool);
+                                try { svgRef.current.setPointerCapture(e.pointerId); } catch (err) { console.warn('[HexMap] setPointerCapture failed:', err); }
                             } else {
                                 handlePanStart(e);
+                                try { svgRef.current.setPointerCapture(e.pointerId); } catch (err) { console.warn('[HexMap] setPointerCapture failed:', err); }
                             }
                         }}
                         onPointerMove={(e) => {
@@ -364,15 +366,13 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                             handlePoiPointerMove(e);
                             handleHexHover(e);
                         }}
-                        onPointerUp={() => {
+                        onPointerUp={(e) => {
                             handlePanEnd();
                             handleTerrainPointerUp();
                             handlePoiPointerUp();
+                            try { svgRef.current.releasePointerCapture(e.pointerId); } catch (err) { console.warn('[HexMap] releasePointerCapture failed:', err); }
                         }}
                         onPointerLeave={() => {
-                            handlePanEnd();
-                            handleTerrainPointerUp();
-                            handlePoiPointerUp();
                             setHoveredHex(null);
                         }}
                         onWheel={handleWheel}

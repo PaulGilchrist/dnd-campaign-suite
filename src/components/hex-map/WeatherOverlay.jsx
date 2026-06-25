@@ -171,7 +171,7 @@ function CloudEffect() {
             animationDelay: s.delay,
             animationDuration: s.duration,
             width: s.size,
-            height: s.size * 0.4,
+            height: `${s.size * 0.4}px`,
             opacity: s.opacity,
           }}
         />

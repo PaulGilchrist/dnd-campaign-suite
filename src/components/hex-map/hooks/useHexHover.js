@@ -16,19 +16,13 @@ function useHexHover(svgRef, hexCols, hexRows) {
     }, [svgRef]);
 
     const handleHexHover = useCallback((e) => {
-        const svg = svgRef.current;
-        if (!svg) return;
-        const rect = svg.getBoundingClientRect();
-        const vb = svg.viewBox.baseVal;
-        const svgX = (e.clientX - rect.left) / rect.width * vb.width + vb.x;
-        const svgY = (e.clientY - rect.top) / rect.height * vb.height + vb.y;
-        const snapped = pixelToHexSnapped(svgX, svgY, HEX_SIZE);
-        if (snapped.q >= 0 && snapped.q < hexCols && snapped.r >= 0 && snapped.r < hexRows) {
-            setHoveredHex(snapped);
+        const hex = getHexFromEvent(e);
+        if (hex && hex.q >= 0 && hex.q < hexCols && hex.r >= 0 && hex.r < hexRows) {
+            setHoveredHex(hex);
         } else {
             setHoveredHex(null);
         }
-    }, [svgRef, hexCols, hexRows]);
+    }, [getHexFromEvent, hexCols, hexRows]);
 
     return { hoveredHex, setHoveredHex, getHexFromEvent, handleHexHover };
 }
