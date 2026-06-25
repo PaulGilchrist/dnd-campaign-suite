@@ -2,7 +2,7 @@
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { buildAbilityDetailHtml } from '../../hooks/combat/useActionPopup.js';
-import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import './CharAbilities.css'
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
@@ -25,20 +25,9 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
               }
            } catch (_e) { /* ignore */ }
           return 0;
-      };
-
-       const getSkillCheckBonus = () => {
-           const stored = getRuntimeValue(playerStats.name, 'pendingSkillCheckBonus', campaignName);
-           if (!stored) return 0;
-           const bonus = parseInt(stored, 10);
-           if (typeof bonus === 'number' && !isNaN(bonus) && bonus > 0) {
-               setRuntimeValue(playerStats.name, 'pendingSkillCheckBonus', null, campaignName);
-               return bonus;
-           }
-           return 0;
        };
 
-     const getPrimalKnowledgeSkills = () => {
+      const getPrimalKnowledgeSkills = () => {
          const automation = playerStats?.automation;
          return automation?.primalKnowledge || [];
      };
@@ -202,13 +191,12 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
                     <div className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollAbilityCheck(ability.name, ability.bonus - exhaustionPenalty + getCosmicOmenBonus(), makeCheckContext(ability.name))}>{signFormatter.format(ability.bonus - exhaustionPenalty + getCosmicOmenBonus())}</div>
                       <div className={'clickable' + (exhaustionPenalty > 0 || autoFailSave || conditionEffects?.saveDisadvantage?.length > 0 ? ' stat--penalized' : '') + (hasSaveAdvantage(ability.name) ? ' stat--buffed' : '')} onClick={() => !autoFailSave && rollSavingThrow(ability.name, ability.save - exhaustionPenalty + getCosmicOmenBonus(), saveContext)} title={getSaveAdvantageSource()}>{autoFailSave ? 'AUTO FAIL' : signFormatter.format(ability.save - exhaustionPenalty + getCosmicOmenBonus())}{hasSaveAdvantage(ability.name) ? ' (Adv)' : ''}</div>
                     <div className='left'>{ability.skills.map((skill) => {
-                        const skillBonus = getSkillBonus(skill);
-                        const skillCheckBonus = getSkillCheckBonus();
-                        return <span key={skill.name}>
-                            <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skillBonus + getCosmicOmenBonus() + skillCheckBonus, makeCheckContext(skill.name))}>{skill.name} ({signFormatter.format(skillBonus + getCosmicOmenBonus() + skillCheckBonus)})</span>
-                            {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
-                        </span>;
-                    })}</div>
+                         const skillBonus = getSkillBonus(skill);
+                         return <span key={skill.name}>
+                             <span className={'clickable' + (exhaustionPenalty > 0 || conditionEffects?.abilityCheckDisadvantage ? ' stat--penalized' : '')} onClick={() => rollSkillCheck(skill.name, skillBonus + getCosmicOmenBonus(), makeCheckContext(skill.name))}>{skill.name} ({signFormatter.format(skillBonus + getCosmicOmenBonus())})</span>
+                             {ability.skills.indexOf(skill) < ability.skills.length - 1 ? ', ' : ''}
+                         </span>;
+                     })}</div>
                 </div>;
             })}
         </div>

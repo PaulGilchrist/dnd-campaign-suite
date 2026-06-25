@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -11,6 +11,8 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const [strokeResult, setStrokeResult] = useState(null);
     const [luckyAdvantageUsed, setLuckyAdvantageUsed] = useState(false);
     const [luckyDisadvantageUsed, setLuckyDisadvantageUsed] = useState(false);
+    const [superiorityUsed, setSuperiorityUsed] = useState(false);
+    const [superiorityResult, setSuperiorityResult] = useState(null);
 
     const isD20 = type === 'd20';
 
@@ -49,6 +51,19 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
         const newTotal = finalRoll + bonus + modifier + tacticalBonus;
         setTacticalResult({ bonus: tacticalBonus, total: newTotal });
         setTacticalUsed(true);
+    };
+
+    const handleSuperiorityManeuver = async (maneuver) => {
+        if (!onSuperiorityManeuver) return;
+        try {
+            const dieResult = Math.floor(Math.random() * 12) + 1;
+            const newTotal = finalRoll + bonus + modifier + dieResult;
+            setSuperiorityResult({ dieValue: dieResult, maneuverName: maneuver.name, total: newTotal });
+            setSuperiorityUsed(true);
+            await onSuperiorityManeuver(maneuver.name, dieResult);
+        } catch (e) {
+            console.error('[DiceRollResult] Superiority maneuver failed:', e);
+        }
     };
 
     const saveAbilityLabel = saveType ? saveType.toUpperCase() : '';
@@ -264,6 +279,16 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
               </div>
             )}
 
+            {availableSuperiorityManeuvers && availableSuperiorityManeuvers.length > 0 && !superiorityUsed && (
+              <div className="dice-roll-reroll">
+                {availableSuperiorityManeuvers.map(m => (
+                  <button key={m.name} className="dice-roll-reroll-btn" onClick={() => handleSuperiorityManeuver(m)} type="button">
+                    <i className="fa-solid fa-bolt"></i> {m.name} (Superiority Die)
+                  </button>
+                ))}
+              </div>
+            )}
+
             {rerollUsed && rerollResult !== null && (
               <div className="dice-roll-reroll-result">
                 <i className="fa-solid fa-rotate"></i> Rerolled: {rerollResult.roll} + {rerollResult.total - rerollResult.roll} = <strong>{rerollResult.total}</strong>
@@ -279,6 +304,12 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             {tacticalUsed && tacticalResult !== null && (
               <div className="dice-roll-reroll-result">
                 <i className="fa-solid fa-hand"></i> Tactical Mind: +{tacticalResult.bonus} = <strong>{tacticalResult.total}</strong>
+              </div>
+            )}
+
+            {superiorityUsed && superiorityResult !== null && (
+              <div className="dice-roll-reroll-result">
+                <i className="fa-solid fa-bolt"></i> {superiorityResult.maneuverName}: d12 {superiorityResult.dieValue} → <strong>{superiorityResult.total}</strong> (+{superiorityResult.dieValue})
               </div>
             )}
 

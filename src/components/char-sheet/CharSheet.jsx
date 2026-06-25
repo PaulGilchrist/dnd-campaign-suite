@@ -442,6 +442,75 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }, [playerStats, campaignName]);
 
+    const handleSuperiorityManeuver = React.useCallback(async (maneuverName, dieValue) => {
+        if (!playerStats) return;
+        try {
+            const { getManeuversForRules: _getManeuversForRules, getSuperiorityDice: _getSuperiorityDice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
+            await _getManeuversForRules(playerStats.rules || '2024');
+            const allManeuvers = await _getManeuversForRules(playerStats.rules || '2024');
+            const maneuver = allManeuvers.find(m => m.name === maneuverName);
+            if (!maneuver) return;
+
+            const superiorityDice = _getSuperiorityDice(playerStats, campaignName);
+            if (superiorityDice <= 0) return;
+
+            await setRuntimeValue(playerStats.name, 'superiorityDice', superiorityDice - 1, campaignName);
+
+            const skillName = popupHtml?.name || 'Ability Check';
+            const oldTotal = popupHtml?.rolls?.[0] + (popupHtml?.bonus || 0);
+            const newTotal = oldTotal + dieValue;
+
+            // Update initiative tracker if this was an initiative roll
+            if (skillName === 'Initiative' || popupHtml?.rollType === 'initiative') {
+                const { loadCombatSummary: _loadCombatSummary } = await import('../../services/encounters/combatData.js');
+                const storage = await import('../../services/ui/storage.js');
+                const cs = await _loadCombatSummary(campaignName);
+                if (cs) {
+                    const creature = cs.creatures.find(
+                        c => c.type === 'player' && c.name === playerStats.name
+                    );
+                    if (creature) {
+                        creature.initiative = String(newTotal);
+                        cs.creatures.sort((a, b) => b.initiative - a.initiative);
+                        storage.default.set('combatSummary', cs, campaignName);
+                    }
+                }
+                window.dispatchEvent(new CustomEvent('initiative-rolled', {
+                    detail: { characterName: playerStats.name, roll: newTotal },
+                }));
+            }
+
+            const logEntry = {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: maneuverName,
+                description: `Used ${maneuverName} on ${skillName} check. Superiority die rolled ${dieValue}. Adjusted total: ${oldTotal} → ${newTotal}.`,
+            };
+
+            // Show result popup
+            const desc = `<b>${maneuverName}</b><br/>Rolled d12 for ${dieValue}.<br/>${skillName}: ${oldTotal} → <b>${newTotal}</b> (+${dieValue})`;
+            setPopupHtml({
+                type: 'automation_info',
+                name: maneuverName,
+                description: desc,
+            });
+
+            // Log to campaign log via API
+            try {
+                const resp = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(logEntry),
+                });
+                if (!resp.ok) console.error('[CharSheet] Failed to log superiority maneuver:', resp.status);
+            } catch (e) {
+                console.error('[CharSheet] Error logging superiority maneuver:', e);
+            }
+        } catch (e) {
+            console.error('[CharSheet] Superiority maneuver execution failed:', e);
+        }
+    }, [playerStats, campaignName, setPopupHtml, popupHtml]);
+
     React.useEffect(() => {
         if (!playerStats) return;
         if (!isRaging) {
@@ -551,7 +620,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                                     ) : null}
                                     <div className="dice-roll-hint">click to dismiss</div>
                                 </div> :
-                            <DiceRollResult {...popupHtml} />
+                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} />
                 }
             </Popup>
         )}

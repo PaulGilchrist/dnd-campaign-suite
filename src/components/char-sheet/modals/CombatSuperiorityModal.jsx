@@ -281,7 +281,7 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
                 </div>
                 <div className="sp-body">
                     <p>{isPrompt ? 'Choose a maneuver to use:' : 'Choose a maneuver to use:'}</p>
-                    {ACTION_TYPE_ORDER.filter(t => (isPrompt && groupedManeuvers[t]) || (!isPrompt && t !== 'attack_rider') && groupedManeuvers[t] && groupedManeuvers[t].some(m => knownManeuvers.includes(m.name))).map(type => (
+                    {ACTION_TYPE_ORDER.filter(t => t !== 'skill_check' && ((isPrompt && groupedManeuvers[t]) || (!isPrompt && t !== 'attack_rider' && groupedManeuvers[t] && groupedManeuvers[t].some(m => knownManeuvers.includes(m.name))))).map(type => (
                         <div key={type} style={{ marginTop: '12px' }}>
                             <h4 style={{ margin: '0 0 4px 0', fontSize: '0.95em', opacity: 0.9 }}>
                                 {ACTION_TYPE_LABELS[type] || type}

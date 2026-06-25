@@ -344,7 +344,10 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
 
         it('resets tandemFootworkBonus to 0 if > 0', async () => {
             getTargetFromAttacker.mockReturnValue(null);
-            getRuntimeValue.mockReturnValue(null).mockReturnValueOnce(5);
+            getRuntimeValue.mockImplementation((name, prop) => {
+                if (name === 'TestFighter' && prop === 'tandemFootworkBonus') return 5;
+                return null;
+            });
             const fn = createFn();
             await fn('Initiative', 3, 'initiative', {});
             expect(setRuntimeValue).toHaveBeenCalledWith('TestFighter', 'tandemFootworkBonus', 0, 'test-campaign');

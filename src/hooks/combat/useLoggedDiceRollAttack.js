@@ -23,6 +23,20 @@ import {
     getShieldOfFaithAcBonus,
     applyMinDamageAdjustment,
 } from './useLoggedDiceRollUtils.js';
+import { loadManeuvers } from '../../services/ui/dataLoader.js';
+
+const SELECTION_KEY = 'BattleMasterManeuvers_selection';
+
+function getKnownManeuvers(characterName, campaignName) {
+    const stored = getRuntimeValue(characterName, SELECTION_KEY, campaignName);
+    return Array.isArray(stored) ? stored : [];
+}
+
+function getSuperiorityDice(characterName, campaignName) {
+    const usesKey = 'superiorityDice';
+    const defaultMax = 4;
+    return Number(getRuntimeValue(characterName, usesKey, campaignName) ?? defaultMax);
+}
 
 export function createLogAndShow(deps) {
     const { characterName, campaignName, characters, setPopupHtml, logEntry } = deps;
@@ -35,7 +49,40 @@ export function createLogAndShow(deps) {
 
         const combatSummary = await loadCombatSummary(campaignName);
 
+        // Pre-load maneuver cache for skill check / initiative superiority buttons
+        if (rollType === 'check' || rollType === 'skill' || rollType === 'initiative') {
+            const { getManeuversForRules: _getManeuversForRules } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
+            await _getManeuversForRules('2024');
+        }
+
         const explicitTargetName = context?.targetName;
+
+        // Compute available superiority maneuvers for skill/initiative checks
+        let availableSuperiorityManeuvers = null;
+        if (rollType === 'check' || rollType === 'skill' || rollType === 'initiative') {
+            const knownNames = getKnownManeuvers(characterName, campaignName);
+            const superiorityDice = getSuperiorityDice(characterName, campaignName);
+            if (knownNames.length > 0 && superiorityDice > 0) {
+                const allManeuvers = await loadManeuvers('2024');
+                const isInitiative = rollType === 'initiative';
+                const skillName = isInitiative ? 'Initiative' : name;
+                availableSuperiorityManeuvers = allManeuvers.filter(m => {
+                    if (!knownNames.includes(m.name)) return false;
+                    if (m.actionType !== 'skill_check') return false;
+                    if (m.initiativeBonus && isInitiative) return true;
+                    if (m.skills && m.skills.length > 0) {
+                        const skillLower = skillName?.toLowerCase() || '';
+                        return m.skills.some(s => s.toLowerCase().includes(skillLower) || skillLower.includes(s.toLowerCase()));
+                    }
+                    return false;
+                }).map(m => ({
+                    name: m.name,
+                    dieExpression: m.dieExpression || 'superiority_die',
+                    skills: m.skills || [],
+                    isInitiative: !!m.initiativeBonus,
+                }));
+            }
+        }
         let target;
         if (explicitTargetName) {
             const explicitTarget = findCreatureByName(combatSummary, explicitTargetName);
@@ -283,6 +330,9 @@ export function createLogAndShow(deps) {
             defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
             baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
             d20Floor10: context?.d20Floor10,
+            characterName,
+            campaignName,
+            availableSuperiorityManeuvers,
         });
 
         if (rollType === 'attack') {
@@ -668,16 +718,6 @@ export function createLogAndShow(deps) {
                 oldTotal: effectiveD20 + bonus,
                 timestamp: Date.now(),
             }, campaignName);
-
-            setRuntimeValue(characterName, 'pendingCombatSuperiorityPrompt', {
-                rollType: 'skill_check',
-                skillContext: {
-                    skillName: name,
-                    isInitiative: false,
-                    timestamp: Date.now(),
-                },
-                timestamp: Date.now(),
-            }, campaignName);
         }
 
         if (rollType === 'save') {
@@ -769,15 +809,17 @@ export function createLogAndShow(deps) {
             }
             clearAllExpirationEffects(characterName, campaignName);
             setRuntimeValue(characterName, 'uncannyMetabolismUsed', false, campaignName);
-            setRuntimeValue(characterName, 'pendingCombatSuperiorityPrompt', {
-                rollType: 'skill_check',
-                skillContext: {
-                    skillName: 'Initiative',
-                    isInitiative: true,
-                    timestamp: Date.now(),
-                },
-                timestamp: Date.now(),
-            }, campaignName);
+
+            setPopupHtml({
+                type: 'initiative',
+                rollType: 'initiative',
+                name: 'Initiative',
+                rolls: [r1],
+                bonus: totalBonus,
+                characterName,
+                campaignName,
+                availableSuperiorityManeuvers,
+            });
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
         }
     };

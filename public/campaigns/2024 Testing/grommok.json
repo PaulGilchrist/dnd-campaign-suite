@@ -5,8 +5,8 @@
   "abilities": [
     {
       "name": "Strength",
-      "baseScore": 12,
-      "featIncrease": 0,
+      "baseScore": 15,
+      "featIncrease": 1,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
@@ -20,27 +20,27 @@
     {
       "name": "Constitution",
       "baseScore": 15,
-      "featIncrease": 0,
+      "featIncrease": 1,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Intelligence",
-      "baseScore": 9,
+      "baseScore": 8,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Wisdom",
-      "baseScore": 11,
+      "baseScore": 8,
       "featIncrease": 0,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
     {
       "name": "Charisma",
-      "baseScore": 9,
+      "baseScore": 8,
       "featIncrease": 0,
       "backgroundIncrease": 1,
       "miscIncrease": 0
@@ -60,7 +60,14 @@
     ]
   },
   "expertSkills": [],
-  "feats": [],
+  "feats": [
+    "Boon Of Fortitude",
+    "Savage Attacker",
+    "Defense",
+    "Great Weapon Master",
+    "Durable",
+    "Charger"
+  ],
   "fightingStyles": [],
   "race": {
     "name": "Orc",
@@ -80,10 +87,10 @@
       "Waterskin"
     ],
     "equipped": [
-      "Chain Mail",
       "Longbow",
-      "Scimitar",
-      "Scimitar"
+      "Longsword",
+      "Shield",
+      "Plate"
     ],
     "gold": 10,
     "magicItems": []
@@ -111,5 +118,9 @@
   "xp": 0,
   "xpMode": "milestone",
   "imagePath": "campaigns/2024 Testing/images/Grommok.png",
-  "originalFileName": "Grommok.json"
+  "originalFileName": "Grommok.json",
+  "featAbilityChoices": {
+    "0": "Strength",
+    "1": "Strength"
+  }
 }

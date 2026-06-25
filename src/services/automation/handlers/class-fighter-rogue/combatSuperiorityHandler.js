@@ -62,7 +62,7 @@ function setRelentlessUsed(playerStats, campaignName) {
     setRuntimeValue(playerStats.name, 'relentlessUsedRound', currentRound, campaignName);
 }
 
-function getSuperiorityDice(playerStats, campaignName) {
+export function getSuperiorityDice(playerStats, campaignName) {
     const usesKey = 'superiorityDice';
     const defaultMax = 4;
     return Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? defaultMax);
@@ -217,6 +217,16 @@ export function getAvailableSkillCheckManeuvers(playerStats, campaignName, skill
     });
 }
 
+export function getSkillCheckManeuversForSkill(playerStats, campaignName, skillName, isInitiative) {
+    const maneuvers = getAvailableSkillCheckManeuvers(playerStats, campaignName, skillName, isInitiative);
+    return maneuvers.map(m => ({
+        name: m.name,
+        dieExpression: m.dieExpression || 'superiority_die',
+        skills: m.skills || [],
+        isInitiative: !!m.initiativeBonus,
+    }));
+}
+
 export async function handleAttackRiderPrompt(action, playerStats, campaignName, _mapName) {
     const pending = getRuntimeValue(playerStats.name, 'pendingCombatSuperiorityPrompt', campaignName);
     if (!pending || !pending.attackContext) { return null; }
@@ -276,6 +286,8 @@ export async function handleSkillCheckPrompt(action, playerStats, campaignName, 
     const superiorityDice = getSuperiorityDice(playerStats, campaignName);
     if (superiorityDice <= 0) return null;
 
+    await getManeuversForRules(playerStats.rules || '2024');
+
     const available = getAvailableSkillCheckManeuvers(playerStats, campaignName, skillContext?.skillName, skillContext?.isInitiative);
     if (available.length === 0) return null;
 
@@ -319,7 +331,7 @@ function getManeuversByType(playerStats, campaignName, knownNames, actionType, a
 
 const allManeuversCache = new Map();
 
-async function getManeuversForRules(rules) {
+export async function getManeuversForRules(rules) {
     const key = rules || '2024';
     if (!allManeuversCache.has(key)) {
         const maneuvers = await loadManeuvers(key);
@@ -370,7 +382,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     const needsSelection = forceSelectionMode || (known.length < maxOptions && unknownManeuvers.length > 0);
 
-    const nonAttackRiderKnown = known.filter(m => m.actionType !== 'attack_rider');
+    const nonAttackRiderKnown = known.filter(m => m.actionType !== 'attack_rider' && m.actionType !== 'skill_check');
     const hasNonAttackRiderManeuvers = nonAttackRiderKnown.length > 0;
 
     const cs = await getCombatContext(campaignName);
