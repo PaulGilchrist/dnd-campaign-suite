@@ -271,6 +271,7 @@ export function createLogAndShow(deps) {
             secondaryFormula: context.autoDamageSecondaryFormula,
             secondaryDamageType: context.autoDamageSecondaryDamageType,
             ripostePopup: context.ripostePopup,
+            source: characterName,
         } : undefined;
 
         logEntry({

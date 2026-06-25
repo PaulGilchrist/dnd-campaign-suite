@@ -35,13 +35,14 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
 
   useEffect(() => {
     if (activePopupHtml?.hit === true && activePopupHtml?.autoDamage && autoDamageRollRef.current) {
+      if (activePopupHtml.autoDamage.source !== characterName) return;
       const timer = setTimeout(() => {
         const { autoDamage } = activePopupHtml;
         autoDamageRollRef.current(autoDamage, activePopupHtml.isCrit);
       }, SHOW_DICE_ROLL_DELAY);
       return () => clearTimeout(timer);
     }
-  }, [activePopupHtml]);
+  }, [activePopupHtml, characterName]);
 
   const logAndShow = createLogAndShow({
     characterName, campaignName, characters, setPopupHtml, logEntry,
