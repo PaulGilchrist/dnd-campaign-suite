@@ -38,7 +38,8 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
     const hasSuperiorityDice = (() => {
         if (!playerStats?.name) return true;
         const dice = getRuntimeValue(playerStats.name, 'superiorityDice');
-        return dice != null && Number(dice) > 0;
+        const value = dice != null ? Number(dice) : (playerStats._trackedResources?.superiorityDice?.current || 0);
+        return value > 0;
     })();
 
     const toggleSelection = (maneuverName) => {
