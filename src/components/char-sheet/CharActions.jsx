@@ -16,7 +16,6 @@ import CharActionModals from './CharActionModals.jsx'
 import CharActionSpellPopups from './CharActionSpellPopups.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
 import { executeHandler } from '../../services/automation/index.js';
-import { onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { onSpellSelected as onDivineInterventionSpellSelected } from '../../services/automation/handlers/class-cleric-paladin/divineInterventionHandler.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -35,6 +34,7 @@ import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../s
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
+
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
@@ -257,9 +257,10 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         sweepingAttackTargetModal, setSweepingAttackTargetModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
+        handleCombatSuperiorityConfirm,
     } = useCharActionModals({
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
-        popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
+        popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
     });
 
     useEffect(() => {
@@ -641,27 +642,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         }
     }, [divineInterventionAction, playerStats, campaignName, rollAttack, rollDamage, mapName, setPopupHtml, setDivineInterventionModal, setDivineInterventionAction, characters]);
 
-    const handleCombatSuperiorityConfirm = React.useCallback(async (selectedManeuverNames, singleUseManeuverName) => {
-        console.log('[Riposte] handleCombatSuperiorityConfirm called', { selectedManeuverNames, singleUseManeuverName, hasAction: !!combatSuperiorityModal?.action });
-        const action = combatSuperiorityModal?.action;
-        if (!action) {
-            console.log('[Riposte] No action found, returning early');
-            return;
-        }
-
-        const result = await onCombatSuperioritySelected(action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
-        console.log('[Riposte] onCombatSuperioritySelected result', result);
-        setCombatSuperiorityModal(null);
-        if (result?.type === 'popup') {
-            console.log('[Riposte] Showing popup');
-            setPopupHtml(result.payload);
-        }
-        if (result?.type === 'attack_roll') {
-            const { attack, targetName } = result.payload;
-            console.log('[Riposte] Firing attack roll', { attackName: attack.name, hitBonus: attack.hitBonus, targetName });
-            rollAttack(attack.name, attack.hitBonus, { targetName, forcedMode: undefined, isOpportunityAttack: true });
-        }
-    }, [combatSuperiorityModal, playerStats, campaignName, setCombatSuperiorityModal, setPopupHtml, rollAttack]);
 
     const getWeaponMastery = (weaponName) => {
         if (playerStats.rules !== '2024') {

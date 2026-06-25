@@ -1952,6 +1952,8 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
 
     return {
         type: 'popup',
+        effect: maneuver.effect,
+        dieValue,
         payload: {
             type: 'automation_info',
             name: maneuver.name,

@@ -89,12 +89,14 @@ export default function useDamageClick({
         // Precision Attack: if attack missed, offer to add superiority die to the attack roll
         const isMiss = popupHtml?.hit === false && popupHtml?.isCrit !== true;
         if (isMiss && setAttackRiderManeuverPrompt) {
+            console.log('[PrecisionAttack] isMiss detected. playerStats.name=', playerStats?.name, 'popupHtml.targetAc=', popupHtml?.targetAc, 'popupHtml.bonus=', popupHtml?.bonus, 'popupHtml.rolls=', popupHtml?.rolls);
             const attackInfo = {
                 weaponType: attack.weaponType,
                 isUnarmedStrike: attack.weaponType === 'unarmed',
                 targetName: popupHtml?.targetName || null,
             };
             const availableManeuvers = await getAttackRiderOptionsByContext(playerStats, campaignName, attackInfo, 'miss');
+            console.log('[PrecisionAttack] availableManeuvers=', availableManeuvers?.map(m => m.name));
             if (availableManeuvers.length > 0) {
                 setAttackRiderManeuverPrompt({
                     maneuvers: availableManeuvers,
@@ -1234,7 +1236,9 @@ export default function useDamageClick({
         proceedWithDamage(attack, formula, total, rolls, modifier);
     };
 
-    const handleAttackRiderManeuverUse = async (maneuverName, attack, popupHtmlData, currentFormula, currentTotal, currentRolls) => {
+    const handleAttackRiderManeuverUse = async (maneuver, attack, popupHtmlData, currentFormula, currentTotal, currentRolls) => {
+        const maneuverName = maneuver?.name || maneuver;
+        console.log(`[PrecisionAttack] handleAttackRiderManeuverUse called: maneuver=${maneuverName}, isMiss=${popupHtmlData?.isMiss}, popupHtml keys=${popupHtml ? Object.keys(popupHtml).join(',') : 'null'}, popupHtmlData keys=${popupHtmlData ? Object.keys(popupHtmlData).join(',') : 'null'}`);
         const attackInfo = {
             weaponType: attack.weaponType,
             isUnarmedStrike: attack.weaponType === 'unarmed',
@@ -1248,24 +1252,23 @@ export default function useDamageClick({
         let updatedRolls = [...currentRolls];
 
         if (popupHtmlData?.isMiss && popupHtml) {
-            const maneuver = popupHtmlData?.maneuvers?.find(m => m.name === maneuverName);
-            if (maneuver) {
+            console.log(`[PrecisionAttack] isMiss branch entered. maneuver.effect=${maneuver?.effect}, maneuver=`, maneuver);
+            if (maneuver && maneuver.effect === 'attack_roll_bonus') {
                 const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
                 const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
-                const origTotal = popupHtml.total || 0;
-                const origD20 = popupHtml.d20Roll || 0;
-                const newD20 = origD20 + dieValue;
-                const hitBonus = popupHtml.hitBonus || 0;
-                const newTotal = newD20 + hitBonus;
-                const targetAC = popupHtml.targetAC || 10;
+                const origD20 = (popupHtml.rolls?.[0] != null && popupHtml.rolls[0] !== 20) ? popupHtml.rolls[0] : (popupHtml.rolls?.[0] || 0);
+                const origBonus = popupHtml.bonus || 0;
+                const origTotal = origD20 + origBonus;
+                const newTotal = origTotal + dieValue;
+                const targetAC = popupHtml.targetAc || 10;
                 const newHit = newTotal >= targetAC;
-                const isNatural20 = newD20 === 20;
+                const isNatural20 = origD20 === 20;
                 const wasCrit = popupHtml.isCrit;
+                console.log(`[PrecisionAttack] dieValue=${dieValue}, origD20=${origD20}, origBonus=${origBonus}, newTotal=${newTotal}, targetAC=${targetAC}, newHit=${newHit}`);
 
                 const updatedPopup = {
                     ...popupHtml,
                     total: newTotal,
-                    d20Roll: newD20,
                     hit: newHit,
                     isCrit: isNatural20 || wasCrit,
                     isNatural20: isNatural20,
@@ -1274,7 +1277,7 @@ export default function useDamageClick({
                     originalD20: origD20,
                 };
 
-                const dieDesc = `Precision Attack: Added ${dieValue} to the attack roll (${origD20} + ${dieValue} = ${newD20}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
+                const dieDesc = `Precision Attack: Added ${dieValue} to the attack roll (${origD20} + ${origBonus} + ${dieValue} = ${newTotal}). ${newHit ? 'The attack now hits!' : 'The attack still misses.'}`;
 
                 setAttackRiderManeuverPrompt(null);
                 setPopupHtml(updatedPopup);
@@ -1290,7 +1293,6 @@ export default function useDamageClick({
             }
         } else {
             if (result?.type === 'popup') {
-                const maneuver = popupHtmlData?.maneuvers?.find(m => m.name === maneuverName);
                 if (maneuver?.damageBonus) {
                     const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
                     const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);

@@ -158,14 +158,14 @@ describe('AttackRiderManeuverPrompt - selection behavior', () => {
 // ── Use maneuver flow ──
 
 describe('AttackRiderManeuverPrompt - use maneuver', () => {
-    it('calls onUse with maneuver name, attack, and popupHtml when Use Maneuver is clicked', async () => {
+    it('calls onUse with selected maneuver, attack, and popupHtml when Use Maneuver is clicked', async () => {
         const onUse = vi.fn().mockResolvedValue(null);
         renderPrompt({ onUse });
         const radios = document.querySelectorAll('input[name="attackRiderManeuver"]');
         fireEvent.click(radios[0]);
         fireEvent.click(screen.getByRole('button', { name: /Use Maneuver/ }));
         await waitFor(() => {
-            expect(onUse).toHaveBeenCalledWith('Disarming Attack', baseAttack, basePopupHtml);
+            expect(onUse).toHaveBeenCalledWith(baseManeuvers[0], baseAttack, basePopupHtml);
         });
     });
 

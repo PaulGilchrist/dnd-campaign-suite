@@ -13,7 +13,7 @@
     "image": "",
     "imageName": "",
     "imagePath": "campaigns/2024 Testing/images/Elder Kito.png",
-    "armorClass": 15,
+    "armorClass": 30,
     "hitPoints": "45",
     "hitDice": "6d8",
     "initiativeBonus": "0",

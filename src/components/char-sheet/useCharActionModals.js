@@ -1,10 +1,11 @@
 import { useState, useRef } from 'react'
 import useDamageClick from './useDamageClick.js';
 import useModalHandlers from './useModalHandlers.js';
+import { useCombatSuperiorityModal } from '../../hooks/combat/useCombatSuperiorityModal.js';
 
 export default function useCharActionModals({
     playerStats, campaignName, mapName,
-    popupHtml, setPopupHtml, rollDamage, buildCtx, buildCtxSync,
+    popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
 }) {
     const [healingPoolModal, setHealingPoolModal] = useState(null);
     const [handOfHealingModal, setHandOfHealingModal] = useState(null);
@@ -55,7 +56,6 @@ export default function useCharActionModals({
     const [giantAncestryModal, setGiantAncestryModal] = useState(null);
     const [hypnoticPatternShakeModal, setHypnoticPatternShakeModal] = useState(null);
     const [arcaneWardRestoreModal, setArcaneWardRestoreModal] = useState(null);
-    const [combatSuperiorityModal, setCombatSuperiorityModal] = useState(null);
     const [eyebiteEffectModal, setEyebiteEffectModal] = useState(null);
     const [divineFuryChoice, setDivineFuryChoice] = useState(null);
     const [damageTypeChoice, setDamageTypeChoice] = useState(null);
@@ -74,6 +74,13 @@ export default function useCharActionModals({
         setSweepingAttackTargetModal,
         pendingDamageRef,
     });
+
+    const {
+        combatSuperiorityModal,
+        setCombatSuperiorityModal,
+        handleCombatSuperiorityConfirm,
+        handleCombatSuperiorityReopenSelection,
+    } = useCombatSuperiorityModal(playerStats, campaignName, rollAttack, rollDamage, setPopupHtml);
 
     const {
         handleMasteryClose,
@@ -158,6 +165,8 @@ export default function useCharActionModals({
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
         arcaneWardRestoreModal, setArcaneWardRestoreModal,
         combatSuperiorityModal, setCombatSuperiorityModal,
+        handleCombatSuperiorityConfirm,
+        handleCombatSuperiorityReopenSelection,
         eyebiteEffectModal, setEyebiteEffectModal,
         divineFuryChoice, setDivineFuryChoice,
         damageTypeChoice, setDamageTypeChoice,

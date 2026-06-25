@@ -5,9 +5,13 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
 
+    const selectedManeuver = maneuvers.find(m => m.name === selected);
+
     const handleUse = async () => {
         if (!selected) return;
-        const res = await onUse(selected, attack, popupHtml);
+        console.log('[AttackRiderManeuverPrompt] handleUse: selected=', selected, 'selectedManeuver=', selectedManeuver, 'popupHtml keys=', popupHtml ? Object.keys(popupHtml) : 'null');
+        const res = await onUse(selectedManeuver, attack, popupHtml);
+        console.log('[AttackRiderManeuverPrompt] onUse returned:', res);
         setResult(res);
         setApplied(true);
     };

@@ -23,13 +23,14 @@ function CombatSuperiorityModal({ payload, onConfirm, onReopenSelection, onClose
         skillContext,
         lastAttack,
         playerStats,
-    } = payload;
-
+    } = payload || {};
 
     const [selectedForSelection, setSelectedForSelection] = useState(knownManeuvers || []);
     const [selectedForUse, setSelectedForUse] = useState(null);
     const [applied, setApplied] = useState(false);
     const [result, setResult] = useState(null);
+
+    if (!payload) return null;
 
     const isPromptMode = !!attackContext || !!skillContext;
     const isPrompt = isPromptMode;
