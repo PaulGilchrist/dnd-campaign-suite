@@ -390,7 +390,7 @@ function HexMap({ campaignName, mapName, onBack, characters = [], onEncounterCre
                                 if (!hex) return;
                                 if (hex.q < 0 || hex.q >= hexCols || hex.r < 0 || hex.r >= hexRows) return;
                                 if (hex.q === partyPosition.q && hex.r === partyPosition.r) return;
-                                if (!travelMgmt.isTravelActive || travelMgmt.travelMode === travelMgmt.MODES.INACTIVE) {
+                                if (!travelMgmt.isTravelActive) {
                                     travelMgmt.startPlanning();
                                 }
                                 travelMgmt.setDestinationAndPath(hex);

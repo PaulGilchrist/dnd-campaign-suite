@@ -310,6 +310,7 @@ export default function useTravelManagement({
     exhaustionMultiplier: getExhaustionMultiplierPercent(forcedMarchHours),
     partyHasMaxExhaustion: partyHasMaxExhaustion(),
     isTravelActive,
+    MODES,
     startPlanning,
     cancelTravel,
     setDestinationAndPath,
