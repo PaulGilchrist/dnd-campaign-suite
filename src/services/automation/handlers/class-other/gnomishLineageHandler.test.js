@@ -1,4 +1,4 @@
-@improved-by-ai
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
     handle,
@@ -16,7 +16,7 @@ vi.mock('../../../../hooks/runtime/useRuntimeState.js', () => ({
     setRuntimeValue: vi.fn(),
 }));
 
-const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime useRuntimeState.js');
+const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -134,6 +134,7 @@ describe('gnomishLineageHandler', () => {
             const calls = setRuntimeValue.mock.calls;
             expect(calls[0][2]).toBe('Forest Gnome');
 
+            setRuntimeValue.mockClear();
             await confirmGnomishLineage(makePlayerStats(), 'Rock Gnome', 'test-campaign');
             const calls2 = setRuntimeValue.mock.calls;
             expect(calls2[0][2]).toBe('Rock Gnome');

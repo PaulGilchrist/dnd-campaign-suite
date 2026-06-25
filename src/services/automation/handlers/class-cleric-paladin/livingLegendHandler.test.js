@@ -146,10 +146,10 @@ describe('livingLegendHandler', () => {
       );
     });
 
-    it('uses custom automation type in payload', async () => {
+    it('uses automation type from action.automation.type in payload', async () => {
       getRuntimeValue.mockReturnValue(undefined);
 
-      const action = makeAction({ type: 'custom_legend' });
+      const action = makeAction({ automation: { type: 'custom_legend' } });
       const result = await handle(action, makePlayerStats(), campaignName, null);
 
       expect(result.payload.automationType).toBe('custom_legend');

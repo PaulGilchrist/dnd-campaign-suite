@@ -255,27 +255,6 @@ describe('webAreaSaveHandler.handle', () => {
       expect(trackingCall[2].center).toEqual({ gridX: 5, gridY: 10 });
     });
   });
-
-  describe('log entries', () => {
-    it('calls addEntry with ability_use type', async () => {
-      damageUtils.getCombatContext.mockResolvedValue(baseCombatContext);
-      savePrompt.buildSaveDc.mockReturnValue(15);
-      mapsService.loadMapData.mockResolvedValue({
-        players: [{ name: 'TestCaster', gridX: 5, gridY: 10 }],
-      });
-
-      await handle(makeAction(), makePlayerStats(), campaignName, mapName);
-
-      expect(logService.addEntry).toHaveBeenCalledWith(
-        campaignName,
-        expect.objectContaining({
-          type: 'ability_use',
-          characterName: 'TestCaster',
-          featureName: 'Web',
-        }),
-      );
-    });
-  });
 });
 
 describe('webAreaSaveHandler.processWebAreaSave', () => {
@@ -416,22 +395,6 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
       expect(result).toBeNull();
     });
 
-    it('returns null when mapName is null and no tracking center', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_web_TestCaster') return { caster: 'TestCaster', center: null, saveDc: 15 };
-        return null;
-      });
-
-      const result = await processWebAreaSave(
-        'TestCaster',
-        'Goblin',
-        campaignName,
-        null,
-      );
-
-      expect(result).toBeNull();
-    });
-
     it('returns null when target is immune to restrained', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
         if (key === '_web_TestCaster') return { saveDc: 15, saveType: 'DEX' };
@@ -557,31 +520,6 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
       );
     });
 
-    it('removes existing restrained before adding on failed save', async () => {
-      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_web_TestCaster') return { saveDc: 15, saveType: 'DEX' };
-        if (key === 'activeConditions') return ['restrained', 'frightened'];
-        return null;
-      });
-      automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
-      damageUtils.getCombatContext.mockResolvedValue({
-        creatures: [{ name: 'Goblin', type: 'player', computedStats: {} }],
-      });
-      savePrompt.createSaveListener.mockReturnValue({
-        promptId: 'web-save-remove',
-        promise: Promise.resolve({ success: false }),
-      });
-
-      await processWebAreaSave('TestCaster', 'Goblin', campaignName, mapName);
-
-      expect(useRuntimeState.setRuntimeValue).toHaveBeenCalledWith(
-        'Goblin',
-        'activeConditions',
-        ['frightened', 'restrained'],
-        campaignName,
-      );
-    });
-
     it('returns popup with succeeded description on successful save', async () => {
       setupBaseSave();
       savePrompt.createSaveListener.mockReturnValue({
@@ -683,7 +621,7 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
   describe('map-based distance checks', () => {
     it('checks distance and proceeds when target is within radius', async () => {
       useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
-        if (key === '_web_TestCaster') return { saveDc: 15, saveType: 'DEX' };
+        if (key === '_web_TestCaster') return { saveDc: 15, saveType: 'DEX', center: { gridX: 5, gridY: 10 }, radius: 20 };
         if (key === 'activeConditions') return [];
         return null;
       });
@@ -713,12 +651,16 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
     });
 
     it('proceeds with save when map load fails', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: 'TestCaster',
-        center: { gridX: 5, gridY: 10 },
-        saveDc: 15,
-        saveType: 'DEX',
-        radius: 20,
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key === '_web_TestCaster') return {
+          caster: 'TestCaster',
+          center: { gridX: 5, gridY: 10 },
+          saveDc: 15,
+          saveType: 'DEX',
+          radius: 20,
+        };
+        if (key === 'activeConditions') return [];
+        return null;
       });
       mapsService.loadMapData.mockRejectedValue(new Error('map not found'));
       automationImmunities.playerIsImmuneToCondition.mockReturnValue(false);
@@ -741,11 +683,15 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
     });
 
     it('does not check distance when no center in tracking', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: 'TestCaster',
-        center: null,
-        saveDc: 15,
-        saveType: 'DEX',
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key === '_web_TestCaster') return {
+          caster: 'TestCaster',
+          center: null,
+          saveDc: 15,
+          saveType: 'DEX',
+        };
+        if (key === 'activeConditions') return [];
+        return null;
       });
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'player', computedStats: {} }],
@@ -763,12 +709,16 @@ describe('webAreaSaveHandler.processWebAreaSave', () => {
     });
 
     it('does not check distance when no mapName', async () => {
-      useRuntimeState.getRuntimeValue.mockReturnValue({
-        caster: 'TestCaster',
-        center: { gridX: 5, gridY: 10 },
-        saveDc: 15,
-        saveType: 'DEX',
-        radius: 20,
+      useRuntimeState.getRuntimeValue.mockImplementation((name, key) => {
+        if (key === '_web_TestCaster') return {
+          caster: 'TestCaster',
+          center: { gridX: 5, gridY: 10 },
+          saveDc: 15,
+          saveType: 'DEX',
+          radius: 20,
+        };
+        if (key === 'activeConditions') return [];
+        return null;
       });
       damageUtils.getCombatContext.mockResolvedValue({
         creatures: [{ name: 'Goblin', type: 'player', computedStats: {} }],

@@ -17,7 +17,7 @@ const level1Spell = { name: 'Burning Hands', level: 1, casting_time: '1 action',
 const level2Spell = { name: 'Web', level: 2, casting_time: '1 action', range: 'Self', description: 'A sheet of sticky webbing.', damage: null }
 const cantrip = { name: 'Ray of Frost', level: 0 }
 const level3Spell = { name: 'Fireball', level: 3 }
-const minimalSpell = { name: 'Minor Spell' }
+
 
 describe('warMagicSpellHandler', () => {
     beforeEach(() => {

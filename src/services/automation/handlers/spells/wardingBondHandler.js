@@ -42,8 +42,8 @@ export async function handle(action, playerStats, campaignName, _mapName) {
 
     if (existingBond) {
         // Remove existing warding bond from target
-        const newTargetBuffs = targetActiveBuffs.filter(b => b.effect !== 'warding_bond');
-        setRuntimeValue(targetName, 'activeBuffs', newTargetBuffs, campaignName);
+        const filteredTargetBuffs = targetActiveBuffs.filter(b => b.effect !== 'warding_bond');
+        setRuntimeValue(targetName, 'activeBuffs', filteredTargetBuffs, campaignName);
 
         // Remove bond from caster
         const casterBuffs = getRuntimeValue(casterName, 'activeBuffs', campaignName);
@@ -63,13 +63,11 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         sourceCharacter: casterName,
     };
 
-    let newTargetBuffs;
-    if (existingBond) {
-        newTargetBuffs = [...newTargetBuffs, targetBuff];
-    } else {
-        newTargetBuffs = [...targetActiveBuffs, targetBuff];
-    }
-    setRuntimeValue(targetName, 'activeBuffs', newTargetBuffs, campaignName);
+    const filteredTargetBuffs = existingBond
+        ? targetActiveBuffs.filter(b => b.effect !== 'warding_bond')
+        : targetActiveBuffs;
+    const finalTargetBuffs = [...filteredTargetBuffs, targetBuff];
+    setRuntimeValue(targetName, 'activeBuffs', finalTargetBuffs, campaignName);
 
     // Store bond relationship on caster
     const casterBuffs = getRuntimeValue(casterName, 'activeBuffs', campaignName);
