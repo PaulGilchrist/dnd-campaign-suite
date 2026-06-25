@@ -32,7 +32,7 @@
 
 **Data flow:** `rulesFactory.getPlayerStats()` → `PlayerStats` (computed stats object) is the single source of truth for character data. Recomputed when characters array changes. `_trackedResources` on PlayerStats seeds the runtime state store.
 
-**Runtime state:** `src/hooks/runtime/useRuntimeState.js` holds an in-memory Map synced to `localStorage`. Server overrides (from `/api/campaigns/:name/change-data`) are applied on top. SSE broadcasts changes to all connected clients.
+**Runtime state:** `src/hooks/runtime/useRuntimeState.js` holds an in-memory Map synced to server API (server first - Do not use localStorage). Server overrides (from `/api/campaigns/:name/change-data`) are applied on top. SSE broadcasts changes to all connected clients.
 
 **Persistence:** No database. Characters saved as JSON under `public/campaigns/:name/`. Runtime changes (HP, spell slots, etc.) saved to `character-change-data.json` with 1-minute debounce. Maps saved as JSON under `public/campaigns/:name/maps/`. Campaign log saved to `campaign-log.json`.
 
@@ -78,7 +78,7 @@ npm run test:coverage                             # Vitest with coverage (v8, ou
 - Vitest with jsdom environment, globals enabled
 - `@testing-library/react` for component tests
 - Test files: `src/**/*.{test,spec}.{js,jsx}`
-- Setup: `src/test/setup.js` mocks `localStorage` and auto-cleans DOM after each test
+- Setup: `src/test/setup.js` mocks server API and auto-cleans DOM after each test
 - `vi` is an ESLint global (no import needed)
 - Run a single test: `npx vitest run path/to/test.js`
 - Coverage: `npm run test:coverage` uses v8 provider, outputs text/json/html/lcov to `./coverage`
