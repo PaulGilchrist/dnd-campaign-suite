@@ -4,7 +4,23 @@ import { renderHook, act } from '@testing-library/react';
 import useHexHover from './useHexHover.js';
 
 vi.mock('../../../services/maps/hexMapUtils.js', () => ({
-    pixelToHexSnapped: vi.fn((x, y) => ({ q: Math.round(x / 30), r: Math.round(y / 30) })),
+    pixelToHexSnapped: vi.fn((x, y, size) => {
+        const r = (2 / 3 * y) / size;
+        const q = (x / (size * Math.sqrt(3))) - r / 2;
+        const s = -q - r;
+        let rq = Math.round(q);
+        let rr = Math.round(r);
+        let rs = Math.round(s);
+        const dq = Math.abs(rq - q);
+        const dr = Math.abs(rr - r);
+        const ds = Math.abs(rs - s);
+        if (dq > dr && dq > ds) {
+            rq = -rr - rs;
+        } else if (dr > ds) {
+            rr = -rq - rs;
+        }
+        return { q: rq, r: rr };
+    }),
 }));
 
 vi.mock('../../../config/outdoorConfig.js', () => ({
@@ -22,7 +38,11 @@ describe('useHexHover', () => {
             getBoundingClientRect: () => ({ left: 0, top: 0, width: 600, height: 300 }),
             viewBox: { baseVal: { x: 0, y: 0, width: 600, height: 300 } },
             getScreenCTM: () => ({ inverse: () => ({ matrixTransform: (pt) => pt }) }),
-            createSVGPoint: () => ({ x: 0, y: 0, matrixTransform: (pt) => pt }),
+            createSVGPoint: () => {
+                const pt = { x: 0, y: 0 };
+                pt.matrixTransform = function () { return this; };
+                return pt;
+            },
             ...mockAttrs,
         };
         ref.current = baseAttrs;
@@ -94,7 +114,7 @@ describe('useHexHover', () => {
             const svgRef = createSvgRef();
             const { result } = renderHook(() => useHexHover(svgRef, 10, 10));
 
-            const mockEvent = { clientX: 150, clientY: 90 };
+            const mockEvent = { clientX: 0, clientY: 0 };
             const hex = result.current.getHexFromEvent(mockEvent);
 
             expect(hex).toEqual({ q: 0, r: 0 });
