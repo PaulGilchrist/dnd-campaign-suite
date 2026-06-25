@@ -315,7 +315,7 @@ export function createLogAndShow(deps) {
             rollType,
             name,
             rolls: [r1, r2],
-            mode: 'normal',
+            mode: context?.forcedMode || 'normal',
             total: r1,
             bonus,
             isNatural20: r1 === 20,
