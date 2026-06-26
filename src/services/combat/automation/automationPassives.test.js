@@ -211,11 +211,12 @@ describe('getPassiveBuffs', () => {
 describe('collectWeaponMastery', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns baseMastery from weapon', () => {
+  it('returns baseMastery from weapon when character has weapon_kind_mastery', () => {
     parseMagicItemName.mockReturnValue({ baseName: 'Longsword', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Longsword'])
     const playerStats = {
       equipment: [{ name: 'Longsword', mastery: 'push' }],
-      automation: { passives: [] },
+      automation: { passives: [{ type: 'weapon_kind_mastery' }] },
     }
     const result = collectWeaponMastery('+1 Longsword', playerStats)
     expect(parseMagicItemName).toHaveBeenCalledWith('+1 Longsword')
@@ -235,9 +236,15 @@ describe('collectWeaponMastery', () => {
 
   it('collects extraMasteries from passives', () => {
     parseMagicItemName.mockReturnValue({ baseName: 'Longsword', magicBonus: 0 })
+    getRuntimeValue.mockReturnValue(['Longsword'])
     const playerStats = {
       equipment: [{ name: 'Longsword', mastery: 'push' }],
-      automation: { passives: [{ extraMastery: ['topple'] }] },
+      automation: {
+        passives: [
+          { type: 'weapon_kind_mastery' },
+          { extraMastery: ['topple'] },
+        ],
+      },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
     expect(result).toEqual({ baseMastery: 'push', extraMasteries: ['topple'] })
@@ -270,7 +277,7 @@ describe('collectWeaponMastery', () => {
       automation: { passives: null },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
-    expect(result.baseMastery).toBe('push')
+    expect(result.baseMastery).toBeNull()
     expect(result.extraMasteries).toEqual([])
   })
 
@@ -288,7 +295,7 @@ describe('collectWeaponMastery', () => {
     parseMagicItemName.mockReturnValue({ baseName: 'Longsword', magicBonus: 0 })
     const playerStats = { equipment: [{ name: 'Longsword', mastery: 'push' }], automation: null }
     const result = collectWeaponMastery('Longsword', playerStats)
-    expect(result.baseMastery).toBe('push')
+    expect(result.baseMastery).toBeNull()
     expect(result.extraMasteries).toEqual([])
   })
 

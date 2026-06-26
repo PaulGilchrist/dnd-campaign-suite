@@ -82,10 +82,7 @@ export function collectWeaponMastery(weaponName, playerStats) {
     if (replaceMastery) {
         extraMasteries.push(...replaceMastery);
     } else if (!hasKindMasteryMatch) {
-        const hasAnyKindMastery = passives.some(p => p.type === 'weapon_kind_mastery');
-        if (hasAnyKindMastery && !baseMastery) {
-            baseMastery = null;
-        }
+        baseMastery = null;
     }
 
     return {
