@@ -246,10 +246,15 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
         expect(result.payload.description).toContain(String(DIE_ROLL_TOTAL));
     });
 
-    it('describes temp_hp effect with calculated temporary hit points', async () => {
+    it('describes temp_hp effect returns rallyChoice modal with ally options', async () => {
         dataLoader.loadManeuvers.mockResolvedValue([
             { name: 'Rally', effect: 'temp_hp' },
         ]);
+        damageUtils.getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Goblin' },
+            ],
+        });
 
         const result = await onCombatSuperioritySelected(
             makeAction(),
@@ -259,10 +264,12 @@ describe('combatSuperiorityHandler.executeManeuver - effect descriptions', () =>
             'Rally'
         );
 
-        expect(result.payload.description).toContain('Temporary Hit Points');
-        // 5 (die) + 7 (floor(15/2))
-        expect(result.payload.description).toContain('12');
-        expect(result.payload.description).toContain('half Fighter level');
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('rallyChoice');
+        expect(result.payload.allyOptions).toHaveLength(1);
+        expect(result.payload.allyOptions[0].label).toBe('Goblin');
+        expect(result.payload.totalHp).toBe(12);
+        expect(result.payload.extraHp).toBe(7);
     });
 
     it('describes damage_reduction effect with STR/DEX modifier calculation', async () => {

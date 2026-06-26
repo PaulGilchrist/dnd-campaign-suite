@@ -130,7 +130,7 @@ describe('AttackRiderModal - Versatile Trickster', () => {
       clickApplySingle();
 
       await waitFor(() => {
-        const radios = document.querySelectorAll('input[name="versatileTricksterTarget"]');
+        const radios = document.querySelectorAll('input[name="secondaryTarget"]');
         expect(radios).toHaveLength(2);
       });
     });
@@ -141,11 +141,10 @@ describe('AttackRiderModal - Versatile Trickster', () => {
       clickApplySingle();
 
       await waitFor(() => {
-        const labels = document.querySelectorAll('label');
+        const labels = document.querySelectorAll('label.secondary-target-row');
         const orcLabel = Array.from(labels).find(l => l.textContent.includes('Orc A'));
         fireEvent.click(orcLabel);
-        const radio = orcLabel.querySelector('input[type="radio"]');
-        expect(radio.checked).toBe(true);
+        expect(orcLabel).toHaveClass('secondary-target-selected');
       });
     });
 

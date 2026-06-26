@@ -337,6 +337,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         sweepingAttackTargetModal, setSweepingAttackTargetModal,
         baitAndSwitchChoiceModal, setBaitAndSwitchChoiceModal,
         commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
+        rallyChoiceModal, setRallyChoiceModal,
         handleAttackRiderManeuverUse,
         handleAttackRiderManeuverSkip,
         handleCombatSuperiorityConfirm,
@@ -448,6 +449,14 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         return () => window.removeEventListener('commander-strike-modal-show', handler);
     }, [setCommanderStrikeChoiceModal]);
 
+    useEffect(() => {
+        const handler = (event) => {
+            setRallyChoiceModal(event.detail);
+        };
+        window.addEventListener('rally-choice-modal-show', handler);
+        return () => window.removeEventListener('rally-choice-modal-show', handler);
+    }, [setRallyChoiceModal]);
+
     const handleAttackClick = React.useCallback((attack) => {
         if (cannotAct) return;
         // Making an attack roll ends any active Friends spell early
@@ -544,56 +553,77 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         setPopupHtml({ type: 'automation_info', name: 'Haste', description: descriptions[actionName] || `Haste extra action: ${actionName}.` });
     }
 
-    const handleSweepingAttackConfirm = React.useCallback(async () => {
-        if (!sweepingAttackTargetModal?.selectedTarget) return;
+    const handleSweepingAttackConfirm = React.useCallback(async (targetName, modalData) => {
+        if (!targetName || !modalData) return;
         const { executeSweepingAttack } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
         const result = await executeSweepingAttack(
-            { automation: { secondaryTargetName: sweepingAttackTargetModal.selectedTarget } },
-            sweepingAttackTargetModal.playerStats,
-            sweepingAttackTargetModal.campaignName,
-            sweepingAttackTargetModal.selectedTarget
+            { automation: { secondaryTargetName: targetName } },
+            modalData.playerStats,
+            modalData.campaignName,
+            targetName
         );
         if (result.payload) {
             setPopupHtml(result.payload);
         }
         setSweepingAttackTargetModal(null);
-    }, [sweepingAttackTargetModal, setPopupHtml, setSweepingAttackTargetModal]);
+    }, [setPopupHtml, setSweepingAttackTargetModal]);
 
-    const handleBaitAndSwitchChoiceConfirm = React.useCallback(async () => {
-        if (!baitAndSwitchChoiceModal?.selectedTarget) return;
+    const handleBaitAndSwitchChoiceConfirm = React.useCallback(async (targetName, modalData) => {
+        if (!targetName || !modalData) return;
         const { executeBaitAndSwitchChoice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
         const result = await executeBaitAndSwitchChoice(
             {
-                dieValue: baitAndSwitchChoiceModal.dieValue,
-                maneuverName: baitAndSwitchChoiceModal.maneuverName,
+                dieValue: modalData.dieValue,
+                maneuverName: modalData.maneuverName,
             },
-            baitAndSwitchChoiceModal.playerStats,
-            baitAndSwitchChoiceModal.campaignName,
-            baitAndSwitchChoiceModal.selectedTarget
+            modalData.playerStats,
+            modalData.campaignName,
+            targetName
         );
         if (result.payload) {
             setPopupHtml(result.payload);
         }
         setBaitAndSwitchChoiceModal(null);
-    }, [baitAndSwitchChoiceModal, setPopupHtml, setBaitAndSwitchChoiceModal]);
+    }, [setPopupHtml, setBaitAndSwitchChoiceModal]);
 
-    const handleCommanderStrikeChoiceConfirm = React.useCallback(async () => {
-        if (!commanderStrikeChoiceModal?.selectedTarget) return;
+    const handleCommanderStrikeChoiceConfirm = React.useCallback(async (targetName, modalData) => {
+        if (!targetName || !modalData) return;
         const { executeCommanderStrikeChoice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
         const result = await executeCommanderStrikeChoice(
             {
-                dieValue: commanderStrikeChoiceModal.dieValue,
-                maneuverName: commanderStrikeChoiceModal.maneuverName,
+                dieValue: modalData.dieValue,
+                maneuverName: modalData.maneuverName,
             },
-            commanderStrikeChoiceModal.playerStats,
-            commanderStrikeChoiceModal.campaignName,
-            commanderStrikeChoiceModal.selectedTarget
+            modalData.playerStats,
+            modalData.campaignName,
+            targetName
         );
         if (result.payload) {
             setPopupHtml(result.payload);
         }
         setCommanderStrikeChoiceModal(null);
-    }, [commanderStrikeChoiceModal, setPopupHtml, setCommanderStrikeChoiceModal]);
+    }, [setPopupHtml, setCommanderStrikeChoiceModal]);
+
+    const handleRallyChoiceConfirm = React.useCallback(async (targetName, modalData) => {
+        if (!targetName || !modalData) return;
+        const { executeRallyChoice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
+        const result = await executeRallyChoice(
+            {
+                dieValue: modalData.dieValue,
+                maneuverName: modalData.maneuverName,
+            },
+            modalData.playerStats,
+            modalData.campaignName,
+            targetName,
+            modalData.totalHp,
+            modalData.extraHp,
+            modalData.description
+        );
+        if (result.payload) {
+            setPopupHtml(result.payload);
+        }
+        setRallyChoiceModal(null);
+    }, [setPopupHtml, setRallyChoiceModal]);
 
     async function handleAutomationAction(action) {
         if (cannotAct) return;
@@ -1107,6 +1137,8 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     handleBaitAndSwitchChoiceConfirm={handleBaitAndSwitchChoiceConfirm}
                     commanderStrikeChoiceModal={commanderStrikeChoiceModal} setCommanderStrikeChoiceModal={setCommanderStrikeChoiceModal}
                     handleCommanderStrikeChoiceConfirm={handleCommanderStrikeChoiceConfirm}
+                    rallyChoiceModal={rallyChoiceModal} setRallyChoiceModal={setRallyChoiceModal}
+                    handleRallyChoiceConfirm={handleRallyChoiceConfirm}
                     handleCombatSuperiorityConfirm={handleCombatSuperiorityConfirm}
                     handleAttackRiderManeuverUse={handleAttackRiderManeuverUse}
                     handleAttackRiderManeuverSkip={handleAttackRiderManeuverSkip}

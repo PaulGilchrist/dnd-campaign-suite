@@ -615,6 +615,11 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases and HP restorati
             { name: 'Rally', effect: 'temp_hp' },
         ]);
         rollExpression.mockReturnValue({ total: 3 });
+        damageUtils.getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Goblin' },
+            ],
+        });
 
         const result = await onCombatSuperioritySelected(
             makeAction(),
@@ -624,8 +629,10 @@ describe('combatSuperiorityHandler.executeManeuver - edge cases and HP restorati
             'Rally'
         );
 
-        expect(result.payload.description).toContain('3 Temporary Hit Points');
-        expect(result.payload.description).toContain('0 from half Fighter level');
+        expect(result.type).toBe('modal');
+        expect(result.modalName).toBe('rallyChoice');
+        expect(result.payload.totalHp).toBe(3);
+        expect(result.payload.extraHp).toBe(0);
     });
 
     it('restores HP up to max when damage_reduction effect is used', async () => {

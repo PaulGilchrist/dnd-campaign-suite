@@ -47,6 +47,7 @@ import MoonlightStepResourceModal from './modals/MoonlightStepResourceModal.jsx'
 import ConstellationSelectionModal from './modals/ConstellationSelectionModal.jsx'
 import CombatSuperiorityModal from './modals/CombatSuperiorityModal.jsx'
 import AttackRiderManeuverPrompt from './modals/AttackRiderManeuverPrompt.jsx'
+import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx'
 import { handleClearWard, handleSpendDice, handleApply } from '../../services/automation/handlers/class-cleric-paladin/bastionOfLawHandler.js'
 
 export default function CharActionModals({
@@ -131,6 +132,8 @@ export default function CharActionModals({
     handleBaitAndSwitchChoiceConfirm,
     commanderStrikeChoiceModal, setCommanderStrikeChoiceModal,
     handleCommanderStrikeChoiceConfirm,
+    rallyChoiceModal, setRallyChoiceModal,
+    handleRallyChoiceConfirm,
     handleDivineInterventionCast,
     pendingDamageRef,
 }) {
@@ -495,148 +498,49 @@ export default function CharActionModals({
                 />
             )}
             {sweepingAttackTargetModal && (
-                <div className="sp-overlay" onClick={() => setSweepingAttackTargetModal(null)}>
-                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
-                        <div className="sp-header">
-                            <i className="fa-solid fa-bolt"></i> Sweeping Attack
-                        </div>
-                        <div className="sp-body">
-                            <p>Choose a creature within 5 feet of {sweepingAttackTargetModal.primaryTarget} to take {sweepingAttackTargetModal.dieValue} damage:</p>
-                            <div style={{ textAlign: 'left', marginTop: '12px' }}>
-                                {sweepingAttackTargetModal.secondaryTargets.map((target, i) => (
-                                    <label
-                                        key={i}
-                                        style={{
-                                            display: 'block', padding: '8px 12px', margin: '4px 0',
-                                            borderRadius: '6px', cursor: 'pointer',
-                                            background: sweepingAttackTargetModal.selectedTarget === target.name ? 'rgba(255,255,255,0.12)' : 'transparent',
-                                            border: sweepingAttackTargetModal.selectedTarget === target.name ? '1px solid var(--color-link)' : '1px solid transparent',
-                                        }}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="sweepingAttackTarget"
-                                            checked={sweepingAttackTargetModal.selectedTarget === target.name}
-                                            onChange={() => {
-                                                const updated = { ...sweepingAttackTargetModal, selectedTarget: target.name };
-                                                setSweepingAttackTargetModal(updated);
-                                            }}
-                                            style={{ marginRight: '8px' }}
-                                        />
-                                        <strong>{target.name}</strong>
-                                        {target.size && <span style={{ opacity: 0.7, marginLeft: '6px', fontSize: '0.85em' }}>({target.size})</span>}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="sp-actions">
-                            <button
-                                className="sp-roll-btn"
-                                disabled={!sweepingAttackTargetModal.selectedTarget}
-                                onClick={handleSweepingAttackConfirm}
-                            >
-                                <i className="fa-solid fa-bolt"></i> Apply Sweeping Attack
-                            </button>
-                            <button className="sp-dismiss-btn" onClick={() => setSweepingAttackTargetModal(null)}>Skip</button>
-                        </div>
-                    </div>
-                </div>
+                <SecondaryTargetModal
+                    title="Sweeping Attack"
+                    targets={sweepingAttackTargetModal.secondaryTargets}
+                    description={`Choose a creature within 5 feet of ${sweepingAttackTargetModal.primaryTarget} to take ${sweepingAttackTargetModal.dieValue} damage:`}
+                    onTargetSelected={(targetName) => handleSweepingAttackConfirm(targetName, sweepingAttackTargetModal)}
+                    onSkip={() => setSweepingAttackTargetModal(null)}
+                    confirmLabel="Apply Sweeping Attack"
+                    confirmIcon="fa-bolt"
+                    showSize={true}
+                />
             )}
             {baitAndSwitchChoiceModal && (
-                <div className="sp-overlay" onClick={() => setBaitAndSwitchChoiceModal(null)}>
-                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
-                        <div className="sp-header">
-                            <i className="fa-solid fa-shield-halved"></i> Bait and Switch — AC Bonus
-                        </div>
-                        <div className="sp-body">
-                            <p>{baitAndSwitchChoiceModal.description}</p>
-                            <p style={{ opacity: 0.8 }}>Who gains the AC bonus?</p>
-                            <div style={{ textAlign: 'left', marginTop: '12px' }}>
-                                {baitAndSwitchChoiceModal.options.map((option, i) => (
-                                    <label
-                                        key={i}
-                                        style={{
-                                            display: 'block', padding: '8px 12px', margin: '4px 0',
-                                            borderRadius: '6px', cursor: 'pointer',
-                                            background: baitAndSwitchChoiceModal.selectedTarget === option.value ? 'rgba(255,255,255,0.12)' : 'transparent',
-                                            border: baitAndSwitchChoiceModal.selectedTarget === option.value ? '1px solid var(--color-link)' : '1px solid transparent',
-                                        }}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="baitAndSwitchChoice"
-                                            checked={baitAndSwitchChoiceModal.selectedTarget === option.value}
-                                            onChange={() => {
-                                                const updated = { ...baitAndSwitchChoiceModal, selectedTarget: option.value };
-                                                setBaitAndSwitchChoiceModal(updated);
-                                            }}
-                                            style={{ marginRight: '8px' }}
-                                        />
-                                        <strong>{option.label}</strong>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="sp-actions">
-                            <button
-                                className="sp-roll-btn"
-                                disabled={!baitAndSwitchChoiceModal.selectedTarget}
-                                onClick={handleBaitAndSwitchChoiceConfirm}
-                            >
-                                <i className="fa-solid fa-check"></i> Apply AC Bonus
-                            </button>
-                            <button className="sp-dismiss-btn" onClick={() => setBaitAndSwitchChoiceModal(null)}>Cancel</button>
-                        </div>
-                    </div>
-                </div>
+                <SecondaryTargetModal
+                    title="Bait and Switch — AC Bonus"
+                    targets={baitAndSwitchChoiceModal.options}
+                    description={baitAndSwitchChoiceModal.description}
+                    onTargetSelected={(targetName) => handleBaitAndSwitchChoiceConfirm(targetName, baitAndSwitchChoiceModal)}
+                    onSkip={() => setBaitAndSwitchChoiceModal(null)}
+                    confirmLabel="Apply AC Bonus"
+                    confirmIcon="fa-check"
+                />
             )}
             {commanderStrikeChoiceModal && (
-                <div className="sp-overlay" onClick={() => setCommanderStrikeChoiceModal(null)}>
-                    <div className="sp-modal" onClick={e => e.stopPropagation()}>
-                        <div className="sp-header">
-                            <i className="fa-solid fa-bolt"></i> Commander's Strike — Ally Attack
-                        </div>
-                        <div className="sp-body">
-                            <p>{commanderStrikeChoiceModal.description}</p>
-                            <p style={{ opacity: 0.8 }}>Choose an ally to receive the attack bonus:</p>
-                            <div style={{ textAlign: 'left', marginTop: '12px' }}>
-                                {commanderStrikeChoiceModal.options.map((option, i) => (
-                                    <label
-                                        key={i}
-                                        style={{
-                                            display: 'block', padding: '8px 12px', margin: '4px 0',
-                                            borderRadius: '6px', cursor: 'pointer',
-                                            background: commanderStrikeChoiceModal.selectedTarget === option.value ? 'rgba(255,255,255,0.12)' : 'transparent',
-                                            border: commanderStrikeChoiceModal.selectedTarget === option.value ? '1px solid var(--color-link)' : '1px solid transparent',
-                                        }}
-                                    >
-                                        <input
-                                            type="radio"
-                                            name="commanderStrikeChoice"
-                                            checked={commanderStrikeChoiceModal.selectedTarget === option.value}
-                                            onChange={() => {
-                                                const updated = { ...commanderStrikeChoiceModal, selectedTarget: option.value };
-                                                setCommanderStrikeChoiceModal(updated);
-                                            }}
-                                            style={{ marginRight: '8px' }}
-                                        />
-                                        <strong>{option.label}</strong>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="sp-actions">
-                            <button
-                                className="sp-roll-btn"
-                                disabled={!commanderStrikeChoiceModal.selectedTarget}
-                                onClick={handleCommanderStrikeChoiceConfirm}
-                            >
-                                <i className="fa-solid fa-check"></i> Grant Attack
-                            </button>
-                            <button className="sp-dismiss-btn" onClick={() => setCommanderStrikeChoiceModal(null)}>Cancel</button>
-                        </div>
-                    </div>
-                </div>
+                <SecondaryTargetModal
+                    title="Commander's Strike — Ally Attack"
+                    targets={commanderStrikeChoiceModal.options}
+                    description={commanderStrikeChoiceModal.description}
+                    onTargetSelected={(targetName) => handleCommanderStrikeChoiceConfirm(targetName, commanderStrikeChoiceModal)}
+                    onSkip={() => setCommanderStrikeChoiceModal(null)}
+                    confirmLabel="Grant Attack"
+                    confirmIcon="fa-check"
+                />
+            )}
+            {rallyChoiceModal && (
+                <SecondaryTargetModal
+                    title="Rally"
+                    targets={rallyChoiceModal.allyOptions}
+                    description={rallyChoiceModal.description}
+                    onTargetSelected={(targetName) => handleRallyChoiceConfirm(targetName, rallyChoiceModal)}
+                    onSkip={() => setRallyChoiceModal(null)}
+                    confirmLabel="Grant Temp HP"
+                    confirmIcon="fa-heart"
+                />
             )}
             {divineFuryChoice && (
                 <div className="sp-overlay" onClick={handleDivineFurySkip}>

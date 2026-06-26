@@ -370,7 +370,9 @@ describe('CharActionModals inline choice modals', () => {
           secondaryTargets: [{ name: 'Ogre', size: 'Huge' }],
         }}
       />);
-      expect(screen.getByText('(Huge)')).toBeInTheDocument();
+      const sizeSpans = document.querySelectorAll('.secondary-target-size');
+      expect(sizeSpans).toHaveLength(1);
+      expect(sizeSpans[0].textContent).toBe('(Huge)');
     });
 
     it('does not display size when target has no size', () => {
@@ -454,17 +456,17 @@ describe('CharActionModals inline choice modals', () => {
           primaryTarget: 'Goblin',
           dieValue: 10,
           secondaryTargets: [{ name: 'Ogre' }, { name: 'Skeleton' }],
-          selectedTarget: 'Ogre',
         }}
       />);
+      fireEvent.click(screen.getByText('Ogre'));
       const applyBtn = screen.getByText(/Apply Sweeping Attack/);
       expect(applyBtn).toBeEnabled();
     });
 
-    it('selecting a target updates selectedTarget state', () => {
-      const setSweepingAttackTargetModal = vi.fn();
+    it('selecting a target and confirming calls handleSweepingAttackConfirm with target name', () => {
+      const handleSweepingAttackConfirm = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ setSweepingAttackTargetModal })}
+        {...createBaseProps({ handleSweepingAttackConfirm })}
         sweepingAttackTargetModal={{
           primaryTarget: 'Goblin',
           dieValue: 10,
@@ -472,8 +474,9 @@ describe('CharActionModals inline choice modals', () => {
         }}
       />);
       fireEvent.click(screen.getByText('Ogre'));
-      expect(setSweepingAttackTargetModal).toHaveBeenCalledWith(expect.objectContaining({
-        selectedTarget: 'Ogre',
+      fireEvent.click(screen.getByText(/Apply Sweeping Attack/));
+      expect(handleSweepingAttackConfirm).toHaveBeenCalledWith('Ogre', expect.objectContaining({
+        primaryTarget: 'Goblin',
       }));
     });
 
@@ -485,11 +488,13 @@ describe('CharActionModals inline choice modals', () => {
           primaryTarget: 'Goblin',
           dieValue: 10,
           secondaryTargets: [{ name: 'Ogre' }],
-          selectedTarget: 'Ogre',
         }}
       />);
+      fireEvent.click(screen.getByText('Ogre'));
       fireEvent.click(screen.getByText(/Apply Sweeping Attack/));
-      expect(handleSweepingAttackConfirm).toHaveBeenCalled();
+      expect(handleSweepingAttackConfirm).toHaveBeenCalledWith('Ogre', expect.objectContaining({
+        primaryTarget: 'Goblin',
+      }));
     });
 
     it('clicking Skip calls setSweepingAttackTargetModal(null)', () => {
@@ -561,18 +566,18 @@ describe('CharActionModals inline choice modals', () => {
       expect(radios).toHaveLength(2);
     });
 
-    it('radio is checked when target matches selectedTarget', () => {
+    it('clicking a target name selects it and enables the confirm button', () => {
       render(<CharActionModals
         {...createBaseProps()}
         sweepingAttackTargetModal={{
           primaryTarget: 'Goblin',
           dieValue: 10,
           secondaryTargets: [{ name: 'Ogre' }, { name: 'Skeleton' }],
-          selectedTarget: 'Skeleton',
         }}
       />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      expect(radios[1]).toBeChecked();
+      expect(screen.getByText(/Apply Sweeping Attack/)).toBeDisabled();
+      fireEvent.click(screen.getByText('Skeleton'));
+      expect(screen.getByText(/Apply Sweeping Attack/)).toBeEnabled();
     });
 
     it('renders label with selected styling when target is chosen', () => {
@@ -582,11 +587,11 @@ describe('CharActionModals inline choice modals', () => {
           primaryTarget: 'Goblin',
           dieValue: 10,
           secondaryTargets: [{ name: 'Ogre' }],
-          selectedTarget: 'Ogre',
         }}
       />);
-      const labels = document.querySelectorAll('label');
-      expect(labels[0]).toHaveStyle({ background: 'rgba(255,255,255,0.12)' });
+      fireEvent.click(screen.getByText('Ogre'));
+      const labels = document.querySelectorAll('label.secondary-target-row');
+      expect(labels[0]).toHaveClass('secondary-target-selected');
     });
 
     it('renders label without selected styling when target is not chosen', () => {
@@ -596,11 +601,11 @@ describe('CharActionModals inline choice modals', () => {
           primaryTarget: 'Goblin',
           dieValue: 10,
           secondaryTargets: [{ name: 'Ogre' }, { name: 'Skeleton' }],
-          selectedTarget: 'Ogre',
         }}
       />);
-      const labels = document.querySelectorAll('label');
-      expect(labels[1]).toHaveStyle({ background: 'transparent' });
+      fireEvent.click(screen.getByText('Ogre'));
+      const labels = document.querySelectorAll('label.secondary-target-row');
+      expect(labels[1]).not.toHaveClass('secondary-target-selected');
     });
   });
 
@@ -643,12 +648,12 @@ describe('CharActionModals inline choice modals', () => {
       expect(screen.getByText(/Apply AC Bonus/)).toBeInTheDocument();
     });
 
-    it('renders Cancel button', () => {
+    it('renders Skip button', () => {
       render(<CharActionModals
         {...createBaseProps()}
         baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }] }}
       />);
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
+      expect(screen.getByText('Skip')).toBeInTheDocument();
     });
 
     it('renders overlay with sp-overlay class', () => {
@@ -679,21 +684,23 @@ describe('CharActionModals inline choice modals', () => {
     it('Apply AC Bonus button is enabled when target is selected', () => {
       render(<CharActionModals
         {...createBaseProps()}
-        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }], selectedTarget: 'player' }}
+        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }] }}
       />);
+      fireEvent.click(screen.getByText('Player'));
       const applyBtn = screen.getByText(/Apply AC Bonus/);
       expect(applyBtn).toBeEnabled();
     });
 
-    it('selecting an option updates selectedTarget state', () => {
-      const setBaitAndSwitchChoiceModal = vi.fn();
+    it('selecting an option and confirming calls handleBaitAndSwitchChoiceConfirm with option value', () => {
+      const handleBaitAndSwitchChoiceConfirm = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ setBaitAndSwitchChoiceModal })}
+        {...createBaseProps({ handleBaitAndSwitchChoiceConfirm })}
         baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }] }}
       />);
       fireEvent.click(screen.getByText('Player'));
-      expect(setBaitAndSwitchChoiceModal).toHaveBeenCalledWith(expect.objectContaining({
-        selectedTarget: 'player',
+      fireEvent.click(screen.getByText(/Apply AC Bonus/));
+      expect(handleBaitAndSwitchChoiceConfirm).toHaveBeenCalledWith('player', expect.objectContaining({
+        description: 'Test',
       }));
     });
 
@@ -701,19 +708,22 @@ describe('CharActionModals inline choice modals', () => {
       const handleBaitAndSwitchChoiceConfirm = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleBaitAndSwitchChoiceConfirm })}
-        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }], selectedTarget: 'player' }}
+        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }] }}
       />);
+      fireEvent.click(screen.getByText('Player'));
       fireEvent.click(screen.getByText(/Apply AC Bonus/));
-      expect(handleBaitAndSwitchChoiceConfirm).toHaveBeenCalled();
+      expect(handleBaitAndSwitchChoiceConfirm).toHaveBeenCalledWith('player', expect.objectContaining({
+        description: 'Test',
+      }));
     });
 
-    it('clicking Cancel calls setBaitAndSwitchChoiceModal(null)', () => {
+    it('clicking Skip calls setBaitAndSwitchChoiceModal(null)', () => {
       const setBaitAndSwitchChoiceModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setBaitAndSwitchChoiceModal })}
         baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }] }}
       />);
-      fireEvent.click(screen.getByText('Cancel'));
+      fireEvent.click(screen.getByText('Skip'));
       expect(setBaitAndSwitchChoiceModal).toHaveBeenCalledWith(null);
     });
 
@@ -756,31 +766,34 @@ describe('CharActionModals inline choice modals', () => {
       expect(radios).toHaveLength(2);
     });
 
-    it('radio is checked when option value matches selectedTarget', () => {
+    it('clicking a target name selects it and enables the confirm button', () => {
       render(<CharActionModals
         {...createBaseProps()}
-        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }, { label: 'Ally', value: 'ally' }], selectedTarget: 'ally' }}
+        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }, { label: 'Ally', value: 'ally' }] }}
       />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      expect(radios[1]).toBeChecked();
+      expect(screen.getByText(/Apply AC Bonus/)).toBeDisabled();
+      fireEvent.click(screen.getByText('Ally'));
+      expect(screen.getByText(/Apply AC Bonus/)).toBeEnabled();
     });
 
     it('renders label with selected styling when option is chosen', () => {
       render(<CharActionModals
         {...createBaseProps()}
-        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }], selectedTarget: 'player' }}
+        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }] }}
       />);
-      const labels = document.querySelectorAll('label');
-      expect(labels[0]).toHaveStyle({ background: 'rgba(255,255,255,0.12)' });
+      fireEvent.click(screen.getByText('Player'));
+      const labels = document.querySelectorAll('label.secondary-target-row');
+      expect(labels[0]).toHaveClass('secondary-target-selected');
     });
 
     it('renders label without selected styling when option is not chosen', () => {
       render(<CharActionModals
         {...createBaseProps()}
-        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }, { label: 'Ally', value: 'ally' }], selectedTarget: 'player' }}
+        baitAndSwitchChoiceModal={{ description: 'Test', options: [{ label: 'Player', value: 'player' }, { label: 'Ally', value: 'ally' }] }}
       />);
-      const labels = document.querySelectorAll('label');
-      expect(labels[1]).toHaveStyle({ background: 'transparent' });
+      fireEvent.click(screen.getByText('Player'));
+      const labels = document.querySelectorAll('label.secondary-target-row');
+      expect(labels[1]).not.toHaveClass('secondary-target-selected');
     });
   });
 
@@ -823,12 +836,12 @@ describe('CharActionModals inline choice modals', () => {
       expect(screen.getByText(/Grant Attack/)).toBeInTheDocument();
     });
 
-    it('renders Cancel button', () => {
+    it('renders Skip button', () => {
       render(<CharActionModals
         {...createBaseProps()}
         commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }] }}
       />);
-      expect(screen.getByText('Cancel')).toBeInTheDocument();
+      expect(screen.getByText('Skip')).toBeInTheDocument();
     });
 
     it('renders overlay with sp-overlay class', () => {
@@ -859,21 +872,23 @@ describe('CharActionModals inline choice modals', () => {
     it('Grant Attack button is enabled when target is selected', () => {
       render(<CharActionModals
         {...createBaseProps()}
-        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }], selectedTarget: 'bard' }}
+        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }] }}
       />);
+      fireEvent.click(screen.getByText('Bard'));
       const grantBtn = screen.getByText(/Grant Attack/);
       expect(grantBtn).toBeEnabled();
     });
 
-    it('selecting an option updates selectedTarget state', () => {
-      const setCommanderStrikeChoiceModal = vi.fn();
+    it('selecting an option and confirming calls handleCommanderStrikeChoiceConfirm with option value', () => {
+      const handleCommanderStrikeChoiceConfirm = vi.fn();
       render(<CharActionModals
-        {...createBaseProps({ setCommanderStrikeChoiceModal })}
+        {...createBaseProps({ handleCommanderStrikeChoiceConfirm })}
         commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }] }}
       />);
       fireEvent.click(screen.getByText('Bard'));
-      expect(setCommanderStrikeChoiceModal).toHaveBeenCalledWith(expect.objectContaining({
-        selectedTarget: 'bard',
+      fireEvent.click(screen.getByText(/Grant Attack/));
+      expect(handleCommanderStrikeChoiceConfirm).toHaveBeenCalledWith('bard', expect.objectContaining({
+        description: 'Test',
       }));
     });
 
@@ -881,19 +896,22 @@ describe('CharActionModals inline choice modals', () => {
       const handleCommanderStrikeChoiceConfirm = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ handleCommanderStrikeChoiceConfirm })}
-        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }], selectedTarget: 'bard' }}
+        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }] }}
       />);
+      fireEvent.click(screen.getByText('Bard'));
       fireEvent.click(screen.getByText(/Grant Attack/));
-      expect(handleCommanderStrikeChoiceConfirm).toHaveBeenCalled();
+      expect(handleCommanderStrikeChoiceConfirm).toHaveBeenCalledWith('bard', expect.objectContaining({
+        description: 'Test',
+      }));
     });
 
-    it('clicking Cancel calls setCommanderStrikeChoiceModal(null)', () => {
+    it('clicking Skip calls setCommanderStrikeChoiceModal(null)', () => {
       const setCommanderStrikeChoiceModal = vi.fn();
       render(<CharActionModals
         {...createBaseProps({ setCommanderStrikeChoiceModal })}
         commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }] }}
       />);
-      fireEvent.click(screen.getByText('Cancel'));
+      fireEvent.click(screen.getByText('Skip'));
       expect(setCommanderStrikeChoiceModal).toHaveBeenCalledWith(null);
     });
 
@@ -936,31 +954,34 @@ describe('CharActionModals inline choice modals', () => {
       expect(radios).toHaveLength(2);
     });
 
-    it('radio is checked when option value matches selectedTarget', () => {
+    it('clicking a target name selects it and enables the confirm button', () => {
       render(<CharActionModals
         {...createBaseProps()}
-        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }, { label: 'Rogue', value: 'rogue' }], selectedTarget: 'rogue' }}
+        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }, { label: 'Rogue', value: 'rogue' }] }}
       />);
-      const radios = document.querySelectorAll('input[type="radio"]');
-      expect(radios[1]).toBeChecked();
+      expect(screen.getByText(/Grant Attack/)).toBeDisabled();
+      fireEvent.click(screen.getByText('Rogue'));
+      expect(screen.getByText(/Grant Attack/)).toBeEnabled();
     });
 
     it('renders label with selected styling when option is chosen', () => {
       render(<CharActionModals
         {...createBaseProps()}
-        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }], selectedTarget: 'bard' }}
+        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }] }}
       />);
-      const labels = document.querySelectorAll('label');
-      expect(labels[0]).toHaveStyle({ background: 'rgba(255,255,255,0.12)' });
+      fireEvent.click(screen.getByText('Bard'));
+      const labels = document.querySelectorAll('label.secondary-target-row');
+      expect(labels[0]).toHaveClass('secondary-target-selected');
     });
 
     it('renders label without selected styling when option is not chosen', () => {
       render(<CharActionModals
         {...createBaseProps()}
-        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }, { label: 'Rogue', value: 'rogue' }], selectedTarget: 'bard' }}
+        commanderStrikeChoiceModal={{ description: 'Test', options: [{ label: 'Bard', value: 'bard' }, { label: 'Rogue', value: 'rogue' }] }}
       />);
-      const labels = document.querySelectorAll('label');
-      expect(labels[1]).toHaveStyle({ background: 'transparent' });
+      fireEvent.click(screen.getByText('Bard'));
+      const labels = document.querySelectorAll('label.secondary-target-row');
+      expect(labels[1]).not.toHaveClass('secondary-target-selected');
     });
   });
 });

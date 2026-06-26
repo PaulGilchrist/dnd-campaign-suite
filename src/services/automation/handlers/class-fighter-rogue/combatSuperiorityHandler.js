@@ -5,10 +5,9 @@ import { evaluateAutoExpression } from '../../../combat/automation/automationSer
 import { buildSaveDc, createSaveListener } from '../../common/savePrompt.js';
 import { getCurrentCombatRound, loadCombatSummary } from '../../../../services/encounters/combatData.js';
 import { loadManeuvers } from '../../../ui/dataLoader.js';
-import { loadMapData } from '../../../maps/mapsService.js';
 import { addEntry } from '../../../ui/logService.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
-import { getCombatContext, findCreatureByName } from '../../../rules/combat/damageUtils.js';
+import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { getDistanceFeet, rangeToFeet } from '../../../rules/combat/rangeValidation.js';
 import { applyDamageToTarget } from '../../../rules/combat/applyDamage.js';
 import storage from '../../../ui/storage.js';
@@ -66,52 +65,6 @@ export function getSuperiorityDice(playerStats, campaignName) {
     const usesKey = 'superiorityDice';
     const defaultMax = 4;
     return Number(getRuntimeValue(playerStats.name, usesKey, campaignName) ?? defaultMax);
-}
-
-async function resolveAllyForRally(campaignName, playerStats, mapName) {
-    const cs = await getCombatContext(campaignName);
-    if (!cs || !cs.creatures) return null;
-
-    const playerName = playerStats.name;
-    const attacker = findCreatureByName(cs, playerName);
-    if (!attacker) return null;
-
-    if (attacker.targetName && attacker.targetName !== playerName) {
-        return attacker.targetName;
-    }
-
-    const allies = cs.creatures.filter(c => {
-        if (c.name === playerName) return false;
-        return true;
-    });
-
-    if (allies.length === 0) return null;
-
-    if (mapName) {
-        const mapData = await loadMapData(campaignName, mapName);
-        if (!mapData) return allies[0].name;
-
-        const attackerPlayer = mapData.players?.find(p => p.name === playerName);
-        if (!attackerPlayer) return allies[0].name;
-
-        const rangeFt = rangeToFeet('30 ft');
-        const attackerPos = { gridX: attackerPlayer.gridX, gridY: attackerPlayer.gridY };
-
-        for (const ally of allies) {
-            const allyPlayer = mapData.players?.find(p => p.name === ally.name);
-            if (allyPlayer) {
-                const allyPos = { gridX: allyPlayer.gridX, gridY: allyPlayer.gridY };
-                const dist = getDistanceFeet(attackerPos, allyPos);
-                if (dist != null && dist <= rangeFt) {
-                    return ally.name;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    return allies[0].name;
 }
 
 async function validateSizeLimit(maneuver, targetName, campaignName, playerStats) {
@@ -355,6 +308,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 description: 'No maneuver data available.',
                 automation: auto,
             },
+            logEntries: [],
         };
     }
 
@@ -873,15 +827,40 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
             : Math.floor(fighterLevel / 2);
         const extraHp = typeof extraHpRaw === 'number' ? Math.floor(extraHpRaw) : Math.floor(fighterLevel / 2);
         const totalHp = dieValue + extraHp;
-        const allyName = await resolveAllyForRally(campaignName, playerStats, action.automation?.mapName);
-        if (allyName) {
-            const existingTempHp = Number(getRuntimeValue(allyName, 'tempHp', campaignName) || 0);
-            const newTotal = Math.max(existingTempHp, totalHp);
-            await setRuntimeValue(allyName, 'tempHp', newTotal, campaignName);
-            description += ` ${allyName} gains ${totalHp} Temporary Hit Points (${dieValue} from die + ${extraHp} from half Fighter level).`;
-        } else {
-            description += ` An ally gains ${totalHp} Temporary Hit Points (${dieValue} from die + ${extraHp} from half Fighter level).`;
+        const cs = await getCombatContext(campaignName);
+        const allies = cs?.creatures?.filter(c => c.name !== playerStats.name) || [];
+        if (allies.length === 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: maneuver.name,
+                    description: `${maneuver.name}: No allies available to receive Rally.`,
+                },
+            };
         }
+        const allyOptions = allies.map(a => ({ label: a.name, value: a.name }));
+        const logEntry = {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description: `${maneuver.name}: Choose an ally to gain temporary hit points.`,
+        };
+        return {
+            type: 'modal',
+            modalName: 'rallyChoice',
+            payload: {
+                playerStats,
+                campaignName,
+                dieValue,
+                maneuverName: maneuver.name,
+                allyOptions,
+                totalHp,
+                extraHp,
+                description,
+            },
+            logEntries: [logEntry],
+        };
     }
 
     if (maneuver.effect === 'ac_bonus_disengage') {
@@ -1929,15 +1908,40 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
             : Math.floor(fighterLevel / 2);
         const extraHp = typeof extraHpRaw === 'number' ? Math.floor(extraHpRaw) : Math.floor(fighterLevel / 2);
         const totalHp = dieValue + extraHp;
-        const allyName = await resolveAllyForRally(campaignName, playerStats, action.automation?.mapName);
-        if (allyName) {
-            const existingTempHp = Number(getRuntimeValue(allyName, 'tempHp', campaignName) || 0);
-            const newTotal = Math.max(existingTempHp, totalHp);
-            await setRuntimeValue(allyName, 'tempHp', newTotal, campaignName);
-            description += ` ${allyName} gains ${totalHp} Temporary Hit Points (${dieValue} from die + ${extraHp} from half Fighter level).`;
-        } else {
-            description += ` An ally gains ${totalHp} Temporary Hit Points (${dieValue} from die + ${extraHp} from half Fighter level).`;
+        const cs = await getCombatContext(campaignName);
+        const allies = cs?.creatures?.filter(c => c.name !== playerStats.name) || [];
+        if (allies.length === 0) {
+            return {
+                type: 'popup',
+                payload: {
+                    type: 'automation_info',
+                    name: maneuver.name,
+                    description: `${maneuver.name}: No allies available to receive Rally.`,
+                },
+            };
         }
+        const allyOptions = allies.map(a => ({ label: a.name, value: a.name }));
+        const logEntry = {
+            type: 'ability_use',
+            characterName: playerStats.name,
+            abilityName: maneuver.name,
+            description: `${maneuver.name}: Choose an ally to gain temporary hit points.`,
+        };
+        return {
+            type: 'modal',
+            modalName: 'rallyChoice',
+            payload: {
+                playerStats,
+                campaignName,
+                dieValue,
+                maneuverName: maneuver.name,
+                allyOptions,
+                totalHp,
+                extraHp,
+                description,
+            },
+            logEntries: [logEntry],
+        };
     }
 
     if (maneuver.effect === 'damage_reduction') {

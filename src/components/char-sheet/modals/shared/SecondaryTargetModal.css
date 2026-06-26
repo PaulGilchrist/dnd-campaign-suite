@@ -30,6 +30,12 @@
     display: inline;
 }
 
+.secondary-target-size {
+    margin-left: 6px;
+    opacity: 0.7;
+    font-size: 0.85em;
+}
+
 .secondary-target-hp {
     margin-left: 8px;
     opacity: 0.7;

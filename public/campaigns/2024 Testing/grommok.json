@@ -91,13 +91,12 @@
       "Longbow",
       "Shield",
       "Plate Armor",
-      "Longsword",
-      "Greataxe",
       "Greatsword",
       "Scimitar",
       "Warhammer",
       "Battleaxe",
-      "Rapier"
+      "Rapier",
+      "Longsword"
     ],
     "gold": 10,
     "magicItems": []
