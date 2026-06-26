@@ -5,8 +5,19 @@ import { FIGHTING_STYLES, getFightingStyle } from './fightingStyles.js';
 describe('fightingStyles', () => {
   describe('FIGHTING_STYLES', () => {
     it.each([
+      'Archery',
+      'Blind Fighting',
+      'Defense',
+      'Dueling',
       'Great Weapon Fighting',
+      'Interception',
       'Protection',
+      'Thrown Weapon Fighting',
+      'Two-Weapon Fighting',
+      'Unarmed Fighting',
+      'Blessed Warrior',
+      'Druidic Warrior',
+      'Superior Technique',
     ])('exports %s with required properties', (name) => {
       const style = FIGHTING_STYLES[name];
       expect(style).toBeDefined();
@@ -15,8 +26,8 @@ describe('fightingStyles', () => {
       expect(style.description.length).toBeGreaterThan(0);
     });
 
-    it('exports exactly 2 fighting styles', () => {
-      expect(Object.keys(FIGHTING_STYLES)).toHaveLength(2);
+    it('exports exactly 13 fighting styles', () => {
+      expect(Object.keys(FIGHTING_STYLES)).toHaveLength(13);
     });
 
     it('provides referentially stable style objects', () => {
@@ -37,9 +48,8 @@ describe('fightingStyles', () => {
     });
 
     it('returns null for unknown names', () => {
-      expect(getFightingStyle('Dueling')).toBeNull();
-      expect(getFightingStyle('Defense')).toBeNull();
-      expect(getFightingStyle('Archery')).toBeNull();
+      expect(getFightingStyle('Unknown Style')).toBeNull();
+      expect(getFightingStyle('')).toBeNull();
     });
 
     it('returns null for empty string', () => {

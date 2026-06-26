@@ -7,6 +7,7 @@ import { executeHandler } from '../../../services/automation/index.js';
 import { applyPortentChoice } from '../../../services/automation/handlers/class-wizard/portentHandler.js';
 import Popup from '../../common/popup.jsx';
 import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
+import { getFightingStyle } from '../../../services/character/fightingStyles.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -202,6 +203,14 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
     const majorName = playerStats.class.major?.name || playerStats.class.subclass?.name;
     const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
     const isBattleMaster = majorName === 'Battle Master';
+    const [fightingStylePopup, setFightingStylePopup] = React.useState(null);
+
+    const handleFightingStyleClick = (styleName) => {
+        const style = getFightingStyle(styleName);
+        if (style) {
+            setFightingStylePopup(`<b>${style.name}</b><br/>${style.description}<br/><span class="dice-roll-hint">click to dismiss</span>`);
+        }
+    };
 
     if (!classLevel) return null;
 
@@ -223,8 +232,18 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
                       <div><b>Energy Die Type: </b>d{classLevel.energy.energy_die_type}</div>
                   </div>
               )}
-              <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
-              <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles?.join(', ') || 'N/A'}</div>
+               <div><b>Extra Attacks: </b>{classLevel.extra_attacks || 0}</div>
+               <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles ? (
+                   <span>{playerStats.class.fightingStyles.map((style, idx) => (
+                       <React.Fragment key={style}>
+                           {idx > 0 && ', '}
+                           <span className="clickable" onClick={() => handleFightingStyleClick(style)}>
+                               {style}
+                           </span>
+                       </React.Fragment>
+                   ))}</span>
+               ) : 'N/A'}</div>
+               {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
               <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
               {isBattleMaster && (
                   <>
@@ -259,13 +278,31 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
     const paladinFeatures = getClassFeatures(playerStats);
     const cha = playerStats.abilities?.find((a) => a.name === 'Charisma');
     const layOnHandsPoolMax = 5 * playerStats.level;
+    const [fightingStylePopup, setFightingStylePopup] = React.useState(null);
+
+    const handleFightingStyleClick = (styleName) => {
+        const style = getFightingStyle(styleName);
+        if (style) {
+            setFightingStylePopup(`<b>${style.name}</b><br/>${style.description}<br/><span class="dice-roll-hint">click to dismiss</span>`);
+        }
+    };
     return (
          <div data-testid="char-class-paladin">
              {cha && <div><b>Aura of Protection: </b>+{cha.bonus} to saves {playerStats.level >= 6 ? '(10 ft.)' : '(locked)'}</div>}
              {paladinFeatures?.auraRange !== null && <div><b>Aura Range: </b>{paladinFeatures.auraRange}</div>}
              <TrackedResourceInput label="Channel Divinity Charges" resourceKey="channelDivinityCharges" playerName={playerStats.name} getMax={() => paladinFeatures?.maxChannelDivinity || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
              <div><b>Extra Attacks: </b>{paladinFeatures?.extraAttacks || 0}</div>
-             {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
+              {playerStats.class.fightingStyles && <div><b>Fighting Styles: </b>{(
+                  <span>{playerStats.class.fightingStyles.map((style, idx) => (
+                      <React.Fragment key={style}>
+                          {idx > 0 && ', '}
+                          <span className="clickable" onClick={() => handleFightingStyleClick(style)}>
+                              {style}
+                          </span>
+                      </React.Fragment>
+                  ))}</span>
+              )}</div>}
+              {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
              <TrackedResourceInput label="Lay On Hands Pool" resourceKey="layOnHandsPool" playerName={playerStats.name} getMax={() => layOnHandsPoolMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
          </div>
     );
@@ -274,6 +311,14 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
 /* ─── Ranger ─── */
 const RangerFeatures = function RangerFeatures({ playerStats }) {
     const rangerFeatures = getClassFeatures(playerStats);
+    const [fightingStylePopup, setFightingStylePopup] = React.useState(null);
+
+    const handleFightingStyleClick = (styleName) => {
+        const style = getFightingStyle(styleName);
+        if (style) {
+            setFightingStylePopup(`<b>${style.name}</b><br/>${style.description}<br/><span class="dice-roll-hint">click to dismiss</span>`);
+        }
+    };
     return (
          <div data-testid="char-class-ranger">
              <div className="automation-actions">
@@ -290,7 +335,17 @@ const RangerFeatures = function RangerFeatures({ playerStats }) {
              </div>
              <div><b>Extra Attacks: </b>{rangerFeatures?.extraAttacks || 0}</div>
              <div><b>Favored Enemies: </b>{rangerFeatures?.favoredEnemies}</div>
-             {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{playerStats.class.fightingStyles.join(', ')}</div>}
+              {playerStats.class.fightingStyles && playerStats.level > 1 && <div><b>Fighting Styles: </b>{(
+                  <span>{playerStats.class.fightingStyles.map((style, idx) => (
+                      <React.Fragment key={style}>
+                          {idx > 0 && ', '}
+                          <span className="clickable" onClick={() => handleFightingStyleClick(style)}>
+                              {style}
+                          </span>
+                      </React.Fragment>
+                  ))}</span>
+              )}</div>}
+              {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
          </div>
     );
 };

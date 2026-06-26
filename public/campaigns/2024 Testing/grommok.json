@@ -50,24 +50,18 @@
   "class": {
     "name": "Fighter",
     "subclass": {
-      "name": "Battle Master",
+      "name": "Champion",
       "type": ""
     },
     "divineOrder": "",
     "primalOrder": "",
     "fightingStyles": [
-      "Defense"
+      "Defense",
+      "Protection"
     ]
   },
   "expertSkills": [],
-  "feats": [
-    "Boon Of Fortitude",
-    "Savage Attacker",
-    "Great Weapon Master",
-    "Durable",
-    "Charger",
-    "Heavy Armor Master"
-  ],
+  "feats": [],
   "fightingStyles": [],
   "race": {
     "name": "Orc",
