@@ -63,7 +63,10 @@ export async function applyTypeChoice(action, playerStats, campaignName, chosenT
         characterName: playerStats.name,
         abilityName: name,
         description: `${name} — damage types ${isChange ? 'changed to' : 'set to'} ${filtered.join(', ')}`,
-    }).catch(() => { });
+    }).catch(e => {
+                        console.error(`[automation] Failed to log entry:`, e);
+                        throw e;
+    })
 
     return {
         type: 'popup',

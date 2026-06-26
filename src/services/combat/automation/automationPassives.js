@@ -53,13 +53,14 @@ export function collectWeaponMastery(weaponName, playerStats) {
 
     const extraMasteries = [];
     let replaceMastery = null;
+    let replaceMasteryOptions = null;
     let hasKindMasteryMatch = false;
     const passives = playerStats.automation?.passives || [];
     for (const passive of passives) {
         if (passive.extraMastery && Array.isArray(passive.extraMastery)) {
             extraMasteries.push(...passive.extraMastery);
         }
-        if (passive.replaceMastery && Array.isArray(passive.replaceMastery)) {
+        if (passive.replaceMastery && Array.isArray(passive.replaceMastery) && passive.replaceMastery.length > 0) {
             replaceMastery = passive.replaceMastery;
         }
         if (passive.type === 'weapon_mastery_choice' && passive.masteryProperties) {
@@ -80,7 +81,10 @@ export function collectWeaponMastery(weaponName, playerStats) {
     }
 
     if (replaceMastery) {
-        extraMasteries.push(...replaceMastery);
+        if (baseMastery) {
+            // Tactical Master: only offer replacement when weapon has a usable mastery
+            replaceMasteryOptions = replaceMastery;
+        }
     } else if (!hasKindMasteryMatch) {
         baseMastery = null;
     }
@@ -88,6 +92,7 @@ export function collectWeaponMastery(weaponName, playerStats) {
     return {
         baseMastery,
         extraMasteries: [...new Set(extraMasteries)],
+        replaceMasteryOptions: replaceMasteryOptions || null,
     };
 }
 

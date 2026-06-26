@@ -117,7 +117,7 @@ describe('collectWeaponMastery', () => {
   it('returns null baseMastery when weapon not in equipment', () => {
     const ps = makePlayerStats({ equipment: [] })
     const result = collectWeaponMastery('Longsword', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [], replaceMasteryOptions: null })
   })
 
   it('returns null base mastery when character lacks weapon_kind_mastery', () => {
@@ -125,7 +125,7 @@ describe('collectWeaponMastery', () => {
       equipment: [{ name: 'Longsword', mastery: 'trip' }],
     })
     const result = collectWeaponMastery('Longsword', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [], replaceMasteryOptions: null })
   })
 
   it('strips magic prefix when looking up weapon in equipment', () => {
@@ -133,7 +133,7 @@ describe('collectWeaponMastery', () => {
       equipment: [{ name: 'Greataxe', mastery: 'heave' }],
     })
     const result = collectWeaponMastery('+1 Greataxe', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [], replaceMasteryOptions: null })
   })
 
   it('collects extra masteries from automation passives', () => {
@@ -146,7 +146,7 @@ describe('collectWeaponMastery', () => {
       },
     })
     const result = collectWeaponMastery('Club', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: ['push', 'topple'] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: ['push', 'topple'], replaceMasteryOptions: null })
   })
 
   it('deduplicates extra masteries across multiple passives', () => {
@@ -160,35 +160,35 @@ describe('collectWeaponMastery', () => {
       },
     })
     const result = collectWeaponMastery('Club', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: ['push', 'topple'] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: ['push', 'topple'], replaceMasteryOptions: null })
   })
 
   it('returns empty extraMasteries when no automation passives exist', () => {
     const ps = makePlayerStats({ equipment: [] })
     const result = collectWeaponMastery('Sword', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [], replaceMasteryOptions: null })
   })
 
   it('handles missing equipment gracefully', () => {
     const ps = makePlayerStats()
     const result = collectWeaponMastery('Sword', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [], replaceMasteryOptions: null })
   })
 
   it('handles missing automation passives gracefully', () => {
     const ps = makePlayerStats({ equipment: [] })
     const result = collectWeaponMastery('Sword', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [], replaceMasteryOptions: null })
   })
 
   it('handles missing automation object on playerStats', () => {
     const ps = makePlayerStats({ equipment: [] })
     delete ps.automation
     const result = collectWeaponMastery('Sword', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: [] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [], replaceMasteryOptions: null })
   })
 
-  it('adds replaceMastery to extraMasteries without clearing baseMastery', () => {
+  it('adds replaceMastery to replaceMasteryOptions without clearing baseMastery', () => {
     const ps = makePlayerStats({
       equipment: [{ name: 'Club', mastery: 'trip' }],
       automation: {
@@ -198,7 +198,7 @@ describe('collectWeaponMastery', () => {
       },
     })
     const result = collectWeaponMastery('Club', ps)
-    expect(result).toEqual({ baseMastery: 'trip', extraMasteries: ['push', 'heave'] })
+    expect(result).toEqual({ baseMastery: 'trip', extraMasteries: [], replaceMasteryOptions: ['push', 'heave'] })
   })
 
   it('combines replaceMastery with extraMastery from multiple passives', () => {
@@ -212,10 +212,10 @@ describe('collectWeaponMastery', () => {
       },
     })
     const result = collectWeaponMastery('Club', ps)
-    expect(result).toEqual({ baseMastery: 'trip', extraMasteries: ['topple', 'heave', 'push'] })
+    expect(result).toEqual({ baseMastery: 'trip', extraMasteries: ['topple', 'heave'], replaceMasteryOptions: ['push'] })
   })
 
-  it('returns null baseMastery when replaceMastery exists but weapon not found', () => {
+  it('returns null baseMastery and no replaceMasteryOptions when weapon not found', () => {
     const ps = makePlayerStats({
       automation: {
         passives: [
@@ -224,7 +224,7 @@ describe('collectWeaponMastery', () => {
       },
     })
     const result = collectWeaponMastery('Club', ps)
-    expect(result).toEqual({ baseMastery: null, extraMasteries: ['push'] })
+    expect(result).toEqual({ baseMastery: null, extraMasteries: [], replaceMasteryOptions: null })
   })
 })
 

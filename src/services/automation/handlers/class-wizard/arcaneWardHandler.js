@@ -155,7 +155,10 @@ export async function onArcaneWardRestore(action, playerStats, spellSlotLevel, c
         characterName: playerName,
         abilityName: action.name,
         description: `${playerName} used Arcane Ward (Bonus Action) to restore ${restoreAmount} HP to the ward (${currentHp} → ${newHp}/${maxHp}). Expend spell slot level ${spellSlotLevelNum}.`,
-    }).catch(() => { });
+    }).catch(e => {
+                        console.error(`[automation] Failed to log entry:`, e);
+                        throw e;
+    })
 
     return {
         type: 'popup',
@@ -319,7 +322,10 @@ export async function onAbjurationSpellCast(action, playerStats, spellName, spel
             characterName: playerName,
             abilityName: 'Arcane Ward',
             description: `${playerName} created Arcane Ward by casting ${spellName} (level ${spellSlotLevelNum}). Ward HP: ${maxHp}.`,
-        }).catch(() => { });
+        }).catch(e => {
+                            console.error(`[automation] Failed to log entry:`, e);
+                            throw e;
+        })
 
         return {
             type: 'popup',
@@ -344,7 +350,10 @@ export async function onAbjurationSpellCast(action, playerStats, spellName, spel
         characterName: playerName,
         abilityName: 'Arcane Ward',
         description: `${playerName} cast ${spellName} (level ${spellSlotLevelNum}). Arcane Ward restored ${restoreAmount} HP (${currentHp} → ${newHp}/${maxHp}).`,
-    }).catch(() => { });
+    }).catch(e => {
+                        console.error(`[automation] Failed to log entry:`, e);
+                        throw e;
+    })
 
     return {
         type: 'popup',

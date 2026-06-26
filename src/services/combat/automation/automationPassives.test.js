@@ -220,7 +220,7 @@ describe('collectWeaponMastery', () => {
     }
     const result = collectWeaponMastery('+1 Longsword', playerStats)
     expect(parseMagicItemName).toHaveBeenCalledWith('+1 Longsword')
-    expect(result).toEqual({ baseMastery: 'push', extraMasteries: [] })
+    expect(result).toEqual({ baseMastery: 'push', extraMasteries: [], replaceMasteryOptions: null })
   })
 
   it('returns null baseMastery when weapon not found', () => {
@@ -247,7 +247,7 @@ describe('collectWeaponMastery', () => {
       },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
-    expect(result).toEqual({ baseMastery: 'push', extraMasteries: ['topple'] })
+    expect(result).toEqual({ baseMastery: 'push', extraMasteries: ['topple'], replaceMasteryOptions: null })
   })
 
   it('deduplicates extraMasteries', () => {
@@ -260,14 +260,14 @@ describe('collectWeaponMastery', () => {
     expect(result.extraMasteries).toEqual(['push', 'topple'])
   })
 
-  it('adds replaceMastery to extraMasteries without clearing baseMastery', () => {
+  it('adds replaceMastery to replaceMasteryOptions without clearing baseMastery', () => {
     parseMagicItemName.mockReturnValue({ baseName: 'Longsword', magicBonus: 0 })
     const playerStats = {
       equipment: [{ name: 'Longsword', mastery: 'push' }],
       automation: { passives: [{ replaceMastery: ['topple', 'shove'] }] },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
-    expect(result).toEqual({ baseMastery: 'push', extraMasteries: ['topple', 'shove'] })
+    expect(result).toEqual({ baseMastery: 'push', extraMasteries: [], replaceMasteryOptions: ['topple', 'shove'] })
   })
 
   it('handles null passives array', () => {
@@ -350,9 +350,11 @@ describe('collectWeaponMastery', () => {
       },
     }
     const result = collectWeaponMastery('Longsword', playerStats)
-    // baseMastery is preserved; extraMasteries accumulates from all sources
+    // baseMastery is preserved; extraMasteries accumulates from extraMastery and weapon_mastery_choice only
+    // replaceMastery goes into replaceMasteryOptions instead
     expect(result.baseMastery).toBe('push')
-    expect(result.extraMasteries).toEqual(expect.arrayContaining(['shove', 'trip', 'topple']))
+    expect(result.extraMasteries).toEqual(expect.arrayContaining(['shove', 'topple']))
+    expect(result.replaceMasteryOptions).toEqual(['trip'])
   })
 })
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getCategories } from '../../services/character/featureCategories.js'
 import { collectWeaponMastery } from '../../services/combat/automation/automationService.js';
-import { applyPostDamageMasteryEffects } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
+import { applyPostDamageMasteryEffects, applyMasteryEffect } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
@@ -39,6 +39,7 @@ import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetama
 import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
 import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
+import TacticalMasterModal from './modals/TacticalMasterModal.jsx';
 
 import './CharActions.css'
 import { isEqual } from 'lodash';
@@ -183,11 +184,22 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 }
                             }
 
-                            // Apply other post-damage mastery effects (Sap, Slow, Vex, Push, Nick)
-                            try {
-                                await applyPostDamageMasteryEffects(lastAttack.attackName, playerStats, campaignName, combatSummary);
-                            } catch (e) {
-                                console.error('[Mastery] Post-damage mastery error:', e);
+                            // Tactical Master: if weapon has a mastery and replaceMasteryOptions exist,
+                            // show a modal to choose which mastery to apply instead of auto-applying.
+                            if (available.replaceMasteryOptions?.length > 0) {
+                                setTacticalMasterModal({
+                                    attackName: lastAttack.attackName,
+                                    baseMastery: available.baseMastery,
+                                    replaceOptions: available.replaceMasteryOptions,
+                                    targetName: lastAttack.targetName,
+                                });
+                            } else {
+                                // Apply post-damage mastery effects (Sap, Slow, Vex, Push, Nick)
+                                try {
+                                    await applyPostDamageMasteryEffects(lastAttack.attackName, playerStats, campaignName, combatSummary);
+                                } catch (e) {
+                                    console.error('[Mastery] Post-damage mastery error:', e);
+                                }
                             }
 
                             // Topple weapon mastery: standalone flow after attack is fully complete.
@@ -413,6 +425,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useState(false);
     const [cleaveSecondTargets, setCleaveSecondTargets] = useState([]);
+    const [tacticalMasterModal, setTacticalMasterModal] = useState(null);
 
     const handleCleaveAttack = React.useCallback(async (cleaveTargetName) => {
         if (!cleaveTargetName) {
@@ -481,6 +494,31 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
             }).catch(() => {});
         }
     }, [campaignName, playerStats, rollDamage]);
+
+    const handleTacticalMasterConfirm = React.useCallback(async (chosenMastery) => {
+        const oldMastery = tacticalMasterModal?.baseMastery;
+        const attackName = tacticalMasterModal?.attackName;
+        const targetName = tacticalMasterModal?.targetName;
+        setTacticalMasterModal(null);
+        if (!chosenMastery) return;
+        if (targetName) {
+            await addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Tactical Master',
+                description: `${playerStats.name} used Tactical Master on ${attackName} against ${targetName} — changed mastery from ${oldMastery} to ${chosenMastery}`,
+                targetName: targetName,
+            }).catch(() => {});
+        }
+        const combatSummary = await getCombatContext(campaignName);
+        const actualTargetName = combatSummary?.lastAttack?.targetName;
+        if (!actualTargetName) return;
+        await applyMasteryEffect(chosenMastery, playerStats, campaignName, actualTargetName);
+    }, [campaignName, playerStats, tacticalMasterModal]);
+
+    const handleTacticalMasterDismiss = () => {
+        setTacticalMasterModal(null);
+    };
 
     useEffect(() => {
         const handler = (event) => {
@@ -1315,6 +1353,18 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     onTargetSelected={handleCleaveAttack}
                     onSkip={() => { setShowCleaveTargetSelection(false); setCleaveSecondTargets([]); }}
                     featureDescription="On a hit, the second creature takes weapon damage (no ability modifier to damage unless negative). Once per turn."
+                />
+            )}
+            {tacticalMasterModal && (
+                <TacticalMasterModal
+                    attackName={tacticalMasterModal.attackName}
+                    baseMastery={tacticalMasterModal.baseMastery}
+                    replaceOptions={tacticalMasterModal.replaceOptions}
+                    targetName={tacticalMasterModal.targetName}
+                    playerStats={playerStats}
+                    campaignName={campaignName}
+                    onConfirm={handleTacticalMasterConfirm}
+                    onClose={handleTacticalMasterDismiss}
                 />
             )}
         </div>
