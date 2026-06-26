@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import './diceRollResult.css';
 
-function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver }) {
+function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind }) {
     const [mode, setMode] = useState(forcedMode || 'normal');
     const [rerollUsed, setRerollUsed] = useState(false);
     const [rerollResult, setRerollResult] = useState(null);
@@ -46,11 +46,12 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20) || (strokeResult !== null && isD20);
     const showFumble = isNatural1 && rollType === 'attack';
 
-    const handleTacticalMind = () => {
-        const tacticalBonus = tacticalMindBonus || 0;
-        const newTotal = finalRoll + bonus + modifier + tacticalBonus;
-        setTacticalResult({ bonus: tacticalBonus, total: newTotal });
+    const handleTacticalMind = async () => {
+        const dieResult = Math.floor(Math.random() * 10) + 1;
+        const newTotal = finalRoll + bonus + modifier + dieResult;
+        setTacticalResult({ bonus: dieResult, total: newTotal });
         setTacticalUsed(true);
+        if (onTacticalMind) await onTacticalMind(dieResult);
     };
 
     const handleSuperiorityManeuver = async (maneuver) => {
@@ -303,7 +304,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
 
             {tacticalUsed && tacticalResult !== null && (
               <div className="dice-roll-reroll-result">
-                <i className="fa-solid fa-hand"></i> Tactical Mind: +{tacticalResult.bonus} = <strong>{tacticalResult.total}</strong>
+                <i className="fa-solid fa-hand"></i> Tactical Mind: +{tacticalResult.bonus} → <strong>{tacticalResult.total}</strong>
               </div>
             )}
 

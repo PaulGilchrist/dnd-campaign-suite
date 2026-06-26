@@ -18,6 +18,7 @@ const INTERACTIVE_HANDLER_TYPES = new Set([
     'combat_superiority',
     'weapon_kind_mastery',
     'weapon_mastery_choice',
+    'tactical_mind',
 ]);
 
 const INTERACTIVE_PASSIVE_EFFECTS = new Set([

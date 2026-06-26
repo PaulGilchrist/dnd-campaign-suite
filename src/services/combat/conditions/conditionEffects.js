@@ -63,7 +63,7 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
     if (!within5ft) return false;
     return true;
   }
-  if (modifier.target !== 'saving_throw' && modifier.target !== 'save' && modifier.target !== 'attack_roll' && modifier.target !== 'attack_rolls' && modifier.target !== 'attack_rolls_vs_unmounted_near_mount' && modifier.target !== 'concentration_saving_throws' && modifier.target !== 'death_saving_throws') return false;
+  if (modifier.target !== 'saving_throw' && modifier.target !== 'save' && modifier.target !== 'attack_roll' && modifier.target !== 'attack_rolls' && modifier.target !== 'attack_rolls_vs_unmounted_near_mount' && modifier.target !== 'concentration_saving_throws' && modifier.target !== 'death_saving_throws' && modifier.target !== 'ability_check' && modifier.target !== 'check') return false;
   if (modifier.condition === 'raging') return isRaging;
   if (modifier.condition === 'shape_shift') return shapeShiftActive;
   if (modifier.condition === 'peerless_athlete') return isPeerlessAthlete;

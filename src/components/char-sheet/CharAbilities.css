@@ -1,6 +1,6 @@
 .abilities-popup-parent .abilities {
     display: grid;
-    grid-template-columns: 80px 45px 45px 72px auto;
+    grid-template-columns: 80px 45px 45px 80px auto;
     text-align: center;
 }
 .abilities-popup-parent .abilities > div {

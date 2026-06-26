@@ -67,57 +67,60 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
            return bonus;
        };
 
-         const makeCheckContext = (checkName) => {
-            let forcedMode = undefined
-            if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
-            if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
-              forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
-            }
-            // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
-            if (!forcedMode && conditionEffects?.abilityCheckAdvantageAbilities) {
-              const abbr = checkName.substring(0, 3).toUpperCase();
-              if (conditionEffects.abilityCheckAdvantageAbilities.includes(abbr)) {
-                forcedMode = 'advantage'
-              }
-            }
-            // Ray of Enfeeblement: STR-based d20 tests have disadvantage
-            if (!forcedMode && conditionEffects?.strCheckDisadvantage) {
-              const abbr = checkName.substring(0, 3).toUpperCase();
-              if (abbr === 'STR' || checkName === 'Strength') {
-                forcedMode = 'disadvantage'
-              }
-            }
-           const ctx = forcedMode ? { forcedMode } : undefined
-           if (conditionEffects?.strCheckReplace) {
-             const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
-             return { ...ctx, strCheckReplace: true, strScore: strAbility?.totalScore || 10 }
-           }
-           if (conditionEffects?.wisCheckReplace) {
-             const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
-             const wisMod = wisAbility?.bonus || 0;
-             const minBonus = Math.max(1, wisMod);
-             return { ...ctx, wisCheckReplace: true, wisCheckMinBonus: minBonus }
-           }
-            if (conditionEffects?.tacticalMind) {
-              return { ...ctx, tacticalMind: true, tacticalMindBonus: conditionEffects.tacticalMindBonus || null }
-            }
-            if (conditionEffects?.reliableTalent) {
-              return { ...ctx, reliableTalent: true }
-            }
-              if (conditionEffects?.strokeOfLuck) {
-                return { ...ctx, strokeOfLuck: true }
-              }
-              if (conditionEffects?.luckyAdvantage) {
-                return { ...ctx, luckyAdvantage: true, luckyAdvantageType: 'advantage' }
-              }
-              if (conditionEffects?.luckyDisadvantage) {
-                return { ...ctx, luckyDisadvantage: true, luckyDisadvantageType: 'disadvantage' }
-              }
-              if (conditionEffects?.d20Floor10) {
-               return { ...ctx, d20Floor10: true }
+          const makeCheckContext = (checkName) => {
+             let forcedMode = undefined
+             if (conditionEffects?.abilityCheckDisadvantage) forcedMode = 'disadvantage'
+             if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
+               forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
              }
-             return ctx
-        }
+             // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
+             if (!forcedMode && conditionEffects?.abilityCheckAdvantageAbilities) {
+               const abbr = checkName.substring(0, 3).toUpperCase();
+               if (conditionEffects.abilityCheckAdvantageAbilities.includes(abbr)) {
+                 forcedMode = 'advantage'
+               }
+             }
+             // Ray of Enfeeblement: STR-based d20 tests have disadvantage
+             if (!forcedMode && conditionEffects?.strCheckDisadvantage) {
+               const abbr = checkName.substring(0, 3).toUpperCase();
+               if (abbr === 'STR' || checkName === 'Strength') {
+                 forcedMode = 'disadvantage'
+               }
+             }
+            const ctx = forcedMode ? { forcedMode } : {}
+            if (conditionEffects?.strCheckReplace) {
+              const strAbility = playerStats?.abilities?.find(a => a.name === 'Strength');
+              ctx.strCheckReplace = true;
+              ctx.strScore = strAbility?.totalScore || 10
+            }
+            if (conditionEffects?.wisCheckReplace) {
+              const wisAbility = playerStats?.abilities?.find(a => a.name === 'Wisdom');
+              const wisMod = wisAbility?.bonus || 0;
+              const minBonus = Math.max(1, wisMod);
+              ctx.wisCheckReplace = true;
+              ctx.wisCheckMinBonus = minBonus
+            }
+             if (conditionEffects?.tacticalMind) {
+               ctx.tacticalMind = true;
+               ctx.tacticalMindBonus = conditionEffects.tacticalMindBonus || null
+             }
+             if (conditionEffects?.reliableTalent) {
+               ctx.reliableTalent = true
+             }
+               if (conditionEffects?.strokeOfLuck) {
+                 ctx.strokeOfLuck = true
+               }
+               if (conditionEffects?.luckyAdvantage) {
+                 ctx.luckyAdvantage = true; ctx.luckyAdvantageType = 'advantage'
+               }
+               if (conditionEffects?.luckyDisadvantage) {
+                 ctx.luckyDisadvantage = true; ctx.luckyDisadvantageType = 'disadvantage'
+               }
+               if (conditionEffects?.d20Floor10) {
+                ctx.d20Floor10 = true
+              }
+              return Object.keys(ctx).length > 0 ? ctx : undefined
+         }
 
       const makeSaveContext = (abilityName) => {
         const abbr = abilityName.substring(0, 3).toLowerCase()

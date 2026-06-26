@@ -442,6 +442,33 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
     }, [playerStats, campaignName]);
 
+    const handleTacticalMind = React.useCallback(async (dieResult) => {
+        if (!playerStats) return;
+        const playerName = playerStats.name;
+        let currentUses = Number(getRuntimeValue(playerName, 'secondWindUses', campaignName) ?? 0);
+        const maxUses = playerStats.class?.class_levels?.[(playerStats.level || 1) - 1]?.second_wind || 0;
+        if (currentUses <= 0) {
+            currentUses = maxUses;
+            await setRuntimeValue(playerName, 'secondWindUses', currentUses, campaignName);
+        }
+        if (currentUses <= 0) return;
+        await setRuntimeValue(playerName, 'secondWindUses', currentUses - 1, campaignName);
+        const { addEntry } = await import('../../services/ui/logService.js');
+        const checkName = popupHtml?.name || 'Ability Check';
+        const d20 = popupHtml?.rolls?.[0] || 0;
+        const bonus = popupHtml?.bonus || 0;
+        const originalTotal = d20 + bonus;
+        const modifiedTotal = originalTotal + dieResult;
+        await addEntry(campaignName, {
+            type: 'ability_use',
+            characterName: playerName,
+            abilityName: 'Tactical Mind',
+            description: `${playerName} used Tactical Mind: +${dieResult} to ${checkName} (d20 ${d20} + ${bonus} = ${originalTotal} → ${modifiedTotal}).`,
+            d10Roll: dieResult,
+            timestamp: Date.now(),
+        });
+    }, [playerStats, campaignName, popupHtml]);
+
     const handleSuperiorityManeuver = React.useCallback(async (maneuverName, dieValue) => {
         if (!playerStats) return;
         try {
@@ -620,7 +647,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                                     ) : null}
                                     <div className="dice-roll-hint">click to dismiss</div>
                                 </div> :
-                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} />
+                            <DiceRollResult {...popupHtml} onSuperiorityManeuver={popupHtml?.availableSuperiorityManeuvers ? handleSuperiorityManeuver : undefined} onTacticalMind={popupHtml?.tacticalMind ? handleTacticalMind : undefined} />
                 }
             </Popup>
         )}

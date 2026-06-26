@@ -333,6 +333,8 @@ export function createLogAndShow(deps) {
             defensiveDuelistBonus: context?.defensiveDuelistBonus || 0,
             baitAndSwitchBonus: context?.baitAndSwitchBonus || 0,
             d20Floor10: context?.d20Floor10,
+            tacticalMind: context?.tacticalMind,
+            tacticalMindBonus: context?.tacticalMindBonus,
             characterName,
             campaignName,
             availableSuperiorityManeuvers,
