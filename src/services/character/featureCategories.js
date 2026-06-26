@@ -213,7 +213,8 @@ const categories2024 = {
         "Pact Magic",
         "Second-Storywork",
         "Slippery Mind",
-        "Somatic Components"
+        "Somatic Components",
+        "Student of War"
     ]
 };
 
