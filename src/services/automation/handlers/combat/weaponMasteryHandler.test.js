@@ -7,7 +7,6 @@ import * as useRuntimeState from '../../../../hooks/runtime/useRuntimeState.js';
 import * as logService from '../../../ui/logService.js';
 import * as damageUtils from '../../../rules/combat/damageUtils.js';
 import * as combatData from '../../../../services/encounters/combatData.js';
-import * as savePrompt from '../../../automation/common/savePrompt.js';
 
 // ── Mocks (hoisted — these replace the real modules) ────────────
 
@@ -382,70 +381,13 @@ describe('weaponMasteryHandler', () => {
 
         // ── Topple ────────────────────────────────────────────────────
 
-        it('should apply Topple effect with a save', async () => {
+        it('should apply Topple effect as a passive target effect', async () => {
             vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-            vi.mocked(savePrompt.createSaveListener).mockReturnValue({ promptId: 'save-prompt-1' });
 
             const result = await applyMasteryEffect('Topple', makePlayerStats(), 'campaign', 'Goblin');
 
             expect(result.type).toBe('popup');
-            expect(result.payload.description).toContain('Topple applied');
-        });
-
-        it('should call createSaveListener with correct DC and save type', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-            vi.mocked(savePrompt.createSaveListener).mockReturnValue({ promptId: 'save-prompt-1' });
-
-            await applyMasteryEffect('Topple', makePlayerStats(), 'campaign', 'Goblin');
-
-            // saveAbility is 'CON' but player stats use 'Constitution' name, so ability lookup fails → mod=0, prof=3 → DC=11
-            expect(vi.mocked(savePrompt.createSaveListener)).toHaveBeenCalledWith('campaign', expect.objectContaining({
-                targetName: 'Goblin',
-                saveType: 'CON',
-                saveDc: 11, // 8 + 0 (ability not found) + 3 (proficiency)
-            }));
-        });
-
-        it('should log a save_triggered entry for Topple', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-            vi.mocked(savePrompt.createSaveListener).mockReturnValue({ promptId: 'save-prompt-1' });
-
-            await applyMasteryEffect('Topple', makePlayerStats(), 'campaign', 'Goblin');
-
-            expect(logService.addEntry).toHaveBeenCalledWith('campaign', expect.objectContaining({
-                type: 'save_triggered',
-                targetName: 'Goblin',
-                saveType: 'CON',
-                saveDc: 11,
-            }));
-        });
-
-        it('should use proficiency 0 when playerStats.proficiency is missing', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-            vi.mocked(savePrompt.createSaveListener).mockReturnValue({ promptId: 'save-prompt-1' });
-
-            const ps = makePlayerStats({ proficiency: 0 });
-
-            await applyMasteryEffect('Topple', ps, 'campaign', 'Goblin');
-
-            // CON name mismatch → mod=0, prof=0 → DC=8
-            expect(vi.mocked(savePrompt.createSaveListener)).toHaveBeenCalledWith('campaign', expect.objectContaining({
-                saveDc: 8, // 8 + 0 + 0
-            }));
-        });
-
-        it('should use ability bonus 0 when target ability is missing', async () => {
-            vi.mocked(useRuntimeState.getRuntimeValue).mockReturnValue([]);
-            vi.mocked(savePrompt.createSaveListener).mockReturnValue({ promptId: 'save-prompt-1' });
-
-            const ps = makePlayerStats({ abilities: [] });
-
-            await applyMasteryEffect('Topple', ps, 'campaign', 'Goblin');
-
-            // CON name mismatch → mod=0, prof=3 → DC=11
-            expect(vi.mocked(savePrompt.createSaveListener)).toHaveBeenCalledWith('campaign', expect.objectContaining({
-                saveDc: 11, // 8 + 0 + 3
-            }));
+            expect(result.payload.description).toContain('Topple: ready');
         });
 
         // ── Vex ───────────────────────────────────────────────────────

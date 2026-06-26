@@ -3,6 +3,7 @@ import { getCategories } from '../../services/character/featureCategories.js'
 import { collectWeaponMastery } from '../../services/combat/automation/automationService.js';
 import { applyPostDamageMasteryEffects } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
+import { createSaveListener } from '../../services/automation/common/savePrompt.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
 import { showWeaponMasteryPopup, buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js'
@@ -13,6 +14,7 @@ import { computeFeatRangeEffects } from '../../services/character/featRangeServi
 import { hasAutomation } from '../../services/combat/automation/automationService.js'
 import { isExhausted } from '../../services/automation/handlers/combat/saveAttackHandler.js'
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import CharActionModals from './CharActionModals.jsx'
 import CharActionSpellPopups from './CharActionSpellPopups.jsx'
 import CharBonusActions from './CharBonusActions.jsx'
@@ -181,11 +183,74 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 }
                             }
 
-                            // Apply other post-damage mastery effects (Sap, Slow, Vex, Push, Topple, Nick)
+                            // Apply other post-damage mastery effects (Sap, Slow, Vex, Push, Nick)
                             try {
                                 await applyPostDamageMasteryEffects(lastAttack.attackName, playerStats, campaignName, combatSummary);
                             } catch (e) {
                                 console.error('[Mastery] Post-damage mastery error:', e);
+                            }
+
+                            // Topple weapon mastery: standalone flow after attack is fully complete.
+                            // Yield to React so the damage popup renders before the save prompt overlays it.
+                            await new Promise(r => setTimeout(r, SHOW_DICE_ROLL_DELAY));
+                            if (allMasteries.includes('Topple')) {
+                                try {
+                                    const toppleTargetName = combatSummary.lastAttack.targetName;
+
+                                    const weaponAttack = playerStats.attacks?.find(a => a.name === lastAttack.attackName);
+                                    const abilityName = weaponAttack?.abilityName || 'Strength';
+                                    const ability = playerStats.abilities?.find(a => a.name === abilityName);
+                                    const abilityMod = ability?.bonus || 0;
+                                    const prof = playerStats.proficiency || 0;
+                                    const saveDc = 8 + abilityMod + prof;
+
+                                    const { promptId, promise } = createSaveListener(campaignName, {
+                                        targetName: toppleTargetName,
+                                        saveType: 'CON',
+                                        saveDc,
+                                    });
+
+                                    addEntry(campaignName, {
+                                        type: 'save_triggered',
+                                        characterName: playerStats.name,
+                                        targetName: toppleTargetName,
+                                        saveType: 'CON',
+                                        saveDc,
+                                        description: `Topple: ${toppleTargetName} must make a DC ${saveDc} CON save (weapon ${abilityName}) or fall Prone.`,
+                                        promptId,
+                                    });
+
+                                    const result = await promise;
+
+                                    if (result && !result.success) {
+                                        const storedConditions = getRuntimeValue(toppleTargetName, 'activeConditions') || [];
+                                        const conditions = Array.isArray(storedConditions) ? storedConditions : [];
+                                        if (!conditions.includes('prone')) {
+                                            await setRuntimeValue(toppleTargetName, 'activeConditions', [...conditions, 'prone'], campaignName);
+                                        }
+
+                                        addEntry(campaignName, {
+                                            type: 'save_result',
+                                            characterName: playerStats.name,
+                                            rollType: 'save-topple',
+                                            targetName: toppleTargetName,
+                                            saveDc,
+                                            saveType: 'CON',
+                                            success: false,
+                                            description: `${toppleTargetName} failed CON save vs Topple. Gains Prone condition.`,
+                                        }).catch((e) => { console.error("[Topple] Error:", e); });
+
+                                        addEntry(campaignName, {
+                                            type: 'ability_use',
+                                            characterName: playerStats.name,
+                                            abilityName: 'Topple',
+                                            description: `${playerStats.name} used Topple on ${toppleTargetName} — target failed CON save (DC ${saveDc}, weapon ${abilityName}), fell Prone.`,
+                                            targetName: toppleTargetName,
+                                        }).catch((e) => { console.error("[Topple] Error:", e); });
+                                    }
+                                } catch (e) {
+                                    console.error('[Topple] Error in Topple mastery flow:', e);
+                                }
                             }
                         }
                     } catch (e) {

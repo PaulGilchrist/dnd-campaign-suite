@@ -2,7 +2,6 @@ import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useR
 import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
-import { createSaveListener } from '../../../automation/common/savePrompt.js';
 import { collectWeaponMastery } from '../../../combat/automation/automationService.js';
 const MASTERY_EFFECTS = {
     Push: {
@@ -96,6 +95,7 @@ export async function applyPostDamageMasteryEffects(attackName, playerStats, cam
         const mastery = MASTERY_EFFECTS[masteryName];
         if (!mastery) continue;
         if (masteryName === 'Graze') continue;
+        if (masteryName === 'Topple') continue;
         if (masteryName === 'Nick') {
             await addEntry(campaignName, {
                 type: 'ability_use',
@@ -181,31 +181,6 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
         }
     }
 
-    let promptId = null;
-    if (mastery.requiresSave && mastery.saveAbility) {
-        const ability = playerStats.abilities?.find(a => a.name === mastery.saveAbility);
-        const mod = ability ? ability.bonus : 0;
-        const prof = playerStats.proficiency || 0;
-        const saveDc = 8 + mod + prof;
-
-        const { promptId: pid } = createSaveListener(campaignName, {
-            targetName,
-            saveType: mastery.saveAbility,
-            saveDc,
-        });
-        promptId = pid;
-
-        addEntry(campaignName, {
-            type: 'save_triggered',
-            characterName: playerStats.name,
-            targetName: targetName || 'unknown',
-            saveType: mastery.saveAbility,
-            saveDc,
-            description: `${masteryName}: ${targetName || 'target'} must make a DC ${saveDc} ${mastery.saveAbility} save or ${mastery.effect === 'topple' ? 'fall Prone' : 'suffer the effect'}.`,
-            promptId,
-        }).catch((e) => { console.error("[weaponMastery] Error:", e); throw e; });
-    }
-
     const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
     let newEffect = {
         target: targetName,
@@ -241,26 +216,6 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
             appliedRound: currentRound,
         };
     }
-    if (masteryName === 'Topple') {
-        const currentRound = getCurrentCombatRound();
-        newEffect = {
-            ...newEffect,
-            appliedRound: currentRound,
-        };
-    }
-    if (mastery.requiresSave && mastery.saveAbility) {
-        const ability = playerStats.abilities?.find(a => a.name === mastery.saveAbility);
-        const mod = ability ? ability.bonus : 0;
-        const prof = playerStats.proficiency || 0;
-        const saveDc = 8 + mod + prof;
-        newEffect = {
-            ...newEffect,
-            saveType: mastery.saveAbility,
-            saveDc,
-            saveAbility: mastery.saveAbility,
-            condition: masteryName === 'Topple' ? 'prone' : null,
-        };
-    }
     if (masteryName === 'Slow') {
         const existingSlowForTarget = storedEffects.filter(
             te => te.target === targetName && te.effect === 'speed_reduction' && te.source === 'Slow'
@@ -278,31 +233,6 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
     }
     const updatedEffects = [...storedEffects, newEffect];
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
-
-    // Set up save-result handler for Topple to apply Prone condition on failure
-    if (masteryName === 'Topple' && promptId && targetName) {
-        const handleSaveResult = (event) => {
-            if (event.detail.promptId !== promptId) return;
-            if (event.detail.success) return;
-            const storedConditions = getRuntimeValue(targetName, 'activeConditions') || [];
-            const conditions = Array.isArray(storedConditions) ? storedConditions : [];
-            if (!conditions.includes('prone')) {
-                setRuntimeValue(targetName, 'activeConditions', [...conditions, 'prone'], campaignName);
-            }
-            addEntry(campaignName, {
-                type: 'save_result',
-                characterName: playerStats.name,
-                rollType: 'save-topple',
-                targetName,
-                saveDc: newEffect.saveDc,
-                saveType: mastery.saveAbility,
-                success: false,
-                description: `${targetName} failed ${mastery.saveAbility} save. Gains Prone condition.`,
-            }).catch((e) => { console.error("[weaponMastery] Error:", e); throw e; });
-            window.removeEventListener('save-result', handleSaveResult);
-        };
-        window.addEventListener('save-result', handleSaveResult);
-    }
 
     // Mark once-per-turn for Cleave
     if (mastery.oncePerTurn && masteryName === 'Cleave') {
@@ -341,7 +271,7 @@ function buildMasteryDescription(masteryName, targetName) {
     const target = targetName || 'target';
     switch (masteryName) {
         case 'Push': return `${masteryName} applied to ${target} — pushed up to 10 ft away.`;
-        case 'Topple': return `${masteryName} applied to ${target} — forced CON save vs Prone.`;
+        case 'Topple': return `${masteryName}: ready to force a CON save vs Prone.`;
         case 'Sap': return `${masteryName} applied to ${target} — Disadvantage on next attack roll.`;
         case 'Slow': return `${masteryName} applied to ${target} — Speed reduced by 10 ft.`;
         case 'Vex': return `${masteryName} applied to ${target} — you have Advantage on next attack.`;
