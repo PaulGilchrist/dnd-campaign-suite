@@ -26,6 +26,7 @@ function RollEntry({ entry }) {
   const isSaveDamage = entry.rollType === 'save-damage';
   const isAoeDamage = entry.rollType === 'aoe-damage';
   const isOverchannelDamage = entry.rollType === 'overchannel-damage';
+  const isGrazeDamage = entry.rollType === 'graze-damage';
   const hasSecondary = entry.secondaryFormula != null;
   const showBothDice = !isDamage && !isSaveDamage && !isAoeDamage && entry.rolls?.length === 2 && entry.mode && entry.mode !== 'normal';
 
@@ -70,7 +71,7 @@ function RollEntry({ entry }) {
         )}
         {entry.isNatural20 && <span className="log-nat-badge log-nat20">NAT 20</span>}
         {entry.isNatural1 && <span className="log-nat-badge log-nat1">FUMBLE</span>}
-        {entry.damageType && (isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage) && (
+        {entry.damageType && (isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage || isGrazeDamage) && (
           <span className="log-damage-type">{entry.damageType}</span>
         )}
         {(isSaveDamage || isAoeDamage) && entry.saveType && entry.saveDc && (
@@ -101,10 +102,10 @@ function RollEntry({ entry }) {
               <span className="log-die log-die-selected">({entry.total})</span>
             )
           )}
-          {(isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage) && entry.formula && (
+          {(isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage || isGrazeDamage) && entry.formula && (
             <span className="log-dice-formula">{entry.formula}</span>
           )}
-          <span className="log-total"><b>{entry.total}{(isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage) ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}{entry.bonusDetail ? ' ' + entry.bonusDetail : ''}</b></span>
+          <span className="log-total"><b>{entry.total}{(isDamage || isSaveDamage || isAoeDamage || isOverchannelDamage || isGrazeDamage) ? '' : (entry.bonus >= 0 ? `+${entry.bonus}` : `${entry.bonus}`)}{entry.bonusDetail ? ' ' + entry.bonusDetail : ''}</b></span>
         </div>
         {(isSaveDamage || isOverchannelDamage) && entry.finalDamage != null && entry.damageType && (
           <span className="log-final-damage">→ {entry.finalDamage} {entry.damageType} damage</span>

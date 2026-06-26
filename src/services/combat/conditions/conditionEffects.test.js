@@ -110,9 +110,6 @@ describe('conditionEffects', () => {
           seeInvisibilityActive: false,
           wardingBondAcBonus: 0,
           cleaveAttack: false,
-           grazeDamage: false,
-           grazeTarget: null,
-           grazeSource: null,
            vexAdvantageTargets: null,
            nickExtraAttack: false,
           toppleEffect: false,
@@ -685,12 +682,6 @@ describe('conditionEffects', () => {
         expect(result.cleaveAttack).toBe(true);
         expect(result.cleaveTarget).toBe('creature1');
         expect(result.cleaveSource).toBe('creature2');
-      });
-
-      it('handles graze', () => {
-        const effects = [{ effect: 'graze', target: 'creature1', source: 'creature2' }];
-        const result = computeConditionEffects([], [], effects);
-        expect(result.grazeDamage).toBe(true);
       });
 
       it('handles nick', () => {

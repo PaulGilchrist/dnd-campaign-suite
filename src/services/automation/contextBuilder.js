@@ -13,6 +13,7 @@ import { getCoronaSaveDisadvantage } from '../combat/auras/coronaAuraUtils.js';
 import { hasAuraOfProtection } from '../combat/auras/auraOfProtection.js';
 import { hasProtectionBuff } from '../combat/auras/protectionBuffUtils.js';
 import { isActive as isAvengingAngelActive, isAuraTarget } from '../automation/handlers/class-cleric-paladin/avengingAngelHandler.js';
+import { collectWeaponMastery } from '../combat/automation/automationService.js';
 
 export function buildAttackContextSync(attack, playerStats, campaignName, conditionAttackMode, _featRangeEffects) {
     const playerName = playerStats.name;
@@ -275,15 +276,15 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         const strokeOfLuckUsed = hasStrokeOfLuck ? getRuntimeValue(playerName, 'strokeOfLuckUsed', campaignName) : false;
         const strokeOfLuckAvailable = hasStrokeOfLuck && !strokeOfLuckUsed;
 
-        // Graze: check if the graze mastery effect is active for this target
+        // Graze: check if the player has Graze weapon mastery for this weapon
         let grazeDamage = false;
         let grazeAbilityName = null;
         let grazeAbilityMod = 0;
-        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-        const grazeEffect = storedEffects.find(te => te.effect === 'graze' && te.target === targetName);
-        if (grazeEffect) {
+        const available = collectWeaponMastery(attack.name, playerStats);
+        const hasGraze = available.baseMastery === 'Graze' || available.extraMasteries?.includes('Graze');
+        if (hasGraze) {
             grazeDamage = true;
-            grazeAbilityName = grazeEffect.abilityName || attack.abilityName || 'STR';
+            grazeAbilityName = attack.abilityName || 'Strength';
             const grazeAbility = playerStats.abilities?.find(a => a.name === grazeAbilityName);
             grazeAbilityMod = grazeAbility?.bonus || 0;
         }

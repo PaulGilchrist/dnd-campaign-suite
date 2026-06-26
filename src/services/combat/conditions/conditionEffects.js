@@ -327,9 +327,6 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
     seeInvisibilityActive: false,
     wardingBondAcBonus: 0,
     cleaveAttack: false,
-    grazeDamage: false,
-    grazeTarget: null,
-    grazeSource: null,
     vexAdvantageTargets: null,
     nickExtraAttack: false,
     toppleEffect: false,
@@ -661,12 +658,6 @@ function computeConditionEffects(conditions = [], saveModifiers = [], targetEffe
       effects.cleaveAttack = true;
       effects.cleaveTarget = te.target;
       effects.cleaveSource = te.source;
-    }
-    // Handle Graze — damage on miss equal to ability modifier
-    if (te.effect === 'graze') {
-      effects.grazeDamage = true;
-      effects.grazeTarget = te.target;
-      effects.grazeSource = te.source;
     }
     // Handle Nick — extra attack as part of Attack action (Light weapon)
     if (te.effect === 'nick') {

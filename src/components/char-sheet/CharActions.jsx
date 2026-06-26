@@ -469,7 +469,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName]);
 
     // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-    // Direct damage click only logs a simple die roll — no targeting, no riders, no damage application.
+    // Save DC attacks: damage is rolled when the target fails the save.
     // This is the ONLY way to apply damage to a selected target: successful To Hit → auto-damage.
     const handleSimpleDamageRoll = React.useCallback(async (attack) => {
         const result = rollExpression(attack.damage);
@@ -1014,7 +1014,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                 if (cannotAct) return;
                                 if (attack.saveDc) { handleActionSpellDamageClick(attack); return; }
                                 // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
-                                // Direct damage click only logs a simple die roll — no targeting, no riders.
+                                // Save DC attacks: damage is rolled when the target fails the save.
                                 handleSimpleDamageRoll(attack);
                             }}>{attack.damage}</div>
 

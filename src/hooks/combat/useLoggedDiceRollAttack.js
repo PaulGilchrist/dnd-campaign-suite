@@ -16,6 +16,7 @@ import {
 } from '../../services/combat/auras/unbreakableMajesty.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
+import { addEntry } from '../../services/ui/logService.js';
 import {
     dispatchUnbreakableMajestySave,
     hasPotentCantrip,
@@ -24,6 +25,7 @@ import {
     applyMinDamageAdjustment,
 } from './useLoggedDiceRollUtils.js';
 import { loadManeuvers } from '../../services/ui/dataLoader.js';
+import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';
 
@@ -454,18 +456,13 @@ export function createLogAndShow(deps) {
                 }
             }
 
-            if (context?.grazeDamage && targetName) {
-                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-                const filteredEffects = storedEffects.filter(te => !(te.effect === 'graze' && te.target === targetName));
-                if (filteredEffects.length !== storedEffects.length) {
-                    setRuntimeValue(campaignName, 'targetEffects', filteredEffects, campaignName);
-                }
-                if (!hit && !isAutoMiss) {
-                    const grazeAbilityMod = context?.grazeAbilityMod || 0;
-                    const grazeDamageAmount = Math.max(0, grazeAbilityMod);
+            if (context?.grazeDamage && targetName && !hit && !isAutoMiss) {
+                const grazeAbilityMod = context?.grazeAbilityMod || 0;
+                const grazeDamageAmount = Math.max(0, grazeAbilityMod);
+                if (grazeDamageAmount > 0) {
                     const grazeDamageType = context?.damageType || 'Slashing';
-                    const grazeFormula = grazeDamageAmount > 0 ? `${grazeDamageAmount} [Graze]` : '0 [Graze]';
-                    if (grazeDamageAmount > 0) {
+                    const grazeFormula = `${grazeDamageAmount} [Graze]`;
+                    setTimeout(async () => {
                         const combatSummary2 = await loadCombatSummary(campaignName);
                         const ignoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, grazeDamageType)) || false;
                         const applyResult = applyDamageToTarget(combatSummary2, targetName, grazeDamageAmount, [grazeDamageType], campaignName, characters, ignoreResistance, characterName);
@@ -480,12 +477,20 @@ export function createLogAndShow(deps) {
                             formula: grazeFormula,
                             rolls: [grazeDamageAmount],
                             total: grazeDamageAmount,
+                            bonus: 0,
                             modifier: 0,
                             damageType: grazeDamageType,
                             targetName: targetName,
                             finalDamage: applyResult?.finalDamage,
                             note: 'Graze: ability modifier damage on miss',
                         });
+                        addEntry(campaignName, {
+                            type: 'ability_use',
+                            characterName: characterName,
+                            abilityName: 'Graze',
+                            description: `${characterName} used Graze on ${name} against ${targetName}`,
+                            targetName: targetName,
+                        }).catch(() => {});
                         setPopupHtml({
                             type: 'graze-damage',
                             name: `${name} (Graze)`,
@@ -502,7 +507,7 @@ export function createLogAndShow(deps) {
                             finalDamage: applyResult?.finalDamage,
                             damageReduced: applyResult?.damageReduced,
                         });
-                    }
+                    }, SHOW_DICE_ROLL_DELAY);
                 }
             }
 

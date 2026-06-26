@@ -81,6 +81,11 @@ const { hasProtectionBuff } = await import('../combat/auras/protectionBuffUtils.
 const { isActive: isAvengingAngelActive, isAuraTarget } = await import(
   './handlers/class-cleric-paladin/avengingAngelHandler.js'
 );
+const { collectWeaponMastery } = await import('../combat/automation/automationService.js');
+
+vi.mock('../combat/automation/automationService.js', () => ({
+  collectWeaponMastery: vi.fn(),
+}));
 
 function defaultBaseAttackContext(targetName = 'Orc', target = null) {
   buildBaseAttackContext.mockResolvedValue({
@@ -133,6 +138,7 @@ describe('contextBuilder: buildAttackContextSync', () => {
     defaultBaseAttackContext();
     defaultAuraMocks();
     getRuntimeValue.mockReturnValue(undefined);
+    collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
   });
 
   describe('basic context fields', () => {
@@ -1249,68 +1255,47 @@ describe('contextBuilder: buildAttackContextSync', () => {
   });
 
   describe('graze damage', () => {
-    it('includes grazeDamage when graze effect exists for target', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'graze', target: 'Orc', abilityName: 'STR' }];
-        return undefined;
-      });
+    it('includes grazeDamage when weapon has Graze mastery', async () => {
+      collectWeaponMastery.mockReturnValue({ baseMastery: 'Graze', extraMasteries: [] });
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
       expect(result.grazeDamage).toBe(true);
-      expect(result.grazeAbilityName).toBe('STR');
-    });
-
-    it('defaults grazeAbilityName to attack.abilityName when not in graze effect', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'graze', target: 'Orc' }];
-        return undefined;
-      });
-      const attack = { ...mockAttack, abilityName: 'DEX' };
-
-      const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal', {});
-
-      expect(result.grazeAbilityName).toBe('DEX');
-    });
-
-    it('defaults grazeAbilityName to STR when not in graze effect or attack', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'graze', target: 'Orc' }];
-        return undefined;
-      });
-
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-
-      expect(result.grazeAbilityName).toBe('STR');
-    });
-
-    it('includes grazeAbilityMod from playerStats abilities', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'graze', target: 'Orc', abilityName: 'Strength' }];
-        return undefined;
-      });
-
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-
+      expect(result.grazeAbilityName).toBe('Strength');
       expect(result.grazeAbilityMod).toBe(4);
     });
 
-    it('sets grazeAbilityMod to 0 when ability not found in playerStats', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'graze', target: 'Orc', abilityName: 'Intelligence' }];
-        return undefined;
-      });
+    it('includes grazeDamage when weapon has Graze in extraMasteries', async () => {
+      collectWeaponMastery.mockReturnValue({ baseMastery: 'Cleave', extraMasteries: ['Graze'] });
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
-      expect(result.grazeAbilityMod).toBe(0);
+      expect(result.grazeDamage).toBe(true);
+      expect(result.grazeAbilityMod).toBe(4);
     });
 
-    it('excludes grazeDamage when no graze effect exists', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [];
-        return undefined;
-      });
+    it('uses attack.abilityName when provided', async () => {
+      collectWeaponMastery.mockReturnValue({ baseMastery: 'Graze', extraMasteries: [] });
+      const attack = { ...mockAttack, abilityName: 'Dexterity' };
+
+      const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal', {});
+
+      expect(result.grazeDamage).toBe(true);
+      expect(result.grazeAbilityName).toBe('Dexterity');
+      expect(result.grazeAbilityMod).toBe(3);
+    });
+
+    it('defaults grazeAbilityName to Strength when no abilityName on attack', async () => {
+      collectWeaponMastery.mockReturnValue({ baseMastery: 'Graze', extraMasteries: [] });
+      const attack = { ...mockAttack, abilityName: undefined };
+
+      const result = await buildAttackContextSync(attack, mockStats, 'camp', 'normal', {});
+
+      expect(result.grazeAbilityName).toBe('Strength');
+    });
+
+    it('excludes grazeDamage when no Graze mastery', async () => {
+      collectWeaponMastery.mockReturnValue({ baseMastery: 'Cleave', extraMasteries: [] });
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
@@ -1319,32 +1304,12 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.grazeAbilityMod).toBe(0);
     });
 
-    it('ignores graze effect for different target', async () => {
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'graze', target: 'Goblin' }];
-        return undefined;
-      });
+    it('excludes grazeDamage when mastery is null', async () => {
+      collectWeaponMastery.mockReturnValue({ baseMastery: null, extraMasteries: [] });
 
       const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
 
       expect(result.grazeDamage).toBe(false);
-    });
-
-    it('matches graze effect when both target and graze target are null (JS null === null)', async () => {
-      buildBaseAttackContext.mockResolvedValue({
-        target: null,
-        targetName: null,
-        resistanceNotice: null,
-      });
-      getRuntimeValue.mockImplementation((name, key) => {
-        if (key === 'targetEffects') return [{ effect: 'graze', target: null }];
-        return undefined;
-      });
-
-      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
-
-      // null === null is true in JS, so graze matches
-      expect(result.grazeDamage).toBe(true);
     });
   });
 

@@ -3,7 +3,7 @@ import { getCombatContext, getTargetFromAttacker } from '../../services/rules/co
 import { getCurrentCombatRound, loadCombatSummary } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
-import { collectWeaponMastery, evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
+import { evaluateAutoExpression, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { parseMagicItemName } from '../../services/rules/core/attackCalc.js';
 import { addEntry } from '../../services/ui/logService.js';
@@ -19,30 +19,6 @@ export default function useDamageClick({
 }) {
     const proceedWithDamage = (attack, formula, total, rolls, modifier) => {
         (mapName ? buildCtx(attack) : buildCtxSync(attack)).then(ctx => {
-            // Auto-apply Graze mastery effect before the attack resolves
-            // Graze triggers on a miss, so it must be set before rollDamage, not after
-            const isMelee = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
-            if (ctx?.targetName && isMelee) {
-                const available = collectWeaponMastery(attack.name, playerStats);
-                const hasGraze = available.baseMastery === 'Graze' || available.extraMasteries?.includes('Graze');
-                if (hasGraze) {
-                    const abilityName = attack.abilityName || 'STR';
-                    const abilityMod = playerStats.abilities?.find(a => a.name === abilityName)?.bonus || 0;
-                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-                    const grazeAlreadySet = storedEffects.some(te => te.effect === 'graze' && te.target === ctx.targetName);
-                    if (!grazeAlreadySet) {
-                        const grazeEffect = {
-                            target: ctx.targetName,
-                            source: 'Graze',
-                            effect: 'graze',
-                            abilityName: abilityName,
-                            abilityMod: abilityMod,
-                            duration: 'until_end_of_turn',
-                        };
-                        setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, grazeEffect], campaignName);
-                    }
-                }
-            }
             rollDamage(attack.name, formula, total, rolls, modifier, ctx);
         }).catch((e) => { console.error("[useDamageClick] Error:", e); throw e; });
     };
