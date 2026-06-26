@@ -14,6 +14,12 @@ export default function useInitiativeEffects(playerStats, campaignName, rollDama
             // Reset Action Surge once-per-turn flag at the start of each turn
             updates.actionSurgeUsedThisRound = null;
 
+            // Reset Relentless (Battle Master level 15) when the player rolls initiative
+            const hasRelentless = (playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.effect === 'relentless');
+            if (hasRelentless) {
+                updates.relentlessUsedRound = null;
+            }
+
             if (!e.detail || !e.detail.characterName) return;
             const rollingName = utils.getName(e.detail.characterName);
             const myName = utils.getName(playerStats.name);

@@ -806,7 +806,7 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name} as a bonus action. Superiority die rolled ${dieValue}. ${maneuver.description}`,
+        description: `Used ${maneuver.name} as a bonus action. ${dieDescription} ${maneuver.description}`,
     };
     await addEntry(campaignName, logEntry).catch(() => {});
 
@@ -1024,7 +1024,7 @@ export async function executeGrantAttackManeuver(action, playerStats, campaignNa
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name}. Superiority die rolled ${dieValue}. Choose an ally to add this to their next attack.`,
+        description: `Used ${maneuver.name}. ${dieDescription} Choose an ally to add this to their next attack.`,
     };
     await addEntry(campaignName, logEntry).catch(() => {});
 
@@ -1211,7 +1211,7 @@ export async function executeMovementManeuver(action, playerStats, campaignName,
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name}. Superiority die rolled ${dieValue}. You or the ally gains +${dieValue} AC until the start of your next turn.`,
+        description: `Used ${maneuver.name}. ${dieDescription} You or the ally gains +${dieValue} AC until the start of your next turn.`,
     };
     await addEntry(campaignName, logEntry).catch(() => {});
 
@@ -1289,7 +1289,7 @@ export async function executeReactionManeuver(action, playerStats, campaignName,
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name} as a reaction. Superiority die rolled ${dieValue}. ${maneuver.description}`,
+        description: `Used ${maneuver.name} as a reaction. ${dieDescription} ${maneuver.description}`,
     };
     await addEntry(campaignName, logEntry).catch(() => {});
 
@@ -1444,7 +1444,7 @@ export async function executeSkillCheckManeuver(action, playerStats, campaignNam
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name}. Superiority die rolled ${dieValue}. Added ${dieValue} to the next ${skillList || 'skill'} check.`,
+        description: `Used ${maneuver.name}. ${dieDescription} Added ${dieValue} to the next ${skillList || 'skill'} check.`,
     };
     await addEntry(campaignName, logEntry).catch(() => {});
 
@@ -1541,7 +1541,7 @@ export async function executeCommandingPresenceReaction(action, playerStats, cam
         type: 'ability_use',
         characterName: playerStats.name,
         abilityName: maneuver.name,
-        description: `Used ${maneuver.name} as a reaction. Superiority die rolled ${dieValue}.`,
+        description: `Used ${maneuver.name} as a reaction. ${dieDescription}`,
     };
     await addEntry(campaignName, logEntry).catch(() => {});
 

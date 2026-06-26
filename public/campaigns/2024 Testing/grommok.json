@@ -6,7 +6,7 @@
     {
       "name": "Strength",
       "baseScore": 15,
-      "featIncrease": 1,
+      "featIncrease": 2,
       "backgroundIncrease": 1,
       "miscIncrease": 0
     },
@@ -20,7 +20,7 @@
     {
       "name": "Constitution",
       "baseScore": 15,
-      "featIncrease": 1,
+      "featIncrease": 2,
       "backgroundIncrease": 0,
       "miscIncrease": 0
     },
@@ -56,17 +56,17 @@
     "divineOrder": "",
     "primalOrder": "",
     "fightingStyles": [
-      "Archery"
+      "Defense"
     ]
   },
   "expertSkills": [],
   "feats": [
     "Boon Of Fortitude",
     "Savage Attacker",
-    "Defense",
     "Great Weapon Master",
     "Durable",
-    "Charger"
+    "Charger",
+    "Heavy Armor Master"
   ],
   "fightingStyles": [],
   "race": {
@@ -96,7 +96,10 @@
     "gold": 10,
     "magicItems": []
   },
-  "languages": [],
+  "languages": [
+    "Common",
+    "Orc"
+  ],
   "resistances": [
     "Poison"
   ],
@@ -122,6 +125,7 @@
   "originalFileName": "Grommok.json",
   "featAbilityChoices": {
     "0": "Strength",
-    "1": "Strength"
+    "1": "Strength",
+    "2": "Strength"
   }
 }

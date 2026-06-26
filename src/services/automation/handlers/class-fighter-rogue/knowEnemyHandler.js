@@ -1,6 +1,9 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { rollExpression } from '../../../dice/diceRoller.js';
+import { evaluateAutoExpression } from '../../../combat/automation/automationService.js';
 import { getMonsterData } from '../../../../services/npcs/monsterUtils.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../../services/rules/combat/damageUtils.js';
+import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -11,7 +14,12 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const storedUses = getRuntimeValue(playerStats.name, usesKey, campaignName);
     const currentUses = storedUses != null ? Number(storedUses) : defaultMax;
 
-    if (currentUses <= 0) {
+    const hasRelentless = (playerStats.automation?.passives ?? []).some(p => p.type === 'passive_rule' && p.effect === 'relentless');
+    const storedRound = getRuntimeValue(playerStats.name, 'relentlessUsedRound', campaignName);
+    const currentRound = getCurrentCombatRound();
+    const relentlessUsed = hasRelentless && storedRound === currentRound;
+
+    if (currentUses <= 0 && !(hasRelentless && !relentlessUsed)) {
         return {
             type: 'popup',
             payload: {
@@ -23,7 +31,18 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         };
     }
 
-    await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+    let dieValue = 0;
+    let usedRelentless = false;
+
+    if (hasRelentless && !relentlessUsed && currentUses <= 0) {
+        const superiorityDieSize = evaluateAutoExpression(auto.dieExpression || 'superiority_die', playerStats);
+        const relentlessRoll = rollExpression(`1d${superiorityDieSize}`);
+        dieValue = relentlessRoll?.total || superiorityDieSize;
+        await setRuntimeValue(playerStats.name, 'relentlessUsedRound', currentRound, campaignName);
+        usedRelentless = true;
+    } else {
+        await setRuntimeValue(playerStats.name, usesKey, currentUses - 1, campaignName);
+    }
 
     // Get target from combat context
     let targetName = null;
@@ -54,6 +73,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     }
 
     let description = `${action.name}: Expend 1 Superiority Die to discern enemy strengths and weaknesses.\n`;
+    if (usedRelentless) {
+        description += `Rolled d${dieValue} for ${dieValue} (Relentless).\n`;
+    }
     description += `Target: ${targetName || 'None (not in combat)'}.\n`;
     description += `Range: ${auto.range || '30 ft'}.\n\n`;
 
@@ -80,6 +102,9 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     let logDescription = `Know Your Enemy used by ${playerStats.name}`;
     if (targetName) {
         logDescription += ` against ${targetName}`;
+    }
+    if (usedRelentless) {
+        logDescription += ` (Relentless - free d${dieValue} die)`;
     }
     logDescription += `.\nRange: ${auto.range || '30 ft'}.\n`;
     if (irvInfo) {
