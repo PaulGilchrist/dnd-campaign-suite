@@ -163,6 +163,7 @@ const categories2024 = {
         "Foe Slayer",
         "Gnomish Cunning",
         "Implements of Mercy",
+        "Improved Combat Superiority",
         "Increased Hit Points",
         "Keen Senses",
         "Monk Subclass",
@@ -179,6 +180,7 @@ const categories2024 = {
         "Trance",
         "Unarmored Defense",
         "Unarmored Movement",
+        "Ultimate Combat Superiority",
         "Versatile",
         "Warlock Subclass",
         "Wizard Subclass"
