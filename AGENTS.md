@@ -17,6 +17,14 @@
 - `public/data/2024/` — 2024 Essentials JSON rule data files
 - `public/campaigns/:name/` — Runtime campaign data (character JSON, change data, maps)
 
+## Git Permissions
+
+Read-only inspection only: `git log`, `git show`, `git diff`, `git status`, `git blame`, `git grep`, `git ls-files`, `git stash list`, `git stash show`, `git remote -v`, `git branch`.
+
+**Strictly forbidden:** `commit`, `checkout`, `switch`, `restore`, `push`, `pull`, `fetch`, `merge`, `rebase`, `cherry-pick`, `reset`, `revert`, `clean`, `stash push/pop/drop`, `branch -d/-D`, `tag -d`, `rm`, `mv`.
+
+- mv is ONLY permitted when refactoring a folder into multiple subfolders.
+
 **Dual ruleset architecture:** `src/services/rules/rulesFactory.js` selects between 5e and 2024 rule modules at runtime. Each character has a `rules` field (`'5e'` or `'2024'`). Both rulesets coexist in one campaign. Key rule modules:
 - `src/services/rules/rules.js` — Core rules engine (shared logic)
 - `src/services/rules/rulesFactory.js` — Factory that picks the right race/class rules per ruleset
