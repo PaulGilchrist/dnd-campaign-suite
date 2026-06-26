@@ -585,5 +585,276 @@ describe('rulesFactory', () => {
       expect(result.resistances).toContain('Fire')
       expect(result.resistances).toContain('Psychic')
     })
+
+    it('does not add Boon Of Energy Resistance when array is empty', async () => {
+      const { getChosenRuntimeValue } = await import(
+        '../automation/common/choiceStorage.js'
+      )
+      vi.mocked(getChosenRuntimeValue).mockImplementation(
+        (_playerStats, name) => {
+          if (name === 'Boon Of Energy Resistance') return []
+          return null
+        }
+      )
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        { rules: '2024', resistances: [] }
+      )
+      expect(result.resistances).toEqual(['Cold'])
+    })
+
+    it('adds land resistance when subclass.type matches mapping', async () => {
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        {
+          rules: '5e',
+          resistances: [],
+          class: { subclass: { type: 'nature' } },
+          automation: {
+            passives: [{ type: 'land_resistance', landMappings: { nature: 'Lightning' } }],
+          },
+        }
+      )
+      expect(result.resistances).toContain('Lightning')
+    })
+
+    it('prioritizes major.type over subclass.type for land resistance', async () => {
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        {
+          rules: '5e',
+          resistances: [],
+          class: { major: { type: 'nature' }, subclass: { type: 'fire' } },
+          automation: {
+            passives: [
+              { type: 'land_resistance', landMappings: { nature: 'Lightning', fire: 'Fire' } },
+            ],
+          },
+        }
+      )
+      expect(result.resistances).toContain('Lightning')
+    })
+
+    it('trims whitespace from class type for land resistance matching', async () => {
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        {
+          rules: '5e',
+          resistances: [],
+          class: { major: { type: '  nature  ' } },
+          automation: {
+            passives: [{ type: 'land_resistance', landMappings: { nature: 'Lightning' } }],
+          },
+        }
+      )
+      expect(result.resistances).toContain('Lightning')
+    })
+
+    it('throws when passives is not an array in getPlayerStats', async () => {
+      await expect(
+        rulesFactory.getPlayerStats(
+          [],
+          [],
+          [],
+          [],
+          {},
+          {
+            rules: '5e',
+            resistances: [],
+            automation: { passives: 'not-an-array' },
+          }
+        )
+      ).rejects.toThrow('Expected passives to be an array')
+    })
+
+    it('throws when damageTypes is not an array in resistance passive', async () => {
+      await expect(
+        rulesFactory.getPlayerStats(
+          [],
+          [],
+          [],
+          [],
+          {},
+          {
+            rules: '5e',
+            resistances: [],
+            automation: {
+              passives: [{ type: 'resistance', damageTypes: 'not-an-array' }],
+            },
+          }
+        )
+      ).rejects.toThrow('Expected damageTypes to be an array')
+    })
+
+    it('throws when landMappings is null in land_resistance passive', async () => {
+      await expect(
+        rulesFactory.getPlayerStats(
+          [],
+          [],
+          [],
+          [],
+          {},
+          {
+            rules: '5e',
+            resistances: [],
+            class: { major: { type: 'nature' } },
+            automation: {
+              passives: [{ type: 'land_resistance', landMappings: null }],
+            },
+          }
+        )
+      ).rejects.toThrow('Expected landMappings to be an object')
+    })
+
+    it('throws when resistances is not an array for passive_immunity', async () => {
+      const { rules5e } = await import('../character/race-rules/index.js')
+      rules5e.getResistances.mockReturnValue('not-an-array')
+      await expect(
+        rulesFactory.getPlayerStats(
+          [],
+          [],
+          [],
+          [],
+          {},
+          {
+            rules: '5e',
+            resistances: [],
+            automation: {
+              passives: [{ type: 'passive_immunity', damageResistance: ['Psychic'] }],
+            },
+          }
+        )
+      ).rejects.toThrow('Expected resistances to be an array')
+      rules5e.getResistances.mockReturnValue(['Fire'])
+    })
+
+    it('throws when resistances is not an array for elemental affinity', async () => {
+      const { getChosenRuntimeValue } = await import(
+        '../automation/common/choiceStorage.js'
+      )
+      vi.mocked(getChosenRuntimeValue).mockImplementation(
+        (_playerStats, name) => {
+          if (name === 'Elemental Affinity') return 'Radiant'
+          return null
+        }
+      )
+      const { rules2024 } = await import('../character/race-rules/index.js')
+      rules2024.getResistances.mockReturnValue('not-an-array')
+      await expect(
+        rulesFactory.getPlayerStats(
+          [],
+          [],
+          [],
+          [],
+          {},
+          {
+            rules: '2024',
+            resistances: [],
+            automation: { passives: [] },
+          }
+        )
+      ).rejects.toThrow('Expected resistances to be an array')
+      rules2024.getResistances.mockReturnValue(['Cold'])
+    })
+
+    it('throws when resistances is not an array for fiendish resilience', async () => {
+      const { getChosenRuntimeValue } = await import(
+        '../automation/common/choiceStorage.js'
+      )
+      vi.mocked(getChosenRuntimeValue).mockImplementation(
+        (_playerStats, name) => {
+          if (name === 'Fiendish Resilience') return 'Fire'
+          return null
+        }
+      )
+      const { rules2024 } = await import('../character/race-rules/index.js')
+      rules2024.getResistances.mockReturnValue('not-an-array')
+      await expect(
+        rulesFactory.getPlayerStats(
+          [],
+          [],
+          [],
+          [],
+          {},
+          {
+            rules: '2024',
+            resistances: [],
+            automation: { passives: [] },
+          }
+        )
+      ).rejects.toThrow('Expected resistances to be an array')
+      rules2024.getResistances.mockReturnValue(['Cold'])
+    })
+
+    it('throws when resistances is not an array for boon of energy resistance', async () => {
+      const { getChosenRuntimeValue } = await import(
+        '../automation/common/choiceStorage.js'
+      )
+      vi.mocked(getChosenRuntimeValue).mockImplementation(
+        (_playerStats, name) => {
+          if (name === 'Boon Of Energy Resistance') return ['Necrotic']
+          return null
+        }
+      )
+      const { rules2024 } = await import('../character/race-rules/index.js')
+      rules2024.getResistances.mockReturnValue('not-an-array')
+      await expect(
+        rulesFactory.getPlayerStats(
+          [],
+          [],
+          [],
+          [],
+          {},
+          {
+            rules: '2024',
+            resistances: [],
+            automation: { passives: [] },
+          }
+        )
+      ).rejects.toThrow('Expected resistances to be an array')
+      rules2024.getResistances.mockReturnValue(['Cold'])
+    })
+
+    it('sets class and race from appropriate ruleset modules', async () => {
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        { rules: '5e', resistances: [] }
+      )
+      expect(result.class).toBeDefined()
+      expect(result.race).toBeDefined()
+    })
+
+    it('sets immunities and resistances from race rules in getPlayerStats', async () => {
+      const result = await rulesFactory.getPlayerStats(
+        [],
+        [],
+        [],
+        [],
+        {},
+        { rules: '5e', resistances: [] }
+      )
+      expect(result.immunities).toBeDefined()
+      expect(result.resistances).toBeDefined()
+    })
   })
 })

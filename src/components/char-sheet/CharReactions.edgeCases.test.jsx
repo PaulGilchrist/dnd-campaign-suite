@@ -131,6 +131,8 @@ import { executeHandler } from '../../services/automation/index.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 import { useSpellUpcastFlow } from '../../hooks/combat/useSpellUpcastFlow.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
+import * as mapsService from '../../services/maps/mapsService.js';
+import * as rangeValidation from '../../services/rules/combat/rangeValidation.js';
 
 const MOCK_ATTACK = { name: 'Longsword', type: 'Action', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing' };
 
@@ -534,5 +536,170 @@ describe('CharReactions - Edge Cases', () => {
     render(<CharReactions {...baseProps} />);
     fireEvent.click(screen.getByText('Stand (Power Word Heal):'));
     expect(setRuntimeValue).toHaveBeenCalledWith(basePlayerStats.name, 'powerWordHealStandPermission', false, baseProps.campaignName);
+  });
+
+  // ===== Popup Dismissal Tests =====
+
+  it('dismisses spell detail popup when popup overlay is clicked', () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('popup-overlay'));
+    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+  });
+
+  it('shows reactive spell popup when automation returns eligibleSpells', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball', isSingleTarget: false }], hasWarnings: true } });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    await waitFor(() => { expect(screen.queryByTestId('popup-overlay')).toBeInTheDocument(); });
+  });
+
+  it('sets reactiveSpellFlow state when selecting from reactive spell eligible popup', () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+  });
+
+  // ===== ArcaneWardRestoreModal prop spreading =====
+
+  it('passes onClose handler to ArcaneWardRestoreModal', () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'modal', modalName: 'arcaneWardRestore', payload: { someData: true } });
+    const stats = { ...basePlayerStats, reactions: [{ name: 'Arcane Ward', description: 'Creates a ward', automation: { type: 'arcane_ward' } }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  it('passes additional modal props to ArcaneWardRestoreModal via spread', () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'modal', modalName: 'arcaneWardRestore', payload: { extraProp: 'value' } });
+    const stats = { ...basePlayerStats, reactions: [{ name: 'Arcane Ward', description: 'Creates a ward', automation: { type: 'arcane_ward' } }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== MetamagicPopup prop passing =====
+
+  it('passes spell name and level to MetamagicPopup', () => {
+    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
+      pendingMetamagic: { spellName: 'Shield', spellLevel: 2, _currentSP: 4 },
+      gateMetamagic: vi.fn(),
+      handleConfirm: vi.fn(),
+      handleSkip: vi.fn(),
+    });
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
+  });
+
+  it('passes onConfirm and onSkip handlers to MetamagicPopup', () => {
+    const handleConfirm = vi.fn();
+    const handleSkip = vi.fn();
+    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
+      pendingMetamagic: { spellName: 'Empowered Spell', spellLevel: 1, _currentSP: 2 },
+      gateMetamagic: vi.fn(),
+      handleConfirm,
+      handleSkip,
+    });
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
+  });
+
+  // ===== Spell detail popup with isReactiveSpellFlow =====
+
+  it('passes handleReactiveSpellCast as onCast when isReactiveSpellFlow is true', () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+  });
+
+  it('passes handleReactionSpellCast as onCast when isReactiveSpellFlow is false', () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+  });
+
+  // ===== buildUpcastLevels integration =====
+
+  it('calls buildUpcastLevels with the selected spell', () => {
+    const buildUpcastLevels = vi.fn(() => [2, 3]);
+    vi.mocked(useSpellUpcastFlow).mockReturnValue({ buildUpcastLevels });
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(buildUpcastLevels).toHaveBeenCalledWith(basePlayerStats.spellAbilities.spells[0]);
+  });
+
+  // ===== getTargetInfo useCallback =====
+
+  it('getTargetInfo returns null when combat context is null', () => {
+    vi.mocked(getCombatContext).mockResolvedValue(null);
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  it('getTargetInfo returns target from combat context when available', () => {
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== reactionCastAction useCallback =====
+
+  it('reactionCastAction executes spell cast with cached positions', () => {
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== Cached reaction cast position ref =====
+
+  it('clears cachedReactionCastPosRef after reactionCastAction executes', () => {
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== resolveReactionSpellPositions with placed items =====
+
+  it('handles map with placedItems but target not found in placed items', async () => {
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Unknown Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Unknown Enemy' });
+    vi.mocked(mapsService.loadMapData).mockResolvedValue({
+      players: [{ name: 'Test Character', gridX: 5, gridY: 5 }],
+      placedItems: [{ name: 'Other NPC', gridX: 10, gridY: 10 }],
+    });
+    vi.mocked(rangeValidation.getNearestPlacedItem).mockReturnValue(null);
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== resolveReactionSpellPositions error handling =====
+
+  it('handles empty placedItems array gracefully', async () => {
+    vi.mocked(mapsService.loadMapData).mockResolvedValue({
+      players: [],
+      placedItems: [],
+    });
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== Reaction with automation but executeHandler returns undefined =====
+
+  it('shows feature detail when executeHandler returns undefined', async () => {
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue(undefined);
+    const stats = { ...basePlayerStats, reactions: [{ name: 'Undefined Handler', description: 'Handler returns undefined', details: 'Some details', automation: { type: 'test' } }] };
+    render(<CharReactions {...baseProps} playerStats={stats} />);
+    await act(async () => { fireEvent.click(screen.getByText('Undefined Handler:')); });
+    await waitFor(() => { expect(buildFeatureDetailHtml).toHaveBeenCalled(); });
   });
 });

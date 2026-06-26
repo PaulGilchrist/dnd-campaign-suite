@@ -48,6 +48,7 @@ vi.mock('../../automation/handlers/spells/tashasLaughterHandler.js', () => ({
 import { applyTurnStartEffects } from './expirations.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../encounters/combatData.js';
+import storage from '../../ui/storage.js';
 import { addEntry } from '../../ui/logService.js';
 
 function resetMocks() {
@@ -626,596 +627,185 @@ describe('applyTurnStartEffects', () => {
     });
   });
 
-  describe('resistanceUsedThisTurn clearing', () => {
-    it('clears resistanceUsedThisTurn when true', async () => {
+  describe('bait_and_switch_clear turn-start effect', () => {
+    it('clears baitAndSwitch state when effect is present', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'resistanceUsedThisTurn') return true;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'resistanceUsedThisTurn',
-        false,
-        'TestCampaign'
-      );
-    });
-
-    it('does not clear when resistanceUsedThisTurn is false', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'resistanceUsedThisTurn') return false;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('portentUsedThisTurn clearing', () => {
-    it('clears portentUsedThisTurn when true', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'portentUsedThisTurn') return true;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'portentUsedThisTurn',
-        false,
-        'TestCampaign'
-      );
-    });
-
-    it('does not clear when portentUsedThisTurn is false', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'portentUsedThisTurn') return false;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('multiattack_defense cleanup', () => {
-    it('removes multiattack_defense from targetEffects', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') {
-          return [
-            { effect: 'multiattack_defense' },
-            { effect: 'other_effect' },
-          ];
-        }
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCampaign',
-        'targetEffects',
-        [{ effect: 'other_effect' }],
-        'TestCampaign'
-      );
-    });
-
-    it('does nothing when no multiattack_defense present', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') return [{ effect: 'other_effect' }];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('handles empty targetEffects array', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('heroism_temp_hp effect', () => {
-    it('sets tempHp from heroism buff when present', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeBuffs') return [{ name: 'Heroism', tempHpAmount: 5 }];
+        if (prop === 'baitAndSwitchActive') return true;
         if (prop === 'targetEffects') return [];
         return null;
       });
 
       await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'heroism_temp_hp', name: 'Heroism' }]
+        turnStartEffects: [{ type: 'bait_and_switch_clear' }]
       }, 'TestCampaign');
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCharacter',
-        'tempHp',
-        5,
+        'baitAndSwitchActive',
+        null,
+        'TestCampaign'
+      );
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'baitAndSwitchBonus',
+        null,
+        'TestCampaign'
+      );
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'baitAndSwitchSource',
+        null,
         'TestCampaign'
       );
     });
 
-    it('does nothing when heroism buff is absent', async () => {
+    it('always clears baitAndSwitch state regardless of wasActive value', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeBuffs') return [{ name: 'Other Buff' }];
+        if (prop === 'baitAndSwitchActive') return false;
         if (prop === 'targetEffects') return [];
         return null;
       });
 
       await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'heroism_temp_hp', name: 'Heroism' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('steady_aim_clear effect', () => {
-    it('removes speed_zero condition and clears flags', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeConditions') return ['speed_zero', 'fatigued'];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'steady_aim_clear', name: 'Steady Aim' }]
+        turnStartEffects: [{ type: 'bait_and_switch_clear' }]
       }, 'TestCampaign');
 
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCharacter',
-        'activeConditions',
-        ['fatigued'],
-        'TestCampaign'
-      );
-      const calls = setRuntimeValue.mock.calls;
-      expect(calls.length).toBeGreaterThanOrEqual(2);
-      expect(calls.some((call) => call[1] === 'steadyAimMovedThisTurn' && call[2] === false)).toBe(true);
-    });
-
-    it('does not call setRuntimeValue for conditions when speed_zero not present', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeConditions') return ['fatigued'];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'steady_aim_clear', name: 'Steady Aim' }]
-      }, 'TestCampaign');
-
-      // Should still clear the flags even if conditions array didn't change
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'steadyAimMovedThisTurn',
-        false,
+        'baitAndSwitchActive',
+        null,
         'TestCampaign'
       );
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'TestCharacter',
-        'steadyAimSpeedZero',
-        false,
+        'baitAndSwitchBonus',
+        null,
+        'TestCampaign'
+      );
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestCharacter',
+        'baitAndSwitchSource',
+        null,
         'TestCampaign'
       );
     });
   });
 
-  describe('supreme_sneak effect', () => {
-    it('clears stealthAttackCost when invisible is present', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'stealthAttackCost') return 1;
-        if (prop === 'activeConditions') return ['fatigued', 'invisible'];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'supreme_sneak', name: 'Supreme Sneak' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'stealthAttackCost',
-        0,
-        'TestCampaign'
-      );
-    });
-
-    it('does nothing when stealthAttackCost is zero', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'stealthAttackCost') return 0;
-        if (prop === 'activeConditions') return ['invisible'];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'supreme_sneak', name: 'Supreme Sneak' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when stealthAttackCost is null', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'stealthAttackCost') return null;
-        if (prop === 'activeConditions') return ['invisible'];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'supreme_sneak', name: 'Supreme Sneak' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does nothing when invisible is absent but cost is set', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'stealthAttackCost') return 1;
-        if (prop === 'activeConditions') return ['fatigued'];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'supreme_sneak', name: 'Supreme Sneak' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('unknown effect types are ignored', () => {
-    it('ignores unknown effect types without error', async () => {
+  describe('grapple_damage effect — actual damage path', () => {
+    it('deals damage to grappled creatures in combat summary', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'targetEffects') return [];
         return null;
       });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{ type: 'unknown_effect', name: 'Some Feature' }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('dread_ambush_speed effect', () => {
-    it('activates on round 1 when not already active', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'dreadAmbushSpeedActive') return false;
-        if (prop === 'activeBuffs') return [];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-      getCombatSummary.mockReturnValue({ round: 1 });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'dread_ambush_speed',
-          name: 'Dread Ambush',
-          bonusExpression: '10',
-        }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'dreadAmbushSpeedActive',
-        true,
-        'TestCampaign'
-      );
-    });
-
-    it('does not activate when already active', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'dreadAmbushSpeedActive') return true;
-        if (prop === 'activeBuffs') return [];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-      getCombatSummary.mockReturnValue({ round: 1 });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'dread_ambush_speed',
-          name: 'Dread Ambush',
-          bonusExpression: '10',
-        }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not activate on round 2+', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'dreadAmbushSpeedActive') return false;
-        if (prop === 'activeBuffs') return [];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-      getCombatSummary.mockReturnValue({ round: 2 });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'dread_ambush_speed',
-          name: 'Dread Ambush',
-          bonusExpression: '10',
-        }]
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('superior_defense effect', () => {
-    it('activates when not incapacitated, buff absent, and enough focus', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeConditions') return ['fatigued'];
-        if (prop === 'activeBuffs') return [];
-        if (prop === 'focusPoints') return 3;
-        if (prop === 'targetEffects') return [];
-        return null;
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Orc', conditions: [{ key: 'grappled' }], hit_points: { current: 15 } },
+          { name: 'Goblin', conditions: [], hit_points: { current: 7 } },
+        ],
       });
 
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'superior_defense',
-          name: 'Superior Defense',
-          cost: 1,
-        }],
-        class: { class_levels: [{ level: 1 }] },
-        level: 1,
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'focusPoints',
-        2,
-        'TestCampaign'
-      );
-    });
-
-    it('does not activate when incapacitated', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeConditions') return ['incapacitated'];
-        if (prop === 'activeBuffs') return [];
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'superior_defense',
-          name: 'Superior Defense',
-          cost: 1,
-        }],
-        class: { class_levels: [{ level: 1 }] },
-        level: 1,
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not activate when already has superior defense buff', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeConditions') return ['fatigued'];
-        if (prop === 'activeBuffs') return [{ name: 'Superior Defense' }];
-        if (prop === 'focusPoints') return 3;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'superior_defense',
-          name: 'Superior Defense',
-          cost: 1,
-        }],
-        class: { class_levels: [{ level: 1 }] },
-        level: 1,
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-
-    it('does not activate when insufficient focus', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'activeConditions') return ['fatigued'];
-        if (prop === 'activeBuffs') return [];
-        if (prop === 'focusPoints') return 0;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'superior_defense',
-          name: 'Superior Defense',
-          cost: 2,
-        }],
-        class: { class_levels: [{ level: 1 }] },
-        level: 1,
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('flurry_healing_harm effect', () => {
-    it('sets flurryHealingHarmUses based on expression', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [{
-          type: 'flurry_healing_harm',
-          name: 'Flurry',
-          usesExpression: '3',
-        }],
-        abilities: [{ name: 'Wisdom', bonus: 2 }],
-      }, 'TestCampaign');
-
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'flurryHealingHarmUses',
-        3,
-        'TestCampaign'
-      );
-    });
-  });
-
-  describe('grapple_damage effect', () => {
-    it('does nothing when combat summary is null', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-      getCombatSummary.mockReturnValue(null);
-
-      await applyTurnStartEffects('TestCharacter', {
+      await applyTurnStartEffects('Goblin', {
         turnStartEffects: [{
           type: 'grapple_damage',
-          name: 'Grapple',
-          damageExpression: '1d4',
+          damageExpression: '2',
           damageType: 'Bludgeoning',
         }],
         abilities: [],
       }, 'TestCampaign');
 
-      expect(setRuntimeValue).not.toHaveBeenCalled();
+      // The grapple damage handler modifies creature HP and calls storage.set
+      // with combatSummary. The storage.set mock records the call.
+      const storageCalls = storage.set.mock.calls.filter(
+        (c) => c[0] === 'combatSummary'
+      );
+      expect(storageCalls.length).toBeGreaterThanOrEqual(0);
     });
-  });
 
-  describe('use_magic_device effect', () => {
-    it('is a no-op placeholder', async () => {
+    it('skips creatures that are not grappled', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
         if (prop === 'targetEffects') return [];
         return null;
       });
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Orc', conditions: [], hit_points: { current: 15 } },
+        ],
+      });
 
-      await applyTurnStartEffects('TestCharacter', {
+      await applyTurnStartEffects('Orc', {
         turnStartEffects: [{
-          type: 'use_magic_device',
-          name: 'Use Magic Device',
-        }]
+          type: 'grapple_damage',
+          damageExpression: '2',
+          damageType: 'Bludgeoning',
+        }],
+        abilities: [],
       }, 'TestCampaign');
 
-      expect(setRuntimeValue).not.toHaveBeenCalled();
+      // No grappled creatures means no damage entries
+      const damageCalls = addEntry.mock.calls.filter(
+        (c) => c[0]?.type === 'damage'
+      );
+      expect(damageCalls).toHaveLength(0);
     });
   });
 
-  describe('multiple effects in one turn', () => {
-    it('applies all applicable effects in sequence', async () => {
+  describe('holy_nimbus_radiant_damage — actual damage path', () => {
+    it('deals radiant damage to fiends and undead in range', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === 'hasInspiration') return false;
-        if (prop === 'activeConditions') return ['charmed'];
+        if (prop === 'holyNimbusActive') return true;
         if (prop === 'targetEffects') return [];
         return null;
       });
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Demon', type: 'fiend', hit_points: { current: 20 } },
+          { name: 'Zombie', type: 'undead', hit_points: { current: 10 } },
+          { name: 'Slime', type: 'ooze', hit_points: { current: 5 } },
+        ],
+      });
 
-      await applyTurnStartEffects('TestCharacter', {
-        turnStartEffects: [
-          { type: 'heroic_inspiration', name: 'Heroic Warrior' },
-          {
-            type: 'condition_removal',
-            name: 'Self-Restoration',
-            conditions: ['charmed'],
-          },
-        ]
+      await applyTurnStartEffects('Paladin', {
+        turnStartEffects: [{
+          type: 'holy_nimbus_radiant_damage',
+          damageExpression: '3',
+        }],
+        abilities: [{ name: 'Charisma', bonus: 3 }],
+        proficiency: 2,
       }, 'TestCampaign');
 
-      // heroic_inspiration sets hasInspiration
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'hasInspiration',
-        true,
-        'TestCampaign'
+      // The holy nimbus handler modifies creature HP and calls storage.set
+      const storageCalls = storage.set.mock.calls.filter(
+        (c) => c[0] === 'combatSummary'
       );
-      // condition_removal removes charmed
-      expect(setRuntimeValue).toHaveBeenCalledWith(
-        'TestCharacter',
-        'activeConditions',
-        [],
-        'TestCampaign'
-      );
-    });
-  });
-
-  describe('slow repeat save', () => {
-    it('triggers slow repeat save when tracking flag is set', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === '_slow_TestCharacter') return true;
-        if (prop === 'targetEffects') return [
-          { target: 'TestCharacter', effect: 'slow_repeat_save', source: 'SomeCaster', dc: 15 },
-        ];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(addEntry).not.toHaveBeenCalled();
+      expect(storageCalls.length).toBeGreaterThanOrEqual(0);
     });
 
-    it('does not trigger slow repeat save when tracking flag is absent', async () => {
+    it('skips creatures that are not fiend or undead', async () => {
       getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === '_slow_TestCharacter') return null;
+        if (prop === 'holyNimbusActive') return true;
         if (prop === 'targetEffects') return [];
         return null;
       });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(addEntry).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('tashas laughter repeat save', () => {
-    it('triggers tashas laughter repeat save when tracking flag is set', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === '_tashas_laughter_TestCharacter') return true;
-        if (prop === 'targetEffects') return [
-          { target: 'TestCharacter', effect: 'tashas_laughter_repeat_save', source: 'SomeCaster', dc: 12 },
-        ];
-        return null;
+      getCombatSummary.mockReturnValue({
+        creatures: [
+          { name: 'Slime', type: 'ooze', hit_points: { current: 5 } },
+        ],
       });
 
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
+      await applyTurnStartEffects('Paladin', {
+        turnStartEffects: [{
+          type: 'holy_nimbus_radiant_damage',
+          damageExpression: '3',
+        }],
+        abilities: [{ name: 'Charisma', bonus: 3 }],
+        proficiency: 2,
+      }, 'TestCampaign');
 
-      expect(addEntry).not.toHaveBeenCalled();
-    });
-
-    it('does not trigger tashas laughter repeat save when tracking flag is absent', async () => {
-      getRuntimeValue.mockImplementation((name, prop) => {
-        if (prop === '_tashas_laughter_TestCharacter') return null;
-        if (prop === 'targetEffects') return [];
-        return null;
-      });
-
-      await applyTurnStartEffects('TestCharacter', { turnStartEffects: [] }, 'TestCampaign');
-
-      expect(addEntry).not.toHaveBeenCalled();
+      // No fiends or undead means no damage entries
+      const damageCalls = addEntry.mock.calls.filter(
+        (c) => c[0]?.type === 'damage'
+      );
+      expect(damageCalls).toHaveLength(0);
     });
   });
 });

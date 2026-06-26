@@ -10,6 +10,11 @@ vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({
   setRuntimeValue: vi.fn(),
 }));
 
+vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
+  DiceRollContext: React.createContext({ popupHtml: null, setPopupHtml: () => {} }),
+  useDiceRollPopup: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
+}));
+
 vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   buildFeatureDetailHtml: vi.fn((reaction) => {
     if (reaction.details) return `<b>${reaction.name}</b><br/>${reaction.description}<br/><br/>${reaction.details}`;
@@ -124,6 +129,7 @@ vi.mock('../../services/rules/spells/spellCastService.js', () => ({
 }));
 
 import { useRuntimeValue, getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
+import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js';
 import { buildFeatureDetailHtml } from '../../hooks/combat/useActionPopup.js';
 import { hasAutomation, hasTacticalShift, hasSpeedyOpportunityDisadvantage } from '../../services/combat/automation/automationService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
@@ -164,6 +170,7 @@ const baseProps = {
 function resetMocks() {
   vi.mocked(useRuntimeValue).mockImplementation(() => undefined);
   vi.mocked(getRuntimeValue).mockImplementation(() => null);
+  vi.mocked(useDiceRollPopup).mockImplementation(() => ({ popupHtml: null, setPopupHtml: vi.fn() }));
   vi.mocked(useLoggedDiceRoll).mockImplementation(() => {
     const [popupHtml, setPopupHtml] = React.useState(null);
     return {
@@ -353,6 +360,65 @@ describe('CharReactions', () => {
 
   // ===== Opportunity Attack Handler =====
 
+  it('shows Inspiring Movement message when target has inspiringMovementNoOA', async () => {
+    const mockRollAttack = vi.fn();
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    vi.mocked(getRuntimeValue).mockImplementation((charName, key) => {
+      if (key === 'inspiringMovementNoOA' && charName === 'Enemy') return true;
+      return null;
+    });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
+    expect(mockRollAttack).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('dice-roll-result')).not.toBeInTheDocument();
+  });
+
+  it('shows Tactical Shift message when target has Tactical Shift', async () => {
+    const mockRollAttack = vi.fn();
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    vi.mocked(hasTacticalShift).mockReturnValue(true);
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
+    expect(mockRollAttack).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('dice-roll-result')).not.toBeInTheDocument();
+  });
+
+  it('shows Speedy Movement Disadvantage message when target has Speedy', async () => {
+    const mockRollAttack = vi.fn();
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    vi.mocked(hasSpeedyOpportunityDisadvantage).mockReturnValue(true);
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
+    expect(mockRollAttack).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('dice-roll-result')).not.toBeInTheDocument();
+  });
+
+  it('proceeds with normal OA when target exists but has no special protections', async () => {
+    const mockRollAttack = vi.fn();
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
+    expect(mockRollAttack).toHaveBeenCalledWith(MOCK_ATTACK.name, MOCK_ATTACK.hitBonus, { forcedMode: undefined, isOpportunityAttack: true });
+  });
+
+  it('proceeds with normal OA when getCombatContext returns success but no target from attacker', async () => {
+    const mockRollAttack = vi.fn();
+    vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue(null);
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Opportunity Attack:')); });
+    expect(mockRollAttack).toHaveBeenCalled();
+  });
+
   it('calls rollAttack with attack name, hit bonus, and isOpportunityAttack flag for a basic OA', async () => {
     const mockRollAttack = vi.fn();
     vi.mocked(useLoggedDiceRoll).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn(), rollAttack: mockRollAttack, rollDamage: vi.fn() });
@@ -433,6 +499,35 @@ describe('CharReactions', () => {
     expect(mockRollAttack).toHaveBeenCalledWith('Auto Attack', 8, { targetName: 'Enemy', forcedMode: undefined, isOpportunityAttack: true });
   });
 
+  it('shows popupHtml when automation returns a popup result', async () => {
+    const mockSetPopupHtml = vi.fn();
+    vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: '<b>Test Popup</b>' });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    await waitFor(() => { expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Test Popup</b>'); });
+  });
+
+  it('sets reactiveSpellEligible when automation returns popup with eligibleSpells', async () => {
+    vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn() });
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball' }], hasWarnings: true } });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    // reactiveSpellEligible state is set internally - verify by checking that popup was shown
+    await waitFor(() => { expect(screen.queryByTestId('popup-overlay')).toBeInTheDocument(); });
+  });
+
+  it('does not set reactiveSpellEligible when popup has no eligibleSpells', async () => {
+    const mockSetPopupHtml = vi.fn();
+    vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: '<b>Simple Popup</b>' });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    await waitFor(() => { expect(mockSetPopupHtml).toHaveBeenCalledWith('<b>Simple Popup</b>'); });
+  });
 
   it('shows feature detail when automation returns an unknown result type', async () => {
     vi.mocked(hasAutomation).mockReturnValue(true);
@@ -641,5 +736,27 @@ describe('CharReactions', () => {
     expect(screen.getByText('Shield')).toBeInTheDocument();
     expect(screen.getByText('Counterspell')).toBeInTheDocument();
     expect(screen.queryByText('Hex')).not.toBeInTheDocument();
+  });
+
+  // ===== Spell Detail Popup onCast flow =====
+
+  it('closes spell detail popup when onClose is called', () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+    // The Popup wrapper's onClickOrKeyDown should close it
+    fireEvent.click(screen.getByTestId('popup-overlay'));
+    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+  });
+
+  // ===== Automation popup result with eligibleSpells =====
+
+  it('sets reactiveSpellWarnings when popup payload has hasWarnings=true', async () => {
+    vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: vi.fn() });
+    vi.mocked(hasAutomation).mockReturnValue(true);
+    vi.mocked(executeHandler).mockResolvedValue({ type: 'popup', payload: { eligibleSpells: [{ name: 'Fireball' }], hasWarnings: true } });
+    render(<CharReactions {...baseProps} />);
+    await act(async () => { fireEvent.click(screen.getByText('Reaction Test:')); });
+    await waitFor(() => { expect(screen.queryByTestId('popup-overlay')).toBeInTheDocument(); });
   });
 });

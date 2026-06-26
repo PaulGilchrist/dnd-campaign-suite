@@ -96,10 +96,6 @@ vi.mock('../../hooks/combat/DiceRollContext.js', () => ({
   useDiceRollPopup: vi.fn(() => ({ popupHtml: null, setPopupHtml: vi.fn() })),
 }));
 
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: vi.fn((props) => <div data-testid="dice-roll-result">{props.name || 'DiceRollResult'}</div>),
-}));
-
 vi.mock('./popups/MetamagicPopup.jsx', () => ({
   default: vi.fn((props) => <div data-testid="metamagic-popup">{props.spell?.name || 'MetamagicPopup'}</div>),
 }));
@@ -150,6 +146,47 @@ describe('CharBonusActions - Interactive', () => {
       const actionName = screen.getByText(/War Priest:/);
       fireEvent.click(actionName);
       expect(onAutomationAction).toHaveBeenCalledWith(automatedBonusAction);
+    });
+
+    it('shows feature detail popup when bonus action has details but no automation', () => {
+      hasAutomation.mockReturnValue(false);
+      const mockSetPopupHtml = vi.fn();
+      vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
+      const bonusActionDesc = { name: 'Cunning Action', description: 'You can take a bonus action.', details: 'Dash, Hide, or Disengage.' };
+      render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} />);
+      const actionName = screen.getByText(/Cunning Action:/);
+      fireEvent.click(actionName);
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Cunning Action'));
+      expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('Dash, Hide, or Disengage'));
+    });
+
+    it('does not call onAutomationAction when bonus action has details but no automation', () => {
+      hasAutomation.mockReturnValue(false);
+      const onAutomationAction = vi.fn();
+      const bonusActionDesc = { name: 'Cunning Action', description: 'You can take a bonus action.', details: 'Dash, Hide, or Disengage.' };
+      render(<CharBonusActions playerStats={createStats({ bonusActions: [bonusActionDesc] })} onAutomationAction={onAutomationAction} />);
+      const actionName = screen.getByText(/Cunning Action:/);
+      fireEvent.click(actionName);
+      expect(onAutomationAction).not.toHaveBeenCalled();
+    });
+
+    it('does not call handler when bonus action is exhausted and has no details', () => {
+      hasAutomation.mockReturnValue(true);
+      isExhausted.mockReturnValue(true);
+      const mockSetPopupHtml = vi.fn();
+      vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
+      const onAutomationAction = vi.fn();
+      const rageAction = {
+        ...automatedBonusAction,
+        name: 'Berserker Rage',
+        description: 'You enter a rage.',
+        automation: { type: 'combat_stance', recharge: 'long_rest_or_expend_rage' },
+      };
+      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageAction] })} onAutomationAction={onAutomationAction} />);
+      const actionName = screen.getByText(/Berserker Rage:/);
+      fireEvent.click(actionName);
+      expect(onAutomationAction).not.toHaveBeenCalled();
+      expect(mockSetPopupHtml).not.toHaveBeenCalled();
     });
 
     it('does not call onAutomationAction when the bonus action is exhausted', () => {
@@ -230,6 +267,25 @@ describe('CharBonusActions - Interactive', () => {
       });
     });
 
+    it('shows popup with no rage message when ragePoints is 0', async () => {
+      hasAutomation.mockReturnValue(true);
+      isExhausted.mockReturnValue(true);
+      vi.mocked(getRuntimeValue).mockImplementation((name, key) => {
+        if (key === 'ragePoints') return 0;
+        return null;
+      });
+      const mockSetPopupHtml = vi.fn();
+      vi.mocked(useDiceRollPopup).mockReturnValue({ popupHtml: null, setPopupHtml: mockSetPopupHtml });
+
+      render(<CharBonusActions playerStats={createStats({ bonusActions: [rageBonusAction] })} />);
+      const restoreBtn = screen.getByText(/Restore with Rage/);
+      fireEvent.click(restoreBtn);
+
+      await waitFor(() => {
+        expect(mockSetPopupHtml).toHaveBeenCalledWith(expect.stringContaining('No Rage remaining'));
+      });
+    });
+
   });
 
   describe('attack and damage click handlers', () => {
@@ -272,6 +328,11 @@ describe('CharBonusActions - Interactive', () => {
       fireEvent.click(damageElement);
       expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
     });
+
+    it('applies stat--penalized class when conditionAttackMode is disadvantage on regular attack', () => {
+      render(<CharBonusActions playerStats={createStats({ attacks: [bonusActionAttack] })} conditionAttackMode="disadvantage" exhaustionPenalty={0} />);
+      expect(document.querySelector('.stat--penalized')).toBeInTheDocument();
+    });
   });
 
   describe('spell detail popup', () => {
@@ -294,6 +355,34 @@ describe('CharBonusActions - Interactive', () => {
       fireEvent.click(popupOverlay);
 
       expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+    });
+  });
+
+  describe('save DC attack damage click', () => {
+    const saveDcAttack = {
+      name: 'Cone of Cold',
+      range: 60,
+      saveDc: 14,
+      saveType: 'CON',
+      damage: '8d8',
+      damageType: 'Cold',
+      type: 'Bonus Action',
+    };
+
+    it('calls onActionSpellDamageClick when save DC attack damage is clicked', () => {
+      const mockOnActionSpellDamageClick = vi.fn();
+      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} onActionSpellDamageClick={mockOnActionSpellDamageClick} />);
+      const damageElement = screen.getByText('8d8');
+      fireEvent.click(damageElement);
+      expect(mockOnActionSpellDamageClick).toHaveBeenCalledWith(saveDcAttack);
+    });
+
+    it('does not call onActionSpellDamageClick when cannotAct is true', () => {
+      const mockOnActionSpellDamageClick = vi.fn();
+      render(<CharBonusActions playerStats={createStats({ attacks: [saveDcAttack] })} onActionSpellDamageClick={mockOnActionSpellDamageClick} cannotAct />);
+      const damageElement = screen.getByText('8d8');
+      fireEvent.click(damageElement);
+      expect(mockOnActionSpellDamageClick).not.toHaveBeenCalled();
     });
   });
 
@@ -392,6 +481,27 @@ describe('CharBonusActions - Interactive', () => {
         .mockReturnValue(null);
       render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" onAttackClick={mockOnAttackClick} exhaustionPenalty={2} />);
       expect(screen.getByText('+3')).toBeInTheDocument();
+    });
+
+    it('does not render Horde Breaker hit bonus when cannotAct is true (section not shown)', () => {
+      getRuntimeValue.mockReturnValueOnce(null)
+        .mockReturnValueOnce('Horde Breaker')
+        .mockReturnValueOnce(0)
+        .mockReturnValue(null);
+      const mockOnAttackClick = vi.fn();
+      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" onAttackClick={mockOnAttackClick} cannotAct={true} exhaustionPenalty={0} />);
+      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
+      expect(mockOnAttackClick).not.toHaveBeenCalled();
+    });
+
+    it('does not render Horde Breaker damage when cannotAct is true (section not shown)', () => {
+      getRuntimeValue.mockReturnValueOnce(null)
+        .mockReturnValueOnce('Horde Breaker')
+        .mockReturnValueOnce(0)
+        .mockReturnValue(null);
+      render(<CharBonusActions playerStats={createStats({ attacks: [hordeBreakerAttack], spellAbilities: { spells: [bonusActionSpell] } })} campaignName="test" cannotAct={true} />);
+      expect(screen.queryByText('Horde Breaker')).not.toBeInTheDocument();
+      expect(vi.mocked(addEntry)).not.toHaveBeenCalled();
     });
   });
 

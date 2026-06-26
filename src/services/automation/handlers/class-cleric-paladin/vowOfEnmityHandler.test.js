@@ -28,12 +28,19 @@ function makeAction(overrides = {}) {
     };
 }
 
-function mockRuntimeValues(getters) {
-    vi.spyOn(runtimeState, 'getRuntimeValue').mockImplementation((target, key) => {
+function mockRuntimeValues(getters, state = {}) {
+    Object.assign(state, getters);
+    vi.spyOn(runtimeState, 'getRuntimeValue').mockImplementation((target, key, campaign) => {
+        const k = `${target}:${key}:${campaign}`;
+        if (k in state) return state[k];
         if (key in getters) return getters[key];
         return null;
     });
-    vi.spyOn(runtimeState, 'setRuntimeValue').mockResolvedValue(undefined);
+    vi.spyOn(runtimeState, 'setRuntimeValue').mockImplementation(async (target, key, value, campaign) => {
+        state[`${target}:${key}:${campaign}`] = value;
+        state[key] = value;
+    });
+    return state;
 }
 
 // ─── handle ───
@@ -383,5 +390,309 @@ describe('vowOfEnmityHandler.applyTargetChoice', () => {
         );
 
         expect(result.payload.automation).toEqual({ type: 'vow_of_enmity', customField: 'customVal' });
+    });
+});
+
+// ─── setupVowTransferListener ───
+
+describe('vowOfEnmityHandler.vowTransferListener', () => {
+    let setSpy;
+
+    beforeEach(() => {
+        vi.restoreAllMocks();
+    });
+
+    function setupSpots(runtimeValues, combatCtx, target) {
+        vi.spyOn(runtimeState, 'getRuntimeValue').mockImplementation((targetName, key, campaign) => {
+            const k = `${targetName}:${key}:${campaign}`;
+            if (k in runtimeValues) return runtimeValues[k];
+            if (key in runtimeValues) return runtimeValues[key];
+            return null;
+        });
+        setSpy = vi.spyOn(runtimeState, 'setRuntimeValue');
+        setSpy.mockImplementation(async (targetName, key, value, campaign) => {
+            runtimeValues[`${targetName}:${key}:${campaign}`] = value;
+            runtimeValues[key] = value;
+        });
+        vi.spyOn(damageUtils, 'getCombatContext').mockResolvedValue(combatCtx);
+        vi.spyOn(damageUtils, 'getTargetFromAttacker').mockReturnValue(target);
+    }
+
+    it('clears vowOfEnmityTarget and removes buff when target creature drops to 0 HP', async () => {
+        const runtimeValues = {
+            'Paladin1:vowOfEnmityTarget:TestCampaign': null,
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Goblin', currentHp: 0 }] }, { name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Goblin',
+            campaignName,
+        );
+
+        const buffsCall = setSpy.mock.calls.find(
+            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        );
+        expect(buffsCall[2]).toHaveLength(1);
+        expect(buffsCall[2][0].effect).toBe('vow_of_enmity');
+        expect(buffsCall[2][0].target).toBe('Goblin');
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            null,
+            campaignName,
+        );
+        const allBuffsCalls = setSpy.mock.calls.filter(
+            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        );
+        const lastBuffsCall = allBuffsCalls[allBuffsCalls.length - 1];
+        expect(lastBuffsCall[2]).toHaveLength(0);
+    });
+
+    it('clears vow when target HP uses hit_points.current format', async () => {
+        const runtimeValues = {
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Orc', hit_points: { current: 0 } }] }, { name: 'Orc' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Orc',
+            campaignName,
+        );
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            null,
+            campaignName,
+        );
+    });
+
+    it('does not clear vow when target creature has positive HP', async () => {
+        const runtimeValues = {
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Goblin', currentHp: 5 }] }, { name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Goblin',
+            campaignName,
+        );
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        const clearCalls = setSpy.mock.calls.filter(
+            (c) => c[0] === 'Paladin1' && c[1] === 'vowOfEnmityTarget' && c[2] === null,
+        );
+        expect(clearCalls).toHaveLength(0);
+    });
+
+    it('does not clear vow when combat context is null during event', async () => {
+        const runtimeValues = {
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Goblin', currentHp: 10 }] }, { name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Goblin',
+            campaignName,
+        );
+
+        vi.mocked(damageUtils.getCombatContext).mockResolvedValue(null);
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        const clearCalls = setSpy.mock.calls.filter(
+            (c) => c[0] === 'Paladin1' && c[1] === 'vowOfEnmityTarget' && c[2] === null,
+        );
+        expect(clearCalls).toHaveLength(0);
+    });
+
+    it('does not clear vow when target creature not found in combat context', async () => {
+        const runtimeValues = {
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Orc', currentHp: 10 }] }, { name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Goblin',
+            campaignName,
+        );
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        const clearCalls = setSpy.mock.calls.filter(
+            (c) => c[0] === 'Paladin1' && c[1] === 'vowOfEnmityTarget' && c[2] === null,
+        );
+        expect(clearCalls).toHaveLength(0);
+    });
+
+    it('preserves other buffs when clearing vow_of_enmity', async () => {
+        const runtimeValues = {
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [
+                { name: 'Divine Shield', effect: 'divine_shield' },
+            ],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Goblin', currentHp: 0 }] }, { name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Goblin',
+            campaignName,
+        );
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            null,
+            campaignName,
+        );
+        const allBuffsCalls = setSpy.mock.calls.filter(
+            (c) => c[0] === 'Paladin1' && c[1] === 'activeBuffs' && Array.isArray(c[2]),
+        );
+        const lastBuffsCall = allBuffsCalls[allBuffsCalls.length - 1];
+        expect(lastBuffsCall[2]).toHaveLength(1);
+        expect(lastBuffsCall[2][0].effect).toBe('divine_shield');
+    });
+
+    it('clears vow when target creature HP is exactly 0 using hit_points.current', async () => {
+        const runtimeValues = {
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Goblin', hit_points: { current: 0 } }] }, { name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Goblin',
+            campaignName,
+        );
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            null,
+            campaignName,
+        );
+    });
+
+    it('clears vow when target creature HP is negative', async () => {
+        const runtimeValues = {
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Goblin', currentHp: -1 }] }, { name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Goblin',
+            campaignName,
+        );
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            null,
+            campaignName,
+        );
+    });
+
+    it('handles missing currentHp/hit_points by defaulting to 0', async () => {
+        const runtimeValues = {
+            'Paladin1:channelDivinityCharges:TestCampaign': 2,
+            'Paladin1:activeBuffs:TestCampaign': [],
+        };
+        setupSpots(runtimeValues, { creatures: [{ name: 'Goblin' }] }, { name: 'Goblin' });
+
+        await handle(makeAction(), makePlayerStats(), campaignName);
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            'Goblin',
+            campaignName,
+        );
+
+        const event = new CustomEvent('combat-summary-updated');
+        window.dispatchEvent(event);
+
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(setSpy).toHaveBeenCalledWith(
+            'Paladin1',
+            'vowOfEnmityTarget',
+            null,
+            campaignName,
+        );
     });
 });

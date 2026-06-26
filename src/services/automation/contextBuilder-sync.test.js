@@ -1389,4 +1389,270 @@ describe('contextBuilder: buildAttackContextSync', () => {
       expect(result.forcedMode).toBe('advantage');
     });
   });
+
+  describe('sapEffect (disadvantage_next_attack)', () => {
+    it('sets forcedMode to disadvantage when sap effect targets attacker', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [{ effect: 'disadvantage_next_attack', target: 'Fighter1' }];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBe('disadvantage');
+    });
+
+    it('does not set disadvantage when sap effect targets another creature', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [{ effect: 'disadvantage_next_attack', target: 'Other' }];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBeUndefined();
+    });
+
+    it('does not set sap disadvantage when forcedMode is already set', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [{ effect: 'disadvantage_next_attack', target: 'Fighter1' }];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'advantage', {});
+
+      expect(result.forcedMode).toBe('advantage');
+    });
+  });
+
+  describe('next_attack_advantage (vex effect)', () => {
+    it('sets advantage and consumes effect when vex effect matches attacker and target', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [
+          { effect: 'next_attack_advantage', target: 'Fighter1', vexTarget: 'Orc', source: 'Thorn' },
+        ];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBe('advantage');
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'camp',
+        'targetEffects',
+        [],
+        'camp',
+      );
+    });
+
+    it('does not set advantage when vex effect target does not match attacker', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [
+          { effect: 'next_attack_advantage', target: 'Other', vexTarget: 'Orc', source: 'Thorn' },
+        ];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBeUndefined();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('does not set advantage when vex effect vexTarget does not match attack target', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [
+          { effect: 'next_attack_advantage', target: 'Fighter1', vexTarget: 'Goblin', source: 'Thorn' },
+        ];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.forcedMode).toBeUndefined();
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('does not consume effect when vex effect does not match', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [
+          { effect: 'next_attack_advantage', target: 'Fighter1', vexTarget: 'Goblin', source: 'Thorn' },
+          { effect: 'graze', target: 'Orc' },
+        ];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('preserves other effects when consuming vex effect', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [
+          { effect: 'next_attack_advantage', target: 'Fighter1', vexTarget: 'Orc', source: 'Thorn' },
+          { effect: 'graze', target: 'Orc' },
+        ];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'camp',
+        'targetEffects',
+        [{ effect: 'graze', target: 'Orc' }],
+        'camp',
+      );
+    });
+
+    it('does not set advantage when target is null', async () => {
+      buildBaseAttackContext.mockResolvedValue({
+        target: null,
+        targetName: null,
+        resistanceNotice: null,
+      });
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [
+          { effect: 'next_attack_advantage', target: 'Fighter1', vexTarget: null, source: 'Thorn' },
+        ];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      // null === null is true, so it would match — but targetName is null so the condition `targetName` is falsy
+      expect(result.forcedMode).toBeUndefined();
+    });
+
+    it('does not override existing forcedMode with vex effect', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'targetEffects') return [
+          { effect: 'next_attack_advantage', target: 'Fighter1', vexTarget: 'Orc', source: 'Thorn' },
+        ];
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'disadvantage', {});
+
+      expect(result.forcedMode).toBe('disadvantage');
+    });
+  });
+
+  describe('sacred weapon on melee attacks', () => {
+    it('adds Charisma bonus to sacredWeaponBonus for melee attacks', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'sacred_weapon' }];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.sacredWeaponBonus).toBe(2);
+    });
+
+    it('adds Charisma bonus to hitBonus when sacred weapon is active', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'sacred_weapon' }];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.hitBonus).toBe(9);
+    });
+
+    it('includes sacred weapon text in hitBonusFormula when active', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'sacred_weapon' }];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.hitBonusFormula).toBe('To Hit = 4 + 2 + 1 + Charisma Bonus (2)');
+    });
+
+    it('does not add sacred weapon bonus for ranged attacks', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'sacred_weapon' }];
+        return undefined;
+      });
+
+      const rangedAttack = { ...mockAttack, weaponType: 'ranged', hitBonus: 7, hitBonusFormula: 'To Hit = 5 + 2 + 1' };
+
+      const result = await buildAttackContextSync(rangedAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.sacredWeaponBonus).toBe(0);
+      expect(result.hitBonus).toBe(7);
+      expect(result.hitBonusFormula).toBe('To Hit = 5 + 2 + 1');
+    });
+
+    it('adds sacred weapon bonus for unarmed attacks', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'sacred_weapon' }];
+        return undefined;
+      });
+
+      const unarmedAttack = { ...mockAttack, weaponType: 'unarmed' };
+
+      const result = await buildAttackContextSync(unarmedAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.sacredWeaponBonus).toBe(2);
+    });
+
+    it('caps sacred weapon Charisma bonus at minimum 1', async () => {
+      const stats = {
+        ...mockStats,
+        abilities: [
+          { name: 'Charisma', bonus: -1 },
+          { name: 'Strength', bonus: 4 },
+        ],
+      };
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [{ effect: 'sacred_weapon' }];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, stats, 'camp', 'normal', {});
+
+      expect(result.sacredWeaponBonus).toBe(1);
+    });
+
+    it('does not add sacred weapon bonus when not active', async () => {
+      getRuntimeValue.mockImplementation((name, key) => {
+        if (key === 'activeBuffs') return [];
+        return undefined;
+      });
+
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.sacredWeaponBonus).toBe(0);
+      expect(result.hitBonus).toBe(7);
+    });
+  });
+
+  describe('weaponType and weaponName', () => {
+    it('returns weaponType from attack', async () => {
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.weaponType).toBe('melee');
+    });
+
+    it('returns weaponName from attack', async () => {
+      const result = await buildAttackContextSync(mockAttack, mockStats, 'camp', 'normal', {});
+
+      expect(result.weaponName).toBe('Longsword');
+    });
+  });
 });

@@ -232,4 +232,71 @@ describe('HexMapToolbar', () => {
     const btn = screen.getByTitle(buttonTitle);
     expect(btn.classList.contains('active')).toBe(true);
   });
+
+  describe('print button', () => {
+    it('should render print button', () => {
+      render(<HexMapToolbar {...props} />);
+      expect(screen.getByTitle('Print map')).toBeInTheDocument();
+    });
+
+    it('should call window.print when print button is clicked', () => {
+      const printSpy = vi.spyOn(window, 'print');
+      render(<HexMapToolbar {...props} />);
+      fireEvent.click(screen.getByTitle('Print map'));
+      expect(printSpy).toHaveBeenCalled();
+      printSpy.mockRestore();
+    });
+  });
+
+  describe('road tool', () => {
+    it('should toggle road tool on when clicked', () => {
+      render(<HexMapToolbar {...props} />);
+      fireEvent.click(screen.getByTitle('Connect cities and settlements with roads'));
+      expect(props.setTool).toHaveBeenCalledWith(TOOL_ROAD);
+    });
+
+    it('should toggle road tool off when already active', () => {
+      render(<HexMapToolbar {...props} tool={TOOL_ROAD} />);
+      fireEvent.click(screen.getByTitle('Connect cities and settlements with roads'));
+      expect(props.setTool).toHaveBeenCalledWith(TOOL_NONE);
+    });
+
+    it('should add active class to road button when tool is road', () => {
+      render(<HexMapToolbar {...props} tool={TOOL_ROAD} />);
+      const btn = screen.getByTitle('Connect cities and settlements with roads');
+      expect(btn.classList.contains('active')).toBe(true);
+    });
+  });
+
+  describe('travel tool', () => {
+    it('should toggle travel tool on when clicked', () => {
+      render(<HexMapToolbar {...props} />);
+      fireEvent.click(screen.getByTitle('Travel mode — plan and execute overland travel'));
+      expect(props.setTool).toHaveBeenCalledWith(TOOL_TRAVEL);
+    });
+
+    it('should toggle travel tool off when already active', () => {
+      render(<HexMapToolbar {...props} tool={TOOL_TRAVEL} />);
+      fireEvent.click(screen.getByTitle('Travel mode — plan and execute overland travel'));
+      expect(props.setTool).toHaveBeenCalledWith(TOOL_NONE);
+    });
+
+    it('should add active class to travel button when tool is travel', () => {
+      render(<HexMapToolbar {...props} tool={TOOL_TRAVEL} />);
+      const btn = screen.getByTitle('Travel mode — plan and execute overland travel');
+      expect(btn.classList.contains('active')).toBe(true);
+    });
+  });
+
+  describe('grid size hint', () => {
+    it('should render grid size hint with correct format', () => {
+      render(<HexMapToolbar {...props} gridSize={30} />);
+      expect(screen.getByText('60×30')).toBeInTheDocument();
+    });
+
+    it('should update grid size hint when gridSize changes', () => {
+      render(<HexMapToolbar {...props} gridSize={50} />);
+      expect(screen.getByText('100×50')).toBeInTheDocument();
+    });
+  });
 });

@@ -43,6 +43,7 @@ import { resolveTarget } from '../../common/targetResolver.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { postLogEntry } from '../../../shared/logPoster.js';
 import { addExpiration } from '../../../rules/effects/expirations.js';
+import { addEntry } from '../../../ui/logService.js';
 
 const campaignName = 'TestCampaign';
 
@@ -100,6 +101,41 @@ describe('ottosDanceHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('No creatures in combat');
     });
+
+    it('should return popup when creatures property is missing', async () => {
+      getCombatContext.mockResolvedValue({});
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No creatures in combat');
+    });
+
+    it('should not create save listener when combat context is null', async () => {
+      getCombatContext.mockResolvedValue(null);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(createSaveListener).not.toHaveBeenCalled();
+    });
+
+    it('should not create save listener when combat context has no creatures', async () => {
+      getCombatContext.mockResolvedValue({ creatures: [] });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(createSaveListener).not.toHaveBeenCalled();
+    });
+
+    it('should not create save listener when no target selected', async () => {
+      getCombatContext.mockResolvedValue(baseCombatContext);
+      buildSaveDc.mockReturnValue(15);
+      resolveTarget.mockResolvedValue(null);
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(createSaveListener).not.toHaveBeenCalled();
+    });
   });
 
   describe('target resolution', () => {
@@ -128,6 +164,17 @@ describe('ottosDanceHandler.handle', () => {
 
       expect(resolveTarget).toHaveBeenCalledWith(campaignName, 'TestCaster');
     });
+
+    it('should return popup when target has no name', async () => {
+      getCombatContext.mockResolvedValue(baseCombatContext);
+      buildSaveDc.mockReturnValue(15);
+      resolveTarget.mockResolvedValue({});
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('No target selected');
+    });
   });
 
   describe('repeat save detection', () => {
@@ -152,15 +199,22 @@ describe('ottosDanceHandler.handle', () => {
   });
 
   describe('initial cast - successful save', () => {
-    it('should return popup describing target dancing when save succeeds', async () => {
+    function setupSuccessfulSave() {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(20);
       resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      getRuntimeValue.mockReturnValue(null);
+      getRuntimeValue.mockImplementation((_caster, key) => {
+        if (key === '_ottosDance_Goblin') return null;
+        return [];
+      });
       createSaveListener.mockReturnValue({
-        promptId: 'otto-success',
+        promptId: 'otto-success-save',
         promise: Promise.resolve({ success: true }),
       });
+    }
+
+    it('should return popup describing target dancing when save succeeds', async () => {
+      setupSuccessfulSave();
 
       const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -169,14 +223,7 @@ describe('ottosDanceHandler.handle', () => {
     });
 
     it('should call postLogEntry with condition applied on successful save', async () => {
-      getCombatContext.mockResolvedValue(baseCombatContext);
-      buildSaveDc.mockReturnValue(20);
-      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      getRuntimeValue.mockReturnValue(null);
-      createSaveListener.mockReturnValue({
-        promptId: 'otto-save',
-        promise: Promise.resolve({ success: true }),
-      });
+      setupSuccessfulSave();
 
       await handle(makeAction(), makePlayerStats(), campaignName, null);
 
@@ -189,15 +236,81 @@ describe('ottosDanceHandler.handle', () => {
         }),
       );
     });
+
+    it('should set tracking key on successful save', async () => {
+      setupSuccessfulSave();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestCaster',
+        '_ottosDance_Goblin',
+        true,
+        campaignName,
+      );
+    });
+
+    it('should add expiration for speed_zero on successful save', async () => {
+      setupSuccessfulSave();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addExpiration).toHaveBeenCalledWith(
+        'TestCaster',
+        'Goblin',
+        expect.arrayContaining([{ type: 'speed_zero', condition: 'speed_zero' }]),
+        campaignName,
+        1,
+      );
+    });
+
+    it('should not store target effects on successful save', async () => {
+      setupSuccessfulSave();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
+        (c) => c[1] === 'targetEffects',
+      );
+      expect(targetEffectsCalls.length).toBe(0);
+    });
+
+    it('should call addEntry with ability_use on initial cast', async () => {
+      setupSuccessfulSave();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'TestCaster',
+          abilityName: "Otto's Irresistible Dance",
+        }),
+      );
+    });
+
+    it('should not call addEntry with save_result on successful save', async () => {
+      setupSuccessfulSave();
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      const saveResultCalls = addEntry.mock.calls.filter(
+        (c) => c[1] && c[1].type === 'save_result',
+      );
+      expect(saveResultCalls.length).toBe(0);
+    });
   });
 
   describe('initial cast - failed save', () => {
-    function setupFailedSave() {
+    function setupFailedSave(existingConditions = [], existingEffects = []) {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(15);
       resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
-      getRuntimeValue.mockImplementation((_caster, key) => {
+      getRuntimeValue.mockImplementation((_caster, key, _camp) => {
         if (key === '_ottosDance_Goblin') return null;
+        if (key === 'activeConditions') return existingConditions;
+        if (key === 'targetEffects') return existingEffects;
         return [];
       });
       createSaveListener.mockReturnValue({
@@ -278,6 +391,23 @@ describe('ottosDanceHandler.handle', () => {
       );
     });
 
+    it('should call addEntry with save_result on failed save', async () => {
+      setupFailedSave();
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'save_result',
+          characterName: 'TestCaster',
+          targetName: 'Goblin',
+          saveDc: 15,
+          saveType: 'WIS',
+          success: false,
+        }),
+      );
+    });
+
     it('should update existing dance effect instead of duplicating', async () => {
       getCombatContext.mockResolvedValue(baseCombatContext);
       buildSaveDc.mockReturnValue(15);
@@ -313,6 +443,57 @@ describe('ottosDanceHandler.handle', () => {
       expect(effects.length).toBe(1);
       expect(effects[0].source).toBe('TestCaster');
     });
+
+    it('should handle non-array existing conditions gracefully on failed save', async () => {
+      getCombatContext.mockResolvedValue(baseCombatContext);
+      buildSaveDc.mockReturnValue(15);
+      resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
+      getRuntimeValue.mockImplementation((_caster, key, _camp) => {
+        if (key === '_ottosDance_Goblin') return null;
+        if (key === 'activeConditions') return null;
+        if (key === 'targetEffects') return [];
+        return [];
+      });
+      createSaveListener.mockReturnValue({
+        promptId: 'otto-null-conds',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        expect.arrayContaining(['charmed', 'speed_zero']),
+        campaignName,
+      );
+    });
+
+    it('should append to existing conditions on failed save', async () => {
+      setupFailedSave(['frightened']);
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        expect.arrayContaining(['frightened', 'charmed', 'speed_zero']),
+        campaignName,
+      );
+    });
+
+    it('should call addEntry with ability_use on initial cast', async () => {
+      setupFailedSave();
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'TestCaster',
+          abilityName: "Otto's Irresistible Dance",
+        }),
+      );
+    });
   });
 });
 
@@ -329,6 +510,7 @@ describe('ottosDanceHandler.processOttoDanceRepeatSave', () => {
     );
 
     expect(result).toBeNull();
+    expect(createSaveListener).not.toHaveBeenCalled();
   });
 
   it('should create save listener with WIS save type', async () => {
@@ -358,17 +540,21 @@ describe('ottosDanceHandler.processOttoDanceRepeatSave', () => {
   });
 
   describe('successful repeat save', () => {
-    it('should remove charmed and speed_zero conditions, preserving others', async () => {
-      getRuntimeValue.mockImplementation((_target, prop) => {
-        if (prop === 'activeConditions')
-          return ['charmed', 'speed_zero', 'frightened'];
-        if (prop === '_ottosDance_Goblin') return true;
-        return [];
-      });
+    function setupSuccessPath(existingConditions = ['charmed', 'speed_zero', 'frightened'], existingEffects = []) {
       createSaveListener.mockReturnValue({
         promptId: 'otto-repeat-success',
         promise: Promise.resolve({ success: true }),
       });
+      getRuntimeValue.mockImplementation((_entity, keyOrProp, _camp) => {
+        if (keyOrProp === '_ottosDance_Goblin') return true;
+        if (keyOrProp === 'activeConditions') return existingConditions;
+        if (keyOrProp === 'targetEffects') return existingEffects;
+        return [];
+      });
+    }
+
+    it('should remove charmed and speed_zero conditions, preserving others', async () => {
+      setupSuccessPath();
 
       const result = await processOttoDanceRepeatSave(
         'TestCaster',
@@ -387,15 +573,27 @@ describe('ottosDanceHandler.processOttoDanceRepeatSave', () => {
       expect(result.payload.description).toContain('succeeded on WIS save');
     });
 
+    it('should handle target with no conditions gracefully', async () => {
+      setupSuccessPath([]);
+
+      await processOttoDanceRepeatSave(
+        'TestCaster',
+        'Goblin',
+        15,
+        "Otto's Irresistible Dance",
+        campaignName,
+      );
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        [],
+        campaignName,
+      );
+    });
+
     it('should clear tracking', async () => {
-      getRuntimeValue.mockImplementation((_caster, key) => {
-        if (key === '_ottosDance_Goblin') return true;
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'otto-repeat-track',
-        promise: Promise.resolve({ success: true }),
-      });
+      setupSuccessPath(['charmed', 'speed_zero']);
 
       await processOttoDanceRepeatSave(
         'TestCaster',
@@ -414,18 +612,9 @@ describe('ottosDanceHandler.processOttoDanceRepeatSave', () => {
     });
 
     it('should clean up target effect', async () => {
-      getRuntimeValue.mockImplementation((_caster, key, prop) => {
-        if (key === '_ottosDance_Goblin') return true;
-        if (prop === 'targetEffects')
-          return [
-            { target: 'Goblin', effect: 'ottos_dance_repeat_save', source: 'TestCaster' },
-          ];
-        return [];
-      });
-      createSaveListener.mockReturnValue({
-        promptId: 'otto-repeat-clean',
-        promise: Promise.resolve({ success: true }),
-      });
+      setupSuccessPath(['charmed'], [
+        { target: 'Goblin', effect: 'ottos_dance_repeat_save', source: 'TestCaster' },
+      ]);
 
       await processOttoDanceRepeatSave(
         'TestCaster',
@@ -448,18 +637,116 @@ describe('ottosDanceHandler.processOttoDanceRepeatSave', () => {
         campaignName,
       );
     });
+
+    it('should post condition removal log entry', async () => {
+      setupSuccessPath(['charmed', 'speed_zero']);
+
+      await processOttoDanceRepeatSave(
+        'TestCaster',
+        'Goblin',
+        15,
+        "Otto's Irresistible Dance",
+        campaignName,
+      );
+
+      expect(postLogEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'condition',
+          action: 'removed',
+          characterName: 'Goblin',
+          condition: 'Charmed, Speed 0',
+        }),
+      );
+    });
+
+    it('should call addEntry with save_result on success', async () => {
+      setupSuccessPath(['charmed', 'speed_zero']);
+
+      await processOttoDanceRepeatSave(
+        'TestCaster',
+        'Goblin',
+        15,
+        "Otto's Irresistible Dance",
+        campaignName,
+      );
+
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'save_result',
+          characterName: 'TestCaster',
+          targetName: 'Goblin',
+          saveDc: 15,
+          saveType: 'WIS',
+          success: true,
+        }),
+      );
+    });
+
+    it('should call addEntry with ability_use on repeat save', async () => {
+      setupSuccessPath(['charmed', 'speed_zero']);
+
+      await processOttoDanceRepeatSave(
+        'TestCaster',
+        'Goblin',
+        15,
+        "Otto's Irresistible Dance",
+        campaignName,
+      );
+
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'TestCaster',
+        }),
+      );
+    });
+
+    it('should handle non-array activeConditions gracefully', async () => {
+      createSaveListener.mockReturnValue({
+        promptId: 'otto-repeat-nonarray',
+        promise: Promise.resolve({ success: true }),
+      });
+      getRuntimeValue.mockImplementation((_target, prop) => {
+        if (prop === 'activeConditions') return null;
+        if (prop === '_ottosDance_Goblin') return true;
+        return [];
+      });
+
+      const result = await processOttoDanceRepeatSave(
+        'TestCaster',
+        'Goblin',
+        15,
+        "Otto's Irresistible Dance",
+        campaignName,
+      );
+
+      expect(result.type).toBe('popup');
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        [],
+        campaignName,
+      );
+    });
   });
 
   describe('failed repeat save', () => {
-    it('should return popup indicating spell continues', async () => {
-      getRuntimeValue.mockImplementation((_caster, key) => {
-        if (key === '_ottosDance_Goblin') return true;
-        return [];
-      });
+    function setupFailedRepeat() {
       createSaveListener.mockReturnValue({
         promptId: 'otto-repeat-fail',
         promise: Promise.resolve({ success: false }),
       });
+      getRuntimeValue.mockImplementation((_entity, keyOrProp) => {
+        if (keyOrProp === '_ottosDance_Goblin') return true;
+        return [];
+      });
+    }
+
+    it('should return popup indicating spell continues', async () => {
+      setupFailedRepeat();
 
       const result = await processOttoDanceRepeatSave(
         'TestCaster',
@@ -472,6 +759,68 @@ describe('ottosDanceHandler.processOttoDanceRepeatSave', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('failed WIS save');
       expect(result.payload.description).toContain('continues');
+    });
+
+    it('should call addEntry with save_result on failed repeat', async () => {
+      setupFailedRepeat();
+
+      await processOttoDanceRepeatSave(
+        'TestCaster',
+        'Goblin',
+        15,
+        "Otto's Irresistible Dance",
+        campaignName,
+      );
+
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          type: 'save_result',
+          characterName: 'TestCaster',
+          targetName: 'Goblin',
+          saveDc: 15,
+          saveType: 'WIS',
+          success: false,
+        }),
+      );
+    });
+
+    it('should not modify conditions on failed save', async () => {
+      setupFailedRepeat();
+
+      await processOttoDanceRepeatSave(
+        'TestCaster',
+        'Goblin',
+        15,
+        "Otto's Irresistible Dance",
+        campaignName,
+      );
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'Goblin',
+        'activeConditions',
+        expect.anything(),
+        campaignName,
+      );
+    });
+
+    it('should not clear tracking on failed save', async () => {
+      setupFailedRepeat();
+
+      await processOttoDanceRepeatSave(
+        'TestCaster',
+        'Goblin',
+        15,
+        "Otto's Irresistible Dance",
+        campaignName,
+      );
+
+      expect(setRuntimeValue).not.toHaveBeenCalledWith(
+        'TestCaster',
+        '_ottosDance_Goblin',
+        null,
+        campaignName,
+      );
     });
   });
 });
@@ -550,6 +899,24 @@ describe('ottosDanceHandler.processOttoDanceSuccessSave', () => {
       'Goblin',
       'activeConditions',
       ['frightened', 'speed_zero'],
+      campaignName,
+    );
+  });
+
+  it('should handle non-array storedConds gracefully', async () => {
+    getRuntimeValue.mockReturnValue(null);
+
+    await processOttoDanceSuccessSave(
+      'TestCaster',
+      'Goblin',
+      "Otto's Irresistible Dance",
+      campaignName,
+    );
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'Goblin',
+      'activeConditions',
+      ['speed_zero'],
       campaignName,
     );
   });

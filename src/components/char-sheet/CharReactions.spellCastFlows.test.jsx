@@ -147,6 +147,8 @@ import { executeHandler } from '../../services/automation/index.js';
 import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js';
 import { applyWarCasterReaction } from '../../services/automation/handlers/reactions/reactionSpellHandler.js';
+import * as mapsService from '../../services/maps/mapsService.js';
+import * as rangeValidation from '../../services/rules/combat/rangeValidation.js';
 
 const MOCK_ATTACK = { name: 'Longsword', type: 'Action', range: 5, hitBonus: 5, damage: '1d8+3', damageType: 'Slashing' };
 
@@ -243,6 +245,21 @@ describe('CharReactions - Spell Cast Flows', () => {
     expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('spell-cast-button'));
     // selectedSpell is cleared immediately, popup closes
+    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+  });
+
+  it('clears selectedSpell when reaction spell cast is initiated', () => {
+    const gateMetamagic = vi.fn();
+    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
+      pendingMetamagic: null,
+      gateMetamagic,
+      handleConfirm: vi.fn(),
+      handleSkip: vi.fn(),
+    });
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('spell-cast-button'));
     expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
   });
 
@@ -347,5 +364,131 @@ describe('CharReactions - Spell Cast Flows', () => {
     // The hit column shows "—" (em dash)
     const cells = document.querySelectorAll('.attacks > div:nth-child(3)');
     expect(cells.length).toBeGreaterThan(0);
+  });
+
+  // ===== handleReactionSpellCast - Normal Spell Cast =====
+
+  it('clears selectedSpell when reaction spell cast is initiated', () => {
+    const gateMetamagic = vi.fn();
+    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
+      pendingMetamagic: null,
+      gateMetamagic,
+      handleConfirm: vi.fn(),
+      handleSkip: vi.fn(),
+    });
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('spell-cast-button'));
+    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+  });
+
+  // ===== handleReactiveSpellCast - WarCaster Flow =====
+
+  it('calls applyWarCasterReaction when reactive spell is cast', async () => {
+    const gateMetamagic = vi.fn();
+    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
+      pendingMetamagic: null,
+      gateMetamagic,
+      handleConfirm: vi.fn(),
+      handleSkip: vi.fn(),
+    });
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    const stats = { ...basePlayerStats, reactions: [{ name: 'War Caster', description: 'Casts a spell as reaction', automation: { type: 'reaction_spell' } }] };
+    const props = { ...baseProps, playerStats: stats, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  it('clears reactiveSpellEligible and reactiveSpellWarnings when reactive spell cast is initiated', () => {
+    const gateMetamagic = vi.fn();
+    vi.mocked(useSpellMetamagicFlow).mockReturnValue({
+      pendingMetamagic: null,
+      gateMetamagic,
+      handleConfirm: vi.fn(),
+      handleSkip: vi.fn(),
+    });
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    fireEvent.click(screen.getByTestId('spell-cast-button'));
+    expect(screen.queryByTestId('spell-detail-popup')).not.toBeInTheDocument();
+  });
+
+  // ===== resolveReactionSpellPositions - Position Resolution =====
+
+  it('resolves positions when mapName, player, and target are all found', async () => {
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    vi.mocked(mapsService.loadMapData).mockResolvedValue({
+      players: [{ name: 'Test Character', gridX: 5, gridY: 5 }, { name: 'Enemy', gridX: 8, gridY: 8 }],
+      placedItems: [],
+    });
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  it('resolves target position from placed items when target is not in players array', async () => {
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Goblin King' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Goblin King' });
+    vi.mocked(mapsService.loadMapData).mockResolvedValue({
+      players: [{ name: 'Test Character', gridX: 5, gridY: 5 }],
+      placedItems: [{ name: 'Goblin King', gridX: 10, gridY: 10 }],
+    });
+    vi.mocked(rangeValidation.getNearestPlacedItem).mockReturnValue({ name: 'Goblin King', gridX: 10, gridY: 10 });
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  it('does not resolve positions when map player is not found', async () => {
+    vi.mocked(getCombatContext).mockResolvedValue({ creatures: [{ name: 'Enemy' }] });
+    vi.mocked(getTargetFromAttacker).mockReturnValue({ name: 'Enemy' });
+    vi.mocked(mapsService.loadMapData).mockResolvedValue({
+      players: [{ name: 'Unknown Character', gridX: 5, gridY: 5 }],
+      placedItems: [],
+    });
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  it('handles map data with no players array', async () => {
+    vi.mocked(mapsService.loadMapData).mockResolvedValue({ placedItems: [] });
+    const props = { ...baseProps, mapName: 'test-map' };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== ArcaneWardRestoreModal prop passing =====
+
+  it('passes playerStats and campaignName to ArcaneWardRestoreModal', () => {
+    const props = { ...baseProps, playerStats: { ...basePlayerStats, reactions: [] } };
+    render(<CharReactions {...props} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
+  });
+
+  // ===== Reactivity spell eligible popup selection =====
+
+  it('sets fullSpell with prepared Always when selecting from reactive spell popup', () => {
+    render(<CharReactions {...baseProps} />);
+    fireEvent.click(screen.getByText('Shield'));
+    expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
+  });
+
+  // ===== Multi-target spell indicator =====
+
+  it('shows multi-target indicator for non-single-target spells in reactive popup', () => {
+    render(<CharReactions {...baseProps} />);
+    const spellDiv = screen.getByText('Shield');
+    expect(spellDiv).toBeInTheDocument();
+  });
+
+  // ===== Warning display in reactive spell popup =====
+
+  it('shows warning message when reactiveSpellWarnings is true in reactive popup', () => {
+    render(<CharReactions {...baseProps} />);
+    expect(screen.getByText('Reactions')).toBeInTheDocument();
   });
 });

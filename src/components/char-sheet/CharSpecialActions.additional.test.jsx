@@ -24,7 +24,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
   isInteractiveAutomation: vi.fn((action) => {
     if (!action?.automation) return false;
     const auto = Array.isArray(action.automation) ? action.automation[0] : action.automation;
-    const interactiveTypes = ['teleport', 'signature_spells', 'spell_mastery'];
+    const interactiveTypes = ['teleport', 'signature_spells', 'spell_mastery', 'combat_superiority', 'weapon_kind_mastery', 'weapon_mastery_choice'];
     if (auto.type === 'passive_rule') {
       const interactiveEffects = ['abjuration_savant', 'divination_savant', 'evocation_savant', 'illusion_savant'];
       return interactiveEffects.includes(auto.effect);

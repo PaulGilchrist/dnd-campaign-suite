@@ -92,10 +92,6 @@ vi.mock('../../hooks/combat/useActionPopup.js', () => ({
   }),
 }));
 
-vi.mock('./DiceRollResult.jsx', () => ({
-  default: vi.fn((props) => <div data-testid="dice-roll-result">{props.name || 'DiceRollResult'}</div>),
-}));
-
 vi.mock('./popups/MetamagicPopup.jsx', () => ({
   default: vi.fn((props) => <div data-testid="metamagic-popup">{props.spell?.name || 'MetamagicPopup'}</div>),
 }));
@@ -146,22 +142,22 @@ describe('CharBonusActions - Edge Cases', () => {
       expect(document.querySelector('.attacks.mastery-enabled')).not.toBeInTheDocument();
     });
 
-    it('crashes when playerStats.bonusActions is undefined (production bug)', () => {
+    it('throws when playerStats.bonusActions is undefined (component expects array)', () => {
       const stats = createStats({ bonusActions: undefined });
       expect(() => render(<CharBonusActions playerStats={stats} />)).toThrow();
     });
 
-    it('crashes when playerStats.bonusActions is null (production bug)', () => {
+    it('throws when playerStats.bonusActions is null (component expects array)', () => {
       const stats = createStats({ bonusActions: null });
       expect(() => render(<CharBonusActions playerStats={stats} />)).toThrow();
     });
 
-    it('crashes when playerStats.attacks is undefined (production bug)', () => {
+    it('throws when playerStats.attacks is undefined (component expects array)', () => {
       const stats = createStats({ attacks: undefined, bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
       expect(() => render(<CharBonusActions playerStats={stats} />)).toThrow();
     });
 
-    it('crashes when playerStats.attacks is null (production bug)', () => {
+    it('throws when playerStats.attacks is null (component expects array)', () => {
       const stats = createStats({ attacks: null, bonusActions: [{ name: 'Test', description: 'Test desc', details: 'Test details' }] });
       expect(() => render(<CharBonusActions playerStats={stats} />)).toThrow();
     });
@@ -323,13 +319,6 @@ describe('CharBonusActions - Edge Cases', () => {
       render(<CharBonusActions playerStats={createStats({ bonusActions: [automatedAction] })} onAutomationAction={vi.fn()} />);
       fireEvent.click(screen.getByText(/Auto Test:/));
       expect(screen.getByText(/Auto Test:/)).toBeInTheDocument();
-    });
-  });
-
-  describe('bonus action spell click with nonexistent spell', () => {
-    it('does not crash when handleBonusSpellClick is called with nonexistent spell name', () => {
-      render(<CharBonusActions playerStats={createStats({ bonusActions: [{ name: 'Test', description: 'Test', details: 'Details' }] })} />);
-      expect(screen.getByText('Bonus Actions')).toBeInTheDocument();
     });
   });
 });

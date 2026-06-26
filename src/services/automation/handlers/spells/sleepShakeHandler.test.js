@@ -43,6 +43,7 @@ import { postLogEntry } from '../../../shared/logPoster.js';
 import { getCombatContext } from '../../../rules/combat/damageUtils.js';
 import { addEntry } from '../../../ui/logService.js';
 import { resolveMapPositions } from '../../common/targetResolver.js';
+import { getDistanceFeet } from '../../../rules/combat/rangeValidation.js';
 
 const campaignName = 'TestCampaign';
 const mapName = 'TestMap';
@@ -322,6 +323,159 @@ describe('sleepShakeHandler.handle', () => {
         await handle(makeAction(), makePlayerStats(), campaignName, mapName);
 
         expect(resolveMapPositions).toHaveBeenCalledWith(campaignName, mapName, 'Cleric1');
+    });
+
+    it('filters out targets beyond range when map positions are available', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Goblin', type: 'npc' },
+                { name: 'Orc', type: 'npc' },
+                { name: 'Skeleton', type: 'npc' },
+            ],
+        });
+        resolveMapPositions.mockResolvedValue({
+            attackerPos: { gridX: 1, gridY: 1 },
+            mapData: {
+                players: [],
+                placedItems: [
+                    { name: 'Goblin', gridX: 1, gridY: 1 },
+                    { name: 'Orc', gridX: 10, gridY: 10 },
+                ],
+            },
+        });
+        getDistanceFeet.mockImplementation((a, b) => {
+            const dx = b.gridX - a.gridX;
+            const dy = b.gridY - a.gridY;
+            return Math.sqrt(dx * dx + dy * dy) * 5;
+        });
+
+        const result = await handle(makeAction({ range: '15 ft' }), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.targets).toContain('Goblin');
+        expect(result.payload.targets).not.toContain('Orc');
+        expect(result.payload.targets).toContain('Skeleton');
+    });
+
+    it('includes targets without map positions when range filtering is active', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Goblin', type: 'npc' },
+                { name: 'Orc', type: 'npc' },
+            ],
+        });
+        resolveMapPositions.mockResolvedValue({
+            attackerPos: { gridX: 1, gridY: 1 },
+            mapData: {
+                players: [{ name: 'Goblin', gridX: 1, gridY: 1 }],
+                placedItems: [],
+            },
+        });
+        getDistanceFeet.mockReturnValue(5);
+
+        const result = await handle(makeAction({ range: '5 ft' }), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.targets).toContain('Goblin');
+        expect(result.payload.targets).toContain('Orc');
+    });
+
+    it('skips range filtering when attackerPos is null', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Goblin', type: 'npc' },
+                { name: 'Orc', type: 'npc' },
+            ],
+        });
+        resolveMapPositions.mockResolvedValue({
+            attackerPos: null,
+            mapData: {
+                players: [],
+                placedItems: [],
+            },
+        });
+
+        const result = await handle(makeAction({ range: '5 ft' }), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.targets).toContain('Goblin');
+        expect(result.payload.targets).toContain('Orc');
+    });
+
+    it('skips range filtering when rangeFt is 0 (default with no range)', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Goblin', type: 'npc' },
+            ],
+        });
+        resolveMapPositions.mockResolvedValue({
+            attackerPos: { gridX: 1, gridY: 1 },
+            mapData: {
+                players: [],
+                placedItems: [],
+            },
+        });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.targets).toContain('Goblin');
+    });
+
+    it('prioritizes player with both incapacitated and unconscious over eligible targets', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Ally1', type: 'player' },
+                { name: 'Goblin', type: 'npc', conditions: [] },
+                { name: 'Orc', type: 'npc', conditions: [] },
+            ],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return ['incapacitated', 'unconscious'];
+            return [];
+        });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.targets).toEqual(['Ally1']);
+    });
+
+    it('does not prioritize player with only poisoned condition', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Ally1', type: 'player' },
+                { name: 'Goblin', type: 'npc', conditions: [] },
+            ],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return ['poisoned'];
+            return [];
+        });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.targets).toContain('Ally1');
+        expect(result.payload.targets).toContain('Goblin');
+    });
+
+    it('handles npc with undefined conditions array gracefully', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Goblin', type: 'npc' },
+            ],
+        });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.targets).toContain('Goblin');
+    });
+
+    it('handles empty conditions array on npc', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [
+                { name: 'Goblin', type: 'npc', conditions: [] },
+            ],
+        });
+
+        const result = await handle(makeAction(), makePlayerStats(), campaignName, mapName);
+
+        expect(result.payload.targets).toContain('Goblin');
     });
 
     it('handles player target with non-sleep conditions (should not appear as sleep target)', async () => {
@@ -671,5 +825,262 @@ describe('sleepShakeHandler.handleConfirm', () => {
         await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
 
         expect(storage.default.set).not.toHaveBeenCalled();
+    });
+
+    it('does not call storage.set when target not found in combat', async () => {
+        const storage = await import('../../../ui/storage.js');
+
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'NonExistent');
+
+        expect(storage.default.set).not.toHaveBeenCalled();
+    });
+
+    it('does not post log entries when target not found in combat', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'NonExistent');
+
+        expect(postLogEntry).not.toHaveBeenCalled();
+    });
+
+    it('still calls addEntry when target not found in combat', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'NonExistent');
+
+        expect(addEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({
+                type: 'ability_use',
+                targetName: 'NonExistent',
+            }),
+        );
+    });
+
+    it('handles player target where conditions is a string instead of array', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Ally1', type: 'player' }],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return 'incapacitated';
+            return [];
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+    });
+
+    it('handles player target where conditions is null', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Ally1', type: 'player' }],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return null;
+            return [];
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(postLogEntry).not.toHaveBeenCalled();
+    });
+
+    it('handles player target where conditions is undefined', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Ally1', type: 'player' }],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return undefined;
+            return [];
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
+
+        expect(setRuntimeValue).not.toHaveBeenCalled();
+        expect(postLogEntry).not.toHaveBeenCalled();
+    });
+
+    it('handles npc with null conditions array', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: null }],
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
+
+        const storageMod = await import('../../../ui/storage.js');
+        expect(storageMod.default.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
+        expect(postLogEntry).not.toHaveBeenCalled();
+    });
+
+    it('handles npc with undefined conditions', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc' }],
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
+
+        const storageMod = await import('../../../ui/storage.js');
+        expect(storageMod.default.set).toHaveBeenCalledWith('combatSummary', expect.any(Object), campaignName);
+        expect(postLogEntry).not.toHaveBeenCalled();
+    });
+
+    it('posts only incapacitated log entry when npc has only incapacitated (not unconscious)', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'incapacitated' }] }],
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
+
+        expect(postLogEntry).toHaveBeenCalledTimes(1);
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({ condition: 'Incapacitated' }),
+        );
+    });
+
+    it('posts only unconscious log entry when npc has only unconscious (not incapacitated)', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'unconscious' }] }],
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
+
+        expect(postLogEntry).toHaveBeenCalledTimes(1);
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({ condition: 'Unconscious' }),
+        );
+    });
+
+    it('handles player with only incapacitated (not unconscious) condition', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Ally1', type: 'player' }],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return ['incapacitated', 'blinded'];
+            return [];
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
+
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({ condition: 'Incapacitated' }),
+        );
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({ condition: 'Unconscious' }),
+        );
+    });
+
+    it('handles player with only unconscious (not incapacitated) condition', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Ally1', type: 'player' }],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return ['unconscious', 'blinded'];
+            return [];
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
+
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({ condition: 'Incapacitated' }),
+        );
+        expect(postLogEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({ condition: 'Unconscious' }),
+        );
+    });
+
+    it('preserves other conditions on player while removing sleep conditions', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Ally1', type: 'player' }],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return ['incapacitated', 'unconscious', 'blinded', 'poisoned'];
+            return [];
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+            'Ally1',
+            'activeConditions',
+            ['blinded', 'poisoned'],
+            campaignName,
+        );
+    });
+
+    it('preserves other conditions on npc while removing sleep conditions', async () => {
+        const combatSummary = {
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [{ key: 'unconscious' }, { key: 'incapacitated' }, { key: 'blinded' }, { key: 'poisoned' }] }],
+        };
+        getCombatContext.mockResolvedValue(combatSummary);
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
+
+        const goblin = combatSummary.creatures[0];
+        const remainingKeys = goblin.conditions.map(c => c.key);
+        expect(remainingKeys).toContain('blinded');
+        expect(remainingKeys).toContain('poisoned');
+        expect(remainingKeys).not.toContain('unconscious');
+        expect(remainingKeys).not.toContain('incapacitated');
+    });
+
+    it('calls addEntry with correct description format for npc target', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
+
+        expect(addEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({
+                description: 'Cleric1 used an action to shake Goblin out of its magical slumber.',
+            }),
+        );
+    });
+
+    it('calls addEntry with correct description format for player target', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Ally1', type: 'player' }],
+        });
+        getRuntimeValue.mockImplementation((name) => {
+            if (name === 'Ally1') return ['unconscious'];
+            return [];
+        });
+
+        await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Ally1');
+
+        expect(addEntry).toHaveBeenCalledWith(
+            campaignName,
+            expect.objectContaining({
+                description: 'Cleric1 used an action to shake Ally1 out of its magical slumber.',
+            }),
+        );
+    });
+
+    it('returns popup with automation_info type', async () => {
+        getCombatContext.mockResolvedValue({
+            creatures: [{ name: 'Goblin', type: 'npc', conditions: [] }],
+        });
+
+        const result = await handleConfirm(makeAction(), makePlayerStats(), campaignName, mapName, 'Goblin');
+
+        expect(result.type).toBe('popup');
+        expect(result.payload.type).toBe('automation_info');
+        expect(result.payload.name).toBe('Shake Asleep');
     });
 });

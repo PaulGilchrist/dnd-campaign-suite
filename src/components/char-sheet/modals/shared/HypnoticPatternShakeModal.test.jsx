@@ -1,6 +1,6 @@
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import HypnoticPatternShakeModal from './HypnoticPatternShakeModal.jsx';
 
 vi.mock('../../../../services/automation/index.js', () => ({
@@ -27,9 +27,15 @@ function makeProps(overrides) {
   return { ...baseProps, ...(overrides || {}) };
 }
 
-afterEach(() => {
-  vi.clearAllMocks();
-});
+  beforeEach(() => {
+    vi.resetAllMocks();
+    executeHandler.mockClear();
+    addEntry.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
 
 describe('HypnoticPatternShakeModal', () => {
   describe('initial render', () => {
@@ -372,6 +378,46 @@ describe('HypnoticPatternShakeModal', () => {
       await waitFor(() => {
         expect(addEntry).not.toHaveBeenCalled();
       });
+    });
+
+    it('does not close or call addEntry when executeHandler throws', async () => {
+      const onClose = vi.fn();
+      const unhandledRejectionHandler = () => {};
+      process.on('unhandledRejection', unhandledRejectionHandler);
+      try {
+        executeHandler.mockRejectedValue(new Error('handler failed'));
+        render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
+        await waitFor(() => {
+          expect(onClose).not.toHaveBeenCalled();
+          expect(addEntry).not.toHaveBeenCalled();
+        });
+      }
+      finally {
+        process.off('unhandledRejection', unhandledRejectionHandler);
+      }
+    });
+
+    it('does not close when addEntry rejects', async () => {
+      const onClose = vi.fn();
+      const unhandledRejectionHandler = () => {};
+      process.on('unhandledRejection', unhandledRejectionHandler);
+      try {
+        executeHandler.mockResolvedValue({ success: true });
+        addEntry.mockRejectedValue(new Error('log failed'));
+        render(<HypnoticPatternShakeModal {...makeProps({ onClose })} />);
+        const radios = document.querySelectorAll('input[type="radio"]');
+        fireEvent.click(radios[0]);
+        fireEvent.click(screen.getByRole('button', { name: 'Shake Free (Orc Warrior)' }));
+        await waitFor(() => {
+          expect(onClose).not.toHaveBeenCalled();
+        });
+      }
+      finally {
+        process.off('unhandledRejection', unhandledRejectionHandler);
+      }
     });
   });
 

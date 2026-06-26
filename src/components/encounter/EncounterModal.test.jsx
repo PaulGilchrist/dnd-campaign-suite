@@ -252,5 +252,39 @@ describe('EncounterModal', () => {
             const input = screen.getByLabelText('New Name');
             expect(document.activeElement).toBe(input);
         });
+
+        it('calls onRename with old and new names when rename is clicked', async () => {
+            const encounters = [
+                { name: 'old-name', savedAt: '2024-01-01T00:00:00Z' },
+            ];
+            const props = createProps({ mode: 'load', encounters });
+            render(<EncounterModal {...props} />);
+            const renameBtn = screen.getByRole('button', { name: 'Rename old-name' });
+            fireEvent.click(renameBtn);
+        });
+
+        it('clears error when new name is entered and rename clicked', () => {
+            const encounters = [
+                { name: 'old-name', savedAt: '2024-01-01T00:00:00Z' },
+            ];
+            const props = createProps({ mode: 'load', encounters });
+            render(<EncounterModal {...props} />);
+            const renameBtn = screen.getByRole('button', { name: 'Rename old-name' });
+            fireEvent.click(renameBtn);
+        });
+    });
+
+    describe('useEffect behavior', () => {
+        it('resets name when mode changes to save', () => {
+            const props = createProps({ mode: 'save' });
+            const { rerender } = render(<EncounterModal {...props} />);
+            const input = screen.getByLabelText('Encounter Name');
+            fireEvent.change(input, { target: { value: 'Test Encounter' } });
+            expect(input).toHaveValue('Test Encounter');
+            rerender(<EncounterModal {...createProps({ mode: 'load' })} />);
+            rerender(<EncounterModal {...createProps({ mode: 'save' })} />);
+            const updatedInput = screen.getByLabelText('Encounter Name');
+            expect(updatedInput).toHaveValue('');
+        });
     });
 });

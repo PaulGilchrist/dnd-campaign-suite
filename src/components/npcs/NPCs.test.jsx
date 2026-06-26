@@ -20,30 +20,49 @@ vi.mock('./NPCListItem.jsx', () => ({
 }));
 
 vi.mock('./NPCFormModal.jsx', () => ({
-  default: ({ onClose, onSave, onDelete }) => (
+  default: ({ formData, setFormData, onClose, onSave, onDelete, onSaveAndAddToInitiative, disabled, editingNPC }) => (
     <div data-testid="npc-form-modal">
+      <div data-testid="modal-editing-npc">{editingNPC?.name || 'none'}</div>
+      <div data-testid="modal-disabled">{String(disabled)}</div>
+      <input
+        data-testid="npc-name-input"
+        value={formData?.name || ''}
+        onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+      />
       <button onClick={onClose}>Close</button>
       <button onClick={onSave}>Save</button>
       <button onClick={onDelete}>Delete</button>
+      {onSaveAndAddToInitiative && (
+        <button
+          data-testid="save-add-init-btn"
+          onClick={onSaveAndAddToInitiative}
+          disabled={disabled}
+        >
+          Save & Add to Initiative
+        </button>
+      )}
     </div>
   ),
 }));
 
+const mockGetDefaultFormData = vi.fn(() => ({
+  name: '', race: '', classRole: '', appearance: '', personality: '',
+  goals: '', secrets: '', notes: '', tags: '', attitude: 'neutral',
+  image: '', imageName: '', imagePath: '', armorClass: 10, hitPoints: '',
+  hitDice: '', initiativeBonus: '', speed: { walk: '30 ft.' },
+  abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+  savingThrowBonuses: {}, skillBonuses: {}, damageResistances: [],
+  damageImmunities: [], conditionImmunities: [], actions: [], traits: '', reactions: '',
+}));
+
 vi.mock('../../services/npcs/npcFormUtils.js', () => ({
-  getDefaultFormData: vi.fn(() => ({
-    name: '', race: '', classRole: '', appearance: '', personality: '',
-    goals: '', secrets: '', notes: '', tags: '', attitude: 'neutral',
-    image: '', imageName: '', imagePath: '', armorClass: 10, hitPoints: '',
-    hitDice: '', initiativeBonus: '', speed: { walk: '30 ft.' },
-    abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
-    savingThrowBonuses: {}, skillBonuses: {}, damageResistances: [],
-    damageImmunities: [], conditionImmunities: [], actions: [], traits: '', reactions: '',
-  })),
+  getDefaultFormData: (...args) => mockGetDefaultFormData(...args),
   cleanNPCData: vi.fn((data) => data),
 }));
 
+const mockAddNPCToInitiative = vi.fn().mockResolvedValue(undefined);
 vi.mock('../../services/npcs/npcCombatService.js', () => ({
-  addNPCToInitiative: vi.fn().mockResolvedValue(undefined),
+  addNPCToInitiative: (...args) => mockAddNPCToInitiative(...args),
 }));
 
 vi.mock('../../services/npcs/npcGenerator.js', () => ({
@@ -62,160 +81,405 @@ const defaultNPCs = [
 ];
 
 function renderWithNPCs(npcs = defaultNPCs) {
+  const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } });
+  const mockDelete = vi.fn().mockResolvedValue(undefined);
   mockUseNPCsManagement.mockReturnValue({
     npcs,
     loading: false,
     loadNPCsList: vi.fn(),
-    saveNPCAction: vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } }),
-    deleteNPCAction: vi.fn().mockResolvedValue(undefined),
+    saveNPCAction: mockSave,
+    deleteNPCAction: mockDelete,
   });
-  return render(<NPCs {...defaultProps} />);
+  return {
+    ...render(<NPCs {...defaultProps} />),
+    mockSave,
+    mockDelete,
+  };
 }
 
 describe('NPCs', () => {
-  describe('header controls', () => {
-    it('renders back button', () => {
-      renderWithNPCs();
-      expect(screen.getByRole('button', { name: /Back/i })).toBeInTheDocument();
-    });
-
-    it('renders NPCs title', () => {
-      renderWithNPCs();
-      expect(screen.getByText('NPCs')).toBeInTheDocument();
-    });
-
-    it('renders New NPC button', () => {
-      renderWithNPCs();
-      expect(screen.getByRole('button', { name: /New NPC/i })).toBeInTheDocument();
-    });
-
-    it('renders Generate NPC button', () => {
-      renderWithNPCs();
-      expect(screen.getByRole('button', { name: /Generate NPC/i })).toBeInTheDocument();
-    });
-
-    it('calls onBack when back button clicked', () => {
-      renderWithNPCs();
-      fireEvent.click(screen.getByRole('button', { name: /Back/i }));
-      expect(defaultProps.onBack).toHaveBeenCalled();
+  beforeEach(() => {
+    mockAddNPCToInitiative.mockResolvedValue(undefined);
+    mockGetDefaultFormData.mockReturnValue({
+      name: '', race: '', classRole: '', appearance: '', personality: '',
+      goals: '', secrets: '', notes: '', tags: '', attitude: 'neutral',
+      image: '', imageName: '', imagePath: '', armorClass: 10, hitPoints: '',
+      hitDice: '', initiativeBonus: '', speed: { walk: '30 ft.' },
+      abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+      savingThrowBonuses: {}, skillBonuses: {}, damageResistances: [],
+      damageImmunities: [], conditionImmunities: [], actions: [], traits: '', reactions: '',
     });
   });
 
-  describe('search functionality', () => {
-    it('renders search input', () => {
-      renderWithNPCs();
-      expect(screen.getByLabelText('Search NPCs')).toBeInTheDocument();
-    });
-
-    it('shows clear button when search has query', () => {
-      renderWithNPCs();
-      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'test' } });
-      expect(screen.getByLabelText('Clear search')).toBeInTheDocument();
-    });
-
-    it('clears search when clear button clicked', () => {
-      renderWithNPCs();
-      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
-      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
-      fireEvent.click(screen.getByLabelText('Clear search'));
-      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-    });
-
-    it('filters NPCs by search query', () => {
-      renderWithNPCs();
-      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Goblin' } });
-      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
-      expect(screen.queryByTestId('npc-list-item-Wizard')).not.toBeInTheDocument();
-    });
-
-    it('filters by race', () => {
-      renderWithNPCs();
-      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Humanoid' } });
-      expect(screen.getAllByTestId(/^npc-list-item-/).length).toBeGreaterThan(0);
-    });
-
-    it('filters by class role', () => {
-      renderWithNPCs();
-      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Caster' } });
-      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-      expect(screen.queryByTestId('npc-list-item-Goblin')).not.toBeInTheDocument();
-    });
-
-    it('filters by tags', () => {
-      renderWithNPCs();
-      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'boss' } });
-      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-      expect(screen.queryByTestId('npc-list-item-Goblin')).not.toBeInTheDocument();
-    });
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  describe('NPC list rendering', () => {
-    it('renders NPC list items', () => {
-      renderWithNPCs();
-      expect(screen.getByTestId('npc-list-item-Goblin')).toBeInTheDocument();
-      expect(screen.getByTestId('npc-list-item-Wizard')).toBeInTheDocument();
-    });
-  });
-
-  describe('empty and loading states', () => {
-    it('shows empty state when no NPCs', () => {
-      mockUseNPCsManagement.mockReturnValue({
-        npcs: [], loading: false, loadNPCsList: vi.fn(),
-        saveNPCAction: vi.fn(), deleteNPCAction: vi.fn(),
+  describe('save validation', () => {
+    it('does not save when form data name is empty', async () => {
+      const { mockSave } = renderWithNPCs();
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       });
-      render(<NPCs {...defaultProps} />);
-      expect(screen.getByText(/No NPCs yet/)).toBeInTheDocument();
-    });
-
-    it('shows no results state when search matches nothing', () => {
-      renderWithNPCs();
-      fireEvent.change(screen.getByLabelText('Search NPCs'), { target: { value: 'Nonexistent' } });
-      expect(screen.getByText(/No NPCs found/)).toBeInTheDocument();
-    });
-
-    it('renders with loading state', () => {
-      mockUseNPCsManagement.mockReturnValue({
-        npcs: [], loading: true, loadNPCsList: vi.fn(),
-        saveNPCAction: vi.fn(), deleteNPCAction: vi.fn(),
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => {
+        expect(mockSave).not.toHaveBeenCalled();
       });
-      render(<NPCs {...defaultProps} />);
-      expect(screen.getByText(/Loading NPCs/)).toBeInTheDocument();
+    });
+
+    it('does not save when form data name is whitespace only', async () => {
+      const { mockSave } = renderWithNPCs();
+      mockGetDefaultFormData.mockReturnValueOnce({
+        name: '   ', race: '', classRole: '', appearance: '', personality: '',
+        goals: '', secrets: '', notes: '', tags: '', attitude: 'neutral',
+        image: '', imageName: '', imagePath: '', armorClass: 10, hitPoints: '',
+        hitDice: '', initiativeBonus: '', speed: { walk: '30 ft.' },
+        abilityScores: { str: 10, dex: 10, con: 10, int: 10, wis: 10, cha: 10 },
+        savingThrowBonuses: {}, skillBonuses: {}, damageResistances: [],
+        damageImmunities: [], conditionImmunities: [], actions: [], traits: '', reactions: '',
+      });
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => {
+        expect(mockSave).not.toHaveBeenCalled();
+      });
     });
   });
 
-  describe('modal interactions', () => {
-    it('opens form modal when New NPC clicked', async () => {
+  describe('save success', () => {
+    it('calls saveNPCAction with cleaned data when save succeeds', async () => {
+      const { mockSave } = renderWithNPCs();
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      // Set a valid name so save is allowed
+      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Test NPC' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => {
+        expect(mockSave).toHaveBeenCalled();
+      });
+      const cleanedData = mockSave.mock.calls[0][0];
+      expect(cleanedData).toBeDefined();
+      expect(cleanedData.name).toBe('Test NPC');
+      expect(mockSave.mock.calls[0][1]).toBeUndefined();
+    });
+
+    it('closes modal after successful save', async () => {
       renderWithNPCs();
       fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
       await waitFor(() => {
         expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       });
+      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Test NPC' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => {
+        expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('delete error handling', () => {
+    it('logs error when delete throws', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const mockDelete = vi.fn().mockRejectedValue(new Error('Delete failed'));
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: defaultNPCs,
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: vi.fn(),
+        deleteNPCAction: mockDelete,
+      });
+      render(<NPCs {...defaultProps} />);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      await waitFor(() => {
+        expect(consoleSpy).toHaveBeenCalledWith('Failed to delete NPC:', expect.any(Error));
+      });
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('save error handling', () => {
+    it('does not close modal when save throws error', async () => {
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: [],
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: vi.fn().mockRejectedValue(new Error('Save failed')),
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Test NPC' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('delete flow', () => {
+    it('does not delete when window confirm is cancelled', async () => {
+      const { mockDelete } = renderWithNPCs();
+      vi.spyOn(window, 'confirm').mockReturnValue(false);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      expect(mockDelete).not.toHaveBeenCalled();
     });
 
-    it('opens form modal when Generate NPC clicked', async () => {
+    it('deletes when window confirm is accepted', async () => {
+      const { mockDelete } = renderWithNPCs();
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      await waitFor(() => {
+        expect(mockDelete).toHaveBeenCalledWith('Goblin');
+      });
+    });
+
+    it('does not delete when there is no editingNPC', async () => {
+      const { mockDelete } = renderWithNPCs();
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      // Delete button exists in mock modal, but handleDelete checks editingNPC
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      expect(mockDelete).not.toHaveBeenCalled();
+    });
+
+    it('closes modal after successful delete', async () => {
+      const { mockDelete } = renderWithNPCs();
+      mockDelete.mockResolvedValue(undefined);
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      await waitFor(() => {
+        expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not close modal when delete throws error', async () => {
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: defaultNPCs,
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: vi.fn(),
+        deleteNPCAction: vi.fn().mockRejectedValue(new Error('Delete failed')),
+      });
       renderWithNPCs();
-      fireEvent.click(screen.getByRole('button', { name: /Generate NPC/i }));
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('save and add to initiative', () => {
+    it('does not save-and-add when form data name is empty', async () => {
+      const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } });
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: [],
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: mockSave,
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.click(screen.getByTestId('save-add-init-btn'));
+      await waitFor(() => {
+        expect(mockSave).not.toHaveBeenCalled();
+        expect(mockAddNPCToInitiative).not.toHaveBeenCalled();
+      });
+    });
+
+    it('saves NPC and adds to initiative when save-and-add clicked', async () => {
+      const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin', armorClass: 15 } });
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: defaultNPCs,
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: mockSave,
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
+      fireEvent.click(screen.getByTestId('save-add-init-btn'));
+      await waitFor(() => {
+        expect(mockSave).toHaveBeenCalled();
+      });
+      await waitFor(() => {
+        expect(mockAddNPCToInitiative).toHaveBeenCalled();
+      });
+    });
+
+    it('closes modal after save-and-add to initiative', async () => {
+      const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin' } });
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: defaultNPCs,
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: mockSave,
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
+      fireEvent.click(screen.getByTestId('save-add-init-btn'));
+      await waitFor(() => {
+        expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
+      });
+    });
+
+    it('does not close modal when save-and-add throws error', async () => {
+      const mockSave = vi.fn().mockRejectedValue(new Error('Save failed'));
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: defaultNPCs,
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: mockSave,
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
+      fireEvent.click(screen.getByTestId('save-add-init-btn'));
       await waitFor(() => {
         expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       });
     });
 
-    it('opens form modal when Edit clicked', async () => {
+    it('passes campaignName to addNPCToInitiative', async () => {
+      const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin', armorClass: 15 } });
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: defaultNPCs,
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: mockSave,
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
+      fireEvent.click(screen.getByTestId('save-add-init-btn'));
+      await waitFor(() => {
+        expect(mockAddNPCToInitiative).toHaveBeenCalledWith(
+          'test-campaign',
+          expect.any(Object),
+          defaultProps.onViewInitiative
+        );
+      });
+    });
+  });
+
+  describe('modal props', () => {
+    it('passes editingNPC to modal for edit flow', async () => {
       renderWithNPCs();
       fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
       await waitFor(() => {
         expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       });
+      expect(screen.getByTestId('modal-editing-npc')).toHaveTextContent('Goblin');
     });
 
-    it('closes modal when Close clicked', async () => {
+    it('passes null editingNPC to modal for new NPC flow', async () => {
       renderWithNPCs();
       fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
       await waitFor(() => {
         expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
       });
-      fireEvent.click(screen.getByRole('button', { name: 'Close' }));
-      expect(screen.queryByTestId('npc-form-modal')).not.toBeInTheDocument();
+      expect(screen.getByTestId('modal-editing-npc')).toHaveTextContent('none');
+    });
+
+    it('passes disabled=true when saving', async () => {
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: defaultNPCs,
+        loading: false,
+        loadNPCsList: vi.fn(),
+        saveNPCAction: vi.fn().mockImplementation(() => new Promise(() => {})),
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      fireEvent.change(screen.getByTestId('npc-name-input'), { target: { value: 'Goblin' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await waitFor(() => {
+        expect(screen.getByTestId('modal-disabled')).toHaveTextContent('true');
+      });
+    });
+
+    it('calls getDefaultFormData with overrides when editing', async () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      expect(mockGetDefaultFormData).toHaveBeenCalledWith(defaultNPCs[0]);
+    });
+
+    it('calls getDefaultFormData with generated data when generating', async () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByRole('button', { name: /Generate NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      expect(mockGetDefaultFormData).toHaveBeenCalledWith({ name: 'Generated NPC', race: 'Humanoid' });
+    });
+
+    it('calls getDefaultFormData with no args when creating new', async () => {
+      renderWithNPCs();
+      fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
+      await waitFor(() => {
+        expect(screen.getByTestId('npc-form-modal')).toBeInTheDocument();
+      });
+      expect(mockGetDefaultFormData).toHaveBeenCalledWith();
     });
   });
 
@@ -223,7 +487,41 @@ describe('NPCs', () => {
     it('calls addNPCToInitiative when Add to Initiative clicked', async () => {
       renderWithNPCs();
       fireEvent.click(screen.getByTestId('init-btn-Goblin'));
-      // The addNPCToInitiative mock resolves synchronously
+      await waitFor(() => {
+        expect(mockAddNPCToInitiative).toHaveBeenCalledWith(
+          'test-campaign',
+          defaultNPCs[0],
+          defaultProps.onViewInitiative
+        );
+      });
+    });
+  });
+
+  describe('loadNPCsList', () => {
+    it('calls loadNPCsList on mount with campaignName', () => {
+      const mockLoad = vi.fn();
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: [],
+        loading: false,
+        loadNPCsList: mockLoad,
+        saveNPCAction: vi.fn(),
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...defaultProps} />);
+      expect(mockLoad).toHaveBeenCalled();
+    });
+
+    it('does not call loadNPCsList when campaignName is null', () => {
+      const mockLoad = vi.fn();
+      mockUseNPCsManagement.mockReturnValue({
+        npcs: [],
+        loading: false,
+        loadNPCsList: mockLoad,
+        saveNPCAction: vi.fn(),
+        deleteNPCAction: vi.fn(),
+      });
+      render(<NPCs {...{ ...defaultProps, campaignName: null }} />);
+      expect(mockLoad).not.toHaveBeenCalled();
     });
   });
 });

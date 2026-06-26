@@ -965,4 +965,91 @@ describe('CharClassFeatures', () => {
             expect(btn).toHaveClass('automation-btn--disabled');
         });
     });
+
+    describe('main CharClassFeatures entry point', () => {
+        it('renders Adrenaline Rush tracked resource when bonus_action_dash special action exists', () => {
+            const stats = makeStats({
+                class: { name: 'UnknownClass' },
+                automation: { specialActions: [{ effect: 'bonus_action_dash' }] },
+            });
+            renderComponent(stats);
+            expect(screen.getByTestId('tracked-resource-Adrenaline Rush')).toBeInTheDocument();
+        });
+
+        it('does not render Adrenaline Rush when no bonus_action_dash special action', () => {
+            const stats = makeStats({
+                class: { name: 'UnknownClass' },
+                automation: { specialActions: [] },
+            });
+            renderComponent(stats);
+            expect(screen.queryByTestId('tracked-resource-Adrenaline Rush')).not.toBeInTheDocument();
+        });
+
+        it('renders Adrenaline Rush with proficiency as max when bonus_action_dash exists', () => {
+            const stats = makeStats({
+                class: { name: 'UnknownClass' },
+                automation: { specialActions: [{ effect: 'bonus_action_dash' }] },
+            });
+            renderComponent(stats);
+            expect(screen.getByTestId('tracked-resource-Adrenaline Rush')).toHaveTextContent('3');
+        });
+
+        it('renders class component and Adrenaline Rush when both exist', () => {
+            const stats = makeStats({
+                class: { name: 'Cleric', class_levels: [{ level: 5 }] },
+                automation: { passives: [], specialActions: [{ effect: 'bonus_action_dash' }] },
+            });
+            renderComponent(stats);
+            expect(screen.getByTestId('char-class-cleric')).toBeInTheDocument();
+            expect(screen.getByTestId('tracked-resource-Adrenaline Rush')).toBeInTheDocument();
+        });
+
+        it('renders WeaponKindMasteryModal when weaponKindMasteryModal state is set', () => {
+            const stats = makeStats({
+                level: 5,
+                class: {
+                    name: 'Fighter',
+                    class_levels: [{ level: 5 }, { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 }],
+                    fightingStyles: [],
+                },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            expect(screen.getByTestId('char-class-fighter')).toBeInTheDocument();
+        });
+
+        it('renders weapon mastery as clickable for fighter', () => {
+            const stats = makeStats({
+                level: 5,
+                class: {
+                    name: 'Fighter',
+                    class_levels: [{ level: 5, weapon_mastery: 'Heavy' }, { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 }],
+                    fightingStyles: [],
+                },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            const weaponMasterySpan = screen.getByText(/Weapon Mastery:/).nextSibling;
+            expect(weaponMasterySpan).toHaveAttribute('class', 'clickable');
+        });
+
+        it('calls handleWeaponMasteryClick when weapon mastery span is clicked', () => {
+            global.fetch = vi.fn().mockResolvedValue({
+                json: () => Promise.resolve([]),
+            });
+            const stats = makeStats({
+                level: 5,
+                class: {
+                    name: 'Fighter',
+                    class_levels: [{ level: 5, weapon_mastery: 'Heavy' }, { level: 4 }, { level: 3 }, { level: 2 }, { level: 1 }],
+                    fightingStyles: [],
+                },
+                automation: { passives: [] },
+            });
+            renderComponent(stats);
+            const clickable = document.querySelector('.clickable');
+            fireEvent.click(clickable);
+            expect(getRuntimeValue).toHaveBeenCalledWith('Thorin', '_Weapon_Kind_Mastery_chosenWeapons', mockCampaignName);
+        });
+    });
 });

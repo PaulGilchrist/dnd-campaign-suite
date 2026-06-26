@@ -118,4 +118,30 @@ describe('classFeatures.getClassFeatures', () => {
     expect(capturedArgs.length).toBe(1);
     expect(capturedArgs[0]).toEqual(inputStats);
   });
+
+  it('returns null when class name is empty string', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures(makePlayerStats({ class: { name: '' } }));
+    expect(result).toBeNull();
+  });
+
+  it('returns null when class name is undefined', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures(makePlayerStats({ class: { name: undefined } }));
+    expect(result).toBeNull();
+  });
+
+  it('returns undefined when the rules method does not exist for a known class', async () => {
+    // Clear all methods from mockedClassRules so Bard has no getBardFeatures
+    const clear = (obj) => {
+      const keys = Object.keys(obj);
+      for (const key of keys) {
+        delete obj[key];
+      }
+    };
+    clear(mockedClassRules);
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures(makePlayerStats());
+    expect(result).toBeUndefined();
+  });
 });

@@ -1,0 +1,245 @@
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('../../ui/dataLoader.js', () => ({
+  loadSkills: vi.fn(),
+  loadPassiveSkills: vi.fn(),
+  loadFeatData: vi.fn().mockResolvedValue([]),
+  loadBackgroundData: vi.fn(() => null),
+}));
+
+vi.mock('../../character/classRules.js', () => ({
+  default: {
+    getClass: vi.fn(),
+    getFeatures: vi.fn(),
+    getHighestSubclassLevel: vi.fn(),
+    getRangerFeatures: vi.fn(() => ({ extraAttacks: 0 })),
+  },
+}));
+
+vi.mock('../../character/classRules2024.js', () => ({
+  default: { getClass: vi.fn(), getFeatures: vi.fn(), getHighestSubclassLevel: vi.fn() },
+}));
+
+vi.mock('../../character/race-rules/index.js', () => ({
+  rules5e: {
+    getRace: vi.fn(), getRacialBonus: vi.fn(), getImmunities: vi.fn(),
+    getResistances: vi.fn(), getSenses: vi.fn(), getTraits: vi.fn(),
+  },
+  rules2024: { getRace: vi.fn(), getSenses: vi.fn(), getTraits: vi.fn() },
+}));
+
+vi.mock('./abilityCalc.js', () => ({
+  getAbilities: vi.fn(), getHitPoints: vi.fn(), getCarryingCapacity: vi.fn(),
+}));
+
+vi.mock('./abilityCalc2024.js', () => ({
+  getAbilities: vi.fn(), getHitPoints: vi.fn(), getCarryingCapacity: vi.fn(),
+}));
+
+vi.mock('./attackCalc.js', () => ({
+  getAttacks: vi.fn(() => []),
+  parseMagicItemName: vi.fn((name) => ({ baseName: name, magicBonus: 0 })),
+}));
+
+vi.mock('./attackCalc2024.js', () => ({ getAttacks: vi.fn() }));
+vi.mock('./spellCalc.js', () => ({ getSpellAbilities: vi.fn(() => null) }));
+vi.mock('./spellCalc2024.js', () => ({ getSpellAbilities: vi.fn(() => null) }));
+
+vi.mock('../../character/proficiencyUtils.js', () => ({
+  getProficiencyChoiceCount: vi.fn(() => 0),
+  getProficiencies: vi.fn(() => [5, []]),
+}));
+
+vi.mock('../../character/proficiencyUtils2024.js', () => ({
+  getProficiencyChoiceCount: vi.fn(),
+  getProficiencies: vi.fn(),
+}));
+
+vi.mock('../../hooks/runtime/useRuntimeState.js', () => ({ getRuntimeValue: vi.fn(() => undefined) }));
+
+vi.mock('../../combat/automation/automationService.js', () => ({
+  collectAutomationFromFeatures: vi.fn(() => ({ passives: [], actions: [], specialActions: [] })),
+  collectSaveModifiers: vi.fn(() => ({})),
+  collectTurnStartEffects: vi.fn(() => []),
+  getConditionImmunities: vi.fn(() => []),
+  getConditionalImmunities: vi.fn(() => []),
+  getEvasionEffects: vi.fn(() => []),
+  getAllSaveProficiencies: vi.fn(() => []),
+  evaluateAutoExpression: vi.fn(() => 0),
+  buildAttackInfo: vi.fn(() => null),
+}));
+
+vi.mock('../../automation/handlers/class-other/elfishLineageHandler.js', () => ({
+  getElfisLineageSelection: vi.fn(() => null),
+}));
+
+vi.mock('../../character/featBuffService.js', () => ({
+  computeAllFeatBuffs: vi.fn(() => ({
+    abilityScoreIncreases: [],
+    proficiencies: [],
+    features: [],
+  })),
+}));
+
+vi.mock('../../character/featureCategories.js', () => ({
+  getCategories: vi.fn(() => ({
+    actions: [],
+    bonusActions: [],
+    reactions: [],
+    specialActions: [],
+    characterAdvancement: [],
+  })),
+}));
+
+import rules from '../rules.js';
+import classRules from '../../character/classRules.js';
+import { rules5e as raceRules } from '../../character/race-rules/index.js';
+import * as abilityCalc from './abilityCalc.js';
+import * as attackCalc from './attackCalc.js';
+import * as automationService from '../../combat/automation/automationService.js';
+import * as dataLoader from '../../ui/dataLoader.js';
+
+const defaultSkills = [
+  { name: 'Athletics', ability: 'Strength' },
+  { name: 'Stealth', ability: 'Dexterity' },
+  { name: 'Acrobatics', ability: 'Dexterity' },
+  { name: 'Arcana', ability: 'Intelligence' },
+  { name: 'History', ability: 'Intelligence' },
+  { name: 'Perception', ability: 'Wisdom' },
+  { name: 'Insight', ability: 'Wisdom' },
+  { name: 'Persuasion', ability: 'Charisma' },
+  { name: 'Deception', ability: 'Charisma' },
+];
+
+const defaultAbilities = [
+  { name: 'Strength', totalScore: 15, bonus: 2, skills: [] },
+  { name: 'Dexterity', totalScore: 14, bonus: 2, skills: [] },
+  { name: 'Constitution', totalScore: 13, bonus: 1, skills: [] },
+  { name: 'Intelligence', totalScore: 12, bonus: 1, skills: [] },
+  { name: 'Wisdom', totalScore: 10, bonus: 0, skills: [] },
+  { name: 'Charisma', totalScore: 8, bonus: -1, skills: [] },
+];
+
+const makePlayerSummary = (overrides = {}) => ({
+  name: 'TestCharacter', level: 1, rules: '5e',
+  class: { name: 'Fighter', saving_throws: [], languages: [], fightingStyles: [], proficiencies: [], class_levels: [{}], subclass: {}, major: {} },
+  race: { name: 'Human', languages: ['Common'], traits: [] },
+  languages: [],
+  abilities: [
+    { name: 'Strength', baseScore: 15, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Dexterity', baseScore: 14, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Constitution', baseScore: 13, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Intelligence', baseScore: 12, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Wisdom', baseScore: 10, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+    { name: 'Charisma', baseScore: 8, featIncrease: 0, miscIncrease: 0, backgroundIncrease: 0 },
+  ],
+  inventory: { equipped: [], magicItems: [] },
+  skillProficiencies: [], expertise: [], actions: [], bonusActions: [], reactions: [], specialActions: [], activeBuffs: [],
+  ...overrides,
+});
+
+const setupDefaults = (overrides = {}) => {
+  vi.mocked(dataLoader.loadSkills).mockResolvedValue(defaultSkills);
+  vi.mocked(dataLoader.loadPassiveSkills).mockResolvedValue(['Insight']);
+  classRules.getClass.mockReturnValue({ name: 'Fighter', hit_die: 10, saving_throws: [], proficiencies: [], class_levels: [{}], languages: [], subclass: {}, major: {}, ...overrides.class });
+  raceRules.getRace.mockReturnValue({ name: 'Human', languages: ['Common'], traits: [], ...overrides.race });
+  raceRules.getTraits.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.traits });
+  raceRules.getSenses.mockReturnValue(overrides.senses || []);
+  raceRules.getImmunities.mockReturnValue(overrides.immunities || []);
+  raceRules.getResistances.mockReturnValue(overrides.resistances || []);
+  classRules.getFeatures.mockReturnValue({ actions: [], bonusActions: [], reactions: [], specialActions: [], characterAdvancement: [], ...overrides.features });
+  automationService.collectAutomationFromFeatures.mockReturnValue(overrides.automation || { passives: [], actions: [], specialActions: [] });
+  automationService.collectSaveModifiers.mockReturnValue({});
+  automationService.collectTurnStartEffects.mockReturnValue([]);
+  automationService.getConditionImmunities.mockReturnValue([]);
+  automationService.getConditionalImmunities.mockReturnValue([]);
+  automationService.getEvasionEffects.mockReturnValue([]);
+  automationService.getAllSaveProficiencies.mockReturnValue([]);
+  abilityCalc.getAbilities.mockResolvedValue(overrides.abilities || defaultAbilities);
+  abilityCalc.getHitPoints.mockReturnValue(overrides.hitPoints ?? 12);
+  abilityCalc.getCarryingCapacity.mockReturnValue(overrides.carryingCapacity ?? 150);
+  attackCalc.getAttacks.mockReturnValue(overrides.attacks || []);
+};
+
+describe('rules.getPlayerStats - missing array error handling', () => {
+  beforeEach(() => { vi.clearAllMocks(); setupDefaults(); });
+
+  it('should throw when race.traits is null for Powerful Build check', async () => {
+    setupDefaults({ race: { name: 'Hill Giant', languages: ['Common'], traits: null } });
+    const playerSummary = makePlayerSummary();
+    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
+  });
+
+  it('should throw when race.traits is undefined for Powerful Build check', async () => {
+    setupDefaults({ race: { name: 'Human', languages: ['Common'], traits: undefined } });
+    const playerSummary = makePlayerSummary();
+    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
+  });
+
+  it('should throw when race.traits is null for Halfling Nimbleness check', async () => {
+    setupDefaults({ race: { name: 'Lightfoot Halfling', languages: ['Common'], traits: null } });
+    const playerSummary = makePlayerSummary();
+    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: race.traits');
+  });
+
+  it('should throw when passives is null for speed increase check', async () => {
+    setupDefaults({ automation: { passives: null } });
+    const playerSummary = makePlayerSummary();
+    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: passives');
+  });
+
+  it('should throw when actions is null in getActions', () => {
+    const playerSummary = makePlayerSummary({ actions: null });
+    expect(() => rules.getActions(playerSummary)).toThrow('Missing array: actions');
+  });
+
+  it('should throw when bonusActions is null in getActions', () => {
+    const playerSummary = makePlayerSummary({ bonusActions: null });
+    expect(() => rules.getActions(playerSummary)).toThrow('Missing array: bonusActions');
+  });
+
+  it('should throw when reactions is null in getActions', () => {
+    const playerSummary = makePlayerSummary({ reactions: null });
+    expect(() => rules.getActions(playerSummary)).toThrow('Missing array: reactions');
+  });
+
+  it('should throw when specialActions is null in getActions', () => {
+    const playerSummary = makePlayerSummary({ specialActions: null });
+    expect(() => rules.getActions(playerSummary)).toThrow('Missing array: specialActions');
+  });
+
+  it('should throw when race.languages is null in getLanguages', () => {
+    const stats = { race: { languages: null }, class: { languages: [] }, languages: [] };
+    expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: race.languages');
+  });
+
+  it('should throw when subrace.languages is null in getLanguages', () => {
+    const stats = {
+      race: { languages: ['Common'], subrace: { languages: null, language_options: { choose: 0 } } },
+      class: { languages: [] },
+      languages: [],
+    };
+    expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: subrace.languages');
+  });
+
+  it('should throw when class.languages is an object in getLanguages', () => {
+    const stats = { race: { languages: ['Common'] }, class: { languages: {} }, languages: [] };
+    expect(() => rules.getLanguages(stats, {})).toThrow('Missing array: class.languages');
+  });
+
+  it('should throw when inventory.magicItems is null in getMagicItems', () => {
+    expect(() => rules.getMagicItems([], { inventory: { magicItems: null } })).toThrow('Missing array: inventory.magicItems');
+  });
+
+  it('should throw when features is null in getPlayerStats', async () => {
+    vi.mocked(featBuffService.computeAllFeatBuffs).mockReturnValue({
+      abilityScoreIncreases: [], proficiencies: [], features: null,
+    });
+    setupDefaults({ race: { name: 'Human', languages: ['Common'], traits: [] } });
+    const playerSummary = makePlayerSummary();
+    await expect(rules.getPlayerStats([], [], [], [], [], playerSummary)).rejects.toThrow('Missing array: features');
+  });
+});
+
+import * as featBuffService from '../../character/featBuffService.js';

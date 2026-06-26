@@ -110,7 +110,7 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
         // Sacred Weapon: Add Charisma modifier to attack rolls (minimum +1) for melee attacks
         let sacredWeaponBonus = 0;
         const sacredWeaponActive = activeBuffs.some(b => b.effect === 'sacred_weapon');
-        if (sacredWeaponActive && (isMelee || attack.weaponType === 'melee')) {
+        if (sacredWeaponActive && (attack.weaponType === 'melee' || attack.weaponType === 'unarmed')) {
             const cha = playerStats.abilities?.find(a => a.name === 'Charisma');
             const chaMod = Math.max(1, cha?.bonus || 0);
             sacredWeaponBonus = chaMod;
