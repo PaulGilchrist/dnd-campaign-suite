@@ -363,7 +363,7 @@ function App() {
     const prefix = `change-${campaignName}-`;
     if (!event.key.startsWith(prefix)) return;
     const storeKey = event.key.slice(prefix.length);
-    setRuntimeObject(campaignName, { [storeKey]: event.data }, campaignName, true);
+    setRuntimeObject(storeKey, event.data, campaignName, true);
   }, [campaignName, setCharacters]);
 
   const handleDeleteCharacter = async (characterName) => {

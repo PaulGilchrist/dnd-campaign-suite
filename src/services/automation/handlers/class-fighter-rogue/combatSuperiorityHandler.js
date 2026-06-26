@@ -370,6 +370,7 @@ export async function onCombatSuperioritySelected(action, playerStats, campaignN
         const allManeuvers = await loadManeuvers(playerStats.rules || '2024');
 
         if (selectedManeuverNames.length === 0) {
+            await setRuntimeValue(playerStats.name, SELECTION_KEY, [], campaignName);
             return {
                 type: 'popup',
                 payload: {
@@ -385,7 +386,7 @@ export async function onCombatSuperioritySelected(action, playerStats, campaignN
             allManeuvers.some(m => m.name === n)
         );
 
-        await setRuntimeValue(playerStats.name, SELECTION_KEY, validNames, campaignName, true);
+        await setRuntimeValue(playerStats.name, SELECTION_KEY, validNames, campaignName);
 
         const namesHtml = validNames.map(n => `<b>${n}</b>`).join(', ');
         return {

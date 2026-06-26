@@ -83,8 +83,7 @@ describe('onCombatSuperioritySelected - selection', () => {
                 'TestFighter',
                 'BattleMasterManeuvers_selection',
                 ['Trip Attack', 'Pushing Attack'],
-                'test-campaign',
-                true
+                'test-campaign'
             );
         });
 
@@ -100,8 +99,7 @@ describe('onCombatSuperioritySelected - selection', () => {
                 'TestFighter',
                 'BattleMasterManeuvers_selection',
                 ['Trip Attack', 'Pushing Attack', 'Rally'],
-                'test-campaign',
-                true
+                'test-campaign'
             );
         });
 
@@ -117,8 +115,7 @@ describe('onCombatSuperioritySelected - selection', () => {
                 'TestFighter',
                 'BattleMasterManeuvers_selection',
                 [],
-                'test-campaign',
-                true
+                'test-campaign'
             );
         });
     });
