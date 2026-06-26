@@ -198,6 +198,7 @@ const categories2024 = {
     ],
 
     characterAdvancement: [
+        "Additional Fighting Style",
         "Deft Explorer",
         "Divine Order",
         "Draconic Ancestry",
