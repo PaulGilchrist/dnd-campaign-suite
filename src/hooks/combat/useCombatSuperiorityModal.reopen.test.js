@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCombatSuperiorityModal } from './useCombatSuperiorityModal.js';
@@ -38,17 +39,25 @@ import { executeHandler } from '../../services/automation/index.js';
 describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', () => {
   const mockPlayerStats = { name: 'Thorin', level: 5 };
   const mockCampaignName = 'test-campaign';
-  const mockRollAttack = vi.fn();
-  const mockRollDamage = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('should return early when combatSuperiorityModal is null', async () => {
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+  const renderHookWithModal = (modalState = null) => {
+    const { result } = renderHook(() =>
+      useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
+    if (modalState !== null) {
+      act(() => {
+        result.current.setCombatSuperiorityModal(modalState);
+      });
+    }
+    return result;
+  };
+
+  it('should return early without calling executeHandler when modal is null', async () => {
+    const result = renderHookWithModal(null);
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
@@ -57,14 +66,8 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
     expect(executeHandler).not.toHaveBeenCalled();
   });
 
-  it('should return early when combatSuperiorityModal.action is null', async () => {
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: null });
-    });
+  it('should return early without calling executeHandler when modal.action is null', async () => {
+    const result = renderHookWithModal({ action: null });
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
@@ -73,50 +76,17 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
     expect(executeHandler).not.toHaveBeenCalled();
   });
 
-  it('should call executeHandler with forceSelectionMode action', async () => {
-    const originalAction = {
-      name: 'Combat Superiority',
-      automation: {
-        type: 'combat_superiority',
-        dieExpression: 'superiority_die',
-      },
-    };
-
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: {
-        action: originalAction,
-        knownManeuvers: ['Rally', 'Disarming Attack'],
-        selectionMode: true,
-      },
-    });
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: originalAction });
-    });
+  it('should return early without calling executeHandler when modal has no action property', async () => {
+    const result = renderHookWithModal({ knownManeuvers: ['Rally'] });
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
     });
 
-    expect(executeHandler).toHaveBeenCalledWith(
-      expect.objectContaining({
-        automation: expect.objectContaining({
-          forceSelectionMode: true,
-        }),
-      }),
-      mockPlayerStats,
-      mockCampaignName,
-      null
-    );
+    expect(executeHandler).not.toHaveBeenCalled();
   });
 
-  it('should preserve existing automation fields and add forceSelectionMode', async () => {
+  it('should call executeHandler with action that has forceSelectionMode:true and preserve existing automation fields', async () => {
     const originalAction = {
       name: 'Combat Superiority',
       automation: {
@@ -130,35 +100,38 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
     executeHandler.mockResolvedValue({
       type: 'modal',
       modalName: 'combatSuperiority',
-      payload: { action: originalAction },
+      payload: { action: originalAction, knownManeuvers: ['Rally'] },
     });
 
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: originalAction });
-    });
+    const result = renderHookWithModal({ action: originalAction });
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
     });
 
-    const calledAction = executeHandler.mock.calls[0][0];
-    expect(calledAction.automation.type).toBe('combat_superiority');
-    expect(calledAction.automation.dieExpression).toBe('superiority_die');
-    expect(calledAction.automation.saveDc).toBe(15);
-    expect(calledAction.automation.saveType).toBe('DEX');
-    expect(calledAction.automation.forceSelectionMode).toBe(true);
+    expect(executeHandler).toHaveBeenCalledTimes(1);
+    const [calledAction] = executeHandler.mock.calls[0];
+    expect(calledAction.name).toBe('Combat Superiority');
+    expect(calledAction.automation).toEqual({
+      type: 'combat_superiority',
+      dieExpression: 'superiority_die',
+      saveDc: 15,
+      saveType: 'DEX',
+      forceSelectionMode: true,
+    });
+    expect(executeHandler).toHaveBeenCalledWith(
+      expect.any(Object),
+      mockPlayerStats,
+      mockCampaignName,
+      null
+    );
   });
 
-  it('should set combatSuperiorityModal when result is modal combatSuperiority', async () => {
+  it('should set combatSuperiorityModal when executeHandler returns matching modal', async () => {
     const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
-
     const newPayload = {
       action: originalAction,
-      knownManeuvers: ['Rally'],
+      knownManeuvers: ['Rally', 'Disarming Attack'],
       selectionMode: true,
     };
 
@@ -168,13 +141,7 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
       payload: newPayload,
     });
 
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: originalAction });
-    });
+    const result = renderHookWithModal({ action: originalAction });
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
@@ -183,8 +150,9 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
     expect(result.current.combatSuperiorityModal).toEqual(newPayload);
   });
 
-  it('should not update combatSuperiorityModal when result is not combatSuperiority modal', async () => {
+  it('should not update modal when executeHandler returns a different modal type', async () => {
     const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
+    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
 
     executeHandler.mockResolvedValue({
       type: 'modal',
@@ -192,68 +160,101 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityReopenSelection', (
       payload: { action: originalAction },
     });
 
-    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal(existingPayload);
-    });
+    const result = renderHookWithModal(existingPayload);
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
     });
 
-    // Modal should remain unchanged
-    expect(result.current.combatSuperiorityModal).toEqual(existingPayload);
+    expect(result.current.combatSuperiorityModal).toBe(existingPayload);
   });
 
-  it('should not update combatSuperiorityModal when result has no type modal', async () => {
+  it('should not update modal when executeHandler returns non-modal result', async () => {
     const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
+    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
 
     executeHandler.mockResolvedValue({
-      type: 'popup',
-      payload: { name: 'No maneuvers available' },
+      type: 'attack_roll',
+      payload: { attack: {}, targetName: 'goblin' },
     });
 
-    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal(existingPayload);
-    });
+    const result = renderHookWithModal(existingPayload);
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
     });
 
-    expect(result.current.combatSuperiorityModal).toEqual(existingPayload);
+    expect(result.current.combatSuperiorityModal).toBe(existingPayload);
   });
 
-  it('should not update combatSuperiorityModal when executeHandler returns null', async () => {
+  it('should not update modal when executeHandler returns null', async () => {
     const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
+    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
 
     executeHandler.mockResolvedValue(null);
 
-    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal(existingPayload);
-    });
+    const result = renderHookWithModal(existingPayload);
 
     await act(async () => {
       await result.current.handleCombatSuperiorityReopenSelection();
     });
 
-    expect(result.current.combatSuperiorityModal).toEqual(existingPayload);
+    expect(result.current.combatSuperiorityModal).toBe(existingPayload);
+  });
+
+  it('should not update modal when executeHandler returns undefined', async () => {
+    const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
+    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
+
+    executeHandler.mockResolvedValue(undefined);
+
+    const result = renderHookWithModal(existingPayload);
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityReopenSelection();
+    });
+
+    expect(result.current.combatSuperiorityModal).toBe(existingPayload);
+  });
+
+  it('should set modal to undefined when executeHandler returns matching modal with no payload', async () => {
+    const originalAction = { name: 'Combat Superiority', automation: { type: 'combat_superiority' } };
+    const existingPayload = { action: originalAction, knownManeuvers: ['Rally'] };
+
+    executeHandler.mockResolvedValue({
+      type: 'modal',
+      modalName: 'combatSuperiority',
+    });
+
+    const result = renderHookWithModal(existingPayload);
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityReopenSelection();
+    });
+
+    expect(result.current.combatSuperiorityModal).toBeUndefined();
+  });
+
+  it('should create a new object for the reopened action without mutating the original', async () => {
+    const originalAction = {
+      name: 'Combat Superiority',
+      automation: { type: 'combat_superiority' },
+    };
+
+    executeHandler.mockResolvedValue({
+      type: 'modal',
+      modalName: 'combatSuperiority',
+      payload: { action: originalAction },
+    });
+
+    const result = renderHookWithModal({ action: originalAction });
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityReopenSelection();
+    });
+
+    const [calledAction] = executeHandler.mock.calls[0];
+    expect(calledAction).not.toBe(originalAction);
+    expect(calledAction.automation).not.toBe(originalAction.automation);
   });
 });

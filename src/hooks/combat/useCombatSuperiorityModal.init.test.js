@@ -1,8 +1,8 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useCombatSuperiorityModal } from './useCombatSuperiorityModal.js';
 
-// Mock all external dependencies
 vi.mock('../../services/automation/index.js', () => ({
   executeHandler: vi.fn(),
 }));
@@ -41,21 +41,22 @@ describe('useCombatSuperiorityModal - Initialization', () => {
   const mockRollDamage = vi.fn();
   const mockOnPopupHtml = vi.fn();
 
-  it('should return the expected interface', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should return null modal, setters, and handlers on mount', () => {
     const { result } = renderHook(
       () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, mockOnPopupHtml)
     );
 
-    expect(result.current).toHaveProperty('combatSuperiorityModal', null);
-    expect(result.current).toHaveProperty('setCombatSuperiorityModal');
-    expect(result.current).toHaveProperty('handleCombatSuperiorityConfirm');
-    expect(result.current).toHaveProperty('handleCombatSuperiorityReopenSelection');
+    expect(result.current.combatSuperiorityModal).toBeNull();
     expect(typeof result.current.setCombatSuperiorityModal).toBe('function');
     expect(typeof result.current.handleCombatSuperiorityConfirm).toBe('function');
     expect(typeof result.current.handleCombatSuperiorityReopenSelection).toBe('function');
   });
 
-  it('should initialize with null modal state', () => {
+  it('should initialize with null modal state when no onPopupHtml callback is provided', () => {
     const { result } = renderHook(
       () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
     );
@@ -63,19 +64,55 @@ describe('useCombatSuperiorityModal - Initialization', () => {
     expect(result.current.combatSuperiorityModal).toBeNull();
   });
 
-  it('should work without onPopupHtml callback', () => {
+  it('should initialize without error when onPopupHtml is undefined', () => {
     const { result } = renderHook(
       () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, undefined)
     );
 
-    expect(result.current).toHaveProperty('combatSuperiorityModal');
+    expect(result.current.combatSuperiorityModal).toBeNull();
+    expect(typeof result.current.handleCombatSuperiorityConfirm).toBe('function');
   });
 
-  it('should work with null onPopupHtml', () => {
+  it('should initialize without error when onPopupHtml is null', () => {
     const { result } = renderHook(
       () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, null)
     );
 
-    expect(result.current).toHaveProperty('combatSuperiorityModal');
+    expect(result.current.combatSuperiorityModal).toBeNull();
+    expect(typeof result.current.handleCombatSuperiorityConfirm).toBe('function');
+  });
+
+  it('should allow setCombatSuperiorityModal to update modal state', () => {
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    );
+
+    const modalPayload = { action: { name: 'Test Maneuver' }, knownManeuvers: ['Rally'] };
+
+    act(() => {
+      result.current.setCombatSuperiorityModal(modalPayload);
+    });
+
+    expect(result.current.combatSuperiorityModal).toEqual(modalPayload);
+  });
+
+  it('should allow setCombatSuperiorityModal to clear modal state', () => {
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    );
+
+    const modalPayload = { action: { name: 'Test Maneuver' } };
+
+    act(() => {
+      result.current.setCombatSuperiorityModal(modalPayload);
+    });
+
+    expect(result.current.combatSuperiorityModal).toEqual(modalPayload);
+
+    act(() => {
+      result.current.setCombatSuperiorityModal(null);
+    });
+
+    expect(result.current.combatSuperiorityModal).toBeNull();
   });
 });

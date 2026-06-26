@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCombatSuperiorityModal } from './useCombatSuperiorityModal.js';
@@ -36,225 +37,123 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
 import { executeHandler } from '../../services/automation/index.js';
 import { setRuntimeValue, getRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 
-describe('useCombatSuperiorityModal - Pending prompt polling (attack)', () => {
+const ATTACK_PROMPT = {
+  rollType: 'attack',
+  attackContext: { d20: 10, targetAc: 15 },
+};
+
+const SKILL_CHECK_PROMPT = {
+  rollType: 'skill_check',
+  skillContext: { skillName: 'Stealth' },
+};
+
+const COMBAT_SUPERIORITY_RESULT = {
+  type: 'modal',
+  modalName: 'combatSuperiority',
+  payload: { action: { name: 'Combat Superiority' }, knownManeuvers: ['Rally'] },
+};
+
+describe('useCombatSuperiorityModal - Pending prompt polling', () => {
   const mockPlayerStats = { name: 'Thorin', level: 5 };
   const mockCampaignName = 'test-campaign';
-  const mockRollAttack = vi.fn();
-  const mockRollDamage = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    getRuntimeValue.mockReturnValue(null);
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    vi.useRealTimers();
   });
 
-  it('should poll getRuntimeValue for pendingCombatSuperiorityPrompt', () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'attack',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
+  function renderWithPendingPrompt(pendingPrompt) {
+    if (pendingPrompt != null) {
+      getRuntimeValue.mockImplementation((key, prop, campaign) => {
+        if (key === mockPlayerStats.name && prop === 'pendingCombatSuperiorityPrompt' && campaign === mockCampaignName) {
+          return pendingPrompt;
+        }
+        return null;
+      });
+    } else {
+      getRuntimeValue.mockReturnValue(null);
+    }
+  }
 
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: { action: { name: 'Combat Superiority' }, knownManeuvers: ['Rally'] },
+  function advancePendingHandler() {
+    // Interval fires every 500ms, then setTimeout for SHOW_DICE_ROLL_DELAY (2000ms)
+    // Total: 500 + 2000 = 2500ms for first execution
+    return act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
     });
+  }
 
-    const { result, unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+  it('should not call executeHandler when no pending prompt exists', () => {
+    renderWithPendingPrompt(null);
+
+    renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    expect(result.current.combatSuperiorityModal).toBeNull();
-
-    // Clear intervals to stop the polling
-    unmount();
+    expect(executeHandler).not.toHaveBeenCalled();
   });
 
-  it('should call executeHandler when pending prompt exists and popup not visible', async () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'attack',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
+  it('should not call executeHandler when pending prompt has neither attackContext nor skillContext', () => {
+    renderWithPendingPrompt({ rollType: 'attack', attackContext: null, skillContext: null });
 
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: { action: { name: 'Combat Superiority' }, knownManeuvers: ['Rally'] },
-    });
-
-    // Mock popupHtmlRef.current as false (no popup visible)
-    document.querySelector = vi.fn((selector) => {
-      if (selector === '.char-actions') return document.createElement('div');
-      return null;
-    });
-
-    globalThis.MutationObserver = class {
-      observe() {}
-      disconnect() {}
-      takeRecords() { return []; }
-    };
-
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    // Wait for the interval to fire (500ms + SHOW_DICE_ROLL_DELAY 2000ms = 2500ms)
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3000));
+    act(() => {
+      vi.advanceTimersByTime(5000);
     });
 
-    expect(executeHandler).toHaveBeenCalled();
-
-    unmount();
+    expect(executeHandler).not.toHaveBeenCalled();
   });
 
-  it('should skip when modal is already showing', () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'attack',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
+  it('should not call executeHandler when pending prompt rollType is unknown', () => {
+    renderWithPendingPrompt({ rollType: 'spell', attackContext: { d20: 10 } });
 
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: { action: { name: 'Combat Superiority' } },
-    });
-
-    const { result, unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    // Set the modal so the polling should skip
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(executeHandler).not.toHaveBeenCalled();
+  });
+
+  it('should not call executeHandler when modal is already showing', () => {
+    renderWithPendingPrompt(ATTACK_PROMPT);
+
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
+    );
+
     act(() => {
       result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
     });
 
-    // Wait for a short interval
     act(() => {
-      new Promise(resolve => setTimeout(resolve, 100));
-    });
-
-    // executeHandler should not have been called because modal is set
-    expect(executeHandler).not.toHaveBeenCalled();
-
-    unmount();
-  });
-
-  it('should skip when pending prompt is null', () => {
-    getRuntimeValue.mockReturnValue(null);
-
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: { action: { name: 'Combat Superiority' } },
-    });
-
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      new Promise(resolve => setTimeout(resolve, 100));
+      vi.advanceTimersByTime(5000);
     });
 
     expect(executeHandler).not.toHaveBeenCalled();
-
-    unmount();
-  });
-
-  it('should skip when pending prompt has no attackContext and no skillContext', () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return { rollType: 'attack' }; // no attackContext or skillContext
-      }
-      return null;
-    });
-
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      new Promise(resolve => setTimeout(resolve, 100));
-    });
-
-    expect(executeHandler).not.toHaveBeenCalled();
-
-    unmount();
-  });
-
-  it('should skip when pending prompt has unknown rollType', () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'spell',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
-
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      new Promise(resolve => setTimeout(resolve, 100));
-    });
-
-    expect(executeHandler).not.toHaveBeenCalled();
-
-    unmount();
+    expect(result.current.combatSuperiorityModal).toEqual({ action: { name: 'Test' } });
   });
 
   it('should call executeHandler with combat_superiority_attack_rider for attack rollType', async () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'attack',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
+    renderWithPendingPrompt(ATTACK_PROMPT);
+    executeHandler.mockResolvedValue(COMBAT_SUPERIORITY_RESULT);
 
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: { action: { name: 'Combat Superiority' } },
-    });
-
-    document.querySelector = vi.fn(() => document.createElement('div'));
-    globalThis.MutationObserver = class {
-      observe() {}
-      disconnect() {}
-      takeRecords() { return []; }
-    };
-
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    });
+    await advancePendingHandler();
 
     expect(executeHandler).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -265,41 +164,17 @@ describe('useCombatSuperiorityModal - Pending prompt polling (attack)', () => {
       mockCampaignName,
       null
     );
-
-    unmount();
   });
 
   it('should call executeHandler with combat_superiority_prompt_skill_check for skill_check rollType', async () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'skill_check',
-          skillContext: { skillName: 'Stealth' },
-        };
-      }
-      return null;
-    });
+    renderWithPendingPrompt(SKILL_CHECK_PROMPT);
+    executeHandler.mockResolvedValue(COMBAT_SUPERIORITY_RESULT);
 
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: { action: { name: 'Combat Superiority' } },
-    });
-
-    document.querySelector = vi.fn(() => document.createElement('div'));
-    globalThis.MutationObserver = class {
-      observe() {}
-      disconnect() {}
-      takeRecords() { return []; }
-    };
-
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    });
+    await advancePendingHandler();
 
     expect(executeHandler).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -310,203 +185,97 @@ describe('useCombatSuperiorityModal - Pending prompt polling (attack)', () => {
       mockCampaignName,
       null
     );
-
-    unmount();
   });
 
-  it('should set combatSuperiorityModal when executeHandler returns combatSuperiority modal', async () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'attack',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
-
+  it('should set combatSuperiorityModal and clear pending prompt when executeHandler returns combatSuperiority modal', async () => {
     const modalPayload = {
       action: { name: 'Combat Superiority' },
       knownManeuvers: ['Rally', 'Disarming Attack'],
     };
-
+    renderWithPendingPrompt(ATTACK_PROMPT);
     executeHandler.mockResolvedValue({
       type: 'modal',
       modalName: 'combatSuperiority',
       payload: modalPayload,
     });
 
-    document.querySelector = vi.fn(() => document.createElement('div'));
-    globalThis.MutationObserver = class {
-      observe() {}
-      disconnect() {}
-      takeRecords() { return []; }
-    };
-
-    const { result, unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    });
+    expect(result.current.combatSuperiorityModal).toBeNull();
+
+    await advancePendingHandler();
 
     expect(result.current.combatSuperiorityModal).toEqual(modalPayload);
-
-    // Should clear the pending prompt
     expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Thorin',
+      mockPlayerStats.name,
       'pendingCombatSuperiorityPrompt',
       null,
       mockCampaignName
     );
-
-    unmount();
   });
 
-  it('should clear pending prompt when executeHandler throws', async () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'attack',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
-
-    executeHandler.mockRejectedValue(new Error('Handler failed'));
-
-    document.querySelector = vi.fn(() => document.createElement('div'));
-    globalThis.MutationObserver = class {
-      observe() {}
-      disconnect() {}
-      takeRecords() { return []; }
-    };
+  it('should clear pending prompt and log error when executeHandler rejects', async () => {
+    const error = new Error('Handler failed');
+    renderWithPendingPrompt(ATTACK_PROMPT);
+    executeHandler.mockRejectedValue(error);
 
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    });
+    await advancePendingHandler();
 
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       '[useCombatSuperiorityModal] Error checking pending prompt:',
-      expect.any(Error)
+      error
     );
-
     expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Thorin',
+      mockPlayerStats.name,
       'pendingCombatSuperiorityPrompt',
       null,
       mockCampaignName
     );
 
     consoleErrorSpy.mockRestore();
-    unmount();
   });
 
-  it('should not call executeHandler again if handledPending is true', async () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'attack',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
+  it('should invoke executeHandler only once per pending prompt (deduplication)', async () => {
+    renderWithPendingPrompt(ATTACK_PROMPT);
+    executeHandler.mockResolvedValue(COMBAT_SUPERIORITY_RESULT);
 
-    executeHandler.mockResolvedValue({
-      type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: { action: { name: 'Combat Superiority' } },
-    });
-
-    document.querySelector = vi.fn(() => document.createElement('div'));
-    globalThis.MutationObserver = class {
-      observe() {}
-      disconnect() {}
-      takeRecords() { return []; }
-    };
-
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    // Wait for first interval to fire
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 3000));
-    });
+    await advancePendingHandler();
 
-    const callCountAfterFirst = executeHandler.mock.calls.length;
-
-    expect(callCountAfterFirst).toBeGreaterThanOrEqual(1);
-
-    unmount();
+    expect(executeHandler).toHaveBeenCalledTimes(1);
   });
 
-  it('should wait for popup to disappear before calling executeHandler', async () => {
-    getRuntimeValue.mockImplementation((key, prop, campaign) => {
-      if (key === 'Thorin' && prop === 'pendingCombatSuperiorityPrompt' && campaign === 'test-campaign') {
-        return {
-          rollType: 'attack',
-          attackContext: { d20: 10, targetAc: 15 },
-        };
-      }
-      return null;
-    });
-
+  it('should not update modal state if non-combatSuperiority modal is returned', async () => {
+    renderWithPendingPrompt(ATTACK_PROMPT);
     executeHandler.mockResolvedValue({
       type: 'modal',
-      modalName: 'combatSuperiority',
-      payload: { action: { name: 'Combat Superiority' } },
+      modalName: 'otherModal',
+      payload: { action: { name: 'Other' } },
     });
 
-    // Simulate popupHtmlRef.current being true initially
-    document.querySelector = vi.fn(() => document.createElement('div'));
-    globalThis.MutationObserver = class {
-      observe() {}
-      disconnect() {}
-      takeRecords() { return []; }
-    };
-
-    // We need to simulate the popup being visible via the MutationObserver callback
-    // The MutationObserver sets popupHtmlRef.current based on querySelector
-    const charActions = document.createElement('div');
-    charActions.className = 'char-actions';
-    const popupEl = document.createElement('div');
-    popupEl.className = 'superiority-popup';
-    charActions.appendChild(popupEl);
-    document.body.appendChild(charActions);
-
-    globalThis.MutationObserver = class {
-      observe(target, _options) {
-        // Simulate mutation that adds a popup
-        setTimeout(() => {
-          const newPopup = document.createElement('div');
-          newPopup.className = 'superiority-popup';
-          target.appendChild(newPopup);
-        }, 100);
-      }
-      disconnect() {}
-      takeRecords() { return []; }
-    };
-
-    const { unmount } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName)
     );
 
-    // Wait for the delay + popup check cycle
-    await act(async () => {
-      await new Promise(resolve => setTimeout(resolve, 4000));
-    });
+    await advancePendingHandler();
 
-    document.body.removeChild(charActions);
-    unmount();
+    expect(result.current.combatSuperiorityModal).toBeNull();
+    expect(setRuntimeValue).not.toHaveBeenCalledWith(
+      mockPlayerStats.name,
+      'pendingCombatSuperiorityPrompt',
+      null,
+      mockCampaignName
+    );
   });
 });

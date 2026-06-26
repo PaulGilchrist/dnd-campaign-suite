@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCombatSuperiorityModal } from './useCombatSuperiorityModal.js';
@@ -39,461 +40,711 @@ import { addEntry } from '../../services/ui/logService.js';
 import { loadCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';
 
-describe('useCombatSuperiorityModal - handleCombatSuperiorityConfirm (attack_roll_bonus / Precision Attack)', () => {
+const createLastAttackRoll = (overrides = {}) => ({
+  d20: 15,
+  bonus: 5,
+  targetAc: 16,
+  isCrit: false,
+  ...overrides,
+});
+
+const createLastAttack = (overrides = {}) => ({
+  damageFormula: '2d6+3',
+  damageType: 'Slashing',
+  damageName: 'Longsword',
+  attackName: 'Longsword',
+  targetName: 'Orc',
+  ...overrides,
+});
+
+const defaultDiceResult = { total: 10, rolls: [4, 3], modifier: 3 };
+
+describe('useCombatSuperiorityModal - handleCombatSuperityConfirm (attack_roll_bonus / Precision Attack)', () => {
   const mockPlayerStats = { name: 'Thorin', level: 5 };
   const mockCampaignName = 'test-campaign';
-  const mockRollAttack = vi.fn();
-  const mockRollDamage = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
-    rollExpression.mockReturnValue({ total: 10, rolls: [4, 3], modifier: 3 });
+    rollExpression.mockReturnValue(defaultDiceResult);
   });
 
-  it('should handle effect attack_roll_bonus when lastAttackRoll has d20 and targetAc and lastAttack has damageFormula', async () => {
-    const lastAttackRoll = { d20: 15, bonus: 5, targetAc: 16, isCrit: false };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
+  describe('successful attack hit scenarios', () => {
+    it('should update lastAttackRoll with added dieValue to bonus and total, and mark as hit when newTotal >= targetAc', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 5, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 4;
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
+
+      const rollDamage = vi.fn();
+      const showPopup = vi.fn();
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), rollDamage, showPopup)
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'lastAttackRoll',
+        expect.objectContaining({
+          bonus: 9,
+          total: 24,
+          hit: true,
+          isCrit: false,
+        }),
+        mockCampaignName
+      );
+
+      expect(rollDamage).toHaveBeenCalledTimes(1);
+      expect(rollDamage).toHaveBeenCalledWith(
+        'Longsword',
+        '2d6+3',
+        10,
+        [4, 3],
+        3,
+        expect.objectContaining({
+          damageType: 'Slashing',
+          targetName: 'Orc',
+          attackerName: 'Thorin',
+        })
+      );
     });
 
-    const cs = {
-      lastAttack: {
-        damageFormula: '2d6+3',
-        damageType: 'Slashing',
-        damageName: 'Longsword',
-        attackName: 'Longsword',
-        targetName: 'Orc',
-      },
-    };
-    loadCombatSummary.mockResolvedValue(cs);
+    it('should mark attack as natural 20 crit when d20 is 20 regardless of dieValue', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 20, bonus: 5, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 3;
 
-    const showPopupMock = vi.fn();
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, showPopupMock)
-    );
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
 
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 4,
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'lastAttackRoll',
+        expect.objectContaining({
+          isCrit: true,
+          total: 28,
+        }),
+        mockCampaignName
+      );
     });
 
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+    it('should preserve isCrit: true when already a natural 20 and bonus is added', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 20, bonus: 5, targetAc: 16, isCrit: true });
+      const lastAttack = createLastAttack();
+      const dieValue = 5;
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'lastAttackRoll',
+        expect.objectContaining({
+          isCrit: true,
+          total: 30,
+        }),
+        mockCampaignName
+      );
     });
 
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+    it('should mark as crit when isCrit was already true but d20 is not 20', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 19, bonus: 5, targetAc: 16, isCrit: true });
+      const lastAttack = createLastAttack();
+      const dieValue = 2;
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'lastAttackRoll',
+        expect.objectContaining({
+          isCrit: true,
+          total: 26,
+        }),
+        mockCampaignName
+      );
     });
 
-    // Verify the attack roll was updated
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Thorin',
-      'lastAttackRoll',
-      expect.objectContaining({
-        bonus: 9,
-        total: 24,
-        hit: true,
-        isCrit: false,
-      }),
-      mockCampaignName
-    );
+    it('should roll damage when attack transitions from miss to hit via precision attack', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 2, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 4;
 
-    // Verify combat summary cache was updated
-    expect(setCombatSummaryCache).toHaveBeenCalled();
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
 
-    // Verify log entry was added
-    expect(addEntry).toHaveBeenCalledWith(mockCampaignName, expect.objectContaining({
-      type: 'ability_use',
-      abilityName: 'Precision Attack',
-    }));
+      const rollDamage = vi.fn();
 
-    // When attack hits and rollDamage is provided, rollDamage is called and showPopup is NOT called
-    expect(mockRollDamage).toHaveBeenCalledTimes(1);
-    expect(mockRollDamage).toHaveBeenCalledWith(
-      'Longsword',
-      '2d6+3',
-      10,
-      [4, 3],
-      3,
-      expect.objectContaining({
-        damageType: 'Slashing',
-        targetName: 'Orc',
-        attackerName: 'Thorin',
-      })
-    );
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), rollDamage, vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(rollDamage).toHaveBeenCalledTimes(1);
+    });
+
+    it('should set pendingCombatSuperiorityPrompt to null after rolling damage', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 2, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue: 4 });
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'pendingCombatSuperiorityPrompt',
+        null,
+        mockCampaignName
+      );
+    });
   });
 
-  it('should update isCrit when d20 is 20 (natural 20)', async () => {
-    const lastAttackRoll = { d20: 20, bonus: 5, targetAc: 16, isCrit: false };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
+  describe('miss scenarios', () => {
+    it('should show still misses popup when attack still misses after adding dieValue', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 8, bonus: 2, targetAc: 18, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 3;
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
+
+      const showPopup = vi.fn();
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), null, showPopup)
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(showPopup).toHaveBeenCalledWith(expect.objectContaining({
+        type: 'automation_info',
+        name: 'Precision Attack',
+        description: expect.stringContaining('still misses'),
+      }));
     });
 
-    const cs = {
-      lastAttack: {
-        damageFormula: '2d6+3',
-        damageType: 'Slashing',
-        damageName: 'Longsword',
-        attackName: 'Longsword',
-        targetName: 'Orc',
-      },
-    };
-    loadCombatSummary.mockResolvedValue(cs);
+    it('should not call rollDamage when attack still misses', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 8, bonus: 2, targetAc: 18, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 3;
 
-    const showPopupMock = vi.fn();
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, showPopupMock)
-    );
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
 
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 3,
+      const rollDamage = vi.fn();
+      const showPopup = vi.fn();
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), rollDamage, showPopup)
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(rollDamage).not.toHaveBeenCalled();
+      expect(showPopup).toHaveBeenCalled();
     });
 
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
-    });
+    it('should mark attack as not hit when newTotal < targetAc', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 8, bonus: 2, targetAc: 18, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 3;
 
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
-    });
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Thorin',
-      'lastAttackRoll',
-      expect.objectContaining({
-        isCrit: true,
-      }),
-      mockCampaignName
-    );
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), null, vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'lastAttackRoll',
+        expect.objectContaining({
+          hit: false,
+          total: 13,
+        }),
+        mockCampaignName
+      );
+    });
   });
 
-  it('should keep isCrit true when already a natural 20 and bonus added', async () => {
-    const lastAttackRoll = { d20: 20, bonus: 5, targetAc: 16, isCrit: true };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
+  describe('boundary and edge cases', () => {
+    it('should mark as hit when newTotal exactly equals targetAc', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 1, targetAc: 20, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 4;
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
+
+      const rollDamage = vi.fn();
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), rollDamage, vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'lastAttackRoll',
+        expect.objectContaining({
+          hit: true,
+          total: 20,
+        }),
+        mockCampaignName
+      );
+
+      expect(rollDamage).toHaveBeenCalledTimes(1);
     });
 
-    const cs = {
-      lastAttack: {
-        damageFormula: '2d6+3',
-        damageType: 'Slashing',
-        damageName: 'Longsword',
-        attackName: 'Longsword',
-        targetName: 'Orc',
-      },
-    };
-    loadCombatSummary.mockResolvedValue(cs);
+    it('should handle lastAttackRoll with undefined bonus by defaulting to 0', async () => {
+      const lastAttackRoll = { d20: 15, bonus: undefined, targetAc: 16, isCrit: false };
+      const lastAttack = createLastAttack();
+      const dieValue = 4;
 
-    const showPopupMock = vi.fn();
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, showPopupMock)
-    );
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
 
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 5,
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'lastAttackRoll',
+        expect.objectContaining({
+          bonus: 4,
+          total: 19,
+        }),
+        mockCampaignName
+      );
     });
 
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+    it('should not call rollAttack when rollDamage callback is null', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 2, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue: 4 });
+
+      const rollAttack = vi.fn();
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, rollAttack, null)
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(rollAttack).not.toHaveBeenCalled();
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'lastAttackRoll',
+        expect.objectContaining({
+          hit: true,
+        }),
+        mockCampaignName
+      );
     });
 
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+    it('should not call rollDamage when rollExpression returns null', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 2, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      rollExpression.mockReturnValue(null);
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue: 4 });
+
+      const rollDamage = vi.fn();
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), rollDamage)
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(rollDamage).not.toHaveBeenCalled();
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'Thorin',
+        'pendingCombatSuperiorityPrompt',
+        null,
+        mockCampaignName
+      );
     });
 
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Thorin',
-      'lastAttackRoll',
-      expect.objectContaining({
-        isCrit: true,
-      }),
-      mockCampaignName
-    );
+    it('should skip precision attack logic when lastAttackRoll.d20 is null', async () => {
+      const lastAttackRoll = { d20: null, bonus: 5, targetAc: 16 };
+      const lastAttack = { damageFormula: '2d6+3' };
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+
+      executeManeuver.mockResolvedValue({
+        effect: 'attack_roll_bonus',
+        dieValue: 4,
+        logEntries: [{ type: 'ability_use', characterName: 'Thorin', abilityName: 'Precision Attack', description: 'Test' }],
+      });
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(addEntry).toHaveBeenCalled();
+    });
+
+    it('should skip precision attack logic when lastAttackRoll.targetAc is null', async () => {
+      const lastAttackRoll = { d20: 15, bonus: 5, targetAc: null };
+      const lastAttack = { damageFormula: '2d6+3' };
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+
+      executeManeuver.mockResolvedValue({
+        effect: 'attack_roll_bonus',
+        dieValue: 4,
+      });
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      const lastAttackRollCalls = setRuntimeValue.mock.calls.filter(
+        call => call[0] === 'Thorin' && call[1] === 'lastAttackRoll'
+      );
+      expect(lastAttackRollCalls).toHaveLength(0);
+    });
+
+    it('should skip precision attack logic when lastAttack has no damageFormula', async () => {
+      const lastAttackRoll = { d20: 15, bonus: 5, targetAc: 16 };
+      const lastAttack = { damageFormula: null };
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+
+      executeManeuver.mockResolvedValue({
+        effect: 'attack_roll_bonus',
+        dieValue: 4,
+      });
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      const lastAttackRollCalls = setRuntimeValue.mock.calls.filter(
+        call => call[0] === 'Thorin' && call[1] === 'lastAttackRoll'
+      );
+      expect(lastAttackRollCalls).toHaveLength(0);
+    });
   });
 
-  it('should show "still misses" message when attack still misses after bonus', async () => {
-    const lastAttackRoll = { d20: 8, bonus: 2, targetAc: 18, isCrit: false };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
+  describe('combat summary cache and logging', () => {
+    it('should update combat summary cache with new total, hit, and isCrit when attack hits', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 5, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 4;
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(setCombatSummaryCache).toHaveBeenCalled();
+      const cachedCs = setCombatSummaryCache.mock.calls[0][0];
+      expect(cachedCs.lastAttack).toEqual(
+        expect.objectContaining({
+          total: 24,
+          hit: true,
+          isCrit: false,
+        })
+      );
     });
 
-    const cs = {
-      lastAttack: {
-        damageFormula: '2d6+3',
-        damageType: 'Slashing',
-        damageName: 'Longsword',
-        attackName: 'Longsword',
-        targetName: 'Orc',
-      },
-    };
-    loadCombatSummary.mockResolvedValue(cs);
+    it('should log ability_use entry with correct description format on precision attack', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 8, bonus: 2, targetAc: 18, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 3;
 
-    const showPopupMock = vi.fn();
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, showPopupMock)
-    );
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
 
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 3,
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), null, vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(addEntry).toHaveBeenCalledWith(
+        mockCampaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          abilityName: 'Precision Attack',
+          description: expect.stringContaining('Precision Attack: Added 3'),
+        })
+      );
     });
 
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
-    });
+    it('should include characterName in log entry', async () => {
+      const playerStats = { name: 'Grimjaw', level: 7 };
+      const campaignName = 'mythic-raids';
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 5, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
 
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
-    });
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue: 4 });
 
-    expect(showPopupMock).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'Precision Attack',
-      description: expect.stringContaining('still misses'),
-    }));
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(playerStats, campaignName, vi.fn(), vi.fn(), vi.fn())
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(addEntry).toHaveBeenCalledWith(
+        campaignName,
+        expect.objectContaining({
+          characterName: 'Grimjaw',
+          abilityName: 'Precision Attack',
+        })
+      );
+    });
   });
 
-  it('should roll damage and call rollDamage when attack becomes a hit', async () => {
-    const lastAttackRoll = { d20: 15, bonus: 2, targetAc: 16, isCrit: false };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
+  describe('popup description format', () => {
+    it('should show popup with correct description format when attack hits', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 15, bonus: 2, targetAc: 16, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 4;
+
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
+
+      const showPopup = vi.fn();
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), null, showPopup)
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(showPopup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'automation_info',
+          name: 'Precision Attack',
+          description: 'Precision Attack: Added 4 to the attack roll (15 + 2 + 4 = 21). The attack now hits!',
+        })
+      );
     });
 
-    const cs = {
-      lastAttack: {
-        damageFormula: '2d6+3',
-        damageType: 'Slashing',
-        damageName: 'Longsword',
-        attackName: 'Longsword',
-        targetName: 'Orc',
-      },
-    };
-    loadCombatSummary.mockResolvedValue(cs);
+    it('should show popup with correct description format when attack still misses', async () => {
+      const lastAttackRoll = createLastAttackRoll({ d20: 8, bonus: 2, targetAc: 18, isCrit: false });
+      const lastAttack = createLastAttack();
+      const dieValue = 3;
 
-    const showPopupMock = vi.fn();
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, showPopupMock)
-    );
+      getRuntimeValue.mockReturnValue(lastAttackRoll);
+      loadCombatSummary.mockResolvedValue({ lastAttack });
+      executeManeuver.mockResolvedValue({ effect: 'attack_roll_bonus', dieValue });
 
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 4,
+      const showPopup = vi.fn();
+
+      const { result } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, vi.fn(), null, showPopup)
+      );
+
+      act(() => {
+        result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
+      });
+
+      await act(async () => {
+        await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
+      });
+
+      expect(showPopup).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'automation_info',
+          name: 'Precision Attack',
+          description: 'Precision Attack: Added 3 to the attack roll (8 + 2 + 3 = 13). The attack still misses.',
+        })
+      );
     });
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
-    });
-
-    expect(mockRollDamage).toHaveBeenCalledWith(
-      'Longsword',
-      '2d6+3',
-      10,
-      [4, 3],
-      3,
-      expect.objectContaining({
-        damageType: 'Slashing',
-        targetName: 'Orc',
-        attackerName: 'Thorin',
-      })
-    );
-
-    // Should set pendingCombatSuperiorityPrompt to null
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Thorin',
-      'pendingCombatSuperiorityPrompt',
-      null,
-      mockCampaignName
-    );
-  });
-
-  it('should not call rollDamage when rollExpression returns null', async () => {
-    const lastAttackRoll = { d20: 15, bonus: 2, targetAc: 16, isCrit: false };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
-    });
-
-    const cs = {
-      lastAttack: {
-        damageFormula: '2d6+3',
-        damageType: 'Slashing',
-        damageName: 'Longsword',
-        attackName: 'Longsword',
-        targetName: 'Orc',
-      },
-    };
-    loadCombatSummary.mockResolvedValue(cs);
-    rollExpression.mockReturnValue(null);
-
-    const showPopupMock = vi.fn();
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, showPopupMock)
-    );
-
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 4,
-    });
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
-    });
-
-    expect(mockRollDamage).not.toHaveBeenCalled();
-    // When rollExpression returns null during a hit, it returns early without calling showPopup
-    expect(setRuntimeValue).toHaveBeenCalledWith(
-      'Thorin',
-      'pendingCombatSuperiorityPrompt',
-      null,
-      mockCampaignName
-    );
-  });
-
-  it('should not call rollDamage when rollDamage callback is null', async () => {
-    const lastAttackRoll = { d20: 15, bonus: 2, targetAc: 16, isCrit: false };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
-    });
-
-    const cs = {
-      lastAttack: {
-        damageFormula: '2d6+3',
-        damageType: 'Slashing',
-        damageName: 'Longsword',
-        attackName: 'Longsword',
-        targetName: 'Orc',
-      },
-    };
-    loadCombatSummary.mockResolvedValue(cs);
-    rollExpression.mockReturnValue({ total: 10, rolls: [4, 3], modifier: 3 });
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, null)
-    );
-
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 4,
-    });
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
-    });
-
-    expect(mockRollDamage).not.toHaveBeenCalled();
-  });
-
-  it('should skip precision attack logic when lastAttackRoll.d20 is null', async () => {
-    const lastAttackRoll = { d20: null, bonus: 5, targetAc: 16 };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
-    });
-
-    const cs = { lastAttack: { damageFormula: '2d6+3' } };
-    loadCombatSummary.mockResolvedValue(cs);
-
-    const showPopupMock = vi.fn();
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, showPopupMock)
-    );
-
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 4,
-      logEntries: [{ type: 'ability_use', characterName: 'Thorin', abilityName: 'Precision Attack', description: 'Test' }],
-    });
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
-    });
-
-    // Should fall through to the type popup handler
-    expect(addEntry).toHaveBeenCalled();
-  });
-
-  it('should skip precision attack logic when lastAttackRoll.targetAc is null', async () => {
-    const lastAttackRoll = { d20: 15, bonus: 5, targetAc: null };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
-    });
-
-    const cs = { lastAttack: { damageFormula: '2d6+3' } };
-    loadCombatSummary.mockResolvedValue(cs);
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 4,
-    });
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
-    });
-
-    // Should skip the precision attack block
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('Thorin', 'lastAttackRoll', expect.any(Object), mockCampaignName);
-  });
-
-  it('should skip precision attack logic when lastAttack has no damageFormula', async () => {
-    const lastAttackRoll = { d20: 15, bonus: 5, targetAc: 16 };
-    getRuntimeValue.mockImplementation((key, prop) => {
-      if (key === 'Thorin' && prop === 'lastAttackRoll') return lastAttackRoll;
-      return null;
-    });
-
-    const cs = { lastAttack: { damageFormula: null } };
-    loadCombatSummary.mockResolvedValue(cs);
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    executeManeuver.mockResolvedValue({
-      effect: 'attack_roll_bonus',
-      dieValue: 4,
-    });
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Precision Attack' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Precision Attack');
-    });
-
-    // Should skip the precision attack block
-    expect(setRuntimeValue).not.toHaveBeenCalledWith('Thorin', 'lastAttackRoll', expect.any(Object), mockCampaignName);
   });
 });

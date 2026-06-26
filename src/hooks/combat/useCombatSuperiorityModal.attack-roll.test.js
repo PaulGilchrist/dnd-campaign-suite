@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCombatSuperiorityModal } from './useCombatSuperiorityModal.js';
@@ -35,7 +36,37 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
 
 import { executeManeuver, onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
-describe('useCombatSuperiorityModal - handleCombatSuperiorityConfirm (attack_roll type)', () => {
+const createAttackPayload = (overrides = {}) => ({
+  attack: {
+    name: 'Riposte',
+    hitBonus: 7,
+    damageFormula: '1d8+3',
+    damageType: 'Slashing',
+    ...overrides.attack,
+  },
+  targetName: 'Orc',
+  ...overrides,
+});
+
+const createAttackRollResult = (overrides = {}) => {
+  const base = {
+    type: 'attack_roll',
+    payload: createAttackPayload(),
+    context: {
+      superiorityDieValue: 4,
+      baseDamageFormula: '1d8+3',
+    },
+    popup: { name: 'Riposte', description: 'Reply with an attack.' },
+  };
+  return {
+    ...base,
+    ...overrides,
+    ...(overrides.context ? { context: { ...base.context, ...overrides.context } } : {}),
+    ...(overrides.payload ? { payload: { ...base.payload, ...overrides.payload } } : {}),
+  };
+};
+
+describe('useCombatSuperiorityModal - attack_roll path', () => {
   const mockPlayerStats = { name: 'Thorin', level: 5 };
   const mockCampaignName = 'test-campaign';
   const mockRollAttack = vi.fn();
@@ -45,306 +76,617 @@ describe('useCombatSuperiorityModal - handleCombatSuperiorityConfirm (attack_rol
     vi.clearAllMocks();
   });
 
-  it('should call rollAttack when executeManeuver returns type attack_roll', async () => {
-    const attackPayload = {
-      attack: {
-        name: 'Riposte',
-        hitBonus: 7,
-        damageFormula: '1d8+3',
-        damageType: 'Slashing',
-      },
-      targetName: 'Orc',
-    };
+  describe('single-use maneuver path (executeManeuver)', () => {
+    it('should call rollAttack with correct hit bonus (hitBonus + superiorityDieValue)', async () => {
+      const result = createAttackRollResult({
+        context: { superiorityDieValue: 4 },
+      });
+      executeManeuver.mockResolvedValue(result);
 
-    executeManeuver.mockResolvedValue({
-      type: 'attack_roll',
-      payload: attackPayload,
-      context: {
-        superiorityDieValue: 4,
-        baseDamageFormula: '1d8+3',
-      },
-      popup: { name: 'Riposte', description: 'Reply with an attack.' },
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Riposte' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Riposte');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        'Riposte',
+        11,
+        expect.any(Object)
+      );
     });
 
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
+    it('should pass all expected rollAttack arguments including targetName, damageType, and superiorityDieValue', async () => {
+      const result = createAttackRollResult({
+        payload: {
+          attack: {
+            name: 'Parry',
+            hitBonus: 5,
+            damageFormula: '1d6+2',
+            damageType: 'Bludgeoning',
+          },
+          targetName: 'Goblin',
+        },
+        context: { superiorityDieValue: 3, baseDamageFormula: '1d6+2' },
+        popup: { name: 'Parry', description: 'Reply with an attack.' },
+      });
+      executeManeuver.mockResolvedValue(result);
 
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Riposte' } });
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Parry' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Parry');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        'Parry',
+        8,
+        expect.objectContaining({
+          targetName: 'Goblin',
+          forcedMode: undefined,
+          isOpportunityAttack: true,
+          autoDamageFormula: '1d6+2 + 3 [Superiority]',
+          autoDamageName: 'Parry (Riposte)',
+          damageType: 'Bludgeoning',
+          autoDamageRollResult: null,
+          superiorityDieValue: 3,
+          ripostePopup: { name: 'Parry', description: 'Reply with an attack.' },
+        })
+      );
     });
 
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Riposte');
+    it('should combine superiorityDieValue into autoDamageFormula when both are present', async () => {
+      const result = createAttackRollResult({
+        context: { superiorityDieValue: 5, baseDamageFormula: '2d4+2' },
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          autoDamageFormula: '2d4+2 + 5 [Superiority]',
+        })
+      );
     });
 
-    expect(mockRollAttack).toHaveBeenCalledWith(
-      'Riposte',
-      11, // hitBonus 7 + superiorityDieValue 4
-      expect.objectContaining({
-        targetName: 'Orc',
-        forcedMode: undefined,
-        isOpportunityAttack: true,
-        autoDamageFormula: '1d8+3 + 4 [Superiority]',
-        autoDamageName: 'Riposte (Riposte)',
-        damageType: 'Slashing',
-        autoDamageRollResult: null,
-        superiorityDieValue: 4,
-        ripostePopup: { name: 'Riposte', description: 'Reply with an attack.' },
-      })
-    );
+    it('should omit superiority suffix from autoDamageFormula when superiorityDieValue is zero', async () => {
+      const result = createAttackRollResult({
+        context: { superiorityDieValue: 0, baseDamageFormula: '1d4+1' },
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          autoDamageFormula: '1d4+1',
+        })
+      );
+    });
+
+    it('should set autoDamageFormula to null when no baseDamageFormula and no attack.damageFormula', async () => {
+      const result = createAttackRollResult({
+        payload: {
+          attack: {
+            name: 'Test',
+            hitBonus: 5,
+            damageType: 'Slashing',
+          },
+          targetName: 'Zombie',
+        },
+        context: { superiorityDieValue: 3, baseDamageFormula: undefined },
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          autoDamageFormula: null,
+        })
+      );
+    });
+
+    it('should default superiorityDieValue to 0 when context is missing', async () => {
+      const result = createAttackRollResult({
+        context: null,
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          superiorityDieValue: 0,
+        })
+      );
+    });
+
+    it('should default superiorityDieValue to 0 when context is undefined', async () => {
+      const result = createAttackRollResult({
+        context: undefined,
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          superiorityDieValue: 0,
+        })
+      );
+    });
+
+    it('should default damageType to Slashing when not provided on attack', async () => {
+      const result = createAttackRollResult({
+        payload: {
+          attack: {
+            name: 'Test',
+            hitBonus: 5,
+          },
+          targetName: 'Zombie',
+        },
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          damageType: 'Slashing',
+        })
+      );
+    });
+
+    it('should set autoDamageName to attack name with (Riposte) suffix', async () => {
+      const result = createAttackRollResult({
+        payload: {
+          attack: { name: 'Gouging Attack', hitBonus: 6, damageFormula: '1d4+1', damageType: 'Piercing' },
+          targetName: 'Troll',
+        },
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Gouging Attack' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Gouging Attack');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          autoDamageName: 'Gouging Attack (Riposte)',
+        })
+      );
+    });
+
+    it('should skip rollAttack when rollAttack callback is null', async () => {
+      const result = createAttackRollResult();
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, null, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Riposte' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Riposte');
+      });
+
+      expect(mockRollAttack).not.toHaveBeenCalled();
+    });
+
+    it('should clear the modal after handling attack_roll', async () => {
+      const result = createAttackRollResult();
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Riposte' } });
+      });
+
+      expect(hookResult.current.combatSuperiorityModal).not.toBeNull();
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Riposte');
+      });
+
+      expect(hookResult.current.combatSuperiorityModal).toBeNull();
+    });
+
+    it('should add logEntries from executeManeuver result', async () => {
+      const { addEntry } = await import('../../services/ui/logService.js');
+      executeManeuver.mockResolvedValue({
+        type: 'attack_roll',
+        payload: createAttackPayload(),
+        context: { superiorityDieValue: 4, baseDamageFormula: '1d8+3' },
+        logEntries: [
+          { type: 'ability_use', characterName: 'Thorin', abilityName: 'Riposte', description: 'Riposte used.' },
+        ],
+      });
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Riposte' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Riposte');
+      });
+
+      expect(addEntry).toHaveBeenCalledWith(
+        mockCampaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'Thorin',
+          abilityName: 'Riposte',
+        })
+      );
+    });
+
+    it('should pass ripostePopup from result.popup when provided', async () => {
+      const result = createAttackRollResult({
+        popup: { name: 'Riposte', description: 'Reply with an attack after hitting.' },
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Riposte' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Riposte');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          ripostePopup: { name: 'Riposte', description: 'Reply with an attack after hitting.' },
+        })
+      );
+    });
+
+    it('should pass ripostePopup as undefined when result.popup is missing', async () => {
+      const result = createAttackRollResult({
+        popup: undefined,
+      });
+      executeManeuver.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Test');
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(Number),
+        expect.objectContaining({
+          ripostePopup: undefined,
+        })
+      );
+    });
   });
 
-  it('should handle attack_roll when onCombatSuperioritySelected returns type attack_roll', async () => {
-    const attackPayload = {
-      attack: {
-        name: 'Parry',
-        hitBonus: 5,
-        damageFormula: '1d6+2',
-        damageType: 'Bludgeoning',
-      },
-      targetName: 'Goblin',
-    };
+  describe('multi-maneuver path (onCombatSuperioritySelected)', () => {
+    it('should call rollAttack with correct values from onCombatSuperioritySelected result', async () => {
+      const result = createAttackRollResult({
+        payload: {
+          attack: {
+            name: 'Parry',
+            hitBonus: 5,
+            damageFormula: '1d6+2',
+            damageType: 'Bludgeoning',
+          },
+          targetName: 'Goblin',
+        },
+        context: { superiorityDieValue: 3, baseDamageFormula: '1d6+2' },
+        popup: undefined,
+      });
+      onCombatSuperioritySelected.mockResolvedValue(result);
 
-    onCombatSuperioritySelected.mockResolvedValue({
-      type: 'attack_roll',
-      payload: attackPayload,
-      context: {
-        superiorityDieValue: 3,
-        baseDamageFormula: '1d6+2',
-      },
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Parry' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm(['Parry']);
+      });
+
+      expect(mockRollAttack).toHaveBeenCalledWith(
+        'Parry',
+        8,
+        expect.objectContaining({
+          targetName: 'Goblin',
+          forcedMode: undefined,
+          isOpportunityAttack: true,
+          autoDamageFormula: '1d6+2 + 3 [Superiority]',
+          autoDamageName: 'Parry (Riposte)',
+          damageType: 'Bludgeoning',
+          autoDamageRollResult: null,
+          superiorityDieValue: 3,
+        })
+      );
     });
 
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
+    it('should skip rollAttack when rollAttack callback is null in multi-maneuver path', async () => {
+      const result = createAttackRollResult();
+      onCombatSuperioritySelected.mockResolvedValue(result);
 
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Parry' } });
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, null, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Riposte' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm(['Riposte']);
+      });
+
+      expect(mockRollAttack).not.toHaveBeenCalled();
     });
 
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm(['Parry']);
+    it('should add logEntries from onCombatSuperioritySelected result', async () => {
+      const { addEntry } = await import('../../services/ui/logService.js');
+      onCombatSuperioritySelected.mockResolvedValue({
+        type: 'attack_roll',
+        payload: createAttackPayload(),
+        context: { superiorityDieValue: 4, baseDamageFormula: '1d8+3' },
+        logEntries: [
+          { type: 'ability_use', characterName: 'Thorin', abilityName: 'Selection', description: 'Maneuver selected.' },
+        ],
+      });
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Select' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm(['Select']);
+      });
+
+      expect(addEntry).toHaveBeenCalledWith(
+        mockCampaignName,
+        expect.objectContaining({
+          type: 'ability_use',
+          characterName: 'Thorin',
+          abilityName: 'Selection',
+        })
+      );
     });
 
-    expect(mockRollAttack).toHaveBeenCalledWith(
-      'Parry',
-      8, // hitBonus 5 + superiorityDieValue 3
-      expect.objectContaining({
-        targetName: 'Goblin',
-        isOpportunityAttack: true,
-        autoDamageFormula: '1d6+2 + 3 [Superiority]',
-        autoDamageName: 'Parry (Riposte)',
-        damageType: 'Bludgeoning',
-        superiorityDieValue: 3,
-      })
-    );
+    it('should clear the modal after handling attack_roll in multi-maneuver path', async () => {
+      const result = createAttackRollResult();
+      onCombatSuperioritySelected.mockResolvedValue(result);
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Select' } });
+      });
+
+      expect(hookResult.current.combatSuperiorityModal).not.toBeNull();
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm(['Select']);
+      });
+
+      expect(hookResult.current.combatSuperiorityModal).toBeNull();
+    });
   });
 
-  it('should not call rollAttack when rollAttack callback is null (single-use)', async () => {
-    executeManeuver.mockResolvedValue({
-      type: 'attack_roll',
-      payload: {
-        attack: { name: 'Riposte', hitBonus: 7, damageFormula: '1d8+3', damageType: 'Slashing' },
-        targetName: 'Orc',
-      },
-      context: { superiorityDieValue: 4 },
+  describe('early-return modal paths (baitAndSwitchChoice, commanderStrikeChoice, rallyChoice)', () => {
+    it('should not call rollAttack when executeManeuver returns baitAndSwitchChoice modal', async () => {
+      executeManeuver.mockResolvedValue({
+        type: 'modal',
+        modalName: 'baitAndSwitchChoice',
+        payload: { test: true },
+      });
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Bait and Switch' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Bait and Switch');
+      });
+
+      expect(mockRollAttack).not.toHaveBeenCalled();
     });
 
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, null, mockRollDamage)
-    );
+    it('should not call rollAttack when executeManeuver returns commanderStrikeChoice modal', async () => {
+      executeManeuver.mockResolvedValue({
+        type: 'modal',
+        modalName: 'commanderStrikeChoice',
+        payload: { test: true },
+      });
 
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Riposte' } });
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Commander Strike' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Commander Strike');
+      });
+
+      expect(mockRollAttack).not.toHaveBeenCalled();
     });
 
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Riposte');
+    it('should not call rollAttack when executeManeuver returns rallyChoice modal', async () => {
+      executeManeuver.mockResolvedValue({
+        type: 'modal',
+        modalName: 'rallyChoice',
+        payload: { test: true },
+      });
+
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Rally' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm([], 'Rally');
+      });
+
+      expect(mockRollAttack).not.toHaveBeenCalled();
     });
 
-    expect(mockRollAttack).not.toHaveBeenCalled();
-  });
+    it('should not call rollAttack when onCombatSuperioritySelected returns rallyChoice modal', async () => {
+      onCombatSuperioritySelected.mockResolvedValue({
+        type: 'modal',
+        modalName: 'rallyChoice',
+        payload: { test: true },
+      });
 
-  it('should not call rollAttack when rollAttack callback is null (multi-maneuver)', async () => {
-    onCombatSuperioritySelected.mockResolvedValue({
-      type: 'attack_roll',
-      payload: {
-        attack: { name: 'Parry', hitBonus: 5, damageFormula: '1d6+2', damageType: 'Bludgeoning' },
-        targetName: 'Goblin',
-      },
-      context: { superiorityDieValue: 3 },
+      const { result: hookResult } = renderHook(
+        () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
+      );
+
+      act(() => {
+        hookResult.current.setCombatSuperiorityModal({ action: { name: 'Rally' } });
+      });
+
+      await act(async () => {
+        await hookResult.current.handleCombatSuperiorityConfirm(['Rally']);
+      });
+
+      expect(mockRollAttack).not.toHaveBeenCalled();
     });
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, null, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Parry' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm(['Parry']);
-    });
-
-    expect(mockRollAttack).not.toHaveBeenCalled();
-  });
-
-  it('should handle attack_roll with zero superiorityDieValue', async () => {
-    const attackPayload = {
-      attack: { name: 'Test', hitBonus: 5, damageFormula: '1d4+1', damageType: 'Piercing' },
-      targetName: 'Skeleton',
-    };
-
-    executeManeuver.mockResolvedValue({
-      type: 'attack_roll',
-      payload: attackPayload,
-      context: { superiorityDieValue: 0, baseDamageFormula: '1d4+1' },
-    });
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Test');
-    });
-
-    expect(mockRollAttack).toHaveBeenCalledWith(
-      'Test',
-      5,
-      expect.objectContaining({
-        autoDamageFormula: '1d4+1',
-        superiorityDieValue: 0,
-      })
-    );
-  });
-
-  it('should handle attack_roll with no baseDamageFormula', async () => {
-    executeManeuver.mockResolvedValue({
-      type: 'attack_roll',
-      payload: {
-        attack: { name: 'Test', hitBonus: 5, damageType: 'Slashing' },
-        targetName: 'Zombie',
-      },
-      context: { superiorityDieValue: 3 },
-    });
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Test');
-    });
-
-    expect(mockRollAttack).toHaveBeenCalledWith(
-      'Test',
-      8,
-      expect.objectContaining({
-        autoDamageFormula: null,
-        superiorityDieValue: 3,
-      })
-    );
-  });
-
-  it('should handle attack_roll with no attack.damageFormula', async () => {
-    executeManeuver.mockResolvedValue({
-      type: 'attack_roll',
-      payload: {
-        attack: { name: 'Test', hitBonus: 5, damageType: 'Slashing' },
-        targetName: 'Zombie',
-      },
-      context: { superiorityDieValue: 3 },
-    });
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Test');
-    });
-
-    expect(mockRollAttack).toHaveBeenCalledWith(
-      'Test',
-      8,
-      expect.objectContaining({
-        autoDamageFormula: null,
-      })
-    );
-  });
-
-  it('should handle attack_roll with no context superiorityDieValue', async () => {
-    executeManeuver.mockResolvedValue({
-      type: 'attack_roll',
-      payload: {
-        attack: { name: 'Test', hitBonus: 5, damageFormula: '1d6+2', damageType: 'Slashing' },
-        targetName: 'Zombie',
-      },
-    });
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Test');
-    });
-
-    expect(mockRollAttack).toHaveBeenCalledWith(
-      'Test',
-      5,
-      expect.objectContaining({
-        superiorityDieValue: 0,
-      })
-    );
-  });
-
-  it('should default damageType to Slashing when not provided', async () => {
-    executeManeuver.mockResolvedValue({
-      type: 'attack_roll',
-      payload: {
-        attack: { name: 'Test', hitBonus: 5 },
-        targetName: 'Zombie',
-      },
-    });
-
-    const { result } = renderHook(
-      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage)
-    );
-
-    act(() => {
-      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
-    });
-
-    await act(async () => {
-      await result.current.handleCombatSuperiorityConfirm([], 'Test');
-    });
-
-    expect(mockRollAttack).toHaveBeenCalledWith(
-      'Test',
-      5,
-      expect.objectContaining({
-        damageType: 'Slashing',
-      })
-    );
   });
 });

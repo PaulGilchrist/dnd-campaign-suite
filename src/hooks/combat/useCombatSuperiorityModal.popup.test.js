@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useCombatSuperiorityModal } from './useCombatSuperiorityModal.js';
@@ -33,6 +34,8 @@ vi.mock('../../services/automation/handlers/class-fighter-rogue/combatSuperiorit
   onCombatSuperioritySelected: vi.fn(),
 }));
 
+import { executeManeuver } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+
 describe('useCombatSuperiorityModal - showPopup callback', () => {
   const mockPlayerStats = { name: 'Thorin', level: 5 };
   const mockCampaignName = 'test-campaign';
@@ -44,53 +47,183 @@ describe('useCombatSuperiorityModal - showPopup callback', () => {
     vi.clearAllMocks();
   });
 
-  it('should call onPopupHtml when showPopup is invoked with HTML string', () => {
+  it('should call onPopupHtml with a string payload when showPopup is triggered', async () => {
     const { result } = renderHook(
       () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, mockOnPopupHtml)
     );
+
+    const stringPayload = '<b>Raw HTML</b><br/>No formatting.';
+    executeManeuver.mockResolvedValue({
+      type: 'popup',
+      payload: stringPayload,
+    });
 
     act(() => {
       result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
     });
 
-    // Access the internal showPopup via handleCombatSuperiorityConfirm with a maneuver that triggers popup
-    // For now, just verify the callback is wired by checking the confirm path
-    expect(typeof result.current.handleCombatSuperiorityConfirm).toBe('function');
+    await act(async () => {
+      await result.current.handleCombatSuperiorityConfirm([], 'Test');
+    });
+
+    expect(mockOnPopupHtml).toHaveBeenCalledWith(stringPayload);
   });
 
-  it('should set combatSuperiorityModal state via setCombatSuperiorityModal', () => {
+  it('should call onPopupHtml with formatted HTML when showPopup is triggered with an object payload', async () => {
     const { result } = renderHook(
       () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, mockOnPopupHtml)
     );
 
-    const modalPayload = {
-      action: { name: 'Rally' },
-      knownManeuvers: ['Rally'],
-      selectionMode: false,
-    };
-
-    act(() => {
-      result.current.setCombatSuperiorityModal(modalPayload);
+    const popupPayload = { name: 'Gouging Attack', description: 'Target takes extra damage.' };
+    executeManeuver.mockResolvedValue({
+      type: 'popup',
+      payload: popupPayload,
     });
 
-    expect(result.current.combatSuperiorityModal).toEqual(modalPayload);
+    act(() => {
+      result.current.setCombatSuperiorityModal({ action: { name: 'Gouging Attack' } });
+    });
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityConfirm([], 'Gouging Attack');
+    });
+
+    expect(mockOnPopupHtml).toHaveBeenCalledWith(
+      '<b><i class="fa-solid fa-bolt"></i> Gouging Attack</b><br/>Target takes extra damage.<br/><span class="dice-roll-hint">click to dismiss</span>'
+    );
   });
 
-  it('should clear combatSuperiorityModal when setCombatSuperiorityModal(null) is called', () => {
+  it('should not call onPopupHtml when it is undefined', async () => {
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, undefined)
+    );
+
+    executeManeuver.mockResolvedValue({
+      type: 'popup',
+      payload: { name: 'Test', description: 'Should not error.' },
+    });
+
+    act(() => {
+      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+    });
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityConfirm([], 'Test');
+    });
+
+    expect(mockOnPopupHtml).not.toHaveBeenCalled();
+  });
+
+  it('should not call onPopupHtml when it is null', async () => {
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, null)
+    );
+
+    executeManeuver.mockResolvedValue({
+      type: 'popup',
+      payload: { name: 'Test', description: 'Should not error.' },
+    });
+
+    act(() => {
+      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+    });
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityConfirm([], 'Test');
+    });
+
+    expect(mockOnPopupHtml).not.toHaveBeenCalled();
+  });
+
+  it('should format popup HTML with fallback name when payload has no name', async () => {
     const { result } = renderHook(
       () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, mockOnPopupHtml)
     );
 
-    const modalPayload = { action: { name: 'Rally' } };
+    executeManeuver.mockResolvedValue({
+      type: 'popup',
+      payload: { description: 'No name provided.' },
+    });
 
     act(() => {
-      result.current.setCombatSuperiorityModal(modalPayload);
+      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
     });
-    expect(result.current.combatSuperiorityModal).toEqual(modalPayload);
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityConfirm([], 'Test');
+    });
+
+    expect(mockOnPopupHtml).toHaveBeenCalledWith(
+      '<b><i class="fa-solid fa-bolt"></i> Combat Superiority</b><br/>No name provided.<br/><span class="dice-roll-hint">click to dismiss</span>'
+    );
+  });
+
+  it('should format popup HTML with fallback description when payload has no description', async () => {
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, mockOnPopupHtml)
+    );
+
+    executeManeuver.mockResolvedValue({
+      type: 'popup',
+      payload: { name: 'Test Maneuver' },
+    });
 
     act(() => {
-      result.current.setCombatSuperiorityModal(null);
+      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
     });
-    expect(result.current.combatSuperiorityModal).toBeNull();
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityConfirm([], 'Test');
+    });
+
+    expect(mockOnPopupHtml).toHaveBeenCalledWith(
+      '<b><i class="fa-solid fa-bolt"></i> Test Maneuver</b><br/><br/><span class="dice-roll-hint">click to dismiss</span>'
+    );
+  });
+
+  it('should format popup HTML with fallback name when payload name is empty string', async () => {
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, mockOnPopupHtml)
+    );
+
+    executeManeuver.mockResolvedValue({
+      type: 'popup',
+      payload: { name: '', description: 'Empty name.' },
+    });
+
+    act(() => {
+      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+    });
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityConfirm([], 'Test');
+    });
+
+    expect(mockOnPopupHtml).toHaveBeenCalledWith(
+      '<b><i class="fa-solid fa-bolt"></i> Combat Superiority</b><br/>Empty name.<br/><span class="dice-roll-hint">click to dismiss</span>'
+    );
+  });
+
+  it('should format popup HTML with empty description line when payload description is empty string', async () => {
+    const { result } = renderHook(
+      () => useCombatSuperiorityModal(mockPlayerStats, mockCampaignName, mockRollAttack, mockRollDamage, mockOnPopupHtml)
+    );
+
+    executeManeuver.mockResolvedValue({
+      type: 'popup',
+      payload: { name: 'Test', description: '' },
+    });
+
+    act(() => {
+      result.current.setCombatSuperiorityModal({ action: { name: 'Test' } });
+    });
+
+    await act(async () => {
+      await result.current.handleCombatSuperiorityConfirm([], 'Test');
+    });
+
+    expect(mockOnPopupHtml).toHaveBeenCalledWith(
+      '<b><i class="fa-solid fa-bolt"></i> Test</b><br/><br/><span class="dice-roll-hint">click to dismiss</span>'
+    );
   });
 });

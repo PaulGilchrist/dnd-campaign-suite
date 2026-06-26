@@ -1,3 +1,4 @@
+// @improved-by-ai
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import React from 'react';
@@ -5,147 +6,124 @@ import useSharedPopup from './useSharedPopup.js';
 import { DiceRollContext } from './DiceRollContext.js';
 
 describe('useSharedPopup', () => {
-  describe('initialization', () => {
+  describe('returns expected shape', () => {
     it('should return popupHtml, setPopupHtml, value, and Provider', () => {
       const { result } = renderHook(() => useSharedPopup());
-      expect(result.current.popupHtml).toBeNull();
+
+      expect(result.current).toHaveProperty('popupHtml', null);
       expect(result.current.setPopupHtml).toBeInstanceOf(Function);
       expect(result.current.value).toBeInstanceOf(Object);
-      expect(result.current.Provider).toBe(DiceRollContext.Provider);
+      expect(result.current).toHaveProperty('Provider');
     });
 
-    it('should initialize with popupHtml as null', () => {
+    it('should initialize popupHtml as null', () => {
       const { result } = renderHook(() => useSharedPopup());
       expect(result.current.popupHtml).toBeNull();
     });
 
-    it('should return a function for setPopupHtml', () => {
+    it('should return DiceRollContext.Provider as Provider', () => {
       const { result } = renderHook(() => useSharedPopup());
-      expect(typeof result.current.setPopupHtml).toBe('function');
+      expect(result.current.Provider).toBe(DiceRollContext.Provider);
     });
   });
 
   describe('value object', () => {
-    it('should return a memoized value object', () => {
+    it('should contain popupHtml, setPopupHtml, and _isShared flag', () => {
       const { result } = renderHook(() => useSharedPopup());
-      expect(result.current.value).toEqual({
-        popupHtml: null,
-        setPopupHtml: expect.any(Function),
-        _isShared: true,
-      });
+
+      expect(result.current.value).toEqual(
+        expect.objectContaining({
+          popupHtml: null,
+          setPopupHtml: expect.any(Function),
+          _isShared: true,
+        }),
+      );
     });
 
-    it('should have _isShared set to true on the value object', () => {
+    it('should reflect updated popupHtml in the value object after state change', () => {
       const { result } = renderHook(() => useSharedPopup());
-      expect(result.current.value._isShared).toBe(true);
-    });
+      const html = '<p>test</p>';
 
-    it('should include popupHtml from the hook in the value object', () => {
-      const { result, rerender } = renderHook(() => useSharedPopup());
-      expect(result.current.value.popupHtml).toBeNull();
       act(() => {
-        result.current.setPopupHtml('<p>test</p>');
+        result.current.setPopupHtml(html);
       });
-      rerender();
-      expect(result.current.value.popupHtml).toBe('<p>test</p>');
+
+      expect(result.current.value.popupHtml).toBe(html);
     });
 
-    it('should include setPopupHtml function in the value object', () => {
-      const { result } = renderHook(() => useSharedPopup());
-      expect(typeof result.current.value.setPopupHtml).toBe('function');
-    });
-
-    it('should return the same value object reference when only setPopupHtml is called', () => {
+    it('should return a new value object reference when popupHtml changes', () => {
       const { result } = renderHook(() => useSharedPopup());
       const initialValue = result.current.value;
+
       act(() => {
-        result.current.setPopupHtml('<p>new html</p>');
-      });
-      // value is memoized with [popupHtml] dependency, so it changes when popupHtml changes
-      // but setPopupHtml is the same function reference
-      expect(result.current.value.setPopupHtml).toBe(initialValue.setPopupHtml);
-    });
-  });
-
-  describe('Provider', () => {
-    it('should return DiceRollContext.Provider as the Provider', () => {
-      const { result } = renderHook(() => useSharedPopup());
-      expect(result.current.Provider).toBe(DiceRollContext.Provider);
-    });
-
-    it('should allow consuming the Provider value via useDiceRollPopup', () => {
-      const { result } = renderHook(() => useSharedPopup());
-      const Provider = result.current.Provider;
-
-      const ConsumerHook = () => {
-        const ctx = React.useContext(DiceRollContext);
-        return ctx;
-      };
-
-      const { result: consumerResult } = renderHook(() => ConsumerHook(), {
-        wrapper: ({ children }) => (
-          <Provider value={result.current.value}>
-            {children}
-          </Provider>
-        ),
+        result.current.setPopupHtml('<p>changed</p>');
       });
 
-      expect(consumerResult.current._isShared).toBe(true);
-      expect(consumerResult.current.popupHtml).toBeNull();
-      expect(typeof consumerResult.current.setPopupHtml).toBe('function');
+      expect(result.current.value).not.toBe(initialValue);
+    });
+
+    it('should keep the same setPopupHtml function reference across updates', () => {
+      const { result } = renderHook(() => useSharedPopup());
+      const initialFn = result.current.value.setPopupHtml;
+
+      act(() => {
+        result.current.setPopupHtml('<p>changed</p>');
+      });
+
+      expect(result.current.value.setPopupHtml).toBe(initialFn);
     });
   });
 
   describe('popupHtml state updates', () => {
-    it('should update popupHtml when setPopupHtml is called with HTML string', () => {
+    it('should update to any HTML string value', () => {
       const { result } = renderHook(() => useSharedPopup());
+      const html = '<div class="popup"><p>Test</p><span>Content</span></div>';
+
       act(() => {
-        result.current.setPopupHtml('<div>test</div>');
+        result.current.setPopupHtml(html);
       });
-      expect(result.current.popupHtml).toBe('<div>test</div>');
+
+      expect(result.current.popupHtml).toBe(html);
     });
 
-    it('should update popupHtml when setPopupHtml is called with null', () => {
+    it('should update to null to clear the popup', () => {
       const { result } = renderHook(() => useSharedPopup());
+
       act(() => {
         result.current.setPopupHtml('<div>test</div>');
       });
       expect(result.current.popupHtml).toBe('<div>test</div>');
+
       act(() => {
         result.current.setPopupHtml(null);
       });
       expect(result.current.popupHtml).toBeNull();
     });
 
-    it('should update popupHtml when setPopupHtml is called with empty string', () => {
+    it('should update to an empty string', () => {
       const { result } = renderHook(() => useSharedPopup());
+
       act(() => {
         result.current.setPopupHtml('');
       });
+
       expect(result.current.popupHtml).toBe('');
     });
 
-    it('should update popupHtml when setPopupHtml is called with complex HTML', () => {
-      const html = '<div class="popup"><p>Test</p><span>Content</span></div>';
+    it('should keep popupHtml and value.popupHtml in sync', () => {
       const { result } = renderHook(() => useSharedPopup());
+      const html = '<p>synced</p>';
+
       act(() => {
         result.current.setPopupHtml(html);
       });
-      expect(result.current.popupHtml).toBe(html);
-    });
 
-    it('should update value object popupHtml in sync with popupHtml', () => {
-      const { result } = renderHook(() => useSharedPopup());
-      act(() => {
-        result.current.setPopupHtml('<p>synced</p>');
-      });
-      expect(result.current.popupHtml).toBe('<p>synced</p>');
-      expect(result.current.value.popupHtml).toBe('<p>synced</p>');
+      expect(result.current.popupHtml).toBe(result.current.value.popupHtml);
     });
   });
 
-  describe('integration with DiceRollContext consumers', () => {
-    it('should provide correct context to a consumer component', () => {
+  describe('context provider integration', () => {
+    it('should provide correct context to a consumer wrapped in Provider', () => {
       const { result } = renderHook(() => useSharedPopup());
       const Provider = result.current.Provider;
 
@@ -157,15 +135,37 @@ describe('useSharedPopup', () => {
 
       renderHook(() => CaptureContext(), {
         wrapper: ({ children }) => (
-          <Provider value={result.current.value}>
-            {children}
-          </Provider>
+          <Provider value={result.current.value}>{children}</Provider>
         ),
       });
 
       expect(capturedContext._isShared).toBe(true);
       expect(capturedContext.popupHtml).toBeNull();
       expect(typeof capturedContext.setPopupHtml).toBe('function');
+    });
+
+    it('should propagate updated popupHtml to context consumers', () => {
+      const { result } = renderHook(() => useSharedPopup());
+      const Provider = result.current.Provider;
+
+      let capturedContext = null;
+      const CaptureContext = () => {
+        capturedContext = React.useContext(DiceRollContext);
+        return null;
+      };
+
+      const { rerender } = renderHook(() => CaptureContext(), {
+        wrapper: ({ children }) => (
+          <Provider value={result.current.value}>{children}</Provider>
+        ),
+      });
+
+      act(() => {
+        result.current.setPopupHtml('<p>updated</p>');
+      });
+      rerender();
+
+      expect(capturedContext.popupHtml).toBe('<p>updated</p>');
     });
 
     it('should allow multiple consumers to read the same context', () => {
@@ -175,56 +175,25 @@ describe('useSharedPopup', () => {
       let ctx1 = null;
       let ctx2 = null;
 
-      const Capture1 = () => {
+      const CaptureMultiple = () => {
         ctx1 = React.useContext(DiceRollContext);
-        return null;
-      };
-      const Capture2 = () => {
         ctx2 = React.useContext(DiceRollContext);
         return null;
       };
 
-      const CombinedCapture = () => {
-        Capture1();
-        Capture2();
-        return null;
-      };
-
-      renderHook(() => CombinedCapture(), {
+      renderHook(() => CaptureMultiple(), {
         wrapper: ({ children }) => (
-          <Provider value={result.current.value}>
-            {children}
-          </Provider>
+          <Provider value={result.current.value}>{children}</Provider>
         ),
       });
 
+      expect(ctx1).toBe(ctx2);
       expect(ctx1._isShared).toBe(true);
-      expect(ctx2._isShared).toBe(true);
-      expect(ctx1).toEqual(ctx2);
     });
   });
 
-  describe('value memoization', () => {
-    it('should create a new value object when popupHtml changes', () => {
-      const { result } = renderHook(() => useSharedPopup());
-      const initialValue = result.current.value;
-      act(() => {
-        result.current.setPopupHtml('<p>changed</p>');
-      });
-      // After state update, the memoized value should have a new reference
-      // because popupHtml changed in the dependency array
-      expect(result.current.value).not.toBe(initialValue);
-    });
-
-    it('should keep the same value object reference when popupHtml does not change', () => {
-      const { result } = renderHook(() => useSharedPopup());
-      // The key assertion is that the value always has _isShared: true
-      expect(result.current.value._isShared).toBe(true);
-    });
-  });
-
-  describe('multiple callers', () => {
-    it('should create independent popup states for each caller', () => {
+  describe('independent instances', () => {
+    it('should maintain independent popupHtml states across callers', () => {
       const { result: result1 } = renderHook(() => useSharedPopup());
       const { result: result2 } = renderHook(() => useSharedPopup());
 
@@ -239,20 +208,11 @@ describe('useSharedPopup', () => {
       expect(result2.current.popupHtml).toBeNull();
     });
 
-    it('should have independent value objects for each caller', () => {
+    it('should return distinct value objects for each caller', () => {
       const { result: result1 } = renderHook(() => useSharedPopup());
       const { result: result2 } = renderHook(() => useSharedPopup());
 
       expect(result1.current.value).not.toBe(result2.current.value);
-    });
-
-    it('should have independent Providers for each caller', () => {
-      const { result: result1 } = renderHook(() => useSharedPopup());
-      const { result: result2 } = renderHook(() => useSharedPopup());
-
-      // Both return the same React context Provider reference
-      expect(result1.current.Provider).toBe(result2.current.Provider);
-      expect(result1.current.Provider).toBe(DiceRollContext.Provider);
     });
   });
 });

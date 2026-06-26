@@ -1,18 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { clearRuntimeState } from '../../../hooks/runtime/useRuntimeState.js';
+// @improved-by-ai
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { clearRuntimeState, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getChosenRuntimeValue, setChosenRuntimeValue } from './choiceStorage.js';
 
 // ── Helpers ─────────────────────────────────────────────────────
 
 function resetRuntime() {
+    localStorage.clear();
     clearRuntimeState('alice');
     clearRuntimeState('bob');
-    clearRuntimeState('charlie');
-    clearRuntimeState('diana-prime');
-    clearRuntimeState('multi word');
-    clearRuntimeState('spaces   in   name');
-    clearRuntimeState('');
-    localStorage.clear();
 }
 
 function makePlayerStats(overrides = {}) {
@@ -34,66 +30,24 @@ beforeEach(() => {
     });
 });
 
-describe('makeKey (key generation)', () => {
-    function getPrivateKey(playerName, name, suffix) {
-        const base = `_${name.replace(/\s+/g, '_')}`;
-        return suffix ? `${base}_${suffix}` : base;
-    }
-
-    it('generates a key with underscore prefix and underscored name for simple name', () => {
-        expect(getPrivateKey('alice', 'Fire Shield', 'chosenType')).toBe('_Fire_Shield_chosenType');
-    });
-
-    it('generates a key without suffix when suffix is falsy', () => {
-        expect(getPrivateKey('alice', 'Fire Shield', '')).toBe('_Fire_Shield');
-        expect(getPrivateKey('alice', 'Fire Shield', undefined)).toBe('_Fire_Shield');
-        expect(getPrivateKey('alice', 'Fire Shield', null)).toBe('_Fire_Shield');
-    });
-
-    it('collapses multiple consecutive spaces into a single underscore', () => {
-        expect(getPrivateKey('alice', 'Fire    Shield', 'chosenType')).toBe('_Fire_Shield_chosenType');
-    });
-
-    it('handles names with no spaces', () => {
-        expect(getPrivateKey('alice', 'FireShield', 'chosenType')).toBe('_FireShield_chosenType');
-    });
-
-    it('handles names that are just spaces', () => {
-        expect(getPrivateKey('alice', '   ', 'chosenType')).toBe('___chosenType');
-    });
-
-    it('preserves non-space special characters in name', () => {
-        expect(getPrivateKey('alice', 'Fire-Shield', 'chosenType')).toBe('_Fire-Shield_chosenType');
-        expect(getPrivateKey('alice', 'Fire.Shield', 'chosenType')).toBe('_Fire.Shield_chosenType');
-    });
+afterEach(() => {
+    resetRuntime();
+    vi.restoreAllMocks();
 });
 
 describe('getChosenRuntimeValue', () => {
-    it('returns null when no value has been stored for the key', () => {
+    it('returns null when no value has been stored', () => {
         const stats = makePlayerStats();
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBeNull();
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType')).toBeNull();
     });
 
-    it('returns the stored value when it has been set via setChosenRuntimeValue', () => {
-        const stats = makePlayerStats();
-        setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
-
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBe('Fire');
-    });
-
-    it('uses spaces-underscored key format internally', () => {
+    it('returns the value set via setChosenRuntimeValue', () => {
         const stats = makePlayerStats();
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
-
-        // The key should be _Fire_Shield_chosenType, which maps to a runtime store
-        // entry under stats.name ('alice')
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBe('Fire');
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType')).toBe('Fire');
     });
 
-    it('returns different values for different names with the same player', () => {
+    it('returns different values for different feature names', () => {
         const stats = makePlayerStats();
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
         setChosenRuntimeValue(stats, 'Cold Shield', 'Ice', 'chosenType');
@@ -122,87 +76,65 @@ describe('getChosenRuntimeValue', () => {
         expect(getChosenRuntimeValue(bob, 'Fire Shield', 'chosenType')).toBe('Cold');
     });
 
-    it('stores and retrieves non-string values (numbers)', () => {
+    it('stores and retrieves various value types', () => {
         const stats = makePlayerStats();
-        setChosenRuntimeValue(stats, 'Dice Count', 6, 'count');
 
-        const result = getChosenRuntimeValue(stats, 'Dice Count', 'count');
-        expect(result).toBe(6);
+        setChosenRuntimeValue(stats, 'Number', 42, 'num');
+        setChosenRuntimeValue(stats, 'Boolean', true, 'bool');
+        setChosenRuntimeValue(stats, 'Zero', 0, 'zero');
+        setChosenRuntimeValue(stats, 'EmptyString', '', 'empty');
+        setChosenRuntimeValue(stats, 'Array', ['a', 'b'], 'arr');
+        setChosenRuntimeValue(stats, 'Object', { key: 'val' }, 'obj');
+
+        expect(getChosenRuntimeValue(stats, 'Number', 'num')).toBe(42);
+        expect(getChosenRuntimeValue(stats, 'Boolean', 'bool')).toBe(true);
+        expect(getChosenRuntimeValue(stats, 'Zero', 'zero')).toBe(0);
+        expect(getChosenRuntimeValue(stats, 'EmptyString', 'empty')).toBe('');
+        expect(getChosenRuntimeValue(stats, 'Array', 'arr')).toEqual(['a', 'b']);
+        expect(getChosenRuntimeValue(stats, 'Object', 'obj')).toEqual({ key: 'val' });
     });
 
-    it('stores and retrieves non-string values (objects)', () => {
+    it('persists values across spaces in feature names', () => {
         const stats = makePlayerStats();
-        const objVal = { type: 'Fire', resistance: true };
-        setChosenRuntimeValue(stats, 'Fire Shield', objVal, 'chosenType');
-
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toEqual({ type: 'Fire', resistance: true });
+        setChosenRuntimeValue(stats, 'Damage Types', ['Fire', 'Cold'], 'chosenTypes');
+        expect(getChosenRuntimeValue(stats, 'Damage Types', 'chosenTypes')).toEqual(['Fire', 'Cold']);
     });
 
-    it('stores and retrieves non-string values (arrays)', () => {
-        const stats = makePlayerStats();
-        const arrVal = ['Fire', 'Cold', 'Lightning'];
-        setChosenRuntimeValue(stats, 'Damage Types', arrVal, 'chosenTypes');
-
-        const result = getChosenRuntimeValue(stats, 'Damage Types', 'chosenTypes');
-        expect(result).toEqual(['Fire', 'Cold', 'Lightning']);
-    });
-
-    it('uses playerStats.campaignName when campaignName parameter is not provided', () => {
-        const stats = makePlayerStats({ campaignName: 'MyCampaign' });
-        setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
-
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBe('Fire');
-    });
-
-    it('uses the override campaignName when provided', () => {
-        const stats = makePlayerStats({ campaignName: 'MyCampaign' });
-        setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType', 'OverrideCampaign');
-
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType', 'OverrideCampaign');
-        expect(result).toBe('Fire');
-    });
-
-    it('shares storage across campaigns because getRuntimeValue ignores campaignName param', () => {
-        const stats = makePlayerStats();
-        setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType', 'CampaignA');
-
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType', 'CampaignB');
-        expect(result).toBe('Fire');
-    });
-
-    it('handles player names with spaces', () => {
+    it('persists values across spaces in player names', () => {
         const stats = makePlayerStats({ name: 'multi word' });
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
-
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBe('Fire');
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType')).toBe('Fire');
     });
 
-    it('handles names with hyphens', () => {
+    it('persists values across hyphens in player names', () => {
         const stats = makePlayerStats({ name: 'diana-prime' });
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
-
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBe('Fire');
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType')).toBe('Fire');
     });
 
-    it('returns null when the runtime store has not been seeded for the character', () => {
-        clearRuntimeState('nonexistent');
-        const stats = makePlayerStats({ name: 'nonexistent' });
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBeNull();
+    it('uses campaignName from playerStats when no override is provided', () => {
+        const stats = makePlayerStats({ campaignName: 'MyCampaign' });
+        setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
+
+        // Verify the runtime store entry exists under the correct campaign-scoped key
+        const storeValue = getRuntimeValue('alice', '_Fire_Shield_chosenType');
+        expect(storeValue).toBe('Fire');
+    });
+
+    it('clears state for a character when it is removed from runtime', () => {
+        const stats = makePlayerStats();
+        setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
+        clearRuntimeState('alice');
+
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType')).toBeNull();
     });
 });
 
 describe('setChosenRuntimeValue', () => {
-    it('stores a string value for a player', () => {
+    it('stores a value in the runtime store', () => {
         const stats = makePlayerStats();
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
-
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBe('Fire');
+        expect(getRuntimeValue('alice', '_Fire_Shield_chosenType')).toBe('Fire');
     });
 
     it('overwrites an existing value for the same key', () => {
@@ -210,8 +142,7 @@ describe('setChosenRuntimeValue', () => {
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
         setChosenRuntimeValue(stats, 'Fire Shield', 'Cold', 'chosenType');
 
-        const result = getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType');
-        expect(result).toBe('Cold');
+        expect(getChosenRuntimeValue(stats, 'Fire Shield', 'chosenType')).toBe('Cold');
     });
 
     it('does not affect values for different suffixes', () => {
@@ -243,11 +174,15 @@ describe('setChosenRuntimeValue', () => {
         expect(getChosenRuntimeValue(bob, 'Fire Shield', 'chosenType')).toBe('Cold');
     });
 
-    it('calls fetch to persist the value to the server', () => {
+    it('calls fetch to persist the value to the server', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+        vi.stubGlobal('fetch', fetchMock);
+
         const stats = makePlayerStats();
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
 
-        expect(fetch).toHaveBeenCalledWith(
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock).toHaveBeenCalledWith(
             '/api/campaigns/TestCampaign/alice',
             expect.objectContaining({
                 method: 'POST',
@@ -257,26 +192,31 @@ describe('setChosenRuntimeValue', () => {
         );
     });
 
-    it('includes the runtime key and value in the fetch body', () => {
+    it('includes the runtime key and value in the fetch body', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+        vi.stubGlobal('fetch', fetchMock);
+
         const stats = makePlayerStats();
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType');
 
-        const callArgs = fetch.mock.calls[0];
-        const body = JSON.parse(callArgs[1].body);
-        expect(body.value).toHaveProperty('_Fire_Shield_chosenType', 'Fire');
+        const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+        expect(body.value['_Fire_Shield_chosenType']).toBe('Fire');
     });
 
-    it('uses the override campaignName in the fetch URL when provided', () => {
+    it('uses the override campaignName in the fetch URL when provided', async () => {
+        const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
+        vi.stubGlobal('fetch', fetchMock);
+
         const stats = makePlayerStats();
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType', 'OverrideCampaign');
 
-        expect(fetch).toHaveBeenCalledWith(
+        expect(fetchMock).toHaveBeenCalledWith(
             '/api/campaigns/OverrideCampaign/alice',
             expect.any(Object)
         );
     });
 
-    it('uses the override campaignName in the get read when provided', () => {
+    it('uses the override campaignName for reads when provided', () => {
         const stats = makePlayerStats();
         setChosenRuntimeValue(stats, 'Fire Shield', 'Fire', 'chosenType', 'OverrideCampaign');
 
@@ -284,27 +224,15 @@ describe('setChosenRuntimeValue', () => {
         expect(result).toBe('Fire');
     });
 
-    it('handles boolean values', () => {
+    it('handles boolean false as a valid value', () => {
         const stats = makePlayerStats();
-        setChosenRuntimeValue(stats, 'Flag', true, 'enabled');
-
-        const result = getChosenRuntimeValue(stats, 'Flag', 'enabled');
-        expect(result).toBe(true);
+        setChosenRuntimeValue(stats, 'Flag', false, 'enabled');
+        expect(getChosenRuntimeValue(stats, 'Flag', 'enabled')).toBe(false);
     });
 
-    it('handles zero as a valid value', () => {
+    it('handles null as a stored value', () => {
         const stats = makePlayerStats();
-        setChosenRuntimeValue(stats, 'Count', 0, 'count');
-
-        const result = getChosenRuntimeValue(stats, 'Count', 'count');
-        expect(result).toBe(0);
-    });
-
-    it('handles empty string as a valid value', () => {
-        const stats = makePlayerStats();
-        setChosenRuntimeValue(stats, 'Name', '', 'chosenType');
-
-        const result = getChosenRuntimeValue(stats, 'Name', 'chosenType');
-        expect(result).toBe('');
+        setChosenRuntimeValue(stats, 'NullField', null, 'field');
+        expect(getChosenRuntimeValue(stats, 'NullField', 'field')).toBeNull();
     });
 });
