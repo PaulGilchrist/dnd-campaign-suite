@@ -205,7 +205,7 @@ describe('createLogAndShow - Weapon Mastery', () => {
             expect(applyMasteryEffect).toHaveBeenCalledWith('Push', { name: 'TestFighter' }, 'test-campaign', 'Goblin');
         });
 
-        it('logs Cleave and Nick via logEntry without applying', async () => {
+        it('applies Cleave via applyMasteryEffect and logs Nick only', async () => {
             collectWeaponMastery.mockReturnValue({ baseMastery: 'Cleave', extraMasteries: ['Nick'] });
             const fn = createFn();
             await fn('Longsword', 5, 'attack', {
@@ -215,10 +215,7 @@ describe('createLogAndShow - Weapon Mastery', () => {
                 weaponName: 'Longsword',
                 playerStats: { name: 'TestFighter' },
             });
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'ability_use',
-                abilityName: 'Cleave',
-            }));
+            expect(applyMasteryEffect).toHaveBeenCalledWith('Cleave', expect.anything(), 'test-campaign', 'Goblin');
             expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
                 type: 'ability_use',
                 abilityName: 'Nick',

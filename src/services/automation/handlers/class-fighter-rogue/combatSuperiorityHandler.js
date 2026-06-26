@@ -908,7 +908,6 @@ export async function executeBonusActionManeuver(action, playerStats, campaignNa
             appliedRound: currentRound,
         };
         await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
-        console.log(`[FeintingAttack] Stored effect for ${playerStats.name} vs ${targetName}: dieValue=${dieValue}, effect=${JSON.stringify(newEffect)}`);
         description += ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
     }
 
@@ -1915,7 +1914,6 @@ export async function executeManeuver(action, playerStats, campaignName, maneuve
             appliedRound: currentRound,
         };
         await setRuntimeValue(campaignName, 'targetEffects', [...storedEffects, newEffect], campaignName);
-        console.log(`[FeintingAttack/executeManeuver] Stored effect for ${playerStats.name} vs ${targetName}: dieValue=${dieValue}, effect=${JSON.stringify(newEffect)}`);
         description += ` You have Advantage on your next attack roll against the target. If it hits, add ${dieValue} to the damage roll.`;
     }
 

@@ -269,7 +269,7 @@ export function createLogAndShow(deps) {
                     if (alreadyApplied === context.targetName) {
                         continue;
                     }
-                    if (masteryName === 'Cleave' || masteryName === 'Nick') {
+                    if (masteryName === 'Nick') {
                         const desc = `${context.attackerName} used ${masteryName} on ${context.targetName}`;
                         logEntry({
                             type: 'ability_use',

@@ -247,9 +247,7 @@ export async function applyMasteryEffect(masteryName, playerStats, campaignName,
         }
     }
     const updatedEffects = [...storedEffects, newEffect];
-    console.log('[weaponMastery] Setting targetEffects: newEffect=%o updatedEffectsCount=%d', newEffect, updatedEffects.length);
     setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
-    console.log('[weaponMastery] targetEffects set DONE: mastery=%s target=%s effect=%s', masteryName, targetName, mastery.effect);
 
     // Set up save-result handler for Topple to apply Prone condition on failure
     if (masteryName === 'Topple' && promptId && targetName) {

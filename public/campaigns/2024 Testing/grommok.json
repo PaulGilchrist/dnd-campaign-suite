@@ -89,7 +89,6 @@
     ],
     "equipped": [
       "Longbow",
-      "+1 Longsword",
       "Shield",
       "Plate Armor",
       "Greataxe",
@@ -97,7 +96,8 @@
       "Scimitar",
       "Warhammer",
       "Battleaxe",
-      "Rapier"
+      "Rapier",
+      "Lognsword"
     ],
     "gold": 10,
     "magicItems": []

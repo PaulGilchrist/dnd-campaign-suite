@@ -90,14 +90,12 @@ export default function useDamageClick({
         // Precision Attack: if attack missed, offer to add superiority die to the attack roll
         const isMiss = popupHtml?.hit === false && popupHtml?.isCrit !== true;
         if (isMiss && setAttackRiderManeuverPrompt) {
-            console.log('[PrecisionAttack] isMiss detected. playerStats.name=', playerStats?.name, 'popupHtml.targetAc=', popupHtml?.targetAc, 'popupHtml.bonus=', popupHtml?.bonus, 'popupHtml.rolls=', popupHtml?.rolls);
             const attackInfo = {
                 weaponType: attack.weaponType,
                 isUnarmedStrike: attack.weaponType === 'unarmed',
                 targetName: popupHtml?.targetName || null,
             };
             const availableManeuvers = await getAttackRiderOptionsByContext(playerStats, campaignName, attackInfo, 'miss');
-            console.log('[PrecisionAttack] availableManeuvers=', availableManeuvers?.map(m => m.name));
             if (availableManeuvers.length > 0) {
                 setAttackRiderManeuverPrompt({
                     maneuvers: availableManeuvers,
@@ -1170,7 +1168,6 @@ export default function useDamageClick({
         if (attack.weaponType === 'melee') {
             const available = collectWeaponMastery(attack.name, playerStats);
             const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
-            console.log('[useDamageClick] Mastery: weapon=%s base=%s extra=%o', attack.name, available.baseMastery, allMasteries);
             const cs = await getCombatContext(campaignName);
             const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
             const targetName = target?.name || null;
@@ -1180,7 +1177,7 @@ export default function useDamageClick({
                 if (!mastery) continue;
                 if (masteryName === 'Graze') continue;
                 if (targetName) {
-                    if (masteryName === 'Cleave' || masteryName === 'Nick') {
+                    if (masteryName === 'Nick') {
                         const desc = `${playerStats.name} used ${masteryName} on ${targetName}`;
                         addEntry(campaignName, {
                             type: 'ability_use',
@@ -1269,7 +1266,6 @@ export default function useDamageClick({
 
     const handleAttackRiderManeuverUse = async (maneuver, attack, popupHtmlData, currentFormula, currentTotal, currentRolls) => {
         const maneuverName = maneuver?.name || maneuver;
-        console.log(`[PrecisionAttack] handleAttackRiderManeuverUse called: maneuver=${maneuverName}, isMiss=${popupHtmlData?.isMiss}, popupHtml keys=${popupHtml ? Object.keys(popupHtml).join(',') : 'null'}, popupHtmlData keys=${popupHtmlData ? Object.keys(popupHtmlData).join(',') : 'null'}`);
         const attackInfo = {
             weaponType: attack.weaponType,
             isUnarmedStrike: attack.weaponType === 'unarmed',
@@ -1283,7 +1279,6 @@ export default function useDamageClick({
         let updatedRolls = [...currentRolls];
 
         if (popupHtmlData?.isMiss && popupHtml) {
-            console.log(`[PrecisionAttack] isMiss branch entered. maneuver.effect=${maneuver?.effect}, maneuver=`, maneuver);
             if (maneuver && maneuver.effect === 'attack_roll_bonus') {
                 const dieRoll = rollExpression(maneuver.dieExpression || 'superiority_die');
                 const dieValue = dieRoll?.total || evaluateAutoExpression(maneuver.dieExpression || 'superiority_die', playerStats);
@@ -1295,7 +1290,6 @@ export default function useDamageClick({
                 const newHit = newTotal >= targetAC;
                 const isNatural20 = origD20 === 20;
                 const wasCrit = popupHtml.isCrit;
-                console.log(`[PrecisionAttack] dieValue=${dieValue}, origD20=${origD20}, origBonus=${origBonus}, newTotal=${newTotal}, targetAC=${targetAC}, newHit=${newHit}`);
 
                 const updatedPopup = {
                     ...popupHtml,

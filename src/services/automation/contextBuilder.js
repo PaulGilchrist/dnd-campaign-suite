@@ -203,7 +203,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             );
             if (distractingEffect) {
                 forcedMode = 'advantage';
-                console.log(`[buildAttackContextSync] distracting_strike_advantage for ${playerName} vs ${targetName}`);
                 const cleanedEffects = storedEffects.filter(
                     te => !(te.effect === 'distracting_strike_advantage' && te.target === targetName && te.source !== playerName)
                 );
@@ -219,7 +218,6 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             );
             if (vexEffect) {
                 forcedMode = 'advantage';
-                console.log(`[buildAttackContextSync] next_attack_advantage for ${playerName} vs ${targetName} (source: ${vexEffect.source})`);
                 const cleanedEffects = storedEffects.filter(
                     te => !(te.effect === 'next_attack_advantage' && te.target === playerName && te.vexTarget === targetName)
                 );

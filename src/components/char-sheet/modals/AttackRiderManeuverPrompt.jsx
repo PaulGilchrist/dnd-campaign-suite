@@ -9,9 +9,7 @@ function AttackRiderManeuverPrompt({ maneuvers, attack, popupHtml, onUse, onSkip
 
     const handleUse = async () => {
         if (!selected) return;
-        console.log('[AttackRiderManeuverPrompt] handleUse: selected=', selected, 'selectedManeuver=', selectedManeuver, 'popupHtml keys=', popupHtml ? Object.keys(popupHtml) : 'null');
         const res = await onUse(selectedManeuver, attack, popupHtml);
-        console.log('[AttackRiderManeuverPrompt] onUse returned:', res);
         setResult(res);
         setApplied(true);
     };
