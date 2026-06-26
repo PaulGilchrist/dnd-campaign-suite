@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { getCategories } from '../../services/character/featureCategories.js'
-import { collectWeaponMastery } from '../../services/combat/automation/automationService.js'
+import { collectWeaponMastery } from '../../services/combat/automation/automationService.js';
+import { applyPostDamageMasteryEffects } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import { sanitizeHtml } from '../../services/ui/sanitize.js';
 import useLoggedDiceRoll from '../../hooks/combat/useLoggedDiceRoll.js'
 import { useDiceRollPopup } from '../../hooks/combat/DiceRollContext.js'
@@ -178,6 +179,13 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                                     setCleaveSecondTargets(secondTargets);
                                     setShowCleaveTargetSelection(true);
                                 }
+                            }
+
+                            // Apply other post-damage mastery effects (Sap, Slow, Vex, Push, Topple, Nick)
+                            try {
+                                await applyPostDamageMasteryEffects(lastAttack.attackName, playerStats, campaignName, combatSummary);
+                            } catch (e) {
+                                console.error('[Mastery] Post-damage mastery error:', e);
                             }
                         }
                     } catch (e) {

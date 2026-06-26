@@ -3,6 +3,7 @@ import { addEntry } from '../../../ui/logService.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../rules/combat/damageUtils.js';
 import { getCurrentCombatRound } from '../../../../services/encounters/combatData.js';
 import { createSaveListener } from '../../../automation/common/savePrompt.js';
+import { collectWeaponMastery } from '../../../combat/automation/automationService.js';
 const MASTERY_EFFECTS = {
     Push: {
         label: 'Push (10 ft)',
@@ -83,6 +84,34 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             availableMasteries,
         },
     };
+}
+
+export async function applyPostDamageMasteryEffects(attackName, playerStats, campaignName, combatSummary) {
+    const available = collectWeaponMastery(attackName, playerStats);
+    const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+    const targetName = combatSummary?.lastAttack?.targetName;
+    if (!targetName) return;
+
+    for (const masteryName of allMasteries) {
+        const mastery = MASTERY_EFFECTS[masteryName];
+        if (!mastery) continue;
+        if (masteryName === 'Graze') continue;
+        if (masteryName === 'Nick') {
+            const desc = `${playerStats.name} used ${masteryName} on ${targetName}`;
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: masteryName,
+                description: desc,
+                targetName: targetName,
+            }).catch(() => {});
+            continue;
+        }
+        const alreadyApplied = getRuntimeValue(campaignName, `_${masteryName}_appliedTarget`, campaignName);
+        if (alreadyApplied === targetName) { continue; }
+        setRuntimeValue(campaignName, `_${masteryName}_appliedTarget`, targetName, campaignName);
+        await applyMasteryEffect(masteryName, playerStats, campaignName, targetName);
+    }
 }
 
 export async function applyMasteryEffect(masteryName, playerStats, campaignName, targetName) {

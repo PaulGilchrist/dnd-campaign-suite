@@ -50,7 +50,6 @@ import { getCurrentCombatRound, loadCombatSummary } from '../../services/encount
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
 import { getActiveBuffs } from '../../services/automation/common/buffToggle.js';
 import { collectWeaponMastery, hasTwoWeaponFighting } from '../../services/combat/automation/automationService.js';
-import { addEntry } from '../../services/ui/logService.js';
 
 const defaultRollResult = { total: 5, rolls: [5], modifier: 0 };
 
@@ -549,43 +548,6 @@ describe('useDamageClick - edge cases', () => {
                 expect.any(Array),
                 expect.any(Number),
                 expect.any(Object),
-            );
-        });
-    });
-
-    // ── Weapon mastery auto-application ─────────────────────────────────
-
-    describe('Weapon mastery auto-application', () => {
-        it('applies Sap mastery automatically and logs to party log', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap', extraMasteries: [] });
-            getRuntimeValue.mockReturnValue(null);
-            getCombatContext.mockResolvedValue({
-                name: 'test-campaign',
-                creatures: [{ name: 'Goblin', type: 'npc' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', type: 'npc' });
-            const stats = {
-                ...mockPlayerStats,
-                automation: {
-                    actions: [],
-                    passives: [],
-                },
-            };
-            const { handleDamageClick } = UseDamageClick({ playerStats: stats });
-            const attack = { name: 'Longsword', damage: '1d8+3', damageType: 'slashing', weaponType: 'melee', properties: [] };
-
-            await handleDamageClick(attack);
-            await tick();
-
-            expect(mockSetWeaponMasteryModal).not.toHaveBeenCalled();
-            expect(addEntry).toHaveBeenCalledWith(
-                'test-campaign',
-                expect.objectContaining({
-                    type: 'ability_use',
-                    characterName: 'TestFighter',
-                    abilityName: 'Sap',
-                    targetName: 'Goblin',
-                }),
             );
         });
     });

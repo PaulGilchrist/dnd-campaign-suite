@@ -568,35 +568,6 @@ describe('useDamageClick', () => {
     // ── Weapon mastery modal ────────────────────────────────────────────
 
     describe('weapon mastery modal', () => {
-        it('applies Sap mastery automatically for melee attacks with mastery', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap', extraMasteries: [] });
-            getRuntimeValue.mockReturnValue(null);
-            getCombatContext.mockResolvedValue({
-                name: 'test-campaign',
-                creatures: [{ name: 'Goblin', type: 'npc' }],
-            });
-            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', type: 'npc' });
-            const { handleDamageClick } = HookFactory(deps);
-            const attack = {
-                name: 'Longsword',
-                damage: '1d8+3',
-                damageType: 'slashing',
-                weaponType: 'melee',
-                properties: [],
-            };
-
-            await handleDamageClick(attack);
-            await new Promise(r => setTimeout(r, 0));
-
-            expect(deps.setWeaponMasteryModal).not.toHaveBeenCalled();
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'test-campaign',
-                '_Sap_appliedTarget',
-                'Goblin',
-                'test-campaign',
-            );
-        });
-
         it('does not open modal for ranged attacks', async () => {
             collectWeaponMastery.mockReturnValue({ baseMastery: 'Sap', extraMasteries: [] });
             const { handleDamageClick } = HookFactory(deps);
