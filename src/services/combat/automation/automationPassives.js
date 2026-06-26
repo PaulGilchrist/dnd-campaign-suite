@@ -50,6 +50,7 @@ export function collectWeaponMastery(weaponName, playerStats) {
     const { baseName } = parseMagicItemName(weaponName);
     const weapon = playerStats.equipment?.find(item => item.name === baseName);
     let baseMastery = weapon?.mastery || null;
+    console.log('[Nick Debug] collectWeaponMastery:', { weaponName, baseName, weaponFound: !!weapon, baseMastery });
 
     const extraMasteries = [];
     let replaceMastery = null;

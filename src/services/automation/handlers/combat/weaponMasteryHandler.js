@@ -97,12 +97,11 @@ export async function applyPostDamageMasteryEffects(attackName, playerStats, cam
         if (!mastery) continue;
         if (masteryName === 'Graze') continue;
         if (masteryName === 'Nick') {
-            const desc = `${playerStats.name} used ${masteryName} on ${targetName}`;
-            addEntry(campaignName, {
+            await addEntry(campaignName, {
                 type: 'ability_use',
                 characterName: playerStats.name,
                 abilityName: masteryName,
-                description: desc,
+                description: `${playerStats.name} used ${masteryName} on ${targetName} — Light weapon extra attack available as part of Attack action.`,
                 targetName: targetName,
             }).catch(() => {});
             continue;
