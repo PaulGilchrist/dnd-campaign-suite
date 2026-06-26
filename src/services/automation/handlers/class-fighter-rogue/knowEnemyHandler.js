@@ -1,6 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { getMonsterData } from '../../../../services/npcs/monsterUtils.js';
 import { getCombatContext, getTargetFromAttacker } from '../../../../services/rules/combat/damageUtils.js';
+import { addEntry } from '../../../ui/logService.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
@@ -75,6 +76,36 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     } else {
         description += `No monster data found for target. The target may be a player character or a custom NPC.\n`;
     }
+
+    let logDescription = `Know Your Enemy used by ${playerStats.name}`;
+    if (targetName) {
+        logDescription += ` against ${targetName}`;
+    }
+    logDescription += `.\nRange: ${auto.range || '30 ft'}.\n`;
+    if (irvInfo) {
+        if (irvInfo.immunities.length > 0) {
+            logDescription += `Immunities: ${irvInfo.immunities.join(', ')}\n`;
+        }
+        if (irvInfo.resistances.length > 0) {
+            logDescription += `Resistances: ${irvInfo.resistances.join(', ')}\n`;
+        }
+        if (irvInfo.vulnerabilities.length > 0) {
+            logDescription += `Vulnerabilities: ${irvInfo.vulnerabilities.join(', ')}\n`;
+        }
+        if (irvInfo.conditionImmunities.length > 0) {
+            logDescription += `Condition Immunities: ${irvInfo.conditionImmunities.join(', ')}\n`;
+        }
+        if (irvInfo.immunities.length === 0 && irvInfo.resistances.length === 0 && irvInfo.vulnerabilities.length === 0 && irvInfo.conditionImmunities.length === 0) {
+            logDescription += `No immunities, resistances, vulnerabilities, or condition immunities.\n`;
+        }
+    }
+
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: action.name,
+        description: logDescription,
+    }).catch(() => {});
 
     return {
         type: 'popup',

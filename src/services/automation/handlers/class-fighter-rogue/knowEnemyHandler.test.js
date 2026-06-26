@@ -16,9 +16,14 @@ vi.mock('../../../../services/rules/combat/damageUtils.js', () => ({
     getTargetFromAttacker: vi.fn(),
 }));
 
+vi.mock('../../../ui/logService.js', () => ({
+    addEntry: vi.fn(() => Promise.resolve()),
+}));
+
 const { getRuntimeValue, setRuntimeValue } = await import('../../../../hooks/runtime/useRuntimeState.js');
 const { getMonsterData } = await import('../../../../services/npcs/monsterUtils.js');
 const { getCombatContext, getTargetFromAttacker } = await import('../../../../services/rules/combat/damageUtils.js');
+const { addEntry } = await import('../../../ui/logService.js');
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -60,6 +65,7 @@ describe('knowEnemyHandler', () => {
             );
             expect(result.payload.automation).toEqual(makeAction().automation);
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
         it('returns error popup when stored value is 0 (not null)', async () => {
@@ -69,6 +75,7 @@ describe('knowEnemyHandler', () => {
 
             expect(result.type).toBe('popup');
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
 
         it('proceeds when 1 superiority die available', async () => {
@@ -86,6 +93,11 @@ describe('knowEnemyHandler', () => {
                 0,
                 'test-campaign'
             );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('defaults to uses_max when no stored value (null)', async () => {
@@ -102,6 +114,11 @@ describe('knowEnemyHandler', () => {
                 3,
                 'test-campaign'
             );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('expend dice uses uses_max from action when stored value is null', async () => {
@@ -121,6 +138,11 @@ describe('knowEnemyHandler', () => {
                 5,
                 'test-campaign'
             );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('treats string "0" as zero dice (no expenditure)', async () => {
@@ -131,6 +153,7 @@ describe('knowEnemyHandler', () => {
             expect(result.type).toBe('popup');
             expect(result.payload.description).toContain('No Superiority Dice remaining');
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
@@ -147,6 +170,11 @@ describe('knowEnemyHandler', () => {
                 2,
                 'test-campaign'
             );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('does not expenditure when error popup is returned', async () => {
@@ -155,6 +183,7 @@ describe('knowEnemyHandler', () => {
             await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
 
             expect(setRuntimeValue).not.toHaveBeenCalled();
+            expect(addEntry).not.toHaveBeenCalled();
         });
     });
 
@@ -179,6 +208,12 @@ describe('knowEnemyHandler', () => {
             expect(result.payload.description).toContain('Resistances: bludgeoning');
             expect(result.payload.description).toContain('Vulnerabilities: piercing');
             expect(result.payload.description).toContain('Condition Immunities: poisoned');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+                description: expect.stringContaining('Know Your Enemy used by TestFighter against Goblin'),
+            }));
         });
 
         it('handles target not in combat (no combat context)', async () => {
@@ -195,6 +230,11 @@ describe('knowEnemyHandler', () => {
                 2,
                 'test-campaign'
             );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('handles target not in combat when combat context is empty object', async () => {
@@ -206,6 +246,11 @@ describe('knowEnemyHandler', () => {
 
             expect(result.payload.description).toContain('Target: None (not in combat)');
             expect(result.payload.description).toContain('No monster data found for target');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('handles monster data lookup failure', async () => {
@@ -218,6 +263,11 @@ describe('knowEnemyHandler', () => {
 
             expect(result.payload.description).toContain('No monster data found for target');
             expect(result.payload.description).toContain('player character');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('handles monster with no immunities/resistances/vulnerabilities/conditionImmunities', async () => {
@@ -237,6 +287,11 @@ describe('knowEnemyHandler', () => {
             expect(result.payload.description).toContain(
                 'No immunities, resistances, vulnerabilities, or condition immunities.'
             );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('handles monster data missing vulnerability field', async () => {
@@ -254,6 +309,11 @@ describe('knowEnemyHandler', () => {
 
             expect(result.payload.description).toContain('Immunities: poison');
             expect(result.payload.description).not.toContain('Vulnerabilities:');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('handles combat context throw and still expends dice', async () => {
@@ -270,6 +330,11 @@ describe('knowEnemyHandler', () => {
                 2,
                 'test-campaign'
             );
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('handles monster data lookup throw', async () => {
@@ -283,6 +348,11 @@ describe('knowEnemyHandler', () => {
             expect(result.payload.description).toContain('Target: MysteryCreature');
             expect(result.payload.description).toContain('No monster data found for target');
             expect(result.payload.description).toContain('player character');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
 
         it('handles multiple immunities and resistances', async () => {
@@ -303,6 +373,11 @@ describe('knowEnemyHandler', () => {
             expect(result.payload.description).toContain('Resistances: acid, fire');
             expect(result.payload.description).toContain('Vulnerabilities: piercing');
             expect(result.payload.description).toContain('Condition Immunities: charmed, exhaustion, frightened');
+            expect(addEntry).toHaveBeenCalledWith('test-campaign', expect.objectContaining({
+                type: 'ability_use',
+                characterName: 'TestFighter',
+                abilityName: 'Know Enemy',
+            }));
         });
     });
 

@@ -4854,8 +4854,8 @@
             "level": 7,
             "automation": {
               "type": "know_enemy",
-              "range": "30_ft",
-              "uses_max": 4
+              "casting_time": "1 bonus action",
+              "range": "30_ft"
             }
           },
           {

@@ -5823,7 +5823,12 @@
                                 "name": "Know Your Enemy",
                                 "level": 7,
                                 "prerequisites": [],
-                                "description": "If you spend at least 1 minute observing or interacting with another creature outside combat, you can learn certain information about its capabilities compared to your own. The DM tells you if the creature is your equal, superior, or inferior in regard to two of the following characteristics of your choice: strength score, dexterity score, constitution score, armor class, current hit points, total class levels (if any), or fighter class levels (if any)"
+                                "description": "If you spend at least 1 minute observing or interacting with another creature outside combat, you can learn certain information about its capabilities compared to your own. The DM tells you if the creature is your equal, superior, or inferior in regard to two of the following characteristics of your choice: strength score, dexterity score, constitution score, armor class, current hit points, total class levels (if any), or fighter class levels (if any)",
+                                "automation": {
+                                    "type": "know_enemy",
+                                    "casting_time": "1 bonus action",
+                                    "range": "30 ft"
+                                }
                             }
                         ]
                     },
