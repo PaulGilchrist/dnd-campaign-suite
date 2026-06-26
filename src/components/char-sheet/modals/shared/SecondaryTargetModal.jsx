@@ -33,7 +33,8 @@ function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featur
                         {targets.map((target, i) => {
                             const isSelected = selected === (isOptionTarget(target) ? target.value : target.name);
                             const targetKey = isOptionTarget(target) ? target.value : target.name;
-                            const shouldShowHp = showHp !== false && target.currentHp != null && target.maxHp != null;
+                            const isNpcOrMonster = !target || target.type === 'npc' || target.type === 'monster';
+                            const shouldShowHp = showHp !== false && !isNpcOrMonster && target.currentHp != null && target.maxHp != null;
                             const shouldShowSize = showSize && target.size;
                             return (
                                 <label
@@ -56,6 +57,9 @@ function SecondaryTargetModal({ title, targets, onTargetSelected, onSkip, featur
                                                 {shouldShowSize && <span className="secondary-target-size">({target.size})</span>}
                                                 {shouldShowHp && <span className="secondary-target-hp">
                                                     {target.currentHp}/{target.maxHp} HP ({Math.round((target.currentHp / target.maxHp) * 100)}%)
+                                                </span>}
+                                                {!shouldShowHp && target.currentHp != null && target.maxHp != null && <span className="secondary-target-hp">
+                                                    {Math.round((target.currentHp / target.maxHp) * 100)}%
                                                 </span>}
                                             </>
                                         )}
