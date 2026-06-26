@@ -391,7 +391,10 @@ describe('character-creation/utils', () => {
     });
 
     it('returns unique skills extracted from ability scores', async () => {
-      vi.spyOn(dataLoader, 'loadAbilityScores').mockResolvedValue(mockAbilityScoresData);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockAbilityScoresData)
+      });
       const skills = await utils.getSkillsFromAbilityScores('5e');
       expect(skills).toContain('Athletics');
       expect(skills).toContain('Acrobatics');
@@ -401,8 +404,8 @@ describe('character-creation/utils', () => {
       expect(skills).toHaveLength(18);
     });
 
-    it('returns fallback skills when loadAbilityScores rejects', async () => {
-      vi.spyOn(dataLoader, 'loadAbilityScores').mockRejectedValue(new Error('Network error'));
+    it('returns fallback skills when fetch response is not ok', async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: false });
       const errorSpy = vi.spyOn(console, 'error');
       const skills = await utils.getSkillsFromAbilityScores('5e');
       expect(skills).toContain('Acrobatics');
@@ -412,13 +415,14 @@ describe('character-creation/utils', () => {
       errorSpy.mockRestore();
     });
 
-    it('returns fallback skills when loadAbilityScores returns undefined', async () => {
-      vi.spyOn(dataLoader, 'loadAbilityScores').mockResolvedValue(undefined);
+    it('returns fallback skills when fetch throws', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
       const errorSpy = vi.spyOn(console, 'error');
       const skills = await utils.getSkillsFromAbilityScores('5e');
       expect(skills).toContain('Acrobatics');
       expect(skills).toContain('Athletics');
       expect(skills).toContain('Perception');
+      expect(errorSpy).toHaveBeenCalledWith('Error loading ability-scores.json:', expect.any(Error));
       errorSpy.mockRestore();
     });
   });
@@ -430,13 +434,25 @@ describe('character-creation/utils', () => {
     });
 
     it('returns ability full_name values from the data', async () => {
-      vi.spyOn(dataLoader, 'loadAbilityScores').mockResolvedValue(mockAbilityScoresData);
+      global.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockAbilityScoresData)
+      });
       const names = await utils.getAbilityNamesFromJson();
       expect(names).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
     });
 
-    it('returns fallback names when loadAbilityScores rejects', async () => {
-      vi.spyOn(dataLoader, 'loadAbilityScores').mockRejectedValue(new Error('Network error'));
+    it('returns fallback names when fetch response is not ok', async () => {
+      global.fetch = vi.fn().mockResolvedValue({ ok: false });
+      const errorSpy = vi.spyOn(console, 'error');
+      const names = await utils.getAbilityNamesFromJson();
+      expect(names).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
+      expect(errorSpy).toHaveBeenCalledWith('Error loading ability-scores.json:', expect.any(Error));
+      errorSpy.mockRestore();
+    });
+
+    it('returns fallback names when fetch throws', async () => {
+      global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
       const errorSpy = vi.spyOn(console, 'error');
       const names = await utils.getAbilityNamesFromJson();
       expect(names).toEqual(['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma']);
