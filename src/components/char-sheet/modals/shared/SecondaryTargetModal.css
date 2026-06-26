@@ -1,0 +1,42 @@
+.secondary-target-list {
+    text-align: left;
+    margin-top: 12px;
+}
+
+.secondary-target-row {
+    display: block;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+}
+
+.secondary-target-row:hover {
+    border-color: var(--color-link);
+}
+
+.secondary-target-row.secondary-target-selected {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--color-link);
+}
+
+.secondary-target-row input[type="radio"] {
+    margin-right: 8px;
+}
+
+.secondary-target-name {
+    display: inline;
+}
+
+.secondary-target-hp {
+    margin-left: 8px;
+    opacity: 0.7;
+}
+
+.secondary-target-note {
+    opacity: 0.7;
+    font-size: 0.85em;
+    margin-top: 8px;
+}

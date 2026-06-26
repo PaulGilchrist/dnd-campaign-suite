@@ -66,7 +66,6 @@ export default function useCharActionModals({
     const [commanderStrikeChoiceModal, setCommanderStrikeChoiceModal] = useState(null);
 
     const pendingDamageRef = useRef(null);
-    const [cleaveAttackPending, setCleaveAttackPending] = useState(null);
 
     const { handleDamageClick, proceedWithDamage } = useDamageClick({
         playerStats, campaignName, mapName,
@@ -87,8 +86,6 @@ export default function useCharActionModals({
     const {
         handleMasteryClose,
         handleWeaponMasteryChoice,
-        handleCleaveAttack,
-        handleCleaveSkip,
         handleDivineFuryDamageType,
         handleDivineFurySkip,
         handleGenericDamageTypeChoice,
@@ -105,11 +102,9 @@ export default function useCharActionModals({
         playerStats, campaignName,
         rollDamage, proceedWithDamage,
         pendingDamageRef,
-        cleaveAttackPending,
         featureChoice,
         setDamageTypeChoice, setDivineFuryChoice,
         setWeaponMasteryModal, setWeaponMasteryChoiceModal,
-        setCleaveAttackPending,
         setFeatureChoice,
         setStarryFormConstellationModal, setTwinklingConstellationModal,
         setPopupHtml,
@@ -192,8 +187,5 @@ export default function useCharActionModals({
         handleFeatureChoiceSkip,
         handleConstellationSelect,
         handleElderChampionRestore,
-        cleaveAttackPending,
-        handleCleaveAttack,
-        handleCleaveSkip,
     };
 }

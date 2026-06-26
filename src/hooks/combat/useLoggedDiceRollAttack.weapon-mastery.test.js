@@ -99,7 +99,6 @@ import {
     applyMinDamageAdjustment,
 } from './useLoggedDiceRollUtils.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
-import { applyMasteryEffect } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import {
     isUnbreakableMajestyActive,
     hasAttackerTriggeredMajesty,
@@ -136,8 +135,8 @@ describe('createLogAndShow - Weapon Mastery', () => {
         return createLogAndShow(deps);
     }
 
-    describe('weapon mastery auto-apply on hit', () => {
-        it('calls applyMasteryEffect for non-Cleave/Nick masteries on hit', async () => {
+    describe('weapon mastery not applied during attack roll', () => {
+        it('does not call collectWeaponMastery during attack roll', async () => {
             const fn = createFn();
             await fn('Longsword', 5, 'attack', {
                 targetName: 'Goblin',
@@ -146,12 +145,11 @@ describe('createLogAndShow - Weapon Mastery', () => {
                 weaponName: 'Longsword',
                 playerStats: { name: 'TestFighter' },
             });
-            expect(collectWeaponMastery).toHaveBeenCalledWith('Longsword', { name: 'TestFighter' });
-            expect(applyMasteryEffect).toHaveBeenCalledWith('Push', { name: 'TestFighter' }, 'test-campaign', 'Goblin');
+            expect(collectWeaponMastery).not.toHaveBeenCalled();
         });
 
-        it('skips graze in mastery auto-apply', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: 'Graze', extraMasteries: [] });
+        it('does not call applyMasteryEffect during attack roll', async () => {
+            const { applyMasteryEffect } = await import('../../services/automation/handlers/combat/weaponMasteryHandler.js');
             const fn = createFn();
             await fn('Longsword', 5, 'attack', {
                 targetName: 'Goblin',
@@ -163,24 +161,7 @@ describe('createLogAndShow - Weapon Mastery', () => {
             expect(applyMasteryEffect).not.toHaveBeenCalled();
         });
 
-        it('skips mastery if already applied to same target (dedup)', async () => {
-            getRuntimeValue.mockImplementation((scope, key) => {
-                if (key === '_Push_appliedTarget') return 'Goblin';
-                return null;
-            });
-            collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: [] });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', {
-                targetName: 'Goblin',
-                weaponType: 'melee',
-                attackerName: 'TestFighter',
-                weaponName: 'Longsword',
-                playerStats: { name: 'TestFighter' },
-            });
-            expect(applyMasteryEffect).not.toHaveBeenCalledWith('Push', expect.anything(), expect.anything(), expect.anything());
-        });
-
-        it('does not apply mastery for ranged weapons', async () => {
+        it('still rolls attack for ranged weapons without mastery check', async () => {
             const fn = createFn();
             await fn('Longbow', 5, 'attack', {
                 targetName: 'Goblin',
@@ -190,65 +171,6 @@ describe('createLogAndShow - Weapon Mastery', () => {
                 playerStats: { name: 'TestFighter' },
             });
             expect(collectWeaponMastery).not.toHaveBeenCalled();
-        });
-
-        it('applies extra masteries in array', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: ['Vex', 'Sap'] });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', {
-                targetName: 'Goblin',
-                weaponType: 'melee',
-                attackerName: 'TestFighter',
-                weaponName: 'Longsword',
-                playerStats: { name: 'TestFighter' },
-            });
-            expect(applyMasteryEffect).toHaveBeenCalledWith('Push', { name: 'TestFighter' }, 'test-campaign', 'Goblin');
-        });
-
-        it('applies Cleave via applyMasteryEffect and logs Nick only', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: 'Cleave', extraMasteries: ['Nick'] });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', {
-                targetName: 'Goblin',
-                weaponType: 'melee',
-                attackerName: 'TestFighter',
-                weaponName: 'Longsword',
-                playerStats: { name: 'TestFighter' },
-            });
-            expect(applyMasteryEffect).toHaveBeenCalledWith('Cleave', expect.anything(), 'test-campaign', 'Goblin');
-            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
-                type: 'ability_use',
-                abilityName: 'Nick',
-            }));
-        });
-
-        it('catches and logs mastery errors without failing', async () => {
-            const origError = console.error;
-            const mockError = vi.fn();
-            console.error = mockError;
-            collectWeaponMastery.mockImplementation(() => { throw new Error('test error'); });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', {
-                targetName: 'Goblin',
-                weaponType: 'melee',
-                attackerName: 'TestFighter',
-                weaponName: 'Longsword',
-                playerStats: { name: 'TestFighter' },
-            });
-            expect(mockError).toHaveBeenCalledWith('[useLoggedDiceRollAttack] Mastery auto-apply error:', expect.any(Error));
-            console.error = origError;
-        });
-
-        it('uses attackerName as fallback for playerStats when not provided', async () => {
-            collectWeaponMastery.mockReturnValue({ baseMastery: 'Push', extraMasteries: [] });
-            const fn = createFn();
-            await fn('Longsword', 5, 'attack', {
-                targetName: 'Goblin',
-                weaponType: 'melee',
-                attackerName: 'TestFighter',
-                weaponName: 'Longsword',
-            });
-            expect(collectWeaponMastery).toHaveBeenCalledWith('Longsword', { name: 'TestFighter' });
         });
     });
 });

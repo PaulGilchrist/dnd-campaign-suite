@@ -266,8 +266,6 @@ function createBaseProps(overrides) {
     setEyebiteEffectModal: vi.fn(),
     handleMasteryClose: vi.fn(),
     handleWeaponMasteryChoice: vi.fn(),
-    handleCleaveAttack: vi.fn(),
-    handleCleaveSkip: vi.fn(),
     handleDivineFuryDamageType: vi.fn(),
     handleDivineFurySkip: vi.fn(),
     handleGenericDamageTypeChoice: vi.fn(),
@@ -413,11 +411,10 @@ describe('CharActionModals', () => {
         {...createBaseProps()}
         healingPoolModal={{ name: 'Test Pool' }}
         divineFuryChoice={{}}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Enemy', maxHp: 20, currentHp: 10 }] }}
       />);
       expect(screen.getByTestId('healing-pool-modal')).toBeInTheDocument();
       expect(screen.getByText(/Divine Fury/)).toBeInTheDocument();
-      expect(screen.getByText(/Choose Second Target/)).toBeInTheDocument();
+      expect(screen.getByText(/Divine Fury — Damage Type/)).toBeInTheDocument();
     });
 
     it('renders both constellation modal variants simultaneously', () => {

@@ -22,8 +22,6 @@ const mockDamageClickResult = {
 const mockModalHandlersResult = {
   handleMasteryClose: vi.fn(),
   handleWeaponMasteryChoice: vi.fn(),
-  handleCleaveAttack: vi.fn(),
-  handleCleaveSkip: vi.fn(),
   handleDivineFuryDamageType: vi.fn(),
   handleDivineFurySkip: vi.fn(),
   handleGenericDamageTypeChoice: vi.fn(),
@@ -106,8 +104,6 @@ const modalStatePairs = [
 const delegatedHandlerNames = [
   'handleMasteryClose',
   'handleWeaponMasteryChoice',
-  'handleCleaveAttack',
-  'handleCleaveSkip',
   'handleDivineFuryDamageType',
   'handleDivineFurySkip',
   'handleGenericDamageTypeChoice',
@@ -137,7 +133,6 @@ describe('useCharActionModals', () => {
         expect(result.current[stateName]).toBeNull();
       }
 
-      expect(result.current.cleaveAttackPending).toBeNull();
       expect(result.current.pendingDamageRef.current).toBeNull();
     });
   });
@@ -155,12 +150,6 @@ describe('useCharActionModals', () => {
         expect(result.current[stateName]).toEqual(modalData);
       });
     }
-
-    it('cleavesAttackPending is initially null', () => {
-      const { result } = renderHook(() => useCharActionModals(baseArgs));
-      expect(result.current.cleaveAttackPending).toBeNull();
-    });
-  });
 
   describe('delegated functions', () => {
     it('returns handleDamageClick from useDamageClick', () => {
@@ -185,7 +174,6 @@ describe('useCharActionModals', () => {
       }
 
       expect(result.current).toHaveProperty('pendingDamageRef');
-      expect(result.current).toHaveProperty('cleaveAttackPending');
       expect(result.current).toHaveProperty('handleDamageClick');
 
       for (const handlerName of delegatedHandlerNames) {
@@ -208,7 +196,6 @@ describe('useCharActionModals', () => {
 
       expect(handlersCall).toHaveProperty('setWeaponMasteryModal');
       expect(handlersCall).toHaveProperty('setWeaponMasteryChoiceModal');
-      expect(handlersCall).toHaveProperty('setCleaveAttackPending');
       expect(handlersCall).toHaveProperty('setFeatureChoice');
       expect(handlersCall).toHaveProperty('setDamageTypeChoice');
       expect(handlersCall).toHaveProperty('setDivineFuryChoice');
@@ -253,7 +240,6 @@ describe('useCharActionModals', () => {
       const { result } = renderHook(() => useCharActionModals({}));
 
       expect(result.current.healingPoolModal).toBeNull();
-      expect(result.current.cleaveAttackPending).toBeNull();
       expect(result.current.pendingDamageRef.current).toBeNull();
     });
 
@@ -266,4 +252,5 @@ describe('useCharActionModals', () => {
       expect(result.current.featureChoice).toBeNull();
     });
   });
+});
 });

@@ -266,8 +266,6 @@ function createBaseProps(overrides) {
     setEyebiteEffectModal: vi.fn(),
     handleMasteryClose: vi.fn(),
     handleWeaponMasteryChoice: vi.fn(),
-    handleCleaveAttack: vi.fn(),
-    handleCleaveSkip: vi.fn(),
     handleDivineFuryDamageType: vi.fn(),
     handleDivineFurySkip: vi.fn(),
     handleGenericDamageTypeChoice: vi.fn(),
@@ -293,123 +291,6 @@ function createBaseProps(overrides) {
 describe('CharActionModals inline modals', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  // ── Cleave modal behavior ──
-
-  describe('Cleave modal', () => {
-    it('renders Cleave overlay with header', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }] }}
-      />);
-      expect(screen.getByText(/Choose Second Target/)).toBeInTheDocument();
-    });
-
-    it('renders each target name from secondTargets', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }, { name: 'Ogre', maxHp: 50, currentHp: 25 }] }}
-      />);
-      expect(screen.getByText('Goblin')).toBeInTheDocument();
-      expect(screen.getByText('Ogre')).toBeInTheDocument();
-    });
-
-    it('renders HP display for each target', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }] }}
-      />);
-      expect(screen.getByText('10/20 HP (50%)')).toBeInTheDocument();
-    });
-
-    it('renders HP display with currentHp defaulting to maxHp when currentHp is undefined', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Full Health', maxHp: 30 }] }}
-      />);
-      expect(screen.getByText('30/30 HP (100%)')).toBeInTheDocument();
-    });
-
-    it('renders 0% HP when currentHp is 0', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Dead', maxHp: 30, currentHp: 0 }] }}
-      />);
-      expect(screen.getByText('0/30 HP (0%)')).toBeInTheDocument();
-    });
-
-    it('renders Skip button', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }] }}
-      />);
-      expect(screen.getByText('Skip')).toBeInTheDocument();
-    });
-
-    it('renders overlay with sp-overlay class', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }] }}
-      />);
-      expect(document.querySelector('.sp-overlay')).toBeInTheDocument();
-    });
-
-    it('renders modal container with sp-modal class', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }] }}
-      />);
-      expect(document.querySelector('.sp-modal')).toBeInTheDocument();
-    });
-
-    it('calls handleCleaveAttack when clicking a target name', () => {
-      const handleCleaveAttack = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleCleaveAttack })}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 15, currentHp: 8 }] }}
-      />);
-      fireEvent.click(screen.getByText('Goblin'));
-      expect(handleCleaveAttack).toHaveBeenCalledWith('Goblin');
-    });
-
-    it('calls handleCleaveSkip when clicking Skip button', () => {
-      const handleCleaveSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleCleaveSkip })}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }] }}
-      />);
-      fireEvent.click(screen.getByText('Skip'));
-      expect(handleCleaveSkip).toHaveBeenCalled();
-    });
-
-    it('calls handleCleaveSkip when clicking the overlay background', () => {
-      const handleCleaveSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleCleaveSkip })}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }] }}
-      />);
-      fireEvent.click(document.querySelector('.sp-overlay'));
-      expect(handleCleaveSkip).toHaveBeenCalled();
-    });
-
-    it('does not call handleCleaveSkip when clicking inside the modal content', () => {
-      const handleCleaveSkip = vi.fn();
-      render(<CharActionModals
-        {...createBaseProps({ handleCleaveSkip })}
-        cleaveAttackPending={{ secondTargets: [{ name: 'Goblin', maxHp: 20, currentHp: 10 }] }}
-      />);
-      fireEvent.click(document.querySelector('.sp-modal'));
-      expect(handleCleaveSkip).not.toHaveBeenCalled();
-    });
-
-    it('renders cleave modal when secondTargets is empty array', () => {
-      render(<CharActionModals
-        {...createBaseProps()}
-        cleaveAttackPending={{ secondTargets: [] }}
-      />);
-      expect(screen.getByText(/Choose Second Target/)).toBeInTheDocument();
-    });
   });
 
   // ── Divine Fury choice modal ──

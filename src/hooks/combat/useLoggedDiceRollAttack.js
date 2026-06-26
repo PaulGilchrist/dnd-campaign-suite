@@ -16,8 +16,6 @@ import {
 } from '../../services/combat/auras/unbreakableMajesty.js';
 import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { collectWeaponMastery } from '../../services/combat/automation/automationService.js';
-import { applyMasteryEffect, MASTERY_EFFECTS } from '../../services/automation/handlers/combat/weaponMasteryHandler.js';
 import {
     dispatchUnbreakableMajestySave,
     hasPotentCantrip,
@@ -254,39 +252,6 @@ export function createLogAndShow(deps) {
         }
         const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && hit;
 
-        // Auto-apply weapon mastery effects on hit (Sap, Slow, Vex, Push, Topple, Cleave, Nick)
-        if (hit && context?.weaponType === 'melee' && context?.attackerName && context?.targetName) {
-            try {
-                const playerStatsForMastery = context.playerStats || { name: context.attackerName };
-                const available = collectWeaponMastery(context.weaponName, playerStatsForMastery);
-                const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
-                for (const masteryName of allMasteries) {
-                    const mastery = MASTERY_EFFECTS[masteryName];
-                    if (!mastery || masteryName === 'Graze') continue;
-
-                    const dedupKey = `_${masteryName}_appliedTarget`;
-                    const alreadyApplied = getRuntimeValue(campaignName, dedupKey, campaignName);
-                    if (alreadyApplied === context.targetName) {
-                        continue;
-                    }
-                    if (masteryName === 'Nick') {
-                        const desc = `${context.attackerName} used ${masteryName} on ${context.targetName}`;
-                        logEntry({
-                            type: 'ability_use',
-                            characterName: context.attackerName,
-                            abilityName: masteryName,
-                            description: desc,
-                            targetName: context.targetName,
-                        });
-                    } else {
-                        setRuntimeValue(campaignName, dedupKey, context.targetName, campaignName);
-                        await applyMasteryEffect(masteryName, context.playerStats || { name: context.attackerName }, campaignName, context.targetName);
-                    }
-                }
-            } catch (e) {
-                console.error('[useLoggedDiceRollAttack] Mastery auto-apply error:', e);
-            }
-        }
         const autoDamage = hit && context?.autoDamageFormula ? {
             name: context.autoDamageName || name,
             formula: context.autoDamageFormula,

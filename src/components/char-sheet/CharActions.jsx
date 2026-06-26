@@ -27,6 +27,7 @@ import { endFriendsOnHostileAction } from '../../services/rules/features/friends
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { getNearestPlacedItem } from '../../services/rules/combat/rangeValidation.js';
+import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js';
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
@@ -34,11 +35,22 @@ import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../s
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
+import SecondaryTargetModal from './modals/shared/SecondaryTargetModal.jsx';
 
 import './CharActions.css'
 import { isEqual } from 'lodash';
 
 const signFormatter = new Intl.NumberFormat('en-US', { signDisplay: 'always' });
+
+function resolveCreatureHp(creature, playerStatsForHp) {
+    if (!creature) return { currentHp: 0, maxHp: 0 };
+    if (creature.type === 'player') {
+        const currentHp = getRuntimeValue(creature.name, 'currentHitPoints') ?? getRuntimeValue(creature.name, 'hitPoints') ?? 0;
+        const maxHp = getRuntimeValue(creature.name, 'hitPoints') ?? playerStatsForHp?.hitPoints ?? 0;
+        return { currentHp, maxHp };
+    }
+    return { currentHp: creature.currentHp ?? creature.maxHp, maxHp: creature.maxHp };
+}
 
 function formatRange(range) {
     if (!range && range !== 0) return '';
@@ -122,6 +134,56 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     context.metamagicHeighten = autoDamage.metamagicHeighten;
                 }
                 rollDamage(autoDamage.name, autoFormula, overchannelResult.total, overchannelResult.rolls, overchannelResult.modifier, context);
+
+                // Post-damage: check for Cleave mastery and show target selection if applicable
+                if (autoDamage.targetName) {
+                    try {
+                        const combatSummary = await loadCombatSummary(campaignName);
+                        const lastAttack = combatSummary?.lastAttack;
+                        if (lastAttack?.hit && lastAttack?.weaponType === 'melee') {
+                            const available = collectWeaponMastery(lastAttack.attackName, playerStats);
+                            const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
+                            if (allMasteries.includes('Cleave')) {
+                                const firstTarget = combatSummary?.creatures?.find(c => c.name === lastAttack.targetName);
+
+                                // Check if there's an active map with position data
+                                const mapName = playerStats?.mapName;
+                                const hasMapPositions = mapName && firstTarget?.position;
+
+                                let secondTargets;
+                                if (hasMapPositions) {
+                                    const attackerPos = combatSummary?.creatures?.find(c => c.name === playerStats.name)?.position;
+                                    const reach = 8;
+                                    if (attackerPos) {
+                                        secondTargets = combatSummary.creatures
+                                            .filter(c => c.name !== lastAttack.targetName && c.position)
+                                            .map(c => ({
+                                                ...c,
+                                                ...resolveCreatureHp(c, playerStats),
+                                                distanceFromFirst: getDistanceFeet(firstTarget.position, c.position),
+                                                distanceFromAttacker: getDistanceFeet(attackerPos, c.position),
+                                            }))
+                                            .filter(t => t.distanceFromFirst !== null && t.distanceFromFirst <= 5 && t.distanceFromAttacker !== null && t.distanceFromAttacker <= reach);
+                                    }
+                                }
+
+                                // No map or no attacker position — all creatures in range
+                                if (!hasMapPositions || !secondTargets) {
+                                    secondTargets = combatSummary.creatures
+                                        .filter(c => c.name !== lastAttack.targetName)
+                                        .map(c => ({ ...c, ...resolveCreatureHp(c, playerStats) }));
+                                }
+
+                                if (secondTargets.length > 0) {
+                                    setCleaveSecondTargets(secondTargets);
+                                    setShowCleaveTargetSelection(true);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('[Cleave] Post-damage mastery error:', e);
+                    }
+                }
 
                 // Clear Lunging Attack and Commander's Strike bonuses after auto-damage is rolled
                 const lungingDie = getRuntimeValue(playerStats.name, 'lungingAttackDieValue', campaignName);
@@ -260,9 +322,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         handleFeatureChoiceSkip,
         handleConstellationSelect,
         handleElderChampionRestore,
-        cleaveAttackPending,
-        handleCleaveAttack,
-        handleCleaveSkip,
         hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
         arcaneWardRestoreModal, setArcaneWardRestoreModal,
         combatSuperiorityModal, setCombatSuperiorityModal,
@@ -277,6 +336,77 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         playerStats, campaignName, mapName, conditionAttackMode, featRangeEffects,
         popupHtml, setPopupHtml, rollDamage, rollAttack, buildCtx, buildCtxSync,
     });
+
+    const [showCleaveTargetSelection, setShowCleaveTargetSelection] = useState(false);
+    const [cleaveSecondTargets, setCleaveSecondTargets] = useState([]);
+
+    const handleCleaveAttack = React.useCallback(async (cleaveTargetName) => {
+        if (!cleaveTargetName) {
+            setShowCleaveTargetSelection(false);
+            return;
+        }
+        setShowCleaveTargetSelection(false);
+
+        const combatSummary = await getCombatContext(campaignName);
+        const lastAttack = combatSummary?.lastAttack;
+        if (!lastAttack) return;
+
+        const abilityName = playerStats?.abilities?.[0]?.name || 'STR';
+        const ability = playerStats?.abilities?.find(a => a.name === abilityName);
+        const abilityMod = ability?.bonus || 0;
+        const attackBonus = abilityMod + (playerStats.proficiency || 0);
+
+        const target = combatSummary?.creatures?.find(c => c.name === cleaveTargetName);
+        const targetAc = target?.ac || 0;
+
+        const d20Roll = Math.floor(Math.random() * 20) + 1;
+        const totalRoll = d20Roll + attackBonus;
+        const hit = totalRoll >= targetAc;
+
+        // Cleave deals weapon damage without ability modifier to damage
+        let cleaveDamageFormula = lastAttack.damageFormula
+            .replace(/\+\s*\d+/g, '')
+            .trim();
+        if (!cleaveDamageFormula || !/d\d/.test(cleaveDamageFormula)) {
+            cleaveDamageFormula = lastAttack.damageFormula;
+        }
+
+        let damageResult = null;
+        if (hit) {
+            damageResult = rollExpression(cleaveDamageFormula);
+        }
+
+        if (hit && damageResult) {
+            const context = {
+                targetName: cleaveTargetName,
+                damageType: lastAttack.damageType || 'same_as_weapon',
+                attackerName: playerStats.name,
+            };
+            rollDamage(`${lastAttack.attackName} (Cleave)`, cleaveDamageFormula, damageResult.total, damageResult.rolls, 0, context);
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Cleave',
+                description: `${playerStats.name} used Cleave on ${lastAttack.attackName} against ${cleaveTargetName}`,
+                targetName: cleaveTargetName,
+            }).catch(() => {});
+        } else {
+            const context = {
+                targetName: cleaveTargetName,
+                damageType: lastAttack.damageType || 'same_as_weapon',
+                attackerName: playerStats.name,
+                isAutoMiss: true,
+            };
+            rollDamage(`${lastAttack.attackName} (Cleave)`, cleaveDamageFormula || '0', 0, [], 0, context);
+            addEntry(campaignName, {
+                type: 'ability_use',
+                characterName: playerStats.name,
+                abilityName: 'Cleave',
+                description: `${playerStats.name} used Cleave on ${lastAttack.attackName} against ${cleaveTargetName} — Miss`,
+                targetName: cleaveTargetName,
+            }).catch(() => {});
+        }
+    }, [campaignName, playerStats, rollDamage]);
 
     useEffect(() => {
         const handler = (event) => {
@@ -975,12 +1105,9 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     divineFuryChoice={divineFuryChoice}
                     damageTypeChoice={damageTypeChoice}
                     featureChoice={featureChoice}
-                    cleaveAttackPending={cleaveAttackPending}
                     handleMasteryClose={handleMasteryClose}
                     handleWeaponMasteryChoice={handleWeaponMasteryChoice}
                     handleWeaponKindMasteryClose={handleWeaponKindMasteryClose}
-                    handleCleaveAttack={handleCleaveAttack}
-                    handleCleaveSkip={handleCleaveSkip}
                     handleDivineFuryDamageType={handleDivineFuryDamageType}
                     handleDivineFurySkip={handleDivineFurySkip}
                     handleGenericDamageTypeChoice={handleGenericDamageTypeChoice}
@@ -1076,6 +1203,15 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                 rollDamage={rollDamage}
                 getTargetInfo={getTargetInfo}
             />
+            {showCleaveTargetSelection && (
+                <SecondaryTargetModal
+                    title="Cleave — Choose Second Target"
+                    targets={cleaveSecondTargets}
+                    onTargetSelected={handleCleaveAttack}
+                    onSkip={() => { setShowCleaveTargetSelection(false); setCleaveSecondTargets([]); }}
+                    featureDescription="On a hit, the second creature takes weapon damage (no ability modifier to damage unless negative). Once per turn."
+                />
+            )}
         </div>
     )
 }, areEqual);
