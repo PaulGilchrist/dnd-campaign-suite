@@ -141,7 +141,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     try {
                         const combatSummary = await loadCombatSummary(campaignName);
                         const lastAttack = combatSummary?.lastAttack;
-                        console.log('[Nick Debug] CharActions autoDamageRoll:', { targetName: autoDamage.targetName, combatSummary: !!combatSummary, lastAttack: !!lastAttack, lastAttackData: lastAttack });
                         if (lastAttack?.hit && lastAttack?.weaponType === 'melee') {
                             const available = collectWeaponMastery(lastAttack.attackName, playerStats);
                             const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
