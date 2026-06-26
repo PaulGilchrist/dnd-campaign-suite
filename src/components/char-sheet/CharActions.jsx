@@ -141,7 +141,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     try {
                         const combatSummary = await loadCombatSummary(campaignName);
                         const lastAttack = combatSummary?.lastAttack;
-                        if (lastAttack?.hit && lastAttack?.weaponType === 'melee') {
+                        if (lastAttack?.hit) {
                             const available = collectWeaponMastery(lastAttack.attackName, playerStats);
                             const allMasteries = [available.baseMastery, ...(available.extraMasteries || [])].filter(Boolean);
                             if (allMasteries.includes('Cleave')) {

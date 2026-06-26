@@ -106,9 +106,11 @@ export async function applyPostDamageMasteryEffects(attackName, playerStats, cam
             }).catch(() => {});
             continue;
         }
-        const alreadyApplied = getRuntimeValue(campaignName, `_${masteryName}_appliedTarget`, campaignName);
-        if (alreadyApplied === targetName) { continue; }
-        setRuntimeValue(campaignName, `_${masteryName}_appliedTarget`, targetName, campaignName);
+        if (masteryName !== 'Slow') {
+            const alreadyApplied = getRuntimeValue(campaignName, `_${masteryName}_appliedTarget`, campaignName);
+            if (alreadyApplied === targetName) { continue; }
+            setRuntimeValue(campaignName, `_${masteryName}_appliedTarget`, targetName, campaignName);
+        }
         await applyMasteryEffect(masteryName, playerStats, campaignName, targetName);
     }
 }
