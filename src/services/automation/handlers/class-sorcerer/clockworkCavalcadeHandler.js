@@ -34,7 +34,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 characterName: playerName,
                 abilityName: featureName,
                 description: `${playerName} restored Clockwork Cavalcade by spending 7 Sorcery Points.`,
-            }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); throw e; });
+            }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); });
         } else {
             return {
                 type: 'popup',
@@ -61,7 +61,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} used ${featureName}.`,
-    }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); throw e; });
+    }).catch((e) => { console.error("[clockworkCavalcade] Error:", e); });
 
     return {
         type: 'popup',

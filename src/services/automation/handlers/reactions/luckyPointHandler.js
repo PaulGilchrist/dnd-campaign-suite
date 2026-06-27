@@ -57,7 +57,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name} to apply ${effectType} on a D20 test.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[luckyPoint] Error:", e); throw e; });
+    }).catch((e) => { console.error("[luckyPoint] Error:", e); });
 
     return infoPopup(action.name, description, auto);
 }

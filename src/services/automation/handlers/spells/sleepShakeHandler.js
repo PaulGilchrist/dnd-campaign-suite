@@ -158,7 +158,7 @@ export async function handleConfirm(action, playerStats, campaignName, _mapName,
         description: `${playerName} used an action to shake ${targetName} out of its magical slumber.`,
         targetName,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[sleepShake] Error:", e); throw e; });
+    }).catch((e) => { console.error("[sleepShake] Error:", e); });
 
     return {
         type: 'popup',

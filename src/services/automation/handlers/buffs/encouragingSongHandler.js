@@ -75,7 +75,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name} to grant Heroic Inspiration to ${allies.length} ally${allies.length !== 1 ? 'ies' : 'y'}.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[encouragingSongHandler] Error:", e); throw e; });
+    }).catch((e) => { console.error("[encouragingSongHandler] Error:", e); });
 
     return {
         type: 'popup',

@@ -37,7 +37,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated Smite of Protection. You and allies in Aura of Protection have Half Cover until start of your next turn.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[smiteOfProtection] Error:", e); throw e; });
+    }).catch((e) => { console.error("[smiteOfProtection] Error:", e); });
 
     return {
         type: 'popup',

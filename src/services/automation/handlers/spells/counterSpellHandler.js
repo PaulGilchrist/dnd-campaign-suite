@@ -51,7 +51,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${featureName} triggered — ${targetName} must make ${saveType} save (DC ${saveDc})`,
         promptId,
-    }).catch((e) => { console.error("[counterSpell] Error:", e); throw e; });
+    }).catch((e) => { console.error("[counterSpell] Error:", e); });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -66,7 +66,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType,
                 success: false,
                 description: `${targetName} failed ${saveType} save. ${targetName}'s spell is countered and wasted.`,
-            }).catch((e) => { console.error("[counterSpell] Error:", e); throw e; });
+            }).catch((e) => { console.error("[counterSpell] Error:", e); });
         } else {
             addEntry(campaignName, {
                 type: 'save_result',
@@ -77,7 +77,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType,
                 success: true,
                 description: `${targetName} succeeded on ${saveType} save. ${featureName} fails to counter the spell.`,
-            }).catch((e) => { console.error("[counterSpell] Error:", e); throw e; });
+            }).catch((e) => { console.error("[counterSpell] Error:", e); });
 
             const passives = playerStats.automation?.passives;
             const spellBreaker = passives?.find(p => p.type === 'spell_breaker');

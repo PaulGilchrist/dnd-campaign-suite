@@ -95,7 +95,7 @@ function DivineSparkModal({ featureName, attackerName, targetName, campaignName,
                 bonus: event.detail.saveBonus ?? 0,
                 formula: `1d20${event.detail.saveBonus !== 0 ? '+' + event.detail.saveBonus : ''}`,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error("[DivineSparkModal] Error:", e); throw e; });
+            }).catch((e) => { console.error("[DivineSparkModal] Error:", e); });
 
             setResult({
                 type: 'harm',

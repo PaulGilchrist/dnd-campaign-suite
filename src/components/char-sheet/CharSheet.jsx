@@ -21,6 +21,10 @@ import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js'
 import { evaluateAutoExpression } from '../../services/combat/automation/automationService.js';
 import { EXHAUSTION_LEVELS } from '../../services/combat/conditions/exhaustionRules.js';
 import { isCreatureWarded } from '../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js';
+import { addEntry } from '../../services/ui/logService.js';
+import { getManeuversForRules, getSuperiorityDice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import * as storageService from '../../services/ui/storage.js';
 import './CharSheet.css'
 
 function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment, allMagicItems, allRaces, allSpells, allSpells2024, playerSummary, allRaces2024, allMagicItems2024, onDeleteCharacter, onEditCharacter, onUploadClick, onSaveClick, campaignName, activeMapName, characters }) {
@@ -453,7 +457,6 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
         }
         if (currentUses <= 0) return;
         await setRuntimeValue(playerName, 'secondWindUses', currentUses - 1, campaignName);
-        const { addEntry } = await import('../../services/ui/logService.js');
         const checkName = popupHtml?.name || 'Ability Check';
         const d20 = popupHtml?.rolls?.[0] || 0;
         const bonus = popupHtml?.bonus || 0;
@@ -472,13 +475,12 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
     const handleSuperiorityManeuver = React.useCallback(async (maneuverName, dieValue) => {
         if (!playerStats) return;
         try {
-            const { getManeuversForRules: _getManeuversForRules, getSuperiorityDice: _getSuperiorityDice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-            await _getManeuversForRules(playerStats.rules || '2024');
-            const allManeuvers = await _getManeuversForRules(playerStats.rules || '2024');
+            await getManeuversForRules(playerStats.rules || '2024');
+            const allManeuvers = await getManeuversForRules(playerStats.rules || '2024');
             const maneuver = allManeuvers.find(m => m.name === maneuverName);
             if (!maneuver) return;
 
-            const superiorityDice = _getSuperiorityDice(playerStats, campaignName);
+            const superiorityDice = getSuperiorityDice(playerStats, campaignName);
             if (superiorityDice <= 0) return;
 
             await setRuntimeValue(playerStats.name, 'superiorityDice', superiorityDice - 1, campaignName);
@@ -489,9 +491,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
 
             // Update initiative tracker if this was an initiative roll
             if (skillName === 'Initiative' || popupHtml?.rollType === 'initiative') {
-                const { loadCombatSummary: _loadCombatSummary } = await import('../../services/encounters/combatData.js');
-                const storage = await import('../../services/ui/storage.js');
-                const cs = await _loadCombatSummary(campaignName);
+                const cs = await loadCombatSummary(campaignName);
                 if (cs) {
                     const creature = cs.creatures.find(
                         c => c.type === 'player' && c.name === playerStats.name
@@ -499,7 +499,7 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                     if (creature) {
                         creature.initiative = String(newTotal);
                         cs.creatures.sort((a, b) => b.initiative - a.initiative);
-                        storage.default.set('combatSummary', cs, campaignName);
+                        storageService.default.set('combatSummary', cs, campaignName);
                     }
                 }
                 window.dispatchEvent(new CustomEvent('initiative-rolled', {

@@ -133,7 +133,7 @@ function EyebiteEffectModal({ combatSummary, attackerName, attackerPos, saveDc, 
                     bonus: saveBonus,
                     formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
                     timestamp: Date.now(),
-                }).catch((e) => { console.error("[EyebiteEffectModal] Error:", e); throw e; });
+                }).catch((e) => { console.error("[EyebiteEffectModal] Error:", e); });
 
             } else {
                 const promptId = utils.guid();
@@ -159,7 +159,7 @@ function EyebiteEffectModal({ combatSummary, attackerName, attackerPos, saveDc, 
                     bonus: 0,
                     formula: `1d20 (waiting)`,
                     timestamp: Date.now(),
-                }).catch((e) => { console.error("[EyebiteEffectModal] Error:", e); throw e; });
+                }).catch((e) => { console.error("[EyebiteEffectModal] Error:", e); });
             }
         });
 
@@ -200,7 +200,7 @@ function EyebiteEffectModal({ combatSummary, attackerName, attackerPos, saveDc, 
             bonus: detail.saveBonus ?? 0,
             formula: `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}`,
             timestamp: Date.now(),
-        }).catch((e) => { console.error("[EyebiteEffectModal] Error:", e); throw e; });
+        }).catch((e) => { console.error("[EyebiteEffectModal] Error:", e); });
 
         storage.set('combatSummary', combatSummary, campaignName);
         window.dispatchEvent(new CustomEvent('combat-summary-updated'));

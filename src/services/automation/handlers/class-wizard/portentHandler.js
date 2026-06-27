@@ -214,7 +214,7 @@ async function applyPortentChoice(action, playerStats, campaignName, targetName,
         targetName,
         diceRemaining: remainingDice.length,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[portent] Error:", e); throw e; });
+    }).catch((e) => { console.error("[portent] Error:", e); });
 
     const description = buildPortentDescription(action, eventType, chosenDie, bonus, label, originalD20, targetName, outcomeNote);
     return infoPopup(action.name, description, action.automation);

@@ -65,7 +65,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated Elder Champion. Aura of Protection is imbued with primal power for 1 minute.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[elderChampion] Error:", e); throw e; });
+    }).catch((e) => { console.error("[elderChampion] Error:", e); });
 
     return {
         type: 'popup',

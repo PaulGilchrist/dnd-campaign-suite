@@ -59,7 +59,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     abilityName: featureName,
                     description: `${playerName} expended a level ${spellSlot.level} spell slot to restore a use of ${featureName}.`,
                     timestamp: Date.now(),
-                }).catch((e) => { console.error("[illusorySelf] Error:", e); throw e; });
+                }).catch((e) => { console.error("[illusorySelf] Error:", e); });
             } else {
                 return {
                     type: 'popup',
@@ -98,7 +98,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             description: `${playerName} used ${featureName} — ${attackerName}'s attack misses due to illusory duplicate.`,
             targetName: attackerName,
             timestamp: Date.now(),
-        }).catch((e) => { console.error("[illusorySelf] Error:", e); throw e; });
+        }).catch((e) => { console.error("[illusorySelf] Error:", e); });
     }
 
     let description = `Attacker: <b>${attackerName}</b><br/><br/>`;

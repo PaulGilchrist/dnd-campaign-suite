@@ -386,7 +386,7 @@ async function applyHolyNimbusRadiantDamage(activeName, playerStats, effect, cam
                 damageAmount: damage,
                 description: `Holy Nimbus radiant damage: ${damage} radiant to ${creatureName}`,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error("[expirations] Error:", e); throw e; });
+            }).catch((e) => { console.error("[expirations] Error:", e); });
         } catch { /* ignore per-creature errors */ }
     }
 
@@ -469,7 +469,7 @@ async function applyInnerRadianceDamage(activeName, playerStats, effect, campaig
                     damageAmount: damage,
                     description: `Inner Radiance aura: ${damage} ${damageType.toLowerCase()} to ${creatureName}`,
                     timestamp: Date.now(),
-                }).catch((e) => { console.error("[expirations] Error:", e); throw e; });
+                }).catch((e) => { console.error("[expirations] Error:", e); });
             } catch { /* ignore per-creature errors */ }
         }
     }
@@ -687,7 +687,7 @@ async function applyGrappleDamageTurnStart(activeName, playerStats, effect, camp
                 damageAmount: damage,
                 description: `Unarmed Fighting grapple damage: ${damage} ${damageType.toLowerCase()} to ${creatureName}`,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error("[expirations] Error:", e); throw e; });
+            }).catch((e) => { console.error("[expirations] Error:", e); });
         } catch { /* ignore per-creature errors */ }
     }
 
@@ -853,7 +853,7 @@ function clearExpirationEffects(effects, targetName, attackerName, campaignName)
                         abilityName: 'Draconic Flight',
                         description: `${targetName}'s spectral wings dissolve due to the Incapacitated condition.`,
                         timestamp: Date.now(),
-                    }).catch((e) => { console.error("[expirations] Error:", e); throw e; });
+                    }).catch((e) => { console.error("[expirations] Error:", e); });
                 }
                 setRuntimeValue(
                     targetName,

@@ -104,7 +104,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                 sourceName: attackerName,
                 timestamp: Date.now(),
              }),
-          }).catch((e) => { console.error("[SetConditionModal] Error:", e); throw e; });
+          }).catch((e) => { console.error("[SetConditionModal] Error:", e); });
      }, [campaignName, attackerName, conditionName, additionalCondition, saveType]);
 
     const handleApply = useCallback(() => {
@@ -153,7 +153,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                     bonus: saveBonus,
                     formula: `1d20${saveBonus !== 0 ? '+' + saveBonus : ''}`,
                     timestamp: Date.now(),
-                 }).catch((e) => { console.error("[SetConditionModal] Error:", e); throw e; });
+                 }).catch((e) => { console.error("[SetConditionModal] Error:", e); });
 
              } else {
                 const promptId = utils.guid();
@@ -179,7 +179,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
                     bonus: 0,
                     formula: `1d20 (waiting)`,
                     timestamp: Date.now(),
-                 }).catch((e) => { console.error("[SetConditionModal] Error:", e); throw e; });
+                 }).catch((e) => { console.error("[SetConditionModal] Error:", e); });
              }
          });
 
@@ -227,7 +227,7 @@ function SetConditionModal({ combatSummary, attackerName, attackerPos, saveDc, c
             bonus: detail.saveBonus ?? 0,
             formula: `1d20${detail.saveBonus !== 0 ? '+' + detail.saveBonus : ''}`,
             timestamp: Date.now(),
-         }).catch((e) => { console.error("[SetConditionModal] Error:", e); throw e; });
+         }).catch((e) => { console.error("[SetConditionModal] Error:", e); });
 
         // Persist and notify after player save result
         storage.set('combatSummary', combatSummary, campaignName);

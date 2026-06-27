@@ -86,7 +86,7 @@ export async function applyProtectionFromEnergy(action, playerStats, campaignNam
         description: `${playerStats.name} cast ${action.name} on ${targetName} for ${damageType} resistance.`,
         targetName,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[protectionFromEnergyHandler] Error:", e); throw e; });
+    }).catch((e) => { console.error("[protectionFromEnergyHandler] Error:", e); });
 
     return {
         type: 'popup',

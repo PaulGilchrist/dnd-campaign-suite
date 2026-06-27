@@ -139,7 +139,7 @@ function Map({ campaignName, characters, isLocalhost, mapName, onBack, onEncount
     const { handleDrop } = useMapDrops({ isLocalhost, getGridFromEvent, setMapData, setPlacedItems });
 
     useEffect(() => {
-        loadMonsters().then(setMonstersLoaded).catch((e) => { console.error("[Map] Error:", e); throw e; });
+        loadMonsters().then(setMonstersLoaded).catch((e) => { console.error("[Map] Error:", e); });
     }, []);
 
     const handleViewStats = useCallback((itemId) => {

@@ -78,7 +78,7 @@ export async function confirmIllusoryReality(action, playerStats, campaignName, 
         abilityName: featureName,
         description: `${playerName} used ${featureName} — the object "${trimmedName}" becomes real.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[illusoryReality] Error:", e); throw e; });
+    }).catch((e) => { console.error("[illusoryReality] Error:", e); });
 
     return {
         type: 'popup',

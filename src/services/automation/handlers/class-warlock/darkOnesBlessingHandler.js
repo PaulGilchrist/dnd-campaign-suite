@@ -59,7 +59,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
         abilityName: action.name,
         description: `${playerStats.name} gained ${result.amount} temporary hit points from Dark One's Blessing.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[darkOnesBlessing] Error:", e); throw e; });
+    }).catch((e) => { console.error("[darkOnesBlessing] Error:", e); });
 
     return {
         type: 'popup',

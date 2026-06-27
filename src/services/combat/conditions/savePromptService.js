@@ -4,7 +4,7 @@ export function sendSavePrompt(campaignName, promptData) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: promptData }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); throw e; });
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function sendSaveResult(campaignName, targetName, resultData) {
@@ -13,7 +13,7 @@ export function sendSaveResult(campaignName, targetName, resultData) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: resultData }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); throw e; });
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function clearSavePrompt(campaignName, targetName, promptId) {
@@ -22,7 +22,7 @@ export function clearSavePrompt(campaignName, targetName, promptId) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: { promptId } }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); throw e; });
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function sendDeathSavePrompt(campaignName, promptData) {
@@ -31,14 +31,14 @@ export function sendDeathSavePrompt(campaignName, promptData) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: promptData }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); throw e; });
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function clearDeathSavePrompt(campaignName, targetName) {
   const key = `deathSavePrompt-${targetName}`;
   fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/${key}`, {
     method: 'DELETE',
-  }).catch((e) => { console.error("[savePromptService] Error:", e); throw e; });
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function sendDeathSaveResult(campaignName, targetName, resultData) {
@@ -47,7 +47,7 @@ export function sendDeathSaveResult(campaignName, targetName, resultData) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: resultData }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); throw e; });
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function sendConcentrationPrompt(campaignName, promptData) {
@@ -56,7 +56,7 @@ export function sendConcentrationPrompt(campaignName, promptData) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: promptData }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); throw e; });
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }
 
 export function sendConcentrationResult(campaignName, targetName, resultData) {
@@ -65,5 +65,5 @@ export function sendConcentrationResult(campaignName, targetName, resultData) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ value: resultData }),
-  }).catch((e) => { console.error("[savePromptService] Error:", e); throw e; });
+  }).catch((e) => { console.error("[savePromptService] Error:", e); });
 }

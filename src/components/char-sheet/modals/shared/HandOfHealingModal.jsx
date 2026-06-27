@@ -81,7 +81,7 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
                 sourceName: `${monkName} (${healName}`,
                 timestamp: Date.now(),
                 })
-            }).catch((e) => { console.error("[HandOfHealingModal] Error:", e); throw e; });
+            }).catch((e) => { console.error("[HandOfHealingModal] Error:", e); });
 
         setCureCondition(conditionName);
      }, [campaignName, getTargetConditions, targetName, healName, monkName]);

@@ -48,7 +48,7 @@ export async function processSleepRepeatSave(casterName, targetName, saveDc, cam
         abilityName: 'Sleep (repeat save)',
         description: `${targetName} makes a WIS save (DC ${saveDc}) at end of turn (Sleep).`,
         promptId,
-    }).catch((e) => { console.error("[sleep] Error:", e); throw e; });
+    }).catch((e) => { console.error("[sleep] Error:", e); });
 
     const saveResult = await promise;
 
@@ -69,7 +69,7 @@ export async function processSleepRepeatSave(casterName, targetName, saveDc, cam
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save. Sleep ends!`,
-        }).catch((e) => { console.error("[sleep] Error:", e); throw e; });
+        }).catch((e) => { console.error("[sleep] Error:", e); });
 
         postLogEntry(campaignName, {
             type: 'condition',
@@ -116,7 +116,7 @@ export async function processSleepRepeatSave(casterName, targetName, saveDc, cam
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save and is now Unconscious.`,
-    }).catch((e) => { console.error("[sleep] Error:", e); throw e; });
+    }).catch((e) => { console.error("[sleep] Error:", e); });
 
     return {
         type: 'popup',
@@ -189,7 +189,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Sleep! ${targetName} must make a WIS save (DC ${dc}) or become Incapacitated.`,
             promptId,
-        }).catch((e) => { console.error("[sleep] Error:", e); throw e; });
+        }).catch((e) => { console.error("[sleep] Error:", e); });
 
         const saveResult = await promise;
 
@@ -204,7 +204,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: true,
                 description: `${targetName} succeeded on WIS save against Sleep.`,
-            }).catch((e) => { console.error("[sleep] Error:", e); throw e; });
+            }).catch((e) => { console.error("[sleep] Error:", e); });
         } else {
             affectedCount++;
 
@@ -264,7 +264,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: false,
                 description: `${targetName} failed WIS save against Sleep and is Incapacitated. At the end of each of its turns, it repeats the save.`,
-            }).catch((e) => { console.error("[sleep] Error:", e); throw e; });
+            }).catch((e) => { console.error("[sleep] Error:", e); });
 
             results.push(`${targetName} is Incapacitated.`);
         }

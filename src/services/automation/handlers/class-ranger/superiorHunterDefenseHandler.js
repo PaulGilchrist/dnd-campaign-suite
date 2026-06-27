@@ -58,7 +58,7 @@ export async function handle(action, playerStats, campaignName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName}, gaining Resistance to ${damageType} damage until end of current turn.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[superiorHunterDefense] Error:", e); throw e; });
+    }).catch((e) => { console.error("[superiorHunterDefense] Error:", e); });
 
     return {
         type: 'popup',

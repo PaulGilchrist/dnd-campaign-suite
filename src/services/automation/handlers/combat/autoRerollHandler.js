@@ -183,7 +183,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 abilityName: action.name,
                 description: `${playerName} used ${action.name} to override a failed ${saveLabel} save.`,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error("[autoReroll] Error:", e); throw e; });
+            }).catch((e) => { console.error("[autoReroll] Error:", e); });
 
             return infoPopup(action.name, description, auto);
         }
@@ -206,7 +206,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             abilityName: action.name,
             description: `${playerName} used ${action.name} to reroll a saving throw.`,
             timestamp: Date.now(),
-        }).catch((e) => { console.error("[autoReroll] Error:", e); throw e; });
+        }).catch((e) => { console.error("[autoReroll] Error:", e); });
 
         return result;
     }
@@ -258,7 +258,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             biDieRoll,
             biDieSize: bardicDieSize,
             timestamp: Date.now(),
-        }).catch((e) => { console.error("[autoReroll] Error:", e); throw e; });
+        }).catch((e) => { console.error("[autoReroll] Error:", e); });
 
         return result;
     }
@@ -302,7 +302,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             abilityName: action.name,
             description: `${playerName} used ${action.name}: rolled 1d${psionicDieSize} (${dieRoll}) to failed attack roll. Psionic Energy: ${currentUses - 1}/${defaultMax}.`,
             timestamp: Date.now(),
-        }).catch((e) => { console.error("[autoReroll] Error:", e); throw e; });
+        }).catch((e) => { console.error("[autoReroll] Error:", e); });
 
         return result;
     }
@@ -340,7 +340,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
             abilityName: action.name,
             description: `${playerName} used ${action.name} to convert a miss into a hit.`,
             timestamp: Date.now(),
-        }).catch((e) => { console.error("[autoReroll] Error:", e); throw e; });
+        }).catch((e) => { console.error("[autoReroll] Error:", e); });
 
         return infoPopup(action.name, `<b>${action.name}</b><br/>` +
             `d20(${lastAttack.d20}) + ${lastAttack.bonus} = ${lastAttack.d20 + lastAttack.bonus} vs AC ${lastAttack.targetAc || '—'} → <b>MISS</b><br/>` +
@@ -369,7 +369,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 abilityName: action.name,
                 description: `${playerName} used ${action.name}: +${bonus} to own failed attack roll.`,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error("[autoReroll] Error:", e); throw e; });
+            }).catch((e) => { console.error("[autoReroll] Error:", e); });
             return result;
         }
         if (abilityFresh) {
@@ -380,7 +380,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                 abilityName: action.name,
                 description: `${playerName} used ${action.name}: +${bonus} to own failed ability check.`,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error("[autoReroll] Error:", e); throw e; });
+            }).catch((e) => { console.error("[autoReroll] Error:", e); });
             return result;
         }
 
@@ -396,7 +396,7 @@ export async function handle(action, playerStats, campaignName, mapName) {
                     description: `${playerName} used ${action.name}: +${bonus} to ${ally.name}'s failed attack roll.`,
                     targetName: ally.name,
                     timestamp: Date.now(),
-                }).catch((e) => { console.error("[autoReroll] Error:", e); throw e; });
+                }).catch((e) => { console.error("[autoReroll] Error:", e); });
                 return result;
             }
         }

@@ -41,7 +41,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${action.name} triggered — target ${targetName} must make ${auto.saveType || 'WIS'} save (DC ${saveDc})`,
         promptId,
-    }).catch((e) => { console.error("[postCastRider] Error:", e); throw e; });
+    }).catch((e) => { console.error("[postCastRider] Error:", e); });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -60,7 +60,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'WIS',
                 success: true,
                 description: `${targetName} succeeded on ${auto.saveType || 'WIS'} save. No effect.`,
-            }).catch((e) => { console.error("[postCastRider] Error:", e); throw e; });
+            }).catch((e) => { console.error("[postCastRider] Error:", e); });
         } else {
             const conditionChoices = RIDER_CONDITIONS[auto.condition] || [auto.condition.toLowerCase()];
             const appliedCondition = conditionChoices[0];
@@ -79,7 +79,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'WIS',
                 success: false,
                 description: `${targetName} failed ${auto.saveType || 'WIS'} save. ${appliedCondition.charAt(0).toUpperCase() + appliedCondition.slice(1)} for 1 minute.`,
-            }).catch((e) => { console.error("[postCastRider] Error:", e); throw e; });
+            }).catch((e) => { console.error("[postCastRider] Error:", e); });
 
             addExpiration(playerStats.name, targetName, [
                 { type: 'condition', condition: appliedCondition }

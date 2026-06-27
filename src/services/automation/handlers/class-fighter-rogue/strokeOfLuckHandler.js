@@ -52,7 +52,7 @@ export async function handle(action, playerStats, campaignName) {
         abilityName: action.name,
         description: `${playerName} used ${action.name} to turn a D20 test into a 20.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[strokeOfLuck] Error:", e); throw e; });
+    }).catch((e) => { console.error("[strokeOfLuck] Error:", e); });
 
     return infoPopup(action.name, description, auto);
 }

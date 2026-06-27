@@ -50,7 +50,7 @@ async function handle(action, playerStats, campaignName, _mapName) {
         description: `${playerName} used ${action.name}: +${d10Roll} to ${checkName} (d20 ${d20} + ${checkBonus} = ${originalTotal} → ${modifiedTotal}).`,
         d10Roll,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[tacticalMind] Error:", e); throw e; });
+    }).catch((e) => { console.error("[tacticalMind] Error:", e); });
 
     return infoPopup(action.name, description, auto);
 }

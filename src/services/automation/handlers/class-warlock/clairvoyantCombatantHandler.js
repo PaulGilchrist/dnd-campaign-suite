@@ -46,7 +46,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     abilityName: featureName,
                     description: `${playerName} expended a Pact Magic spell slot to restore a use of ${featureName}.`,
                     timestamp: Date.now(),
-                }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); throw e; });
+                }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); });
             } else {
                 return {
                     type: 'popup',
@@ -140,7 +140,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         targetName,
         promptId,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); throw e; });
+    }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -156,7 +156,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 success: false,
                 description: `${targetName} failed ${saveType} save — Clairvoyant Combatant active. Target has Disadvantage on attacks against you, you have Advantage on attacks against target.`,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); throw e; });
+            }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); });
         } else {
             // Target succeeded — remove the effects
             const filteredEffects = (getRuntimeValue(campaignName, 'targetEffects', campaignName) || []).filter(
@@ -182,7 +182,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 success: true,
                 description: `${targetName} succeeded on ${saveType} save — Clairvoyant Combatant has no effect.`,
                 timestamp: Date.now(),
-            }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); throw e; });
+            }).catch((e) => { console.error("[clairvoyantCombatant] Error:", e); });
         }
 
         window.removeEventListener('save-result', handleSaveResult);

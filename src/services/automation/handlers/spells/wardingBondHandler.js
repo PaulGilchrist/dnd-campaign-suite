@@ -93,7 +93,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         description: `${casterName} cast ${action.name} on ${targetName}.`,
         targetName,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[wardingBond] Error:", e); throw e; });
+    }).catch((e) => { console.error("[wardingBond] Error:", e); });
 
     return {
         type: 'popup',

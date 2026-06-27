@@ -48,7 +48,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: action.name,
             description: `${casterName} casts Mass Suggestion! ${targetName} must make a WIS save (DC ${dc}) or become Charmed.`,
             promptId,
-        }).catch((e) => { console.error("[massSuggestion] Error:", e); throw e; });
+        }).catch((e) => { console.error("[massSuggestion] Error:", e); });
 
         const saveResult = await promise;
 
@@ -63,7 +63,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: 'WIS',
                 success: true,
                 description: `${targetName} succeeded on WIS save against Mass Suggestion.`,
-            }).catch((e) => { console.error("[massSuggestion] Error:", e); throw e; });
+            }).catch((e) => { console.error("[massSuggestion] Error:", e); });
         } else {
             affectedCount++;
 

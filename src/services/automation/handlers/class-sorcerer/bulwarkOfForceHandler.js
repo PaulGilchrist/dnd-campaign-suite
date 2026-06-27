@@ -43,7 +43,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated Bulwark of Force. Allies within 30 feet have Half Cover.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[bulwarkOfForce] Error:", e); throw e; });
+    }).catch((e) => { console.error("[bulwarkOfForce] Error:", e); });
 
     return {
         type: 'popup',

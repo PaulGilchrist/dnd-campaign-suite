@@ -86,7 +86,7 @@ export async function handle(action, playerStats, campaignName) {
         abilityName: featureName,
         description: `${featureName}: ${companion.name} gains ${tempHp} Temporary Hit Points.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[createThrallTempHp] Error:", e); throw e; });
+    }).catch((e) => { console.error("[createThrallTempHp] Error:", e); });
 
     return {
         type: 'popup',

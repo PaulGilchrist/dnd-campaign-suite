@@ -173,7 +173,7 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
         abilityName: action.name,
         description: `${action.name} triggered — ${targetName} must make ${auto.saveType || 'CON'} save (DC ${saveDc})`,
         promptId,
-    }).catch((e) => { console.error("[reactionDamage] Error:", e); throw e; });
+    }).catch((e) => { console.error("[reactionDamage] Error:", e); });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -189,7 +189,7 @@ export async function handle(action, playerStats, campaignName, mapName, allEqui
                     total: damageResult.total,
                     formula: auto.damageExpression,
                     description: `${action.name} dealt ${damageResult.total} ${auto.damageType || 'Necrotic'} damage to ${targetName}.`,
-                }).catch((e) => { console.error("[reactionDamage] Error:", e); throw e; });
+                }).catch((e) => { console.error("[reactionDamage] Error:", e); });
             }
         }
 

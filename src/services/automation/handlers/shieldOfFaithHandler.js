@@ -81,7 +81,7 @@ export async function applyShieldOfFaith(action, playerStats, campaignName, mapN
             characterName: playerStats.name,
             abilityName: SHIELD_OF_FAITH_BUFF_NAME,
             description: `${playerStats.name} cast ${SHIELD_OF_FAITH_BUFF_NAME} on ${targetName}. Target's AC increases by 2.`,
-        }).catch((e) => { console.error("[shieldOfFaith] Error:", e); throw e; });
+        }).catch((e) => { console.error("[shieldOfFaith] Error:", e); });
     }
 
     return {

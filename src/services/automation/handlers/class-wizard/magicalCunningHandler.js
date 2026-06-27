@@ -130,7 +130,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} used Magical Cunning, regaining ${slotsToRegain} expended Pact Magic spell slot(s).`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[magicalCunning] Error:", e); throw e; });
+    }).catch((e) => { console.error("[magicalCunning] Error:", e); });
 
     return {
         type: 'popup',

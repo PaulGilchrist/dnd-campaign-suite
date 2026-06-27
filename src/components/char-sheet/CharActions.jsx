@@ -26,6 +26,7 @@ import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
+import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
@@ -89,7 +90,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
     const { popupHtml, setPopupHtml } = useDiceRollPopup();
 
     useEffect(() => {
-        computeFeatRangeEffects(playerStats.feats, playerStats.rules, playerStats).then(setFeatRangeEffects).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
+        computeFeatRangeEffects(playerStats.feats, playerStats.rules, playerStats).then(setFeatRangeEffects).catch((e) => { console.error("[CharActions] Error:", e); });
     }, [playerStats.feats, playerStats.rules, playerStats]);
 
     useEffect(() => {
@@ -303,7 +304,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                             targetName: playerStats.name,
                             finalDamage: applyResult?.finalDamage,
                             note: 'Overchannel self-damage (ignores resistance/immunity)',
-                        }).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
+                        }).catch((e) => { console.error("[CharActions] Error:", e); });
                     }
                 }
             }
@@ -568,7 +569,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         buildCtx(attack).then(ctx => {
             const effectiveHitBonus = ctx?.hitBonus ?? attack.hitBonus;
             rollAttack(attack.name, effectiveHitBonus - exhaustionPenalty, ctx);
-        }).catch((e) => { console.error("[CharActions] Error:", e); throw e; });
+        }).catch((e) => { console.error("[CharActions] Error:", e); });
     }, [cannotAct, buildCtx, rollAttack, exhaustionPenalty, playerStats.name, campaignName]);
 
     // To-Hit attacks: damage is ALWAYS rolled through the "To Hit" flow.
@@ -658,7 +659,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleSweepingAttackConfirm = React.useCallback(async (targetName, modalData) => {
         if (!targetName || !modalData) return;
-        const { executeSweepingAttack } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
         const result = await executeSweepingAttack(
             { automation: { secondaryTargetName: targetName } },
             modalData.playerStats,
@@ -673,7 +673,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleBaitAndSwitchChoiceConfirm = React.useCallback(async (targetName, modalData) => {
         if (!targetName || !modalData) return;
-        const { executeBaitAndSwitchChoice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
         const result = await executeBaitAndSwitchChoice(
             {
                 dieValue: modalData.dieValue,
@@ -691,7 +690,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleCommanderStrikeChoiceConfirm = React.useCallback(async (targetName, modalData) => {
         if (!targetName || !modalData) return;
-        const { executeCommanderStrikeChoice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
         const result = await executeCommanderStrikeChoice(
             {
                 dieValue: modalData.dieValue,
@@ -709,7 +707,6 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
 
     const handleRallyChoiceConfirm = React.useCallback(async (targetName, modalData) => {
         if (!targetName || !modalData) return;
-        const { executeRallyChoice } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
         const result = await executeRallyChoice(
             {
                 dieValue: modalData.dieValue,

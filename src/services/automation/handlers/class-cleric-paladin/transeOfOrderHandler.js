@@ -31,7 +31,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 characterName: playerName,
                 abilityName: featureName,
                 description: `${playerName} restored Transe of Order by spending 5 Sorcery Points.`,
-            }).catch((e) => { console.error("[transeOfOrder] Error:", e); throw e; });
+            }).catch((e) => { console.error("[transeOfOrder] Error:", e); });
 
             return {
                 type: 'popup',
@@ -63,7 +63,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         characterName: playerName,
         abilityName: featureName,
         description: `${playerName} activated ${featureName} (Bonus Action, 1 minute). Attack rolls against you can't benefit from Advantage. D20 tests treat 9 or lower as 10.`,
-    }).catch((e) => { console.error("[transeOfOrder] Error:", e); throw e; });
+    }).catch((e) => { console.error("[transeOfOrder] Error:", e); });
 
     return {
         type: 'popup',

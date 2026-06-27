@@ -38,7 +38,7 @@ function WeaponKindMasteryModal({ action, playerStats, campaignName, meleeOnly, 
                 : weaponItems;
 
             setWeapons(filtered);
-        }).catch((e) => { console.error("[WeaponKindMasteryModal] Error:", e); throw e; });
+        }).catch((e) => { console.error("[WeaponKindMasteryModal] Error:", e); });
     }, [action, playerStats, meleeOnly]);
 
     const toggleWeapon = (weaponName) => {

@@ -151,7 +151,7 @@ export function useActionSpellMetamagic({
             } else {
                 buildCtx(attack).then(ctx => {
                     rollDamage(attack.name, formula, total, rolls, modifier, ctx);
-                }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); throw e; });
+                }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); });
             }
             return;
         }
@@ -183,7 +183,7 @@ export function useActionSpellMetamagic({
                 } else {
                     buildCtx(attack).then(ctx => {
                         rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
-                    }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); throw e; });
+                    }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); });
                 }
             },
         });
@@ -220,7 +220,7 @@ export function useActionSpellMetamagic({
                 } else {
                     buildCtx(attack).then(ctx => {
                         rollAttack(attack.name, attack.hitBonus - exhaustionPenalty, { ...ctx, ...metaCtx });
-                    }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); throw e; });
+                    }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); });
                 }
             },
         });
@@ -261,7 +261,7 @@ export function useActionSpellMetamagic({
                 } else {
                     buildCtx(attack).then(ctx => {
                         rollDamage(attack.name, formula, total, rolls, modifier, { ...ctx, ...metaCtx });
-                    }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); throw e; });
+                    }).catch((e) => { console.error("[useActionSpellMetamagic] Error:", e); });
                 }
             },
         });

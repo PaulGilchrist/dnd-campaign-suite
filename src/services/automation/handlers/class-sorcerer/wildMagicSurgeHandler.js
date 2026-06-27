@@ -87,7 +87,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} triggered Wild Magic Surge (rolled 20): ${effectText.substring(0, 120)}...`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[wildMagicSurge] Error:", e); throw e; });
+    }).catch((e) => { console.error("[wildMagicSurge] Error:", e); });
 
     return {
         type: 'popup',
@@ -164,7 +164,7 @@ export async function onTamedSurgeSelected(action, playerStats, campaignName, se
         abilityName: action.name,
         description: `${playerName} used Tamed Surge to select: ${selectedSurge.effect.substring(0, 120)}...`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[wildMagicSurge] Error:", e); throw e; });
+    }).catch((e) => { console.error("[wildMagicSurge] Error:", e); });
 
     return {
         type: 'popup',
@@ -250,7 +250,7 @@ export async function onDoubleRollSelected(action, playerStats, campaignName, se
         abilityName: action.featureName,
         description: `${playerName} triggered Wild Magic Surge (rolled ${selectedRoll}): ${effectText.substring(0, 120)}...`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[wildMagicSurge] Error:", e); throw e; });
+    }).catch((e) => { console.error("[wildMagicSurge] Error:", e); });
 
     return {
         type: 'popup',

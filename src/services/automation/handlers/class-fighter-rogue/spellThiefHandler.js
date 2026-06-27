@@ -55,7 +55,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: featureName,
         description: `${playerName} used ${featureName} — ${targetName} must make INT save (DC ${saveDc}) or lose the spell.`,
         promptId,
-    }).catch((e) => { console.error("[spellThief] Error:", e); throw e; });
+    }).catch((e) => { console.error("[spellThief] Error:", e); });
 
     const handleSaveResult = async (event) => {
         if (event.detail.promptId !== promptId) return;
@@ -90,7 +90,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'INT',
                 success: false,
                 description: `${targetName} failed INT save. Spell negated. ${playerName} steals ${spellName} for 8 hours. ${casterName} cannot cast ${spellName} for 8 hours.`,
-            }).catch((e) => { console.error("[spellThief] Error:", e); throw e; });
+            }).catch((e) => { console.error("[spellThief] Error:", e); });
 
             window.dispatchEvent(new CustomEvent('combat-summary-updated'));
         } else {
@@ -103,7 +103,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                 saveType: auto.saveType || 'INT',
                 success: true,
                 description: `${targetName} succeeded on INT save. ${featureName} has no effect.`,
-            }).catch((e) => { console.error("[spellThief] Error:", e); throw e; });
+            }).catch((e) => { console.error("[spellThief] Error:", e); });
         }
 
         window.removeEventListener('save-result', handleSaveResult);

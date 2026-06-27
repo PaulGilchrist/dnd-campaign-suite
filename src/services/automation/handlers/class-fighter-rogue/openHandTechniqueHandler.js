@@ -82,7 +82,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         saveDc,
         saveType,
         description: `${action.name} — ${targetName} must make a ${saveType} saving throw (DC ${saveDc}).`,
-    }).catch((e) => { console.error("[openHandTechnique] Error:", e); throw e; });
+    }).catch((e) => { console.error("[openHandTechnique] Error:", e); });
 
     const saveResult = await promise;
     const success = saveResult.success;
@@ -101,7 +101,7 @@ export async function applyOpenHandTechnique(action, playerStats, campaignName, 
         bonus: saveResult.saveBonus ?? 0,
         formula: `1d20${saveResult.saveBonus !== 0 ? '+' + saveResult.saveBonus : ''}`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[openHandTechnique] Error:", e); throw e; });
+    }).catch((e) => { console.error("[openHandTechnique] Error:", e); });
 
     if (!success) {
         await applyOpenHandEffect(action, playerStats, campaignName, targetName, chosenOption);

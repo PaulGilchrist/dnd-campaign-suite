@@ -12,7 +12,7 @@ function MonsterNameAutocomplete({ value, onChange = () => {}, onCommit, positio
     const debounceRef = useRef(null);
 
     useEffect(() => {
-        loadMonsters().then(setMonsters).catch((e) => { console.error("[MonsterNameAutocomplete] Error:", e); throw e; });
+        loadMonsters().then(setMonsters).catch((e) => { console.error("[MonsterNameAutocomplete] Error:", e); });
          }, []);
 
     const allNames = useCallback(() => {

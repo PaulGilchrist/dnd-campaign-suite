@@ -163,7 +163,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                     isHealing: true,
                     isUnconscious: false,
                 })
-            }).catch((e) => { console.error("[HealingPoolModal] Error:", e); throw e; });
+            }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
             setLog(prev => [...prev, { action: 'Heal', target: playerStats.name, amount, poolAfter: newPool }]);
             setHealAmount(Math.min(healAmount, newPool));
         }
@@ -210,7 +210,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                     isHealing: true,
                     isUnconscious: false,
                 })
-            }).catch((e) => { console.error("[HealingPoolModal] Error:", e); throw e; });
+            }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
             setLog(prev => [...prev, {
                 action: `Roll ${diceToRoll}d${dieType}`,
                 target: playerStats.name,
@@ -251,7 +251,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 sourceName: playerStats.name,
                 timestamp: Date.now(),
               })
-          }).catch((e) => { console.error("[HealingPoolModal] Error:", e); throw e; });
+          }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
         setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
         setHealAmount(Math.min(healAmount, newPool));
@@ -289,7 +289,7 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                     sourceName: playerStats.name,
                     timestamp: Date.now(),
                 })
-            }).catch((e) => { console.error("[HealingPoolModal] Error:", e); throw e; });
+            }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
             setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
         });

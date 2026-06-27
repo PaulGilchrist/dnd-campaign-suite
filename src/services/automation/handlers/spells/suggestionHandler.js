@@ -37,7 +37,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${casterName} casts Suggestion on ${targetName}! ${targetName} must make a WIS save (DC ${dc}) or become Charmed.`,
         promptId,
-    }).catch((e) => { console.error("[suggestion] Error:", e); throw e; });
+    }).catch((e) => { console.error("[suggestion] Error:", e); });
 
     const saveResult = await promise;
 
@@ -51,7 +51,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save against Suggestion.`,
-        }).catch((e) => { console.error("[suggestion] Error:", e); throw e; });
+        }).catch((e) => { console.error("[suggestion] Error:", e); });
 
         return {
             type: 'popup',
@@ -93,7 +93,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         saveType: 'WIS',
         success: false,
         description: `${targetName} failed WIS save against Suggestion and is Charmed.`,
-    }).catch((e) => { console.error("[suggestion] Error:", e); throw e; });
+    }).catch((e) => { console.error("[suggestion] Error:", e); });
 
     return {
         type: 'popup',

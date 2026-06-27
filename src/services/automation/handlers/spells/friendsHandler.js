@@ -33,7 +33,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: 'Friends',
         description: `${playerStats.name} casts Friends on ${targetName}. ${targetName} must make a WIS save (DC ${dc}) or be Charmed.`,
         promptId,
-    }).catch((e) => { console.error("[friends] Error:", e); throw e; });
+    }).catch((e) => { console.error("[friends] Error:", e); });
 
     const saveResult = await promise;
 
@@ -47,7 +47,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             saveType: 'WIS',
             success: true,
             description: `${targetName} succeeded on WIS save against Friends.`,
-        }).catch((e) => { console.error("[friends] Error:", e); throw e; });
+        }).catch((e) => { console.error("[friends] Error:", e); });
 
         // Clear active Friends tracking since spell had no effect
         setRuntimeValue(campaignName, activeKey, null, campaignName);

@@ -156,7 +156,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
             abilityName: 'Grease',
             description: `${targetName} must make a ${tracking.saveType} save (DC ${tracking.saveDc}) or become Prone (Grease area).`,
             promptId,
-        }).catch((e) => { console.error("[greaseAreaSave] Error:", e); throw e; });
+        }).catch((e) => { console.error("[greaseAreaSave] Error:", e); });
 
         const saveResult = await promise;
 
@@ -175,7 +175,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
                 saveType: tracking.saveType,
                 success: false,
                 description: `${targetName} failed ${tracking.saveType} save against Grease. Becomes Prone.`,
-            }).catch((e) => { console.error("[greaseAreaSave] Error:", e); throw e; });
+            }).catch((e) => { console.error("[greaseAreaSave] Error:", e); });
         } else {
             addEntry(campaignName, {
                 type: 'save_result',
@@ -186,7 +186,7 @@ export async function processGreaseAreaSave(casterName, targetName, campaignName
                 saveType: tracking.saveType,
                 success: true,
                 description: `${targetName} succeeded on ${tracking.saveType} save against Grease.`,
-            }).catch((e) => { console.error("[greaseAreaSave] Error:", e); throw e; });
+            }).catch((e) => { console.error("[greaseAreaSave] Error:", e); });
         }
 
         return {

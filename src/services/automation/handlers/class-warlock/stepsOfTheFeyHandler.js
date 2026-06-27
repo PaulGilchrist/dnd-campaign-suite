@@ -61,7 +61,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
             abilityName: featureName,
             description: `${featureName} triggered — ${targetName} must make WIS save (DC ${saveDc}) or have Disadvantage on attack rolls against creatures other than ${playerName}.`,
             promptId,
-        }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); throw e; });
+        }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); });
 
         const handleSaveResult = async (event) => {
             if (event.detail.promptId !== promptId) return;
@@ -85,7 +85,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     saveType: 'WIS',
                     success: false,
                     description: `${targetName} failed WIS save. ${targetName} has Disadvantage on attack rolls against creatures other than ${playerName} until start of ${playerName}'s next turn.`,
-                }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); throw e; });
+                }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); });
 
                 // Duration: roughly 1 round (until start of taunter's next turn)
                 addExpiration(playerName, targetName, [
@@ -101,7 +101,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
                     saveType: 'WIS',
                     success: true,
                     description: `${targetName} succeeded on WIS save from ${featureName}. No effect.`,
-                }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); throw e; });
+                }).catch((e) => { console.error("[stepsOfTheFey] Error:", e); });
             }
 
             window.removeEventListener('save-result', handleSaveResult);

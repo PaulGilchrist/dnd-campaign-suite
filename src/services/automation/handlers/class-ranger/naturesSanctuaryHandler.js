@@ -85,7 +85,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         abilityName: action.name,
         description: `${playerName} activated Nature's Sanctuary.`,
         timestamp: Date.now(),
-    }).catch((e) => { console.error("[naturesSanctuary] Error:", e); throw e; });
+    }).catch((e) => { console.error("[naturesSanctuary] Error:", e); });
 
     return {
         type: 'popup',
