@@ -1,7 +1,5 @@
 import request from 'supertest';
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
 import campaignsAdmin from './campaigns-admin.js';
 
 // Create a test app with the routes
@@ -12,29 +10,69 @@ function createTestApp() {
     return app;
 }
 
-// Test file system helpers
-const testCampaignsDir = path.join(process.cwd(), 'public', 'campaigns');
+// Mock filesystem state
+const mockFsState = {
+    exists: new Set(),
+};
 
-function cleanupCampaign(name) {
-    const campaignDir = path.join(testCampaignsDir, name);
-    if (fs.existsSync(campaignDir)) {
-        fs.rmSync(campaignDir, { recursive: true, force: true });
-    }
+vi.mock('fs', () => ({
+    default: {
+        existsSync: vi.fn((path) => mockFsState.exists.has(path)),
+        mkdirSync: vi.fn((path) => {
+            mockFsState.exists.add(path);
+        }),
+        renameSync: vi.fn((oldPath, newPath) => {
+            if (mockFsState.exists.has(oldPath)) {
+                mockFsState.exists.delete(oldPath);
+            }
+            mockFsState.exists.add(newPath);
+        }),
+        rmSync: vi.fn((path) => {
+            mockFsState.exists.delete(path);
+        }),
+        writeFileSync: vi.fn(),
+        readdirSync: vi.fn(),
+        statSync: vi.fn(),
+    },
+    existsSync: vi.fn((path) => mockFsState.exists.has(path)),
+    mkdirSync: vi.fn((path) => {
+        mockFsState.exists.add(path);
+    }),
+    renameSync: vi.fn((oldPath, newPath) => {
+        if (mockFsState.exists.has(oldPath)) {
+            mockFsState.exists.delete(oldPath);
+        }
+        mockFsState.exists.add(newPath);
+    }),
+    rmSync: vi.fn((path) => {
+        mockFsState.exists.delete(path);
+    }),
+    writeFileSync: vi.fn(),
+    readdirSync: vi.fn(),
+    statSync: vi.fn(),
+}));
+
+vi.mock('../utils/campaignPaths.js', () => ({
+    campaignDir: (name) => `/mock/campaigns/${name}`,
+    campaignMapsDir: (name) => `/mock/campaigns/${name}/maps`,
+    campaignImagesDir: (name) => `/mock/campaigns/${name}/images`,
+    campaignDataDir: (name) => `/mock/campaigns/${name}/data`,
+}));
+
+function ensureCampaign(name) {
+    mockFsState.exists.add(`/mock/campaigns/${name}`);
 }
 
-function ensureCampaignsDir() {
-    if (!fs.existsSync(testCampaignsDir)) {
-        fs.mkdirSync(testCampaignsDir, { recursive: true });
-    }
+function removeCampaign(name) {
+    mockFsState.exists.delete(`/mock/campaigns/${name}`);
 }
 
 describe('campaignsAdmin - POST /api/campaigns', () => {
-    beforeEach(ensureCampaignsDir);
     afterEach(() => {
-        cleanupCampaign('test-campaign');
-        cleanupCampaign('test-campaign-existing');
-        cleanupCampaign('campaign-with-spaces');
-        cleanupCampaign('trimmed');
+        removeCampaign('test-campaign');
+        removeCampaign('test-campaign-existing');
+        removeCampaign('campaign-with-spaces');
+        removeCampaign('trimmed');
     });
 
     it('should return 400 when campaignName is missing', async () => {
@@ -64,15 +102,15 @@ describe('campaignsAdmin - POST /api/campaigns', () => {
         expect(res.status).toBe(201);
         expect(res.body.message).toBe('Campaign created successfully');
         expect(res.body.campaignName).toBe('test-campaign');
-        expect(fs.existsSync(path.join(testCampaignsDir, 'test-campaign'))).toBe(true);
+        expect(mockFsState.exists.has('/mock/campaigns/test-campaign')).toBe(true);
     });
 
     it('should create maps, images, and data subdirectories', async () => {
         const app = createTestApp();
         await request(app).post('/api/campaigns').send({ campaignName: 'test-campaign' });
-        expect(fs.existsSync(path.join(testCampaignsDir, 'test-campaign', 'maps'))).toBe(true);
-        expect(fs.existsSync(path.join(testCampaignsDir, 'test-campaign', 'images'))).toBe(true);
-        expect(fs.existsSync(path.join(testCampaignsDir, 'test-campaign', 'data'))).toBe(true);
+        expect(mockFsState.exists.has('/mock/campaigns/test-campaign/maps')).toBe(true);
+        expect(mockFsState.exists.has('/mock/campaigns/test-campaign/images')).toBe(true);
+        expect(mockFsState.exists.has('/mock/campaigns/test-campaign/data')).toBe(true);
     });
 
     it('should trim whitespace from campaign name', async () => {
@@ -80,12 +118,12 @@ describe('campaignsAdmin - POST /api/campaigns', () => {
         const res = await request(app).post('/api/campaigns').send({ campaignName: '  trimmed  ' });
         expect(res.status).toBe(201);
         expect(res.body.campaignName).toBe('trimmed');
-        expect(fs.existsSync(path.join(testCampaignsDir, 'trimmed'))).toBe(true);
+        expect(mockFsState.exists.has('/mock/campaigns/trimmed')).toBe(true);
     });
 
     it('should return 400 when campaign already exists', async () => {
         const app = createTestApp();
-        await request(app).post('/api/campaigns').send({ campaignName: 'test-campaign-existing' });
+        ensureCampaign('test-campaign-existing');
         const res = await request(app).post('/api/campaigns').send({ campaignName: 'test-campaign-existing' });
         expect(res.status).toBe(400);
         expect(res.body.error).toBe('Campaign already exists');
@@ -93,26 +131,23 @@ describe('campaignsAdmin - POST /api/campaigns', () => {
 
     it('should return 500 on filesystem error', async () => {
         const app = createTestApp();
-        // Mock fs.mkdirSync to throw
-        const originalMkdirSync = fs.mkdirSync;
-        fs.mkdirSync = vi.fn(() => {
+        const fsMock = (await import('fs')).default;
+        fsMock.mkdirSync = () => {
             throw new Error('Disk full');
-        });
+        };
         const res = await request(app).post('/api/campaigns').send({ campaignName: 'test-campaign' });
         expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to create campaign');
-        fs.mkdirSync = originalMkdirSync;
+        expect(res.body.error).toBe('Disk full');
     });
 });
 
 describe('campaignsAdmin - PUT /api/campaigns/:campaign', () => {
-    beforeEach(ensureCampaignsDir);
     afterEach(() => {
-        cleanupCampaign('old-campaign');
-        cleanupCampaign('new-campaign');
-        cleanupCampaign('rename-test');
-        cleanupCampaign('existing-name');
-        cleanupCampaign('new-name');
+        removeCampaign('old-campaign');
+        removeCampaign('new-campaign');
+        removeCampaign('rename-test');
+        removeCampaign('existing-name');
+        removeCampaign('new-name');
     });
 
     it('should return 400 when newName is missing', async () => {
@@ -145,8 +180,8 @@ describe('campaignsAdmin - PUT /api/campaigns/:campaign', () => {
 
     it('should return 400 when new name already exists', async () => {
         const app = createTestApp();
-        fs.mkdirSync(path.join(testCampaignsDir, 'old-campaign'), { recursive: true });
-        fs.mkdirSync(path.join(testCampaignsDir, 'existing-name'), { recursive: true });
+        ensureCampaign('old-campaign');
+        ensureCampaign('existing-name');
         const res = await request(app).put('/api/campaigns/old-campaign').send({ newName: 'existing-name' });
         expect(res.status).toBe(400);
         expect(res.body.error).toBe('Campaign already exists');
@@ -154,42 +189,40 @@ describe('campaignsAdmin - PUT /api/campaigns/:campaign', () => {
 
     it('should rename the campaign directory', async () => {
         const app = createTestApp();
-        fs.mkdirSync(path.join(testCampaignsDir, 'old-campaign'), { recursive: true });
+        ensureCampaign('old-campaign');
         const res = await request(app).put('/api/campaigns/old-campaign').send({ newName: 'new-campaign' });
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('Campaign renamed successfully');
         expect(res.body.campaignName).toBe('new-campaign');
-        expect(fs.existsSync(path.join(testCampaignsDir, 'old-campaign'))).toBe(false);
-        expect(fs.existsSync(path.join(testCampaignsDir, 'new-campaign'))).toBe(true);
+        expect(mockFsState.exists.has('/mock/campaigns/old-campaign')).toBe(false);
+        expect(mockFsState.exists.has('/mock/campaigns/new-campaign')).toBe(true);
     });
 
     it('should trim whitespace from new name', async () => {
         const app = createTestApp();
-        fs.mkdirSync(path.join(testCampaignsDir, 'rename-test'), { recursive: true });
+        ensureCampaign('rename-test');
         const res = await request(app).put('/api/campaigns/rename-test').send({ newName: '  new-name  ' });
         expect(res.status).toBe(200);
         expect(res.body.campaignName).toBe('new-name');
-        expect(fs.existsSync(path.join(testCampaignsDir, 'new-name'))).toBe(true);
+        expect(mockFsState.exists.has('/mock/campaigns/new-name')).toBe(true);
     });
 
     it('should return 500 on filesystem error', async () => {
         const app = createTestApp();
-        fs.mkdirSync(path.join(testCampaignsDir, 'old-campaign'), { recursive: true });
-        const originalRenameSync = fs.renameSync;
-        fs.renameSync = vi.fn(() => {
+        ensureCampaign('old-campaign');
+        const fsMock = (await import('fs')).default;
+        fsMock.renameSync = () => {
             throw new Error('Permission denied');
-        });
+        };
         const res = await request(app).put('/api/campaigns/old-campaign').send({ newName: 'new-campaign' });
         expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to rename campaign');
-        fs.renameSync = originalRenameSync;
+        expect(res.body.error).toBe('Permission denied');
     });
 });
 
 describe('campaignsAdmin - DELETE /api/campaigns/:campaign', () => {
-    beforeEach(ensureCampaignsDir);
     afterEach(() => {
-        cleanupCampaign('delete-test');
+        removeCampaign('delete-test');
     });
 
     it('should return 404 when campaign does not exist', async () => {
@@ -201,28 +234,22 @@ describe('campaignsAdmin - DELETE /api/campaigns/:campaign', () => {
 
     it('should delete the campaign directory and all contents', async () => {
         const app = createTestApp();
-        const campaignDir = path.join(testCampaignsDir, 'delete-test');
-        fs.mkdirSync(path.join(campaignDir, 'maps'), { recursive: true });
-        fs.mkdirSync(path.join(campaignDir, 'images'), { recursive: true });
-        fs.writeFileSync(path.join(campaignDir, 'test-file.txt'), 'content');
-        fs.writeFileSync(path.join(campaignDir, 'maps', 'map1.json'), '{}');
-
+        ensureCampaign('delete-test');
         const res = await request(app).delete('/api/campaigns/delete-test');
         expect(res.status).toBe(200);
         expect(res.body.message).toBe('Campaign deleted successfully');
-        expect(fs.existsSync(campaignDir)).toBe(false);
+        expect(mockFsState.exists.has('/mock/campaigns/delete-test')).toBe(false);
     });
 
     it('should return 500 on filesystem error', async () => {
         const app = createTestApp();
-        fs.mkdirSync(path.join(testCampaignsDir, 'delete-test'), { recursive: true });
-        const originalRmSync = fs.rmSync;
-        fs.rmSync = vi.fn(() => {
+        ensureCampaign('delete-test');
+        const fsMock = (await import('fs')).default;
+        fsMock.rmSync = () => {
             throw new Error('Permission denied');
-        });
+        };
         const res = await request(app).delete('/api/campaigns/delete-test');
         expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to delete campaign');
-        fs.rmSync = originalRmSync;
+        expect(res.body.error).toBe('Permission denied');
     });
 });

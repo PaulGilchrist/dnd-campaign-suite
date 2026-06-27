@@ -7,24 +7,6 @@ import {
 } from '../utils/encounterUtils.js';
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function createTestCampaignDir(campaignName, hasFile = false, fileContent = null) {
-    const baseDir = path.join(process.cwd(), 'public', 'campaigns', campaignName, 'data');
-    fs.mkdirSync(baseDir, { recursive: true });
-    if (hasFile) {
-        fs.writeFileSync(path.join(baseDir, 'encounters.json'), JSON.stringify(fileContent));
-    }
-    return baseDir;
-}
-
-function removeTestCampaignDir(campaignName) {
-    const dir = path.join(process.cwd(), 'public', 'campaigns', campaignName);
-    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
-}
-
-// ---------------------------------------------------------------------------
 // getEncountersFilePath
 // ---------------------------------------------------------------------------
 describe('encounterUtils - getEncountersFilePath', () => {
@@ -61,21 +43,22 @@ describe('encounterUtils - getEncountersFilePath', () => {
 // readEncounters
 // ---------------------------------------------------------------------------
 describe('encounterUtils - readEncounters', () => {
+    beforeEach(() => {
+        vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
-        removeTestCampaignDir('test-campaign-1');
-        removeTestCampaignDir('test-campaign-2');
-        removeTestCampaignDir('test-campaign-3');
-        removeTestCampaignDir('test-campaign-4');
-        removeTestCampaignDir('test-campaign-5');
     });
 
     it('should return empty encounters array when file does not exist', () => {
+        fs.existsSync.mockReturnValueOnce(false);
         const result = readEncounters('nonexistent-campaign');
         expect(result).toEqual({ encounters: [] });
     });
 
     it('should return empty encounters array when campaign directory does not exist', () => {
+        fs.existsSync.mockReturnValueOnce(false);
         const result = readEncounters('totally-missing-campaign');
         expect(result).toEqual({ encounters: [] });
     });
@@ -87,7 +70,7 @@ describe('encounterUtils - readEncounters', () => {
                 { id: 'enc-2', name: 'Dragon Lair', level: 15 },
             ],
         };
-        createTestCampaignDir('test-campaign-1', true, encountersData);
+        vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(encountersData));
 
         const result = readEncounters('test-campaign-1');
         expect(result).toEqual(encountersData);
@@ -95,7 +78,7 @@ describe('encounterUtils - readEncounters', () => {
 
     it('should handle encounters with empty array', () => {
         const encountersData = { encounters: [] };
-        createTestCampaignDir('test-campaign-2', true, encountersData);
+        vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(encountersData));
 
         const result = readEncounters('test-campaign-2');
         expect(result).toEqual(encountersData);
@@ -117,16 +100,14 @@ describe('encounterUtils - readEncounters', () => {
                 },
             ],
         };
-        createTestCampaignDir('test-campaign-3', true, encountersData);
+        vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(encountersData));
 
         const result = readEncounters('test-campaign-3');
         expect(result).toEqual(encountersData);
     });
 
     it('should return empty encounters on invalid JSON', () => {
-        const baseDir = path.join(process.cwd(), 'public', 'campaigns', 'test-campaign-4', 'data');
-        fs.mkdirSync(baseDir, { recursive: true });
-        fs.writeFileSync(path.join(baseDir, 'encounters.json'), 'this is not valid json{{{');
+        vi.spyOn(fs, 'readFileSync').mockReturnValue('this is not valid json{{{');
 
         const spy = vi.spyOn(console, 'error');
         const result = readEncounters('test-campaign-4');
@@ -137,24 +118,15 @@ describe('encounterUtils - readEncounters', () => {
     });
 
     it('should handle file read errors gracefully', () => {
-        const baseDir = path.join(process.cwd(), 'public', 'campaigns', 'test-campaign-5', 'data');
-        fs.mkdirSync(baseDir, { recursive: true });
-        const filePath = path.join(baseDir, 'encounters.json');
-        fs.writeFileSync(filePath, JSON.stringify({ encounters: [{ id: '1' }] }));
-
-        if (process.platform !== 'win32') {
-            fs.chmodSync(filePath, 0o000);
-        }
+        vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+            throw new Error('EACCES: permission denied');
+        });
 
         const spy = vi.spyOn(console, 'error');
         const result = readEncounters('test-campaign-5');
 
         expect(result).toEqual({ encounters: [] });
         spy.mockRestore();
-
-        if (process.platform !== 'win32') {
-            fs.chmodSync(filePath, 0o644);
-        }
     });
 
     it('should return encounters with various data types', () => {
@@ -163,7 +135,7 @@ describe('encounterUtils - readEncounters', () => {
                 { id: '1', name: 'String', active: true, count: 42, values: null, nested: { a: 1 } },
             ],
         };
-        createTestCampaignDir('test-campaign-1', true, encountersData);
+        vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify(encountersData));
 
         const result = readEncounters('test-campaign-1');
         expect(result).toEqual(encountersData);
@@ -176,10 +148,6 @@ describe('encounterUtils - readEncounters', () => {
 describe('encounterUtils - writeEncounters', () => {
     afterEach(() => {
         vi.restoreAllMocks();
-        removeTestCampaignDir('write-test-1');
-        removeTestCampaignDir('write-test-2');
-        removeTestCampaignDir('write-test-3');
-        removeTestCampaignDir('write-test-4');
     });
 
     it('should write encounters data to the correct file path', () => {

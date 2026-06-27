@@ -1,5 +1,13 @@
 import request from 'supertest';
 import express from 'express';
+
+vi.mock('../utils/changeData.js', () => ({
+    characterChangeData: new Map(),
+    publish: vi.fn(),
+    saveFile: vi.fn(),
+    debouncedSave: vi.fn(),
+}));
+
 import { characterChangeData } from '../utils/changeData.js';
 import campaignsChangedata from './campaigns-changedata.js';
 
@@ -189,11 +197,11 @@ describe('campaignsChangedata - POST /api/campaigns/:campaign/:key', () => {
 
     it('should create the campaign entry if it does not exist', async () => {
         const app = createTestApp();
-        expect(characterChangeData.has('new-campaign')).toBe(false);
-        const res = await request(app).post('/api/campaigns/new-campaign/character1').send({ value: { hp: 10 } });
+        expect(characterChangeData.has('test-campaign')).toBe(false);
+        const res = await request(app).post('/api/campaigns/test-campaign/character1').send({ value: { hp: 10 } });
         expect(res.status).toBe(200);
-        expect(characterChangeData.has('new-campaign')).toBe(true);
-        expect(characterChangeData.get('new-campaign').character1).toEqual({ hp: 10 });
+        expect(characterChangeData.has('test-campaign')).toBe(true);
+        expect(characterChangeData.get('test-campaign').character1).toEqual({ hp: 10 });
     });
 
     it('should overwrite an existing key value', async () => {

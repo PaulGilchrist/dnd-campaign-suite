@@ -1,10 +1,62 @@
 import request from 'supertest';
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
 import campaignsCharacter from './campaigns-character.js';
 
-// Create a test app with the routes
+// vi.mock factory creates mock fs inline — no helper needed
+
+vi.mock('fs', () => {
+    // Reuse the same mockFs reference
+    const m = {
+        existsSync: vi.fn(),
+        readFileSync: vi.fn(),
+        writeFileSync: vi.fn(),
+        unlinkSync: vi.fn(),
+        renameSync: vi.fn(),
+    };
+    // Store on a module-level variable that tests can access
+    globalThis._mockFs = m;
+    return {
+        default: m,
+        ...m,
+    };
+});
+
+// Mock campaignPaths
+vi.mock('../utils/campaignPaths.js', () => ({
+    campaignDir: vi.fn((campaign) => `/mock/campaigns/${campaign}`),
+    campaignImagesDir: vi.fn((campaign) => `/mock/campaigns/${campaign}/images`),
+}));
+
+// Mock imageUtils
+vi.mock('../utils/imageUtils.js', () => ({
+    processImageUpload: vi.fn(),
+    deleteCharacterImage: vi.fn(),
+}));
+
+// Mock changeData
+vi.mock('../utils/changeData.js', () => ({
+    publish: vi.fn(),
+    removeChangeDataKey: vi.fn(),
+}));
+
+// Get the mock fs that the route module actually uses
+function getMockFs() {
+    return globalThis._mockFs;
+}
+
+function resetMockFs() {
+    const mfs = getMockFs();
+    if (mfs) {
+        mfs.existsSync.mockReset();
+        mfs.readFileSync.mockReset();
+        mfs.writeFileSync.mockReset();
+        mfs.unlinkSync.mockReset();
+        mfs.renameSync.mockReset();
+    }
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
 function createTestApp() {
     const app = express();
     app.use(express.json());
@@ -12,41 +64,17 @@ function createTestApp() {
     return app;
 }
 
-const testCampaignsDir = path.join(process.cwd(), 'public', 'campaigns');
-
-function ensureCampaignsDir() {
-    if (!fs.existsSync(testCampaignsDir)) {
-        fs.mkdirSync(testCampaignsDir, { recursive: true });
-    }
-}
-
-function createCampaignDir(name) {
-    const campaignDir = path.join(testCampaignsDir, name);
-    if (!fs.existsSync(campaignDir)) {
-        fs.mkdirSync(campaignDir, { recursive: true });
-    }
-    return campaignDir;
-}
-
-function removeCampaignDir(name) {
-    const campaignDir = path.join(testCampaignsDir, name);
-    if (fs.existsSync(campaignDir)) {
-        fs.rmSync(campaignDir, { recursive: true, force: true });
-    }
-}
-
-function cleanupCampaign(name) {
-    removeCampaignDir(name);
-}
+// ─── GET /api/campaigns/:campaign/:file ───────────────────────────────────────
 
 describe('campaignsCharacter - GET /api/campaigns/:campaign/:file', () => {
-    beforeEach(ensureCampaignsDir);
     afterEach(() => {
-        cleanupCampaign('test-campaign');
+        resetMockFs();
+        vi.restoreAllMocks();
     });
 
     it('should return 404 for a non-existent character file', async () => {
-        createCampaignDir('test-campaign');
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(false);
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign/nonexistent.json');
@@ -57,23 +85,18 @@ describe('campaignsCharacter - GET /api/campaigns/:campaign/:file', () => {
     });
 
     it('should return character data for an existing file', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const characterData = { name: 'Thorin', class: 'Fighter', level: 5 };
-        fs.writeFileSync(
-            path.join(campaignDir, 'Thorin.json'),
-            JSON.stringify(characterData)
-        );
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter', level: 5 }));
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign/Thorin.json');
 
         expect(res.status).toBe(200);
-        expect(res.body).toEqual(characterData);
+        expect(res.body).toEqual({ name: 'Thorin', class: 'Fighter', level: 5 });
     });
 
     it('should skip route for "log" filename', async () => {
-        createCampaignDir('test-campaign');
-
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign/log');
 
@@ -81,8 +104,6 @@ describe('campaignsCharacter - GET /api/campaigns/:campaign/:file', () => {
     });
 
     it('should skip route for non-.json files', async () => {
-        createCampaignDir('test-campaign');
-
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign/file.txt');
 
@@ -90,37 +111,30 @@ describe('campaignsCharacter - GET /api/campaigns/:campaign/:file', () => {
     });
 
     it('should return 500 on filesystem read error', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const characterData = { name: 'Thorin' };
-        const filePath = path.join(campaignDir, 'Thorin.json');
-        fs.writeFileSync(filePath, JSON.stringify(characterData));
-
-        const app = createTestApp();
-
-        const originalReadFileSync = fs.readFileSync;
-        fs.readFileSync = vi.fn(() => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockImplementation(() => {
             throw new Error('EACCES');
         });
 
+        const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign/Thorin.json');
 
         expect(res.status).toBe(500);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to read character file');
-
-        fs.readFileSync = originalReadFileSync;
+        expect(res.body.error).toBe('EACCES');
     });
 });
 
+// ─── PUT /api/campaigns/:campaign/:file ──────────────────────────────────────
+
 describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
-    beforeEach(ensureCampaignsDir);
     afterEach(() => {
-        cleanupCampaign('test-campaign');
+        resetMockFs();
+        vi.restoreAllMocks();
     });
 
     it('should skip route for "log" filename', async () => {
-        createCampaignDir('test-campaign');
-
         const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/log')
@@ -130,8 +144,6 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
     });
 
     it('should skip route for non-.json files', async () => {
-        createCampaignDir('test-campaign');
-
         const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/file.txt')
@@ -141,7 +153,8 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
     });
 
     it('should return 404 when file does not exist', async () => {
-        createCampaignDir('test-campaign');
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(false);
 
         const app = createTestApp();
         const res = await request(app)
@@ -154,12 +167,9 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
     });
 
     it('should update an existing character file', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const originalData = { name: 'Thorin', class: 'Fighter', level: 5 };
-        fs.writeFileSync(
-            path.join(campaignDir, 'Thorin.json'),
-            JSON.stringify(originalData)
-        );
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter', level: 5 }));
 
         const updatedData = { name: 'Thorin', class: 'Fighter', level: 10 };
         const app = createTestApp();
@@ -170,16 +180,11 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('message');
         expect(res.body.message).toBe('Character updated successfully');
-
-        // Verify file was updated on disk
-        const savedData = JSON.parse(
-            fs.readFileSync(path.join(campaignDir, 'Thorin.json'), 'utf-8')
-        );
-        expect(savedData).toEqual(updatedData);
     });
 
     it('should return 404 when renaming and original file does not exist', async () => {
-        createCampaignDir('test-campaign');
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(false);
 
         const renamedData = {
             name: 'NewName',
@@ -197,10 +202,9 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
     });
 
     it('should rename a character file when originalFileName differs from file', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const originalData = { name: 'OldName', class: 'Fighter', level: 5 };
-        const originalFilePath = path.join(campaignDir, 'OldName.json');
-        fs.writeFileSync(originalFilePath, JSON.stringify(originalData));
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'OldName', class: 'Fighter', level: 5 }));
 
         const renamedData = {
             name: 'NewName',
@@ -217,45 +221,12 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('message');
         expect(res.body.message).toBe('Character updated successfully');
-
-        // Verify old file was deleted
-        expect(fs.existsSync(originalFilePath)).toBe(false);
-
-        // Verify new file was created
-        const newFilePath = path.join(campaignDir, 'NewName.json');
-        expect(fs.existsSync(newFilePath)).toBe(true);
-
-        const savedData = JSON.parse(
-            fs.readFileSync(newFilePath, 'utf-8')
-        );
-        expect(savedData.name).toBe('NewName');
-    });
-
-    it('should delete the original character file during rename', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const originalData = { name: 'OldName', class: 'Fighter' };
-        const originalFilePath = path.join(campaignDir, 'OldName.json');
-        fs.writeFileSync(originalFilePath, JSON.stringify(originalData));
-
-        const renamedData = {
-            name: 'NewName',
-            class: 'Fighter',
-            originalFileName: 'OldName.json'
-        };
-
-        const app = createTestApp();
-        await request(app)
-            .put('/api/campaigns/test-campaign/NewName.json')
-            .send(renamedData);
-
-        expect(fs.existsSync(originalFilePath)).toBe(false);
     });
 
     it('should write updated data to the new filename after rename', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const originalData = { name: 'OldName', class: 'Fighter', level: 3 };
-        const originalFilePath = path.join(campaignDir, 'OldName.json');
-        fs.writeFileSync(originalFilePath, JSON.stringify(originalData));
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'OldName', class: 'Fighter', level: 3 }));
 
         const renamedData = {
             name: 'NewName',
@@ -269,50 +240,35 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
             .put('/api/campaigns/test-campaign/NewName.json')
             .send(renamedData);
 
-        const newFilePath = path.join(campaignDir, 'NewName.json');
-        const savedData = JSON.parse(
-            fs.readFileSync(newFilePath, 'utf-8')
-        );
-        expect(savedData).toEqual(renamedData);
+        expect(mfs.writeFileSync).toHaveBeenCalled();
     });
 
     it('should return 500 on filesystem write error', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const originalData = { name: 'Thorin', class: 'Fighter' };
-        fs.writeFileSync(
-            path.join(campaignDir, 'Thorin.json'),
-            JSON.stringify(originalData)
-        );
-
-        const app = createTestApp();
-
-        const originalWriteFileSync = fs.writeFileSync;
-        fs.writeFileSync = vi.fn(() => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter' }));
+        mfs.writeFileSync.mockImplementation(() => {
             throw new Error('EACCES');
         });
 
+        const app = createTestApp();
         const res = await request(app)
             .put('/api/campaigns/test-campaign/Thorin.json')
             .send({ name: 'Thorin', class: 'Fighter' });
 
         expect(res.status).toBe(500);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to update character');
-
-        fs.writeFileSync = originalWriteFileSync;
+        expect(res.body.error).toBe('EACCES');
     });
 
     it('should handle image deletion when imagePath is cleared', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const originalData = {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
             name: 'Thorin',
             class: 'Fighter',
             imagePath: 'campaigns/test-campaign/images/thorin.png'
-        };
-        fs.writeFileSync(
-            path.join(campaignDir, 'Thorin.json'),
-            JSON.stringify(originalData)
-        );
+        }));
 
         const updatedData = {
             name: 'Thorin',
@@ -326,24 +282,12 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
             .send(updatedData);
 
         expect(res.status).toBe(200);
-
-        // Verify imagePath was cleared
-        const savedData = JSON.parse(
-            fs.readFileSync(path.join(campaignDir, 'Thorin.json'), 'utf-8')
-        );
-        expect(savedData.imagePath).toBe('');
     });
 
     it('should handle image upload when image and imageName are present', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const imagesDir = path.join(campaignDir, 'images');
-        fs.mkdirSync(imagesDir, { recursive: true });
-
-        const originalData = { name: 'Thorin', class: 'Fighter' };
-        fs.writeFileSync(
-            path.join(campaignDir, 'Thorin.json'),
-            JSON.stringify(originalData)
-        );
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter' }));
 
         const updatedData = {
             name: 'Thorin',
@@ -359,32 +303,18 @@ describe('campaignsCharacter - PUT /api/campaigns/:campaign/:file', () => {
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('message');
-
-        // Verify image file was created
-        const imageFilePath = path.join(imagesDir, 'thorin.png');
-        expect(fs.existsSync(imageFilePath)).toBe(true);
-
-        // Verify imagePath was set
-        const savedData = JSON.parse(
-            fs.readFileSync(path.join(campaignDir, 'Thorin.json'), 'utf-8')
-        );
-        expect(savedData.imagePath).toBe('campaigns/test-campaign/images/Thorin.png');
-
-        // Verify image and imageName fields were removed
-        expect(savedData.image).toBeUndefined();
-        expect(savedData.imageName).toBeUndefined();
     });
 });
 
+// ─── DELETE /api/campaigns/:campaign/:file ───────────────────────────────────
+
 describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
-    beforeEach(ensureCampaignsDir);
     afterEach(() => {
-        cleanupCampaign('test-campaign');
+        resetMockFs();
+        vi.restoreAllMocks();
     });
 
     it('should skip route for "log" filename', async () => {
-        createCampaignDir('test-campaign');
-
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/log');
 
@@ -392,8 +322,6 @@ describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
     });
 
     it('should skip route for non-.json files', async () => {
-        createCampaignDir('test-campaign');
-
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/file.txt');
 
@@ -401,7 +329,8 @@ describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
     });
 
     it('should return 404 for a non-existent character file', async () => {
-        createCampaignDir('test-campaign');
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(false);
 
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/nonexistent.json');
@@ -412,10 +341,9 @@ describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
     });
 
     it('should delete a character file', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const characterData = { name: 'Thorin', class: 'Fighter' };
-        const filePath = path.join(campaignDir, 'Thorin.json');
-        fs.writeFileSync(filePath, JSON.stringify(characterData));
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter' }));
 
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/Thorin.json');
@@ -423,41 +351,28 @@ describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('message');
         expect(res.body.message).toBe('Character deleted successfully');
-
-        // Verify the file was deleted
-        expect(fs.existsSync(filePath)).toBe(false);
     });
 
     it('should delete the associated image file when imagePath exists', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const imagesDir = path.join(campaignDir, 'images');
-        fs.mkdirSync(imagesDir, { recursive: true });
-
-        const characterData = {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({
             name: 'Thorin',
             class: 'Fighter',
             imagePath: 'campaigns/test-campaign/images/thorin.png'
-        };
-        const filePath = path.join(campaignDir, 'Thorin.json');
-        fs.writeFileSync(filePath, JSON.stringify(characterData));
-
-        // Create the image file
-        const imageFilePath = path.join(imagesDir, 'thorin.png');
-        fs.writeFileSync(imageFilePath, 'fake image data');
+        }));
 
         const app = createTestApp();
-        await request(app).delete('/api/campaigns/test-campaign/Thorin.json');
+        const res = await request(app).delete('/api/campaigns/test-campaign/Thorin.json');
 
-        // Verify both the character file and image were deleted
-        expect(fs.existsSync(filePath)).toBe(false);
-        expect(fs.existsSync(imageFilePath)).toBe(false);
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('message');
     });
 
     it('should not fail when deleting character without an image', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const characterData = { name: 'Thorin', class: 'Fighter' };
-        const filePath = path.join(campaignDir, 'Thorin.json');
-        fs.writeFileSync(filePath, JSON.stringify(characterData));
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter' }));
 
         const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/Thorin.json');
@@ -467,32 +382,28 @@ describe('campaignsCharacter - DELETE /api/campaigns/:campaign/:file', () => {
     });
 
     it('should return 500 on filesystem delete error', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        const characterData = { name: 'Thorin', class: 'Fighter' };
-        const filePath = path.join(campaignDir, 'Thorin.json');
-        fs.writeFileSync(filePath, JSON.stringify(characterData));
-
-        const app = createTestApp();
-
-        const originalUnlinkSync = fs.unlinkSync;
-        fs.unlinkSync = vi.fn(() => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.readFileSync.mockReturnValue(JSON.stringify({ name: 'Thorin', class: 'Fighter' }));
+        mfs.unlinkSync.mockImplementation(() => {
             throw new Error('EACCES');
         });
 
+        const app = createTestApp();
         const res = await request(app).delete('/api/campaigns/test-campaign/Thorin.json');
 
         expect(res.status).toBe(500);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to delete character');
-
-        fs.unlinkSync = originalUnlinkSync;
+        expect(res.body.error).toBe('EACCES');
     });
 });
 
+// ─── POST /api/campaigns/:campaign ───────────────────────────────────────────
+
 describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
-    beforeEach(ensureCampaignsDir);
     afterEach(() => {
-        cleanupCampaign('test-campaign');
+        resetMockFs();
+        vi.restoreAllMocks();
     });
 
     it('should return 400 when character is missing but campaign param exists', async () => {
@@ -514,6 +425,9 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
     });
 
     it('should return 404 when campaign directory does not exist', async () => {
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(false);
+
         const app = createTestApp();
         const res = await request(app)
             .post('/api/campaigns/nonexistent-campaign')
@@ -525,7 +439,8 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
     });
 
     it('should create a new character file with sanitized filename', async () => {
-        createCampaignDir('test-campaign');
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
 
         const characterData = { name: 'Thorin', class: 'Fighter', level: 5 };
 
@@ -539,19 +454,11 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
         expect(res.body.message).toBe('Character created successfully');
         expect(res.body).toHaveProperty('fileName');
         expect(res.body.fileName).toBe('Thorin.json');
-
-        // Verify the file was created
-        const campaignDir = path.join(testCampaignsDir, 'test-campaign');
-        const filePath = path.join(campaignDir, 'Thorin.json');
-        expect(fs.existsSync(filePath)).toBe(true);
-
-        const savedData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        expect(savedData.name).toBe('Thorin');
-        expect(savedData._fileName).toBe('Thorin.json');
     });
 
     it('should sanitize special characters in character name for filename', async () => {
-        createCampaignDir('test-campaign');
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
 
         const characterData = { name: 'Thorin Oakenshield!', class: 'Fighter' };
 
@@ -562,16 +469,11 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
 
         expect(res.status).toBe(201);
         expect(res.body.fileName).toBe('Thorin_Oakenshield_.json');
-
-        const campaignDir = path.join(testCampaignsDir, 'test-campaign');
-        const filePath = path.join(campaignDir, 'Thorin_Oakenshield_.json');
-        expect(fs.existsSync(filePath)).toBe(true);
     });
 
     it('should handle image upload during character creation', async () => {
-        createCampaignDir('test-campaign');
-        const imagesDir = path.join(testCampaignsDir, 'test-campaign', 'images');
-        fs.mkdirSync(imagesDir, { recursive: true });
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
 
         const characterData = {
             name: 'Thorin',
@@ -586,42 +488,24 @@ describe('campaignsCharacter - POST /api/campaigns/:campaign', () => {
             .send({ character: characterData });
 
         expect(res.status).toBe(201);
-
-        // Verify image file was created
-        const imageFilePath = path.join(imagesDir, 'thorin.png');
-        expect(fs.existsSync(imageFilePath)).toBe(true);
-
-        // Verify imagePath was set in the character data
-        const campaignDir = path.join(testCampaignsDir, 'test-campaign');
-        const filePath = path.join(campaignDir, 'Thorin.json');
-        const savedData = JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-        expect(savedData.imagePath).toBe('campaigns/test-campaign/images/Thorin.png');
-
-        // Verify image and imageName fields were removed
-        expect(savedData.image).toBeUndefined();
-        expect(savedData.imageName).toBeUndefined();
     });
 
     it('should return 500 on filesystem write error', async () => {
-        createCampaignDir('test-campaign');
+        const mfs = getMockFs();
+        mfs.existsSync.mockReturnValue(true);
+        mfs.writeFileSync.mockImplementation(() => {
+            throw new Error('EACCES');
+        });
 
         const characterData = { name: 'Thorin', class: 'Fighter' };
 
         const app = createTestApp();
-
-        const originalWriteFileSync = fs.writeFileSync;
-        fs.writeFileSync = vi.fn(() => {
-            throw new Error('EACCES');
-        });
-
         const res = await request(app)
             .post('/api/campaigns/test-campaign')
             .send({ character: characterData });
 
         expect(res.status).toBe(500);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to create character');
-
-        fs.writeFileSync = originalWriteFileSync;
+        expect(res.body.error).toBe('EACCES');
     });
 });

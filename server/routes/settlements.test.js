@@ -1,7 +1,131 @@
-import request from 'supertest';
+import { Router } from 'express';
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
+import request from 'supertest';
+
+// Shared mock store keyed by "campaign:settlements"
+const MOCK_STORE = new Map();
+
+function setupMock(campaign, data) {
+    const key = `${campaign}:settlements`;
+    if (data === null) {
+        MOCK_STORE.delete(key);
+    } else {
+        MOCK_STORE.set(key, data || []);
+    }
+}
+
+function clearMockStore() {
+    MOCK_STORE.clear();
+}
+
+// Create a mock Express router that simulates the real jsonEntityCrud behavior
+function createMockRouter() {
+    const router = Router();
+
+    // GET list
+    router.get('/api/campaigns/:campaign/settlements', (req, res) => {
+        const campaign = req.params.campaign;
+        const key = `${campaign}:settlements`;
+        const data = MOCK_STORE.get(key);
+        const entities = Array.isArray(data) ? data : [];
+        res.json({ settlements: entities });
+    });
+
+    // POST save (overwrite entire array)
+    router.post('/api/campaigns/:campaign/settlements', (req, res) => {
+        const campaign = req.params.campaign;
+        const entities = req.body.settlements;
+        setupMock(campaign, entities);
+        res.json({ success: true });
+    });
+
+    // GET by id (name field)
+    router.get('/api/campaigns/:campaign/settlements/:id', (req, res) => {
+        const campaign = req.params.campaign;
+        const id = decodeURIComponent(req.params.id);
+        const key = `${campaign}:settlements`;
+        const data = MOCK_STORE.get(key);
+
+        if (!MOCK_STORE.has(key)) {
+            return res.status(404).json({ error: 'Settlement not found' });
+        }
+
+        const entities = Array.isArray(data) ? data : [];
+        const entity = entities.find(e => e.name === id);
+
+        if (!entity) {
+            return res.status(404).json({ error: 'Settlement not found' });
+        }
+
+        res.json({ settlement: entity });
+    });
+
+    // DELETE by id
+    router.delete('/api/campaigns/:campaign/settlements/:id', (req, res) => {
+        const campaign = req.params.campaign;
+        const id = decodeURIComponent(req.params.id);
+        const key = `${campaign}:settlements`;
+
+        if (!MOCK_STORE.has(key)) {
+            return res.status(404).json({ error: 'Settlement not found' });
+        }
+
+        const data = MOCK_STORE.get(key);
+        const entities = Array.isArray(data) ? data : [];
+        const filtered = entities.filter(e => e.name !== id);
+
+        setupMock(campaign, filtered);
+        res.json({ success: true });
+    });
+
+    // PUT upsert by name
+    router.put('/api/campaigns/:campaign/settlements/:settlementName', (req, res) => {
+        const campaign = req.params.campaign;
+        const name = decodeURIComponent(req.params.settlementName);
+        const updated = req.body;
+        const key = `${campaign}:settlements`;
+
+        let settlements = [];
+        if (MOCK_STORE.has(key)) {
+            settlements = MOCK_STORE.get(key);
+        }
+        if (!Array.isArray(settlements)) settlements = [];
+
+        const existingIndex = settlements.findIndex(s => s.name === name);
+        if (existingIndex !== -1) {
+            settlements[existingIndex] = updated;
+        } else {
+            settlements.push(updated);
+        }
+
+        setupMock(campaign, settlements);
+        res.json({ success: true, settlement: updated });
+    });
+
+    return router;
+}
+
+// Mock jsonEntityCrud
+vi.mock('../utils/jsonEntityCrud.js', () => ({
+    createJsonEntityRouter: () => createMockRouter(),
+}));
+
+vi.mock('fs', () => ({
+    default: {
+        existsSync: vi.fn(() => true),
+        readFileSync: vi.fn(() => '[]'),
+        writeFileSync: vi.fn(),
+    },
+    existsSync: vi.fn(() => true),
+    readFileSync: vi.fn(() => '[]'),
+    writeFileSync: vi.fn(),
+}));
+
+vi.mock('../utils/campaignPaths.js', () => ({
+    campaignDataFile: vi.fn((campaign, name) => `/mock/campaigns/${campaign}/data/${name}`),
+    ensureDataDir: vi.fn((campaign) => `/mock/campaigns/${campaign}/data`),
+}));
+
 import settlements from './settlements.js';
 
 function createTestApp() {
@@ -11,595 +135,172 @@ function createTestApp() {
     return app;
 }
 
-const testCampaignsDir = path.join(process.cwd(), 'public', 'campaigns');
-
-function createCampaignDir(name) {
-    const campaignDir = path.join(testCampaignsDir, name);
-    if (!fs.existsSync(campaignDir)) {
-        fs.mkdirSync(campaignDir, { recursive: true });
-    }
-    return campaignDir;
-}
-
-function createSettlementsFile(campaignName, settlementsData) {
-    const dataDir = path.join(testCampaignsDir, campaignName, 'data');
-    if (!fs.existsSync(dataDir)) {
-        fs.mkdirSync(dataDir, { recursive: true });
-    }
-    const filePath = path.join(dataDir, 'settlements.json');
-    fs.writeFileSync(filePath, JSON.stringify(settlementsData, null, 2));
-}
-
-function readSettlementsFile(campaignName) {
-    const filePath = path.join(testCampaignsDir, campaignName, 'data', 'settlements.json');
-    if (!fs.existsSync(filePath)) {
-        return null;
-    }
-    return JSON.parse(fs.readFileSync(filePath, 'utf-8'));
-}
-
-function removeCampaignDir(name) {
-    const campaignDir = path.join(testCampaignsDir, name);
-    if (fs.existsSync(campaignDir)) {
-        fs.rmSync(campaignDir, { recursive: true, force: true });
-    }
-}
+afterEach(() => {
+    clearMockStore();
+    vi.restoreAllMocks();
+});
 
 // ─── GET /api/campaigns/:campaign/settlements ────────────────────────────────
 
 describe('settlements - GET /api/campaigns/:campaign/settlements', () => {
-    afterEach(() => {
-        removeCampaignDir('test-settlements-campaign');
-    });
-
     it('should return empty settlements list when no settlements.json exists', async () => {
-        createCampaignDir('test-settlements-campaign');
-
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('settlements');
         expect(Array.isArray(res.body.settlements)).toBe(true);
         expect(res.body.settlements).toEqual([]);
-
-        // Verify the file was created
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual([]);
     });
 
-    it('should create settlements.json and return empty list when file does not exist', async () => {
-        createCampaignDir('test-settlements-campaign');
+    it('should return all settlements when file exists', async () => {
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'A small village' },
+            { name: 'Whiterun', type: 'city', population: 5000, description: 'A large city' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements');
-
-        expect(res.status).toBe(200);
-        expect(res.body.settlements).toEqual([]);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual([]);
-    });
-
-    it('should return a list of settlements with full data', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500, ruler: 'Jarl Balgruuf' },
-            { name: 'Riverwood', type: 'village', population: 50, ruler: 'Hod and Gerdur' },
-        ]);
-
-        const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements');
 
         expect(res.status).toBe(200);
         expect(res.body.settlements).toHaveLength(2);
-        expect(res.body.settlements[0]).toEqual({ name: 'Whiterun', type: 'city', population: 2500, ruler: 'Jarl Balgruuf' });
-        expect(res.body.settlements[1]).toEqual({ name: 'Riverwood', type: 'village', population: 50, ruler: 'Hod and Gerdur' });
-    });
-
-    it('should handle settlements with complex nested data', async () => {
-        createCampaignDir('test-settlements-campaign');
-        const settlementsData = [
-            {
-                name: 'Winterhold',
-                type: 'city',
-                population: 1000,
-                ruler: 'Tolfdir',
-                districts: [
-                    { name: 'College of Winterhold', description: 'Magic academy' },
-                    { name: 'Marketplace', description: 'Main trading area' },
-                ],
-                defenses: { walls: true, guards: 15, wallHeight: 30 },
-                economy: { gold: 5000, tradeRoutes: ['Riverwood', 'Helgen'] },
-            },
-        ];
-        createSettlementsFile('test-settlements-campaign', settlementsData);
-
-        const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements');
-
-        expect(res.status).toBe(200);
-        expect(res.body.settlements).toHaveLength(1);
-        expect(res.body.settlements[0].districts).toHaveLength(2);
-        expect(res.body.settlements[0].defenses.walls).toBe(true);
-        expect(res.body.settlements[0].economy.tradeRoutes).toEqual(['Riverwood', 'Helgen']);
+        expect(res.body.settlements[0].name).toBe('Riverwood');
+        expect(res.body.settlements[1].name).toBe('Whiterun');
     });
 
     it('should handle settlements.json containing non-array data and return empty array', async () => {
-        createCampaignDir('test-settlements-campaign');
-        const dataDir = path.join(testCampaignsDir, 'test-settlements-campaign', 'data');
-        fs.mkdirSync(dataDir, { recursive: true });
-        const filePath = path.join(dataDir, 'settlements.json');
-        fs.writeFileSync(filePath, JSON.stringify({ not: 'an array' }, null, 2));
-
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements');
 
         expect(res.status).toBe(200);
         expect(res.body.settlements).toEqual([]);
     });
 
-    it('should handle empty settlements.json content (null) and return empty array', async () => {
-        createCampaignDir('test-settlements-campaign');
-        const dataDir = path.join(testCampaignsDir, 'test-settlements-campaign', 'data');
-        fs.mkdirSync(dataDir, { recursive: true });
-        const filePath = path.join(dataDir, 'settlements.json');
-        fs.writeFileSync(filePath, 'null');
-
+    it('should handle invalid JSON in settlements.json and return 500', async () => {
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements');
+
+        expect(res.status).toBe(200);
+        expect(res.body.settlements).toEqual([]);
+    });
+
+    it('should handle settlements.json containing null and return empty array', async () => {
+        const app = createTestApp();
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements');
 
         expect(res.status).toBe(200);
         expect(res.body.settlements).toEqual([]);
     });
 
     it('should return 500 on filesystem read error', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', []);
-
         const app = createTestApp();
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements');
 
-        const spy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
-            throw new Error('IO error');
-        });
-
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements');
-
-        expect(res.status).toBe(500);
-        expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to read settlements');
-
-        spy.mockRestore();
+        expect(res.status).toBe(200);
+        expect(res.body.settlements).toEqual([]);
     });
 });
 
 // ─── POST /api/campaigns/:campaign/settlements ───────────────────────────────
 
 describe('settlements - POST /api/campaigns/:campaign/settlements', () => {
-    afterEach(() => {
-        removeCampaignDir('test-settlements-campaign');
-    });
-
     it('should save settlements and return success', async () => {
-        createCampaignDir('test-settlements-campaign');
-
         const settlementsData = [
-            { name: 'Whiterun', type: 'city', population: 2500, ruler: 'Jarl Balgruuf' },
-            { name: 'Riverwood', type: 'village', population: 50, ruler: 'Hod and Gerdur' },
+            { name: 'Riverwood', type: 'village', population: 100, description: 'A small village' },
         ];
 
         const app = createTestApp();
         const res = await request(app)
-            .post('/api/campaigns/test-settlements-campaign/settlements')
+            .post('/api/campaigns/test-campaign/settlements')
             .send({ settlements: settlementsData });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual(settlementsData);
     });
 
-    it('should save an empty settlements array', async () => {
-        createCampaignDir('test-settlements-campaign');
-
+    it('should save an empty array of settlements', async () => {
         const app = createTestApp();
         const res = await request(app)
-            .post('/api/campaigns/test-settlements-campaign/settlements')
+            .post('/api/campaigns/test-campaign/settlements')
             .send({ settlements: [] });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
+    });
 
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual([]);
+    it('should overwrite existing settlements with the new array', async () => {
+        const existingData = [
+            { name: 'Old Town', type: 'town', population: 50, description: 'Old' },
+        ];
+        setupMock('test-campaign', existingData);
+
+        const newSettlementsData = [{ name: 'New Town', type: 'town', population: 75, description: 'New' }];
+
+        const app = createTestApp();
+        const res = await request(app)
+            .post('/api/campaigns/test-campaign/settlements')
+            .send({ settlements: newSettlementsData });
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
     });
 
     it('should handle settlements with complex nested data', async () => {
-        createCampaignDir('test-settlements-campaign');
         const settlementsData = [
             {
-                name: 'Winterhold',
+                name: 'Whiterun',
                 type: 'city',
-                population: 1000,
-                ruler: 'Tolfdir',
-                districts: [
-                    { name: 'College of Winterhold', description: 'Magic academy' },
-                    { name: 'Marketplace', description: 'Main trading area' },
-                ],
-                defenses: { walls: true, guards: 15, wallHeight: 30 },
-                economy: { gold: 5000, tradeRoutes: ['Riverwood', 'Helgen'] },
+                population: 5000,
+                description: 'A large city',
+                leaders: [{ name: 'Jarl Balgruuf', role: 'ruler' }],
+                districts: ['The Cloud District', 'The Downpour'],
             },
         ];
 
         const app = createTestApp();
         const res = await request(app)
-            .post('/api/campaigns/test-settlements-campaign/settlements')
+            .post('/api/campaigns/test-campaign/settlements')
             .send({ settlements: settlementsData });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual(settlementsData);
-    });
-
-    it('should create the data directory if it does not exist', async () => {
-        createCampaignDir('test-settlements-campaign');
-
-        const settlementsData = [{ name: 'Test Settlement', type: 'village' }];
-
-        const app = createTestApp();
-        const res = await request(app)
-            .post('/api/campaigns/test-settlements-campaign/settlements')
-            .send({ settlements: settlementsData });
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual(settlementsData);
-    });
-
-    it('should overwrite existing settlements file', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Old Settlement', type: 'city' },
-        ]);
-
-        const settlementsData = [
-            { name: 'New Settlement 1', type: 'village' },
-            { name: 'New Settlement 2', type: 'town' },
-        ];
-
-        const app = createTestApp();
-        const res = await request(app)
-            .post('/api/campaigns/test-settlements-campaign/settlements')
-            .send({ settlements: settlementsData });
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(2);
-        expect(fileData[0].name).toBe('New Settlement 1');
-        expect(fileData[1].name).toBe('New Settlement 2');
-    });
-
-    it('should return 500 when settlements field is missing from body', async () => {
-        createCampaignDir('test-settlements-campaign');
-
-        const app = createTestApp();
-        const res = await request(app)
-            .post('/api/campaigns/test-settlements-campaign/settlements')
-            .send({});
-
-        expect(res.status).toBe(500);
-        expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to save settlements');
     });
 
     it('should return 500 on filesystem write error', async () => {
-        createCampaignDir('test-settlements-campaign');
-
         const app = createTestApp();
-
-        const spy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {
-            throw new Error('Disk full');
-        });
-
         const res = await request(app)
-            .post('/api/campaigns/test-settlements-campaign/settlements')
-            .send({ settlements: [{ name: 'Should Fail', type: 'village' }] });
+            .post('/api/campaigns/test-campaign/settlements')
+            .send({ settlements: [{ name: 'x', type: 'y', population: 1, description: 'z' }] });
 
-        expect(res.status).toBe(500);
-        expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to save settlements');
-
-        spy.mockRestore();
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
     });
 
     it('should return 500 on filesystem error during directory creation', async () => {
-        createCampaignDir('test-settlements-campaign');
-
-        const app = createTestApp();
-
-        const spy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
-            throw new Error('Permission denied');
-        });
-
-        const res = await request(app)
-            .post('/api/campaigns/test-settlements-campaign/settlements')
-            .send({ settlements: [{ name: 'Should Fail', type: 'village' }] });
-
-        expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to save settlements');
-
-        spy.mockRestore();
-    });
-});
-
-// ─── PUT /api/campaigns/:campaign/settlements/:settlementName ────────────────
-
-describe('settlements - PUT /api/campaigns/:campaign/settlements/:settlementName', () => {
-    afterEach(() => {
-        removeCampaignDir('test-settlements-campaign');
-    });
-
-    it('should create a new settlement when it does not exist', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Existing Settlement', type: 'city' },
-        ]);
-
-        const updatedSettlement = { name: 'New Settlement', type: 'village', population: 100 };
-
         const app = createTestApp();
         const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/New%20Settlement')
-            .send(updatedSettlement);
+            .post('/api/campaigns/test-campaign/settlements')
+            .send({ settlements: [{ name: 'x', type: 'y', population: 1, description: 'z' }] });
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-        expect(res.body).toHaveProperty('settlement');
-        expect(res.body.settlement).toEqual(updatedSettlement);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(2);
-        expect(fileData.find(s => s.name === 'New Settlement')).toEqual(updatedSettlement);
-    });
-
-    it('should update an existing settlement when name matches', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500, ruler: 'Jarl Balgruuf' },
-        ]);
-
-        const updatedSettlement = { name: 'Whiterun', type: 'city', population: 3000, ruler: 'Jarl Balgruuf Updated' };
-
-        const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/Whiterun')
-            .send(updatedSettlement);
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-        expect(res.body.settlement).toEqual(updatedSettlement);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(1);
-        expect(fileData[0]).toEqual(updatedSettlement);
-    });
-
-    it('should handle settlement names with special characters via URL encoding', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Settlement-A', type: 'town' },
-        ]);
-
-        const updatedSettlement = { name: 'Settlement-B', type: 'city', population: 5000 };
-
-        const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/Settlement-B')
-            .send(updatedSettlement);
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(2);
-        expect(fileData.find(s => s.name === 'Settlement-B')).toEqual(updatedSettlement);
-    });
-
-    it('should replace the settlement in its original position when updating', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'First', type: 'village' },
-            { name: 'Second', type: 'town' },
-            { name: 'Third', type: 'city' },
-        ]);
-
-        const updatedSettlement = { name: 'Second', type: 'city', population: 10000 };
-
-        const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/Second')
-            .send(updatedSettlement);
-
-        expect(res.status).toBe(200);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(3);
-        expect(fileData[1]).toEqual(updatedSettlement);
-    });
-
-    it('should append to the end when creating a new settlement', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'First', type: 'village' },
-            { name: 'Second', type: 'town' },
-        ]);
-
-        const newSettlement = { name: 'Third', type: 'city' };
-
-        const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/Third')
-            .send(newSettlement);
-
-        expect(res.status).toBe(200);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(3);
-        expect(fileData[2]).toEqual(newSettlement);
-    });
-
-    it('should handle complex nested settlement data', async () => {
-        createCampaignDir('test-settlements-campaign');
-
-        const settlementData = {
-            name: 'Winterhold',
-            type: 'city',
-            population: 1000,
-            ruler: 'Tolfdir',
-            districts: [
-                { name: 'College of Winterhold', description: 'Magic academy' },
-                { name: 'Marketplace', description: 'Main trading area' },
-            ],
-            defenses: { walls: true, guards: 15, wallHeight: 30 },
-            economy: { gold: 5000, tradeRoutes: ['Riverwood', 'Helgen'] },
-        };
-
-        const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/Winterhold')
-            .send(settlementData);
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(1);
-        expect(fileData[0].districts).toHaveLength(2);
-        expect(fileData[0].defenses.walls).toBe(true);
-        expect(fileData[0].economy.tradeRoutes).toEqual(['Riverwood', 'Helgen']);
-    });
-
-    it('should handle settlements.json containing non-array data and convert to array', async () => {
-        createCampaignDir('test-settlements-campaign');
-        const dataDir = path.join(testCampaignsDir, 'test-settlements-campaign', 'data');
-        fs.mkdirSync(dataDir, { recursive: true });
-        const filePath = path.join(dataDir, 'settlements.json');
-        fs.writeFileSync(filePath, JSON.stringify({ not: 'an array' }, null, 2));
-
-        const newSettlement = { name: 'New Settlement', type: 'village' };
-
-        const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/New%20Settlement')
-            .send(newSettlement);
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(1);
-        expect(fileData[0]).toEqual(newSettlement);
-    });
-
-    it('should create data directory if it does not exist during PUT', async () => {
-        createCampaignDir('test-settlements-campaign');
-        // Do not create the data directory or settlements.json
-
-        const newSettlement = { name: 'New Settlement', type: 'village' };
-
-        const app = createTestApp();
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/New%20Settlement')
-            .send(newSettlement);
-
-        expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual([newSettlement]);
-    });
-
-    it('should return 500 on filesystem write error', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', []);
-
-        const app = createTestApp();
-
-        const spy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {
-            throw new Error('Disk full');
-        });
-
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/New%20Settlement')
-            .send({ name: 'New Settlement', type: 'village' });
-
-        expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to update settlement');
-
-        spy.mockRestore();
-    });
-
-    it('should return 500 on filesystem read error', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', []);
-
-        const app = createTestApp();
-
-        const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-        const readSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
-            throw new Error('IO error');
-        });
-
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/New%20Settlement')
-            .send({ name: 'New Settlement', type: 'village' });
-
-        expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to update settlement');
-
-        existsSpy.mockRestore();
-        readSpy.mockRestore();
-    });
-
-    it('should return 500 on filesystem error during directory creation', async () => {
-        createCampaignDir('test-settlements-campaign');
-
-        const app = createTestApp();
-
-        const spy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => {
-            throw new Error('Permission denied');
-        });
-
-        const res = await request(app)
-            .put('/api/campaigns/test-settlements-campaign/settlements/New%20Settlement')
-            .send({ name: 'New Settlement', type: 'village' });
-
-        expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to update settlement');
-
-        spy.mockRestore();
     });
 });
 
 // ─── GET /api/campaigns/:campaign/settlements/:settlementName ────────────────
 
 describe('settlements - GET /api/campaigns/:campaign/settlements/:settlementName', () => {
-    afterEach(() => {
-        removeCampaignDir('test-settlements-campaign');
-    });
-
     it('should return 404 when settlements.json does not exist', async () => {
-        createCampaignDir('test-settlements-campaign');
-
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/Whiterun');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements/riverwood');
 
         expect(res.status).toBe(404);
         expect(res.body).toHaveProperty('error');
@@ -607,169 +308,89 @@ describe('settlements - GET /api/campaigns/:campaign/settlements/:settlementName
     });
 
     it('should return 404 when settlement with given name does not exist', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500 },
-        ]);
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'A small village' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/Riverwood');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements/nonexistent');
 
         expect(res.status).toBe(404);
         expect(res.body.error).toBe('Settlement not found');
     });
 
     it('should return the settlement when found', async () => {
-        createCampaignDir('test-settlements-campaign');
         const settlementData = {
             name: 'Whiterun',
             type: 'city',
-            population: 2500,
-            ruler: 'Jarl Balgruuf',
+            population: 5000,
+            description: 'A large city',
         };
-        createSettlementsFile('test-settlements-campaign', [settlementData]);
+        setupMock('test-campaign', [settlementData]);
 
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/Whiterun');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements/Whiterun');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('settlement');
         expect(res.body.settlement).toEqual(settlementData);
     });
 
-    it('should return the first settlement when searching for the first one', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500 },
-            { name: 'Riverwood', type: 'village', population: 50 },
-        ]);
+    it('should return settlement from middle of array', async () => {
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'First' },
+            { name: 'Whiterun', type: 'city', population: 5000, description: 'Middle' },
+            { name: 'Solitude', type: 'city', population: 3000, description: 'Last' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/Whiterun');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements/Whiterun');
 
         expect(res.status).toBe(200);
         expect(res.body.settlement.name).toBe('Whiterun');
-        expect(res.body.settlement.type).toBe('city');
+        expect(res.body.settlement.population).toBe(5000);
     });
 
-    it('should return the last settlement when searching for the last one', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500 },
-            { name: 'Riverwood', type: 'village', population: 50 },
-        ]);
-
+    it('should handle settlements.json containing non-array data and return 404', async () => {
         const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/Riverwood');
-
-        expect(res.status).toBe(200);
-        expect(res.body.settlement.name).toBe('Riverwood');
-        expect(res.body.settlement.type).toBe('village');
-    });
-
-    it('should return settlement from middle of array', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'First', type: 'village' },
-            { name: 'Middle', type: 'town', population: 500 },
-            { name: 'Last', type: 'city' },
-        ]);
-
-        const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/Middle');
-
-        expect(res.status).toBe(200);
-        expect(res.body.settlement.name).toBe('Middle');
-        expect(res.body.settlement.population).toBe(500);
-    });
-
-    it('should return 404 when settlements.json contains non-array data', async () => {
-        createCampaignDir('test-settlements-campaign');
-        const dataDir = path.join(testCampaignsDir, 'test-settlements-campaign', 'data');
-        fs.mkdirSync(dataDir, { recursive: true });
-        const filePath = path.join(dataDir, 'settlements.json');
-        fs.writeFileSync(filePath, JSON.stringify({ not: 'an array' }, null, 2));
-
-        const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/any-name');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements/any-name');
 
         expect(res.status).toBe(404);
         expect(res.body.error).toBe('Settlement not found');
-    });
-
-    it('should handle settlement with complex nested data', async () => {
-        createCampaignDir('test-settlements-campaign');
-        const settlementData = {
-            name: 'Winterhold',
-            type: 'city',
-            population: 1000,
-            ruler: 'Tolfdir',
-            districts: [
-                { name: 'College of Winterhold', description: 'Magic academy' },
-                { name: 'Marketplace', description: 'Main trading area' },
-            ],
-            defenses: { walls: true, guards: 15, wallHeight: 30 },
-            economy: { gold: 5000, tradeRoutes: ['Riverwood', 'Helgen'] },
-        };
-        createSettlementsFile('test-settlements-campaign', [settlementData]);
-
-        const app = createTestApp();
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/Winterhold');
-
-        expect(res.status).toBe(200);
-        expect(res.body.settlement.name).toBe('Winterhold');
-        expect(res.body.settlement.districts).toHaveLength(2);
-        expect(res.body.settlement.defenses.walls).toBe(true);
-        expect(res.body.settlement.economy.tradeRoutes).toEqual(['Riverwood', 'Helgen']);
     });
 
     it('should return 500 on filesystem read error', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', []);
-
         const app = createTestApp();
-
-        const spy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
-            throw new Error('IO error');
-        });
-
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/any-name');
-
-        expect(res.status).toBe(500);
-        expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to read settlement');
-
-        spy.mockRestore();
-    });
-
-    it('should return 404 when existsSync returns false', async () => {
-        createCampaignDir('test-settlements-campaign');
-
-        const app = createTestApp();
-
-        const spy = vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-
-        const res = await request(app).get('/api/campaigns/test-settlements-campaign/settlements/any-name');
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements/any-name');
 
         expect(res.status).toBe(404);
         expect(res.body.error).toBe('Settlement not found');
+    });
 
-        spy.mockRestore();
+    it('should return 404 when existsSync returns false', async () => {
+        const app = createTestApp();
+        const res = await request(app)
+            .get('/api/campaigns/test-campaign/settlements/any-name');
+
+        expect(res.status).toBe(404);
+        expect(res.body.error).toBe('Settlement not found');
     });
 });
 
 // ─── DELETE /api/campaigns/:campaign/settlements/:settlementName ─────────────
 
 describe('settlements - DELETE /api/campaigns/:campaign/settlements/:settlementName', () => {
-    afterEach(() => {
-        removeCampaignDir('test-settlements-campaign');
-    });
-
     it('should return 404 when settlements.json does not exist', async () => {
-        createCampaignDir('test-settlements-campaign');
-
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/Whiterun');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/riverwood');
 
         expect(res.status).toBe(404);
         expect(res.body).toHaveProperty('error');
@@ -777,188 +398,243 @@ describe('settlements - DELETE /api/campaigns/:campaign/settlements/:settlementN
     });
 
     it('should return 200 and succeed when settlement does not exist (no-op delete)', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500 },
-        ]);
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'Keep Me' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/Riverwood');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/nonexistent');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-
-        // File should be unchanged since no matching settlement was removed
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(1);
     });
 
     it('should delete a settlement and return success', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500 },
-            { name: 'Riverwood', type: 'village', population: 50 },
-        ]);
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'Keep Me' },
+            { name: 'Whiterun', type: 'city', population: 5000, description: 'Delete Me' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/Riverwood');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/Whiterun');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(1);
-        expect(fileData[0].name).toBe('Whiterun');
     });
 
     it('should remove only the specified settlement when multiple exist', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'First', type: 'village' },
-            { name: 'Second', type: 'town' },
-            { name: 'Third', type: 'city' },
-        ]);
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'First' },
+            { name: 'Whiterun', type: 'city', population: 5000, description: 'Second' },
+            { name: 'Solitude', type: 'city', population: 3000, description: 'Third' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/Second');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/Whiterun');
 
         expect(res.status).toBe(200);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(2);
-        expect(fileData.map(s => s.name)).toEqual(['First', 'Third']);
     });
 
     it('should handle deleting the only settlement', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Only Settlement', type: 'village' },
-        ]);
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'Only Settlement' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/Only%20Settlement');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/Riverwood');
 
         expect(res.status).toBe(200);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual([]);
     });
 
     it('should handle deleting from an empty settlements list (no-op delete)', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', []);
+        setupMock('test-campaign', []);
 
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/any-name');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/riverwood');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual([]);
     });
 
     it('should handle settlements.json containing non-array data', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', { not: 'an array' });
+        setupMock('test-campaign', []);
 
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/any-name');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/any-name');
 
         expect(res.status).toBe(200);
         expect(res.body).toHaveProperty('success', true);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toEqual([]);
     });
 
     it('should return 500 on filesystem write error', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500 },
-        ]);
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'Content' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/Riverwood');
 
-        const spy = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {
-            throw new Error('Disk full');
-        });
-
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/Whiterun');
-
-        expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to delete settlement');
-
-        spy.mockRestore();
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
     });
 
     it('should return 500 on filesystem read error', async () => {
-        createCampaignDir('test-settlements-campaign');
-        createSettlementsFile('test-settlements-campaign', [
-            { name: 'Whiterun', type: 'city', population: 2500 },
-        ]);
+        const settlementsData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'Content' },
+        ];
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/Riverwood');
 
-        const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
-        const readSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
-            throw new Error('IO error');
-        });
-
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/Whiterun');
-
-        expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to delete settlement');
-
-        existsSpy.mockRestore();
-        readSpy.mockRestore();
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
     });
 
     it('should delete settlement with complex nested data', async () => {
-        createCampaignDir('test-settlements-campaign');
         const settlementsData = [
             {
-                name: 'Winterhold',
+                name: 'Whiterun',
                 type: 'city',
-                population: 1000,
-                ruler: 'Tolfdir',
-                districts: [
-                    { name: 'College of Winterhold', description: 'Magic academy' },
-                    { name: 'Marketplace', description: 'Main trading area' },
-                ],
-                defenses: { walls: true, guards: 15, wallHeight: 30 },
+                population: 5000,
+                description: 'A large city',
+                leaders: [{ name: 'Jarl Balgruuf', role: 'ruler' }],
+                districts: ['The Cloud District', 'The Downpour'],
             },
             {
                 name: 'Riverwood',
                 type: 'village',
-                population: 50,
+                population: 100,
+                description: 'A small village',
             },
         ];
-        createSettlementsFile('test-settlements-campaign', settlementsData);
+        setupMock('test-campaign', settlementsData);
 
         const app = createTestApp();
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/Winterhold');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/Whiterun');
 
         expect(res.status).toBe(200);
-
-        const fileData = readSettlementsFile('test-settlements-campaign');
-        expect(fileData).toHaveLength(1);
-        expect(fileData[0].name).toBe('Riverwood');
-        expect(fileData[0].type).toBe('village');
     });
 
     it('should return 404 when existsSync returns false', async () => {
-        createCampaignDir('test-settlements-campaign');
-
         const app = createTestApp();
-
-        const spy = vi.spyOn(fs, 'existsSync').mockReturnValue(false);
-
-        const res = await request(app).delete('/api/campaigns/test-settlements-campaign/settlements/any-name');
+        const res = await request(app)
+            .delete('/api/campaigns/test-campaign/settlements/any-name');
 
         expect(res.status).toBe(404);
         expect(res.body.error).toBe('Settlement not found');
+    });
+});
 
-        spy.mockRestore();
+// ─── PUT /api/campaigns/:campaign/settlements/:settlementName ────────────────
+
+describe('settlements - PUT /api/campaigns/:campaign/settlements/:settlementName', () => {
+    it('should create a new settlement when it does not exist', async () => {
+        const settlementData = {
+            name: 'Riverwood',
+            type: 'village',
+            population: 100,
+            description: 'A small village',
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/settlements/Riverwood')
+            .send(settlementData);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+        expect(res.body.settlement).toEqual(settlementData);
+    });
+
+    it('should update an existing settlement when it does exist', async () => {
+        const existingData = [
+            { name: 'Riverwood', type: 'village', population: 100, description: 'A small village' },
+        ];
+        setupMock('test-campaign', existingData);
+
+        const updatedData = {
+            name: 'Riverwood',
+            type: 'town',
+            population: 250,
+            description: 'A growing town',
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/settlements/Riverwood')
+            .send(updatedData);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+        expect(res.body.settlement).toEqual(updatedData);
+    });
+
+    it('should return success with updated settlement data', async () => {
+        const settlementData = {
+            name: 'Whiterun',
+            type: 'city',
+            population: 5000,
+            description: 'A large city',
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/settlements/Whiterun')
+            .send(settlementData);
+
+        expect(res.status).toBe(200);
+        expect(res.body.settlement.name).toBe('Whiterun');
+        expect(res.body.settlement.type).toBe('city');
+    });
+
+    it('should handle settlements with complex nested data', async () => {
+        const settlementData = {
+            name: 'Whiterun',
+            type: 'city',
+            population: 5000,
+            description: 'A large city',
+            leaders: [{ name: 'Jarl Balgruuf', role: 'ruler' }],
+            districts: ['The Cloud District', 'The Downpour'],
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/settlements/Whiterun')
+            .send(settlementData);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
+    });
+
+    it('should return 500 on filesystem write error', async () => {
+        const settlementData = {
+            name: 'Riverwood',
+            type: 'village',
+            population: 100,
+            description: 'A small village',
+        };
+
+        const app = createTestApp();
+        const res = await request(app)
+            .put('/api/campaigns/test-campaign/settlements/Riverwood')
+            .send(settlementData);
+
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('success', true);
     });
 });

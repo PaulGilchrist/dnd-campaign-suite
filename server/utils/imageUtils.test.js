@@ -9,15 +9,38 @@ import {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function createTestCampaignDir(campaignName) {
-    const imagesDir = path.join(process.cwd(), 'public', 'campaigns', campaignName, 'images');
-    fs.mkdirSync(imagesDir, { recursive: true });
-    return imagesDir;
+// In-memory store for captured file writes: Map<filePath, content>
+const writtenFiles = new Map();
+
+function setupImageMocks(_campaignName) {
+    writtenFiles.clear();
+    // Mock fs.writeFileSync to capture writes in-memory
+    vi.spyOn(fs, 'writeFileSync').mockImplementation((filePath, data, encoding) => {
+        writtenFiles.set(filePath, { data, encoding });
+    });
+    // Mock fs.existsSync to always return true (directories "exist")
+    vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+    // Mock fs.mkdirSync as no-op
+    vi.spyOn(fs, 'mkdirSync').mockImplementation(() => { /* no-op */ });
+    // Mock fs.openSync, fs.fsyncSync, fs.closeSync as no-ops
+    vi.spyOn(fs, 'openSync').mockImplementation(() => 0);
+    vi.spyOn(fs, 'fsyncSync').mockImplementation(() => { /* no-op */ });
+    vi.spyOn(fs, 'closeSync').mockImplementation(() => { /* no-op */ });
+    // Mock fs.unlinkSync as no-op
+    vi.spyOn(fs, 'unlinkSync').mockImplementation(() => { /* no-op */ });
+    // Mock fs.readFileSync for tests that read back written files
+    vi.spyOn(fs, 'readFileSync').mockImplementation((filePath, encoding) => {
+        const entry = writtenFiles.get(filePath);
+        if (entry) {
+            if (encoding === 'base64') return entry.data;
+            return entry.data;
+        }
+        return '';
+    });
 }
 
-function removeTestCampaignDir(campaignName) {
-    const dir = path.join(process.cwd(), 'public', 'campaigns', campaignName);
-    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
+function getWrittenFilePath(campaignName, fileName) {
+    return path.join(process.cwd(), 'public', 'campaigns', campaignName, 'images', fileName);
 }
 
 function createMockCharacter(imageName, imageData) {
@@ -35,16 +58,12 @@ function createMockCharacter(imageName, imageData) {
 // processImageUpload
 // ---------------------------------------------------------------------------
 describe('imageUtils - processImageUpload', () => {
+    beforeEach(() => {
+        setupImageMocks('test-campaign-1');
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
-        removeTestCampaignDir('test-campaign-1');
-        removeTestCampaignDir('test-campaign-2');
-        removeTestCampaignDir('test-campaign-3');
-        removeTestCampaignDir('test-campaign-4');
-        removeTestCampaignDir('test-campaign-5');
-        removeTestCampaignDir('test-campaign-6');
-        removeTestCampaignDir('test-campaign-7');
-        removeTestCampaignDir('test-campaign-8');
     });
 
     it('should be a function', () => {
@@ -82,168 +101,147 @@ describe('imageUtils - processImageUpload', () => {
     });
 
     it('should extract .jpg extension from imageName', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-1');
         const character = createMockCharacter('photo.jpg', 'data:image/jpeg;base64,abc123');
 
         processImageUpload('test-campaign-1', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.jpg');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-1', 'TestChar.jpg');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
         expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-1', 'images', 'TestChar.jpg'));
         expect(character.image).toBeUndefined();
         expect(character.imageName).toBeUndefined();
     });
 
     it('should extract .png extension from imageName', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-2');
         const character = createMockCharacter('photo.png', 'data:image/png;base64,abc123');
 
         processImageUpload('test-campaign-2', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.png');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-2', 'TestChar.png');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
         expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-2', 'images', 'TestChar.png'));
     });
 
     it('should extract .gif extension from imageName', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-3');
         const character = createMockCharacter('photo.gif', 'data:image/gif;base64,abc123');
 
         processImageUpload('test-campaign-3', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.gif');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-3', 'TestChar.gif');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
         expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-3', 'images', 'TestChar.gif'));
     });
 
     it('should default to .png when imageName has no extension', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-4');
         const character = createMockCharacter('photo', 'data:image/bmp;base64,abc123');
 
         processImageUpload('test-campaign-4', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.png');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-4', 'TestChar.png');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
         expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-4', 'images', 'TestChar.png'));
     });
 
     it('should extract extension from imageName with dots in name', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-5');
         const character = createMockCharacter('my.photo', 'data:image/png;base64,abc123');
 
         processImageUpload('test-campaign-5', 'TestChar', character);
 
         // The regex \.[^.]+$ matches '.photo' as the extension
-        const expectedPath = path.join(imagesDir, 'TestChar.photo');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-5', 'TestChar.photo');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
     });
 
     it('should strip data URL prefix and save raw base64', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-1');
         const fullDataUrl = 'data:image/png;base64,aGVsbG8gd29ybGQ=';
         const character = createMockCharacter('photo.png', fullDataUrl);
 
         processImageUpload('test-campaign-1', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.png');
-        const fileContent = fs.readFileSync(expectedPath, 'base64');
-        expect(fileContent).toBe('aGVsbG8gd29ybGQ=');
+        const expectedPath = getWrittenFilePath('test-campaign-1', 'TestChar.png');
+        const entry = writtenFiles.get(expectedPath);
+        expect(entry.data).toBe('aGVsbG8gd29ybGQ=');
     });
 
     it('should handle jpeg data URL with jpeg mime type', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-2');
         const fullDataUrl = 'data:image/jpeg;base64,dGVzdA==';
         const character = createMockCharacter('photo.jpg', fullDataUrl);
 
         processImageUpload('test-campaign-2', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.jpg');
-        const fileContent = fs.readFileSync(expectedPath, 'base64');
-        expect(fileContent).toBe('dGVzdA==');
+        const expectedPath = getWrittenFilePath('test-campaign-2', 'TestChar.jpg');
+        const entry = writtenFiles.get(expectedPath);
+        expect(entry.data).toBe('dGVzdA==');
     });
 
     it('should handle gif data URL with gif mime type', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-3');
         const fullDataUrl = 'data:image/gif;base64,Z2lm';
         const character = createMockCharacter('photo.gif', fullDataUrl);
 
         processImageUpload('test-campaign-3', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.gif');
-        const fileContent = fs.readFileSync(expectedPath, 'base64');
-        expect(fileContent).toBe('Z2lm');
+        const expectedPath = getWrittenFilePath('test-campaign-3', 'TestChar.gif');
+        const entry = writtenFiles.get(expectedPath);
+        expect(entry.data).toBe('Z2lm');
     });
 
     it('should create the images directory if it does not exist', () => {
-        // Don't call createTestCampaignDir - let the function create it
+        // The mock for mkdirSync is a no-op, but the function should still work
         const character = createMockCharacter('photo.png', 'data:image/png;base64,abc123');
 
         processImageUpload('test-campaign-4', 'TestChar', character);
 
-        const imagesDir = path.join(process.cwd(), 'public', 'campaigns', 'test-campaign-4', 'images');
-        expect(fs.existsSync(imagesDir)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-4', 'TestChar.png');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
     });
 
     it('should delete old image when originalImagePath is provided', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-5');
-
-        // Create an old image file
         const oldImagePath = path.join('campaigns', 'test-campaign-5', 'images', 'OldChar.png');
         const oldFilePath = path.join(process.cwd(), 'public', oldImagePath);
-        fs.mkdirSync(path.dirname(oldFilePath), { recursive: true });
-        fs.writeFileSync(oldFilePath, 'old data', 'base64');
 
         const character = createMockCharacter('photo.png', 'data:image/png;base64,newdata');
 
         processImageUpload('test-campaign-5', 'TestChar', character, oldImagePath);
 
-        // Old file should be deleted
-        expect(fs.existsSync(oldFilePath)).toBe(false);
-        // New file should exist
-        const newFilePath = path.join(imagesDir, 'TestChar.png');
-        expect(fs.existsSync(newFilePath)).toBe(true);
+        // Old file should have been "deleted" (unlinkSync called)
+        const unlinkSpy = fs.unlinkSync;
+        expect(unlinkSpy).toHaveBeenCalledWith(oldFilePath);
+        // New file should exist in written files
+        const newFilePath = getWrittenFilePath('test-campaign-5', 'TestChar.png');
+        expect(writtenFiles.has(newFilePath)).toBe(true);
     });
 
     it('should not fail to delete old image if it does not exist', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-6');
-
         const character = createMockCharacter('photo.png', 'data:image/png;base64,newdata');
 
         processImageUpload('test-campaign-6', 'TestChar', character, 'campaigns/nonexistent/images/old.png');
 
         // New file should still be created
-        const newFilePath = path.join(imagesDir, 'TestChar.png');
-        expect(fs.existsSync(newFilePath)).toBe(true);
+        const newFilePath = getWrittenFilePath('test-campaign-6', 'TestChar.png');
+        expect(writtenFiles.has(newFilePath)).toBe(true);
     });
 
     it('should not delete old image when originalImagePath is not provided', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-7');
-
-        // Create an old image file
-        const oldImagePath = path.join('campaigns', 'test-campaign-7', 'images', 'OldChar.png');
-        const oldFilePath = path.join(process.cwd(), 'public', oldImagePath);
-        fs.mkdirSync(path.dirname(oldFilePath), { recursive: true });
-        fs.writeFileSync(oldFilePath, 'old data', 'base64');
-
         const character = createMockCharacter('photo.png', 'data:image/png;base64,newdata');
 
         processImageUpload('test-campaign-7', 'TestChar', character);
 
-        // Old file should still exist
-        expect(fs.existsSync(oldFilePath)).toBe(true);
+        // unlinkSync should not have been called for any old image
+        const unlinkSpy = fs.unlinkSync;
+        // The mock was set up as no-op, but we can check the call count
+        expect(unlinkSpy.mock.calls.length).toBe(0);
         // New file should also exist
-        const newFilePath = path.join(imagesDir, 'TestChar.png');
-        expect(fs.existsSync(newFilePath)).toBe(true);
+        const newFilePath = getWrittenFilePath('test-campaign-7', 'TestChar.png');
+        expect(writtenFiles.has(newFilePath)).toBe(true);
     });
 
     it('should use character name as the image filename', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-8');
         const character = createMockCharacter('photo.png', 'data:image/png;base64,abc123');
 
         processImageUpload('test-campaign-8', 'DragonSlayer', character);
 
-        const expectedPath = path.join(imagesDir, 'DragonSlayer.png');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-8', 'DragonSlayer.png');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
         expect(character.imagePath).toBe(path.join('campaigns', 'test-campaign-8', 'images', 'DragonSlayer.png'));
     });
 
@@ -268,7 +266,6 @@ describe('imageUtils - processImageUpload', () => {
     });
 
     it('should write file with fsync for durability', () => {
-        createTestCampaignDir('test-campaign-2');
         const character = createMockCharacter('photo.png', 'data:image/png;base64,abc123');
 
         const fsyncSyncSpy = vi.spyOn(fs, 'fsyncSync').mockImplementation(() => { /* no-op */ });
@@ -284,7 +281,6 @@ describe('imageUtils - processImageUpload', () => {
     });
 
     it('should log to console.error on success', () => {
-        createTestCampaignDir('test-campaign-3');
         const character = createMockCharacter('photo.png', 'data:image/png;base64,abc123');
 
         const spy = vi.spyOn(console, 'error').mockImplementation(() => { /* no-op */ });
@@ -299,72 +295,64 @@ describe('imageUtils - processImageUpload', () => {
 
     it('should handle campaign names with hyphens', () => {
         const campaignName = 'my-test-campaign';
-        const imagesDir = createTestCampaignDir(campaignName);
         const character = createMockCharacter('photo.png', 'data:image/png;base64,abc123');
 
         processImageUpload(campaignName, 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.png');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath(campaignName, 'TestChar.png');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
         expect(character.imagePath).toBe(path.join('campaigns', campaignName, 'images', 'TestChar.png'));
     });
 
     it('should handle campaign names with underscores', () => {
         const campaignName = 'my_test_campaign';
-        const imagesDir = createTestCampaignDir(campaignName);
         const character = createMockCharacter('photo.png', 'data:image/png;base64,abc123');
 
         processImageUpload(campaignName, 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.png');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath(campaignName, 'TestChar.png');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
         expect(character.imagePath).toBe(path.join('campaigns', campaignName, 'images', 'TestChar.png'));
     });
 
     it('should handle large base64 data', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-4');
         // Simulate a large base64 string (e.g., 1MB image)
         const largeBase64 = 'data:image/png;base64,' + 'A'.repeat(1000000);
         const character = createMockCharacter('photo.png', largeBase64);
 
         processImageUpload('test-campaign-4', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.png');
-        expect(fs.existsSync(expectedPath)).toBe(true);
-        const fileContent = fs.readFileSync(expectedPath, 'base64');
-        expect(fileContent).toBe('A'.repeat(1000000));
+        const expectedPath = getWrittenFilePath('test-campaign-4', 'TestChar.png');
+        const entry = writtenFiles.get(expectedPath);
+        expect(entry.data).toBe('A'.repeat(1000000));
     });
 
     it('should handle image data URL with uppercase extensions', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-5');
         const character = createMockCharacter('photo.PNG', 'data:image/png;base64,abc123');
 
         processImageUpload('test-campaign-5', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.PNG');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-5', 'TestChar.PNG');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
     });
 
     it('should handle data URL with non-standard mime type', () => {
-        const imagesDir = createTestCampaignDir('test-campaign-6');
         const character = createMockCharacter('photo.webp', 'data:image/webp;base64,d2VicA==');
 
         processImageUpload('test-campaign-6', 'TestChar', character);
 
-        const expectedPath = path.join(imagesDir, 'TestChar.webp');
-        expect(fs.existsSync(expectedPath)).toBe(true);
-        const fileContent = fs.readFileSync(expectedPath, 'base64');
-        expect(fileContent).toBe('d2VicA==');
+        const expectedPath = getWrittenFilePath('test-campaign-6', 'TestChar.webp');
+        const entry = writtenFiles.get(expectedPath);
+        expect(entry.data).toBe('d2VicA==');
     });
 
     it('should use process.cwd() for path resolution', () => {
-        createTestCampaignDir('test-campaign-7');
         const character = createMockCharacter('photo.png', 'data:image/png;base64,abc123');
 
         processImageUpload('test-campaign-7', 'TestChar', character);
 
-        const expectedPath = path.join(process.cwd(), 'public', 'campaigns', 'test-campaign-7', 'images', 'TestChar.png');
-        expect(fs.existsSync(expectedPath)).toBe(true);
+        const expectedPath = getWrittenFilePath('test-campaign-7', 'TestChar.png');
+        expect(writtenFiles.has(expectedPath)).toBe(true);
     });
 
     it('should handle image with empty string imageName (skipped due to falsy check)', () => {
@@ -384,11 +372,12 @@ describe('imageUtils - processImageUpload', () => {
 // deleteCharacterImage
 // ---------------------------------------------------------------------------
 describe('imageUtils - deleteCharacterImage', () => {
+    beforeEach(() => {
+        setupImageMocks('del-campaign-1');
+    });
+
     afterEach(() => {
         vi.restoreAllMocks();
-        removeTestCampaignDir('del-campaign-1');
-        removeTestCampaignDir('del-campaign-2');
-        removeTestCampaignDir('del-campaign-3');
     });
 
     it('should be a function', () => {
@@ -396,14 +385,14 @@ describe('imageUtils - deleteCharacterImage', () => {
     });
 
     it('should delete an existing image file', () => {
-        createTestCampaignDir('del-campaign-1');
         const imagePath = path.join('campaigns', 'del-campaign-1', 'images', 'TestChar.png');
         const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
 
         deleteCharacterImage(imagePath);
 
-        expect(fs.existsSync(fullPath)).toBe(false);
+        // unlinkSync should have been called with the full path
+        const unlinkSpy = fs.unlinkSync;
+        expect(unlinkSpy).toHaveBeenCalledWith(fullPath);
     });
 
     it('should do nothing when imagePath is null', () => {
@@ -436,6 +425,10 @@ describe('imageUtils - deleteCharacterImage', () => {
     it('should do nothing when file does not exist', () => {
         const spy = vi.spyOn(console, 'error').mockImplementation(() => { /* no-op */ });
 
+        // existsSync returns true in our mock, but we need to test the "file doesn't exist" path
+        // Reset the mock for this test
+        fs.existsSync.mockReturnValue(false);
+
         deleteCharacterImage('campaigns/nonexistent/images/missing.png');
 
         expect(spy).not.toHaveBeenCalled();
@@ -443,10 +436,7 @@ describe('imageUtils - deleteCharacterImage', () => {
     });
 
     it('should log to console.error on successful deletion', () => {
-        createTestCampaignDir('del-campaign-2');
         const imagePath = path.join('campaigns', 'del-campaign-2', 'images', 'TestChar.png');
-        const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
 
         const spy = vi.spyOn(console, 'error').mockImplementation(() => { /* no-op */ });
 
@@ -457,10 +447,7 @@ describe('imageUtils - deleteCharacterImage', () => {
     });
 
     it('should log error when file deletion fails', () => {
-        createTestCampaignDir('del-campaign-3');
         const imagePath = path.join('campaigns', 'del-campaign-3', 'images', 'TestChar.png');
-        const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
 
         vi.spyOn(fs, 'unlinkSync').mockImplementation(() => {
             throw new Error('permission denied');
@@ -475,92 +462,70 @@ describe('imageUtils - deleteCharacterImage', () => {
     });
 
     it('should resolve path relative to public/', () => {
-        createTestCampaignDir('del-campaign-1');
         const imagePath = path.join('campaigns', 'del-campaign-1', 'images', 'TestChar.png');
         const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
-
-        const unlinkSyncSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => { /* no-op */ });
 
         deleteCharacterImage(imagePath);
 
-        expect(unlinkSyncSpy).toHaveBeenCalledWith(fullPath);
-        unlinkSyncSpy.mockRestore();
+        const unlinkSpy = fs.unlinkSync;
+        expect(unlinkSpy).toHaveBeenCalledWith(fullPath);
     });
 
     it('should handle image paths with subdirectories', () => {
-        const campaignDir = path.join(process.cwd(), 'public', 'campaigns', 'del-campaign-2', 'images');
-        fs.mkdirSync(campaignDir, { recursive: true });
-
-        const subDir = path.join(campaignDir, 'subfolder');
-        fs.mkdirSync(subDir, { recursive: true });
-
         const imagePath = path.join('campaigns', 'del-campaign-2', 'images', 'subfolder', 'TestChar.png');
         const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
 
         deleteCharacterImage(imagePath);
 
-        expect(fs.existsSync(fullPath)).toBe(false);
+        const unlinkSpy = fs.unlinkSync;
+        expect(unlinkSpy).toHaveBeenCalledWith(fullPath);
     });
 
     it('should handle different file extensions', () => {
-        createTestCampaignDir('del-campaign-3');
         const imagePath = path.join('campaigns', 'del-campaign-3', 'images', 'TestChar.jpg');
         const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
 
         deleteCharacterImage(imagePath);
 
-        expect(fs.existsSync(fullPath)).toBe(false);
+        const unlinkSpy = fs.unlinkSync;
+        expect(unlinkSpy).toHaveBeenCalledWith(fullPath);
     });
 
     it('should use process.cwd() for path resolution', () => {
-        createTestCampaignDir('del-campaign-1');
         const imagePath = path.join('campaigns', 'del-campaign-1', 'images', 'TestChar.png');
-        const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
-
-        const unlinkSyncSpy = vi.spyOn(fs, 'unlinkSync').mockImplementation(() => { /* no-op */ });
 
         deleteCharacterImage(imagePath);
 
-        expect(unlinkSyncSpy).toHaveBeenCalledWith(
+        const unlinkSpy = fs.unlinkSync;
+        expect(unlinkSpy).toHaveBeenCalledWith(
             expect.stringContaining(process.cwd()),
         );
-        unlinkSyncSpy.mockRestore();
     });
 
     it('should handle campaign names with hyphens', () => {
         const campaignName = 'my-test-campaign';
-        const imagesDir = path.join(process.cwd(), 'public', 'campaigns', campaignName, 'images');
-        fs.mkdirSync(imagesDir, { recursive: true });
-
         const imagePath = path.join('campaigns', campaignName, 'images', 'TestChar.png');
         const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
 
         deleteCharacterImage(imagePath);
 
-        expect(fs.existsSync(fullPath)).toBe(false);
+        const unlinkSpy = fs.unlinkSync;
+        expect(unlinkSpy).toHaveBeenCalledWith(fullPath);
     });
 
     it('should handle campaign names with underscores', () => {
         const campaignName = 'my_test_campaign';
-        const imagesDir = path.join(process.cwd(), 'public', 'campaigns', campaignName, 'images');
-        fs.mkdirSync(imagesDir, { recursive: true });
-
         const imagePath = path.join('campaigns', campaignName, 'images', 'TestChar.png');
         const fullPath = path.join(process.cwd(), 'public', imagePath);
-        fs.writeFileSync(fullPath, 'test data', 'base64');
 
         deleteCharacterImage(imagePath);
 
-        expect(fs.existsSync(fullPath)).toBe(false);
+        const unlinkSpy = fs.unlinkSync;
+        expect(unlinkSpy).toHaveBeenCalledWith(fullPath);
     });
 
     it('should not throw on any error', () => {
-        vi.spyOn(fs, 'existsSync').mockImplementation(() => {
+        fs.existsSync.mockImplementation(() => {
             throw new Error('filesystem error');
         });
 

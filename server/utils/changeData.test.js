@@ -1,5 +1,4 @@
 import fs from 'fs';
-import path from 'path';
 import http from 'http';
 import {
     activeMaps,
@@ -22,20 +21,6 @@ function clearStores() {
     activeMaps.clear();
     characterChangeData.clear();
     spellOverlayData.clear();
-}
-
-function createTestCampaignDir(campaignName, hasFile = false, fileContent = null) {
-    const baseDir = path.join(process.cwd(), 'public', 'campaigns', campaignName, 'data');
-    fs.mkdirSync(baseDir, { recursive: true });
-    if (hasFile) {
-        fs.writeFileSync(path.join(baseDir, 'character-change-data.json'), JSON.stringify(fileContent));
-    }
-    return baseDir;
-}
-
-function removeTestCampaignDir(campaignName) {
-    const dir = path.join(process.cwd(), 'public', 'campaigns', campaignName);
-    try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* ignore */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -142,92 +127,148 @@ describe('changeData - readFile', () => {
 
     afterEach(() => {
         clearStores();
-        // Clean up any test campaigns we created
-        removeTestCampaignDir('test-campaign-1');
-        removeTestCampaignDir('test-campaign-2');
-        removeTestCampaignDir('test-campaign-3');
     });
 
     it('should load existing change data files into the store', () => {
-        createTestCampaignDir('test-campaign-1', true, { character1: { hp: 25 } });
+        const readdirSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([
+            { name: 'test-campaign-1', isDirectory: () => true },
+        ]);
+        const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+        const readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue(JSON.stringify({ character1: { hp: 25 } }));
         readFile();
         expect(characterChangeData.get('test-campaign-1')).toEqual({ character1: { hp: 25 } });
+        readdirSpy.mockRestore();
+        existsSpy.mockRestore();
+        readFileSyncSpy.mockRestore();
     });
 
     it('should set empty object when file does not exist', () => {
-        createTestCampaignDir('test-campaign-1', false);
+        const readdirSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([
+            { name: 'test-campaign-1', isDirectory: () => true },
+        ]);
+        let existsCallCount = 0;
+        const existsSpy = vi.spyOn(fs, 'existsSync').mockImplementation((_p) => {
+            existsCallCount++;
+            if (existsCallCount === 1) return true; // campaigns dir exists
+            return false; // file does not exist
+        });
         readFile();
         expect(characterChangeData.has('test-campaign-1')).toBe(true);
         expect(characterChangeData.get('test-campaign-1')).toEqual({});
+        readdirSpy.mockRestore();
+        existsSpy.mockRestore();
     });
 
     it('should handle multiple campaigns', () => {
-        createTestCampaignDir('test-campaign-1', true, { character1: { hp: 25 } });
-        createTestCampaignDir('test-campaign-2', true, { character2: { hp: 10 } });
+        const readdirSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([
+            { name: 'test-campaign-1', isDirectory: () => true },
+            { name: 'test-campaign-2', isDirectory: () => true },
+        ]);
+        let existsCallCount = 0;
+        const existsSpy = vi.spyOn(fs, 'existsSync').mockImplementation((_p) => {
+            existsCallCount++;
+            if (existsCallCount === 1) return true; // campaigns dir exists
+            return true; // all file paths exist
+        });
+        const readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+            if (p.includes('test-campaign-1')) return JSON.stringify({ character1: { hp: 25 } });
+            if (p.includes('test-campaign-2')) return JSON.stringify({ character2: { hp: 10 } });
+            return '{}';
+        });
         readFile();
         expect(characterChangeData.get('test-campaign-1')).toEqual({ character1: { hp: 25 } });
         expect(characterChangeData.get('test-campaign-2')).toEqual({ character2: { hp: 10 } });
+        readdirSpy.mockRestore();
+        existsSpy.mockRestore();
+        readFileSyncSpy.mockRestore();
     });
 
     it('should mix campaigns with and without files', () => {
-        createTestCampaignDir('test-campaign-1', true, { character1: { hp: 25 } });
-        createTestCampaignDir('test-campaign-2', false);
+        const readdirSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([
+            { name: 'test-campaign-1', isDirectory: () => true },
+            { name: 'test-campaign-2', isDirectory: () => true },
+        ]);
+        let existsCallCount = 0;
+        const existsSpy = vi.spyOn(fs, 'existsSync').mockImplementation((_p) => {
+            existsCallCount++;
+            if (existsCallCount === 1) return true; // campaigns dir exists
+            if (existsCallCount === 2) return true; // test-campaign-1 file exists
+            if (existsCallCount === 3) return false; // test-campaign-2 file does not exist
+            return true;
+        });
+        const readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockImplementation((p) => {
+            if (p.includes('test-campaign-1')) return JSON.stringify({ character1: { hp: 25 } });
+            return '{}';
+        });
         readFile();
         expect(characterChangeData.get('test-campaign-1')).toEqual({ character1: { hp: 25 } });
         expect(characterChangeData.get('test-campaign-2')).toEqual({});
+        readdirSpy.mockRestore();
+        existsSpy.mockRestore();
+        readFileSyncSpy.mockRestore();
     });
 
     it('should handle invalid JSON gracefully', () => {
-        const baseDir = path.join(process.cwd(), 'public', 'campaigns', 'test-campaign-3', 'data');
-        fs.mkdirSync(baseDir, { recursive: true });
-        fs.writeFileSync(path.join(baseDir, 'character-change-data.json'), 'this is not valid json{{{');
+        const readdirSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([
+            { name: 'test-campaign-3', isDirectory: () => true },
+        ]);
+        const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+        const readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockReturnValue('this is not valid json{{{');
 
-        const spy = vi.spyOn(console, 'error');
+        const consoleSpy = vi.spyOn(console, 'error');
         readFile();
 
         expect(characterChangeData.get('test-campaign-3')).toEqual({});
-        expect(spy).toHaveBeenCalledWith(
+        expect(consoleSpy).toHaveBeenCalledWith(
             'Failed to read character change data for campaign test-campaign-3:',
             expect.any(String),
         );
-        spy.mockRestore();
-        removeTestCampaignDir('test-campaign-3');
+        consoleSpy.mockRestore();
+        readdirSpy.mockRestore();
+        existsSpy.mockRestore();
+        readFileSyncSpy.mockRestore();
     });
 
     it('should skip non-directory entries in campaigns folder', () => {
-        const campaignsDir = path.join(process.cwd(), 'public', 'campaigns');
-        fs.mkdirSync(campaignsDir, { recursive: true });
-        fs.writeFileSync(path.join(campaignsDir, 'not-a-campaign.txt'), 'ignore me');
+        const readdirSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([
+            { name: 'test-campaign', isDirectory: () => true },
+            { name: 'not-a-campaign.txt', isDirectory: () => false },
+        ]);
+        const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
         readFile();
         expect(characterChangeData.has('not-a-campaign.txt')).toBe(false);
+        readdirSpy.mockRestore();
+        existsSpy.mockRestore();
     });
 
     it('should do nothing if campaigns directory does not exist', () => {
-        const campaignsDir = path.join(process.cwd(), 'public', 'campaigns');
-        try { fs.rmSync(campaignsDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        const spy = vi.spyOn(fs, 'existsSync').mockReturnValue(false);
         readFile();
         expect(characterChangeData.size).toBe(0);
+        spy.mockRestore();
     });
 
     it('should handle file read errors gracefully', () => {
-        const baseDir = path.join(process.cwd(), 'public', 'campaigns', 'test-campaign-3', 'data');
-        fs.mkdirSync(baseDir, { recursive: true });
-        const filePath = path.join(baseDir, 'character-change-data.json');
-        fs.writeFileSync(filePath, JSON.stringify({ character1: { hp: 25 } }));
+        const readdirSpy = vi.spyOn(fs, 'readdirSync').mockReturnValue([
+            { name: 'test-campaign-3', isDirectory: () => true },
+        ]);
+        const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValue(true);
+        const readFileSyncSpy = vi.spyOn(fs, 'readFileSync').mockImplementation(() => {
+            throw new Error('EACCES: permission denied');
+        });
 
-        if (process.platform !== 'win32') {
-            fs.chmodSync(filePath, 0o000);
-        }
-
-        const spy = vi.spyOn(console, 'error');
+        const consoleSpy = vi.spyOn(console, 'error');
         readFile();
         expect(characterChangeData.has('test-campaign-3')).toBe(true);
-        spy.mockRestore();
-
-        if (process.platform !== 'win32') {
-            fs.chmodSync(filePath, 0o644);
-        }
-        removeTestCampaignDir('test-campaign-3');
+        expect(characterChangeData.get('test-campaign-3')).toEqual({});
+        expect(consoleSpy).toHaveBeenCalledWith(
+            'Failed to read character change data for campaign test-campaign-3:',
+            expect.any(String),
+        );
+        consoleSpy.mockRestore();
+        readdirSpy.mockRestore();
+        existsSpy.mockRestore();
+        readFileSyncSpy.mockRestore();
     });
 });
 

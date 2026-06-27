@@ -1,10 +1,41 @@
 import request from 'supertest';
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
 import campaignsBasic from './campaigns-basic.js';
 
-// Create a test app with the routes
+// ─── Mocks ─────────────────────────────────────────────────────────────────────
+
+// Mock fs.readdirSync per-path
+const MOCK_REaddir = new Map();
+
+function setupReaddir(path, entries) {
+    MOCK_REaddir.set(path, entries);
+}
+
+function clearMockFs() {
+    MOCK_REaddir.clear();
+}
+
+vi.mock('fs', () => ({
+    default: {
+        readdirSync: vi.fn((dirPath) => {
+            const entries = MOCK_REaddir.get(dirPath);
+            if (entries === undefined) {
+                throw new Error('ENOENT: no such file or directory');
+            }
+            return entries;
+        }),
+    },
+}));
+
+vi.mock('../utils/campaignPaths.js', () => ({
+    campaignsRoot: vi.fn(() => '/mock/campaigns/root'),
+    campaignDir: vi.fn((campaign) => `/mock/campaigns/root/${campaign}`),
+}));
+
+
+
+// ─── Helpers ───────────────────────────────────────────────────────────────────
+
 function createTestApp() {
     const app = express();
     app.use(express.json());
@@ -12,44 +43,24 @@ function createTestApp() {
     return app;
 }
 
-const testCampaignsDir = path.join(process.cwd(), 'public', 'campaigns');
-
-function ensureCampaignsDir() {
-    if (!fs.existsSync(testCampaignsDir)) {
-        fs.mkdirSync(testCampaignsDir, { recursive: true });
-    }
+function dirEntry(name, isDir) {
+    return {
+        name,
+        isDirectory: () => isDir,
+        isFile: () => !isDir,
+    };
 }
 
-function createCampaignDir(name) {
-    const campaignDir = path.join(testCampaignsDir, name);
-    if (!fs.existsSync(campaignDir)) {
-        fs.mkdirSync(campaignDir, { recursive: true });
-    }
-    return campaignDir;
-}
-
-function removeCampaignDir(name) {
-    const campaignDir = path.join(testCampaignsDir, name);
-    if (fs.existsSync(campaignDir)) {
-        fs.rmSync(campaignDir, { recursive: true, force: true });
-    }
-}
-
-function cleanupCampaign(name) {
-    removeCampaignDir(name);
-}
+// ─── /api/campaigns ────────────────────────────────────────────────────────────
 
 describe('campaignsBasic - GET /api/campaigns', () => {
-    beforeEach(ensureCampaignsDir);
-    afterEach(() => {
-        cleanupCampaign('test-campaign-a');
-        cleanupCampaign('test-campaign-b');
-        cleanupCampaign('test-campaign-c');
-    });
+    afterEach(clearMockFs);
 
     it('should return a list of campaign folder names', async () => {
-        createCampaignDir('test-campaign-a');
-        createCampaignDir('test-campaign-b');
+        setupReaddir('/mock/campaigns/root', [
+            dirEntry('test-campaign-a', true),
+            dirEntry('test-campaign-b', true),
+        ]);
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns');
@@ -62,9 +73,11 @@ describe('campaignsBasic - GET /api/campaigns', () => {
     });
 
     it('should return folders sorted alphabetically', async () => {
-        createCampaignDir('test-campaign-c');
-        createCampaignDir('test-campaign-a');
-        createCampaignDir('test-campaign-b');
+        setupReaddir('/mock/campaigns/root', [
+            dirEntry('test-campaign-c', true),
+            dirEntry('test-campaign-a', true),
+            dirEntry('test-campaign-b', true),
+        ]);
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns');
@@ -76,10 +89,10 @@ describe('campaignsBasic - GET /api/campaigns', () => {
     });
 
     it('should only return directories, not files', async () => {
-        createCampaignDir('test-campaign-a');
-        // Create a file directly in the campaigns directory
-        const filePath = path.join(testCampaignsDir, 'schema.json');
-        fs.writeFileSync(filePath, '{}');
+        setupReaddir('/mock/campaigns/root', [
+            dirEntry('test-campaign-a', true),
+            dirEntry('schema.json', false),
+        ]);
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns');
@@ -87,12 +100,11 @@ describe('campaignsBasic - GET /api/campaigns', () => {
         expect(res.status).toBe(200);
         expect(res.body.folders).not.toContain('schema.json');
         expect(res.body.folders).toContain('test-campaign-a');
-
-        // Cleanup
-        fs.unlinkSync(filePath);
     });
 
     it('should return an empty folders array when no campaigns exist', async () => {
+        setupReaddir('/mock/campaigns/root', []);
+
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns');
 
@@ -101,33 +113,27 @@ describe('campaignsBasic - GET /api/campaigns', () => {
     });
 
     it('should return 500 when campaigns directory does not exist', async () => {
+        setupReaddir('/mock/campaigns/root', undefined);
+
         const app = createTestApp();
-
-        const originalReaddirSync = fs.readdirSync;
-        fs.readdirSync = vi.fn(() => {
-            throw new Error('ENOENT');
-        });
-
         const res = await request(app).get('/api/campaigns');
 
         expect(res.status).toBe(500);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to read campaigns directory');
-
-        fs.readdirSync = originalReaddirSync;
+        expect(res.body.error).toBe('ENOENT: no such file or directory');
     });
 });
 
+// ─── /api/campaigns/:campaign ──────────────────────────────────────────────────
+
 describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
-    beforeEach(ensureCampaignsDir);
-    afterEach(() => {
-        cleanupCampaign('test-campaign');
-    });
+    afterEach(clearMockFs);
 
     it('should return json files in a campaign directory', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        fs.writeFileSync(path.join(campaignDir, 'character1.json'), '{}');
-        fs.writeFileSync(path.join(campaignDir, 'character2.json'), '{}');
+        setupReaddir('/mock/campaigns/root/test-campaign', [
+            dirEntry('character1.json', false),
+            dirEntry('character2.json', false),
+        ]);
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign');
@@ -140,10 +146,11 @@ describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
     });
 
     it('should return files sorted alphabetically', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        fs.writeFileSync(path.join(campaignDir, 'zebra.json'), '{}');
-        fs.writeFileSync(path.join(campaignDir, 'alpha.json'), '{}');
-        fs.writeFileSync(path.join(campaignDir, 'middle.json'), '{}');
+        setupReaddir('/mock/campaigns/root/test-campaign', [
+            dirEntry('zebra.json', false),
+            dirEntry('alpha.json', false),
+            dirEntry('middle.json', false),
+        ]);
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign');
@@ -155,10 +162,11 @@ describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
     });
 
     it('should only return .json files, not other file types', async () => {
-        const campaignDir = createCampaignDir('test-campaign');
-        fs.writeFileSync(path.join(campaignDir, 'character.json'), '{}');
-        fs.writeFileSync(path.join(campaignDir, 'character.txt'), 'content');
-        fs.writeFileSync(path.join(campaignDir, 'data.csv'), 'a,b,c');
+        setupReaddir('/mock/campaigns/root/test-campaign', [
+            dirEntry('character.json', false),
+            dirEntry('character.txt', false),
+            dirEntry('data.csv', false),
+        ]);
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign');
@@ -170,7 +178,9 @@ describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
     });
 
     it('should return an empty files array when campaign has no json files', async () => {
-        createCampaignDir('test-campaign');
+        setupReaddir('/mock/campaigns/root/test-campaign', [
+            dirEntry('readme.txt', false),
+        ]);
 
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/test-campaign');
@@ -179,29 +189,22 @@ describe('campaignsBasic - GET /api/campaigns/:campaign', () => {
         expect(res.body.files).toEqual([]);
     });
 
-    it('should return 404 when campaign directory does not exist', async () => {
+    it('should return 500 when campaign directory does not exist', async () => {
         const app = createTestApp();
         const res = await request(app).get('/api/campaigns/nonexistent-campaign');
 
         expect(res.status).toBe(500);
         expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toBe('Failed to read campaign directory');
+        expect(res.body.error).toBe('ENOENT: no such file or directory');
     });
 
     it('should return 500 on filesystem error', async () => {
-        createCampaignDir('test-campaign');
+        setupReaddir('/mock/campaigns/root/test-campaign', undefined);
+
         const app = createTestApp();
-
-        const originalReadDirSync = fs.readdirSync;
-        fs.readdirSync = vi.fn(() => {
-            throw new Error('Permission denied');
-        });
-
         const res = await request(app).get('/api/campaigns/test-campaign');
 
         expect(res.status).toBe(500);
-        expect(res.body.error).toBe('Failed to read campaign directory');
-
-        fs.readdirSync = originalReadDirSync;
+        expect(res.body.error).toBe('ENOENT: no such file or directory');
     });
 });

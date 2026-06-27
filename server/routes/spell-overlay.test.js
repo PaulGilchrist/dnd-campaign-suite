@@ -292,19 +292,19 @@ describe('spell-overlay - POST /spell-overlay', () => {
         });
 
         it('should create the campaign entry if it does not exist yet', async () => {
-            expect(spellOverlayData.has('new-campaign')).toBe(false);
+            expect(spellOverlayData.has('test-campaign')).toBe(false);
 
             const app = createTestApp();
             const res = await request(app)
-                .post('/spell-overlay?campaign=new-campaign')
+                .post('/spell-overlay?campaign=test-campaign')
                 .send({
                     action: 'add',
                     overlays: [{ id: 'overlay-1', name: 'First Overlay' }],
                 });
 
             expect(res.status).toBe(200);
-            expect(spellOverlayData.has('new-campaign')).toBe(true);
-            expect(spellOverlayData.get('new-campaign')).toHaveLength(1);
+            expect(spellOverlayData.has('test-campaign')).toBe(true);
+            expect(spellOverlayData.get('test-campaign')).toHaveLength(1);
         });
     });
 
