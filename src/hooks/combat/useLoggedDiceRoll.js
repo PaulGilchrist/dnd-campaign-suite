@@ -1,6 +1,7 @@
 import { useRef, useEffect } from 'react';
 import useDiceRoll from './useDiceRoll.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
+import { addEntry } from '../../services/ui/logService.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 import { createSaves } from './useLoggedDiceRollSaves.js';
@@ -24,11 +25,7 @@ export default function useLoggedDiceRoll(characterName, campaignName, options =
   const pendingSaves = window.__pendingSaves;
 
   function logEntry(entry) {
-    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(entry),
-      }).catch((e) => { console.error("[useLoggedDiceRoll] Error:", e); });
+    addEntry(campaignName, entry).catch((e) => { console.error("[useLoggedDiceRoll] Error:", e); });
   }
 
   setupEventListeners({

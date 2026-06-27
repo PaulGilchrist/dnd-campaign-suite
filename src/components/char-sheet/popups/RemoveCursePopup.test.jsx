@@ -1,5 +1,5 @@
 // @improved-by-ai
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import RemoveCursePopup from './RemoveCursePopup.jsx';
 
@@ -152,60 +152,66 @@ describe('RemoveCursePopup', () => {
         expect(screen.getByText(/Effects to remove from Goblin/)).toBeInTheDocument();
     });
 
-    it('shows curse option when target has cursed buffs by type', () => {
+    it('shows curse option when target has cursed buffs by type', async () => {
         mockRuntimeValue('Goblin', [{ type: 'cursed', name: 'Cursed Ring' }], []);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        expect(screen.getByText(/Curse \(1 cursed effect\(s\)\)/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Curse \(1 cursed effect\(s\)\)/)).toBeInTheDocument();
+        });
     });
 
-    it('shows curse option when target has cursed buffs by flag', () => {
+    it('shows curse option when target has cursed buffs by flag', async () => {
         mockRuntimeValue('Goblin', [{ name: 'Hex', cursed: true }], []);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        expect(screen.getByText(/Curse \(1 cursed effect\(s\)\)/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Curse \(1 cursed effect\(s\)\)/)).toBeInTheDocument();
+        });
     });
 
-    it('shows attunement option when target has attuned items', () => {
+    it('shows attunement option when target has attuned items', async () => {
         mockRuntimeValue('Goblin', [], [{ item: 'Cursed Armor' }]);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        expect(screen.getByText(/Attunement \(1 attuned item\(s\)\)/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Attunement \(1 attuned item\(s\)\)/)).toBeInTheDocument();
+        });
     });
 
-    it('shows multiple cursed effects with correct count', () => {
+    it('shows multiple cursed effects with correct count', async () => {
         mockRuntimeValue('Goblin', [
             { type: 'cursed', name: 'Cursed Ring' },
             { type: 'cursed', name: 'Cursed Shield' },
         ], []);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        expect(screen.getByText(/Curse \(2 cursed effect\(s\)\)/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Curse \(2 cursed effect\(s\)\)/)).toBeInTheDocument();
+        });
     });
 
-    it('shows multiple attuned items with correct count', () => {
+    it('shows multiple attuned items with correct count', async () => {
         mockRuntimeValue('Goblin', [], [
             { item: 'Cursed Armor' },
             { item: 'Cursed Helm' },
             { item: 'Cursed Ring' },
         ]);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        expect(screen.getByText(/Attunement \(3 attuned item\(s\)\)/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Attunement \(3 attuned item\(s\)\)/)).toBeInTheDocument();
+        });
     });
 
-    it('shows both curse and attunement options when target has both', () => {
+    it('shows both curse and attunement options when target has both', async () => {
         mockRuntimeValue('Goblin', [{ type: 'cursed', name: 'Cursed Ring' }], [{ item: 'Cursed Armor' }]);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        expect(screen.getByText(/Curse \(\d/)).toBeInTheDocument();
-        expect(screen.getByText(/Attunement \(\d/)).toBeInTheDocument();
+        fireEvent.click(screen.getByText('Goblin'));
+        await waitFor(() => {
+            expect(screen.getByText(/Curse \(\d/)).toBeInTheDocument();
+            expect(screen.getByText(/Attunement \(\d/)).toBeInTheDocument();
+        });
     });
 
     it('shows no curses message when target has neither curses nor attunement', () => {
@@ -218,37 +224,34 @@ describe('RemoveCursePopup', () => {
 
     // ── Selection toggling ──
 
-    it('toggles curse selection on and off', () => {
+    it('toggles curse selection on and off', async () => {
         mockRuntimeValue('Goblin', [{ type: 'cursed', name: 'Cursed Ring' }], []);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        const curseOption = screen.getByText(/Curse \(\d/);
+        fireEvent.click(screen.getByText('Goblin'));
+        const curseOption = await screen.findByText(/Curse \(\d/);
         fireEvent.click(curseOption);
         expect(curseOption.textContent).toContain('\u2713');
         fireEvent.click(curseOption);
         expect(curseOption.textContent).not.toContain('\u2713');
     });
 
-    it('toggles attunement selection on and off', () => {
+    it('toggles attunement selection on and off', async () => {
         mockRuntimeValue('Goblin', [], [{ item: 'Cursed Armor' }]);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        const attunementOption = screen.getByText(/Attunement \(\d/);
+        fireEvent.click(screen.getByText('Goblin'));
+        const attunementOption = await screen.findByText(/Attunement \(\d/);
         fireEvent.click(attunementOption);
         expect(attunementOption.textContent).toContain('\u2713');
         fireEvent.click(attunementOption);
         expect(attunementOption.textContent).not.toContain('\u2713');
     });
 
-    it('allows selecting both curse and attunement independently', () => {
+    it('allows selecting both curse and attunement independently', async () => {
         mockRuntimeValue('Goblin', [{ type: 'cursed', name: 'Cursed Ring' }], [{ item: 'Cursed Armor' }]);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        const curseOption = screen.getByText(/Curse \(\d/);
-        const attunementOption = screen.getByText(/Attunement \(\d/);
+        fireEvent.click(screen.getByText('Goblin'));
+        const curseOption = await screen.findByText(/Curse \(\d/);
+        const attunementOption = await screen.findByText(/Attunement \(\d/);
         fireEvent.click(curseOption);
         fireEvent.click(attunementOption);
         expect(curseOption.textContent).toContain('\u2713');
@@ -272,27 +275,24 @@ describe('RemoveCursePopup', () => {
         expect(castButton).toBeDisabled();
     });
 
-    it('enables Cast Remove Curse when at least one effect is selected', () => {
+    it('enables Cast Remove Curse when at least one effect is selected', async () => {
         mockRuntimeValue('Goblin', [{ type: 'cursed', name: 'Cursed Ring' }], []);
         render(<RemoveCursePopup {...createProps()} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        const curseOption = screen.getByText(/Curse \(\d/);
+        fireEvent.click(screen.getByText('Goblin'));
+        const curseOption = await screen.findByText(/Curse \(\d/);
         fireEvent.click(curseOption);
-        const castButton = screen.getByRole('button', { name: 'Cast Remove Curse' });
-        expect(castButton).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Cast Remove Curse' })).toBeEnabled();
     });
 
     // ── Confirm behavior ──
 
-    it('calls onConfirm with target name and selections when Cast is clicked', () => {
+    it('calls onConfirm with target name and selections when Cast is clicked', async () => {
         const onConfirm = vi.fn();
         mockRuntimeValue('Goblin', [{ type: 'cursed', name: 'Cursed Ring' }], [{ item: 'Cursed Armor' }]);
         render(<RemoveCursePopup {...createProps({ onConfirm })} />);
-        const goblinTarget = screen.getByText('Goblin');
-        fireEvent.click(goblinTarget);
-        const curseOption = screen.getByText(/Curse \(\d/);
-        const attunementOption = screen.getByText(/Attunement \(\d/);
+        fireEvent.click(screen.getByText('Goblin'));
+        const curseOption = await screen.findByText(/Curse \(\d/);
+        const attunementOption = await screen.findByText(/Attunement \(\d/);
         fireEvent.click(curseOption);
         fireEvent.click(attunementOption);
         fireEvent.click(screen.getByRole('button', { name: 'Cast Remove Curse' }));
@@ -320,13 +320,13 @@ describe('RemoveCursePopup', () => {
         expect(onConfirm).not.toHaveBeenCalled();
     });
 
-    it('passes correct selections when only curse is selected', () => {
+    it('passes correct selections when only curse is selected', async () => {
         const onConfirm = vi.fn();
         mockRuntimeValue('Orc', [{ type: 'cursed', name: 'Hex' }], []);
         render(<RemoveCursePopup {...createProps({ onConfirm, creatureTargets: ['Orc'] })} />);
-        const orcTarget = screen.getByText('Orc');
-        fireEvent.click(orcTarget);
-        fireEvent.click(screen.getByText(/Curse \(\d/));
+        fireEvent.click(screen.getByText('Orc'));
+        const curseOption = await screen.findByText(/Curse \(\d/);
+        fireEvent.click(curseOption);
         fireEvent.click(screen.getByRole('button', { name: 'Cast Remove Curse' }));
         expect(onConfirm).toHaveBeenCalledWith({
             targetName: 'Orc',
@@ -334,13 +334,13 @@ describe('RemoveCursePopup', () => {
         });
     });
 
-    it('passes correct selections when only attunement is selected', () => {
+    it('passes correct selections when only attunement is selected', async () => {
         const onConfirm = vi.fn();
         mockRuntimeValue('Troll', [], [{ item: 'Plate Armor' }]);
         render(<RemoveCursePopup {...createProps({ onConfirm, creatureTargets: ['Troll'] })} />);
-        const trollTarget = screen.getByText('Troll');
-        fireEvent.click(trollTarget);
-        fireEvent.click(screen.getByText(/Attunement \(\d/));
+        fireEvent.click(screen.getByText('Troll'));
+        const attunementOption = await screen.findByText(/Attunement \(\d/);
+        fireEvent.click(attunementOption);
         fireEvent.click(screen.getByRole('button', { name: 'Cast Remove Curse' }));
         expect(onConfirm).toHaveBeenCalledWith({
             targetName: 'Troll',

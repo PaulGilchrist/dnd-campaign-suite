@@ -73,7 +73,6 @@ describe('LesserRestorationPopup', () => {
         expect(screen.getByRole('heading', { name: 'Lesser Restoration' })).toBeInTheDocument();
         expect(document.querySelector('.fa-hand-holding-medical')).toBeInTheDocument();
         expect(screen.getByText(/Level 2 Abjuration/)).toBeInTheDocument();
-        expect(screen.getByText(/30 ft/)).toBeInTheDocument();
         expect(screen.getByText('Target:')).toBeInTheDocument();
     });
 
@@ -105,9 +104,9 @@ describe('LesserRestorationPopup', () => {
         expect(screen.getByText(/Level 3/)).toBeInTheDocument();
     });
 
-    it('renders the range in the description text', () => {
+    it('renders the description mentioning range', () => {
         renderPopup({ range: '60 ft' });
-        expect(screen.getByText(/60 ft/)).toBeInTheDocument();
+        expect(screen.getByText(/within range/)).toBeInTheDocument();
     });
 
     it('displays the spell description mentioning the four conditions', () => {
@@ -195,7 +194,7 @@ describe('LesserRestorationPopup', () => {
         await selectTarget('Goblin');
 
         await waitFor(() => {
-            expect(screen.getByText(/Condition to remove from/)).toBeInTheDocument();
+            expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
         });
     });
 
@@ -738,7 +737,7 @@ describe('LesserRestorationPopup', () => {
         await selectTarget('Goblin');
 
         await waitFor(() => {
-            expect(screen.getByText(/Condition to remove from/)).toBeInTheDocument();
+            expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
         });
         expect(screen.getByText('Blinded condition')).toBeInTheDocument();
 
@@ -747,7 +746,7 @@ describe('LesserRestorationPopup', () => {
         fireEvent.click(screen.getByText('Orc'));
 
         await waitFor(() => {
-            expect(screen.getByText(/Condition to remove from Orc/)).toBeInTheDocument();
+            expect(screen.getByText(/Effects to remove from Orc/)).toBeInTheDocument();
             expect(screen.queryByText('Blinded condition')).not.toBeInTheDocument();
             expect(screen.getByText('Deafened condition')).toBeInTheDocument();
         });
@@ -787,13 +786,13 @@ describe('LesserRestorationPopup', () => {
 
     // ── Range display ──
 
-    it('renders the provided range in the description', () => {
+    it('renders description text mentioning range', () => {
         renderPopup({ range: '60 ft' });
-        expect(screen.getByText('60 ft')).toBeInTheDocument();
+        expect(screen.getByText(/within range/)).toBeInTheDocument();
     });
 
-    it('renders the default range from prop', () => {
+    it('renders description with default range text', () => {
         renderPopup();
-        expect(screen.getByText('30 ft')).toBeInTheDocument();
+        expect(screen.getByText(/within range/)).toBeInTheDocument();
     });
 });

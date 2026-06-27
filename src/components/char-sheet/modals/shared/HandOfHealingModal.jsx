@@ -2,6 +2,7 @@ import React, { useCallback } from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
 import utils from '../../../../services/ui/utils.js'
 import storage from '../../../../services/ui/storage.js'
+import { addEntry } from '../../../../services/ui/logService.js'
 import { getCombatSummary } from '../../../../services/encounters/combatData.js'
 import '../../CharSheet.css'
 
@@ -70,17 +71,13 @@ function HandOfHealingModal({ healName, formula, rolls, bonus, healAmount, monkN
              }
          } catch { /* ignore */ }
 
-        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'condition',
-                characterName: targetName,
-                condition: conditionName,
-                action: 'broken',
-                sourceName: `${monkName} (${healName}`,
-                timestamp: Date.now(),
-                })
+        addEntry(campaignName, {
+            type: 'condition',
+            characterName: targetName,
+            condition: conditionName,
+            action: 'broken',
+            sourceName: `${monkName} (${healName}`,
+            timestamp: Date.now(),
             }).catch((e) => { console.error("[HandOfHealingModal] Error:", e); });
 
         setCureCondition(conditionName);

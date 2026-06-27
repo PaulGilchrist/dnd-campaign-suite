@@ -2,6 +2,7 @@
 import React from 'react'
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
+import { addEntry } from '../../../services/ui/logService.js'
 import HiddenInput from '../../common/HiddenInput.jsx'
 import DeathSavingThrows from './DeathSavingThrows.jsx'
 
@@ -30,18 +31,14 @@ function CharHitPoints({ playerStats, campaignName }) {
           setRuntimeValue(playerStats.name, 'currentHitPoints', numValue, campaignName);
 
           if (delta !== 0) {
-              fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                      type: 'hp_change',
-                      targetName: playerStats.name,
-                      delta,
-                      currentHp: value,
-                      maxHp: effectiveMaxHp,
-                      isHealing: delta > 0,
-                      isUnconscious: value <= 0,
-                  })
+              addEntry(campaignName, {
+                  type: 'hp_change',
+                  targetName: playerStats.name,
+                  delta,
+                  currentHp: value,
+                  maxHp: effectiveMaxHp,
+                  isHealing: delta > 0,
+                  isUnconscious: value <= 0,
               }).catch((e) => { console.error("[CharHitPoints] Error:", e); });
           }
 

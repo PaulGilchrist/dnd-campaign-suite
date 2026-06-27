@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getRuntimeValue, setRuntimeValue, addStorageChangeListener } from '../runtime/useRuntimeState.js';
 import { getClassFeatures } from '../../services/character/classFeatures.js';
 import utils from '../../services/ui/utils.js';
+import { addEntry } from '../../services/ui/logService.js';
 
 export function spendSorceryPoints(characterName, amount, campaignName) {
   const current = Number(getRuntimeValue(characterName, 'sorceryPoints') ?? 0);
@@ -33,11 +34,7 @@ export function logMetamagicUse(campaignName, characterName, spellName, options,
     timestamp: Date.now(),
     id: utils.guid(),
   };
-  fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(entry),
-  }).catch((e) => { console.error("[useMetamagic] Error:", e); });
+  addEntry(campaignName, entry).catch((e) => { console.error("[useMetamagic] Error:", e); });
 }
 
 export default function useMetamagic(playerStats, campaignName) {

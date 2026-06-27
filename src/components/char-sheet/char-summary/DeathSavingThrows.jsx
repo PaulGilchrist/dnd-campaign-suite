@@ -3,6 +3,7 @@ import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRunt
 import { clearDeathSavePrompt } from '../../../services/combat/conditions/savePromptService.js'
 import * as deathSaveRules from '../../../services/combat/conditions/deathSaveRules.js'
 import { hasSaveModifier } from '../../../services/combat/conditions/conditionEffects.js'
+import { addEntry } from '../../../services/ui/logService.js'
 import './CharSummary.css'
 
 function DeathSavingThrows({ playerStats, campaignName }) {
@@ -38,11 +39,7 @@ function DeathSavingThrows({ playerStats, campaignName }) {
     const isDead = deathSaveRules.isDead(failures)
 
     const logEntry = (entry) => {
-        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(entry)
-        }).catch((e) => { console.error("[DeathSavingThrows] Error:", e); throw e; })
+        addEntry(campaignName, entry).catch((e) => { console.error("[DeathSavingThrows] Error:", e); throw e; })
     }
 
     const rollDeathSave = () => {

@@ -522,14 +522,8 @@ function CharSheet({ allAbilityScores, allClasses, allClasses2024, allEquipment,
                 description: desc,
             });
 
-            // Log to campaign log via API
             try {
-                const resp = await fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(logEntry),
-                });
-                if (!resp.ok) console.error('[CharSheet] Failed to log superiority maneuver:', resp.status);
+                await addEntry(campaignName, logEntry);
             } catch (e) {
                 console.error('[CharSheet] Error logging superiority maneuver:', e);
             }

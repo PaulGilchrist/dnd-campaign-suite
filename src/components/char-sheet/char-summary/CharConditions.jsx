@@ -3,6 +3,7 @@ import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js'
 import { rollD20 } from '../../../services/dice/diceRoller.js'
 import { CONDITIONS, CONDITION_SAVE_DC, CONDITION_SAVE_MAP, getAbilityLabel, getAbilitySaveBonus } from '../../../services/combat/conditions/conditionUtils.js'
+import { addEntry } from '../../../services/ui/logService.js'
 import { EXHAUSTION_LEVELS, isDeadFromExhaustion, getExhaustionSaveDC } from '../../../services/combat/conditions/exhaustionRules.js'
 import usePopup from '../../../hooks/combat/usePopup.js'
 import Popup from '../../common/popup.jsx'
@@ -45,11 +46,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
    }, [activeConditions, playerStats.name, campaignName])
 
   function logEntry(entry) {
-    fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(entry)
-    }).catch((e) => { console.error("[CharConditions] Error:", e); throw e; })
+    addEntry(campaignName, entry).catch((e) => { console.error("[CharConditions] Error:", e); throw e; })
   }
 
   async function handleConditionSave(conditionKey, saveAbility, saveLabel) {

@@ -14,6 +14,7 @@ import {
     applyResistanceEffect,
     applyShieldOfFaithEffect,
 } from '../../services/automation/index.js'
+import { useConfirmableFlow } from './useConfirmableFlow.js'
 
 function getCreatureTargets(excludeName, campaignName) {
   const cs = getCombatSummary(campaignName);
@@ -25,18 +26,20 @@ function getCreatureTargets(excludeName, campaignName) {
 
 export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
   const isSorcerer = playerStats?.class?.name === 'Sorcerer';
-  const [pendingMetamagic, setPendingMetamagic] = React.useState(null);
-  const [pendingMultiTarget, setPendingMultiTarget] = React.useState(null);
-  const [pendingAid, setPendingAid] = React.useState(null);
-  const [pendingHeroesFeast, setPendingHeroesFeast] = React.useState(null);
-  const [pendingGreaterRestoration, setPendingGreaterRestoration] = React.useState(null);
-  const [pendingLesserRestoration, setPendingLesserRestoration] = React.useState(null);
-  const [pendingMageArmor, setPendingMageArmor] = React.useState(null);
-  const [pendingShieldOfFaith, setPendingShieldOfFaith] = React.useState(null);
-  const [pendingProtectionFromEnergy, setPendingProtectionFromEnergy] = React.useState(null);
-  const [pendingResistance, setPendingResistance] = React.useState(null);
-  const [pendingRemoveCurse, setPendingRemoveCurse] = React.useState(null);
-  const [pendingMagicMissile, setPendingMagicMissile] = React.useState(null);
+  const { setPending: cfSetPending, getPending, createConfirmHandler, createSkipHandler, clearPending: cfClearPending } = useConfirmableFlow(playerStats, campaignName);
+
+  const pendingMetamagic = getPending('metamagic');
+  const pendingMultiTarget = getPending('multiTarget');
+  const pendingAid = getPending('aid');
+  const pendingHeroesFeast = getPending('heroesFeast');
+  const pendingGreaterRestoration = getPending('greaterRestoration');
+  const pendingLesserRestoration = getPending('lesserRestoration');
+  const pendingMageArmor = getPending('mageArmor');
+  const pendingShieldOfFaith = getPending('shieldOfFaith');
+  const pendingProtectionFromEnergy = getPending('protectionFromEnergy');
+  const pendingResistance = getPending('resistance');
+  const pendingRemoveCurse = getPending('removeCurse');
+  const pendingMagicMissile = getPending('magicMissile');
 
   const gateMetamagic = React.useCallback((spell, metaCtx = {}) => {
     const isGreaterRestoration = (spell.name || '').toLowerCase() === 'greater restoration';
@@ -50,7 +53,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingLesserRestoration({
+        cfSetPending('lesserRestoration', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -68,7 +71,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingGreaterRestoration({
+        cfSetPending('greaterRestoration', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -86,7 +89,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingRemoveCurse({
+        cfSetPending('removeCurse', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -104,7 +107,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingAid({
+        cfSetPending('aid', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -124,7 +127,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingHeroesFeast({
+        cfSetPending('heroesFeast', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -144,7 +147,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingMageArmor({
+        cfSetPending('mageArmor', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -163,7 +166,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingShieldOfFaith({
+        cfSetPending('shieldOfFaith', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -182,7 +185,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingProtectionFromEnergy({
+        cfSetPending('protectionFromEnergy', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -202,7 +205,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
         ?.filter(c => c.name !== playerStats?.name)
         .map(c => c.name) || [];
       if (creatureTargets.length > 0) {
-        setPendingResistance({
+        cfSetPending('resistance', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -224,7 +227,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       if (creatureTargets.length > 0) {
         const slotLevel = spell.level || 1;
         const totalMissiles = 3 + (slotLevel - 1);
-        setPendingMagicMissile({
+        cfSetPending('magicMissile', {
           spell,
           totalMissiles,
           missileDamage: '1d4 + 1',
@@ -239,7 +242,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     if (multiTargetSpread) {
       const creatureTargets = getCreatureTargets(playerStats?.name, campaignName);
       if (creatureTargets.length > 0) {
-        setPendingMultiTarget({
+        cfSetPending('multiTarget', {
           spell,
           spellName: spell.name,
           spellLevel: spell.level || 0,
@@ -271,7 +274,7 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     const isPsionic = isPsionicSpell(playerStats, spell.name);
     const hasPsionic = hasPsionicSorcery(playerStats);
 
-    setPendingMetamagic({
+    cfSetPending('metamagic', {
       spell,
       spellName: spell.name,
       spellLevel: spell.level || 0,
@@ -281,12 +284,13 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
       psionicCost: isPsionic && hasPsionic ? spellLevel : 0,
       _metaCtx: metaCtx,
     });
-    }, [isSorcerer, playerStats, campaignName, onExecute]);
+    }, [isSorcerer, playerStats, campaignName, onExecute, cfSetPending]);
 
   const handleConfirm = React.useCallback((result) => {
     const pending = pendingMetamagic;
-    setPendingMetamagic(null);
     if (!pending) return;
+
+    cfClearPending('metamagic');
 
     let totalMetamagicCost = result?.totalCost || 0;
     let psionicCost = 0;
@@ -328,12 +332,13 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     }
 
     onExecute(pending.spell, metaCtx);
-  }, [pendingMetamagic, playerStats, campaignName, onExecute]);
+  }, [pendingMetamagic, playerStats, campaignName, onExecute, cfClearPending]);
 
   const handleSkip = React.useCallback(() => {
     const pending = pendingMetamagic;
-    setPendingMetamagic(null);
     if (!pending) return;
+
+    cfClearPending('metamagic');
 
     addEntry(campaignName, {
       type: 'spell',
@@ -347,12 +352,13 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     onExecute(pending.spell, {});
-  }, [pendingMetamagic, playerStats.name, campaignName, onExecute]);
+  }, [pendingMetamagic, playerStats.name, campaignName, onExecute, cfClearPending]);
 
   const handleMultiTargetConfirm = React.useCallback((result) => {
     const pending = pendingMultiTarget;
-    setPendingMultiTarget(null);
     if (!pending) return;
+
+    cfClearPending('multiTarget');
 
     addEntry(campaignName, {
       type: 'spell',
@@ -371,12 +377,13 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     }
 
     onExecute(pending.spell, metaCtx);
-  }, [pendingMultiTarget, playerStats, campaignName, onExecute]);
+  }, [pendingMultiTarget, playerStats, campaignName, onExecute, cfClearPending]);
 
   const handleMultiTargetSkip = React.useCallback(() => {
     const pending = pendingMultiTarget;
-    setPendingMultiTarget(null);
     if (!pending) return;
+
+    cfClearPending('multiTarget');
 
     addEntry(campaignName, {
       type: 'spell',
@@ -390,436 +397,122 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     });
 
     onExecute(pending.spell, {});
-  }, [pendingMultiTarget, playerStats, campaignName, onExecute]);
+  }, [pendingMultiTarget, playerStats, campaignName, onExecute, cfClearPending]);
 
-  const handleAidConfirm = React.useCallback(async (result) => {
-    const pending = pendingAid;
-    setPendingAid(null);
-    if (!pending) return;
+  const handleAidConfirm = createConfirmHandler('aid', async (pending, result) => {
+    await applyAidEffect(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'aid', range: pending.range, maxTargets: pending.maxTargets } },
+      playerStats,
+      campaignName,
+      null,
+      result
+    );
+  });
 
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
+  const handleAidSkip = createSkipHandler('aid');
 
-    try {
-      await applyAidEffect(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'aid', range: pending.range, maxTargets: pending.maxTargets } },
-        playerStats,
-        campaignName,
-        null,
-        result
-      );
-    } catch (e) {
-      console.error('[aid] Failed to apply effect:', e);
-      throw e;
-    }
-  }, [pendingAid, playerStats, campaignName]);
+  const handleHeroesFeastConfirm = createConfirmHandler('heroesFeast', async (pending, result) => {
+    await applyHeroesFeastEffect(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'heroes_feast', range: pending.range, maxTargets: pending.maxTargets } },
+      playerStats,
+      campaignName,
+      null,
+      result
+    );
+  });
 
-  const handleAidSkip = React.useCallback(() => {
-    const pending = pendingAid;
-    setPendingAid(null);
-    if (!pending) return;
+  const handleHeroesFeastSkip = createSkipHandler('heroesFeast');
 
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingAid, playerStats, campaignName]);
+  const handleGreaterRestorationConfirm = createConfirmHandler('greaterRestoration', async (pending, result) => {
+    const { confirmGreaterRestoration } = await import('../../services/rules/features/greaterRestorationService.js');
+    await confirmGreaterRestoration(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'greater_restoration', range: pending.range } },
+      playerStats,
+      campaignName,
+      null,
+      result
+    );
+  });
 
-  const handleHeroesFeastConfirm = React.useCallback(async (result) => {
-    const pending = pendingHeroesFeast;
-    setPendingHeroesFeast(null);
-    if (!pending) return;
+  const handleGreaterRestorationSkip = createSkipHandler('greaterRestoration');
 
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
+  const handleLesserRestorationConfirm = createConfirmHandler('lesserRestoration', async (pending, result) => {
+    await applyLesserRestorationEffect(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'lesser_restoration', range: pending.range } },
+      playerStats,
+      campaignName,
+      null,
+      result
+    );
+  });
 
-    try {
-      await applyHeroesFeastEffect(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'heroes_feast', range: pending.range, maxTargets: pending.maxTargets } },
-        playerStats,
-        campaignName,
-        null,
-        result
-      );
-    } catch (e) {
-      console.error("[heroesFeast] Failed to apply effect:", e);
-      throw e;
-    }
-  }, [pendingHeroesFeast, playerStats, campaignName]);
+  const handleLesserRestorationSkip = createSkipHandler('lesserRestoration');
 
-  const handleHeroesFeastSkip = React.useCallback(() => {
-    const pending = pendingHeroesFeast;
-    setPendingHeroesFeast(null);
-    if (!pending) return;
+  const handleRemoveCurseConfirm = createConfirmHandler('removeCurse', async (pending, result) => {
+    await confirmRemoveCurse(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'remove_curse', range: pending.range } },
+      playerStats,
+      campaignName,
+      null,
+      result
+    );
+  });
 
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingHeroesFeast, playerStats, campaignName]);
+  const handleRemoveCurseSkip = createSkipHandler('removeCurse');
 
-  const handleGreaterRestorationConfirm = React.useCallback(async (result) => {
-    const pending = pendingGreaterRestoration;
-    setPendingGreaterRestoration(null);
-    if (!pending) return;
+  const handleMageArmorConfirm = createConfirmHandler('mageArmor', async (pending, result) => {
+    await applyMageArmorEffect(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'mage_armor', range: pending.range } },
+      playerStats,
+      campaignName,
+      null,
+      result
+    );
+  });
 
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
+  const handleMageArmorSkip = createSkipHandler('mageArmor');
 
-    try {
-      const { confirmGreaterRestoration } = await import('../../services/rules/features/greaterRestorationService.js');
-      await confirmGreaterRestoration(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'greater_restoration', range: pending.range } },
-        playerStats,
-        campaignName,
-        null,
-        result
-      );
-    } catch (e) {
-      console.error('[greaterRestoration] Failed to apply effect:', e);
-      throw e;
-    }
-  }, [pendingGreaterRestoration, playerStats, campaignName]);
+  const handleShieldOfFaithConfirm = createConfirmHandler('shieldOfFaith', async (pending, result) => {
+    await applyShieldOfFaithEffect(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'shield_of_faith', range: pending.range } },
+      playerStats,
+      campaignName,
+      null,
+      result
+    );
+  });
 
-  const handleGreaterRestorationSkip = React.useCallback(() => {
-    const pending = pendingGreaterRestoration;
-    setPendingGreaterRestoration(null);
-    if (!pending) return;
+  const handleShieldOfFaithSkip = createSkipHandler('shieldOfFaith');
 
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingGreaterRestoration, playerStats, campaignName]);
+  const handleProtectionFromEnergyConfirm = createConfirmHandler('protectionFromEnergy', async (pending, result) => {
+    await applyProtectionFromEnergyHandler(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'protection_from_energy', damageTypes: pending.damageTypes } },
+      playerStats,
+      campaignName,
+      result.targetName,
+      result.damageType
+    );
+  });
 
-  const handleLesserRestorationConfirm = React.useCallback(async (result) => {
-    const pending = pendingLesserRestoration;
-    setPendingLesserRestoration(null);
-    if (!pending) return;
+  const handleProtectionFromEnergySkip = createSkipHandler('protectionFromEnergy');
 
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
+  const handleResistanceConfirm = createConfirmHandler('resistance', async (pending, result) => {
+    await applyResistanceEffect(
+      { name: pending.spellName, spell: pending.spell, automation: { type: 'damage_reduction', reductionExpression: '1d4', damageTypes: [], trigger: 'damage_taken_of_chosen_resistance_type' } },
+      playerStats,
+      campaignName,
+      result.targetName,
+      result.damageType
+    );
+  });
 
-    try {
-      await applyLesserRestorationEffect(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'lesser_restoration', range: pending.range } },
-        playerStats,
-        campaignName,
-        null,
-        result
-      );
-    } catch (e) {
-      console.error('[lesserRestoration] Failed to apply effect:', e);
-      throw e;
-    }
-  }, [pendingLesserRestoration, playerStats, campaignName]);
-
-  const handleLesserRestorationSkip = React.useCallback(() => {
-    const pending = pendingLesserRestoration;
-    setPendingLesserRestoration(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingLesserRestoration, playerStats, campaignName]);
-
-  const handleRemoveCurseConfirm = React.useCallback(async (result) => {
-    const pending = pendingRemoveCurse;
-    setPendingRemoveCurse(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-
-    try {
-      await confirmRemoveCurse(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'remove_curse', range: pending.range } },
-        playerStats,
-        campaignName,
-        null,
-        result
-      );
-    } catch (e) {
-      console.error('[removeCurse] Failed to apply effect:', e);
-      throw e;
-    }
-  }, [pendingRemoveCurse, playerStats, campaignName]);
-
-  const handleRemoveCurseSkip = React.useCallback(() => {
-    const pending = pendingRemoveCurse;
-    setPendingRemoveCurse(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingRemoveCurse, playerStats, campaignName]);
-
-  const handleMageArmorConfirm = React.useCallback(async (result) => {
-    const pending = pendingMageArmor;
-    setPendingMageArmor(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-
-    try {
-      await applyMageArmorEffect(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'mage_armor', range: pending.range } },
-        playerStats,
-        campaignName,
-        null,
-        result
-      );
-    } catch (e) {
-      console.error('[mageArmor] Failed to apply effect:', e);
-      throw e;
-    }
-  }, [pendingMageArmor, playerStats, campaignName]);
-
-  const handleMageArmorSkip = React.useCallback(() => {
-    const pending = pendingMageArmor;
-    setPendingMageArmor(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingMageArmor, playerStats.name, campaignName]);
-
-  const handleProtectionFromEnergyConfirm = React.useCallback(async (result) => {
-    const pending = pendingProtectionFromEnergy;
-    setPendingProtectionFromEnergy(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-
-    try {
-      await applyProtectionFromEnergyHandler(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'protection_from_energy', damageTypes: pending.damageTypes } },
-        playerStats,
-        campaignName,
-        result.targetName,
-        result.damageType
-      );
-    } catch (e) {
-      console.error('[protectionFromEnergy] Failed to apply effect:', e);
-      throw e;
-    }
-  }, [pendingProtectionFromEnergy, playerStats, campaignName]);
-
-  const handleProtectionFromEnergySkip = React.useCallback(() => {
-    const pending = pendingProtectionFromEnergy;
-    setPendingProtectionFromEnergy(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingProtectionFromEnergy, playerStats.name, campaignName]);
-
-  const handleResistanceConfirm = React.useCallback(async (result) => {
-    const pending = pendingResistance;
-    setPendingResistance(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-
-    try {
-      await applyResistanceEffect(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'damage_reduction', reductionExpression: '1d4', damageTypes: [], trigger: 'damage_taken_of_chosen_resistance_type' } },
-        playerStats,
-        campaignName,
-        result.targetName,
-        result.damageType
-      );
-    } catch (e) {
-      console.error('[resistance] Failed to apply effect:', e);
-      throw e;
-    }
-  }, [pendingResistance, playerStats, campaignName]);
-
-  const handleResistanceSkip = React.useCallback(() => {
-    const pending = pendingResistance;
-    setPendingResistance(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingResistance, playerStats.name, campaignName]);
-
-  const handleShieldOfFaithConfirm = React.useCallback(async (result) => {
-    const pending = pendingShieldOfFaith;
-    setPendingShieldOfFaith(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-
-    try {
-      await applyShieldOfFaithEffect(
-        { name: pending.spellName, spell: pending.spell, automation: { type: 'shield_of_faith', range: pending.range } },
-        playerStats,
-        campaignName,
-        null,
-        result
-      );
-    } catch (e) {
-      console.error('[shieldOfFaith] Failed to apply effect:', e);
-      throw e;
-    }
-  }, [pendingShieldOfFaith, playerStats, campaignName]);
-
-  const handleShieldOfFaithSkip = React.useCallback(() => {
-    const pending = pendingShieldOfFaith;
-    setPendingShieldOfFaith(null);
-    if (!pending) return;
-
-    addEntry(campaignName, {
-      type: 'spell',
-      characterName: playerStats.name,
-      spellName: pending.spellName,
-      spellLevel: pending.spellLevel || 0,
-      castingTime: pending.castingTime,
-      metamagic: [],
-      spCost: 0,
-      timestamp: Date.now(),
-    });
-  }, [pendingShieldOfFaith, playerStats.name, campaignName]);
+  const handleResistanceSkip = createSkipHandler('resistance');
 
   const handleMagicMissileConfirm = React.useCallback((result) => {
     const pending = pendingMagicMissile;
-    setPendingMagicMissile(null);
     if (!pending) return;
+
+    cfClearPending('magicMissile');
 
     const { spell } = pending;
     const distribution = result.distribution;
@@ -830,11 +523,11 @@ export function useSpellMetamagicFlow(playerStats, campaignName, onExecute) {
     const slotLevel = spell.level || 1;
     const finalMetaCtx = { magicMissileDistribution: distribution, slotLevel };
     onExecute(spell, finalMetaCtx);
-  }, [pendingMagicMissile, onExecute]);
+  }, [pendingMagicMissile, onExecute, cfClearPending]);
 
   const handleMagicMissileSkip = React.useCallback(() => {
-    setPendingMagicMissile(null);
-  }, []);
+    cfClearPending('magicMissile');
+  }, [cfClearPending]);
 
   return { pendingMetamagic, pendingMultiTarget, pendingAid, pendingHeroesFeast, pendingGreaterRestoration, pendingLesserRestoration, pendingMageArmor, pendingShieldOfFaith, pendingProtectionFromEnergy, pendingResistance, pendingRemoveCurse, pendingMagicMissile, gateMetamagic, handleConfirm, handleSkip, handleMultiTargetConfirm, handleMultiTargetSkip, handleAidConfirm, handleAidSkip, handleHeroesFeastConfirm, handleHeroesFeastSkip, handleGreaterRestorationConfirm, handleGreaterRestorationSkip, handleLesserRestorationConfirm, handleLesserRestorationSkip, handleMageArmorConfirm, handleMageArmorSkip, handleShieldOfFaithConfirm, handleShieldOfFaithSkip, handleProtectionFromEnergyConfirm, handleProtectionFromEnergySkip, handleResistanceConfirm, handleResistanceSkip, handleRemoveCurseConfirm, handleRemoveCurseSkip, handleMagicMissileConfirm, handleMagicMissileSkip };
 }

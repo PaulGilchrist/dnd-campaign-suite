@@ -75,8 +75,9 @@ describe('AidTargetPopup', () => {
 
     // ── Spell prop edge cases ──
 
-    it('throws when spell prop is null (missing null check on spell.level)', () => {
-        expect(() => render(<AidTargetPopup {...makeProps({ spell: null })} />)).toThrow();
+    it('renders with fallback when spell prop is null', () => {
+        render(<AidTargetPopup {...makeProps({ spell: null })} />);
+        expect(screen.getByRole('heading', { name: 'Aid' })).toBeInTheDocument();
     });
 
     it('shows "Spell" fallback when spell has no name', () => {

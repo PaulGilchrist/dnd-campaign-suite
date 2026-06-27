@@ -3,6 +3,7 @@ import React from 'react'
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js'
 import useTrackedResource from '../../../../hooks/runtime/useTrackedResource.js'
 import storage from '../../../../services/ui/storage.js'
+import { addEntry } from '../../../../services/ui/logService.js'
 import { getTargetFromAttacker, getCombatContext } from '../../../../services/rules/combat/damageUtils.js'
 import { applyHealingToTarget } from '../../../../services/rules/combat/applyHealing.js'
 import { CONDITIONS } from '../../../../services/combat/conditions/conditionUtils.js'
@@ -151,18 +152,14 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         } else {
             const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + amount);
             setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
-            fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: 'hp_change',
-                    targetName: playerStats.name,
-                    delta: amount,
-                    currentHp: newHp,
-                    maxHp: playerStats.hitPoints,
-                    isHealing: true,
-                    isUnconscious: false,
-                })
+            addEntry(campaignName, {
+                type: 'hp_change',
+                targetName: playerStats.name,
+                delta: amount,
+                currentHp: newHp,
+                maxHp: playerStats.hitPoints,
+                isHealing: true,
+                isUnconscious: false,
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
             setLog(prev => [...prev, { action: 'Heal', target: playerStats.name, amount, poolAfter: newPool }]);
             setHealAmount(Math.min(healAmount, newPool));
@@ -198,18 +195,14 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
         } else {
             const newHp = Math.min(playerStats.hitPoints, targetCurrentHp + total);
             setRuntimeValue(playerStats.name, 'currentHitPoints', newHp, campaignName);
-            fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: 'hp_change',
-                    targetName: playerStats.name,
-                    delta: total,
-                    currentHp: newHp,
-                    maxHp: playerStats.hitPoints,
-                    isHealing: true,
-                    isUnconscious: false,
-                })
+            addEntry(campaignName, {
+                type: 'hp_change',
+                targetName: playerStats.name,
+                delta: total,
+                currentHp: newHp,
+                maxHp: playerStats.hitPoints,
+                isHealing: true,
+                isUnconscious: false,
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
             setLog(prev => [...prev, {
                 action: `Roll ${diceToRoll}d${dieType}`,
@@ -240,17 +233,13 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
             }
         }
 
-        fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                type: 'condition',
-                characterName: targetName,
-                condition: condition,
-                action: 'broken',
-                sourceName: playerStats.name,
-                timestamp: Date.now(),
-              })
+        addEntry(campaignName, {
+            type: 'condition',
+            characterName: targetName,
+            condition: condition,
+            action: 'broken',
+            sourceName: playerStats.name,
+            timestamp: Date.now(),
           }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
         setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
@@ -278,17 +267,13 @@ function HealingPoolModal({ playerStats, campaignName, name: featureName = 'Lay 
                 }
             }
 
-            fetch(`/api/campaigns/${encodeURIComponent(campaignName)}/log`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    type: 'condition',
-                    characterName: targetName,
-                    condition: condition,
-                    action: 'broken',
-                    sourceName: playerStats.name,
-                    timestamp: Date.now(),
-                })
+            addEntry(campaignName, {
+                type: 'condition',
+                characterName: targetName,
+                condition: condition,
+                action: 'broken',
+                sourceName: playerStats.name,
+                timestamp: Date.now(),
             }).catch((e) => { console.error("[HealingPoolModal] Error:", e); });
 
             setLog(prev => [...prev, { action: `Cure ${condition}`, target: targetName, amount: cureCost, poolAfter: newPool }]);
