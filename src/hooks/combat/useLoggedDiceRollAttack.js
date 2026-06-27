@@ -23,7 +23,7 @@ import {
     getShieldAcBonus,
     getShieldOfFaithAcBonus,
     applyMinDamageAdjustment,
-} from './useLoggedDiceRollUtils.js';
+} from './loggedDiceRollUtils.js';
 import { loadManeuvers } from '../../services/ui/dataLoader.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import { getManeuversForRules } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';

@@ -172,9 +172,11 @@ describe('useMonstersData', () => {
     // Second render in same module scope should use the in-memory cache
     const { result: secondResult } = renderHook(() => useMonstersData());
 
-    // Cache hit: monsters populated immediately, no fetch called
+    // Cache hit: monsters populated via useAsyncData microtask, no fetch called
+    await waitFor(() => {
+      expect(secondResult.current.loading).toBe(false);
+    });
     expect(secondResult.current.monsters).toEqual(mockMonsters);
-    expect(secondResult.current.loading).toBe(false);
     expect(secondResult.current.error).toBeNull();
     expect(global.fetch).not.toHaveBeenCalled();
   });

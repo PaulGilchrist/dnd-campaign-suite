@@ -43,7 +43,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: vi.fn(),
 }));
 
-vi.mock('./useLoggedDiceRollUtils.js', () => ({
+vi.mock('./loggedDiceRollUtils.js', () => ({
     hasPotentCantrip: vi.fn(),
 }));
 
@@ -53,7 +53,7 @@ import { sendSaveResult } from '../../services/combat/conditions/savePromptServi
 import { getCombatContext, getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { hasPotentCantrip } from './useLoggedDiceRollUtils.js';
+import { hasPotentCantrip } from './loggedDiceRollUtils.js';
 import { createSaves } from './useLoggedDiceRollSaves.js';
 
 describe('createSaves (useLoggedDiceRollSaves)', () => {

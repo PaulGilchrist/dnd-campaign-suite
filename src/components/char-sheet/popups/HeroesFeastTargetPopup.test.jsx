@@ -1,7 +1,7 @@
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import HeroesFeastTargetPopup from './HeroesFeastTargetPopup.jsx';
+import MultiTargetCountPopup from './MultiTargetCountPopup.jsx';
 
 // ── Test fixtures ──
 
@@ -18,15 +18,21 @@ const baseProps = {
     _attackerPos: {},
     onConfirm: vi.fn(),
     onSkip: vi.fn(),
+    icon: 'fa-solid fa-utensils',
+    title: 'Heroes\' Feast',
+    school: 'Conjuration',
+    defaultLevel: 6,
+    description: "Choose up to 3 creatures within 30 ft. Each target's Hit Point maximum increases by 11, and they gain Resistance to Poison damage and Immunity to the Frightened and Poisoned conditions.",
+    confirmLabel: "Cast Heroes' Feast",
 };
 
 function renderPopup(props) {
-    return render(<HeroesFeastTargetPopup {...baseProps} {...props} />);
+    return render(<MultiTargetCountPopup {...baseProps} {...props} />);
 }
 
 // ── Tests ──
 
-describe('HeroesFeastTargetPopup', () => {
+describe('MultiTargetCountPopup', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });

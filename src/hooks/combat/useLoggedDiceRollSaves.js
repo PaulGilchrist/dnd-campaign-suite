@@ -9,7 +9,7 @@ import { getTargetFromAttacker, getCombatContext } from '../../services/rules/co
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { MELEE_REACH_FEET } from '../../services/combat/baseCombatActions.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { hasPotentCantrip } from './useLoggedDiceRollUtils.js';
+import { hasPotentCantrip } from './loggedDiceRollUtils.js';
 
 export function createSaves(deps) {
     const { characterName, campaignName, setPopupHtml, logEntry, logAndShow, pendingSaves, charactersRef } = deps;

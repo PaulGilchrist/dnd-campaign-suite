@@ -1,7 +1,7 @@
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import LesserRestorationPopup from './LesserRestorationPopup.jsx';
+import TargetWithCheckboxesPopup from './TargetWithCheckboxesPopup.jsx';
 
 vi.mock('../../../hooks/runtime/useRuntimeState.js', () => ({
     getRuntimeValue: vi.fn(() => null),
@@ -12,10 +12,13 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../../services/ui/utils.js', () => ({
+    __esModule: true,
     default: {
         getName: (name) => name || 'Unknown',
     },
 }));
+
+import utils from '../../../services/ui/utils.js';
 
 // Import mocked functions AFTER vi.mock calls
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
@@ -31,6 +34,28 @@ function renderPopup(overrides = {}) {
     const onConfirm = vi.fn();
     const onSkip = vi.fn();
 
+    const conditionMatches = (c, targetCondition) =>
+        (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
+
+    const loadTargetData = async (targetName) => {
+        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+        let csConditions = [];
+        try {
+            const cs = await getCombatSummary('test-campaign');
+            if (cs) {
+                const creature = cs.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+                if (creature && Array.isArray(creature.conditions)) {
+                    csConditions = creature.conditions.map(c => c.key);
+                }
+            }
+        } catch { /* ignore */ }
+        const allConditions = [...new Set([...conditions, ...csConditions])];
+        const ALLOWED_CONDITIONS = [{ id: 'blinded' }, { id: 'deafened' }, { id: 'paralyzed' }, { id: 'poisoned' }];
+        return ALLOWED_CONDITIONS
+            .filter(c => allConditions.some(a => conditionMatches(a, c.id)))
+            .map(c => ({ id: c.id, label: `${c.id.charAt(0).toUpperCase() + c.id.slice(1)} condition`, selectionData: { condition: c.id } }));
+    };
+
     const props = {
         spell: mockSpell,
         playerStats: {},
@@ -39,6 +64,14 @@ function renderPopup(overrides = {}) {
         range: mockRange,
         onConfirm,
         onSkip,
+        loadTargetData,
+        icon: 'fa-solid fa-hand-holding-medical',
+        title: 'Lesser Restoration',
+        school: 'Abjuration',
+        defaultLevel: 2,
+        description: 'Choose a creature within range and select one condition to remove.',
+        noItemsMessage: 'No applicable conditions found on this target',
+        confirmLabel: 'Cast Lesser Restoration',
         ...overrides,
     };
 
@@ -49,7 +82,7 @@ function renderPopup(overrides = {}) {
         props.onSkip = overrides.onSkip;
     }
 
-    return render(<LesserRestorationPopup {...props} />);
+    return render(<TargetWithCheckboxesPopup {...props} />);
 }
 
 // ── Helpers ──
@@ -61,7 +94,7 @@ async function selectTarget(name) {
 
 // ── Tests ──
 
-describe('LesserRestorationPopup', () => {
+describe('TargetWithCheckboxesPopup', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -417,7 +450,7 @@ describe('LesserRestorationPopup', () => {
 
     it('handles undefined spell with fallback values', () => {
         render(
-            <LesserRestorationPopup
+            <TargetWithCheckboxesPopup
                 spell={undefined}
                 playerStats={{}}
                 campaignName="test-campaign"
@@ -433,7 +466,7 @@ describe('LesserRestorationPopup', () => {
 
     it('handles null spell with fallback values', () => {
         render(
-            <LesserRestorationPopup
+            <TargetWithCheckboxesPopup
                 spell={null}
                 playerStats={{}}
                 campaignName="test-campaign"
@@ -449,7 +482,7 @@ describe('LesserRestorationPopup', () => {
 
     it('handles spell missing name property with fallback', () => {
         render(
-            <LesserRestorationPopup
+            <TargetWithCheckboxesPopup
                 spell={{ level: 3 }}
                 playerStats={{}}
                 campaignName="test-campaign"
@@ -464,7 +497,7 @@ describe('LesserRestorationPopup', () => {
 
     it('handles spell missing level property with fallback', () => {
         render(
-            <LesserRestorationPopup
+            <TargetWithCheckboxesPopup
                 spell={{ name: 'Test Spell' }}
                 playerStats={{}}
                 campaignName="test-campaign"

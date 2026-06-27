@@ -1,7 +1,7 @@
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import ResistanceTargetPopup from './ResistanceTargetPopup.jsx';
+import TargetWithTypePopup from './TargetWithTypePopup.jsx';
 
 // ── Test fixtures ──
 
@@ -23,13 +23,19 @@ function makeProps(overrides = {}) {
         damageTypes: damageTypes,
         onConfirm: vi.fn(),
         onSkip: vi.fn(),
+        icon: 'fa-solid fa-shield-halved',
+        title: 'Resistance',
+        school: 'Abjuration',
+        defaultLevel: 1,
+        description: 'Choose a willing creature within range. Until the spell ends, the target reduces the damage by 1d4. This can only happen once per turn.',
+        confirmLabel: 'Cast Resistance',
         ...overrides,
     };
 }
 
 // ── Tests ──
 
-describe('ResistanceTargetPopup', () => {
+describe('TargetWithTypePopup', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -38,18 +44,18 @@ describe('ResistanceTargetPopup', () => {
 
     describe('rendering', () => {
         it('renders the popup title with shield icon', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(screen.getByText('Resistance')).toBeInTheDocument();
         });
 
         it('displays spell name and level', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(screen.getByText('Shield')).toBeInTheDocument();
             expect(screen.getByText(/Level 1 Abjuration/)).toBeInTheDocument();
         });
 
         it('displays the description text with dynamic range value', () => {
-            render(<ResistanceTargetPopup {...makeProps({ range: 60 })} />);
+            render(<TargetWithTypePopup {...makeProps({ range: 60 })} />);
             expect(screen.getByText(/Choose a willing creature within/)).toBeInTheDocument();
             expect(screen.getByText(/60/)).toBeInTheDocument();
             expect(screen.getByText(/reduces the damage by 1d4/)).toBeInTheDocument();
@@ -57,7 +63,7 @@ describe('ResistanceTargetPopup', () => {
         });
 
         it('renders all creature targets and damage types', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             for (const name of creatureTargets) {
                 expect(screen.getByText(name)).toBeInTheDocument();
             }
@@ -67,70 +73,70 @@ describe('ResistanceTargetPopup', () => {
         });
 
         it('renders cancel and confirm buttons', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(screen.getByText('Cancel')).toBeInTheDocument();
             expect(screen.getByText('Cast Resistance')).toBeInTheDocument();
         });
 
         it('renders fallback text when spell is null', () => {
-            render(<ResistanceTargetPopup {...makeProps({ spell: null })} />);
+            render(<TargetWithTypePopup {...makeProps({ spell: null })} />);
             expect(screen.getByText('Spell')).toBeInTheDocument();
             expect(screen.getByText(/Level 0 Abjuration/)).toBeInTheDocument();
         });
 
         it('renders fallback text when spell is undefined', () => {
-            render(<ResistanceTargetPopup {...makeProps({ spell: undefined })} />);
+            render(<TargetWithTypePopup {...makeProps({ spell: undefined })} />);
             expect(screen.getByText('Spell')).toBeInTheDocument();
             expect(screen.getByText(/Level 0 Abjuration/)).toBeInTheDocument();
         });
 
         it('renders with popup-overlay class', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
         });
 
         it('renders with popup-modal class', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(document.querySelector('.popup-modal')).toBeInTheDocument();
         });
 
         it('renders with metamagic-popup class', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
         });
 
         it('renders with metamagic-popup-inner class', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(document.querySelector('.metamagic-popup-inner')).toBeInTheDocument();
         });
 
         it('renders with metamagic-spell-name class', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(document.querySelector('.metamagic-spell-name')).toBeInTheDocument();
         });
 
         it('renders with metamagic-twin-target class', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(document.querySelector('.metamagic-twin-target')).toBeInTheDocument();
         });
 
         it('renders with metamagic-actions class', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(document.querySelector('.metamagic-actions')).toBeInTheDocument();
         });
 
         it('renders btn-secondary class on Cancel button', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(screen.getByText('Cancel')).toHaveClass('btn-secondary');
         });
 
         it('renders btn class on Cast Resistance button', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             expect(screen.getByText('Cast Resistance')).toHaveClass('btn');
         });
 
         it('renders shield-halved icon in the title', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             const icon = document.querySelector('.fa-solid.fa-shield-halved');
             expect(icon).toBeInTheDocument();
         });
@@ -140,13 +146,13 @@ describe('ResistanceTargetPopup', () => {
 
     describe('spell prop edge cases', () => {
         it('shows fallback text when spell has no name', () => {
-            render(<ResistanceTargetPopup {...makeProps({ spell: {} })} />);
+            render(<TargetWithTypePopup {...makeProps({ spell: {} })} />);
             const spellNameEl = document.querySelector('.metamagic-spell-name strong');
             expect(spellNameEl.textContent).toBe('Spell');
         });
 
         it('shows default level 0 when spell has no level', () => {
-            render(<ResistanceTargetPopup {...makeProps({ spell: { name: 'Test' } })} />);
+            render(<TargetWithTypePopup {...makeProps({ spell: { name: 'Test' } })} />);
             expect(screen.getByText(/Level 0/)).toBeInTheDocument();
         });
     });
@@ -155,7 +161,7 @@ describe('ResistanceTargetPopup', () => {
 
     describe('selection', () => {
         it('disables confirm button until both target and damage type are selected', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             const confirmBtn = screen.getByText('Cast Resistance');
             expect(confirmBtn).toBeDisabled();
 
@@ -170,7 +176,7 @@ describe('ResistanceTargetPopup', () => {
 
         it('allows switching target selection', () => {
             const onConfirm = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onConfirm })} />);
+            render(<TargetWithTypePopup {...makeProps({ onConfirm })} />);
             const alric = screen.getByText('Alric');
             const brea = screen.getByText('Brea');
             const fire = screen.getByText('Fire');
@@ -183,7 +189,7 @@ describe('ResistanceTargetPopup', () => {
 
         it('allows switching damage type selection', () => {
             const onConfirm = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onConfirm })} />);
+            render(<TargetWithTypePopup {...makeProps({ onConfirm })} />);
             const alric = screen.getByText('Alric');
             const cold = screen.getByText('Cold');
             const fire = screen.getByText('Fire');
@@ -195,14 +201,14 @@ describe('ResistanceTargetPopup', () => {
         });
 
         it('shows checkmark for selected target', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             const alric = screen.getByText('Alric');
             fireEvent.click(alric);
             expect(alric.textContent).toContain('\u2713');
         });
 
         it('shows checkmark for selected damage type', () => {
-            render(<ResistanceTargetPopup {...makeProps()} />);
+            render(<TargetWithTypePopup {...makeProps()} />);
             const fire = screen.getByText('Fire');
             fireEvent.click(fire);
             expect(fire.textContent).toContain('\u2713');
@@ -214,7 +220,7 @@ describe('ResistanceTargetPopup', () => {
     describe('confirm', () => {
         it('calls onConfirm with selected target and damage type', () => {
             const onConfirm = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onConfirm })} />);
+            render(<TargetWithTypePopup {...makeProps({ onConfirm })} />);
             fireEvent.click(screen.getByText('Alric'));
             fireEvent.click(screen.getByText('Fire'));
             fireEvent.click(screen.getByText('Cast Resistance'));
@@ -224,7 +230,7 @@ describe('ResistanceTargetPopup', () => {
 
         it('does not call onConfirm when target is not selected', () => {
             const onConfirm = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onConfirm })} />);
+            render(<TargetWithTypePopup {...makeProps({ onConfirm })} />);
             fireEvent.click(screen.getByText('Fire'));
             fireEvent.click(screen.getByText('Cast Resistance'));
             expect(onConfirm).not.toHaveBeenCalled();
@@ -232,7 +238,7 @@ describe('ResistanceTargetPopup', () => {
 
         it('does not call onConfirm when damage type is not selected', () => {
             const onConfirm = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onConfirm })} />);
+            render(<TargetWithTypePopup {...makeProps({ onConfirm })} />);
             fireEvent.click(screen.getByText('Alric'));
             fireEvent.click(screen.getByText('Cast Resistance'));
             expect(onConfirm).not.toHaveBeenCalled();
@@ -244,14 +250,14 @@ describe('ResistanceTargetPopup', () => {
     describe('skip', () => {
         it('calls onSkip when Cancel button is clicked', () => {
             const onSkip = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onSkip })} />);
+            render(<TargetWithTypePopup {...makeProps({ onSkip })} />);
             fireEvent.click(screen.getByText('Cancel'));
             expect(onSkip).toHaveBeenCalledTimes(1);
         });
 
         it('calls onSkip when overlay is clicked', () => {
             const onSkip = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onSkip })} />);
+            render(<TargetWithTypePopup {...makeProps({ onSkip })} />);
             const overlay = document.querySelector('.popup-overlay');
             fireEvent.click(overlay);
             expect(onSkip).toHaveBeenCalledTimes(1);
@@ -259,7 +265,7 @@ describe('ResistanceTargetPopup', () => {
 
         it('does not call onSkip when modal content is clicked', () => {
             const onSkip = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onSkip })} />);
+            render(<TargetWithTypePopup {...makeProps({ onSkip })} />);
             const modal = document.querySelector('.popup-modal');
             fireEvent.click(modal);
             expect(onSkip).not.toHaveBeenCalled();
@@ -267,21 +273,21 @@ describe('ResistanceTargetPopup', () => {
 
         it('calls onSkip when Escape key is pressed', () => {
             const onSkip = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onSkip })} />);
+            render(<TargetWithTypePopup {...makeProps({ onSkip })} />);
             fireEvent.keyDown(document, { key: 'Escape' });
             expect(onSkip).toHaveBeenCalledTimes(1);
         });
 
         it('does not call onSkip for other keys', () => {
             const onSkip = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onSkip })} />);
+            render(<TargetWithTypePopup {...makeProps({ onSkip })} />);
             fireEvent.keyDown(document, { key: 'Enter' });
             expect(onSkip).not.toHaveBeenCalled();
         });
 
         it('does not call onSkip when modal inner content is clicked', () => {
             const onSkip = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onSkip })} />);
+            render(<TargetWithTypePopup {...makeProps({ onSkip })} />);
             const inner = document.querySelector('.metamagic-popup-inner');
             fireEvent.click(inner);
             expect(onSkip).not.toHaveBeenCalled();
@@ -290,7 +296,7 @@ describe('ResistanceTargetPopup', () => {
         it('calls onSkip without calling onConfirm when skipped after selections', () => {
             const onConfirm = vi.fn();
             const onSkip = vi.fn();
-            render(<ResistanceTargetPopup {...makeProps({ onConfirm, onSkip })} />);
+            render(<TargetWithTypePopup {...makeProps({ onConfirm, onSkip })} />);
 
             fireEvent.click(screen.getByText('Alric'));
             fireEvent.click(screen.getByText('Fire'));
@@ -306,7 +312,7 @@ describe('ResistanceTargetPopup', () => {
     describe('keyboard listener cleanup', () => {
         it('removes keydown listener on unmount', () => {
             const removeListenerSpy = vi.spyOn(document, 'removeEventListener');
-            const { unmount } = render(<ResistanceTargetPopup {...makeProps()} />);
+            const { unmount } = render(<TargetWithTypePopup {...makeProps()} />);
             unmount();
             expect(removeListenerSpy).toHaveBeenCalledWith('keydown', expect.any(Function));
         });
@@ -316,23 +322,23 @@ describe('ResistanceTargetPopup', () => {
 
     describe('edge cases', () => {
         it('renders with empty creature targets list', () => {
-            render(<ResistanceTargetPopup {...makeProps({ creatureTargets: [] })} />);
+            render(<TargetWithTypePopup {...makeProps({ creatureTargets: [] })} />);
             expect(screen.getByText('Target:')).toBeInTheDocument();
             expect(screen.queryByText('Alric')).not.toBeInTheDocument();
         });
 
         it('renders with empty damage types list', () => {
-            render(<ResistanceTargetPopup {...makeProps({ damageTypes: [] })} />);
+            render(<TargetWithTypePopup {...makeProps({ damageTypes: [] })} />);
             expect(screen.getByText('Damage Type:')).toBeInTheDocument();
         });
 
         it('renders with zero range', () => {
-            render(<ResistanceTargetPopup {...makeProps({ range: 0 })} />);
+            render(<TargetWithTypePopup {...makeProps({ range: 0 })} />);
             expect(screen.getByText(/0/)).toBeInTheDocument();
         });
 
         it('renders with negative range', () => {
-            render(<ResistanceTargetPopup {...makeProps({ range: -10 })} />);
+            render(<TargetWithTypePopup {...makeProps({ range: -10 })} />);
             expect(screen.getByText(/-10/)).toBeInTheDocument();
         });
     });

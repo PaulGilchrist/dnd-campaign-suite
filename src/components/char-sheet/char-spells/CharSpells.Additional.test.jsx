@@ -143,56 +143,56 @@ vi.mock('../popups/MultiTargetPopup.jsx', () => ({
   },
 }));
 
-vi.mock('../popups/AidTargetPopup.jsx', () => ({
-  default: function AidTargetPopup() {
+vi.mock('../popups/MultiTargetCountPopup.jsx', () => ({
+  default: function MultiTargetCountPopup() {
     return <div data-testid="aid-target-popup">Aid</div>;
   },
 }));
 
-vi.mock('../popups/HeroesFeastTargetPopup.jsx', () => ({
-  default: function HeroesFeastTargetPopup() {
+vi.mock('../popups/MultiTargetCountPopup.jsx', () => ({
+  default: function MultiTargetCountPopup() {
     return <div data-testid="heroes-feast-popup">HeroesFeast</div>;
   },
 }));
 
-vi.mock('../popups/GreaterRestorationPopup.jsx', () => ({
-  default: function GreaterRestorationPopup() {
+vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
+  default: function TargetWithCheckboxesPopup() {
     return <div data-testid="greater-restoration-popup">GreaterRestoration</div>;
   },
 }));
 
-vi.mock('../popups/LesserRestorationPopup.jsx', () => ({
-  default: function LesserRestorationPopup() {
+vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
+  default: function TargetWithCheckboxesPopup() {
     return <div data-testid="lesser-restoration-popup">LesserRestoration</div>;
   },
 }));
 
-vi.mock('../popups/RemoveCursePopup.jsx', () => ({
-  default: function RemoveCursePopup() {
+vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
+  default: function TargetWithCheckboxesPopup() {
     return <div data-testid="remove-curse-popup">RemoveCurse</div>;
   },
 }));
 
-vi.mock('../popups/MageArmorTargetPopup.jsx', () => ({
-  default: function MageArmorTargetPopup() {
+vi.mock('../popups/SingleTargetPopup.jsx', () => ({
+  default: function SingleTargetPopup() {
     return <div data-testid="mage-armor-popup">MageArmor</div>;
   },
 }));
 
-vi.mock('../popups/ShieldOfFaithTargetPopup.jsx', () => ({
-  default: function ShieldOfFaithTargetPopup() {
+vi.mock('../popups/SingleTargetPopup.jsx', () => ({
+  default: function SingleTargetPopup() {
     return <div data-testid="shield-of-faith-popup">ShieldOfFaith</div>;
   },
 }));
 
-vi.mock('../popups/ProtectionFromEnergyTargetPopup.jsx', () => ({
-  default: function ProtectionFromEnergyTargetPopup() {
+vi.mock('../popups/TargetWithTypePopup.jsx', () => ({
+  default: function TargetWithTypePopup() {
     return <div data-testid="protection-from-energy-popup">ProtectionFromEnergy</div>;
   },
 }));
 
-vi.mock('../popups/ResistanceTargetPopup.jsx', () => ({
-  default: function ResistanceTargetPopup() {
+vi.mock('../popups/TargetWithTypePopup.jsx', () => ({
+  default: function TargetWithTypePopup() {
     return <div data-testid="resistance-popup">Resistance</div>;
   },
 }));

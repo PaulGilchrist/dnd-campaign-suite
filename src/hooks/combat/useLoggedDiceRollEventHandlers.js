@@ -9,7 +9,7 @@ import {
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { postLogEntry } from '../../services/shared/logPoster.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { hasSoulstitchProtection } from './useLoggedDiceRollUtils.js';
+import { hasSoulstitchProtection } from './loggedDiceRollUtils.js';
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
 

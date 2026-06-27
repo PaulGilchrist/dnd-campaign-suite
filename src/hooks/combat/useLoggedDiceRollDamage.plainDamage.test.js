@@ -42,7 +42,7 @@ vi.mock('../../services/rules/combat/aoeService.js', () => ({
     sendAoePlayerSaves: vi.fn(),
 }));
 
-vi.mock('./useLoggedDiceRollUtils.js', () => ({
+vi.mock('./loggedDiceRollUtils.js', () => ({
     readAoeContext: vi.fn(),
     hasPotentCantrip: vi.fn(),
     isMagicMissileImmune: vi.fn(),
@@ -66,7 +66,7 @@ import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { applyMinDamageAdjustment } from './useLoggedDiceRollUtils.js';
+import { applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
 import { rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 

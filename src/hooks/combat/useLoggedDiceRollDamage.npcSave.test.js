@@ -42,7 +42,7 @@ vi.mock('../../services/rules/combat/aoeService.js', () => ({
     sendAoePlayerSaves: vi.fn(),
 }));
 
-vi.mock('./useLoggedDiceRollUtils.js', () => ({
+vi.mock('./loggedDiceRollUtils.js', () => ({
     readAoeContext: vi.fn(),
     hasPotentCantrip: vi.fn(),
     isMagicMissileImmune: vi.fn(),
@@ -67,7 +67,7 @@ import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { postLogEntry } from '../../services/shared/logPoster.js';
-import { hasPotentCantrip, hasSoulstitchProtection, applyMinDamageAdjustment } from './useLoggedDiceRollUtils.js';
+import { hasPotentCantrip, hasSoulstitchProtection, applyMinDamageAdjustment } from './loggedDiceRollUtils.js';
 import { computeDamageAfterSave, rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { rollExpressionDoubled } from '../../services/dice/diceRoller.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';

@@ -19,7 +19,7 @@ import {
     isMagicMissileImmune,
     hasSoulstitchProtection,
     applyMinDamageAdjustment,
-} from './useLoggedDiceRollUtils.js';
+} from './loggedDiceRollUtils.js';
 
 function handleOverchannelSelfDamage(characterName, campaignName, context, logEntry, characters) {
     if (context?.overchannelActive) {

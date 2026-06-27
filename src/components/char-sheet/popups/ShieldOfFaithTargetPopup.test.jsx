@@ -1,7 +1,7 @@
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import ShieldOfFaithTargetPopup from './ShieldOfFaithTargetPopup.jsx';
+import SingleTargetPopup from './SingleTargetPopup.jsx';
 
 // ── Test fixtures ──
 
@@ -28,19 +28,25 @@ function renderPopup(overrides = {}) {
         ...overrides,
     };
     return render(
-        <ShieldOfFaithTargetPopup
+        <SingleTargetPopup
             spell={spellProp}
             creatureTargets={targets}
             range={rangeProp}
             onConfirm={onConfirm}
             onSkip={onSkip}
+            icon="fa-solid fa-shield-halved"
+            title="Shield of Faith"
+            school="Abjuration"
+            defaultLevel={2}
+            description={`Choose a creature within ${rangeProp} ft. The target gains a +2 bonus to AC.`}
+            confirmLabel="Cast Shield of Faith"
         />
     );
 }
 
 // ── Tests ──
 
-describe('ShieldOfFaithTargetPopup', () => {
+describe('SingleTargetPopup', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });

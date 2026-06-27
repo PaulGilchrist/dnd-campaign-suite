@@ -1,7 +1,7 @@
 // @improved-by-ai
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import GreaterRestorationPopup from './GreaterRestorationPopup.jsx';
+import TargetWithCheckboxesPopup from './TargetWithCheckboxesPopup.jsx';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCombatSummary } from '../../../services/encounters/combatData.js';
 
@@ -16,10 +16,13 @@ vi.mock('../../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../../services/ui/utils.js', () => ({
+    __esModule: true,
     default: {
         getName: (name) => name || 'Unknown',
     },
 }));
+
+import utils from '../../../services/ui/utils.js';
 
 // ── Test fixtures ──
 
@@ -27,6 +30,49 @@ const baseSpell = { name: 'Greater Restoration', level: 5 };
 const creatureTargets = ['Goblin', 'Orc', 'Troll'];
 
 function makeProps(overrides = {}) {
+    const conditionMatches = (c, targetCondition) =>
+        (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
+
+    const loadTargetData = async (targetName) => {
+        const result = [];
+        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+        let csConditions = [];
+        try {
+            const cs = await getCombatSummary('test-campaign');
+            if (cs) {
+                const creature = cs.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+                if (creature && Array.isArray(creature.conditions)) {
+                    csConditions = creature.conditions.map(c => c.key);
+                }
+            }
+        } catch { /* ignore */ }
+        const allConditions = [...new Set([...conditions, ...csConditions])];
+        const RESTORATION_CONDITIONS = [{ id: 'charmed' }, { id: 'petrified' }];
+        RESTORATION_CONDITIONS
+            .filter(c => allConditions.some(cond => conditionMatches(cond, c.id)))
+            .forEach(c => {
+                result.push({ id: c.id, label: `${c.id.charAt(0).toUpperCase() + c.id.slice(1)} condition`, selectionData: { type: 'condition', condition: c.id } });
+            });
+        const exhaustion = getRuntimeValue(targetName, 'exhaustionLevel') || 0;
+        if (exhaustion > 0) {
+            result.push({ id: 'exhaustion', label: `Exhaustion level (current: ${exhaustion})`, selectionData: { type: 'exhaustion' } });
+        }
+        const activeBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+        const hasCurse = activeBuffs.some(b => b.type === 'cursed' || b.cursed);
+        if (hasCurse) {
+            result.push({ id: 'curse', label: 'Curse (including attunement to cursed magic item)', selectionData: { type: 'curse' } });
+        }
+        const abilityReductions = getRuntimeValue(targetName, 'abilityReductions') || {};
+        if (Object.keys(abilityReductions).length > 0) {
+            result.push({ id: 'ability_reduction', label: 'Ability score reduction', selectionData: { type: 'ability_reduction' } });
+        }
+        const hpMaxReduction = getRuntimeValue(targetName, 'hpMaxReduction') || 0;
+        if (hpMaxReduction > 0) {
+            result.push({ id: 'hp_max_reduction', label: 'Hit Point maximum reduction', selectionData: { type: 'hp_max_reduction' } });
+        }
+        return result;
+    };
+
     return {
         spell: baseSpell,
         _playerStats: {},
@@ -35,6 +81,14 @@ function makeProps(overrides = {}) {
         range: '60 ft',
         onConfirm: vi.fn(),
         onSkip: vi.fn(),
+        loadTargetData,
+        icon: 'fa-solid fa-hand-holding-medical',
+        title: 'Greater Restoration',
+        school: 'Abjuration',
+        defaultLevel: 5,
+        description: 'Choose a creature within range and select the effect(s) to remove.',
+        noItemsMessage: 'No removable effects found on this target',
+        confirmLabel: 'Cast Greater Restoration',
         ...overrides,
     };
 }
@@ -63,7 +117,7 @@ function applyRuntimeState(runtimeState) {
 
 // ── Tests ──
 
-describe('GreaterRestorationPopup', () => {
+describe('TargetWithCheckboxesPopup', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
@@ -71,14 +125,14 @@ describe('GreaterRestorationPopup', () => {
     // ── Default render ──
 
     it('renders the popup overlay, modal, and spell heading', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         expect(screen.getByRole('heading', { name: /greater restoration/i })).toBeInTheDocument();
         expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
         expect(document.querySelector('.popup-modal')).toBeInTheDocument();
     });
 
     it('displays the spell name, level, and school in the spell name section', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         const spellName = document.querySelector('.metamagic-spell-name');
         expect(spellName.textContent).toContain('Greater Restoration');
         expect(spellName.textContent).toContain('Level 5');
@@ -86,36 +140,36 @@ describe('GreaterRestorationPopup', () => {
     });
 
     it('renders the spell description with range', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         expect(screen.getByText(/Choose a creature within/)).toBeInTheDocument();
         expect(screen.getByText('60 ft')).toBeInTheDocument();
     });
 
     it('renders a health icon in the heading', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         expect(document.querySelector('.fa-hand-holding-medical')).toBeInTheDocument();
     });
 
     it('renders all creature targets in the target list', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         creatureTargets.forEach(name => {
             expect(screen.getByText(name)).toBeInTheDocument();
         });
     });
 
     it('renders Cancel and Cast buttons', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         expect(screen.getByText('Cancel')).toBeInTheDocument();
         expect(screen.getByText('Cast Greater Restoration')).toBeInTheDocument();
     });
 
     it('disables the Cast button before any target is selected', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         expect(screen.getByText('Cast Greater Restoration')).toBeDisabled();
     });
 
     it('renders with the expected structural CSS classes', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         expect(document.querySelector('.popup-overlay')).toBeInTheDocument();
         expect(document.querySelector('.popup-modal')).toBeInTheDocument();
         expect(document.querySelector('.metamagic-popup')).toBeInTheDocument();
@@ -129,7 +183,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'], exhaustionLevel: 1 }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
@@ -141,7 +195,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/\u2713 Goblin/)).toBeInTheDocument();
@@ -152,7 +206,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
@@ -170,7 +224,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/No removable effects found on this target/)).toBeInTheDocument();
@@ -183,7 +237,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -194,7 +248,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['petrified'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Petrified condition/)).toBeInTheDocument();
@@ -205,7 +259,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -224,7 +278,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['CHARMED'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -239,7 +293,7 @@ describe('GreaterRestorationPopup', () => {
             creatures: [{ name: 'Goblin', conditions: [{ key: 'charmed' }] }],
         });
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -252,7 +306,7 @@ describe('GreaterRestorationPopup', () => {
             creatures: [{ name: 'Goblin', conditions: [{ key: 'petrified' }] }],
         });
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -275,7 +329,7 @@ describe('GreaterRestorationPopup', () => {
             creatures: [{ name: 'Orc', conditions: [{ key: 'charmed' }] }],
         });
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/No removable effects found on this target/)).toBeInTheDocument();
@@ -286,7 +340,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockRejectedValue(new Error('network error'));
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/No removable effects found on this target/)).toBeInTheDocument();
@@ -299,7 +353,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ exhaustionLevel: 2 }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Exhaustion level \(current: 2\)/)).toBeInTheDocument();
@@ -310,7 +364,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ exhaustionLevel: 0 }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
@@ -324,7 +378,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeBuffs: [{ type: 'cursed' }] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Curse/)).toBeInTheDocument();
@@ -335,7 +389,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeBuffs: [{ cursed: true }] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Curse/)).toBeInTheDocument();
@@ -346,7 +400,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeBuffs: [{ type: 'buff' }] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
@@ -360,7 +414,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ abilityReductions: { STR: -2 } }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Ability score reduction/)).toBeInTheDocument();
@@ -371,7 +425,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ abilityReductions: {} }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
@@ -385,7 +439,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ hpMaxReduction: 5 }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Hit Point maximum reduction/)).toBeInTheDocument();
@@ -396,7 +450,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ hpMaxReduction: 0 }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Effects to remove from/)).toBeInTheDocument();
@@ -410,7 +464,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ exhaustionLevel: 1 }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
@@ -427,7 +481,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -444,7 +498,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeBuffs: [{ type: 'cursed' }] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Curse/)).toBeInTheDocument();
@@ -461,7 +515,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ abilityReductions: { STR: -2 } }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Ability score reduction/)).toBeInTheDocument();
@@ -478,7 +532,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ hpMaxReduction: 3 }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Hit Point maximum reduction/)).toBeInTheDocument();
@@ -502,7 +556,7 @@ describe('GreaterRestorationPopup', () => {
         }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
@@ -525,7 +579,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -541,7 +595,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/No removable effects found/)).toBeInTheDocument();
@@ -553,7 +607,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -574,7 +628,7 @@ describe('GreaterRestorationPopup', () => {
         }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onConfirm })} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
@@ -602,7 +656,7 @@ describe('GreaterRestorationPopup', () => {
         }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onConfirm })} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Hit Point maximum reduction/)).toBeInTheDocument();
@@ -623,7 +677,7 @@ describe('GreaterRestorationPopup', () => {
 
     it('does not call onConfirm when no target is selected', () => {
         const onConfirm = vi.fn();
-        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onConfirm })} />);
         fireEvent.click(screen.getByText('Cast Greater Restoration'));
         expect(onConfirm).not.toHaveBeenCalled();
     });
@@ -633,7 +687,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onConfirm })} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/No removable effects found/)).toBeInTheDocument();
@@ -647,14 +701,14 @@ describe('GreaterRestorationPopup', () => {
 
     it('calls onSkip when Cancel button is clicked', () => {
         const onSkip = vi.fn();
-        render(<GreaterRestorationPopup {...makeProps({ onSkip })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onSkip })} />);
         fireEvent.click(screen.getByText('Cancel'));
         expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
     it('calls onSkip when overlay background is clicked', () => {
         const onSkip = vi.fn();
-        render(<GreaterRestorationPopup {...makeProps({ onSkip })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onSkip })} />);
         fireEvent.click(document.querySelector('.popup-overlay'));
         expect(onSkip).toHaveBeenCalledTimes(1);
     });
@@ -664,7 +718,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps({ onSkip })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onSkip })} />);
         fireEvent.click(screen.getByText('Goblin'));
         fireEvent.click(screen.getByText(/Choose a creature within/));
         expect(onSkip).not.toHaveBeenCalled();
@@ -674,14 +728,14 @@ describe('GreaterRestorationPopup', () => {
 
     it('calls onSkip when Escape key is pressed', () => {
         const onSkip = vi.fn();
-        render(<GreaterRestorationPopup {...makeProps({ onSkip })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onSkip })} />);
         fireEvent.keyDown(document, { key: 'Escape' });
         expect(onSkip).toHaveBeenCalledTimes(1);
     });
 
     it('does not call onSkip for non-Escape key press', () => {
         const onSkip = vi.fn();
-        render(<GreaterRestorationPopup {...makeProps({ onSkip })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onSkip })} />);
         fireEvent.keyDown(document, { key: 'Enter' });
         expect(onSkip).not.toHaveBeenCalled();
     });
@@ -689,19 +743,19 @@ describe('GreaterRestorationPopup', () => {
     // ── Fallback values ──
 
     it('shows fallback spell name when spell prop is undefined', () => {
-        render(<GreaterRestorationPopup {...makeProps({ spell: undefined })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ spell: undefined })} />);
         expect(screen.getByText(/Spell/)).toBeInTheDocument();
     });
 
     it('shows fallback level when spell.level is undefined', () => {
-        render(<GreaterRestorationPopup {...makeProps({ spell: { name: 'Test Spell' } })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ spell: { name: 'Test Spell' } })} />);
         expect(screen.getByText(/Level 5/)).toBeInTheDocument();
     });
 
     // ── Empty creature targets ──
 
     it('renders without target list when creatureTargets is empty', () => {
-        render(<GreaterRestorationPopup {...makeProps({ creatureTargets: [] })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ creatureTargets: [] })} />);
         expect(screen.getByText('Cast Greater Restoration')).toBeDisabled();
         creatureTargets.forEach(name => {
             expect(screen.queryByText(name)).not.toBeInTheDocument();
@@ -711,7 +765,7 @@ describe('GreaterRestorationPopup', () => {
     // ── Range display ──
 
     it('renders the provided range in the description', () => {
-        render(<GreaterRestorationPopup {...makeProps({ range: '30 ft' })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ range: '30 ft' })} />);
         expect(screen.getByText('30 ft')).toBeInTheDocument();
     });
 
@@ -724,7 +778,7 @@ describe('GreaterRestorationPopup', () => {
             creatures: [{ name: 'Goblin', conditions: [{ key: 'charmed' }] }],
         });
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
 
         await waitFor(() => {
@@ -738,7 +792,7 @@ describe('GreaterRestorationPopup', () => {
             creatures: [{ name: 'Goblin' }],
         });
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
 
         await waitFor(() => {
@@ -750,7 +804,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockResolvedValue({ creatures: null });
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
 
         await waitFor(() => {
@@ -764,7 +818,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed', 'petrified'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -789,7 +843,7 @@ describe('GreaterRestorationPopup', () => {
 
         const props = makeProps();
         props.campaignName = 'my-campaign';
-        render(<GreaterRestorationPopup {...props} />);
+        render(<TargetWithCheckboxesPopup {...props} />);
         fireEvent.click(screen.getByText('Goblin'));
 
         await waitFor(() => {
@@ -800,7 +854,7 @@ describe('GreaterRestorationPopup', () => {
     // ── Spell prop null ──
 
     it('shows fallback values when spell is null', () => {
-        render(<GreaterRestorationPopup {...makeProps({ spell: null })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ spell: null })} />);
         expect(screen.getByText(/Spell/)).toBeInTheDocument();
         expect(screen.getByText(/Level 5/)).toBeInTheDocument();
     });
@@ -812,7 +866,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed', 'petrified'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onConfirm })} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -852,7 +906,7 @@ describe('GreaterRestorationPopup', () => {
         }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps({ onConfirm })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ onConfirm })} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
@@ -887,7 +941,7 @@ describe('GreaterRestorationPopup', () => {
         }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
@@ -912,7 +966,7 @@ describe('GreaterRestorationPopup', () => {
         }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Exhaustion level/)).toBeInTheDocument();
@@ -933,7 +987,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps({ creatureTargets: ['Goblin', null, 'Orc'] })} />);
+        render(<TargetWithCheckboxesPopup {...makeProps({ creatureTargets: ['Goblin', null, 'Orc'] })} />);
         expect(screen.getByText('Goblin')).toBeInTheDocument();
         expect(screen.getByText('Orc')).toBeInTheDocument();
     });
@@ -944,7 +998,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
 
         await waitFor(() => {
@@ -962,7 +1016,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed', 'petrified'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();
@@ -980,7 +1034,7 @@ describe('GreaterRestorationPopup', () => {
     // ── Description content ──
 
     it('displays the full spell description text', () => {
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         expect(screen.getByText(/This spell can remove one or more of the following/)).toBeInTheDocument();
         expect(screen.getByText(/exhaustion level/)).toBeInTheDocument();
         expect(screen.getByText(/Charmed or Petrified condition/)).toBeInTheDocument();
@@ -995,7 +1049,7 @@ describe('GreaterRestorationPopup', () => {
         applyRuntimeState(defaultRuntimeState({ activeConditions: ['charmed'] }));
         getCombatSummary.mockReturnValue(null);
 
-        render(<GreaterRestorationPopup {...makeProps()} />);
+        render(<TargetWithCheckboxesPopup {...makeProps()} />);
         fireEvent.click(screen.getByText('Goblin'));
         await waitFor(() => {
             expect(screen.getByText(/Charmed condition/)).toBeInTheDocument();

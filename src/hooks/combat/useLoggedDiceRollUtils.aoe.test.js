@@ -18,7 +18,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
 }));
 
 import { loadMapData } from '../../services/maps/mapsService.js';
-import { readAoeContext } from './useLoggedDiceRollUtils.js';
+import { readAoeContext } from './loggedDiceRollUtils.js';
 
 describe('readAoeContext', () => {
     const mockOverlayData = {

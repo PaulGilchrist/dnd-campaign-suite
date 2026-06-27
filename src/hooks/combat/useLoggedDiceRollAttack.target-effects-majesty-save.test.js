@@ -61,7 +61,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: vi.fn(),
 }));
 
-vi.mock('./useLoggedDiceRollUtils.js', () => ({
+vi.mock('./loggedDiceRollUtils.js', () => ({
     dispatchUnbreakableMajestySave: vi.fn(),
     hasPotentCantrip: vi.fn(),
     getShieldAcBonus: vi.fn(),
@@ -86,7 +86,7 @@ import {
     getShieldAcBonus,
     getShieldOfFaithAcBonus,
     applyMinDamageAdjustment,
-} from './useLoggedDiceRollUtils.js';
+} from './loggedDiceRollUtils.js';
 import { createLogAndShow } from './useLoggedDiceRollAttack.js';
 import {
     isUnbreakableMajestyActive,

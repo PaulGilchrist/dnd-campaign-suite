@@ -1,5 +1,5 @@
 import { loadSkills } from '../../ui/dataLoader.js';
-import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
+import { applyMaxHpPassives } from './carryingCapacity.js';
 export { getCarryingCapacity } from './carryingCapacity.js';
 
 export async function getAbilities(playerStats) {
@@ -84,21 +84,7 @@ export function getHitPoints(playerStats) {
         hitPoints += playerStats.class.major.hit_point_bonus_per_level * playerStats.level;
      }
 
-    const passives = playerStats.automation?.passives || [];
-    for (const passive of passives) {
-        if (passive.type === 'passive_rule' && passive.effect === 'max_hp_increase') {
-            if (passive.amount) {
-                hitPoints += passive.amount;
-            } else if (passive.bonusExpression) {
-                const bonus = evaluateAutoExpression(passive.bonusExpression, playerStats);
-                if (typeof bonus === 'number' && !isNaN(bonus)) {
-                    hitPoints += bonus;
-                }
-            }
-        }
-    }
-
-    return hitPoints;
+    return applyMaxHpPassives(playerStats, hitPoints);
 }
 
 

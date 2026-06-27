@@ -42,7 +42,7 @@ vi.mock('../../services/rules/combat/aoeService.js', () => ({
     sendAoePlayerSaves: vi.fn(),
 }));
 
-vi.mock('./useLoggedDiceRollUtils.js', () => ({
+vi.mock('./loggedDiceRollUtils.js', () => ({
     readAoeContext: vi.fn(),
     hasPotentCantrip: vi.fn(),
     isMagicMissileImmune: vi.fn(),
@@ -72,7 +72,7 @@ import {
     isMagicMissileImmune,
     hasSoulstitchProtection,
     applyMinDamageAdjustment,
-} from './useLoggedDiceRollUtils.js';
+} from './loggedDiceRollUtils.js';
 import { computeDamageAfterSave, rollSaveForCreature, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { createLogDamageAndShow } from './useLoggedDiceRollDamage.js';
 

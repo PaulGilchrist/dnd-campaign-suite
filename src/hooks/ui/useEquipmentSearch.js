@@ -1,24 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useAsyncData } from '../useAsyncData.js';
 import { loadEquipment } from '../../services/ui/dataLoader.js';
 
 export function useEquipmentSearch(tempInventory, onTempInventoryChange, onInventoryChange) {
-  const [equipmentData, setEquipmentData] = useState([]);
+  const { data: equipmentData } = useAsyncData(() => loadEquipment(), [], []);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEquipment, setFilteredEquipment] = useState([]);
   const [searchField, setSearchField] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showOnlySelectedBackpack, setShowOnlySelectedBackpack] = useState(false);
-    const [showOnlySelectedEquipped, setShowOnlySelectedEquipped] = useState(false);
-
-
-  // Load equipment data
-  useEffect(() => {
-    const fetchEquipment = async () => {
-      const data = await loadEquipment();
-      setEquipmentData(data);
-    };
-    fetchEquipment();
-  }, []);
+  const [showOnlySelectedEquipped, setShowOnlySelectedEquipped] = useState(false);
 
   // Filter equipment based on search query and category
   useEffect(() => {

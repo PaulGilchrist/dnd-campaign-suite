@@ -9,15 +9,10 @@ import MetamagicPopup from '../popups/MetamagicPopup.jsx'
 import SpellDetailPopup from './SpellDetailPopup.jsx'
 import CharSpellSlots from './CharSpellSlots.jsx'
 import MultiTargetPopup from '../popups/MultiTargetPopup.jsx'
-import AidTargetPopup from '../popups/AidTargetPopup.jsx'
-import HeroesFeastTargetPopup from '../popups/HeroesFeastTargetPopup.jsx'
-import GreaterRestorationPopup from '../popups/GreaterRestorationPopup.jsx'
-import LesserRestorationPopup from '../popups/LesserRestorationPopup.jsx'
-import RemoveCursePopup from '../popups/RemoveCursePopup.jsx'
-import MageArmorTargetPopup from '../popups/MageArmorTargetPopup.jsx'
-import ShieldOfFaithTargetPopup from '../popups/ShieldOfFaithTargetPopup.jsx'
-import ProtectionFromEnergyTargetPopup from '../popups/ProtectionFromEnergyTargetPopup.jsx'
-import ResistanceTargetPopup from '../popups/ResistanceTargetPopup.jsx'
+import MultiTargetCountPopup from '../popups/MultiTargetCountPopup.jsx'
+import TargetWithCheckboxesPopup from '../popups/TargetWithCheckboxesPopup.jsx'
+import SingleTargetPopup from '../popups/SingleTargetPopup.jsx'
+import TargetWithTypePopup from '../popups/TargetWithTypePopup.jsx'
 import MagicMissileTargetPopup from '../popups/MagicMissileTargetPopup.jsx'
 import { rollExpression, rollExpressionDoubled, rollExpressionMaximized } from '../../../services/dice/diceRoller.js';
 import { getCombatContext, getTargetFromAttacker, getAttackerTargetName } from '../../../services/rules/combat/damageUtils.js';
@@ -30,7 +25,8 @@ import { executeSpellCast } from '../../../services/rules/spells/spellCastServic
 import * as mapsService from '../../../services/maps/mapsService.js';
 import { getNearestPlacedItem } from '../../../services/rules/combat/rangeValidation.js';
 import { isInnateSorceryActive } from '../../../services/combat/buffs/buffService.js';
-import { useRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import { useRuntimeValue, setRuntimeValue, getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import utils from '../../../services/ui/utils.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
@@ -444,7 +440,7 @@ return (
                       />
                     )}
                     {pendingAid && (
-                      <AidTargetPopup
+                      <MultiTargetCountPopup
                         spell={{ name: pendingAid.spellName, level: pendingAid.spellLevel || 0 }}
                         playerStats={playerStats}
                         campaignName={campaignName}
@@ -458,7 +454,7 @@ return (
                       />
                     )}
                     {pendingHeroesFeast && (
-                      <HeroesFeastTargetPopup
+                      <MultiTargetCountPopup
                         spell={{ name: pendingHeroesFeast.spellName, level: pendingHeroesFeast.spellLevel || 0 }}
                         playerStats={playerStats}
                         campaignName={campaignName}
@@ -471,41 +467,158 @@ return (
                         onSkip={handleHeroesFeastSkip}
                       />
                     )}
-                    {pendingGreaterRestoration && (
-                      <GreaterRestorationPopup
-                        spell={{ name: pendingGreaterRestoration.spellName, level: pendingGreaterRestoration.spellLevel || 0 }}
-                        playerStats={playerStats}
-                        campaignName={campaignName}
-                        creatureTargets={pendingGreaterRestoration.creatureTargets}
-                        range={pendingGreaterRestoration.range}
-                        onConfirm={handleGreaterRestorationConfirm}
-                        onSkip={handleGreaterRestorationSkip}
-                      />
-                    )}
-                    {pendingLesserRestoration && (
-                      <LesserRestorationPopup
-                        spell={{ name: pendingLesserRestoration.spellName, level: pendingLesserRestoration.spellLevel || 0 }}
-                        playerStats={playerStats}
-                        campaignName={campaignName}
-                        creatureTargets={pendingLesserRestoration.creatureTargets}
-                        range={pendingLesserRestoration.range}
-                        onConfirm={handleLesserRestorationConfirm}
-                        onSkip={handleLesserRestorationSkip}
-                      />
-                    )}
-                    {pendingRemoveCurse && (
-                      <RemoveCursePopup
-                        spell={{ name: pendingRemoveCurse.spellName, level: pendingRemoveCurse.spellLevel || 0 }}
-                        playerStats={playerStats}
-                        campaignName={campaignName}
-                        creatureTargets={pendingRemoveCurse.creatureTargets}
-                        range={pendingRemoveCurse.range}
-                        onConfirm={handleRemoveCurseConfirm}
-                        onSkip={handleRemoveCurseSkip}
-                      />
-                    )}
+                    {pendingGreaterRestoration && (() => {
+                      const loadTargetData = async (targetName) => {
+                        const result = [];
+                        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                        let csConditions = [];
+                        try {
+                          const cs = await getCombatSummary(campaignName);
+                          if (cs) {
+                            const creature = cs.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+                            if (creature && Array.isArray(creature.conditions)) {
+                              csConditions = creature.conditions.map(c => c.key);
+                            }
+                          }
+                        } catch { /* ignore */ }
+                        const allConditions = [...new Set([...conditions, ...csConditions])];
+                        const RESTORATION_CONDITIONS = [{ id: 'charmed' }, { id: 'petrified' }];
+                        const conditionMatches = (c, targetCondition) =>
+                          (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
+                        RESTORATION_CONDITIONS
+                          .filter(c => allConditions.some(cond => conditionMatches(cond, c.id)))
+                          .forEach(c => {
+                            result.push({ id: c.id, label: `${c.id.charAt(0).toUpperCase() + c.id.slice(1)} condition`, selectionData: { type: 'condition', condition: c.id } });
+                          });
+                        const exhaustion = getRuntimeValue(targetName, 'exhaustionLevel') || 0;
+                        if (exhaustion > 0) {
+                          result.push({ id: 'exhaustion', label: `Exhaustion level (current: ${exhaustion})`, selectionData: { type: 'exhaustion' } });
+                        }
+                        const activeBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                        const hasCurse = activeBuffs.some(b => b.type === 'cursed' || b.cursed);
+                        if (hasCurse) {
+                          result.push({ id: 'curse', label: 'Curse (including attunement to cursed magic item)', selectionData: { type: 'curse' } });
+                        }
+                        const abilityReductions = getRuntimeValue(targetName, 'abilityReductions') || {};
+                        if (Object.keys(abilityReductions).length > 0) {
+                          result.push({ id: 'ability_reduction', label: 'Ability score reduction', selectionData: { type: 'ability_reduction' } });
+                        }
+                        const hpMaxReduction = getRuntimeValue(targetName, 'hpMaxReduction') || 0;
+                        if (hpMaxReduction > 0) {
+                          result.push({ id: 'hp_max_reduction', label: 'Hit Point maximum reduction', selectionData: { type: 'hp_max_reduction' } });
+                        }
+                        return result;
+                      };
+                      return (
+                        <TargetWithCheckboxesPopup
+                          spell={{ name: pendingGreaterRestoration.spellName, level: pendingGreaterRestoration.spellLevel || 0 }}
+                          playerStats={playerStats}
+                          campaignName={campaignName}
+                          creatureTargets={pendingGreaterRestoration.creatureTargets}
+                          range={pendingGreaterRestoration.range}
+                          onConfirm={handleGreaterRestorationConfirm}
+                          onSkip={handleGreaterRestorationSkip}
+                          loadTargetData={loadTargetData}
+                          icon="fa-solid fa-hand-holding-medical"
+                          title="Greater Restoration"
+                          school="Abjuration"
+                          defaultLevel={5}
+                          description={
+                            <span>
+                              Choose a creature within <strong>{pendingGreaterRestoration.range}</strong> and select the effect(s) to remove.
+                              This spell can remove one or more of the following from the target:
+                              an exhaustion level, the Charmed or Petrified condition, a curse (including attunement to a cursed magic item),
+                              any reduction to an ability score, or any reduction to the target's Hit Point maximum.
+                            </span>
+                          }
+                          noItemsMessage="No removable effects found on this target"
+                          confirmLabel="Cast Greater Restoration"
+                        />
+                      );
+                    })()}
+                    {pendingLesserRestoration && (() => {
+                      const loadTargetData = async (targetName) => {
+                        const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
+                        let csConditions = [];
+                        try {
+                          const cs = await getCombatSummary(campaignName);
+                          if (cs) {
+                            const creature = cs.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
+                            if (creature && Array.isArray(creature.conditions)) {
+                              csConditions = creature.conditions.map(c => c.key);
+                            }
+                          }
+                        } catch { /* ignore */ }
+                        const allConditions = [...new Set([...conditions, ...csConditions])];
+                        const ALLOWED_CONDITIONS = [{ id: 'blinded' }, { id: 'deafened' }, { id: 'paralyzed' }, { id: 'poisoned' }];
+                        const conditionMatches = (c, targetCondition) =>
+                          (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
+                        return ALLOWED_CONDITIONS
+                          .filter(c => allConditions.some(a => conditionMatches(a, c.id)))
+                          .map(c => ({ id: c.id, label: `${c.id.charAt(0).toUpperCase() + c.id.slice(1)} condition`, selectionData: { condition: c.id } }));
+                      };
+                      return (
+                        <TargetWithCheckboxesPopup
+                          spell={{ name: pendingLesserRestoration.spellName, level: pendingLesserRestoration.spellLevel || 0 }}
+                          playerStats={playerStats}
+                          campaignName={campaignName}
+                          creatureTargets={pendingLesserRestoration.creatureTargets}
+                          range={pendingLesserRestoration.range}
+                          onConfirm={handleLesserRestorationConfirm}
+                          onSkip={handleLesserRestorationSkip}
+                          loadTargetData={loadTargetData}
+                          icon="fa-solid fa-hand-holding-medical"
+                          title="Lesser Restoration"
+                          school="Abjuration"
+                          defaultLevel={2}
+                          description="Choose a creature within range and select one condition to remove. This spell can end one condition on the target: Blinded, Deafened, Paralyzed, or Poisoned."
+                          loadTargetData={loadTargetData}
+                          noItemsMessage="No applicable conditions found on this target"
+                          confirmLabel="Cast Lesser Restoration"
+                        />
+                      );
+                    })()}
+                    {pendingRemoveCurse && (() => {
+                      const loadTargetData = async (targetName) => {
+                        const result = [];
+                        const activeBuffs = getRuntimeValue(targetName, 'activeBuffs') || [];
+                        const cursedBuffs = activeBuffs.filter(b => b.type === 'cursed' || b.cursed);
+                        if (cursedBuffs.length > 0) {
+                          result.push({ id: 'curse', label: `Curse (${cursedBuffs.length} cursed effect(s))`, selectionData: { type: 'curse' } });
+                        }
+                        const attunement = getRuntimeValue(targetName, 'attunement') || [];
+                        if (attunement.length > 0) {
+                          result.push({ id: 'attunement', label: `Attunement (${attunement.length} attuned item(s))`, selectionData: { type: 'attunement' } });
+                        }
+                        return result;
+                      };
+                      return (
+                        <TargetWithCheckboxesPopup
+                          spell={{ name: pendingRemoveCurse.spellName, level: pendingRemoveCurse.spellLevel || 0 }}
+                          playerStats={playerStats}
+                          campaignName={campaignName}
+                          creatureTargets={pendingRemoveCurse.creatureTargets}
+                          range={pendingRemoveCurse.range}
+                          onConfirm={handleRemoveCurseConfirm}
+                          onSkip={handleRemoveCurseSkip}
+                          loadTargetData={loadTargetData}
+                          icon="fa-solid fa-hand-holding-medical"
+                          title="Remove Curse"
+                          school="Abjuration"
+                          defaultLevel={3}
+                          description={
+                            <span>
+                              Choose a creature within <strong>{pendingRemoveCurse.range}</strong>. This spell ends all curses affecting the target
+                              and breaks the target's attunement to any cursed magic items.
+                            </span>
+                          }
+                          noItemsMessage="No curses or attunement found on this target"
+                          confirmLabel="Cast Remove Curse"
+                        />
+                      );
+                    })()}
                     {pendingMageArmor && (
-                      <MageArmorTargetPopup
+                      <SingleTargetPopup
                         spell={{ name: pendingMageArmor.spellName, level: pendingMageArmor.spellLevel || 0 }}
                         playerStats={playerStats}
                         campaignName={campaignName}
@@ -516,7 +629,7 @@ return (
                       />
                     )}
                     {pendingShieldOfFaith && (
-                      <ShieldOfFaithTargetPopup
+                      <SingleTargetPopup
                         spell={{ name: pendingShieldOfFaith.spellName, level: pendingShieldOfFaith.spellLevel || 0 }}
                         playerStats={playerStats}
                         campaignName={campaignName}
@@ -527,7 +640,7 @@ return (
                       />
                     )}
                     {pendingProtectionFromEnergy && (
-                      <ProtectionFromEnergyTargetPopup
+                      <TargetWithTypePopup
                         spell={{ name: pendingProtectionFromEnergy.spellName, level: pendingProtectionFromEnergy.spellLevel || 0 }}
                         playerStats={playerStats}
                         campaignName={campaignName}
@@ -539,7 +652,7 @@ return (
                       />
                     )}
                     {pendingResistance && (
-                      <ResistanceTargetPopup
+                      <TargetWithTypePopup
                         spell={{ name: pendingResistance.spellName, level: pendingResistance.spellLevel || 0 }}
                         playerStats={playerStats}
                         campaignName={campaignName}

@@ -16,7 +16,7 @@ vi.mock('../../services/combat/automation/automationService.js', () => ({ hasIgn
 vi.mock('../../services/rules/features/invisibilityService.js', () => ({ endInvisibilityOnHostileAction: vi.fn() }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: vi.fn((n) => n || 'Unknown'), guid: vi.fn(() => 'test-guid-1234') } }));
 vi.mock('../../services/ui/storage.js', () => ({ default: { set: vi.fn() } }));
-vi.mock('./useLoggedDiceRollUtils.js', () => ({ hasSoulstitchProtection: vi.fn() }));
+vi.mock('./loggedDiceRollUtils.js', () => ({ hasSoulstitchProtection: vi.fn() }));
 vi.mock('../../services/shared/logPoster.js', () => ({ postLogEntry: vi.fn() }));
 
 import { addExpiration } from '../../services/rules/effects/expirations.js';
@@ -25,7 +25,7 @@ import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js'
 import { computeDamageAfterEvasion, applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
-import { hasSoulstitchProtection } from './useLoggedDiceRollUtils.js';
+import { hasSoulstitchProtection } from './loggedDiceRollUtils.js';
 import utils from '../../services/ui/utils.js';
 import storage from '../../services/ui/storage.js';
 import { postLogEntry } from '../../services/shared/logPoster.js';

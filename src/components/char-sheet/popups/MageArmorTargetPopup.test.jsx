@@ -1,7 +1,7 @@
 // @improved-by-ai
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
-import MageArmorTargetPopup from './MageArmorTargetPopup.jsx';
+import SingleTargetPopup from './SingleTargetPopup.jsx';
 
 // ── Test fixtures ──
 
@@ -21,14 +21,20 @@ function renderPopup(overrides = {}) {
         _attackerPos: null,
         onConfirm: vi.fn(),
         onSkip: vi.fn(),
+        icon: 'fa-solid fa-shield-halved',
+        title: 'Mage Armor',
+        school: 'Abjuration',
+        defaultLevel: 1,
+        description: '30 ft. Target: base AC becomes 13 + Dexterity modifier',
+        confirmLabel: 'Cast Mage Armor',
         ...overrides,
     };
-    return render(<MageArmorTargetPopup {...props} />);
+    return render(<SingleTargetPopup {...props} />);
 }
 
 // ── Tests ──
 
-describe('MageArmorTargetPopup', () => {
+describe('SingleTargetPopup', () => {
     // ── Rendering ──
 
     describe('rendering', () => {

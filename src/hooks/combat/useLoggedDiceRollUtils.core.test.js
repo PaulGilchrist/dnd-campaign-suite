@@ -31,7 +31,7 @@ import {
     getSoulstitchProtectedCreatures,
     hasSoulstitchProtection,
     applyMinDamageAdjustment,
-} from './useLoggedDiceRollUtils.js';
+} from './loggedDiceRollUtils.js';
 
 describe('dispatchUnbreakableMajestySave', () => {
     beforeEach(() => {

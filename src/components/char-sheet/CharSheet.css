@@ -129,6 +129,62 @@
     color: var(--color-error-light);
 }
 
+.choice-list {
+    text-align: left;
+    margin-top: 12px;
+}
+
+.choice-option {
+    display: block;
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid transparent;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.choice-option:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.choice-option.choice-selected {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: var(--color-link);
+}
+
+.choice-option.choice-existing:not(.choice-selected) {
+    background: rgba(100, 200, 255, 0.1);
+    border: 1px dashed var(--color-link);
+}
+
+.choice-option.choice-disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.choice-label {
+    vertical-align: middle;
+}
+
+.choice-description {
+    opacity: 0.8;
+    margin-left: 8px;
+}
+
+.choice-existing-badge {
+    margin-left: 8px;
+    opacity: 0.7;
+    font-size: 0.85em;
+}
+
+.choice-extra {
+    opacity: 0.6;
+    margin-left: 28px;
+    font-size: 0.85em;
+}
+
 @media print {
     .char-sheet {
         padding: 0;

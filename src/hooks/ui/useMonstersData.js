@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useAsyncData } from '../useAsyncData.js';
 
 /** Module-level cache */
 const cache = {};
@@ -11,60 +11,25 @@ const cache = {};
  * @returns {{ monsters: object[], loading: boolean, error: string|null }}
  */
 export function useMonstersData() {
-    const [monsters, setMonsters] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+  const fetchMonsters = async () => {
+    if (cache['monsters']) return cache['monsters'];
 
-    useEffect(() => {
-        let cancelled = false;
+    const path = '/data/monsters.json';
 
-        async function fetchMonsters() {
-            // Return cached data immediately — skip loading state
-            if (cache['monsters']) {
-                if (!cancelled) {
-                    setMonsters(cache['monsters']);
-                    setLoading(false);
-                    setError(null);
-                }
-                return;
-            }
+    const response = await fetch(path);
 
-            setLoading(true);
-            setError(null);
+    if (!response.ok) {
+      throw new Error(
+        `Failed to load monsters (${response.status} ${response.statusText})`
+      );
+    }
 
-            try {
-                const path = '/data/monsters.json';
+    const data = await response.json();
+    cache['monsters'] = data;
+    return data;
+  };
 
-                const response = await fetch(path);
+  const { data: monsters, loading, error } = useAsyncData(fetchMonsters, [], []);
 
-                if (!response.ok) {
-                    throw new Error(
-                        `Failed to load monsters (${response.status} ${response.statusText})`
-                    );
-                }
-
-                const data = await response.json();
-
-                if (!cancelled) {
-                    cache['monsters'] = data;
-                    setMonsters(data);
-                    setLoading(false);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    setError(err.message);
-                    setMonsters([]);
-                    setLoading(false);
-                }
-            }
-        }
-
-        fetchMonsters();
-
-        return () => {
-            cancelled = true;
-        };
-    }, []);
-
-    return { monsters, loading, error };
+  return { monsters, loading, error };
 }
