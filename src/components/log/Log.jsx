@@ -50,6 +50,9 @@ function RollEntry({ entry }) {
             {entry.isAutoMiss ? 'AUTO-MISS' : (entry.hit ? 'HIT' : 'MISS')} {entry.targetAc != null ? `(AC ${entry.targetAc})` : ''}
           </span>
         )}
+        {entry.rollType === 'attack' && entry.isCrit && !entry.isNatural1 && (
+          <span className="log-critical-hit">Critical Hit!</span>
+        )}
         {entry.rollType === 'attack' && entry.isNatural1 && (
           <span className="log-critical-miss">Critical Miss!</span>
         )}

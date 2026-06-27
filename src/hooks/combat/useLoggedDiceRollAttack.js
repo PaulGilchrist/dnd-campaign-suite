@@ -252,7 +252,7 @@ export function createLogAndShow(deps) {
                 rollsInCriticalRange = effectiveD20 >= low && effectiveD20 <= high;
             }
         }
-        const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && hit;
+        const isCrit = !isAutoMiss && (r1 === 20 || context?.isAutoCrit || rollsInCriticalRange) && (hit || rollsInCriticalRange);
 
         const autoDamage = hit && context?.autoDamageFormula ? {
             name: context.autoDamageName || name,
@@ -292,6 +292,7 @@ export function createLogAndShow(deps) {
             damageType: context?.damageType,
             hit,
             isAutoMiss,
+            isCrit,
             rangeReason: context?.rangeReason,
             resistanceNotice: context?.resistanceNotice,
             hunterLoreNotice: context?.hunterLoreNotice,

@@ -282,6 +282,16 @@ describe('createLogAndShow (useLoggedDiceRollAttack)', () => {
                 isCrit: false,
             }));
         });
+
+        it('marks isCrit when effectiveD20 falls in criticalRange even if attack would miss', async () => {
+            rollD20.mockReturnValueOnce(19);
+            getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 30 });
+            const fn = createFn();
+            await fn('Longsword', 0, 'attack', { targetName: 'Goblin', criticalRange: '19-20' });
+            expect(deps.setPopupHtml).toHaveBeenCalledWith(expect.objectContaining({
+                isCrit: true,
+            }));
+        });
     });
 
     describe('target resolution', () => {
