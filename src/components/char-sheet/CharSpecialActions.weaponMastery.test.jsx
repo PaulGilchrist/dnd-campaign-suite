@@ -355,6 +355,41 @@ describe('CharSpecialActions - Weapon Mastery Modals', () => {
 
       expect(screen.getByText('masteryProperties: Finesse, Heavy, Reach, Thrown')).toBeInTheDocument();
     });
+
+    it('closes WeaponMasteryChoiceModal when confirm button is clicked', async () => {
+      executeHandler.mockResolvedValue({
+        type: 'modal',
+        modalName: 'weaponMasteryChoice',
+        payload: {
+          action: { name: 'Weapon Master' },
+          masteryProperties: ['Finesse', 'Heavy'],
+        },
+      });
+
+      const playerStats = createPlayerStats({
+        specialActions: [
+          { name: 'Weapon Master', description: 'Choose mastery.', automation: { type: 'weapon_mastery_choice' } },
+        ],
+      });
+      render(<CharSpecialActions playerStats={playerStats} campaignName="test" />, {
+        wrapper: ({ children }) => (
+          <DiceRollContext.Provider value={{ popupHtml: null, setPopupHtml: vi.fn() }}>
+            {children}
+          </DiceRollContext.Provider>
+        ),
+      });
+      fireEvent.click(screen.getByText(/Weapon Master/));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('weapon-mastery-choice-modal')).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText('Confirm'));
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('weapon-mastery-choice-modal')).not.toBeInTheDocument();
+      });
+    });
   });
 });
 

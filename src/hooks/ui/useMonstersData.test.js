@@ -147,4 +147,35 @@ describe('useMonstersData', () => {
     expect(result.current.loading).toBe(true);
     expect(result.current.monsters).toEqual([]);
   });
+
+  it('should return cached data immediately on second render (cache hit path)', async () => {
+    const mockMonsters = [{ name: 'Cached Monster', cr: '1' }];
+
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => mockMonsters,
+    });
+
+    const { useMonstersData } = await import('./useMonstersData.js');
+
+    // First render triggers fetch and populates cache
+    const { result: firstResult } = renderHook(() => useMonstersData());
+
+    await waitFor(() => {
+      expect(firstResult.current.loading).toBe(false);
+    });
+    expect(firstResult.current.monsters).toEqual(mockMonsters);
+
+    // Spy on fetch before second render
+    global.fetch.mockClear();
+
+    // Second render in same module scope should use the in-memory cache
+    const { result: secondResult } = renderHook(() => useMonstersData());
+
+    // Cache hit: monsters populated immediately, no fetch called
+    expect(secondResult.current.monsters).toEqual(mockMonsters);
+    expect(secondResult.current.loading).toBe(false);
+    expect(secondResult.current.error).toBeNull();
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
 });

@@ -414,10 +414,10 @@ describe('ottosDanceHandler.handle', () => {
       resolveTarget.mockResolvedValue({ target: { name: 'Goblin' } });
 
       let readCount = 0;
-      getRuntimeValue.mockImplementation((_caster, key, prop) => {
+      getRuntimeValue.mockImplementation((_entity, key, _camp) => {
         if (key === '_ottosDance_Goblin') return null;
-        if (prop === 'activeConditions') return [];
-        if (prop === 'targetEffects') {
+        if (key === 'activeConditions') return [];
+        if (key === 'targetEffects') {
           readCount++;
           if (readCount === 1) {
             return [{ target: 'Goblin', effect: 'ottos_dance_repeat_save', source: 'OldCaster' }];
@@ -709,9 +709,9 @@ describe('ottosDanceHandler.processOttoDanceRepeatSave', () => {
         promptId: 'otto-repeat-nonarray',
         promise: Promise.resolve({ success: true }),
       });
-      getRuntimeValue.mockImplementation((_target, prop) => {
-        if (prop === 'activeConditions') return null;
-        if (prop === '_ottosDance_Goblin') return true;
+      getRuntimeValue.mockImplementation((_entity, key) => {
+        if (key === 'activeConditions') return null;
+        if (key === '_ottosDance_Goblin') return true;
         return [];
       });
 
@@ -921,3 +921,5 @@ describe('ottosDanceHandler.processOttoDanceSuccessSave', () => {
     );
   });
 });
+
+

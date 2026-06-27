@@ -340,6 +340,74 @@ describe('beguilingTwistHandler.handle', () => {
       expect(result.type).toBe('popup');
       expect(result.payload.description).toContain('Cannot determine targets');
     });
+
+    it('should return error popup when ally is the only creature (no other creatures available)', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'Ally1'));
+      getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Ally1', type: 'player' }],
+      });
+
+      const result = await handle(
+        makeAction({ target: 'different_creature' }),
+        makePlayerStats(),
+        campaignName,
+        mapName,
+      );
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('no other creatures are available');
+      expect(result.payload.description).toContain('Ally1');
+    });
+
+    it('should select first other creature when multiple creatures exist', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'Ally1'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'multi-creature-prompt' });
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'Ally1', type: 'player' },
+          { name: 'Ally2', type: 'player' },
+          { name: playerName, type: 'player' },
+        ],
+      });
+
+      const result = await handle(
+        makeAction({ target: 'different_creature' }),
+        makePlayerStats(),
+        campaignName,
+        mapName,
+      );
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.targetName).toBe('Ally2');
+      expect(createSaveListener).toHaveBeenCalledWith(campaignName, {
+        targetName: 'Ally2',
+        saveType: 'WIS',
+        saveDc: 15,
+      });
+    });
+
+    it('should use player as other creature when player is not the one who saved', async () => {
+      findLastAttack.mockResolvedValue(makeHitAttack('Goblin', 'Ally1'));
+      getAbilityModifier.mockReturnValue(3);
+      createSaveListener.mockReturnValue({ promptId: 'player-other-prompt' });
+      getCombatContext.mockResolvedValue({
+        creatures: [
+          { name: 'Ally1', type: 'player' },
+          { name: playerName, type: 'player' },
+        ],
+      });
+
+      const result = await handle(
+        makeAction({ target: 'different_creature' }),
+        makePlayerStats(),
+        campaignName,
+        mapName,
+      );
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.targetName).toBe(playerName);
+    });
   });
 
   describe('save DC calculation', () => {
@@ -713,4 +781,5 @@ describe('beguilingTwistHandler.handle', () => {
       expect(result.payload.targetName).toBe('Goblin');
     });
   });
+
 });

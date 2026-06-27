@@ -304,4 +304,5 @@ describe('postCastRiderHandler.handle', () => {
 
         expect(existingConditions).toEqual(['exhausted']);
     });
+
 });

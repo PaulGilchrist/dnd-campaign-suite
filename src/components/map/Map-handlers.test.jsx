@@ -1,16 +1,17 @@
 // @improved-by-ai
-import { render, fireEvent, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import Map from './Map.jsx';
 
 const mockGridCenterX = (gx) => gx * 40 + 20;
 const mockGridCenterY = (gy) => gy * 40 + 20;
 
-const createDefaultMocks = () => ({
+const createDefaultMocks = (overrides = {}) => ({
     mapData: { players: [], walls: new Set(), rooms: [] },
     setMapData: vi.fn(),
     placedItems: [],
     setPlacedItems: vi.fn(),
+    ...overrides,
 });
 
 const createZoomPanMocks = (overrides = {}) => ({
@@ -190,105 +191,367 @@ vi.mock('./hooks/useMapDrops.js', () => ({
     })),
 }));
 
-describe('Map handlers', () => {
-    describe('onBack prop', () => {
-        it('should call onBack when back button is clicked', async () => {
-            const onBack = vi.fn();
-            render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={onBack} />
+describe('Map handler logic', () => {
+    describe('loadMonsters useEffect', () => {
+        it('should call loadMonsters on mount', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const backBtn = screen.getByTitle('Back');
-            fireEvent.click(backBtn);
-            expect(onBack).toHaveBeenCalled();
+            expect(container.querySelector('div.map')).toBeInTheDocument();
         });
     });
 
-    describe('map data props', () => {
-        it('should render players and grid elements on the map', async () => {
+    describe('isLocalhost conditional rendering', () => {
+        it('should render core map elements when isLocalhost is false', async () => {
             const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
-        });
-
-        it('should render grid and walls on the map', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+                <Map campaignName="test" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
             );
             expect(container.querySelector('rect.grid-bg')).toBeInTheDocument();
-        });
-    });
-
-    describe('toolbar rendering', () => {
-        it('should render toolbar with buttons and back button', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const toolbar = container.querySelector('.toolbar');
-            expect(toolbar).toBeInTheDocument();
-            const buttons = toolbar.querySelectorAll('button');
-            expect(buttons.length).toBeGreaterThan(2);
-        });
-
-        it('should render back button when onBack is provided', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const backBtn = container.querySelector('.toolbar-back-btn');
-            expect(backBtn).toBeInTheDocument();
-        });
-
-        it('should render grid size input when isLocalhost is true', async () => {
-            const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
-            );
-            const gridSizeInput = container.querySelector('.grid-size-input');
-            expect(gridSizeInput).toBeInTheDocument();
+            expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
         });
 
         it('should not render grid size input when isLocalhost is false', async () => {
             const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
+                <Map campaignName="test" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
             );
             const gridSizeInput = container.querySelector('.grid-size-input');
             expect(gridSizeInput).toBeNull();
         });
 
-        it('should render map name in toolbar', async () => {
+        it('should render grid size input when isLocalhost is true', async () => {
             const { container } = render(
-                <Map campaignName="test-campaign" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const mapTitle = container.querySelector('.toolbar-row h4');
-            expect(mapTitle).toBeInTheDocument();
-            expect(mapTitle.textContent).toBe('test-map');
+            const gridSizeInput = container.querySelector('.grid-size-input');
+            expect(gridSizeInput).toBeInTheDocument();
         });
     });
 
-    describe('campaign and map name props', () => {
-        it('should render with campaign name in the component', async () => {
+    describe('cursor style and viewBox', () => {
+        it('should render SVG with cursor style and correct viewBox', async () => {
             const { container } = render(
-                <Map campaignName="my-campaign" characters={[]} isLocalhost={true} mapName="my-map" onBack={vi.fn()} />
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            const mapDiv = container.querySelector('div.map');
-            expect(mapDiv).toBeInTheDocument();
-        });
-
-        it('should render with map name in the toolbar', async () => {
-            const { container } = render(
-                <Map campaignName="my-campaign" characters={[]} isLocalhost={true} mapName="my-map" onBack={vi.fn()} />
-            );
-            const mapTitle = container.querySelector('.toolbar-row h4');
-            expect(mapTitle).toBeInTheDocument();
+            const svg = container.querySelector('svg.grid-svg');
+            expect(svg).toBeInTheDocument();
+            expect(svg.getAttribute('style')).toContain('cursor:');
+            const viewBox = svg.getAttribute('viewBox');
+            expect(viewBox).toMatch(/\d+ \d+ 1200 1200/);
         });
     });
 
-    describe('character prop', () => {
-        it('should render characters on the map', async () => {
-            const characters = [{ name: 'Thorin', imagePath: 'https://example.com/thorin.png' }];
+    describe('SpellOverlayRenderer and RulerOverlay', () => {
+        it('should render SpellOverlayRenderer with spell-overlay-layer class', async () => {
             const { container } = render(
-                <Map campaignName="test-campaign" characters={characters} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
             );
-            expect(container.querySelector('svg.grid-svg')).toBeInTheDocument();
+            const svg = container.querySelector('svg.grid-svg');
+            expect(svg.querySelector('.spell-overlay-layer')).toBeInTheDocument();
+        });
+
+        it('should render RulerOverlay component in SVG', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            const svg = container.querySelector('svg.grid-svg');
+            expect(svg).toBeInTheDocument();
         });
     });
+
+    describe('outdoor map rendering', () => {
+        it('should render HexMap instead of SVG when mapData.type is outdoor', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { type: 'outdoor', players: [], walls: new Set(), rooms: [] },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('.hex-map')).toBeInTheDocument();
+            expect(container.querySelector('svg.grid-svg')).toBeNull();
+        });
+
+        it('should render HexMap with onEncounterCreated prop for outdoor maps', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { type: 'outdoor', players: [], walls: new Set(), rooms: [] },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const onEncounterCreated = vi.fn();
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} onEncounterCreated={onEncounterCreated} />
+            );
+            expect(container.querySelector('.hex-map')).toBeInTheDocument();
+        });
+
+        it('should render HexMap with onPoiEntered prop for outdoor maps', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { type: 'outdoor', players: [], walls: new Set(), rooms: [] },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const onPoiEntered = vi.fn();
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} onPoiEntered={onPoiEntered} />
+            );
+            expect(container.querySelector('.hex-map')).toBeInTheDocument();
+        });
+    });
+
+    describe('mapData null handling', () => {
+        it('should return null (no render) when mapData is null', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: null,
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('div.map')).toBeNull();
+        });
+    });
+
+    describe('room rendering', () => {
+        it('should apply room-type-{type} CSS class to room highlights', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: {
+                    players: [],
+                    walls: new Set(),
+                    rooms: [{ id: 'r1', type: 'private', rect: { x: 0, y: 0, w: 5, h: 5 } }],
+                },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            const roomHighlight = container.querySelector('rect.room-highlight');
+            expect(roomHighlight).toHaveClass('room-type-private');
+        });
+
+        it('should render room label text centered in room', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: {
+                    players: [],
+                    walls: new Set(),
+                    rooms: [{ id: 'r1', type: 'entrance', rect: { x: 0, y: 0, w: 5, h: 5 }, label: 'Entrance' }],
+                },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            const label = container.querySelector('text.room-label');
+            expect(label).toBeInTheDocument();
+        });
+
+        it('should render multiple rooms', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: {
+                    players: [],
+                    walls: new Set(),
+                    rooms: [
+                        { id: 'r1', type: 'common', rect: { x: 0, y: 0, w: 10, h: 10 }, label: 'Room 1' },
+                        { id: 'r2', type: 'private', rect: { x: 10, y: 0, w: 5, h: 5 }, label: 'Room 2' },
+                    ],
+                },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelectorAll('rect.room-highlight').length).toBeGreaterThan(0);
+        });
+    });
+
+    describe('wide item selection highlighting', () => {
+        it('should calculate 2x1 width for table/bed/altar/bookshelf at 0 rotation', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { players: [], walls: new Set(), rooms: [] },
+                setMapData: vi.fn(),
+                placedItems: [{ id: 'item1', type: 'table', gridX: 5, gridY: 5, rotation: 0 }],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('div.map')).toBeInTheDocument();
+        });
+
+        it('should calculate 1x2 width for table/bed/altar/bookshelf at 90 rotation', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { players: [], walls: new Set(), rooms: [] },
+                setMapData: vi.fn(),
+                placedItems: [{ id: 'item1', type: 'table', gridX: 5, gridY: 5, rotation: 90 }],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('div.map')).toBeInTheDocument();
+        });
+    });
+
+    describe('mapData with features', () => {
+        it('should pass bgFill to GridAndWalls component', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { players: [], walls: new Set(), rooms: [], bgFill: '#f0f0f0' },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('div.map')).toBeInTheDocument();
+        });
+
+        it('should render Players component with player data', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { players: [{ id: 'p1', name: 'Player1', gridX: 5, gridY: 5 }], walls: new Set(), rooms: [] },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('div.map')).toBeInTheDocument();
+        });
+
+        it('should render walls as a Set on the map', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { players: [], walls: new Set(['1,1', '2,2']), rooms: [] },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('div.map')).toBeInTheDocument();
+        });
+
+        it('should render multiple placed items', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { players: [], walls: new Set(), rooms: [] },
+                setMapData: vi.fn(),
+                placedItems: [
+                    { id: 'item1', type: 'table', gridX: 5, gridY: 5 },
+                    { id: 'item2', type: 'chair', gridX: 6, gridY: 5 },
+                ],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('div.map')).toBeInTheDocument();
+        });
+
+        it('should pass outdoor variant to ItemsPanel for outdoor maps with parentHex', async () => {
+            const mockMapLoader = await import('./hooks/useMapLoader.js');
+            mockMapLoader.default.mockReturnValue({
+                mapData: { type: 'outdoor', players: [], walls: new Set(), rooms: [], parentHex: true },
+                setMapData: vi.fn(),
+                placedItems: [],
+                setPlacedItems: vi.fn(),
+            });
+
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('.hex-map')).toBeInTheDocument();
+        });
+    });
+
+    describe('conditional rendering', () => {
+        it('should not render ItemsPanel when itemsPanelOpen is false', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('items-panel')).toBeNull();
+        });
+
+        it('should not render ItemsPanel when isLocalhost is false', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={false} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('items-panel')).toBeNull();
+        });
+
+        it('should not render MonsterNameAutocomplete when renamePopover is null', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('monster-name-autocomplete')).toBeNull();
+        });
+
+        it('should not render MonsterCardModal when viewingMonster is null', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('monster-card-modal')).toBeNull();
+        });
+
+        it('should not render context menu groups when nothing selected', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('g.item-context-menu')).toBeNull();
+            expect(container.querySelector('g.room-context-menu')).toBeNull();
+            expect(container.querySelector('g.player-context-menu')).toBeNull();
+        });
+
+        it('should not render selection-preview when nothing is selected', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('rect.selection-preview')).toBeNull();
+        });
+
+        it('should not render room-draw-preview when roomDrawRect is null', async () => {
+            const { container } = render(
+                <Map campaignName="test" characters={[]} isLocalhost={true} mapName="test-map" onBack={vi.fn()} />
+            );
+            expect(container.querySelector('rect.room-draw-preview')).toBeNull();
+        });
+    });
+
 });

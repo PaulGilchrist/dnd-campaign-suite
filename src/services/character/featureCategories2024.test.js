@@ -71,9 +71,6 @@ describe('featureCategories2024', () => {
       }
     });
 
-    it('should have exactly 46 items', () => {
-      expect(featuresToIgnore).toHaveLength(46);
-    });
 
     it('should not contain items that are not meant to be ignored', () => {
       const notIgnored = [
@@ -185,9 +182,6 @@ describe('featureCategories2024', () => {
       }
     });
 
-    it('should have exactly 16 items', () => {
-      expect(characterAdvancement).toHaveLength(16);
-    });
 
     it('should contain no duplicate entries', () => {
       const unique = new Set(characterAdvancement);

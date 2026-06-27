@@ -417,6 +417,8 @@ describe('counterSpellHandler.handle', () => {
     });
   });
 
+
+
   describe('spell_breaker passive', () => {
     async function runSpellBreakerTest(config) {
       const {

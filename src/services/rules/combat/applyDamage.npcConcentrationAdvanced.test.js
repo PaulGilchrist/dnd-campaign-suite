@@ -269,6 +269,36 @@ describe('NPC Concentration — Dragon Constellation & Relentless Hunter', () =>
       expect(rollConcentrationSave).toHaveBeenCalled();
     });
 
+    it('throws when Ranger player level is null', () => {
+      const rangerCreature = createNpcCreature('Ranger', 30, 30, {
+        concentration: { spell: 'Haste', dc: 10 },
+        saveBonuses: { con: 0 },
+      });
+      const cs = makeCombatSummary([rangerCreature]);
+
+      const rangerCharacter = {
+        name: 'Ranger',
+        level: null,
+        computedStats: {
+          resistances: [],
+          immunities: [],
+          class_levels: [],
+          equipment: [],
+          characterAdvancement: [],
+          allFeatures: [],
+          automation: { passives: [] },
+          class: { name: 'Ranger', class_levels: [{ level: 13 }] },
+          level: null,
+        },
+      };
+
+      stubNpcRuntime(30);
+
+      expect(() => applyDamageToTarget(
+        cs, 'Ranger', 10, ['Slashing'], 'TestCampaign', [rangerCharacter],
+      )).toThrow('player level is required for relentless hunter check');
+    });
+
 
   });
 

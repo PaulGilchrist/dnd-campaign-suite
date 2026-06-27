@@ -374,6 +374,23 @@ describe('applyDamageToTarget — Undying Sentinel', () => {
       expect(result.finalDamage).toBe(0);
     });
   });
+
+  describe('edge cases', () => {
+    it('throws when hitPoints is null from runtime', () => {
+      const paladin = createPaladin('GloryPaladin', { level: 15 });
+      const cs = makeCombatSummary([paladin]);
+
+      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
+        currentHitPoints: 10,
+        hitPoints: null,
+      }));
+
+      expect(() => applyDamageToTarget(
+        cs, 'GloryPaladin', 10, ['Slashing'], campaignName,
+        [makeCharacter('GloryPaladin', { level: 15, features: [{ name: 'Undying Sentinel' }] })],
+      )).toThrow('Undying Sentinel: hitPoints not found for GloryPaladin');
+    });
+  });
 });
 
 describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
@@ -529,6 +546,27 @@ describe('applyDamageToTarget — Boon of Recovery (Last Stand)', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith(
         'BoonChar', 'boonOfRecoveryLastStandUsed', true, campaignName,
       );
+    });
+  });
+
+  describe('edge cases', () => {
+    it('throws when hitPoints is null from runtime', () => {
+      const char = createCharacterWithBoon('BoonChar', { level: 20 });
+      const cs = makeCombatSummary([char]);
+
+      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
+        currentHitPoints: 10,
+        hitPoints: null,
+      }));
+
+      expect(() => applyDamageToTarget(
+        cs, 'BoonChar', 10, ['Slashing'], campaignName,
+        [makeCharacter('BoonChar', {
+          level: 20, maxHp: 180,
+          features: [{ name: 'Boon Of Recovery' }],
+          className: 'Paladin', classLevel: 20,
+        })],
+      )).toThrow('Last Stand: hitPoints not found for BoonChar');
     });
   });
 });
@@ -731,6 +769,82 @@ describe('applyDamageToTarget — Relentless Endurance (Orc race trait)', () => 
         targetName: 'OrcPlayer6',
         sourceName: 'Relentless Endurance',
       }));
+    });
+  });
+
+  describe('edge cases', () => {
+    it('returns intercepted false when allFeatures is null', () => {
+      const orc = makeCreature('OrcNullFeatures', {
+        level: 1,
+        computedStats: {
+          name: 'OrcNullFeatures',
+          level: 1,
+          hitPoints: { max: 100 },
+          class: { name: 'Rogue', class_levels: [{ level: 1 }] },
+          allFeatures: null,
+          equipment: [],
+        },
+      });
+      const cs = makeCombatSummary([orc]);
+
+      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
+        currentHitPoints: 10,
+        hitPoints: 100,
+      }));
+
+      const result = applyDamageToTarget(
+        cs, 'OrcNullFeatures', 10, ['Slashing'], campaignName,
+        [makeCharacter('OrcNullFeatures', {
+          level: 1, maxHp: 100,
+          features: null,
+          className: 'Rogue', classLevel: 1,
+        })],
+      );
+
+      expect(result.finalDamage).toBe(10);
+      expect(result.newHp).toBe(0);
+    });
+
+    it('throws when hitPoints is null from runtime', () => {
+      const orc = createOrc('OrcNoHitPoints', { maxHp: 100 });
+      const cs = makeCombatSummary([orc]);
+
+      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
+        currentHitPoints: 10,
+        hitPoints: null,
+      }));
+
+      expect(() => applyDamageToTarget(
+        cs, 'OrcNoHitPoints', 10, ['Slashing'], campaignName,
+        [makeCharacter('OrcNoHitPoints', {
+          level: 1, maxHp: 100,
+          features: [{ name: 'Relentless Endurance' }],
+          className: 'Rogue', classLevel: 1,
+        })],
+      )).toThrow('Relentless Endurance: hitPoints not found for OrcNoHitPoints');
+    });
+
+    it('adds damageSequenceId to reTriggeredSequenceIds when Relentless Endurance intercepts', () => {
+      const orc = createOrc('OrcSeqId', { maxHp: 100 });
+      const cs = makeCombatSummary([orc]);
+
+      getRuntimeValue.mockImplementation(defaultGetRuntimeValue({
+        currentHitPoints: 10,
+        hitPoints: 100,
+      }));
+
+      const result = applyDamageToTarget(
+        cs, 'OrcSeqId', 10, ['Slashing'], campaignName,
+        [makeCharacter('OrcSeqId', {
+          level: 1, maxHp: 100,
+          features: [{ name: 'Relentless Endurance' }],
+          className: 'Rogue', classLevel: 1,
+        })],
+        false, null, false, { damageSequenceId: 'seq-123' },
+      );
+
+      expect(result.intercepted).toBe(true);
+      expect(result.newHp).toBe(1);
     });
   });
 });

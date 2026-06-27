@@ -3,15 +3,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import WizardStepRaceClass from './WizardStepRaceClass.jsx';
 
+const mockCascadingSelectProps = vi.fn();
+
 vi.mock('./CascadingSelect.jsx', () => {
-  function MockCascadingSelect({
-    label,
-    childLabel,
-    errorKey,
-    errors,
-    onInputChange,
-    fieldName,
-  }) {
+  function MockCascadingSelect(props) {
+    mockCascadingSelectProps(props);
+    const {
+      label,
+      childLabel,
+      errorKey,
+      errors,
+      onInputChange,
+      fieldName,
+    } = props;
     return (
       <div data-testid={`cascading-select-${fieldName}`}>
         <label>{label} *</label>
@@ -56,6 +60,7 @@ const makeProps = (overrides = {}) => ({
 describe('WizardStepRaceClass', () => {
   beforeEach(() => {
     makeOnInputChange.mockClear();
+    mockCascadingSelectProps.mockClear();
   });
 
   describe('structure and labels', () => {
@@ -353,6 +358,204 @@ describe('WizardStepRaceClass', () => {
       render(<WizardStepRaceClass {...makeProps({ errors: {} })} />);
       const errorMessages = document.querySelectorAll('.error-message');
       expect(errorMessages.length).toBe(0);
+    });
+  });
+
+  describe('CascadingSelect prop passing', () => {
+    it('passes optionsKey="className" to class CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const classProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'class'
+      );
+      expect(classProps[0].optionsKey).toBe('className');
+    });
+
+    it('passes childExtraFields={description: ""} to race CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const raceProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'race'
+      );
+      expect(raceProps[0].childExtraFields).toEqual({ description: '' });
+    });
+
+    it('passes childExtraFields={type: ""} to class CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const classProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'class'
+      );
+      expect(classProps[0].childExtraFields).toEqual({ type: '' });
+    });
+
+    it('passes loadingText to race CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const raceProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'race'
+      );
+      expect(raceProps[0].loadingText).toBe('Loading races...');
+    });
+
+    it('passes loadingText to class CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const classProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'class'
+      );
+      expect(classProps[0].loadingText).toBe('Loading classes...');
+    });
+
+    it('passes errorKey="subrace" to race CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const raceProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'race'
+      );
+      expect(raceProps[0].errorKey).toBe('subrace');
+    });
+
+    it('passes errorKey="subclass" to class CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const classProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'class'
+      );
+      expect(classProps[0].errorKey).toBe('subclass');
+    });
+
+    it('passes subOptionsSelector to race CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const raceProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'race'
+      );
+      expect(typeof raceProps[0].subOptionsSelector).toBe('function');
+      const result = raceProps[0].subOptionsSelector('Elf');
+      expect(result).toEqual(['High Elf', 'Wood Elf']);
+    });
+
+    it('passes subOptionsSelector to class CascadingSelect', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const classProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'class'
+      );
+      expect(typeof classProps[0].subOptionsSelector).toBe('function');
+      const clericResult = classProps[0].subOptionsSelector('Cleric');
+      expect(clericResult).toEqual(['Order of the Keeper', 'Order of the Storm']);
+    });
+
+    it('passes formData to both CascadingSelect components', () => {
+      const formData = { race: 'Elf', subrace: 'High Elf', class: { name: 'Cleric' } };
+      render(<WizardStepRaceClass {...makeProps({ formData })} />);
+      const raceProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'race'
+      );
+      expect(raceProps[0].formData).toEqual(formData);
+      const classProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'class'
+      );
+      expect(classProps[0].formData).toEqual(formData);
+    });
+
+    it('passes errors to both CascadingSelect components', () => {
+      const errors = { race: 'Required', subrace: 'Required' };
+      render(<WizardStepRaceClass {...makeProps({ errors })} />);
+      const raceProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'race'
+      );
+      expect(raceProps[0].errors).toEqual(errors);
+      const classProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'class'
+      );
+      expect(classProps[0].errors).toEqual(errors);
+    });
+
+    it('passes onInputChange to both CascadingSelect components', () => {
+      render(<WizardStepRaceClass {...makeProps()} />);
+      const raceProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'race'
+      );
+      expect(raceProps[0].onInputChange).toBe(makeOnInputChange);
+      const classProps = mockCascadingSelectProps.mock.calls.find(
+        call => call[0].fieldName === 'class'
+      );
+      expect(classProps[0].onInputChange).toBe(makeOnInputChange);
+    });
+  });
+
+  describe('pre-selected order values', () => {
+    it('shows pre-selected divineOrder in the select', () => {
+      render(
+        <WizardStepRaceClass
+          {...makeProps({
+            ruleset: '2024',
+            formData: { race: '', subrace: '', class: { name: 'Cleric', divineOrder: 'Protector' } },
+          })}
+        />
+      );
+      const defaultOption = screen.getByText('Select a Divine Order');
+      const select = defaultOption.closest('select');
+      expect(select).toHaveValue('Protector');
+    });
+
+    it('shows pre-selected primalOrder in the select', () => {
+      render(
+        <WizardStepRaceClass
+          {...makeProps({
+            ruleset: '2024',
+            formData: { race: '', subrace: '', class: { name: 'Druid', primalOrder: 'Warden' } },
+          })}
+        />
+      );
+      const defaultOption = screen.getByText('Select a Primal Order');
+      const select = defaultOption.closest('select');
+      expect(select).toHaveValue('Warden');
+    });
+  });
+
+  describe('dynamic class switching in 2024 ruleset', () => {
+    it('shows Primal Order when class changes from Cleric to Druid', () => {
+      const { rerender } = render(
+        <WizardStepRaceClass
+          {...makeProps({
+            ruleset: '2024',
+            formData: { race: '', subrace: '', class: { name: 'Cleric' } },
+          })}
+        />
+      );
+      expect(screen.getByText('Divine Order *')).toBeInTheDocument();
+      expect(screen.queryByText(/Primal Order/)).not.toBeInTheDocument();
+
+      rerender(
+        <WizardStepRaceClass
+          {...makeProps({
+            ruleset: '2024',
+            formData: { race: '', subrace: '', class: { name: 'Druid' } },
+          })}
+        />
+      );
+
+      expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
+      expect(screen.getByText('Primal Order *')).toBeInTheDocument();
+    });
+
+    it('shows Divine Order when class changes from Druid to Cleric', () => {
+      const { rerender } = render(
+        <WizardStepRaceClass
+          {...makeProps({
+            ruleset: '2024',
+            formData: { race: '', subrace: '', class: { name: 'Druid' } },
+          })}
+        />
+      );
+      expect(screen.getByText('Primal Order *')).toBeInTheDocument();
+      expect(screen.queryByText('Divine Order')).not.toBeInTheDocument();
+
+      rerender(
+        <WizardStepRaceClass
+          {...makeProps({
+            ruleset: '2024',
+            formData: { race: '', subrace: '', class: { name: 'Cleric' } },
+          })}
+        />
+      );
+
+      expect(screen.queryByText(/Primal Order/)).not.toBeInTheDocument();
+      expect(screen.getByText('Divine Order *')).toBeInTheDocument();
     });
   });
 });

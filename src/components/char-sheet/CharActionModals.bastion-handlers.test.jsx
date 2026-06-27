@@ -310,6 +310,7 @@ function createBaseProps(overrides) {
     handleSweepingAttackConfirm: vi.fn(),
     handleBaitAndSwitchChoiceConfirm: vi.fn(),
     handleCommanderStrikeChoiceConfirm: vi.fn(),
+    handleRallyChoiceConfirm: vi.fn(),
     pendingDamageRef: { current: null },
     ...overrides,
   };

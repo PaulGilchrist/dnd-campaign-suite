@@ -356,4 +356,5 @@ describe('clockworkCavalcadeHandler', () => {
             expect(result.payload.description).toContain('30-foot Cube');
         });
     });
+
 });

@@ -235,6 +235,39 @@ describe('MapToolbar', () => {
         });
     });
 
+    describe('spell overlay controls integration', () => {
+        it('should call setSelectedShape and setSpellMode when shape is changed in SpellOverlayControls', () => {
+            const mockSetSelectedShape = vi.fn();
+            const mockSetSpellMode = vi.fn();
+            const mockState = createMockSpellOverlayState({
+                spellMode: 'sphere',
+                setSelectedShape: mockSetSelectedShape,
+                setSpellMode: mockSetSpellMode,
+            });
+            renderMapToolbar({ spellOverlayState: mockState });
+            const select = screen.getByRole('combobox');
+            fireEvent.change(select, { target: { value: 'cone' } });
+            expect(mockSetSelectedShape).toHaveBeenCalledWith('cone');
+            expect(mockSetSpellMode).toHaveBeenCalledWith('cone');
+        });
+
+        it('should not render SpellOverlayControls when spellMode is undefined', () => {
+            const mockState = createMockSpellOverlayState({ spellMode: undefined });
+            renderMapToolbar({ spellOverlayState: mockState });
+            expect(screen.queryByText('Spell Overlay')).not.toBeInTheDocument();
+        });
+
+        it('should render without crashing when spellOverlayState is null', () => {
+            renderMapToolbar({ spellOverlayState: null });
+            expect(screen.getByText('Dungeon Map')).toBeInTheDocument();
+        });
+
+        it('should render without crashing when spellOverlayState is undefined', () => {
+            renderMapToolbar({ spellOverlayState: undefined });
+            expect(screen.getByText('Dungeon Map')).toBeInTheDocument();
+        });
+    });
+
     describe('user interactions', () => {
         it('should call onBack when back button is clicked', () => {
             const mockOnBack = vi.fn();

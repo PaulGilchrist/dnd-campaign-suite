@@ -94,9 +94,38 @@ describe('classFeatures.getClassFeatures', () => {
     expect(result).toBeNull();
   });
 
-  it('throws when playerStats is null', async () => {
+  it('throws TypeError when playerStats is null', async () => {
     const { getClassFeatures } = await import('./classFeatures.js');
     expect(() => getClassFeatures(null)).toThrow(TypeError);
+  });
+
+  it('throws TypeError when playerStats is undefined', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    expect(() => getClassFeatures(undefined)).toThrow(TypeError);
+  });
+
+  it('returns null when playerStats is an empty object', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({});
+    expect(result).toBeNull();
+  });
+
+  it('returns null when playerStats is a number', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures(42);
+    expect(result).toBeNull();
+  });
+
+  it('returns null when playerStats is a string', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures('not an object');
+    expect(result).toBeNull();
+  });
+
+  it('returns null when playerStats is a boolean', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures(true);
+    expect(result).toBeNull();
   });
 
   it('returns undefined when class method exists but returns undefined', async () => {
@@ -143,5 +172,50 @@ describe('classFeatures.getClassFeatures', () => {
     const { getClassFeatures } = await import('./classFeatures.js');
     const result = getClassFeatures(makePlayerStats());
     expect(result).toBeUndefined();
+  });
+
+  it('selects classRules2024 when rules is 2024', async () => {
+    const getFeatureMethod = 'getBardFeatures';
+    mockedClassRules2024[getFeatureMethod] = vi.fn(() => ({ ruleset: '2024' }));
+    mockedClassRules[getFeatureMethod] = vi.fn(() => ({ ruleset: '5e' }));
+    const { getClassFeatures } = await import('./classFeatures.js');
+
+    getClassFeatures(makePlayerStats({ rules: '2024' }));
+
+    expect(mockedClassRules2024[getFeatureMethod]).toHaveBeenCalledTimes(1);
+    expect(mockedClassRules[getFeatureMethod]).not.toHaveBeenCalled();
+  });
+
+  it('selects classRules when rules is 5e', async () => {
+    const getFeatureMethod = 'getBardFeatures';
+    mockedClassRules[getFeatureMethod] = vi.fn(() => ({ ruleset: '5e' }));
+    mockedClassRules2024[getFeatureMethod] = vi.fn(() => ({ ruleset: '2024' }));
+    const { getClassFeatures } = await import('./classFeatures.js');
+
+    getClassFeatures(makePlayerStats({ rules: '5e' }));
+
+    expect(mockedClassRules[getFeatureMethod]).toHaveBeenCalledTimes(1);
+    expect(mockedClassRules2024[getFeatureMethod]).not.toHaveBeenCalled();
+  });
+
+  it('returns the exact object returned by the class method', async () => {
+    const expectedReturn = {
+      bardicDie: 1,
+      songOfRestDie: null,
+      magicalSecrets: null,
+      subclassMagicalSecrets: 0,
+    };
+    mockedClassRules.getBardFeatures = vi.fn(() => expectedReturn);
+    const { getClassFeatures } = await import('./classFeatures.js');
+
+    const result = getClassFeatures(makePlayerStats());
+
+    expect(result).toBe(expectedReturn);
+  });
+
+  it('handles playerStats with only rules field (no class)', async () => {
+    const { getClassFeatures } = await import('./classFeatures.js');
+    const result = getClassFeatures({ rules: '2024' });
+    expect(result).toBeNull();
   });
 });

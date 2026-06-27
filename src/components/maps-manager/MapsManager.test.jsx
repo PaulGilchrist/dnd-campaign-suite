@@ -21,7 +21,7 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
 }));
 
 vi.mock('../common/Subscriber.jsx', () => ({
-  default: () => null,
+  default: () => <div data-testid="subscriber" />,
 }));
 
 vi.mock('./GenerateDungeonModal.jsx', () => ({

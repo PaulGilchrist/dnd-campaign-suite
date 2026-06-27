@@ -901,6 +901,178 @@ describe('stinkingCloudHandler', () => {
           campaignName,
         );
       });
+
+      it('should call cleanupTargetEffect on repeat save success', async () => {
+        getRuntimeValue
+          .mockReturnValueOnce(true) // tracking
+          .mockReturnValueOnce(['poisoned']); // activeConditions
+        createSaveListener.mockReturnValue({
+          promptId: 'repeat-prompt',
+          promise: Promise.resolve({ success: true }),
+        });
+
+        await processStinkingCloudRepeatSave(
+          'TestWizard',
+          'EnemyGoblin',
+          13,
+          campaignName,
+        );
+
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          campaignName,
+          'targetEffects',
+          expect.not.arrayContaining([
+            expect.objectContaining({
+              target: 'EnemyGoblin',
+              effect: 'stinking_cloud_repeat_save',
+              source: 'TestWizard',
+            }),
+          ]),
+          campaignName,
+        );
+      });
+
+      it('should handle falsy activeConditions in repeat save success', async () => {
+        getRuntimeValue
+          .mockReturnValueOnce(true) // tracking
+          .mockReturnValueOnce(null); // activeConditions is null
+        createSaveListener.mockReturnValue({
+          promptId: 'repeat-prompt',
+          promise: Promise.resolve({ success: true }),
+        });
+
+        const result = await processStinkingCloudRepeatSave(
+          'TestWizard',
+          'EnemyGoblin',
+          13,
+          campaignName,
+        );
+
+        expect(result.type).toBe('popup');
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'EnemyGoblin',
+          'activeConditions',
+          [],
+          campaignName,
+        );
+      });
+
+      it('should handle non-array activeConditions in repeat save success', async () => {
+        getRuntimeValue
+          .mockReturnValueOnce(true) // tracking
+          .mockReturnValueOnce('not-an-array'); // activeConditions is a string
+        createSaveListener.mockReturnValue({
+          promptId: 'repeat-prompt',
+          promise: Promise.resolve({ success: true }),
+        });
+
+        const result = await processStinkingCloudRepeatSave(
+          'TestWizard',
+          'EnemyGoblin',
+          13,
+          campaignName,
+        );
+
+        expect(result.type).toBe('popup');
+        expect(setRuntimeValue).toHaveBeenCalledWith(
+          'EnemyGoblin',
+          'activeConditions',
+          [],
+          campaignName,
+        );
+      });
+    });
+  });
+
+  describe('defensive coding paths', () => {
+    it('should handle falsy targetEffects in handle save failure', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      getRuntimeValue
+        .mockReturnValueOnce([]) // activeConditions
+        .mockReturnValueOnce(null); // targetEffects is null
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Poisoned');
+    });
+
+    it('should handle non-array targetEffects in handle save failure', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      getRuntimeValue
+        .mockReturnValueOnce([]) // activeConditions
+        .mockReturnValueOnce('not-an-array'); // targetEffects is a string
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.description).toContain('Poisoned');
+    });
+
+    it('should handle falsy activeConditions in handle save failure', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      getRuntimeValue.mockReturnValueOnce(null); // activeConditions is null
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'EnemyGoblin',
+        'activeConditions',
+        ['poisoned'],
+        campaignName,
+      );
+    });
+
+    it('should handle non-array activeConditions in handle save failure', async () => {
+      getCombatContext.mockResolvedValue(singleTargetCombat);
+      getRuntimeValue.mockReturnValueOnce('not-an-array'); // activeConditions is a string
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'EnemyGoblin',
+        'activeConditions',
+        ['poisoned'],
+        campaignName,
+      );
+    });
+
+    it('should handle target with spaces in tracking key', async () => {
+      getCombatContext.mockResolvedValue({
+        creatures: [{ name: 'Enemy Goblin Name' }],
+      });
+      getRuntimeValue.mockReturnValue([]);
+      createSaveListener.mockReturnValue({
+        promptId: 'goblin-prompt',
+        promise: Promise.resolve({ success: false }),
+      });
+
+      await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(setRuntimeValue).toHaveBeenCalledWith(
+        'TestWizard',
+        '_stinking_cloud_Enemy_Goblin_Name',
+        true,
+        campaignName,
+      );
     });
   });
 });

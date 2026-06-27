@@ -955,4 +955,17 @@ describe('CharSummary - useEffect behaviors', () => {
         rerender(<CharSummary playerStats={newStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
         expect(screen.getByText(/5,000 XP/)).toBeInTheDocument();
     });
+
+    it('defaults xpMode to milestone when undefined', () => {
+        const stats = { ...mockPlayerStats, xpMode: undefined };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const summaryText = screen.getByTestId('char-summary-text');
+        expect(summaryText.textContent).toContain('milestone');
+    });
+
+    it('handles initiativeAdvantage being true', () => {
+        const stats = { ...mockPlayerStats, initiativeAdvantage: true };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/\+2/)).toBeInTheDocument();
+    });
 });

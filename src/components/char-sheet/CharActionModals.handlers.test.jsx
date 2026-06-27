@@ -283,6 +283,8 @@ function createBaseProps(overrides) {
     handleDivineInterventionCast: vi.fn(),
     handleDivinationSavantConfirm: vi.fn(),
     handleIllusionSavantConfirm: vi.fn(),
+    setRallyChoiceModal: vi.fn(),
+    handleRallyChoiceConfirm: vi.fn(),
     pendingDamageRef: { current: null },
     ...overrides,
   };

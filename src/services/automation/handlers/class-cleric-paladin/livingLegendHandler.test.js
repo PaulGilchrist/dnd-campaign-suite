@@ -171,6 +171,15 @@ describe('livingLegendHandler', () => {
         expect.any(Object),
       );
     });
+
+    it('re-throws the error when addEntry rejects', async () => {
+      getRuntimeValue.mockReturnValue(undefined);
+      addEntry.mockRejectedValue(new Error('Network failure'));
+
+      await expect(
+        handle(makeAction(), makePlayerStats(), campaignName, null),
+      ).rejects.toThrow('Network failure');
+    });
   });
 
   describe('isLivingLegendActive', () => {

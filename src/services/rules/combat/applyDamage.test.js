@@ -421,6 +421,27 @@ describe('applyDamageToTarget', () => {
       expect(setRuntimeValue).toHaveBeenCalledWith('Dragon', 'currentHitPoints', 100, 'TestCampaign');
     });
 
+    it('removes charmed condition on NPC when endsOnDamage is true', () => {
+      stubNpcRuntime(10, ['charmed']);
+      const npc = createNpcCreature('Wolf', 10, 10, {
+        type: 'monster',
+        conditions: [{ key: 'charmed', endsOnDamage: true }],
+      });
+      const cs = makeCombatSummary([npc]);
+      applyDamageToTarget(cs, 'Wolf', 3, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Wolf')]);
+      expect(npc.conditions).toEqual([]);
+    });
+
+    it('removes frightened condition on NPC monster when taking damage > 0', () => {
+      const npc = createNpcCreature('Goblin', 10, 10, {
+        type: 'monster',
+        conditions: [{ key: 'frightened' }],
+      });
+      const cs = makeCombatSummary([npc]);
+      applyDamageToTarget(cs, 'Goblin', 3, ['Bludgeoning'], 'TestCampaign', [createMinimalCharacter('Goblin')]);
+      expect(npc.conditions).toEqual([]);
+    });
+
     it('updates concentration DC on NPC when damage > 0', () => {
       stubNpcRuntime(10);
       const npc = createNpcCreature('Goblin', 10, 10, {

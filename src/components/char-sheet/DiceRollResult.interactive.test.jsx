@@ -587,4 +587,136 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
         });
     });
+
+    describe('superiority maneuvers', () => {
+        it('shows superiority maneuver buttons when availableSuperiorityManeuvers is provided', () => {
+            const maneuvers = [{ name: 'Precision Attack' }, { name: 'Trip Attack' }];
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    rollType="attack"
+                    availableSuperiorityManeuvers={maneuvers}
+                />
+            );
+            expect(screen.getByText(/Precision Attack/)).toBeInTheDocument();
+            expect(screen.getByText(/Trip Attack/)).toBeInTheDocument();
+        });
+
+        it('shows superiority maneuver buttons for non-d20 types too', () => {
+            render(
+                <DiceRollResult
+                    name="Fireball"
+                    type="damage"
+                    rolls={[6, 5, 4]}
+                    bonus={0}
+                    availableSuperiorityManeuvers={[{ name: 'Trip Attack' }]}
+                />
+            );
+            expect(screen.getByText(/Trip Attack/)).toBeInTheDocument();
+        });
+
+        it('hides superiority maneuver buttons after one is used', () => {
+            const onSuperiority = vi.fn();
+            const { container } = render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    rollType="attack"
+                    availableSuperiorityManeuvers={[{ name: 'Precision Attack' }]}
+                    onSuperiorityManeuver={onSuperiority}
+                />
+            );
+            fireEvent.click(screen.getByText(/Precision Attack/));
+            // After use, the button container is hidden and result is shown
+            expect(container.querySelector('.dice-roll-reroll')).not.toBeInTheDocument();
+            expect(screen.getByText(/Precision Attack:/)).toBeInTheDocument();
+        });
+
+        it('shows superiority result after clicking', () => {
+            const onSuperiority = vi.fn();
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    rollType="attack"
+                    availableSuperiorityManeuvers={[{ name: 'Precision Attack' }]}
+                    onSuperiorityManeuver={onSuperiority}
+                />
+            );
+            fireEvent.click(screen.getByText(/Precision Attack/));
+            expect(screen.getByText(/Precision Attack:/)).toBeInTheDocument();
+        });
+
+        it('calls onSuperiorityManeuver when a maneuver is selected with maneuver name and die value', () => {
+            const onSuperiority = vi.fn();
+            vi.spyOn(Math, 'random').mockReturnValue(0);
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    rollType="attack"
+                    availableSuperiorityManeuvers={[{ name: 'Trip Attack' }]}
+                    onSuperiorityManeuver={onSuperiority}
+                />
+            );
+            fireEvent.click(screen.getByText(/Trip Attack/));
+            expect(onSuperiority).toHaveBeenCalledWith('Trip Attack', 1);
+            vi.restoreAllMocks();
+        });
+
+        it('does not call onSuperiorityManeuver and does nothing visible when it is not provided', () => {
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    rollType="attack"
+                    availableSuperiorityManeuvers={[{ name: 'Trip Attack' }]}
+                />
+            );
+            fireEvent.click(screen.getByText(/Trip Attack/));
+            // Without onSuperiorityManeuver, handleSuperiorityManeuver returns early
+            // The button stays and nothing changes
+            expect(screen.getByText(/Trip Attack/)).toBeInTheDocument();
+            expect(screen.queryByText(/Trip Attack:/)).not.toBeInTheDocument();
+        });
+
+        it('does not show superiority buttons when array is empty', () => {
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    rollType="attack"
+                    availableSuperiorityManeuvers={[]}
+                />
+            );
+            expect(screen.queryByText(/Superiority Die/)).not.toBeInTheDocument();
+        });
+
+        it('does not show superiority buttons when array is null', () => {
+            render(
+                <DiceRollResult
+                    name="Attack"
+                    type="d20"
+                    rolls={[12]}
+                    bonus={3}
+                    rollType="attack"
+                    availableSuperiorityManeuvers={null}
+                />
+            );
+            expect(screen.queryByText(/Superiority Die/)).not.toBeInTheDocument();
+        });
+    });
 });

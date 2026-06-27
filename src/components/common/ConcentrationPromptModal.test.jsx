@@ -4,6 +4,8 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import React from 'react'
 import { rollD20 } from '../../services/dice/diceRoller.js'
 import { sendConcentrationResult } from '../../services/combat/conditions/savePromptService.js'
+import { computeAuraBonus } from '../../services/combat/auras/auraOfProtection.js'
+import { hasSaveModifier } from '../../services/combat/conditions/conditionEffects.js'
 import ConcentrationPromptModal from './ConcentrationPromptModal.jsx'
 
 vi.mock('../../services/ui/utils.js', () => ({
@@ -637,5 +639,385 @@ describe('ConcentrationPromptModal', () => {
     expect(calledData.success).toBe(true)
     expect(calledData.roll).toBe(10)
     expect(calledData.total).toBe(10)
+  })
+
+  it('rolls with advantage when hasSaveModifier returns true for concentration_saving_throws', async () => {
+    vi.mocked(hasSaveModifier).mockReturnValue(true)
+    vi.mocked(rollD20).mockReturnValue(5)
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[createCharacter('testTarget')]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/total:/i)).toBeInTheDocument()
+    })
+
+    expect(rollD20).toHaveBeenCalledTimes(2)
+  })
+
+  it('rolls with advantage when saveModifiers has concentration_spell_damage condition', async () => {
+    const character = createCharacter('testTarget', [
+      {
+        target: 'saving_throw',
+        condition: 'concentration_spell_damage',
+        effect: 'advantage',
+        abilities: ['Constitution'],
+      },
+    ])
+
+    vi.mocked(rollD20).mockReturnValue(3)
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[character]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/total:/i)).toBeInTheDocument()
+    })
+
+    expect(rollD20).toHaveBeenCalledTimes(2)
+  })
+
+  it('applies Starry Form buff when character has Dragon constellation and roll <= 9', async () => {
+    const character = createCharacter('testTarget')
+    character.activeBuffs = [
+      { name: 'Starry Form', constellation: 'Dragon' },
+    ]
+
+    vi.mocked(rollD20).mockReturnValue(7)
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[character]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/total:/i)).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/\+ 3/)).toBeInTheDocument()
+  })
+
+  it('does not apply Starry Form buff when roll > 9', async () => {
+    const character = createCharacter('testTarget')
+    character.activeBuffs = [
+      { name: 'Starry Form', constellation: 'Dragon' },
+    ]
+
+    vi.mocked(rollD20).mockReturnValue(15)
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[character]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/total:/i)).toBeInTheDocument()
+    })
+  })
+
+  it('shows aura bonus detail when aura provides a bonus', async () => {
+    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 2, sourceName: 'Bard' })
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/from Bard/)).toBeInTheDocument()
+    })
+  })
+
+  it('shows aura bonus without source name when sourceName is null', async () => {
+    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 1, sourceName: null })
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/aura/)).toBeInTheDocument()
+    })
+  })
+
+  it('does not show aura bonus detail when aura bonus is 0', async () => {
+    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 0, sourceName: null })
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/CONCENTRATION MAINTAINED/i)).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText(/from/)).not.toBeInTheDocument()
+  })
+
+  it('shows queue position "2 of 2" when viewing second prompt', async () => {
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+    fireEvent.click(screen.getByTestId('subscriber-trigger-second'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    expect(screen.getByText(/\(1 of 2\)/)).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Next Check' })).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next Check' }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/testTarget2/)).toBeInTheDocument()
+      expect(screen.queryByText(/\(.* of/)).not.toBeInTheDocument()
+    })
+  })
+
+  it('handles error in character lookup gracefully', async () => {
+    const character = createCharacter('testTarget')
+    Object.defineProperty(character, 'name', {
+      get() { throw new Error('Access denied') },
+    })
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[character]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/total:/i)).toBeInTheDocument()
+    })
+  })
+
+  it('uses saveModifiers from computedStats when top-level saveModifiers is undefined', async () => {
+    const character = createCharacter('testTarget')
+    delete character.saveModifiers
+    character.computedStats.saveModifiers = [
+      {
+        target: 'concentration_saving_throws',
+        effect: 'advantage',
+      },
+    ]
+
+    vi.mocked(rollD20).mockReturnValue(5)
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[character]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/total:/i)).toBeInTheDocument()
+    })
+
+    expect(rollD20).toHaveBeenCalledTimes(2)
+  })
+
+  it('uses activeBuffs from computedStats when top-level activeBuffs is undefined', async () => {
+    const character = createCharacter('testTarget')
+    delete character.activeBuffs
+    character.computedStats.activeBuffs = [
+      { name: 'Starry Form', constellation: 'Dragon' },
+    ]
+
+    vi.mocked(rollD20).mockReturnValue(5)
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[character]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/total:/i)).toBeInTheDocument()
+    })
+  })
+
+  it('sends saveBonus that includes both ability and aura bonuses', async () => {
+    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 2, sourceName: 'Bard' })
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[createCharacter('testTarget')]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(sendConcentrationResult).toHaveBeenCalled()
+    })
+
+    const [,, calledData] = sendConcentrationResult.mock.calls[0]
+    expect(calledData.saveBonus).toBe(5)
+  })
+
+  it('shows result breakdown with aura bonus detail in event', async () => {
+    vi.mocked(computeAuraBonus).mockResolvedValue({ bonus: 3, sourceName: 'Paladin' })
+
+    const eventHandler = vi.fn()
+    window.addEventListener('concentration-result', eventHandler)
+
+    render(
+      <ConcentrationPromptModal
+        campaignName="test-campaign"
+        characters={[createCharacter('testTarget')]}
+        activeMapName={null}
+      />,
+    )
+
+    fireEvent.click(screen.getByTestId('subscriber-trigger'))
+
+    await waitFor(() => {
+      expect(screen.getByText(/must make a/)).toBeInTheDocument()
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: /roll con save/i }))
+
+    await waitFor(() => {
+      expect(eventHandler).toHaveBeenCalled()
+    })
+
+    const eventDetail = eventHandler.mock.calls[0][0].detail
+    expect(eventDetail.saveBonus).toBe(6)
+    expect(eventDetail.bonusDetail).toBe('(+3 aura from Paladin)')
+
+    window.removeEventListener('concentration-result', eventHandler)
   })
 })

@@ -276,5 +276,35 @@ describe('createLogAndShow - Living Legend & Veer', () => {
                 abilityName: 'Veer',
             }));
         });
+
+        it('logs veer declined when rider confirms false (redirectResult=false)', async () => {
+            getTargetFromAttacker.mockReturnValue({ name: 'Mount', ac: 12 });
+            getRuntimeValue.mockImplementation((name, prop) => {
+                if (name === 'Mount' && prop === 'mountedBy') return 'Rider';
+                if (name === 'Rider' && prop === 'veerActive') return true;
+                if (name === 'Rider' && prop === 'activeConditions') return [];
+                return null;
+            });
+            loadCombatSummary.mockResolvedValue({
+                creatures: [{ name: 'Mount', type: 'npc', ac: 12, conditions: [] }],
+            });
+            // Use fake timers so we can control when the setTimeout fires
+            vi.useFakeTimers();
+            const fn = createFn();
+            const promise = fn('Longsword', 5, 'attack', { targetName: 'Mount' });
+            // The code sets up a Promise that listens for 'veer-confirm' event
+            // We need to advance timers to let the promise setup complete (microtask)
+            await vi.advanceTimersByTimeAsync(1);
+            // Now dispatch the veer-confirm event with confirm=false
+            window.dispatchEvent(new CustomEvent('veer-confirm', {
+                detail: { promptId: 'veer-Mount', confirm: false },
+            }));
+            await promise;
+            expect(deps.logEntry).toHaveBeenCalledWith(expect.objectContaining({
+                abilityName: 'Veer',
+                description: expect.stringContaining('declined to use Veer'),
+            }));
+            vi.useRealTimers();
+        });
     });
 });

@@ -588,5 +588,59 @@ describe('DiceRollResult', () => {
             const hitMiss = container.querySelector('.dice-roll-hit-miss.hit');
             expect(hitMiss.textContent).toContain('AC 16');
         });
+
+        it('shows baitAndSwitchBonus in reaction text when positive', () => {
+            const { container } = render(
+                <DiceRollResult
+                    name="Longsword"
+                    type="attack"
+                    rolls={[18]}
+                    bonus={3}
+                    targetName="Goblin"
+                    targetAc={14}
+                    hit={true}
+                    rollType="attack"
+                    baitAndSwitchBonus={3}
+                />
+            );
+            const hitMiss = container.querySelector('.dice-roll-hit-miss.hit');
+            expect(hitMiss.textContent).toContain('3 reaction');
+        });
+
+        it('does not show baitAndSwitchBonus in reaction text when zero', () => {
+            render(
+                <DiceRollResult
+                    name="Longsword"
+                    type="attack"
+                    rolls={[18]}
+                    bonus={3}
+                    targetName="Goblin"
+                    targetAc={14}
+                    hit={true}
+                    rollType="attack"
+                    baitAndSwitchBonus={0}
+                />
+            );
+            expect(screen.queryByText(/reaction/)).not.toBeInTheDocument();
+        });
+
+        it('combines baitAndSwitchBonus with other reaction bonuses', () => {
+            const { container } = render(
+                <DiceRollResult
+                    name="Longsword"
+                    type="attack"
+                    rolls={[18]}
+                    bonus={3}
+                    targetName="Goblin"
+                    targetAc={14}
+                    hit={true}
+                    rollType="attack"
+                    gloriousDefenseBonus={2}
+                    baitAndSwitchBonus={3}
+                />
+            );
+            const hitMiss = container.querySelector('.dice-roll-hit-miss.hit');
+            expect(hitMiss.textContent).toContain('5 reaction');
+        });
     });
 });

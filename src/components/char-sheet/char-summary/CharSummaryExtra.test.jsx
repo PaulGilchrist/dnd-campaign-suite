@@ -4,6 +4,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import CharSummary from './CharSummary.jsx';
 import { getActiveBuffs } from '../../../services/combat/buffs/buffService.js';
 import { setRuntimeValue, useRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
+import useLoggedDiceRoll from '../../../hooks/combat/useLoggedDiceRoll.js';
+import * as useActionPopup from '../../../hooks/combat/useActionPopup.js';
 
 vi.mock('./CharGold.jsx', () => ({ default: () => <div data-testid="char-gold">Gold</div> }));
 vi.mock('./CharHitPoints.jsx', () => ({ default: () => <div data-testid="char-hp">HP</div> }));
@@ -583,5 +585,312 @@ describe('CharSummary - Character Name and Header', () => {
     it('displays avatar image component', () => {
         render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
         expect(screen.getByTestId('avatar-image')).toBeInTheDocument();
+    });
+});
+
+describe('CharSummary - XP Modal Overlay Click-to-Close', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('closes XP modal when clicking the overlay background', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const levelSuffix = screen.getByText(/milestone/);
+        fireEvent.click(levelSuffix);
+        expect(screen.getByText('Experience Points')).toBeInTheDocument();
+        const overlay = screen.getByText('Experience Points').closest('.xp-modal-overlay');
+        fireEvent.click(overlay);
+        expect(screen.queryByText('Experience Points')).not.toBeInTheDocument();
+    });
+
+    it('does not close XP modal when clicking inside the modal content', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const levelSuffix = screen.getByText(/milestone/);
+        fireEvent.click(levelSuffix);
+        expect(screen.getByText('Experience Points')).toBeInTheDocument();
+        const modalContent = screen.getByText('Experience Points').closest('.xp-modal');
+        fireEvent.click(modalContent);
+        expect(screen.queryByText('Experience Points')).toBeInTheDocument();
+    });
+});
+
+describe('CharSummary - Inspiration Toggle to True', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('renders unchecked checkbox and calls update on click', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const checkbox = screen.getByRole('checkbox');
+        expect(checkbox.checked).toBe(false);
+        fireEvent.click(checkbox);
+    });
+});
+
+describe('CharSummary - XP Save with Whitespace-Only Delta', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('closes modal when delta is whitespace-only', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const levelSuffix = screen.getByText(/milestone/);
+        fireEvent.click(levelSuffix);
+        const input = screen.getByPlaceholderText('+100 or -50');
+        fireEvent.change(input, { target: { value: '   ' } });
+        const applyBtn = screen.getByText('Apply');
+        fireEvent.click(applyBtn);
+        expect(screen.queryByText('Experience Points')).not.toBeInTheDocument();
+    });
+});
+
+describe('CharSummary - XP Mode Toggle Edge Cases', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('does not change xpMode when already in experience mode and checkbox is unchecked', () => {
+        const stats = { ...mockPlayerStats, xpMode: 'experience' };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const levelSuffix = screen.getByText(/2,300 XP/);
+        fireEvent.click(levelSuffix);
+        const xpModal = screen.getByText('Experience Points').closest('.xp-modal');
+        const checkbox = xpModal.querySelector('input[type="checkbox"]');
+        expect(checkbox.checked).toBe(false);
+        fireEvent.click(checkbox);
+        expect(mockPlayerStats.xpMode).toBe('milestone');
+    });
+});
+
+describe('CharSummary - Initiative Roll with Advantage', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('calls rollInitiative with forcedMode advantage when initiativeAdvantage is true', () => {
+        const mockRollInitiative = vi.fn();
+        vi.mocked(useLoggedDiceRoll).mockReturnValue({ rollInitiative: mockRollInitiative });
+        const stats = { ...mockPlayerStats, initiativeAdvantage: true };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const initiativeEl = screen.getByText(/\+2/);
+        fireEvent.click(initiativeEl);
+        expect(mockRollInitiative).toHaveBeenCalledWith(2, { forcedMode: 'advantage' });
+    });
+
+    it('calls rollInitiative without forcedMode when initiativeAdvantage is false', () => {
+        const mockRollInitiative = vi.fn();
+        vi.mocked(useLoggedDiceRoll).mockReturnValue({ rollInitiative: mockRollInitiative });
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const initiativeEl = screen.getByText(/\+2/);
+        fireEvent.click(initiativeEl);
+        expect(mockRollInitiative).toHaveBeenCalledWith(2, undefined);
+    });
+});
+
+describe('CharSummary - Background Popup Call', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('calls showBackgroundPopup with correct params when background is clicked', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const backgroundEl = screen.getByText('Soldier');
+        fireEvent.click(backgroundEl);
+        expect(useActionPopup.showBackgroundPopup).toHaveBeenCalledWith('Soldier', expect.any(Function), '5e');
+    });
+});
+
+describe('CharSummary - Null/Empty Data Graceful Handling', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('handles undefined playerStats.xp in useEffect by defaulting to 0', () => {
+        const stats = { ...mockPlayerStats, xp: undefined, xpMode: 'experience' };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const summaryText = screen.getByTestId('char-summary-text');
+        expect(summaryText.textContent).toContain('0 XP');
+    });
+
+    it('handles undefined playerStats.name in useTrackedResource', () => {
+        const stats = { ...mockPlayerStats, name: undefined };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByTestId('char-gold')).toBeInTheDocument();
+    });
+});
+
+describe('CharSummary - Optional Props Graceful Handling', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('handles undefined onLongRest gracefully', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByTestId('long-rest-btn')).toBeInTheDocument();
+    });
+
+    it('handles undefined characters prop gracefully', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByTestId('char-conditions')).toBeInTheDocument();
+    });
+
+    it('handles undefined activeMapName prop gracefully', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByTestId('char-conditions')).toBeInTheDocument();
+    });
+
+    it('handles undefined playerStats.class.major gracefully', () => {
+        const stats = {
+            ...mockPlayerStats,
+            class: { name: 'Cleric', subclass: null, major: undefined },
+        };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/Cleric/)).toBeInTheDocument();
+    });
+
+    it('handles speed halved with aura bonus', () => {
+        render(<CharSummary
+            playerStats={mockPlayerStats}
+            campaignName={mockCampaignName}
+            exhaustionLevel={0}
+            conditionEffects={{ speedHalved: true }}
+            auraComboEffects={{ speedBonus: 10, speedSource: 'Aura of Protection' }}
+        />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles speed zero with aura bonus', () => {
+        render(<CharSummary
+            playerStats={mockPlayerStats}
+            campaignName={mockCampaignName}
+            exhaustionLevel={0}
+            conditionEffects={{ speedZero: true }}
+            auraComboEffects={{ speedBonus: 10, speedSource: 'Aura of Protection' }}
+        />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles speed reduction with aura bonus', () => {
+        render(<CharSummary
+            playerStats={mockPlayerStats}
+            campaignName={mockCampaignName}
+            exhaustionLevel={0}
+            conditionEffects={{ speedReduction: 10 }}
+            auraComboEffects={{ speedBonus: 5, speedSource: 'Aura of Protection' }}
+        />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+});
+
+describe('CharSummary - Null Data Graceful Handling', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        window.location.hostname = 'localhost';
+        getActiveBuffs.mockReturnValue([]);
+    });
+
+    it('handles null conditionEffects gracefully', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} conditionEffects={null} />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles undefined conditionEffects gracefully', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles null auraComboEffects gracefully', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} auraComboEffects={null} />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles undefined auraComboEffects gracefully', () => {
+        render(<CharSummary playerStats={mockPlayerStats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles null vulnerabilities gracefully', () => {
+        const stats = { ...mockPlayerStats, vulnerabilities: null };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.queryByText(/Vulnerabilities:/)).not.toBeInTheDocument();
+    });
+
+    it('handles null senses gracefully', () => {
+        const stats = { ...mockPlayerStats, senses: null };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.queryByText(/Senses:/)).not.toBeInTheDocument();
+    });
+
+    it('handles null proficiencies gracefully', () => {
+        const stats = { ...mockPlayerStats, proficiencies: null };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.queryByText(/Proficiencies:/)).not.toBeInTheDocument();
+    });
+
+    it('handles null languages gracefully', () => {
+        const stats = { ...mockPlayerStats, languages: null };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.queryByText(/Languages:/)).not.toBeInTheDocument();
+    });
+
+    it('handles null race.subrace gracefully', () => {
+        const stats = {
+            ...mockPlayerStats,
+            race: { name: 'Human', type: null, subrace: null },
+        };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const summaryText = screen.getByTestId('char-summary-text');
+        expect(summaryText.textContent).toContain('Human');
+    });
+
+    it('handles subclass present but subclass.type missing', () => {
+        const stats = {
+            ...mockPlayerStats,
+            class: { name: 'Cleric', subclass: { name: 'War' }, major: { name: 'Cleric' } },
+        };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        const summaryText = screen.getByTestId('char-summary-text');
+        expect(summaryText.textContent).toContain('war');
+        expect(summaryText.textContent).not.toContain('undefined');
+    });
+
+    it('handles undefined playerStats.automation gracefully', () => {
+        const stats = { ...mockPlayerStats, automation: undefined };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles undefined playerStats.passives gracefully', () => {
+        const stats = { ...mockPlayerStats, passives: undefined };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles undefined playerStats.equipment gracefully', () => {
+        const stats = { ...mockPlayerStats, equipment: undefined };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
+    });
+
+    it('handles undefined playerStats.inventory gracefully', () => {
+        const stats = { ...mockPlayerStats, inventory: undefined };
+        render(<CharSummary playerStats={stats} campaignName={mockCampaignName} exhaustionLevel={0} />);
+        expect(screen.getByText(/Speed:/)).toBeInTheDocument();
     });
 });
