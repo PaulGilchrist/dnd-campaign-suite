@@ -1,14 +1,5 @@
 import { REQUIRED_FIELDS } from './constants.js';
-import { loadValidationRules as loadValidationRulesFromService } from '../services/ui/dataLoader.js';
-
-/**
- * Load validation rules from JSON file (uses centralized data-loader)
- * @param {string} ruleset - '5e' or '2024'
- * @returns {Promise<object>} - Validation rules object
- */
-async function loadValidationRules(ruleset = '5e') {
-  return loadValidationRulesFromService(ruleset);
-}
+import { loadValidationRules } from '../services/ui/dataLoader.js';
 
 /**
  * Get point buy costs (async, loads from JSON)
@@ -21,23 +12,11 @@ export async function getPointBuyCosts(ruleset = '5e') {
 }
 
 /**
- * Calculate point buy cost for a score
- * @param {number} baseScore - The base ability score
- * @param {string} ruleset - '5e' or '2024'
- * @returns {Promise<number>} - Point buy cost
- */
-export async function calculatePointBuyCost(baseScore, ruleset = '5e') {
-  const costs = await getPointBuyCosts(ruleset);
-  const score = parseInt(baseScore) || 8;
-  return costs[score] || 0;
-}
-
-/**
  * Calculate total score for an ability
  * @param {object} ability - Ability object with baseScore, featIncrease, backgroundIncrease, miscIncrease
  * @returns {number} - Total score
  */
-export const calculateTotalScore = (ability) => {
+const calculateTotalScore = (ability) => {
   const base = parseInt(ability.baseScore) || 8;
   const feat = parseInt(ability.featIncrease) || 0;
   const bg = parseInt(ability.backgroundIncrease) || 0;
@@ -187,75 +166,3 @@ export const validateFinalFormData = (formData) => {
   return finalErrors;
 };
 
-/**
- * Get feat availability rules (async, loads from JSON)
- * @param {string} ruleset - '5e' or '2024'
- * @returns {Promise<object>} - Feat rules object
- */
-export async function getFeatRules(ruleset = '5e') {
-  const rules = await loadValidationRules(ruleset);
-  return rules.feats || {};
-}
-
-/**
- * Get background language rules (async, loads from JSON)
- * @param {string} ruleset - '5e' or '2024'
- * @returns {Promise<number>} - Number of background languages
- */
-export async function getBackgroundLanguageCount(ruleset = '5e') {
-  const rules = await loadValidationRules(ruleset);
-  return rules.background_languages ?? 2;
-}
-
-/**
- * Get all skills from ability-scores.json
- * @param {string} ruleset - '5e' or '2024' (currently skills are the same for both)
- * @returns {Promise<string[]>} - Array of skill names
- */
-export async function getSkillsFromAbilityScores() {
-  try {
-    const path = '/data/ability-scores.json';
-    const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load ability-scores.json`);
-      }
-    const data = await response.json();
-     // Extract all skills from ability scores
-    const skills = new Set();
-    data.forEach(ability => {
-      if (ability.skills) {
-        ability.skills.forEach(skill => skills.add(skill));
-         }
-       });
-    return Array.from(skills);
-    } catch (error) {
-    console.error('Error loading ability-scores.json:', error);
-     // Fallback to default skills if JSON fails to load
-    return [
-      'Acrobatics', 'Animal Handling', 'Arcana', 'Athletics', 'Deception',
-      'History', 'Insight', 'Intimidation', 'Investigation', 'Medicine',
-      'Nature', 'Perception', 'Performance', 'Persuasion', 'Religion',
-      'Sleight of Hand', 'Stealth', 'Survival'
-      ];
-    }
-}
-
-/**
- * Get ability score names from ability-scores.json
- * @returns {Promise<string[]>} - Array of ability score full names
- */
-export async function getAbilityNamesFromJson() {
-  try {
-    const path = '/data/ability-scores.json';
-    const response = await fetch(path);
-    if (!response.ok) {
-      throw new Error(`Failed to load ability-scores.json`);
-      }
-    const data = await response.json();
-    return data.map(ability => ability.full_name);
-    } catch (error) {
-    console.error('Error loading ability-scores.json:', error);
-     // Fallback to default ability names
-    return ['Strength', 'Dexterity', 'Constitution', 'Intelligence', 'Wisdom', 'Charisma'];
-    }
-}

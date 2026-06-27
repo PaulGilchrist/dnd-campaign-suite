@@ -53,7 +53,7 @@ vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({
 }));
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
-    hasEmpoweredEvocation: vi.fn(),
+    getEmpoweredEvocationFeatures: vi.fn(() => []),
     getEmpoweredEvocationIntModifier: vi.fn(),
 }));
 
@@ -80,7 +80,7 @@ import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.j
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
+import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import {
     hasPotentCantrip,
     getShieldAcBonus,
@@ -207,7 +207,7 @@ describe('createLogAndShow - Potent Cantrip & Soulknife', () => {
 
         it('applies half damage with Empowered Evocation when isAutoMiss and saveDc and isEvocation', async () => {
             hasPotentCantrip.mockReturnValue(true);
-            hasEmpoweredEvocation.mockReturnValue(true);
+            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
             getEmpoweredEvocationIntModifier.mockReturnValue(2);
             applyMinDamageAdjustment.mockImplementation((d) => d);
             loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 15 }] });

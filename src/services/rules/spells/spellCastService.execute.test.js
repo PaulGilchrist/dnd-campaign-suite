@@ -58,7 +58,7 @@ vi.mock('./postCastRiderService.js', () => ({
   triggerSpellThief: vi.fn(() => Promise.resolve()),
   triggerBewitchingMagic: vi.fn(() => Promise.resolve()),
   triggerSoulstitchSpells: vi.fn(() => Promise.resolve()),
-  hasEmpoweredEvocation: vi.fn(() => false),
+  getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }))
 
@@ -473,7 +473,7 @@ describe('executeSpellCast', () => {
   describe('Empowered Evocation', () => {
     it('appends Int modifier to damage formula for evocation spells', async () => {
       const rider = await import('./postCastRiderService.js')
-      vi.mocked(rider.hasEmpoweredEvocation).mockReturnValue(true)
+      vi.mocked(rider.getEmpoweredEvocationFeatures).mockReturnValue([{ type: 'empowered_evocation' }])
       vi.mocked(rider.getEmpoweredEvocationIntModifier).mockReturnValue(5)
 
       const services = makeServices()
@@ -484,7 +484,7 @@ describe('executeSpellCast', () => {
 
     it('does not apply Empowered Evocation to non-evocation spells', async () => {
       const rider = await import('./postCastRiderService.js')
-      vi.mocked(rider.hasEmpoweredEvocation).mockReturnValue(true)
+      vi.mocked(rider.getEmpoweredEvocationFeatures).mockReturnValue([{ type: 'empowered_evocation' }])
       vi.mocked(rider.getEmpoweredEvocationIntModifier).mockReturnValue(5)
 
       const services = makeServices()
@@ -495,7 +495,7 @@ describe('executeSpellCast', () => {
 
     it('does not apply when Int modifier is 0', async () => {
       const rider = await import('./postCastRiderService.js')
-      vi.mocked(rider.hasEmpoweredEvocation).mockReturnValue(true)
+      vi.mocked(rider.getEmpoweredEvocationFeatures).mockReturnValue([{ type: 'empowered_evocation' }])
       vi.mocked(rider.getEmpoweredEvocationIntModifier).mockReturnValue(0)
 
       const services = makeServices()

@@ -16,8 +16,6 @@ vi.mock('../../../ui/logService.js', () => ({
 
 import {
   handle,
-  isLivingLegendActive,
-  hasUnerringStrikeUsed,
   setUnerringStrikeUsed,
 } from './livingLegendHandler.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -180,36 +178,6 @@ describe('livingLegendHandler', () => {
 
       expect(result.type).toBe('popup');
       expect(result.payload.type).toBe('automation_info');
-    });
-  });
-
-  describe('isLivingLegendActive', () => {
-    it.each([
-      [true, true],
-      [false, false],
-      [null, false],
-      [undefined, false],
-      [0, false],
-      ['true', false],
-    ])('returns %s when getRuntimeValue returns %s', (mockValue, expected) => {
-      getRuntimeValue.mockReturnValue(mockValue);
-
-      expect(isLivingLegendActive(playerName, campaignName)).toBe(expected);
-    });
-  });
-
-  describe('hasUnerringStrikeUsed', () => {
-    it.each([
-      [true, true],
-      [false, false],
-      [null, false],
-      [undefined, false],
-      [0, false],
-      ['true', false],
-    ])('returns %s when getRuntimeValue returns %s', (mockValue, expected) => {
-      getRuntimeValue.mockReturnValue(mockValue);
-
-      expect(hasUnerringStrikeUsed(playerName, campaignName)).toBe(expected);
     });
   });
 

@@ -12,7 +12,7 @@ import { handle as handleInitiative } from './handlers/combat/initiativeHandler.
 import { handle as handleResourcePool } from './handlers/resources/resourcePoolHandler.js';
 import { handle as handleFontOfMagic } from './handlers/resources/fontOfMagicHandler.js';
 import { handle as handleHealingPool } from './handlers/healing/healingPoolHandler.js';
-import { handle as handleSpellModifier } from './handlers/spells/spellModifierHandler.js';
+import { automationInfoPopup } from '../shared/popupResponse.js';
 import { handle as handleCombatStance } from './handlers/combat/combatStanceHandler.js';
 import { handle as handleReactionDamage } from './handlers/reactions/reactionDamageHandler.js';
 import { handle as handleReactionDebuff } from './handlers/reactions/reactionDebuffHandler.js';
@@ -237,7 +237,7 @@ const HANDLER_MAP = {
     extra_action: handleExtraAction,
     combat_stance: handleCombatStance,
     attack_rider: handleAttackRider,
-    spell_modifier: handleSpellModifier,
+    spell_modifier: (action) => (action.name === 'Metamagic' ? null : automationInfoPopup(action)),
     temp_hp_buff: handleTempHpBuff,
     auto_reroll: handleAutoReroll,
     reaction_damage: handleReactionDamage,

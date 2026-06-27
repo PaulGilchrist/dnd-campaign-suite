@@ -1,6 +1,6 @@
 import { rollExpression } from '../../../dice/diceRoller.js';
 import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../../services/rules/spells/postCastRiderService.js';
+import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../../../services/rules/spells/postCastRiderService.js';
 import { getMagicInitiateLevel1Spell } from '../feats/magicInitiateHandler.js';
 
 export async function handle(action, playerStats, campaignName, _mapName) {
@@ -139,7 +139,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
         const slotDmg = spellData.damage.damage_at_slot_level;
         let formula = slotDmg?.[Object.keys(slotDmg)[0]];
         if (formula) {
-            const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+            const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
             const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
             const spellSchool = (spellData.school || '').toLowerCase();
             const isEvocation = spellSchool === 'evocation';

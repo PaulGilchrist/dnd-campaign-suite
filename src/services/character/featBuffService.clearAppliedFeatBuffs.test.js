@@ -1,19 +1,10 @@
 // @improved-by-ai
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
-vi.mock('../shared/buffApplier.js', () => ({
-  resetFeatIncreases: vi.fn(),
-}));
-
-import { resetFeatIncreases } from '../shared/buffApplier.js';
 import { clearAppliedFeatBuffs } from './featBuffService.js';
 
 describe('clearAppliedFeatBuffs', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('should reset featIncrease on each ability by calling resetFeatIncreases with abilities array', () => {
+  it('should reset featIncrease on each ability to 0', () => {
     const abilities = [
       { name: 'Strength', featIncrease: 5 },
       { name: 'Dexterity', featIncrease: -2 },
@@ -23,16 +14,15 @@ describe('clearAppliedFeatBuffs', () => {
 
     clearAppliedFeatBuffs(formData);
 
-    expect(resetFeatIncreases).toHaveBeenCalledTimes(1);
-    expect(resetFeatIncreases).toHaveBeenCalledWith(abilities);
+    expect(formData.abilities[0].featIncrease).toBe(0);
+    expect(formData.abilities[1].featIncrease).toBe(0);
+    expect(formData.abilities[2].featIncrease).toBe(0);
   });
 
-  it('should pass undefined to resetFeatIncreases when formData has no abilities property', () => {
+  it('should handle undefined formData.abilities gracefully', () => {
     const formData = {};
 
-    clearAppliedFeatBuffs(formData);
-
-    expect(resetFeatIncreases).toHaveBeenCalledWith(undefined);
+    expect(() => clearAppliedFeatBuffs(formData)).not.toThrow();
   });
 
   it('should throw when formData is null', () => {
@@ -43,7 +33,6 @@ describe('clearAppliedFeatBuffs', () => {
     const formData = { abilities: [] };
 
     expect(() => clearAppliedFeatBuffs(formData)).not.toThrow();
-    expect(resetFeatIncreases).toHaveBeenCalledWith([]);
   });
 
   it('should not modify other formData properties', () => {
@@ -56,6 +45,7 @@ describe('clearAppliedFeatBuffs', () => {
 
     clearAppliedFeatBuffs(formData);
 
+    expect(formData.abilities[0].featIncrease).toBe(0);
     expect(formData.name).toBe('Test Character');
     expect(formData.level).toBe(5);
     expect(formData.class).toBe('Wizard');
@@ -68,6 +58,6 @@ describe('clearAppliedFeatBuffs', () => {
 
     clearAppliedFeatBuffs(formData);
 
-    expect(resetFeatIncreases).toHaveBeenCalledWith(formData.abilities);
+    expect(formData.abilities[0].featIncrease).toBe(0);
   });
 });

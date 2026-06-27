@@ -1,7 +1,7 @@
 import { rollExpression } from '../../dice/diceRoller.js';
 import { computeRangeEffect, computeEffectiveSpellRange, getDistanceFeet, rangeToFeet } from '../combat/rangeValidation.js';
 import { isInnateSorceryActive, getActiveBuffs } from '../../combat/buffs/buffService.js';
-import { triggerPostCastRiderSaves, triggerSpellThief, triggerBewitchingMagic, triggerSoulstitchSpells, hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from './postCastRiderService.js';
+import { triggerPostCastRiderSaves, triggerSpellThief, triggerBewitchingMagic, triggerSoulstitchSpells, getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from './postCastRiderService.js';
 import { triggerPostCastSelfHeals, triggerPostCastAllyHeals } from './postCastHealService.js';
 import { triggerSmiteOfProtection } from '../features/smiteOfProtectionService.js';
 import { triggerInspiringSmite } from '../features/inspiringSmiteService.js';
@@ -18,6 +18,7 @@ import { triggerFalseLife } from '../features/falseLifeService.js';
 import { triggerHealingWord } from '../features/healingWordService.js';
 import { triggerMassCureWounds } from '../features/massCureWoundsService.js';
 import { triggerMassHeal } from '../features/massHealService.js';
+import { usesSpellSlot } from '../features/spellUtils.js';
 import { triggerMassHealingWord } from '../features/massHealingWordService.js';
 import { triggerPrayerOfHealing } from '../features/prayerOfHealingService.js';
 import { triggerFear } from '../features/fearService.js';
@@ -596,7 +597,7 @@ export async function executeSpellCast(spell, metaCtx, { rollAttack, rollDamage,
     const casterConditions = rawConditions;
     const hasInvisible = magicalAmbush && casterConditions.some(c => String(c).toLowerCase() === 'invisible');
 
-    const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+    const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
     const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
     const spellSchool = (spell.school || '').toLowerCase();
     const isEvocation = spellSchool === 'evocation';
@@ -962,10 +963,6 @@ async function triggerHeal(spell, metaCtx, playerStats, campaignName, _mapName) 
 }
 
 const DIVINATION_SCHOOL = 'divination';
-
-function usesSpellSlot(spell, metaCtx) {
-    return metaCtx?.slotLevel > 0 || spell.level > 0;
-}
 
 async function triggerExpertDivination(spell, metaCtx, playerStats, campaignName, mapName) {
     if (!usesSpellSlot(spell, metaCtx)) {

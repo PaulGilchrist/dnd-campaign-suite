@@ -68,7 +68,7 @@ vi.mock('./postCastRiderService.js', () => ({
   triggerSpellThief: vi.fn(),
   triggerBewitchingMagic: vi.fn(),
   triggerSoulstitchSpells: vi.fn(),
-  hasEmpoweredEvocation: vi.fn(() => false),
+  getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }))
 

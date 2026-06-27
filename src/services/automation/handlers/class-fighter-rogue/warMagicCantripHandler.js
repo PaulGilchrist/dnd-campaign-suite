@@ -5,7 +5,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const auto = action.automation;
     const spellListKey = auto.spellList || 'wizard_cantrips';
 
-    const allSpells = await loadSpellData(spellListKey, playerStats);
+    const allSpells = await loadSpellData(playerStats);
     if (!allSpells || !allSpells.length) {
         return {
             type: 'popup',

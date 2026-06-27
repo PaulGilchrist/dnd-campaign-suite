@@ -6,7 +6,7 @@ export async function handle(action, playerStats, campaignName, _mapName) {
     const spellListKey = auto.spellList || 'wizard_spells';
     const maxLevel = auto.maxSpellLevel || 2;
 
-    const allSpells = await loadSpellData(spellListKey, playerStats);
+    const allSpells = await loadSpellData(playerStats);
     if (!allSpells || !allSpells.length) {
         return {
             type: 'popup',

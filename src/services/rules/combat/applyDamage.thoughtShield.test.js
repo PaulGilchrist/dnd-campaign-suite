@@ -103,16 +103,6 @@ function stubPlayerRuntime(currentHp, conditions = [], activeBuffs = [], arcaneW
     });
 }
 
-/**
- * Stub getRuntimeValue for NPC-targeted damage calls.
- * NPCs only need currentHitPoints from runtime (for logDamageApplication maxHp fallback).
- */
-// eslint-disable-next-line no-unused-vars -- helper available if NPC Thought Shield is needed
-function stubNpcRuntime() {
-  getRuntimeValue.mockReset();
-  getRuntimeValue.mockReturnValue(undefined);
-}
-
 // ── Tests ───────────────────────────────────────────────────────
 
 describe('Thought Shield — Psychic damage reflection', () => {

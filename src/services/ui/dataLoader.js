@@ -342,12 +342,11 @@ export async function loadMonsters() {
 
 /**
   * Loads spell data for a given spell list key and player stats.
-  * Delegates to loadSpells() using the player's ruleset version.
-  * @param {string} _spellListKey - The spell list identifier (e.g. 'wizard_spells')
-  * @param {object} playerStats - The character stats object (used for rules version)
-  * @returns {Promise<object[]>} - Array of spells data
-  */
-export async function loadSpellData(_spellListKey, playerStats) {
+   * Delegates to loadSpells() using the player's ruleset version.
+   * @param {object} playerStats - The character stats object (used for rules version)
+   * @returns {Promise<object[]>} - Array of spells data
+   */
+ export async function loadSpellData(playerStats) {
     const version = playerStats?.rules || '5e';
     return loadSpells(version);
 }

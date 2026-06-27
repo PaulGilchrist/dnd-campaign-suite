@@ -11,7 +11,6 @@ vi.mock('../../../automation/index.js', () => ({
 
 import {
   getPostCastRiderSaves,
-  hasPostCastRiderSave,
   triggerPostCastRiderSaves,
 } from '../../../rules/spells/postCastRiderService.js';
 import { getRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
@@ -101,40 +100,6 @@ describe('getPostCastRiderSaves', () => {
 
   it('throws when playerStats is null', () => {
     expect(() => getPostCastRiderSaves(null)).toThrow();
-  });
-});
-
-// ── hasPostCastRiderSave ───────────────────────────────────────
-
-describe('hasPostCastRiderSave', () => {
-  it('returns false when no rider saves exist', () => {
-    expect(hasPostCastRiderSave(makePlayerStats())).toBe(false);
-  });
-
-  it('returns true when at least one post_cast_rider passive exists', () => {
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'post_cast_rider', name: 'Charm Save' }] },
-    });
-    expect(hasPostCastRiderSave(ps)).toBe(true);
-  });
-
-  it('returns true when at least one passive_rule with riderSave exists', () => {
-    const ps = makePlayerStats({
-      automation: { passives: [{ type: 'passive_rule', riderSave: { type: 'CHA' }, name: 'RiderRule' }] },
-    });
-    expect(hasPostCastRiderSave(ps)).toBe(true);
-  });
-
-  it('returns false when only non-matching passives exist', () => {
-    const ps = makePlayerStats({
-      automation: {
-        passives: [
-          { type: 'passive_rule', name: 'NoRider' },
-          { type: 'some_other_type', name: 'Other' },
-        ],
-      },
-    });
-    expect(hasPostCastRiderSave(ps)).toBe(false);
   });
 });
 

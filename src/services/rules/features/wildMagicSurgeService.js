@@ -1,10 +1,7 @@
 import { getRuntimeValue, setRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { getCurrentCombatRound } from '../../encounters/combatData.js';
 import { executeHandler } from '../../automation/index.js';
-
-function usesSpellSlot(spell, metaCtx) {
-    return metaCtx?.slotLevel > 0 || spell.level > 0;
-}
+import { usesSpellSlot } from './spellUtils.js';
 
 function isSorcererSpell(spell, playerStats) {
     const casterClass = playerStats?.class?.name;
@@ -20,10 +17,6 @@ export function getWildMagicSurgeFeatures(playerStats) {
         throw new Error('Expected array, got ' + passives);
     }
     return passives.filter(p => p.type === 'wild_magic_surge');
-}
-
-export function hasWildMagicSurge(playerStats) {
-    return getWildMagicSurgeFeatures(playerStats).length > 0;
 }
 
 export function getControlledChaosFeature(playerStats) {

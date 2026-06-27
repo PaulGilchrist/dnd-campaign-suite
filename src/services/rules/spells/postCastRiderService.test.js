@@ -4,16 +4,16 @@ import { executeHandler } from '../../automation/index.js'
 import {
   getPostCastRiderSaves,
   getSpellThiefFeatures,
-  hasSpellThief,
+
   getMultiTargetSpreads,
   getMultiTargetSpreadForSpell,
-  hasPostCastRiderSave,
+
   triggerPostCastRiderSaves,
   getSoulstitchFeatures,
-  hasSoulstitchSpells,
+
   triggerSoulstitchSpells,
   getEmpoweredEvocationFeatures,
-  hasEmpoweredEvocation,
+
   getEmpoweredEvocationIntModifier,
   triggerSpellThief,
   getBewitchingMagicFeatures,
@@ -121,22 +121,6 @@ describe('postCastRiderService', () => {
     })
   })
 
-  describe('hasSpellThief', () => {
-    it('returns true when spell_thief features exist', () => {
-      const stats = { automation: { passives: [{ type: 'spell_thief' }] } }
-      expect(hasSpellThief(stats)).toBe(true)
-    })
-
-    it('returns false when no spell_thief features', () => {
-      const stats = { automation: { passives: [{ type: 'other' }] } }
-      expect(hasSpellThief(stats)).toBe(false)
-    })
-
-    it('returns false when passives is empty', () => {
-      expect(hasSpellThief({ automation: { passives: [] } })).toBe(false)
-    })
-  })
-
   describe('getMultiTargetSpreads', () => {
     it('returns multi_target_spread passives', () => {
       const stats = {
@@ -206,21 +190,6 @@ describe('postCastRiderService', () => {
     })
   })
 
-  describe('hasPostCastRiderSave', () => {
-    it('returns true when rider saves exist', () => {
-      const stats = { automation: { passives: [{ type: 'post_cast_rider' }] } }
-      expect(hasPostCastRiderSave(stats)).toBe(true)
-    })
-
-    it('returns false when no rider saves', () => {
-      const stats = { automation: { passives: [{ type: 'other' }] } }
-      expect(hasPostCastRiderSave(stats)).toBe(false)
-    })
-
-    it('returns false when passives is empty', () => {
-      expect(hasPostCastRiderSave({ automation: { passives: [] } })).toBe(false)
-    })
-  })
 
   describe('triggerPostCastRiderSaves', () => {
     const enchantmentSpell = { name: 'Charm Person', school: 'enchantment' }
@@ -392,21 +361,6 @@ describe('postCastRiderService', () => {
     })
   })
 
-  describe('hasSoulstitchSpells', () => {
-    it('returns true when soulstitch features exist', () => {
-      const stats = { automation: { passives: [{ type: 'soulstitch_spells' }] } }
-      expect(hasSoulstitchSpells(stats)).toBe(true)
-    })
-
-    it('returns false when no soulstitch features', () => {
-      const stats = { automation: { passives: [{ type: 'other' }] } }
-      expect(hasSoulstitchSpells(stats)).toBe(false)
-    })
-
-    it('returns false when passives is empty', () => {
-      expect(hasSoulstitchSpells({ automation: { passives: [] } })).toBe(false)
-    })
-  })
 
   describe('triggerSoulstitchSpells', () => {
     const evocationSpell = { name: 'Fireball', school: 'Evocation', dc: { dc_type: 'CON' } }
@@ -510,22 +464,6 @@ describe('postCastRiderService', () => {
 
     it('returns empty array when passives is empty', () => {
       expect(getEmpoweredEvocationFeatures({ automation: { passives: [] } })).toEqual([])
-    })
-  })
-
-  describe('hasEmpoweredEvocation', () => {
-    it('returns true when empowered_evocation features exist', () => {
-      const stats = { automation: { passives: [{ type: 'empowered_evocation' }] } }
-      expect(hasEmpoweredEvocation(stats)).toBe(true)
-    })
-
-    it('returns false when no empowered_evocation features', () => {
-      const stats = { automation: { passives: [{ type: 'other' }] } }
-      expect(hasEmpoweredEvocation(stats)).toBe(false)
-    })
-
-    it('returns false when passives is empty', () => {
-      expect(hasEmpoweredEvocation({ automation: { passives: [] } })).toBe(false)
     })
   })
 

@@ -53,7 +53,7 @@ vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({
 }));
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
-    hasEmpoweredEvocation: vi.fn(),
+    getEmpoweredEvocationFeatures: vi.fn(() => []),
     getEmpoweredEvocationIntModifier: vi.fn(),
 }));
 
@@ -79,7 +79,7 @@ import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.j
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
+import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';
 import {
     hasPotentCantrip,
@@ -118,7 +118,7 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
         utils.getName.mockImplementation((n) => n);
         hasIgnoreResistance.mockReturnValue(false);
         hasPotentCantrip.mockReturnValue(false);
-        hasEmpoweredEvocation.mockReturnValue(false);
+        getEmpoweredEvocationFeatures.mockReturnValue([]);
     });
 
     function createFn() {
@@ -251,9 +251,9 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
     });
 
     describe('empowered evocation with potent cantrip', () => {
-        it('adds Empowered Evocation modifier to formula when hasEmpoweredEvocation and isEvocation', async () => {
+        it('adds Empowered Evocation modifier to formula when getEmpoweredEvocationFeatures and isEvocation', async () => {
             hasPotentCantrip.mockReturnValue(true);
-            hasEmpoweredEvocation.mockReturnValue(true);
+            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
             getEmpoweredEvocationIntModifier.mockReturnValue(2);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
@@ -277,7 +277,7 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
 
         it('does not add Empowered Evocation when spell school is not evocation', async () => {
             hasPotentCantrip.mockReturnValue(true);
-            hasEmpoweredEvocation.mockReturnValue(true);
+            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
             getEmpoweredEvocationIntModifier.mockReturnValue(2);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
@@ -300,7 +300,7 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
 
         it('does not add Empowered Evocation when hasEmpoweredEvocation is false', async () => {
             hasPotentCantrip.mockReturnValue(true);
-            hasEmpoweredEvocation.mockReturnValue(false);
+        getEmpoweredEvocationFeatures.mockReturnValue([]);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
             const fn = createFn();
@@ -322,7 +322,7 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
 
         it('does not add Empowered Evocation when int modifier is 0', async () => {
             hasPotentCantrip.mockReturnValue(true);
-            hasEmpoweredEvocation.mockReturnValue(true);
+            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
             getEmpoweredEvocationIntModifier.mockReturnValue(0);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             rollExpression.mockReturnValue({ total: 10, rolls: [5, 5], modifier: 0 });
@@ -345,7 +345,7 @@ describe('createLogAndShow - Target Effects & Empowered Evocation', () => {
 
         it('applies half damage with Empowered Evocation modifier included', async () => {
             hasPotentCantrip.mockReturnValue(true);
-            hasEmpoweredEvocation.mockReturnValue(true);
+            getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
             getEmpoweredEvocationIntModifier.mockReturnValue(3);
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 25 });
             // Total is 15, with +3 = 18, half = 9

@@ -24,35 +24,3 @@ export function mergeDeduplicated(target, key, newItems) {
   });
 }
 
-export function mergeAbilitiesByKey(target, key, newItems, keyFn) {
-  if (!newItems || newItems.length === 0) return;
-  const existing = new Set((target[key] || []).map(item => keyFn(item).toLowerCase()));
-  newItems.forEach(item => {
-    if (!existing.has(keyFn(item).toLowerCase())) {
-      target[key] = target[key] || [];
-      target[key].push(item);
-      existing.add(keyFn(item).toLowerCase());
-    }
-  });
-}
-
-export function resetMiscBonuses(abilities) {
-  if (!abilities) return;
-  abilities.forEach(ability => {
-    ability.miscIncrease = 0;
-  });
-}
-
-export function resetFeatIncreases(abilities) {
-  if (!abilities) return;
-  abilities.forEach(ability => {
-    ability.featIncrease = 0;
-  });
-}
-
-export function resetBackgroundIncreases(abilities) {
-  if (!abilities) return;
-  abilities.forEach(ability => {
-    ability.backgroundIncrease = 0;
-  });
-}

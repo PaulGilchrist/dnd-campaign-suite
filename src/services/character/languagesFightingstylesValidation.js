@@ -7,42 +7,6 @@
 import { loadFeatData, fetchClassData, fetchRaceData, fetchBackgroundData, fetchSubraceData } from '../ui/dataLoader.js';
 
 /**
- * Gets the class data for a specific class name
- * @param {string} className - The name of the class
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object|null>} - The class data or null
- */
-async function getClassByName(className, version = '5e') {
-    if (!className) return null;
-    return fetchClassData(className, version);
-    }
-
-/**
- * Gets the race data for a specific race name
- * @param {string} raceName - The name of the race
- * @param {string} version - '5e' or '2024'
- * @returns {Promise<object|null>} - The race data or null
- */
-async function getRaceByName(raceName, version = '5e') {
-    if (!raceName) return null;
-    return fetchRaceData(raceName, version);
-    }
-
-async function getSubraceByName(subraceName, version = '5e') {
-    if (!subraceName) return null;
-    return fetchSubraceData(subraceName, version);
-    }
-/**
- * Gets the background data for a specific background name (2024 only)
- * @param {string} backgroundName - The name of the background
- * @returns {Promise<object|null>} - The background data or null
- */
-async function getBackgroundByName(backgroundName) {
-    if (!backgroundName) return null;
-    return fetchBackgroundData(backgroundName, '2024');
-    }
-
-/**
  * Determines fighting styles allowed based on class features from JSON
  * @param {object} formData - The character form data
  * @returns {Promise<object>} - { allowed: number, preSelected: string[], details: string }
@@ -53,7 +17,7 @@ export async function getFightingStyleLimits(formData) {
     const level = formData.level || 1;
     const subclass = formData.class?.subclass?.name || '';
     
-    const classData = await getClassByName(className, ruleset);
+    const classData = className ? await fetchClassData(className, ruleset) : null;
     
     let allowed = 0;
     let preSelected = [];
@@ -196,9 +160,9 @@ export async function getLanguageLimits(formData) {
     
     if (ruleset === '2024') {
         // 2024 rules: Languages come from race, class, and background
-        const raceData = await getRaceByName(raceName, '2024');
-        const classData = await getClassByName(className, '2024');
-        const backgroundData = await getBackgroundByName(backgroundName);
+        const raceData = raceName ? await fetchRaceData(raceName, '2024') : null;
+        const classData = className ? await fetchClassData(className, '2024') : null;
+        const backgroundData = backgroundName ? await fetchBackgroundData(backgroundName, '2024') : null;
         // Race languages
         if (raceData) {
             const raceLangs = raceData.languages || [];
@@ -226,8 +190,8 @@ export async function getLanguageLimits(formData) {
         details = `In 2024 rules, languages come from your race, class, and background.`;
            } else {
             // 5e rules
-        const raceData = await getRaceByName(raceName, '5e');
-        const classData = await getClassByName(className, '5e');
+        const raceData = raceName ? await fetchRaceData(raceName, '5e') : null;
+        const classData = className ? await fetchClassData(className, '5e') : null;
 
          // Race languages
         if (raceData) {
@@ -244,7 +208,7 @@ export async function getLanguageLimits(formData) {
 
           // Subrace languages
         if (subraceName) {
-           const subraceData = await getSubraceByName(subraceName, ruleset);
+            const subraceData = subraceName ? await fetchSubraceData(subraceName, ruleset) : null;
             if (subraceData && subraceData.languages && subraceData.languages.length > 0) {
                 const subraceLangs = subraceData.languages;
                 preSelected.push(...subraceLangs);

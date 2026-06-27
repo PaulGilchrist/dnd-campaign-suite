@@ -4,7 +4,7 @@ import { addEntry } from '../../services/ui/logService.js'
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js'
 import { isPsionicSpell, hasPsionicSorcery } from '../../services/rules/spells/metamagicRules.js'
 import { getRuntimeValue } from '../runtime/useRuntimeState.js'
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js'
+import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js'
 
 export function useActionSpellMetamagic({
     playerStats,
@@ -44,7 +44,7 @@ export function useActionSpellMetamagic({
     };
 
     const applyEmpoweredEvocation = (attack, formula, total, rolls, modifier) => {
-        const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+        const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
         if (!hasEmpoweredEvoc) return { formula, total, rolls, modifier };
 
         const spellSchool = (attack.autoDamage?.autoDamageSchool || attack.school || '').toLowerCase();

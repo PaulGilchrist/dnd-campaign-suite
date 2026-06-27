@@ -101,7 +101,7 @@ describe('warMagicSpellHandler', () => {
             const result = await handle(action, mockPlayerStats, mockCampaignName)
 
             expect(result.payload.spellListKey).toBe('sorcerer_spells')
-            expect(loadSpellData).toHaveBeenCalledWith('sorcerer_spells', mockPlayerStats)
+            expect(loadSpellData).toHaveBeenCalledWith(mockPlayerStats)
         })
 
         it('defaults maxSpellLevel to 2 when not specified', async () => {
@@ -130,7 +130,7 @@ describe('warMagicSpellHandler', () => {
 
             await handle(action, mockPlayerStats, mockCampaignName)
 
-            expect(loadSpellData).toHaveBeenCalledWith('wizard_spells', mockPlayerStats)
+            expect(loadSpellData).toHaveBeenCalledWith(mockPlayerStats)
         })
 
         it('returns an info popup when the spell list is empty', async () => {

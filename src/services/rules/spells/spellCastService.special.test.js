@@ -88,7 +88,7 @@ vi.mock('./postCastRiderService.js', () => ({
   triggerSpellThief: vi.fn(async () => null),
   triggerBewitchingMagic: vi.fn(async () => null),
   triggerSoulstitchSpells: vi.fn(async () => null),
-  hasEmpoweredEvocation: vi.fn(() => false),
+  getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }))
 
@@ -155,7 +155,7 @@ describe('executeSpellCast - special spells', () => {
 
     // Ensure post-cast rider defaults
     const postCastRider = await import('./postCastRiderService.js')
-    postCastRider.hasEmpoweredEvocation.mockReturnValue(false)
+    postCastRider.getEmpoweredEvocationFeatures.mockReturnValue([])
     postCastRider.getEmpoweredEvocationIntModifier.mockReturnValue(0)
   })
 

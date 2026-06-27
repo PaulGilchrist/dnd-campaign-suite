@@ -834,7 +834,7 @@ describe('dataLoader', () => {
             const mockData = [{ name: 'Fireball', level: 3 }];
             global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
 
-            const result = await loadSpellData('wizard_spells', { rules: '2024' });
+            const result = await loadSpellData({ rules: '2024' });
             expect(result).toEqual(mockData);
             expect(global.fetch).toHaveBeenCalledWith('/data/2024/spells.json');
         });
@@ -843,7 +843,7 @@ describe('dataLoader', () => {
             const mockData = [{ name: 'Fireball', level: 3 }];
             global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
 
-            const result = await loadSpellData('wizard_spells', {});
+            const result = await loadSpellData({});
             expect(result).toEqual(mockData);
             expect(global.fetch).toHaveBeenCalledWith('/data/spells.json');
         });
@@ -852,7 +852,7 @@ describe('dataLoader', () => {
             const mockData = [{ name: 'Fireball', level: 3 }];
             global.fetch.mockResolvedValueOnce(mockSuccessResponse(mockData));
 
-            const result = await loadSpellData('wizard_spells', null);
+            const result = await loadSpellData(null);
             expect(result).toEqual(mockData);
             expect(global.fetch).toHaveBeenCalledWith('/data/spells.json');
         });
@@ -860,7 +860,7 @@ describe('dataLoader', () => {
         it('should return empty array on error', async () => {
             global.fetch.mockResolvedValueOnce(mockErrorResponse(500));
 
-            const result = await loadSpellData('wizard_spells', { rules: '5e' });
+            const result = await loadSpellData({ rules: '5e' });
             expect(result).toEqual([]);
         });
     });

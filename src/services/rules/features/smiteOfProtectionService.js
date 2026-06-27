@@ -1,10 +1,5 @@
 import { executeHandler } from '../../automation/index.js';
-
-const DIVINE_SMITE_NAME = 'Divine Smite';
-
-export function isDivineSmite(spell) {
-    return (spell.name || '').toLowerCase() === DIVINE_SMITE_NAME.toLowerCase();
-}
+import { isDivineSmite } from './spellUtils.js';
 
 export function getSmiteOfProtectionPassives(playerStats) {
     const passives = (() => {
@@ -13,10 +8,6 @@ export function getSmiteOfProtectionPassives(playerStats) {
         return x;
     })();
     return passives.filter(p => p.type === 'post_cast_smite_cover');
-}
-
-export function hasSmiteOfProtection(playerStats) {
-    return getSmiteOfProtectionPassives(playerStats).length > 0;
 }
 
 export async function triggerSmiteOfProtection(spell, metaCtx, playerStats, campaignName, mapName) {

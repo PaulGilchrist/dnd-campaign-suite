@@ -91,27 +91,7 @@ vi.mock('../../services/ui/dataLoader.js', () => ({
   ])),
 }));
 
-// Mock the handler functions called by modal confirm callbacks
-vi.mock('../../services/automation/handlers/class-wizard/signatureSpellsHandler.js', () => ({
-  onSignatureSpellsSelected: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/spellMasteryHandler.js', () => ({
-  onSpellMasterySelected: vi.fn(),
-}));
-
-vi.mock('../../services/automation/handlers/class-wizard/SavantHandler.js', () => ({
-  onSavantSelected: vi.fn(),
-}));
-
 import { executeHandler } from '../../services/automation/index.js';
-// eslint-disable-next-line no-unused-vars
-import { onSignatureSpellsSelected } from '../../services/automation/handlers/class-wizard/signatureSpellsHandler.js';
-// eslint-disable-next-line no-unused-vars
-import { onSpellMasterySelected } from '../../services/automation/handlers/class-wizard/spellMasteryHandler.js';
-// eslint-disable-next-line no-unused-vars
-import { onSavantSelected } from '../../services/automation/handlers/class-wizard/SavantHandler.js';
-
 const basePlayerStats = {
   specialActions: [],
   class: {

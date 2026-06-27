@@ -14,7 +14,7 @@ import {
     hasAttackerTriggeredMajesty,
     markAttackerTriggeredMajesty,
 } from '../../services/combat/auras/unbreakableMajesty.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
+import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
 import { addEntry } from '../../services/ui/logService.js';
 import {
@@ -539,7 +539,7 @@ export function createLogAndShow(deps) {
             const potentFormula = context.autoDamageFormula;
             const storedDamageResult = context?.autoDamageRollResult;
             if (!isAutoMiss) {
-                const hasEmpoweredEvoc = hasEmpoweredEvocation(potentPlayerStats);
+                const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(potentPlayerStats).length > 0;
                 const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
                 const spellSchool = (context?.autoDamageSchool || '').toLowerCase();
                 const isEvocation = spellSchool === 'evocation';
@@ -639,7 +639,7 @@ export function createLogAndShow(deps) {
                 }
             }
             else if (isAutoMiss && context?.saveDc) {
-                const hasEmpoweredEvoc = hasEmpoweredEvocation(potentPlayerStats);
+                const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(potentPlayerStats).length > 0;
                 const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(potentPlayerStats) : 0;
                 const spellSchool = (context?.autoDamageSchool || '').toLowerCase();
                 const isEvocation = spellSchool === 'evocation';

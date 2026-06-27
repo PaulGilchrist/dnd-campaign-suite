@@ -1,9 +1,7 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  isDivineSmite,
   getInspiringSmitePassives,
-  hasInspiringSmite,
   triggerInspiringSmite,
 } from './inspiringSmiteService.js'
 import { executeHandler } from '../../automation/index.js'
@@ -15,40 +13,6 @@ vi.mock('../../automation/index.js', () => ({
 describe('inspiringSmiteService', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-  })
-
-  describe('isDivineSmite', () => {
-    it('returns true for exact case match', () => {
-      expect(isDivineSmite({ name: 'Divine Smite' })).toBe(true)
-    })
-
-    it('returns true for lowercase variant', () => {
-      expect(isDivineSmite({ name: 'divine smite' })).toBe(true)
-    })
-
-    it('returns true for mixed case variant', () => {
-      expect(isDivineSmite({ name: 'DIVINE SMITE' })).toBe(true)
-    })
-
-    it('returns false for similar but different spell name', () => {
-      expect(isDivineSmite({ name: 'Divine Fire' })).toBe(false)
-    })
-
-    it('returns false for unrelated spell', () => {
-      expect(isDivineSmite({ name: 'Fireball' })).toBe(false)
-    })
-
-    it('returns false for empty string name', () => {
-      expect(isDivineSmite({ name: '' })).toBe(false)
-    })
-
-    it('returns false when name is missing', () => {
-      expect(isDivineSmite({})).toBe(false)
-    })
-
-    it('returns false when spell is null', () => {
-      expect(() => isDivineSmite(null)).toThrow()
-    })
   })
 
   describe('getInspiringSmitePassives', () => {
@@ -87,27 +51,6 @@ describe('inspiringSmiteService', () => {
 
     it('throws when automation.passives is null', () => {
       expect(() => getInspiringSmitePassives({ automation: { passives: null } })).toThrow('Expected array, got null')
-    })
-  })
-
-  describe('hasInspiringSmite', () => {
-    it('returns true when inspiring smite passives exist', () => {
-      const stats = { automation: { passives: [{ type: 'post_cast_inspiring_smite' }] } }
-      expect(hasInspiringSmite(stats)).toBe(true)
-    })
-
-    it('returns false when only non-matching passives exist', () => {
-      const stats = { automation: { passives: [{ type: 'other' }] } }
-      expect(hasInspiringSmite(stats)).toBe(false)
-    })
-
-    it('returns false when passives array is empty', () => {
-      const stats = { automation: { passives: [] } }
-      expect(hasInspiringSmite(stats)).toBe(false)
-    })
-
-    it('throws when passives array is missing', () => {
-      expect(() => hasInspiringSmite({})).toThrow('Expected array, got undefined')
     })
   })
 

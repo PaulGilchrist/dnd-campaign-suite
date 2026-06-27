@@ -1,10 +1,5 @@
 import { executeHandler } from '../../automation/index.js';
-
-const DIVINE_SMITE_NAME = 'Divine Smite';
-
-export function isDivineSmite(spell) {
-    return (spell.name || '').toLowerCase() === DIVINE_SMITE_NAME.toLowerCase();
-}
+import { isDivineSmite } from './spellUtils.js';
 
 export function getInspiringSmitePassives(playerStats) {
     const passives = (() => {
@@ -13,10 +8,6 @@ export function getInspiringSmitePassives(playerStats) {
         return x;
     })();
     return passives.filter(p => p.type === 'post_cast_inspiring_smite');
-}
-
-export function hasInspiringSmite(playerStats) {
-    return getInspiringSmitePassives(playerStats).length > 0;
 }
 
 export async function triggerInspiringSmite(spell, metaCtx, playerStats, campaignName, mapName) {

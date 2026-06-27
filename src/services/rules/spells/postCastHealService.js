@@ -51,10 +51,6 @@ function getPostCastAllyHeals(playerStats) {
     return passives.filter(p => p.type === 'post_cast_ally_heal');
 }
 
-export function hasPostCastSelfHeal(playerStats) {
-    return getPostCastSelfHeals(playerStats).length > 0;
-}
-
 export async function triggerPostCastSelfHeals(spell, metaCtx, playerStats, campaignName, _mapName) {
     if (!isHealingSpell(spell)) {
         return null;

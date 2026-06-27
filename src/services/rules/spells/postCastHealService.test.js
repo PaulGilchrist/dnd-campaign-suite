@@ -1,7 +1,6 @@
 // @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
-  hasPostCastSelfHeal,
   triggerPostCastSelfHeals,
   triggerPostCastAllyHeals,
 } from './postCastHealService.js'
@@ -24,30 +23,6 @@ describe('postCastHealService', () => {
     vi.clearAllMocks()
     evaluateAutoExpression.mockReturnValue(10)
     applyHealingDirectly.mockReturnValue({ newHp: 20, maxHp: 20, actualHeal: 10 })
-  })
-
-  describe('hasPostCastSelfHeal', () => {
-    it('returns true when post_cast_self_heal passives exist', () => {
-      const stats = { automation: { passives: [{ type: 'post_cast_self_heal' }] } }
-      expect(hasPostCastSelfHeal(stats)).toBe(true)
-    })
-
-    it('returns false when no post_cast_self_heal passives', () => {
-      const stats = { automation: { passives: [{ type: 'other' }] } }
-      expect(hasPostCastSelfHeal(stats)).toBe(false)
-    })
-
-    it('returns false when passives array is empty', () => {
-      expect(hasPostCastSelfHeal({ automation: { passives: [] } })).toBe(false)
-    })
-
-    it('throws when automation.passives is null', () => {
-      expect(() => hasPostCastSelfHeal({ automation: { passives: null } })).toThrow('Expected array')
-    })
-
-    it('throws when automation is missing', () => {
-      expect(() => hasPostCastSelfHeal({})).toThrow('Expected array')
-    })
   })
 
   describe('triggerPostCastSelfHeals', () => {

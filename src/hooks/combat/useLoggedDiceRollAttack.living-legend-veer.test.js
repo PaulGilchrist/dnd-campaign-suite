@@ -53,7 +53,7 @@ vi.mock('../../services/combat/auras/unbreakableMajesty.js', () => ({
 }));
 
 vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
-    hasEmpoweredEvocation: vi.fn(),
+    getEmpoweredEvocationFeatures: vi.fn(() => []),
     getEmpoweredEvocationIntModifier: vi.fn(),
 }));
 

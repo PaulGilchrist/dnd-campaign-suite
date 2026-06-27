@@ -101,11 +101,11 @@ const WEATHER_EFFECTS = {
   },
 };
 
-export function getBiome(terrainType) {
+function getBiome(terrainType) {
   return TERRAIN_BIOME[terrainType] || 'temperate';
 }
 
-export function getWeatherTable(biome) {
+function getWeatherTable(biome) {
   return WEATHER_TABLES[biome] || WEATHER_TABLES.temperate;
 }
 
@@ -116,24 +116,11 @@ export function generateWeather(terrainType) {
   return getWeatherEffects(condition);
 }
 
-export function getWeatherEffects(condition) {
+function getWeatherEffects(condition) {
   return {
     condition,
     ...WEATHER_EFFECTS[condition] || WEATHER_EFFECTS.clear,
   };
 }
 
-export function getWeatherIcon(condition) {
-  const effect = WEATHER_EFFECTS[condition];
-  return effect ? effect.icon : 'sun';
-}
 
-export function getWeatherLabel(condition) {
-  const effect = WEATHER_EFFECTS[condition];
-  return effect ? effect.label : 'Unknown';
-}
-
-export function getWeatherDescription(condition) {
-  const effect = WEATHER_EFFECTS[condition];
-  return effect ? effect.description : '';
-}

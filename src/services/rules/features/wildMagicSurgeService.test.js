@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
     getWildMagicSurgeFeatures,
-    hasWildMagicSurge,
     getControlledChaosFeature,
     getTamedSurgeFeature,
     getFeatsOfChaosFeature,
@@ -92,22 +91,6 @@ describe('wildMagicSurgeService', () => {
 
         it('throws when automation is missing', () => {
             expect(() => getWildMagicSurgeFeatures({})).toThrow('Expected array, got undefined');
-        });
-    });
-
-    describe('hasWildMagicSurge', () => {
-        it('returns true when at least one wild_magic_surge passive exists', () => {
-            const playerStats = {
-                automation: { passives: [{ type: 'wild_magic_surge' }] },
-            };
-            expect(hasWildMagicSurge(playerStats)).toBe(true);
-        });
-
-        it('returns false when no wild_magic_surge passives exist', () => {
-            const playerStats = {
-                automation: { passives: [{ type: 'other' }] },
-            };
-            expect(hasWildMagicSurge(playerStats)).toBe(false);
         });
     });
 

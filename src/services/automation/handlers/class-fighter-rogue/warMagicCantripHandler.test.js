@@ -78,7 +78,7 @@ describe('warMagicCantripHandler', () => {
 
             expect(result.type).toBe('modal')
             expect(result.payload.spellListKey).toBe('sorcerer_cantrips')
-            expect(loadSpellData).toHaveBeenCalledWith('sorcerer_cantrips', mockPlayerStats)
+            expect(loadSpellData).toHaveBeenCalledWith(mockPlayerStats)
         })
 
         it('defaults spellListKey to wizard_cantrips when not specified', async () => {
@@ -92,7 +92,7 @@ describe('warMagicCantripHandler', () => {
 
             await handle(action, mockPlayerStats, mockCampaignName)
 
-            expect(loadSpellData).toHaveBeenCalledWith('wizard_cantrips', mockPlayerStats)
+            expect(loadSpellData).toHaveBeenCalledWith(mockPlayerStats)
         })
 
         it('returns an info popup when the spell list contains no cantrips', async () => {

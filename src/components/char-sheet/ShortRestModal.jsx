@@ -47,7 +47,7 @@ function ShortRestModal({ playerStats, campaignName, onClose, onComplete }) {
 
     React.useEffect(() => {
         if (hasMemorizeSpell) {
-            loadSpellData('wizard_spells', playerStats).then(spells => {
+            loadSpellData(playerStats).then(spells => {
                 setAllSpellbookSpells(spells || []);
             }).catch(() => setAllSpellbookSpells([]));
         }

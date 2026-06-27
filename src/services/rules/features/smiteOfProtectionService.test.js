@@ -1,8 +1,6 @@
 // @improved-by-ai
 import {
-    isDivineSmite,
     getSmiteOfProtectionPassives,
-    hasSmiteOfProtection,
     triggerSmiteOfProtection,
 } from './smiteOfProtectionService.js';
 import { executeHandler } from '../../automation/index.js';
@@ -12,36 +10,6 @@ vi.mock('../../automation/index.js', () => ({
 }));
 
 describe('smiteOfProtectionService', () => {
-    describe('isDivineSmite', () => {
-        it('returns true for exact case match', () => {
-            expect(isDivineSmite({ name: 'Divine Smite' })).toBe(true);
-        });
-
-        it('returns true for lowercase', () => {
-            expect(isDivineSmite({ name: 'divine smite' })).toBe(true);
-        });
-
-        it('returns true for mixed case', () => {
-            expect(isDivineSmite({ name: 'DiViNe SmItE' })).toBe(true);
-        });
-
-        it('returns false for similar but different spell name', () => {
-            expect(isDivineSmite({ name: 'Divine Shield' })).toBe(false);
-        });
-
-        it('returns false for other spells', () => {
-            expect(isDivineSmite({ name: 'Burning Hands' })).toBe(false);
-        });
-
-        it('returns false when spell object has no name property', () => {
-            expect(isDivineSmite({})).toBe(false);
-        });
-
-        it('throws when spell is null', () => {
-            expect(() => isDivineSmite(null)).toThrow();
-        });
-    });
-
     describe('getSmiteOfProtectionPassives', () => {
         it('returns only post_cast_smite_cover passives', () => {
             const playerStats = {
@@ -80,51 +48,6 @@ describe('smiteOfProtectionService', () => {
 
         it('throws when automation is missing', () => {
             expect(() => getSmiteOfProtectionPassives({ automation: {} })).toThrow('Expected array, got undefined');
-        });
-    });
-
-    describe('hasSmiteOfProtection', () => {
-        it('returns true when player has at least one smite passive', () => {
-            const playerStats = {
-                automation: {
-                    passives: [
-                        { type: 'post_cast_smite_cover', name: 'Smite of Protection' },
-                    ],
-                },
-            };
-            expect(hasSmiteOfProtection(playerStats)).toBe(true);
-        });
-
-        it('returns true when player has multiple smite passives', () => {
-            const playerStats = {
-                automation: {
-                    passives: [
-                        { type: 'post_cast_smite_cover', name: 'Smite of Protection' },
-                        { type: 'post_cast_smite_cover', name: 'Another Smite' },
-                    ],
-                },
-            };
-            expect(hasSmiteOfProtection(playerStats)).toBe(true);
-        });
-
-        it('returns false when passives array is empty', () => {
-            const playerStats = {
-                automation: {
-                    passives: [],
-                },
-            };
-            expect(hasSmiteOfProtection(playerStats)).toBe(false);
-        });
-
-        it('returns false when passives array has non-smite entries only', () => {
-            const playerStats = {
-                automation: {
-                    passives: [
-                        { type: 'passive_buff', name: 'Aura of Protection' },
-                    ],
-                },
-            };
-            expect(hasSmiteOfProtection(playerStats)).toBe(false);
         });
     });
 

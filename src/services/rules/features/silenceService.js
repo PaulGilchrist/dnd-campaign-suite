@@ -50,11 +50,11 @@ export function isSilenceActive(playerName, campaignName) {
     return getRuntimeValue(playerName, SILENCE_KEY, campaignName) === true;
 }
 
-export function getSilenceCenter(playerName, campaignName) {
+function getSilenceCenter(playerName, campaignName) {
     return getRuntimeValue(playerName, SILENCE_CENTER_KEY, campaignName) || null;
 }
 
-export function getSilenceRadius(playerName, campaignName) {
+function getSilenceRadius(playerName, campaignName) {
     const stored = getRuntimeValue(playerName, SILENCE_RADIUS_KEY, campaignName);
     return stored ? parseInt(stored, 10) : 20;
 }
@@ -63,33 +63,6 @@ export function getSilenceSource(playerName, campaignName) {
     const activeBuffs = getRuntimeValue(playerName, 'activeBuffs', campaignName) || [];
     const buff = activeBuffs.find(b => b.effect === SILENCE_EFFECT);
     return buff?.sourceCharacter || null;
-}
-
-export function getCreaturesInSilenceZone(casterName, campaignName) {
-    const center = getSilenceCenter(casterName, campaignName);
-    if (!center) return [];
-
-    const radius = getSilenceRadius(casterName, campaignName);
-    const combatSummary = getCombatContextSync(campaignName);
-    if (!combatSummary) return [];
-
-    const casterPos = combatSummary.players?.find(p => p.name === casterName);
-    if (!casterPos) return [];
-
-    const centerGrid = { gridX: casterPos.gridX, gridY: casterPos.gridY };
-    const allCreatures = [
-        ...(combatSummary.players || []),
-        ...(combatSummary.creatures || []),
-    ];
-
-    return allCreatures.filter(c => {
-        if (c.name === casterName) return false;
-        const gridX = c.gridX;
-        const gridY = c.gridY;
-        if (gridX == null || gridY == null) return false;
-        const dist = getDistanceFeet(centerGrid, { gridX, gridY });
-        return dist <= radius;
-    }).map(c => c.name);
 }
 
 export function isCreatureInSilenceZone(targetName, casterName, campaignName) {
@@ -127,20 +100,3 @@ function getCombatContextSync(campaignName) {
     return null;
 }
 
-export function shouldHaveDeafenedFromSilence(targetName, campaignName) {
-    if (!isSilenceActive(targetName, campaignName)) return false;
-    return isCreatureInSilenceZone(targetName, targetName, campaignName);
-}
-
-export function getSilenceDeafenedSources(targetName, campaignName) {
-    const sources = [];
-    const activeBuffs = getRuntimeValue(targetName, 'activeBuffs', campaignName) || [];
-    for (const buff of activeBuffs) {
-        if (buff.effect === SILENCE_EFFECT && buff.sourceCharacter) {
-            if (isCreatureInSilenceZone(targetName, buff.sourceCharacter, campaignName)) {
-                sources.push(buff.sourceCharacter);
-            }
-        }
-    }
-    return sources;
-}

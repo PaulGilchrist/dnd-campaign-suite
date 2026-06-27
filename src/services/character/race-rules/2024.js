@@ -1,7 +1,6 @@
 import { cloneDeep } from 'lodash';
 import { getCategories } from '../featureCategories.js'
-import { mergeCategorizedFeatures } from '../featureCategorizationUtils.js'
-import { addTraits as sharedAddTraits } from './addTraits.js';
+import { mergeCategorizedFeatures, categorizeFeatures } from '../featureCategorizationUtils.js'
 import utils from '../../ui/utils.js';
 import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { computePassiveSkills } from '../../shared/computePassiveSkills.js';
@@ -209,7 +208,7 @@ const raceRules = {
 
          return passiveSenses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           },
-        addTraits: (traits) => sharedAddTraits(traits, featureCategories),
+        addTraits: (traits) => categorizeFeatures(traits, featureCategories, { descriptionField: 'description' }),
         getTraits: (playerStats) => {
              // 2024 Rules: Process racial traits including lineages
         let traits = raceRules.addTraits(playerStats.race?.traits);

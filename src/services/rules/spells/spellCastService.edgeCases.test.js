@@ -56,7 +56,7 @@ vi.mock('./postCastRiderService.js', () => ({
   triggerSpellThief: vi.fn(),
   triggerBewitchingMagic: vi.fn(),
   triggerSoulstitchSpells: vi.fn(),
-  hasEmpoweredEvocation: vi.fn(() => false),
+  getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }))
 
@@ -293,7 +293,7 @@ async function resetMockImplementations() {
     triggerSpellThief: async () => null,
     triggerBewitchingMagic: async () => null,
     triggerSoulstitchSpells: async () => null,
-    hasEmpoweredEvocation: () => false,
+    getEmpoweredEvocationFeatures: () => [],
     getEmpoweredEvocationIntModifier: () => 0,
   })
   await m('./postCastHealService.js', {

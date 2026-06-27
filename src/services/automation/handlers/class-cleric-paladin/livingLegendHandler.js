@@ -1,4 +1,4 @@
-import { getRuntimeValue, setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
+import { setRuntimeValue } from '../../../../hooks/runtime/useRuntimeState.js';
 import { addEntry } from '../../../ui/logService.js';
 
 const LIVING_LEGEND_KEY = 'livingLegendActive';
@@ -38,14 +38,6 @@ async function activateLivingLegend(_action, _playerStats, _campaignName) {
     // Living Legend has no explicit resource cost in the description - it activates
     // and provides passive effects for its duration. No charge check needed.
     return null;
-}
-
-export function isLivingLegendActive(playerName, campaignName) {
-    return getRuntimeValue(playerName, LIVING_LEGEND_KEY, campaignName) === true;
-}
-
-export function hasUnerringStrikeUsed(playerName, campaignName) {
-    return getRuntimeValue(playerName, UNERRING_STRIKE_KEY, campaignName) === true;
 }
 
 export async function setUnerringStrikeUsed(playerName, campaignName, used) {

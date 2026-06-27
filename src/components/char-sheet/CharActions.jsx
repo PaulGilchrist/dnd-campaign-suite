@@ -35,7 +35,7 @@ import { getDistanceFeet } from '../../services/rules/combat/rangeValidation.js'
 import { getInnateSorceryBonus } from '../../services/combat/buffs/buffService.js';
 import { buildAttackContext, buildAttackContextSync } from '../../services/automation/contextBuilder.js';
 import { buildEmpoweredSpellState, getEmpoweredSpellDescription } from '../../services/rules/spells/empoweredSpellService.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
+import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../services/rules/spells/postCastRiderService.js';
 import { useActionSpellMetamagic } from '../../hooks/combat/useActionSpellMetamagic.js';
 import useCharActionModals from './useCharActionModals.js';
 import useInitiativeEffects from './useInitiativeEffects.js';
@@ -105,7 +105,7 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
         autoDamageSource: 'char-actions',
         autoDamageRoll: async (autoDamage, isCrit) => {
             let autoFormula = autoDamage.formula;
-            const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+            const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
             const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
             const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
             const isEvocation = spellSchool === 'evocation';

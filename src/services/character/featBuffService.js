@@ -1,5 +1,5 @@
 import { findFeat } from '../shared/featFinder.js';
-import { resetFeatIncreases, mergeDeduplicated } from '../shared/buffApplier.js';
+import { mergeDeduplicated } from '../shared/buffApplier.js';
 
 /**
  * Feat Buff Service
@@ -527,6 +527,13 @@ export function applyFeatBuffsToFormData(formData, allFeats) {
   mergeDeduplicated(formData, 'resistances', buffs.resistances);
 
   return buffs;
+}
+
+function resetFeatIncreases(abilities) {
+  if (!abilities) return;
+  abilities.forEach(ability => {
+    ability.featIncrease = 0;
+  });
 }
 
 export function clearAppliedFeatBuffs(formData) {

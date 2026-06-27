@@ -254,7 +254,7 @@ vi.mock('../../../services/rules/spells/metamagicRules.js', () => ({
 }));
 
 vi.mock('../../../services/rules/spells/postCastRiderService.js', () => ({
-  hasEmpoweredEvocation: vi.fn(() => false),
+  getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(() => 0),
 }));
 

@@ -14,16 +14,12 @@ vi.mock('../../services/shared/featFinder.js', () => ({
 }));
 
 vi.mock('../../services/shared/buffApplier.js', () => ({
-  resetFeatIncreases: vi.fn(),
   applyAbilityScoreIncreases: vi.fn(),
   mergeDeduplicated: vi.fn(),
   resetMiscBonuses: vi.fn(),
 }));
 
-import {
-  resetFeatIncreases,
-  mergeDeduplicated,
-} from '../../services/shared/buffApplier.js';
+import { mergeDeduplicated } from '../../services/shared/buffApplier.js';
 
 describe('computeAllFeatBuffs', () => {
   beforeEach(() => {
@@ -1013,7 +1009,7 @@ describe('applyFeatBuffsToFormData', () => {
 });
 
 describe('clearAppliedFeatBuffs', () => {
-  it('should call resetFeatIncreases with formData.abilities', () => {
+  it('should set featIncrease to 0 on each ability', () => {
     const abilities = [
       { name: 'Strength', featIncrease: 2 },
       { name: 'Dexterity', featIncrease: 1 },
@@ -1022,13 +1018,13 @@ describe('clearAppliedFeatBuffs', () => {
 
     clearAppliedFeatBuffs(formData);
 
-    expect(resetFeatIncreases).toHaveBeenCalledWith(abilities);
+    expect(formData.abilities[0].featIncrease).toBe(0);
+    expect(formData.abilities[1].featIncrease).toBe(0);
   });
 
   it('should handle null abilities gracefully', () => {
     const formData = { abilities: null };
 
     expect(() => clearAppliedFeatBuffs(formData)).not.toThrow();
-    expect(resetFeatIncreases).toHaveBeenCalledWith(null);
   });
 });

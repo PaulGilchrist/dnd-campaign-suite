@@ -38,9 +38,7 @@ vi.mock('./handlers/resources/fontOfMagicHandler.js', () => ({
 vi.mock('./handlers/healing/healingPoolHandler.js', () => ({
   handle: vi.fn().mockResolvedValue({ result: 'healing_pool' }),
 }));
-vi.mock('./handlers/spells/spellModifierHandler.js', () => ({
-  handle: vi.fn().mockResolvedValue({ result: 'spell_modifier' }),
-}));
+
 vi.mock('./handlers/combat/combatStanceHandler.js', () => ({
   handle: vi.fn().mockResolvedValue({ result: 'combat_stance' }),
 }));
@@ -171,7 +169,6 @@ describe('executeHandler', () => {
       ['resource_pool', './handlers/resources/resourcePoolHandler.js'],
       ['font_of_magic', './handlers/resources/fontOfMagicHandler.js'],
       ['healing_pool', './handlers/healing/healingPoolHandler.js'],
-      ['spell_modifier', './handlers/spells/spellModifierHandler.js'],
       ['combat_stance', './handlers/combat/combatStanceHandler.js'],
       ['attack_rider', './handlers/combat/attackRiderHandler.js'],
       ['temp_hp_buff', './handlers/buffs/tempHpBuffHandler.js'],

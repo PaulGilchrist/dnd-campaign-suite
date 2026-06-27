@@ -16,17 +16,6 @@ function normalizeAbilityName(name) {
   return null
 }
 
-export function getAbility(playerStats, abilityName) {
-  if (!playerStats?.abilities) return null
-  const canonical = normalizeAbilityName(abilityName)
-  if (!canonical) return null
-  return playerStats.abilities.find(a => a.name === canonical) ?? null
-}
-
-export function getAbilityBonus(playerStats, abilityName) {
-  return getAbility(playerStats, abilityName)?.bonus ?? 0
-}
-
 export function getAbilityModifier(abilities, abilityName) {
   const canonical = normalizeAbilityName(abilityName)
   if (!canonical) return 0

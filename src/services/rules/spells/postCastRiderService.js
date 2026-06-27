@@ -2,6 +2,7 @@ import { getRuntimeValue } from '../../../hooks/runtime/useRuntimeState.js';
 import { executeHandler } from '../../automation/index.js';
 import { isBlockedBySpellThief } from '../../automation/handlers/class-fighter-rogue/spellThiefHandler.js';
 import { applySoulstitchSelection } from '../../automation/handlers/class-wizard/soulstitchSpellsHandler.js';
+import { usesSpellSlot } from '../features/spellUtils.js';
 
 let soulstitchResolve = null;
 
@@ -11,10 +12,6 @@ const ILLUSION_SCHOOL = 'illusion';
 function isEnchantmentOrIllusion(spell) {
     const school = (spell.school || '').toLowerCase();
     return school === ENCHANTMENT_SCHOOL || school === ILLUSION_SCHOOL;
-}
-
-function usesSpellSlot(spell, metaCtx) {
-    return metaCtx?.slotLevel > 0 || spell.level > 0;
 }
 
 export function getPostCastRiderSaves(playerStats) {
@@ -35,10 +32,6 @@ export function getSpellThiefFeatures(playerStats) {
     }
     const passives = rawPassives;
     return passives.filter(p => p.type === 'spell_thief');
-}
-
-export function hasSpellThief(playerStats) {
-    return getSpellThiefFeatures(playerStats).length > 0;
 }
 
 export function getMultiTargetSpreads(playerStats) {
@@ -65,10 +58,6 @@ export function getMultiTargetSpreadForSpell(playerStats, spellName) {
         }
     }
     return null;
-}
-
-export function hasPostCastRiderSave(playerStats) {
-    return getPostCastRiderSaves(playerStats).length > 0;
 }
 
 export async function triggerPostCastRiderSaves(spell, metaCtx, playerStats, campaignName, mapName) {
@@ -153,12 +142,8 @@ export function getSoulstitchFeatures(playerStats) {
     return passives.filter(p => p.type === 'soulstitch_spells');
 }
 
-export function hasSoulstitchSpells(playerStats) {
-    return getSoulstitchFeatures(playerStats).length > 0;
-}
-
 export async function triggerSoulstitchSpells(spell, metaCtx, playerStats, campaignName, mapName) {
-    if (!hasSoulstitchSpells(playerStats)) {
+    if (getSoulstitchFeatures(playerStats).length === 0) {
         return null;
     }
 
@@ -220,10 +205,6 @@ export function getEmpoweredEvocationFeatures(playerStats) {
     }
     const passives = rawPassives;
     return passives.filter(p => p.type === 'empowered_evocation');
-}
-
-export function hasEmpoweredEvocation(playerStats) {
-    return getEmpoweredEvocationFeatures(playerStats).length > 0;
 }
 
 export function getEmpoweredEvocationIntModifier(playerStats) {

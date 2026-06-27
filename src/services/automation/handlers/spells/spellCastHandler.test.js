@@ -17,7 +17,7 @@ vi.mock('../feats/magicInitiateHandler.js', () => ({
 }));
 
 vi.mock('../../../../services/rules/spells/postCastRiderService.js', () => ({
-  hasEmpoweredEvocation: vi.fn(),
+  getEmpoweredEvocationFeatures: vi.fn(() => []),
   getEmpoweredEvocationIntModifier: vi.fn(),
 }));
 
@@ -451,7 +451,7 @@ describe('spellCastHandler', () => {
         },
       });
       diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7], modifier: 0 });
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(false);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([]);
 
       const action = makeAction({ spell: 'Fire Bolt' });
 
@@ -470,7 +470,7 @@ describe('spellCastHandler', () => {
         },
       });
       diceRoller.rollExpression.mockReturnValue({ total: 9, rolls: [9], modifier: 0 });
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(true);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
       postCastRiderService.getEmpoweredEvocationIntModifier.mockReturnValue(2);
 
       const action = makeAction({ spell: 'Fire Bolt' });
@@ -488,7 +488,7 @@ describe('spellCastHandler', () => {
         },
       });
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(true);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
       postCastRiderService.getEmpoweredEvocationIntModifier.mockReturnValue(2);
 
       const action = makeAction({ spell: 'Chill Touch' });
@@ -506,7 +506,7 @@ describe('spellCastHandler', () => {
         },
       });
       diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7], modifier: 0 });
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(true);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([{ type: 'empowered_evocation' }]);
       postCastRiderService.getEmpoweredEvocationIntModifier.mockReturnValue(0);
 
       const action = makeAction({ spell: 'Fire Bolt' });
@@ -524,7 +524,7 @@ describe('spellCastHandler', () => {
         },
       });
       diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7], modifier: 0 });
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(false);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([]);
 
       const action = makeAction({ spell: 'Fire Bolt' });
 
@@ -541,7 +541,7 @@ describe('spellCastHandler', () => {
         },
       });
       diceRoller.rollExpression.mockReturnValue({ total: 7, rolls: [7], modifier: 0 });
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(false);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([]);
 
       const action = makeAction({ spell: 'Scorching Ray' });
 
@@ -557,7 +557,7 @@ describe('spellCastHandler', () => {
         },
       });
       diceRoller.rollExpression.mockReturnValue({ total: 5, rolls: [5], modifier: 0 });
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(false);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([]);
 
       const mockResponse = {
         json: vi.fn().mockResolvedValue([
@@ -584,7 +584,7 @@ describe('spellCastHandler', () => {
         },
       });
       diceRoller.rollExpression.mockReturnValue(null);
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(false);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([]);
 
       const action = makeAction({ spell: 'Fire Bolt' });
 
@@ -599,7 +599,7 @@ describe('spellCastHandler', () => {
           spells: [{ name: 'Weird Spell', damage: { damage_type: 'Psychic' } }],
         },
       });
-      postCastRiderService.hasEmpoweredEvocation.mockReturnValue(false);
+      postCastRiderService.getEmpoweredEvocationFeatures.mockReturnValue([]);
 
       const action = makeAction({ spell: 'Weird Spell' });
 

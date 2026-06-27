@@ -30,7 +30,7 @@ import utils from '../../../services/ui/utils.js';
 import { addEntry } from '../../../services/ui/logService.js';
 import { applyDamageToTarget } from '../../../services/rules/combat/applyDamage.js';
 import { isPsionicSpell, hasPsionicSorcery } from '../../../services/rules/spells/metamagicRules.js';
-import { hasEmpoweredEvocation, getEmpoweredEvocationIntModifier } from '../../../services/rules/spells/postCastRiderService.js';
+import { getEmpoweredEvocationFeatures, getEmpoweredEvocationIntModifier } from '../../../services/rules/spells/postCastRiderService.js';
 import './CharSpells.css'
 
 const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells, campaignName, exhaustionPenalty = 0, conditionAttackMode, cannotAct, mapName, characters }) {
@@ -43,7 +43,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
         autoDamageSource: 'char-spells',
         autoDamageRoll: (autoDamage, isCrit) => {
           let autoFormula = autoDamage.formula;
-          const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+          const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
           const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
           const spellSchool = (autoDamage.autoDamageSchool || '').toLowerCase();
           const isEvocation = spellSchool === 'evocation';
@@ -226,7 +226,7 @@ const CharSpells = function CharSpells({ playerStats, handleTogglePreparedSpells
     const executeDamageRoll = (formula, spellName, spell) => {
         const wasCrit = dicePopupHtml?.isCrit;
         if (wasCrit && setDicePopupHtml) setDicePopupHtml(null);
-        const hasEmpoweredEvoc = hasEmpoweredEvocation(playerStats);
+        const hasEmpoweredEvoc = getEmpoweredEvocationFeatures(playerStats).length > 0;
         const empEvocIntMod = hasEmpoweredEvoc ? getEmpoweredEvocationIntModifier(playerStats) : 0;
         const spellSchool = (spell.school || '').toLowerCase();
         const isEvocation = spellSchool === 'evocation';
