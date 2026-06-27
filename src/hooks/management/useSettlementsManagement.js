@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useEntityManagement } from '../useEntityManagement';
 import {
   loadSettlements,
   saveSettlements,
@@ -6,70 +7,32 @@ import {
   deleteSettlement,
 } from '../../services/campaign/settlementsService.js';
 
-function useSettlementsManagement(campaignName) {
-  const [settlements, setSettlements] = useState([]);
-  const [loading] = useState(false);
-
-  const loadSettlementsList = useCallback(async () => {
-    if (!campaignName) return;
-    try {
-      const response = await loadSettlements(campaignName);
-      setSettlements(response.settlements || []);
-    } catch (error) {
-      console.error('Failed to load settlements list:', error);
-    }
-  }, [campaignName]);
-
-  const saveSettlementsList = useCallback(async (settlementsArray) => {
-    try {
-      await saveSettlements(campaignName, settlementsArray);
-      await loadSettlementsList();
-    } catch (error) {
-      console.error('Failed to save settlements:', error);
-      throw error;
-    }
-  }, [campaignName, loadSettlementsList]);
+export default function useSettlementsManagement(campaignName) {
+  const { items, loading, loadItems, saveItems, deleteItem } = useEntityManagement(
+    campaignName,
+    { load: loadSettlements, save: saveSettlements, delete: deleteSettlement },
+    { responseKey: 'settlements', loadOnMount: false }
+  );
 
   const saveSettlementAction = useCallback(async (settlement, oldName) => {
     try {
       const result = await saveSettlement(campaignName, settlement, oldName);
       if (result?.settlement) {
-        setSettlements((prev) => {
-          const name = oldName || result.settlement.name;
-          const index = prev.findIndex((s) => s.name === name);
-          if (index !== -1) {
-            const updated = [...prev];
-            updated[index] = result.settlement;
-            return updated;
-          }
-          return [...prev, result.settlement];
-        });
+        await loadItems();
       }
       return result;
     } catch (error) {
       console.error('Failed to save settlement:', error);
       throw error;
     }
-  }, [campaignName]);
-
-  const deleteSettlementAction = useCallback(async (settlementName) => {
-    try {
-      await deleteSettlement(campaignName, settlementName);
-      await loadSettlementsList();
-    } catch (error) {
-      console.error('Failed to delete settlement:', error);
-      throw error;
-    }
-  }, [campaignName, loadSettlementsList]);
+  }, [campaignName, loadItems]);
 
   return {
-    settlements,
+    settlements: items,
     loading,
-    loadSettlementsList,
-    saveSettlementsList,
+    loadSettlementsList: loadItems,
+    saveSettlementsList: saveItems,
     saveSettlementAction,
-    deleteSettlementAction,
+    deleteSettlementAction: deleteItem,
   };
 }
-
-export default useSettlementsManagement;

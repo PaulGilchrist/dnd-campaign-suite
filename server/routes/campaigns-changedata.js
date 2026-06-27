@@ -1,5 +1,6 @@
 import express from 'express';
 import { publish, characterChangeData, saveFile } from '../utils/changeData.js';
+import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
 
@@ -14,14 +15,14 @@ router.use('/api/campaigns/:campaign', (req, res, next) => {
 });
 
 // GET /api/campaigns/:campaign/change-data - Get full change data object for campaign
-router.get('/api/campaigns/:campaign/change-data', (req, res) => {
+router.get('/api/campaigns/:campaign/change-data', asyncHandler((req, res) => {
     const { campaign } = req.params;
     const data = characterChangeData.get(campaign);
     res.json(data || {});
-});
+}));
 
 // GET /api/campaigns/:campaign/:key - Generic GET from in-memory change data store
-router.get('/api/campaigns/:campaign/:key', (req, res, next) => {
+router.get('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
     if (key === 'log') return next();
     const data = characterChangeData.get(campaign);
@@ -31,10 +32,10 @@ router.get('/api/campaigns/:campaign/:key', (req, res, next) => {
     }
 
     res.json({ [key]: data[key] });
-});
+}));
 
 // POST /api/campaigns/:campaign/:key - Generic POST to in-memory change data store
-router.post('/api/campaigns/:campaign/:key', (req, res, next) => {
+router.post('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
     if (key === 'log') return next();
     if (campaign === 'undefined' || campaign === 'null') {
@@ -45,7 +46,7 @@ router.post('/api/campaigns/:campaign/:key', (req, res, next) => {
 
     if (!characterChangeData.has(campaign)) {
         characterChangeData.set(campaign, {});
-     }
+    }
 
     characterChangeData.get(campaign)[key] = value;
     saveFile();
@@ -54,10 +55,10 @@ router.post('/api/campaigns/:campaign/:key', (req, res, next) => {
     publish(`change-${campaign}-${key}`, value);
 
     res.json({ message: 'Data saved successfully' });
-});
+}));
 
 // DELETE /api/campaigns/:campaign/:key - Remove a key from the change data store
-router.delete('/api/campaigns/:campaign/:key', (req, res, next) => {
+router.delete('/api/campaigns/:campaign/:key', asyncHandler((req, res, next) => {
     const { campaign, key } = req.params;
     if (key === 'log') return next();
     if (characterChangeData.has(campaign)) {
@@ -67,6 +68,6 @@ router.delete('/api/campaigns/:campaign/:key', (req, res, next) => {
     publish(`change-${campaign}-${key}`, null);
 
     res.json({ message: 'Data deleted successfully' });
-});
+}));
 
 export default router;

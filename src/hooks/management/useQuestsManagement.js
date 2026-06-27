@@ -1,50 +1,18 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useEntityManagement } from '../useEntityManagement';
 import * as questsService from '../../services/campaign/questsService.js';
 
-function useQuestsManagement(campaignName) {
-  const [quests, setQuests] = useState([]);
-  const [loading, setLoading] = useState(false);
+export default function useQuestsManagement(campaignName) {
+  const { items, loading, loadItems, saveItems, deleteItem } = useEntityManagement(
+    campaignName,
+    { load: questsService.loadQuests, save: questsService.saveQuests, delete: questsService.deleteQuest },
+    { loadOnMount: true }
+  );
 
-  const loadQuestsList = useCallback(async () => {
-    if (!campaignName) return;
-    setLoading(true);
-    try {
-      const quests = await questsService.loadQuests(campaignName);
-      setQuests(quests);
-    } catch (error) {
-      console.error('Failed to load quests:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [campaignName]);
-
-  const saveQuestsList = useCallback(async (questsArray) => {
-    if (!campaignName) return;
-    try {
-      await questsService.saveQuests(campaignName, questsArray);
-      await loadQuestsList();
-    } catch (error) {
-      console.error('Failed to save quests:', error);
-    }
-  }, [campaignName, loadQuestsList]);
-
-  const deleteQuestAction = useCallback(async (questId) => {
-    if (!campaignName) return;
-    try {
-      await questsService.deleteQuest(campaignName, questId);
-      await loadQuestsList();
-    } catch (error) {
-      console.error('Failed to delete quest:', error);
-    }
-  }, [campaignName, loadQuestsList]);
-
-  useEffect(() => {
-    if (campaignName) {
-      loadQuestsList();
-    }
-  }, [campaignName, loadQuestsList]);
-
-  return { quests, loading, loadQuestsList, saveQuestsList, deleteQuestAction };
+  return {
+    quests: items,
+    loading,
+    loadQuestsList: loadItems,
+    saveQuestsList: saveItems,
+    deleteQuestAction: deleteItem,
+  };
 }
-
-export default useQuestsManagement;

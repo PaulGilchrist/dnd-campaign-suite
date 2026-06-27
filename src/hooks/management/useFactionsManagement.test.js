@@ -98,7 +98,7 @@ describe('useFactionsManagement', () => {
       // Factions should remain at the previously loaded value
       expect(result.current.factions).toEqual(existingFactions);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to load Factions list:',
+        'Failed to load factions list:',
         expect.any(Error)
       );
       consoleSpy.mockRestore();
@@ -116,7 +116,7 @@ describe('useFactionsManagement', () => {
 
       expect(result.current.factions).toEqual([]);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to load Factions list:',
+        'Failed to load factions list:',
         expect.any(Error)
       );
       consoleSpy.mockRestore();
@@ -193,7 +193,7 @@ describe('useFactionsManagement', () => {
       expect(mockLoadFactions).not.toHaveBeenCalled();
       expect(result.current.factions).toEqual(existingFactions);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to save Factions:',
+        'Failed to save factions:',
         expect.any(Error)
       );
       consoleSpy.mockRestore();
@@ -267,7 +267,7 @@ describe('useFactionsManagement', () => {
       expect(mockLoadFactions).not.toHaveBeenCalled();
       expect(result.current.factions).toEqual(existingFactions);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to delete Faction:',
+        'Failed to delete factions:',
         expect.any(Error)
       );
       consoleSpy.mockRestore();

@@ -1,51 +1,22 @@
-import { useState, useCallback } from 'react';
+import { useEntityManagement } from '../useEntityManagement';
 import {
   loadFactions,
   saveFactions,
   deleteFaction,
 } from '../../services/campaign/factionsService.js';
 
-function useFactionsManagement(campaignName) {
-  const [factions, setFactions] = useState([]);
-  const [loading] = useState(false);
-
-  const loadFactionsList = useCallback(async () => {
-    if (!campaignName) return;
-    try {
-      const response = await loadFactions(campaignName);
-      setFactions(response.factions || []);
-    } catch (error) {
-      console.error('Failed to load Factions list:', error);
-    }
-  }, [campaignName]);
-
-  const saveFactionsList = useCallback(async (factionsArray) => {
-    try {
-      await saveFactions(campaignName, factionsArray);
-      await loadFactionsList();
-    } catch (error) {
-      console.error('Failed to save Factions:', error);
-      throw error;
-    }
-  }, [campaignName, loadFactionsList]);
-
-  const deleteFactionAction = useCallback(async (factionId) => {
-    try {
-      await deleteFaction(campaignName, factionId);
-      await loadFactionsList();
-    } catch (error) {
-      console.error('Failed to delete Faction:', error);
-      throw error;
-    }
-  }, [campaignName, loadFactionsList]);
+export default function useFactionsManagement(campaignName) {
+  const { items, loading, loadItems, saveItems, deleteItem } = useEntityManagement(
+    campaignName,
+    { load: loadFactions, save: saveFactions, delete: deleteFaction },
+    { responseKey: 'factions', loadOnMount: false }
+  );
 
   return {
-    factions,
+    factions: items,
     loading,
-    loadFactionsList,
-    saveFactionsList,
-    deleteFactionAction,
+    loadFactionsList: loadItems,
+    saveFactionsList: saveItems,
+    deleteFactionAction: deleteItem,
   };
 }
-
-export default useFactionsManagement;

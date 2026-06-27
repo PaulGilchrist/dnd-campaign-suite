@@ -1,6 +1,7 @@
 import { rules5e as raceRules } from '../../character/race-rules/index.js';
 import { loadSkills } from '../../ui/dataLoader.js';
 import { evaluateAutoExpression } from '../../combat/automation/automationExpressions.js';
+export { getCarryingCapacity } from './carryingCapacity.js';
 
 export async function getAbilities(playerStats) {
     const skills = await loadSkills();
@@ -64,10 +65,4 @@ export function getHitPoints(playerStats) {
     return hitPoints
 }
 
-export function getCarryingCapacity(playerStats) {
-    const str = playerStats.abilities.find((a) => a.name === 'Strength');
-    const strScore = str?.totalScore || 10;
-    let capacity = strScore * 15;
-    const sizeMultiplier = playerStats.sizeMultiplier || 1;
-    return capacity * sizeMultiplier;
-}
+

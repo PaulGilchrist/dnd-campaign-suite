@@ -1,3 +1,5 @@
+// NOTE: This hook has a completely different shape (file upload/download, active character
+// selection) and is not refactored to useEntityManagement.
 import { useRef, useState } from 'react';
 import cloneDeep from 'lodash/cloneDeep';
 import { saveAs } from 'file-saver';

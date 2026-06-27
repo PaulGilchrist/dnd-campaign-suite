@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import guid from 'guid';
 import { subscribers, characterChangeData, spellOverlayData } from '../utils/changeData.js';
+import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
 
@@ -17,7 +18,7 @@ router.get('/subscribe', (req, res) => {
         id: clientId,
         res,
         campaignName,
-     };
+    };
     subscribers.push(newClient);
 
     if (campaignName && characterChangeData.has(campaignName)) {
@@ -26,8 +27,8 @@ router.get('/subscribe', (req, res) => {
             const unwrapped = value && typeof value === 'object' && 'value' in value && Object.keys(value).length === 1 ? value.value : value;
             const eventData = `data: ${JSON.stringify({ key: `change-${campaignName}-${key}`, data: unwrapped })}\n\n`;
             try { res.write(eventData); } catch (_e) { break; }
-         }
-     }
+        }
+    }
 
     if (campaignName && spellOverlayData.has(campaignName)) {
         const overlays = spellOverlayData.get(campaignName);
@@ -40,15 +41,15 @@ router.get('/subscribe', (req, res) => {
     req.on('close', () => {
         const index = subscribers.findIndex(client => client.id === clientId);
         if (index !== -1) subscribers.splice(index, 1);
-     });
+    });
 });
 
 router.get('/health', (req, res) => {
     res.status(200).json({ status: 'Healthy' });
 });
 
-router.get(/^(?!\/(api|spell-overlay)).*/, (req, res) => {
+router.get(/^(?!\/(api|spell-overlay)).*/, asyncHandler((req, res) => {
     res.sendFile(path.join(process.cwd(), 'dist', 'index.html'));
-});
+}));
 
 export default router;

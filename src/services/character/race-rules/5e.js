@@ -1,7 +1,8 @@
 import { cloneDeep, merge } from 'lodash';
 import utils from '../../ui/utils.js'
 import { getCategories } from '../featureCategories.js'
-import { categorizeFeatures, mergeCategorizedFeatures } from '../featureCategorizationUtils.js'
+import { mergeCategorizedFeatures } from '../featureCategorizationUtils.js'
+import { addTraits as sharedAddTraits } from './addTraits.js';
 import { computePassiveSkills } from '../../shared/computePassiveSkills.js'
 import { deduplicateAndSort } from '../../shared/deduplicateAndSort.js'
 
@@ -108,9 +109,7 @@ const raceRules = {
             }
          return passiveSenses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           },
-        addTraits: (traits) => {
-            return categorizeFeatures(traits, featureCategories, { descriptionField: 'description' });
-              },
+        addTraits: (traits) => sharedAddTraits(traits, featureCategories),
         getTraits: (playerStats) => {
             // Dependencies: Race
         let traits = raceRules.addTraits(playerStats.race.traits);

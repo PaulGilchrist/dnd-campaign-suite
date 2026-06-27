@@ -178,7 +178,7 @@ describe('useQuestsManagement', () => {
       expect(result.current.loading).toBe(false);
       expect(result.current.quests).toEqual(existingQuests);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to load quests:',
+        'Failed to load items list:',
         expect.any(Error)
       );
       consoleSpy.mockRestore();
@@ -233,15 +233,17 @@ describe('useQuestsManagement', () => {
       vi.clearAllMocks();
       mockSaveQuests.mockRejectedValue(new Error('Save failed'));
 
-      await act(async () => {
-        await result.current.saveQuestsList([{ id: 'new-quest' }]);
-      });
+      await expect(
+        act(async () => {
+          await result.current.saveQuestsList([{ id: 'new-quest' }]);
+        })
+      ).rejects.toThrow('Save failed');
 
       expect(mockSaveQuests).toHaveBeenCalledWith('test-campaign', [{ id: 'new-quest' }]);
       expect(mockLoadQuests).not.toHaveBeenCalled();
       expect(result.current.quests).toEqual(existingQuests);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to save quests:',
+        'Failed to save items:',
         expect.any(Error)
       );
       consoleSpy.mockRestore();
@@ -296,15 +298,17 @@ describe('useQuestsManagement', () => {
       vi.clearAllMocks();
       mockDeleteQuest.mockRejectedValue(new Error('Delete failed'));
 
-      await act(async () => {
-        await result.current.deleteQuestAction('quest-1');
-      });
+      await expect(
+        act(async () => {
+          await result.current.deleteQuestAction('quest-1');
+        })
+      ).rejects.toThrow('Delete failed');
 
       expect(mockDeleteQuest).toHaveBeenCalledWith('test-campaign', 'quest-1');
       expect(mockLoadQuests).not.toHaveBeenCalled();
       expect(result.current.quests).toEqual(existingQuests);
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to delete quest:',
+        'Failed to delete item:',
         expect.any(Error)
       );
       consoleSpy.mockRestore();

@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useEntityManagement } from '../useEntityManagement';
 import {
   loadNPCs,
   saveNPCs,
@@ -6,29 +7,12 @@ import {
   deleteNPC,
 } from '../../services/npcs/npcsService.js';
 
-function useNPCsManagement(campaignName) {
-  const [npcs, setNpcs] = useState([]);
-  const [loading] = useState(false);
-
-  const loadNPCsList = useCallback(async () => {
-    if (!campaignName) return;
-    try {
-      const response = await loadNPCs(campaignName);
-      setNpcs(response.npcs || []);
-    } catch (error) {
-      console.error('Failed to load NPCs list:', error);
-    }
-  }, [campaignName]);
-
-  const saveNPCsList = useCallback(async (npcsArray) => {
-    try {
-      await saveNPCs(campaignName, npcsArray);
-      await loadNPCsList();
-    } catch (error) {
-      console.error('Failed to save NPCs:', error);
-      throw error;
-    }
-  }, [campaignName, loadNPCsList]);
+export default function useNPCsManagement(campaignName) {
+  const { items, loading, loadItems, saveItems, deleteItem } = useEntityManagement(
+    campaignName,
+    { load: loadNPCs, save: saveNPCs, delete: deleteNPC },
+    { responseKey: 'npcs', loadOnMount: false }
+  );
 
   const saveNPCAction = useCallback(async (npc, oldName) => {
     try {
@@ -42,42 +26,21 @@ function useNPCsManagement(campaignName) {
         });
       }
       if (result?.npc) {
-        setNpcs((prev) => {
-          const name = oldName || result.npc.name;
-          const index = prev.findIndex((n) => n.name === name);
-          if (index !== -1) {
-            const updated = [...prev];
-            updated[index] = result.npc;
-            return updated;
-          }
-          return [...prev, result.npc];
-        });
+        await loadItems();
       }
       return result;
     } catch (error) {
       console.error('Failed to save NPC:', error);
       throw error;
     }
-  }, [campaignName]);
-
-  const deleteNPCAction = useCallback(async (npcName) => {
-    try {
-      await deleteNPC(campaignName, npcName);
-      await loadNPCsList();
-    } catch (error) {
-      console.error('Failed to delete NPC:', error);
-      throw error;
-    }
-  }, [campaignName, loadNPCsList]);
+  }, [campaignName, loadItems]);
 
   return {
-    npcs,
+    npcs: items,
     loading,
-    loadNPCsList,
-    saveNPCsList,
+    loadNPCsList: loadItems,
+    saveNPCsList: saveItems,
     saveNPCAction,
-    deleteNPCAction,
+    deleteNPCAction: deleteItem,
   };
 }
-
-export default useNPCsManagement;

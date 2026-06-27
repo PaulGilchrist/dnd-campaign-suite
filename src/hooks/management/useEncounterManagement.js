@@ -1,3 +1,5 @@
+// NOTE: This hook has a significantly different shape (modal state, individual encounter
+// operations) and is not refactored to useEntityManagement.
 import { useState, useCallback } from 'react';
 import {
   loadEncounters,

@@ -1,18 +1,19 @@
 import express from 'express';
 import { publish, spellOverlayData } from '../utils/changeData.js';
+import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
 
-router.get('/spell-overlay', (req, res) => {
+router.get('/spell-overlay', asyncHandler((req, res) => {
     const campaign = req.query.campaign;
     if (!campaign) {
         return res.status(400).json({ error: 'campaign query param required' });
     }
     const overlays = spellOverlayData.has(campaign) ? spellOverlayData.get(campaign) : [];
     res.json({ overlays });
-});
+}));
 
-router.post('/spell-overlay', (req, res) => {
+router.post('/spell-overlay', asyncHandler((req, res) => {
     const campaign = req.query.campaign;
     if (!campaign) {
         return res.status(400).json({ error: 'campaign query param required' });
@@ -54,6 +55,6 @@ router.post('/spell-overlay', (req, res) => {
 
     publish(`spell-overlay-${campaign}`, { action, overlays, overlayId });
     res.json({ ok: true });
-});
+}));
 
 export default router;

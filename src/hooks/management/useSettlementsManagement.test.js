@@ -184,6 +184,12 @@ describe('useSettlementsManagement', () => {
       mockSaveSettlement.mockResolvedValueOnce({
         settlement: updatedSettlement,
       });
+      mockLoadSettlements.mockResolvedValueOnce({
+        settlements: [
+          { name: 'Waterdeep', type: 'Metropolis' },
+          { name: 'Mithral Hall', type: 'Mine' },
+        ],
+      });
 
       const { result } = renderHook(() =>
         useSettlementsManagement('test-campaign')
@@ -221,6 +227,9 @@ describe('useSettlementsManagement', () => {
       mockSaveSettlement.mockResolvedValueOnce({
         settlement: renamedSettlement,
       });
+      mockLoadSettlements.mockResolvedValueOnce({
+        settlements: [{ name: 'NewName', type: 'City' }],
+      });
 
       const { result } = renderHook(() =>
         useSettlementsManagement('test-campaign')
@@ -249,6 +258,12 @@ describe('useSettlementsManagement', () => {
       const newSettlement = { name: 'Mithral Hall', type: 'Mine' };
       mockSaveSettlement.mockResolvedValueOnce({
         settlement: newSettlement,
+      });
+      mockLoadSettlements.mockResolvedValueOnce({
+        settlements: [
+          { name: 'Waterdeep', type: 'City' },
+          { name: 'Mithral Hall', type: 'Mine' },
+        ],
       });
 
       const { result } = renderHook(() =>
@@ -284,6 +299,12 @@ describe('useSettlementsManagement', () => {
       const newSettlement = { name: 'Mithral Hall', type: 'Mine' };
       mockSaveSettlement.mockResolvedValueOnce({
         settlement: newSettlement,
+      });
+      mockLoadSettlements.mockResolvedValueOnce({
+        settlements: [
+          { name: 'Waterdeep', type: 'City' },
+          { name: 'Mithral Hall', type: 'Mine' },
+        ],
       });
 
       const { result } = renderHook(() =>
@@ -325,17 +346,20 @@ describe('useSettlementsManagement', () => {
         await result.current.saveSettlementAction({ name: 'Mithral Hall' }, undefined);
       });
 
+      // loadItems is not called when result has no settlement field, so state is unchanged
       expect(result.current.settlements).toEqual(existingSettlements);
     });
 
     it('returns the result from the service', async () => {
       const existingSettlements = [{ name: 'Waterdeep', type: 'City' }];
       const expectedResult = { settlement: { name: 'Waterdeep', type: 'City' } };
+      const updatedList = [{ name: 'Waterdeep', type: 'City' }];
 
       mockLoadSettlements.mockResolvedValueOnce({
         settlements: existingSettlements,
       });
       mockSaveSettlement.mockResolvedValueOnce(expectedResult);
+      mockLoadSettlements.mockResolvedValueOnce({ settlements: updatedList });
 
       const { result } = renderHook(() =>
         useSettlementsManagement('test-campaign')
@@ -354,6 +378,7 @@ describe('useSettlementsManagement', () => {
       });
 
       expect(returnedValue).toEqual(expectedResult);
+      expect(result.current.settlements).toEqual(updatedList);
     });
 
     it('logs error and re-throws when save fails', async () => {
@@ -418,7 +443,7 @@ describe('useSettlementsManagement', () => {
       ).rejects.toThrow('Delete failed');
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        'Failed to delete settlement:',
+        'Failed to delete settlements:',
         expect.any(Error)
       );
 

@@ -1,51 +1,22 @@
-import { useState, useCallback } from 'react';
+import { useEntityManagement } from '../useEntityManagement';
 import {
   loadNotes,
   saveNotes,
   deleteNote,
 } from '../../services/campaign/notesService.js';
 
-function useNotesManagement(campaignName) {
-  const [notes, setNotes] = useState([]);
-  const [loading] = useState(false);
-
-  const loadNotesList = useCallback(async () => {
-    if (!campaignName) return;
-    try {
-      const response = await loadNotes(campaignName);
-      setNotes(response.notes || []);
-    } catch (error) {
-      console.error('Failed to load notes list:', error);
-    }
-  }, [campaignName]);
-
-  const saveNotesList = useCallback(async (notesArray) => {
-    try {
-      await saveNotes(campaignName, notesArray);
-      await loadNotesList();
-    } catch (error) {
-      console.error('Failed to save notes:', error);
-      throw error;
-    }
-  }, [campaignName, loadNotesList]);
-
-  const deleteNoteAction = useCallback(async (noteId) => {
-    try {
-      await deleteNote(campaignName, noteId);
-      await loadNotesList();
-    } catch (error) {
-      console.error('Failed to delete note:', error);
-      throw error;
-    }
-  }, [campaignName, loadNotesList]);
+export default function useNotesManagement(campaignName) {
+  const { items, loading, loadItems, saveItems, deleteItem } = useEntityManagement(
+    campaignName,
+    { load: loadNotes, save: saveNotes, delete: deleteNote },
+    { responseKey: 'notes', loadOnMount: false }
+  );
 
   return {
-    notes,
+    notes: items,
     loading,
-    loadNotesList,
-    saveNotesList,
-    deleteNoteAction,
+    loadNotesList: loadItems,
+    saveNotesList: saveItems,
+    deleteNoteAction: deleteItem,
   };
 }
-
-export default useNotesManagement;

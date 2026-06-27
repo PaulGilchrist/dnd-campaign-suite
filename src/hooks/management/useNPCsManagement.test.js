@@ -258,6 +258,7 @@ describe('useNPCsManagement', () => {
   describe('saveNPCAction', () => {
     it('appends a new NPC when not in existing list', async () => {
       mockSaveNPC.mockResolvedValue({ npc: { name: 'New NPC', role: 'Wizard' } });
+      mockLoadNPCs.mockResolvedValue({ npcs: [{ name: 'New NPC', role: 'Wizard' }] });
 
       const { result } = renderHook(() => useNPCsManagement('test-campaign'));
 
@@ -285,6 +286,7 @@ describe('useNPCsManagement', () => {
       });
 
       mockSaveNPC.mockResolvedValue({ npc: { name: 'New Name', role: 'Wizard' } });
+      mockLoadNPCs.mockResolvedValue({ npcs: [{ name: 'New Name', role: 'Wizard' }] });
 
       await act(async () => {
         await result.current.saveNPCAction(
@@ -312,6 +314,7 @@ describe('useNPCsManagement', () => {
       });
 
       mockSaveNPC.mockResolvedValue({ npc: { name: 'Elminster', role: 'Archwizard' } });
+      mockLoadNPCs.mockResolvedValue({ npcs: [{ name: 'Elminster', role: 'Archwizard' }] });
 
       await act(async () => {
         await result.current.saveNPCAction({ name: 'Elminster', role: 'Archwizard' });
@@ -323,6 +326,7 @@ describe('useNPCsManagement', () => {
     it('returns the save result', async () => {
       const saveResult = { npc: { name: 'Baela' }, message: 'Updated' };
       mockSaveNPC.mockResolvedValue(saveResult);
+      mockLoadNPCs.mockResolvedValue({ npcs: [{ name: 'Baela' }] });
 
       const { result } = renderHook(() => useNPCsManagement('test-campaign'));
 
@@ -373,6 +377,9 @@ describe('useNPCsManagement', () => {
       mockSaveNPC.mockResolvedValue({
         npc: { name: 'Elminster', imagePath: '/images/elminster.png' },
       });
+      mockLoadNPCs.mockResolvedValue({
+        npcs: [{ name: 'Elminster', imagePath: '/images/elminster.png' }],
+      });
 
       const { result } = renderHook(() => useNPCsManagement('test-campaign'));
 
@@ -387,6 +394,7 @@ describe('useNPCsManagement', () => {
 
     it('passes empty string oldName to service when provided', async () => {
       mockSaveNPC.mockResolvedValue({ npc: { name: 'Grom' } });
+      mockLoadNPCs.mockResolvedValue({ npcs: [{ name: 'Grom' }] });
 
       const { result } = renderHook(() => useNPCsManagement('test-campaign'));
 
