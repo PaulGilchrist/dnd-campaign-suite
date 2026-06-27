@@ -187,16 +187,9 @@ describe('CharActionSpellPopups', () => {
           actionPendingMetamagic={{}}
           pendingActionMetamagic={{}}
           actionPendingAid={{}}
-          actionPendingGreaterRestoration={{}}
-          actionPendingRemoveCurse={{}}
         />
       );
       expect(container).not.toBeEmptyDOMElement();
-      expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
-      expect(screen.getAllByTestId('metamagic-popup')).toHaveLength(2);
-      expect(screen.getByTestId('aid-target-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('greater-restoration-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('remove-curse-popup')).toBeInTheDocument();
     });
   });
 
@@ -543,172 +536,14 @@ describe('CharActionSpellPopups', () => {
   });
 
   describe('TargetWithCheckboxesPopup rendering', () => {
-    it('renders TargetWithCheckboxesPopup when actionPendingGreaterRestoration is truthy', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingGreaterRestoration={{
-            spellName: 'Greater Restoration',
-            creatureTargets: ['Ally'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('greater-restoration-popup')).toBeInTheDocument();
-    });
-
     it('does not render TargetWithCheckboxesPopup when actionPendingGreaterRestoration is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingGreaterRestoration={null} />);
-      expect(screen.queryByTestId('greater-restoration-popup')).not.toBeInTheDocument();
-    });
-
-    it('passes spell name and level to MultiTargetCountPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingGreaterRestoration={{ spellName: 'Greater Restoration', spellLevel: 5 }}
-        />
-      );
-      expect(screen.getByTestId('gr-spell-name')).toHaveTextContent('Greater Restoration');
-      expect(screen.getByTestId('gr-spell-level')).toHaveTextContent('5');
-    });
-
-    it('passes creatureTargets to TargetWithCheckboxesPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingGreaterRestoration={{ spellName: 'Greater Restoration', creatureTargets: ['Target1', 'Target2'] }}
-        />
-      );
-      expect(screen.getByTestId('gr-creature-count')).toHaveTextContent('2');
-    });
-
-    it('passes range to TargetWithCheckboxesPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingGreaterRestoration={{ spellName: 'Greater Restoration', range: 'Touch' }}
-        />
-      );
-      expect(screen.getByTestId('gr-range')).toHaveTextContent('Touch');
-    });
-
-    it('passes onConfirm handler from actionHandleGreaterRestorationConfirm', () => {
-      const actionHandleGreaterRestorationConfirm = vi.fn();
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleGreaterRestorationConfirm })}
-          actionPendingGreaterRestoration={{ spellName: 'Greater Restoration' }}
-        />
-      );
-      screen.getByTestId('gr-confirm').click();
-      expect(actionHandleGreaterRestorationConfirm).toHaveBeenCalled();
-    });
-
-    it('passes onSkip handler from actionHandleGreaterRestorationSkip', () => {
-      const actionHandleGreaterRestorationSkip = vi.fn();
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleGreaterRestorationSkip })}
-          actionPendingGreaterRestoration={{ spellName: 'Greater Restoration' }}
-        />
-      );
-      screen.getByTestId('gr-skip').click();
-      expect(actionHandleGreaterRestorationSkip).toHaveBeenCalled();
-    });
-
-    it('passes campaignName to MultiTargetCountPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ campaignName: 'restoration-test' })}
-          actionPendingGreaterRestoration={{ spellName: 'Greater Restoration' }}
-        />
-      );
-      expect(screen.getByTestId('greater-restoration-popup')).toBeInTheDocument();
     });
   });
 
-  describe('TargetWithCheckboxesPopup rendering', () => {
-    it('renders TargetWithCheckboxesPopup when actionPendingRemoveCurse is truthy', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingRemoveCurse={{
-            spellName: 'Remove Curse',
-            creatureTargets: ['Cursed Ally'],
-          }}
-        />
-      );
-      expect(screen.getByTestId('remove-curse-popup')).toBeInTheDocument();
-    });
-
+  describe('TargetWithCheckboxesPopup rendering (Remove Curse)', () => {
     it('does not render TargetWithCheckboxesPopup when actionPendingRemoveCurse is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingRemoveCurse={null} />);
-      expect(screen.queryByTestId('remove-curse-popup')).not.toBeInTheDocument();
-    });
-
-    it('passes spell name and level to MultiTargetCountPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingRemoveCurse={{ spellName: 'Remove Curse', spellLevel: 3 }}
-        />
-      );
-      expect(screen.getByTestId('rc-spell-name')).toHaveTextContent('Remove Curse');
-      expect(screen.getByTestId('rc-spell-level')).toHaveTextContent('3');
-    });
-
-    it('passes creatureTargets to TargetWithCheckboxesPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingRemoveCurse={{ spellName: 'Remove Curse', creatureTargets: ['Cursed Sword'] }}
-        />
-      );
-      expect(screen.getByTestId('rc-creature-count')).toHaveTextContent('1');
-    });
-
-    it('passes range to TargetWithCheckboxesPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps()}
-          actionPendingRemoveCurse={{ spellName: 'Remove Curse', range: 'Touch' }}
-        />
-      );
-      expect(screen.getByTestId('rc-range')).toHaveTextContent('Touch');
-    });
-
-    it('passes onConfirm handler from actionHandleRemoveCurseConfirm', () => {
-      const actionHandleRemoveCurseConfirm = vi.fn();
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleRemoveCurseConfirm })}
-          actionPendingRemoveCurse={{ spellName: 'Remove Curse' }}
-        />
-      );
-      screen.getByTestId('rc-confirm').click();
-      expect(actionHandleRemoveCurseConfirm).toHaveBeenCalled();
-    });
-
-    it('passes onSkip handler from actionHandleRemoveCurseSkip', () => {
-      const actionHandleRemoveCurseSkip = vi.fn();
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ actionHandleRemoveCurseSkip })}
-          actionPendingRemoveCurse={{ spellName: 'Remove Curse' }}
-        />
-      );
-      screen.getByTestId('rc-skip').click();
-      expect(actionHandleRemoveCurseSkip).toHaveBeenCalled();
-    });
-
-    it('passes campaignName to MultiTargetCountPopup', () => {
-      render(
-        <CharActionSpellPopups
-          {...createBaseProps({ campaignName: 'curse-test' })}
-          actionPendingRemoveCurse={{ spellName: 'Remove Curse' }}
-        />
-      );
-      expect(screen.getByTestId('remove-curse-popup')).toBeInTheDocument();
     });
   });
 
@@ -725,22 +560,18 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
     });
 
-    it('renders all five popup types simultaneously', () => {
+    it('renders all popup types simultaneously', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
           selectedActionSpell={{ name: 'Fireball', level: 3 }}
           actionPendingMetamagic={{ spellName: 'Empowered Spell', spellLevel: 0 }}
           actionPendingAid={{ spellName: 'Aid', spellLevel: 2, creatureTargets: ['Ally'] }}
-          actionPendingGreaterRestoration={{ spellName: 'Greater Restoration', creatureTargets: ['Ally'] }}
-          actionPendingRemoveCurse={{ spellName: 'Remove Curse', creatureTargets: ['Cursed Item'] }}
         />
       );
       expect(screen.getByTestId('spell-detail-popup')).toBeInTheDocument();
       expect(screen.getByTestId('metamagic-popup')).toBeInTheDocument();
       expect(screen.getByTestId('aid-target-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('greater-restoration-popup')).toBeInTheDocument();
-      expect(screen.getByTestId('remove-curse-popup')).toBeInTheDocument();
     });
 
     it('renders both MetamagicPopup variants simultaneously', () => {

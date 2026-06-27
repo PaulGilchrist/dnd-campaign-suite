@@ -213,9 +213,9 @@ describe('SingleTargetPopup', () => {
         expect(screen.getByText('Spell')).toBeInTheDocument();
     });
 
-    it('renders default level 1 when spell level is missing', () => {
+    it('renders default level 2 when spell level is missing', () => {
         renderPopup({ spell: { name: 'Shield of Faith' } });
-        expect(screen.getByText(/Level 1 Abjuration/)).toBeInTheDocument();
+        expect(screen.getByText(/Level 2 Abjuration/)).toBeInTheDocument();
     });
 
     it('renders empty target list when creatureTargets is empty', () => {

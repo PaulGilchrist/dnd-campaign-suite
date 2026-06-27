@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
 vi.mock('../../hooks/useEntityManagement.js', () => ({
-  default: vi.fn(),
+  useEntityManagement: vi.fn(),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({

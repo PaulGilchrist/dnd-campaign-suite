@@ -56,9 +56,9 @@ describe('TargetWithTypePopup', () => {
         expect(spellNameEl).toHaveTextContent(/Abjuration/);
     });
 
-    it('renders description paragraph with range value', () => {
+    it('renders description paragraph', () => {
         render(<TargetWithTypePopup {...makeProps({ range: 60 })} />);
-        expect(screen.getByText(/60/)).toBeInTheDocument();
+        expect(screen.getByText(/Choose a creature within range/)).toBeInTheDocument();
     });
 
     it('renders Target label', () => {

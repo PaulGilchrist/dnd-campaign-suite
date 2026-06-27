@@ -545,7 +545,7 @@ describe('Settlements', () => {
       const saveBtn = screen.getByRole('button', { name: /save/i });
       fireEvent.click(saveBtn);
       await waitFor(() => {
-        expect(mockUseSettlements.saveSettlementAction).toHaveBeenCalled();
+        expect(mockUseSettlements.saveItems).toHaveBeenCalled();
       });
     });
 
@@ -555,7 +555,7 @@ describe('Settlements', () => {
       fireEvent.click(modalOpen);
       const saveBtn = screen.getByRole('button', { name: /save/i });
       fireEvent.click(saveBtn);
-      expect(mockUseSettlements.saveSettlementAction).not.toHaveBeenCalled();
+      expect(mockUseSettlements.saveItems).not.toHaveBeenCalled();
     });
 
     it('disables save button when name is empty', () => {
@@ -600,7 +600,7 @@ describe('Settlements', () => {
       const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
       await waitFor(() => {
-        expect(mockUseSettlements.deleteSettlementAction).toHaveBeenCalledWith('Delete Me');
+        expect(mockUseSettlements.deleteItem).toHaveBeenCalledWith('Delete Me');
       });
     });
 
@@ -617,7 +617,7 @@ describe('Settlements', () => {
       fireEvent.click(settlementItem);
       const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
-      expect(mockUseSettlements.deleteSettlementAction).not.toHaveBeenCalled();
+      expect(mockUseSettlements.deleteItem).not.toHaveBeenCalled();
     });
   });
 

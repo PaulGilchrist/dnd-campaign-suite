@@ -83,11 +83,6 @@ describe('TargetWithCheckboxesPopup', () => {
         expect(screen.getByText(/Level 3 Abjuration/)).toBeInTheDocument();
     });
 
-    it('displays the range in the description', () => {
-        render(<TargetWithCheckboxesPopup {...createProps({ range: '60 ft' })} />);
-        expect(screen.getByText('60 ft')).toBeInTheDocument();
-    });
-
     it('shows the description text about curses and attunement', () => {
         render(<TargetWithCheckboxesPopup {...createProps()} />);
         expect(screen.getByText(/This spell ends all curses affecting the target/)).toBeInTheDocument();

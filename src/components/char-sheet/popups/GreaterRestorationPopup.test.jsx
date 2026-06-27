@@ -766,9 +766,9 @@ describe('TargetWithCheckboxesPopup', () => {
 
     // ── Range display ──
 
-    it('renders the provided range in the description', () => {
+    it('renders description with range prop', () => {
         render(<TargetWithCheckboxesPopup {...makeProps({ range: '30 ft' })} />);
-        expect(screen.getByText('30 ft')).toBeInTheDocument();
+        expect(screen.getByText(/Choose a creature within 30 ft/)).toBeInTheDocument();
     });
 
     // ── Utils / name matching ──
@@ -843,8 +843,7 @@ describe('TargetWithCheckboxesPopup', () => {
         applyRuntimeState(defaultRuntimeState());
         getCombatSummary.mockResolvedValue(null);
 
-        const props = makeProps();
-        props.campaignName = 'my-campaign';
+        const props = makeProps({ campaignName: 'my-campaign' });
         render(<TargetWithCheckboxesPopup {...props} />);
         fireEvent.click(screen.getByText('Goblin'));
 

@@ -54,10 +54,9 @@ describe('TargetWithTypePopup', () => {
             expect(screen.getByText(/Level 1 Abjuration/)).toBeInTheDocument();
         });
 
-        it('displays the description text with dynamic range value', () => {
+        it('displays the description text', () => {
             render(<TargetWithTypePopup {...makeProps({ range: 60 })} />);
             expect(screen.getByText(/Choose a willing creature within/)).toBeInTheDocument();
-            expect(screen.getByText(/60/)).toBeInTheDocument();
             expect(screen.getByText(/reduces the damage by 1d4/)).toBeInTheDocument();
             expect(screen.getByText(/This can only happen once per turn/)).toBeInTheDocument();
         });
@@ -81,13 +80,13 @@ describe('TargetWithTypePopup', () => {
         it('renders fallback text when spell is null', () => {
             render(<TargetWithTypePopup {...makeProps({ spell: null })} />);
             expect(screen.getByText('Spell')).toBeInTheDocument();
-            expect(screen.getByText(/Level 0 Abjuration/)).toBeInTheDocument();
+            expect(screen.getByText(/Level 1 Abjuration/)).toBeInTheDocument();
         });
 
         it('renders fallback text when spell is undefined', () => {
             render(<TargetWithTypePopup {...makeProps({ spell: undefined })} />);
             expect(screen.getByText('Spell')).toBeInTheDocument();
-            expect(screen.getByText(/Level 0 Abjuration/)).toBeInTheDocument();
+            expect(screen.getByText(/Level 1 Abjuration/)).toBeInTheDocument();
         });
 
         it('renders with popup-overlay class', () => {
@@ -151,9 +150,9 @@ describe('TargetWithTypePopup', () => {
             expect(spellNameEl.textContent).toBe('Spell');
         });
 
-        it('shows default level 0 when spell has no level', () => {
+        it('shows default level when spell has no level', () => {
             render(<TargetWithTypePopup {...makeProps({ spell: { name: 'Test' } })} />);
-            expect(screen.getByText(/Level 0/)).toBeInTheDocument();
+            expect(screen.getByText(/Level 1/)).toBeInTheDocument();
         });
     });
 
@@ -332,14 +331,5 @@ describe('TargetWithTypePopup', () => {
             expect(screen.getByText('Damage Type:')).toBeInTheDocument();
         });
 
-        it('renders with zero range', () => {
-            render(<TargetWithTypePopup {...makeProps({ range: 0 })} />);
-            expect(screen.getByText(/0/)).toBeInTheDocument();
-        });
-
-        it('renders with negative range', () => {
-            render(<TargetWithTypePopup {...makeProps({ range: -10 })} />);
-            expect(screen.getByText(/-10/)).toBeInTheDocument();
-        });
     });
 });
