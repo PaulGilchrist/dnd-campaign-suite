@@ -326,7 +326,7 @@ describe('beguilingDefensesHandler.saveResult', () => {
     });
 
     describe('error handling in log entries', () => {
-        it('re-throws error from pact magic ability_use addEntry', async () => {
+        it('does not throw when pact magic ability_use addEntry rejects (fire-and-forget logging)', async () => {
             setupSaveTest(makeHitAttack('Goblin', playerName));
             getRuntimeValue.mockImplementation((_name, key) => {
                 if (key === 'beguilingDefensesUses') return 1;
@@ -336,7 +336,10 @@ describe('beguilingDefensesHandler.saveResult', () => {
             addEntry.mockImplementation(() => Promise.reject(new Error('pact magic log error')));
 
             const action = makeAction({ automation: { uses: 1, pactMagicRecharge: true } });
-            await expect(handle(action, makePlayerStats(), campaignName, null)).rejects.toThrow('pact magic log error');
+            const result = await handle(action, makePlayerStats(), campaignName, null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
         });
     });
 });

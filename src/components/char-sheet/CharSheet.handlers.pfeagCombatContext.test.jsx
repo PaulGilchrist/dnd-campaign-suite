@@ -89,6 +89,7 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 }));
 
 vi.mock('../../services/automation/handlers/buffs/protectionFromEvilAndGoodHandler.js', () => ({
+  handle: vi.fn(),
   isCreatureWarded: vi.fn(() => false),
 }));
 

@@ -26,6 +26,7 @@ import {
 } from './useLoggedDiceRollUtils.js';
 import { loadManeuvers } from '../../services/ui/dataLoader.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
+import { getManeuversForRules } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
 const SELECTION_KEY = 'BattleMasterManeuvers_selection';
 
@@ -53,8 +54,7 @@ export function createLogAndShow(deps) {
 
         // Pre-load maneuver cache for skill check / initiative superiority buttons
         if (rollType === 'check' || rollType === 'skill' || rollType === 'initiative') {
-            const { getManeuversForRules: _getManeuversForRules } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
-            await _getManeuversForRules('2024');
+            await getManeuversForRules('2024');
         }
 
         const explicitTargetName = context?.targetName;

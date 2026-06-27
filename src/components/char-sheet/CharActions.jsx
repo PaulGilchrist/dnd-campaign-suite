@@ -26,7 +26,7 @@ import { useSpellMetamagicFlow } from '../../hooks/combat/useSpellMetamagicFlow.
 import { executeSpellCast } from '../../services/rules/spells/spellCastService.js'
 import { getTargetFromAttacker, getCombatContext, getAttackerTargetName } from '../../services/rules/combat/damageUtils.js';
 import { loadCombatSummary } from '../../services/encounters/combatData.js';
-import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
+import { executeSweepingAttack, executeBaitAndSwitchChoice, executeCommanderStrikeChoice, executeRallyChoice } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 import { endFriendsOnHostileAction } from '../../services/rules/features/friendsService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { applyDamageToTarget } from '../../services/rules/combat/applyDamage.js';

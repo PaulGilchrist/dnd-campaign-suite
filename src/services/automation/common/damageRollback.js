@@ -1,5 +1,6 @@
 import { getCombatContext } from '../../rules/combat/damageUtils.js';
 import { applyHealingToTarget } from '../../rules/combat/applyHealing.js';
+import { addEntry } from '../../ui/logService.js';
 
 /**
  * Get the last attack from combatSummary.lastAttack.
@@ -64,7 +65,6 @@ export async function rollbackDamage(attackerName, targetName, campaignName, fea
 
     const healResult = applyHealingToTarget(cs, targetName, result.totalDamage, campaignName);
     if (healResult?.newHp != null) {
-        const { addEntry } = await import('../../ui/logService.js');
         await addEntry(campaignName, {
             type: 'ability_use',
             characterName: targetName,

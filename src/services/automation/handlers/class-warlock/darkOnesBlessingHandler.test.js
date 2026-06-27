@@ -321,12 +321,13 @@ describe('darkOnesBlessingHandler', () => {
             expect(result.type).toBe('popup');
         });
 
-        it('throws when addEntry fails', async () => {
+        it('does not throw when addEntry fails (fire-and-forget logging)', async () => {
             addEntry.mockRejectedValue(new Error('Log save failed'));
 
-            await expect(
-                handle(makeAction(), makeFiendWarlockStats(), 'campaign', null)
-            ).rejects.toThrow('Log save failed');
+            const result = await handle(makeAction(), makeFiendWarlockStats(), 'campaign', null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
         });
     });
 });

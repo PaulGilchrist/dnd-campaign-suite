@@ -172,13 +172,14 @@ describe('livingLegendHandler', () => {
       );
     });
 
-    it('re-throws the error when addEntry rejects', async () => {
+    it('does not throw when addEntry rejects (fire-and-forget logging)', async () => {
       getRuntimeValue.mockReturnValue(undefined);
       addEntry.mockRejectedValue(new Error('Network failure'));
 
-      await expect(
-        handle(makeAction(), makePlayerStats(), campaignName, null),
-      ).rejects.toThrow('Network failure');
+      const result = await handle(makeAction(), makePlayerStats(), campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
   });
 

@@ -2136,3 +2136,43 @@ export async function executeCommanderStrikeChoice(action, playerStats, campaign
         logEntries: [logEntry],
     };
 }
+
+export async function executeRallyChoice(action, playerStats, campaignName, chosenName, totalHp, extraHp, description) {
+    if (!chosenName || !playerStats || !campaignName) {
+        return {
+            type: 'popup',
+            payload: {
+                type: 'automation_info',
+                name: 'Rally',
+                description: 'No target selected for Rally.',
+            },
+        };
+    }
+
+    const dieValue = action.dieValue;
+    const maneuverName = action.maneuverName || 'Rally';
+
+    setRuntimeValue(chosenName, 'tempHp', totalHp, campaignName);
+
+    await addExpiration(playerStats.name, chosenName, [
+        { type: 'rally_clear' }
+    ], campaignName, 1);
+
+    const logEntry = {
+        type: 'ability_use',
+        characterName: playerStats.name,
+        abilityName: maneuverName,
+        description: `${maneuverName}: ${chosenName} gains ${totalHp} temporary hit points.`,
+        d10Roll: dieValue,
+    };
+
+    return {
+        type: 'popup',
+        payload: {
+            type: 'automation_info',
+            name: maneuverName,
+            description,
+        },
+        logEntries: [logEntry],
+    };
+}

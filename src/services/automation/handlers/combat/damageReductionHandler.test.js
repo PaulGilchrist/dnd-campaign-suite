@@ -322,7 +322,7 @@ describe('damageReductionHandler', () => {
       );
     });
 
-    it('propagates error when addEntry rejects', async () => {
+    it('does not throw when addEntry rejects (fire-and-forget logging)', async () => {
       const ps = makePlayerStats();
       const action = makeAction({
         effect: 'zero_on_success_half_on_fail',
@@ -331,7 +331,10 @@ describe('damageReductionHandler', () => {
       const testError = new Error('log save failed');
       logService.addEntry.mockRejectedValue(testError);
 
-      await expect(handle(action, ps, campaignName, null)).rejects.toThrow('log save failed');
+      const result = await handle(action, ps, campaignName, null);
+
+      expect(result.type).toBe('popup');
+      expect(result.payload.type).toBe('automation_info');
     });
 
     it('does not proceed with zero_on_success_half_on_fail when requiresShield is true and player lacks shield', async () => {

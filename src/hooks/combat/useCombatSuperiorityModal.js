@@ -5,6 +5,7 @@ import { addEntry } from '../../services/ui/logService.js';
 import { loadCombatSummary, setCombatSummaryCache } from '../../services/encounters/combatData.js';
 import { SHOW_DICE_ROLL_DELAY } from '../../config/ui-config.js';
 import { rollExpression } from '../../services/dice/diceRoller.js';
+import { executeManeuver, onCombatSuperioritySelected } from '../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js';
 
 export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack, rollDamage, onPopupHtml) {
     const [combatSuperiorityModal, setCombatSuperiorityModal] = useState(null);
@@ -22,7 +23,6 @@ export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack,
 
         let result;
         if (singleUseManeuverName) {
-            const { executeManeuver } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
             result = await executeManeuver(combatSuperiorityModal.action, playerStats, campaignName, singleUseManeuverName);
             if (result?.logEntries) {
                 for (const entry of result.logEntries) {
@@ -126,7 +126,6 @@ export function useCombatSuperiorityModal(playerStats, campaignName, rollAttack,
             return;
         }
 
-        const { onCombatSuperioritySelected } = await import('../../services/automation/handlers/class-fighter-rogue/combatSuperiorityHandler.js');
         result = await onCombatSuperioritySelected(combatSuperiorityModal.action, playerStats, campaignName, selectedManeuverNames, singleUseManeuverName);
         if (result?.logEntries) {
             for (const entry of result.logEntries) {

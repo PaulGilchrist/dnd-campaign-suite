@@ -172,16 +172,17 @@ describe('psychicTeleportationHandler', () => {
     });
 
     describe('when addEntry fails', () => {
-        it('propagates the error', async () => {
+        it('does not throw (fire-and-forget logging)', async () => {
             runtimeState.getRuntimeValue.mockImplementation((_player, _key, _campaign) => 5);
             automationExpressions.evaluateAutoExpression.mockReturnValue(8);
             runtimeState.setRuntimeValue.mockResolvedValue(undefined);
             const testError = new Error('Log service unavailable');
             logService.addEntry.mockRejectedValue(testError);
 
-            await expect(
-                handle(makeAction(), makePlayerStats(), 'test-campaign', null),
-            ).rejects.toThrow(testError);
+            const result = await handle(makeAction(), makePlayerStats(), 'test-campaign', null);
+
+            expect(result.type).toBe('popup');
+            expect(result.payload.type).toBe('automation_info');
         });
     });
 });
