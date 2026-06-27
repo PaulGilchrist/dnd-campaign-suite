@@ -15,7 +15,7 @@ function TacticalMasterModal({ attackName, baseMastery, replaceOptions, targetNa
                 descMap[m.name] = m.description;
             }
             setMasteryDescriptions(descMap);
-        }).catch((e) => { console.error("[TacticalMasterModal] Error:", e); throw e; });
+        }).catch((e) => { console.error("[TacticalMasterModal] Error:", e); });
     }, []);
 
     const allOptions = [];

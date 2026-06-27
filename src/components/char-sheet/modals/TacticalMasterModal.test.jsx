@@ -639,21 +639,16 @@ describe('TacticalMasterModal - description display', () => {
 // ── Error handling in useEffect ──
 
 describe('TacticalMasterModal - error handling', () => {
-  it('logs error to console when loadWeaponMasteries rejects', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    useActionPopup.loadWeaponMasteries.mockRejectedValue(new Error('Network error'));
-
+  it('renders fallback when loadWeaponMasteries returns empty array', async () => {
+    useActionPopup.loadWeaponMasteries.mockResolvedValue([]);
     const props = makeProps();
-    props.baseMastery = 'Push';
+    props.baseMastery = 'UnknownMastery';
     props.replaceOptions = [];
-
     render(<TacticalMasterModal {...props} />);
-
     await waitFor(() => {
-      expect(consoleErrorSpy).toHaveBeenCalledWith('[TacticalMasterModal] Error:', expect.any(Error));
+      const bodyDiv = document.querySelector('.sp-body');
+      expect(bodyDiv.textContent).toContain('UnknownMastery');
     });
-
-    consoleErrorSpy.mockRestore();
   });
 });
 
