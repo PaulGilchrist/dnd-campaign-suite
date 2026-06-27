@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
+import { useCrudList } from '../../hooks/useCrudList.js';
 import useNotesManagement from '../../hooks/management/useNotesManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Notes.css';
@@ -7,11 +8,12 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
   const { notes, loading, loadNotesList, saveNotesList, deleteNoteAction } =
     useNotesManagement(campaignName);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingNote, setEditingNote] = useState(null);
-  const [formData, setFormData] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const {
+    searchQuery, setSearchQuery, filteredItems: filteredNotes,
+    modalOpen, editingItem: editingNote, formData,
+    saving, setSaving,
+    openNew, openEdit, closeModal, updateFormField,
+  } = useCrudList(notes, ['description']);
   const [deleting, setDeleting] = useState(false);
 
   // Load notes on mount
@@ -28,18 +30,9 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
     return Math.round(total / characters.length);
   }, [characters]);
 
-  // Filtered notes based on search
-  const filteredNotes = useMemo(() => {
-    if (!searchQuery.trim()) return notes;
-    const query = searchQuery.toLowerCase();
-    return notes.filter((note) =>
-      note.description.toLowerCase().includes(query)
-    );
-  }, [notes, searchQuery]);
-
   // Open modal for new note
   const handleNewNote = () => {
-    setFormData({
+    openNew({
       id: crypto.randomUUID(),
       description: '',
       isPrivate: false,
@@ -48,28 +41,18 @@ function Notes({ campaignName, characters, isLocalhost, onBack }) {
       partyLevel,
       partyLocation: '',
     });
-    setEditingNote(null);
-    setModalOpen(true);
   };
 
   // Open modal for editing a note
   const handleEditNote = (note) => {
-    setFormData({ ...note });
-    setEditingNote(note);
-    setModalOpen(true);
+    openEdit(note);
   };
 
   // Close modal and reset
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setFormData(null);
-    setEditingNote(null);
-  };
+  const handleCloseModal = closeModal;
 
   // Handle form field changes
-  const handleFormChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  const handleFormChange = updateFormField;
 
   // Save note (create or update)
   const handleSave = async () => {

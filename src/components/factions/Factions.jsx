@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { useCrudList } from '../../hooks/useCrudList.js';
 import useFactionsManagement from '../../hooks/management/useFactionsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Factions.css';
@@ -14,11 +15,12 @@ function Factions({ campaignName, onBack }) {
   const { factions, loading, loadFactionsList, saveFactionsList, deleteFactionAction } =
     useFactionsManagement(campaignName);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingFaction, setEditingFaction] = useState(null);
-  const [formData, setFormData] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const {
+    searchQuery, setSearchQuery, filteredItems: filteredFactions,
+    modalOpen, editingItem: editingFaction, formData,
+    saving, setSaving,
+    openNew, openEdit, closeModal, updateFormField,
+  } = useCrudList(factions, ['name']);
   const [deleting, setDeleting] = useState(false);
 
   // Load factions on mount
@@ -28,18 +30,9 @@ function Factions({ campaignName, onBack }) {
     }
   }, [campaignName, loadFactionsList]);
 
-  // Filtered factions based on search
-  const filteredFactions = useMemo(() => {
-    if (!searchQuery.trim()) return factions;
-    const query = searchQuery.toLowerCase();
-    return factions.filter(
-      (faction) => faction.name?.toLowerCase().includes(query)
-    );
-  }, [factions, searchQuery]);
-
   // Open modal for new faction
   const handleNewFaction = () => {
-    setFormData({
+    openNew({
       id: crypto.randomUUID(),
       name: '',
       description: '',
@@ -47,28 +40,18 @@ function Factions({ campaignName, onBack }) {
       influence: 1,
       notes: '',
     });
-    setEditingFaction(null);
-    setModalOpen(true);
   };
 
   // Open modal for editing a faction
   const handleEditFaction = (faction) => {
-    setFormData({ ...faction });
-    setEditingFaction(faction);
-    setModalOpen(true);
+    openEdit(faction);
   };
 
   // Close modal and reset
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setFormData(null);
-    setEditingFaction(null);
-  };
+  const handleCloseModal = closeModal;
 
   // Handle form field changes
-  const handleFormChange = (field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
+  const handleFormChange = updateFormField;
 
   // Save faction (create or update)
   const handleSave = async () => {

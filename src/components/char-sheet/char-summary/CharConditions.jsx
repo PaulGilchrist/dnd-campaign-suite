@@ -46,7 +46,7 @@ function CharConditions({ playerStats, campaignName, activeMapName, characters, 
    }, [activeConditions, playerStats.name, campaignName])
 
   function logEntry(entry) {
-    addEntry(campaignName, entry).catch((e) => { console.error("[CharConditions] Error:", e); throw e; })
+    addEntry(campaignName, entry).catch((e) => { console.error("[CharConditions] Error:", e); })
   }
 
   async function handleConditionSave(conditionKey, saveAbility, saveLabel) {

@@ -1,0 +1,9 @@
+[
+  {
+    "id": "quest-1",
+    "title": "Quest",
+    "description": "Content",
+    "stage": "active",
+    "objectives": []
+  }
+]

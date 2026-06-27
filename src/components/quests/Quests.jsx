@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
+import { useCrudList } from '../../hooks/useCrudList.js';
 import useQuestsManagement from '../../hooks/management/useQuestsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Quests.css';
@@ -13,42 +14,30 @@ const STATUS_COLORS = {
 
 function Quests({ campaignName, isLocalhost, onBack }) {
   const { quests, loading, saveQuestsList, deleteQuestAction } = useQuestsManagement(campaignName);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingQuest, setEditingQuest] = useState(null);
-  const [formData, setFormData] = useState({ name: '', status: 'active', description: '', rewards: '', notes: '' });
-  const [saving, setSaving] = useState(false);
+  const {
+    searchQuery, setSearchQuery, filteredItems: filteredQuests,
+    modalOpen, editingItem: editingQuest, formData, setFormData,
+    saving, setSaving,
+    openNew, openEdit, closeModal, updateFormField,
+  } = useCrudList(quests, ['name']);
   const [deleting, setDeleting] = useState(null);
-
-  const filteredQuests = useMemo(() => {
-    if (!searchQuery.trim()) return quests;
-    const query = searchQuery.toLowerCase();
-    return quests.filter(q => q.name?.toLowerCase().includes(query));
-  }, [quests, searchQuery]);
 
   if (!isLocalhost) return null;
 
   const handleNewQuest = () => {
-    setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });
-    setEditingQuest(null);
-    setModalOpen(true);
+    openNew({ name: '', status: 'active', description: '', rewards: '', notes: '' });
   };
 
   const handleEditQuest = (quest) => {
-    setFormData({ ...quest });
-    setEditingQuest(quest);
-    setModalOpen(true);
+    openEdit(quest);
   };
 
   const handleCloseModal = () => {
-    setModalOpen(false);
-    setEditingQuest(null);
+    closeModal();
     setFormData({ name: '', status: 'active', description: '', rewards: '', notes: '' });
   };
 
-  const handleFormChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
+  const handleFormChange = updateFormField;
 
   const handleSave = async () => {
     if (!formData.name?.trim()) return;

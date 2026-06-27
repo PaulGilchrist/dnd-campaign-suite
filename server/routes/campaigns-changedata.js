@@ -1,5 +1,5 @@
 import express from 'express';
-import { publish, characterChangeData, saveFile } from '../utils/changeData.js';
+import { publish, characterChangeData, saveFile, debouncedSave } from '../utils/changeData.js';
 import asyncHandler from '../utils/asyncHandler.js';
 
 const router = express.Router();
@@ -19,6 +19,31 @@ router.get('/api/campaigns/:campaign/change-data', asyncHandler((req, res) => {
     const { campaign } = req.params;
     const data = characterChangeData.get(campaign);
     res.json(data || {});
+}));
+
+// GET /api/campaigns/:campaign/positioning - Get positioning data
+router.get('/api/campaigns/:campaign/positioning', asyncHandler((req, res) => {
+    const { campaign } = req.params;
+    const data = characterChangeData.get(campaign);
+    res.json({ positioning: data?.positioning || {} });
+}));
+
+// POST /api/campaigns/:campaign/positioning - Save positioning data
+router.post('/api/campaigns/:campaign/positioning', asyncHandler((req, res) => {
+    const { campaign } = req.params;
+    const { positioning } = req.body;
+
+    if (!characterChangeData.has(campaign)) {
+        characterChangeData.set(campaign, {});
+    }
+
+    characterChangeData.get(campaign).positioning = positioning;
+    debouncedSave();
+
+    // Broadcast positioning change
+    publish(`positioning-${campaign}`, positioning);
+
+    res.json({ message: 'Positioning saved successfully' });
 }));
 
 // GET /api/campaigns/:campaign/:key - Generic GET from in-memory change data store

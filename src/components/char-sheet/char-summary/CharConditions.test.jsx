@@ -75,7 +75,7 @@ describe('CharConditions', () => {
     vi.clearAllMocks();
     getRuntimeValue.mockReturnValue(null);
     rollD20.mockReturnValue(15);
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: vi.fn() }));
   });
 
   const mockPlayerStats = {

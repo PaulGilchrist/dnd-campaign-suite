@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
+import { useCrudList } from '../../hooks/useCrudList.js';
 import useNPCsManagement from '../../hooks/management/useNPCsManagement.js';
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
@@ -11,11 +12,12 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
   const { npcs, loading, loadNPCsList, saveNPCAction, deleteNPCAction } =
     useNPCsManagement(campaignName);
 
-  const [searchQuery, setSearchQuery] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingNPC, setEditingNPC] = useState(null);
-  const [formData, setFormData] = useState(null);
-  const [saving, setSaving] = useState(false);
+  const {
+    searchQuery, setSearchQuery, filteredItems: filteredNPCs,
+    modalOpen, editingItem: editingNPC, formData, setFormData,
+    saving, setSaving,
+    openNew, openEdit, closeModal,
+  } = useCrudList(npcs, ['name', 'race', 'classRole', 'tags']);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -24,42 +26,19 @@ function NPCs({ campaignName, onBack, onViewInitiative }) {
     }
   }, [campaignName, loadNPCsList]);
 
-  const filteredNPCs = useMemo(() => {
-    if (!searchQuery.trim()) return npcs;
-    const query = searchQuery.toLowerCase();
-    return npcs.filter(
-      (npc) =>
-        npc.name?.toLowerCase().includes(query) ||
-        npc.race?.toLowerCase().includes(query) ||
-        npc.classRole?.toLowerCase().includes(query) ||
-        npc.tags?.toLowerCase().includes(query)
-    );
-  }, [npcs, searchQuery]);
-
-  const handleNewNPC = async () => {
-    setFormData(getDefaultFormData());
-    setEditingNPC(null);
-    setModalOpen(true);
-  };
+  const handleNewNPC = () => openNew(getDefaultFormData());
 
   const handleGenerateNPC = async () => {
     const generated = await generateNPC(npcs);
-    setFormData(getDefaultFormData(generated));
-    setEditingNPC(null);
-    setModalOpen(true);
+    openNew(getDefaultFormData(generated));
   };
 
   const handleEditNPC = (npc) => {
+    openEdit(npc);
     setFormData(getDefaultFormData(npc));
-    setEditingNPC(npc);
-    setModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setFormData(null);
-    setEditingNPC(null);
-  };
+  const handleCloseModal = closeModal;
 
   const handleSave = async () => {
     if (!formData || !formData.name.trim()) return;

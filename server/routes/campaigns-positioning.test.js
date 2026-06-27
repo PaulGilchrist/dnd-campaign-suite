@@ -1,13 +1,13 @@
 import request from 'supertest';
 import express from 'express';
-import campaignsPositioning from './campaigns-positioning.js';
+import campaignsChangedata from './campaigns-changedata.js';
 import * as changeData from '../utils/changeData.js';
 
 // Create a test app with the routes
 function createTestApp() {
     const app = express();
     app.use(express.json());
-    app.use(campaignsPositioning);
+    app.use(campaignsChangedata);
     return app;
 }
 

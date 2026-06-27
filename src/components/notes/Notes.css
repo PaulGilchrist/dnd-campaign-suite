@@ -89,32 +89,3 @@
   user-select: none;
 }
 
-@media print {
-  .ct-container:has(.notes-modal) > :not(.ct-modal-overlay) {
-    display: none !important;
-  }
-
-  .ct-container .ct-modal-overlay:has(.notes-modal) {
-    position: static;
-    background: none;
-    display: block;
-    z-index: auto;
-  }
-
-  .ct-container .ct-modal.notes-modal {
-    max-height: none;
-    height: auto;
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    width: 100%;
-    max-width: 100%;
-    display: block;
-    background: none;
-  }
-
-  .ct-container .ct-modal.notes-modal .ct-modal-body {
-    overflow: visible;
-    padding: 20px;
-  }
-}

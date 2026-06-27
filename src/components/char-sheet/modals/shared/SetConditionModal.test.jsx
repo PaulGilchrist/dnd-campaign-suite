@@ -720,10 +720,8 @@ describe('SetConditionModal', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A no bonuses
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    const logCalls = global.fetch.mock.calls.filter(
-      (call) => call[0] === '/api/campaigns/test-campaign/log'
-    );
-    expect(logCalls.length).toBeGreaterThan(0);
+    const conditionCall = logService.addEntry.mock.calls.find(call => call[1]?.type === 'condition');
+    expect(conditionCall).toBeDefined();
   });
 
   it('does not log condition for NPC save success', () => {
@@ -733,10 +731,8 @@ describe('SetConditionModal', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    const logCalls = global.fetch.mock.calls.filter(
-      (call) => call[0] === '/api/campaigns/test-campaign/log'
-    );
-    expect(logCalls).toHaveLength(0);
+    const conditionCall = logService.addEntry.mock.calls.find(call => call[1]?.type === 'condition');
+    expect(conditionCall).toBeUndefined();
   });
 
   // ── Edge case: confirm with no targets selected is a no-op ──

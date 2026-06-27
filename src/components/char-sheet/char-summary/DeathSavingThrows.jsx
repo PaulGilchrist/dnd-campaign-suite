@@ -39,7 +39,7 @@ function DeathSavingThrows({ playerStats, campaignName }) {
     const isDead = deathSaveRules.isDead(failures)
 
     const logEntry = (entry) => {
-        addEntry(campaignName, entry).catch((e) => { console.error("[DeathSavingThrows] Error:", e); throw e; })
+        addEntry(campaignName, entry).catch((e) => { console.error("[DeathSavingThrows] Error:", e); })
     }
 
     const rollDeathSave = () => {

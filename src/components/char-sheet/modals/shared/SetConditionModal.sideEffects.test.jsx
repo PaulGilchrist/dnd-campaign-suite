@@ -310,11 +310,9 @@ describe('SetConditionModal - Side Effects & Edge Cases', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    const logCalls = global.fetch.mock.calls.filter(
-      (call) => call[0] === '/api/campaigns/test-campaign/log'
-    );
-    expect(logCalls.length).toBeGreaterThan(0);
-    const logBody = JSON.parse(logCalls[0][1].body);
+    const conditionCall = logService.addEntry.mock.calls.find(call => call[1]?.type === 'condition');
+    expect(conditionCall).toBeDefined();
+    const logBody = conditionCall[1];
     expect(logBody.condition).toBe('Frightened & Blinded');
     expect(logBody.type).toBe('condition');
     expect(logBody.action).toBe('applied');
@@ -331,10 +329,9 @@ describe('SetConditionModal - Side Effects & Edge Cases', () => {
     fireEvent.click(screen.getAllByRole('checkbox')[0]); // Goblin A
     fireEvent.click(screen.getByRole('button', { name: /Abjure Foes \(1 target\)/ }));
 
-    const logCalls = global.fetch.mock.calls.filter(
-      (call) => call[0] === '/api/campaigns/test-campaign/log'
-    );
-    const logBody = JSON.parse(logCalls[0][1].body);
+    const conditionCall = logService.addEntry.mock.calls.find(call => call[1]?.type === 'condition');
+    expect(conditionCall).toBeDefined();
+    const logBody = conditionCall[1];
     expect(logBody.condition).toBe('Frightened');
   });
 

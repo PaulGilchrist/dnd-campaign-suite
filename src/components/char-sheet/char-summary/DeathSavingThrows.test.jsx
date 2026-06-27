@@ -59,7 +59,7 @@ describe('DeathSavingThrows', () => {
     deathSaveRules.rollDeathSave.mockReturnValue(defaultRollResult);
     deathSaveRules.rollDeathSaveWithAdvantage.mockReturnValue(defaultRollResult);
     hasSaveModifier.mockReturnValue(false);
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: vi.fn() }));
   });
 
   afterEach(() => {
@@ -502,7 +502,8 @@ describe('DeathSavingThrows', () => {
     });
 
     it('gracefully handles fetch errors when logging', async () => {
-      global.fetch.mockImplementation(() => Promise.reject(new Error('Network error')).catch(() => {}));
+      global.fetch.mockRejectedValue(new Error('Network error'));
+      vi.spyOn(console, 'error').mockImplementation(() => {});
       render(<DeathSavingThrows playerStats={mockPlayerStats} campaignName={mockCampaignName} />);
 
       expect(() => {

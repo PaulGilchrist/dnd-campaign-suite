@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useCrudList } from '../../hooks/useCrudList.js';
 import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
@@ -45,12 +46,13 @@ function Settlements({ campaignName, onBack }) {
   const { settlements, loading, saveSettlementAction, deleteSettlementAction } =
     useSettlementsManagement(campaignName);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  const {
+    searchQuery, setSearchQuery, filteredItems,
+    modalOpen, editingItem: editingSettlement, formData, setFormData,
+    saving, setSaving,
+    openNew, openEdit, closeModal,
+  } = useCrudList(settlements, ['name', 'tags', 'description']);
   const [sizeFilter, setSizeFilter] = useState('');
-  const [modalOpen, setModalOpen] = useState(false);
-  const [editingSettlement, setEditingSettlement] = useState(null);
-  const [formData, setFormData] = useState(null);
-  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [generating, setGenerating] = useState(false);
   const descDataRef = useRef(null);
@@ -62,21 +64,12 @@ function Settlements({ campaignName, onBack }) {
   }, []);
 
   const filteredSettlements = useMemo(() => {
-    let result = settlements;
+    let result = filteredItems;
     if (sizeFilter) {
       result = result.filter(s => s.size === sizeFilter);
     }
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      result = result.filter(
-        (s) =>
-          s.name?.toLowerCase().includes(query) ||
-          s.tags?.toLowerCase().includes(query) ||
-          s.description?.toLowerCase().includes(query)
-      );
-    }
     return result;
-  }, [settlements, searchQuery, sizeFilter]);
+  }, [filteredItems, sizeFilter]);
 
   const getDefaultFormData = (overrides = {}) => ({
     name: '',
@@ -94,19 +87,13 @@ function Settlements({ campaignName, onBack }) {
     ...overrides,
   });
 
-  const handleNewSettlement = () => {
-    setFormData(getDefaultFormData());
-    setEditingSettlement(null);
-    setModalOpen(true);
-  };
+  const handleNewSettlement = () => openNew(getDefaultFormData());
 
   const handleGenerateSettlement = async () => {
     setGenerating(true);
     try {
       const generated = await generateSettlement(settlements);
-      setFormData(getDefaultFormData(generated));
-      setEditingSettlement(null);
-      setModalOpen(true);
+      openNew(getDefaultFormData(generated));
     } catch (error) {
       console.error('Failed to generate settlement:', error);
     } finally {
@@ -115,16 +102,11 @@ function Settlements({ campaignName, onBack }) {
   };
 
   const handleEditSettlement = (settlement) => {
+    openEdit(settlement);
     setFormData(getDefaultFormData(settlement));
-    setEditingSettlement(settlement);
-    setModalOpen(true);
   };
 
-  const handleCloseModal = () => {
-    setModalOpen(false);
-    setFormData(null);
-    setEditingSettlement(null);
-  };
+  const handleCloseModal = closeModal;
 
   const POPULATION_RANGES = {
     village: ['50-100 souls', '100-200 souls', '200-400 souls', '400-800 souls'],

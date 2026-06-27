@@ -74,7 +74,7 @@ function setupFetchMock() {
 describe('CharHitPoints', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn(() => Promise.resolve({ ok: true }));
+    global.fetch = vi.fn(() => Promise.resolve({ ok: true, json: vi.fn() }));
     useRuntimeValue.mockImplementation((_key, prop) => {
       if (prop === 'currentHitPoints') return null;
       if (prop === 'aidHpMaxIncrease') return 0;
