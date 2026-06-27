@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
-import useNPCsManagement from '../../hooks/management/useNPCsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { loadNPCs, saveNPCs, deleteNPC } from '../../services/npcs/npcsService.js';
 import NPCListItem from './NPCListItem.jsx';
 import NPCFormModal from './NPCFormModal.jsx';
 import { getDefaultFormData, cleanNPCData } from '../../services/npcs/npcFormUtils.js';
@@ -9,8 +10,8 @@ import { generateNPC } from '../../services/npcs/npcGenerator.js';
 import './NPCs.css';
 
 function NPCs({ campaignName, onBack, onViewInitiative }) {
-  const { npcs, loading, loadNPCsList, saveNPCAction, deleteNPCAction } =
-    useNPCsManagement(campaignName);
+  const { items: npcs, loading, loadItems: loadNPCsList, saveItems: saveNPCAction, deleteItem: deleteNPCAction } =
+    useEntityManagement(campaignName, { load: loadNPCs, save: saveNPCs, delete: deleteNPC }, { responseKey: 'npcs', loadOnMount: false });
 
   const {
     searchQuery, setSearchQuery, filteredItems: filteredNPCs,

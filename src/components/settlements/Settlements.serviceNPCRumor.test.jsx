@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
-vi.mock('../../hooks/management/useSettlementsManagement.js', () => ({
+vi.mock('../../hooks/useEntityManagement.js', () => ({
   default: vi.fn(),
 }));
 
@@ -40,14 +40,14 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - service, NPC, rumor management', () => {
   const mockUseSettlements = {
-    settlements: [],
+    items: [],
     loading: false,
-    saveSettlementAction: vi.fn().mockResolvedValue(undefined),
-    deleteSettlementAction: vi.fn().mockResolvedValue(undefined),
+    saveItems: vi.fn().mockResolvedValue(undefined),
+    deleteItem: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('Settlements - service, NPC, rumor management', () => {
   });
 
   beforeEach(() => {
-    useSettlementsManagement.mockReturnValue(mockUseSettlements);
+    useEntityManagement.mockReturnValue(mockUseSettlements);
   });
 
   it('allows changing a service type after adding', () => {

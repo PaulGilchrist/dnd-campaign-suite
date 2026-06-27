@@ -129,8 +129,8 @@ vi.mock('./modals/ElementalAffinityModal.jsx', () => ({
 vi.mock('./modals/FiendishResilienceModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="fiendish-resilience-modal">FiendishResilienceModal</div>; },
 }));
-vi.mock('./modals/racial/BoonOfEnergyResistanceModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="boon-of-energy-resistance-modal">BoonOfEnergyResistanceModal</div>; },
+vi.mock('./modals/shared/ChoiceListModal.jsx', () => ({
+  ChoiceListModal: function TestModal() { return <div data-testid="choice-list-modal">ChoiceListModal</div>; },
 }));
 vi.mock('./modals/DragonCompanionModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="dragon-companion-modal">DragonCompanionModal</div>; },
@@ -150,24 +150,9 @@ vi.mock('./modals/arcane/SoulstitchSpellsModal.jsx', () => ({
 vi.mock('./modals/arcane/IllusoryRealityModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="illusory-reality-modal">IllusoryRealityModal</div>; },
 }));
-vi.mock('./modals/racial/ElfisLineageModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="elfis-lineage-modal"><button data-testid="elfis-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/racial/GnomishLineageModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="gnomish-lineage-modal"><button data-testid="gnomish-close" onClick={onClose}>Close</button></div>;
-  },
-}));
 vi.mock('./modals/FiendishLegacyModal.jsx', () => ({
   default: function TestModal({ onClose }) {
     return <div data-testid="fiendish-legacy-modal"><button data-testid="fiendish-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/racial/GiantAncestryModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="giant-ancestry-modal"><button data-testid="giant-close" onClick={onClose}>Close</button></div>;
   },
 }));
 vi.mock('./modals/racial/BreathWeaponShapeModal.jsx', () => ({
@@ -340,7 +325,6 @@ describe('CharActionModals', () => {
       { name: 'bastion-of-law', prop: 'bastionOfLawModal', value: { featureName: 'Test', auto: {} } },
       { name: 'elemental-affinity', prop: 'elementalAffinityModal', value: {} },
       { name: 'fiendish-resilience', prop: 'fiendishResilienceModal', value: {} },
-      { name: 'boon-of-energy-resistance', prop: 'boonOfEnergyResistanceModal', value: {} },
       { name: 'dragon-companion', prop: 'dragonCompanionModal', value: {} },
       { name: 'wild-magic-double-roll', prop: 'wildMagicDoubleRollModal', value: {} },
       { name: 'wild-magic-tamed', prop: 'wildMagicTamedModal', value: {} },
@@ -348,10 +332,7 @@ describe('CharActionModals', () => {
       { name: 'soulstitch-spells', prop: 'soulstitchSpellsModal', value: {} },
       { name: 'illusory-reality', prop: 'illusoryRealityModal', value: {} },
       { name: 'celestial-revelation', prop: 'celestialRevelationModal', value: {} },
-      { name: 'elfis-lineage', prop: 'elfishLineageModal', value: {} },
-      { name: 'gnomish-lineage', prop: 'gnomishLineageModal', value: {} },
       { name: 'fiendish-legacy', prop: 'fiendishLegacyModal', value: {} },
-      { name: 'giant-ancestry', prop: 'giantAncestryModal', value: {} },
       { name: 'breath-weapon-shape', prop: 'breathWeaponShapeModal', value: {} },
       { name: 'hypnotic-pattern-shake', prop: 'hypnoticPatternShakeModal', value: {} },
     ];

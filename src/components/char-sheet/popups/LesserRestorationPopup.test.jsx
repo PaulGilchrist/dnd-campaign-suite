@@ -33,6 +33,7 @@ const mockRange = '30 ft';
 function renderPopup(overrides = {}) {
     const onConfirm = vi.fn();
     const onSkip = vi.fn();
+    const campaignName = overrides.campaignName ?? 'test-campaign';
 
     const conditionMatches = (c, targetCondition) =>
         (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
@@ -41,7 +42,7 @@ function renderPopup(overrides = {}) {
         const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
         let csConditions = [];
         try {
-            const cs = await getCombatSummary('test-campaign');
+            const cs = await getCombatSummary(campaignName);
             if (cs) {
                 const creature = cs.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {
@@ -69,7 +70,7 @@ function renderPopup(overrides = {}) {
         title: 'Lesser Restoration',
         school: 'Abjuration',
         defaultLevel: 2,
-        description: 'Choose a creature within range and select one condition to remove.',
+        description: 'Choose a creature within range and select one condition to remove. This spell can end one condition on the target: Blinded, Deafened, Paralyzed, or Poisoned.',
         noItemsMessage: 'No applicable conditions found on this target',
         confirmLabel: 'Cast Lesser Restoration',
         ...overrides,
@@ -340,7 +341,7 @@ describe('TargetWithCheckboxesPopup', () => {
 
         fireEvent.click(screen.getByText('Cast Lesser Restoration'));
         expect(onConfirm).toHaveBeenCalledTimes(1);
-        expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Goblin', condition: 'blinded' });
+        expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Goblin', selections: [{ condition: 'blinded' }] });
     });
 
     it('passes only the first selected condition to onConfirm', async () => {
@@ -363,8 +364,8 @@ describe('TargetWithCheckboxesPopup', () => {
 
         fireEvent.click(screen.getByText('Cast Lesser Restoration'));
         expect(onConfirm).toHaveBeenCalledTimes(1);
-        // Only the first condition should be passed
-        expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Orc', condition: 'blinded' });
+        // All selected conditions are passed
+        expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Orc', selections: [{ condition: 'blinded' }, { condition: 'poisoned' }, { condition: 'deafened' }] });
     });
 
     it('does not call onConfirm when cast button is clicked without a target', () => {
@@ -458,6 +459,7 @@ describe('TargetWithCheckboxesPopup', () => {
                 range={mockRange}
                 onConfirm={vi.fn()}
                 onSkip={vi.fn()}
+                defaultLevel={2}
             />
         );
         expect(screen.getByText(/Spell/)).toBeInTheDocument();
@@ -474,6 +476,7 @@ describe('TargetWithCheckboxesPopup', () => {
                 range={mockRange}
                 onConfirm={vi.fn()}
                 onSkip={vi.fn()}
+                defaultLevel={2}
             />
         );
         expect(screen.getByText(/Spell/)).toBeInTheDocument();
@@ -490,6 +493,7 @@ describe('TargetWithCheckboxesPopup', () => {
                 range={mockRange}
                 onConfirm={vi.fn()}
                 onSkip={vi.fn()}
+                defaultLevel={2}
             />
         );
         expect(screen.getByText(/Spell/)).toBeInTheDocument();
@@ -505,6 +509,7 @@ describe('TargetWithCheckboxesPopup', () => {
                 range={mockRange}
                 onConfirm={vi.fn()}
                 onSkip={vi.fn()}
+                defaultLevel={2}
             />
         );
         expect(screen.getByText(/Level 2/)).toBeInTheDocument();
@@ -814,7 +819,7 @@ describe('TargetWithCheckboxesPopup', () => {
 
         fireEvent.click(screen.getByText('Cast Lesser Restoration'));
         expect(onConfirm).toHaveBeenCalledTimes(1);
-        expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Goblin', condition: 'blinded' });
+        expect(onConfirm).toHaveBeenCalledWith({ targetName: 'Goblin', selections: [{ condition: 'blinded' }, { condition: 'deafened' }, { condition: 'paralyzed' }] });
     });
 
     // ── Range display ──

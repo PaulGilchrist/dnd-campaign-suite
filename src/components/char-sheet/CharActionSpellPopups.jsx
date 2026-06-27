@@ -1,8 +1,7 @@
 import Popup from '../common/popup.jsx'
 import MetamagicPopup from './popups/MetamagicPopup.jsx'
-import AidTargetPopup from './popups/AidTargetPopup.jsx'
-import GreaterRestorationPopup from './popups/GreaterRestorationPopup.jsx'
-import RemoveCursePopup from './popups/RemoveCursePopup.jsx'
+import MultiTargetCountPopup from './popups/MultiTargetCountPopup.jsx'
+import TargetWithCheckboxesPopup from './popups/TargetWithCheckboxesPopup.jsx'
 import MagicMissileTargetPopup from './popups/MagicMissileTargetPopup.jsx'
 import SpellDetailPopup from './char-spells/SpellDetailPopup.jsx'
 import { getTargetFromAttacker } from '../../services/rules/combat/damageUtils.js'
@@ -59,7 +58,7 @@ export default function CharActionSpellPopups({
                 />
             )}
             {actionPendingAid && (
-                <AidTargetPopup
+                <MultiTargetCountPopup
                     spell={{ name: actionPendingAid.spellName, level: actionPendingAid.spellLevel || 0 }}
                     playerStats={playerStats}
                     campaignName={campaignName}
@@ -73,7 +72,7 @@ export default function CharActionSpellPopups({
                 />
             )}
             {actionPendingGreaterRestoration && (
-                <GreaterRestorationPopup
+                <TargetWithCheckboxesPopup
                     spell={{ name: actionPendingGreaterRestoration.spellName, level: actionPendingGreaterRestoration.spellLevel || 0 }}
                     playerStats={playerStats}
                     campaignName={campaignName}
@@ -84,7 +83,7 @@ export default function CharActionSpellPopups({
                 />
             )}
             {actionPendingRemoveCurse && (
-                <RemoveCursePopup
+                <TargetWithCheckboxesPopup
                     spell={{ name: actionPendingRemoveCurse.spellName, level: actionPendingRemoveCurse.spellLevel || 0 }}
                     playerStats={playerStats}
                     campaignName={campaignName}

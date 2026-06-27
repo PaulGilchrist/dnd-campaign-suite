@@ -26,8 +26,8 @@ vi.mock('./popups/MetamagicPopup.jsx', () => ({
   },
 }));
 
-vi.mock('./popups/AidTargetPopup.jsx', () => ({
-  default: function TestAidTargetPopup({ spell, range, rangeFt, creatureTargets, maxTargets, attackerPos, onConfirm, onSkip }) {
+vi.mock('./popups/MultiTargetCountPopup.jsx', () => ({
+  default: function TestMultiTargetCountPopup({ spell, range, rangeFt, creatureTargets, maxTargets, attackerPos, onConfirm, onSkip }) {
     return (
       <div data-testid="aid-target-popup">
         <span data-testid="aid-spell-name">{spell?.name}</span>
@@ -44,8 +44,8 @@ vi.mock('./popups/AidTargetPopup.jsx', () => ({
   },
 }));
 
-vi.mock('./popups/GreaterRestorationPopup.jsx', () => ({
-  default: function TestGreaterRestorationPopup({ spell, creatureTargets, range, onConfirm, onSkip }) {
+vi.mock('./popups/TargetWithCheckboxesPopup.jsx', () => ({
+  default: function TestTargetWithCheckboxesPopup({ spell, creatureTargets, range, onConfirm, onSkip }) {
     return (
       <div data-testid="greater-restoration-popup">
         <span data-testid="gr-spell-name">{spell?.name}</span>
@@ -59,8 +59,8 @@ vi.mock('./popups/GreaterRestorationPopup.jsx', () => ({
   },
 }));
 
-vi.mock('./popups/RemoveCursePopup.jsx', () => ({
-  default: function TestRemoveCursePopup({ spell, creatureTargets, range, onConfirm, onSkip }) {
+vi.mock('./popups/TargetWithCheckboxesPopup.jsx', () => ({
+  default: function TestTargetWithCheckboxesPopup({ spell, creatureTargets, range, onConfirm, onSkip }) {
     return (
       <div data-testid="remove-curse-popup">
         <span data-testid="rc-spell-name">{spell?.name}</span>
@@ -440,8 +440,8 @@ describe('CharActionSpellPopups', () => {
     });
   });
 
-  describe('AidTargetPopup rendering', () => {
-    it('renders AidTargetPopup when actionPendingAid is truthy', () => {
+  describe('MultiTargetCountPopup rendering', () => {
+    it('renders MultiTargetCountPopup when actionPendingAid is truthy', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -459,12 +459,12 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('aid-target-popup')).toBeInTheDocument();
     });
 
-    it('does not render AidTargetPopup when actionPendingAid is null', () => {
+    it('does not render MultiTargetCountPopup when actionPendingAid is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingAid={null} />);
       expect(screen.queryByTestId('aid-target-popup')).not.toBeInTheDocument();
     });
 
-    it('passes spell name and level to AidTargetPopup', () => {
+    it('passes spell name and level to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -475,7 +475,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('aid-spell-level')).toHaveTextContent('2');
     });
 
-    it('passes range and rangeFt to AidTargetPopup', () => {
+    it('passes range and rangeFt to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -486,7 +486,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('aid-range-ft')).toHaveTextContent('60');
     });
 
-    it('passes creatureTargets and maxTargets to AidTargetPopup', () => {
+    it('passes creatureTargets and maxTargets to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -497,7 +497,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('aid-max-targets')).toHaveTextContent('5');
     });
 
-    it('passes attackerPos to AidTargetPopup', () => {
+    it('passes attackerPos to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -531,7 +531,7 @@ describe('CharActionSpellPopups', () => {
       expect(actionHandleAidSkip).toHaveBeenCalled();
     });
 
-    it('passes campaignName to AidTargetPopup', () => {
+    it('passes campaignName to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps({ campaignName: 'aid-test' })}
@@ -542,8 +542,8 @@ describe('CharActionSpellPopups', () => {
     });
   });
 
-  describe('GreaterRestorationPopup rendering', () => {
-    it('renders GreaterRestorationPopup when actionPendingGreaterRestoration is truthy', () => {
+  describe('TargetWithCheckboxesPopup rendering', () => {
+    it('renders TargetWithCheckboxesPopup when actionPendingGreaterRestoration is truthy', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -556,12 +556,12 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('greater-restoration-popup')).toBeInTheDocument();
     });
 
-    it('does not render GreaterRestorationPopup when actionPendingGreaterRestoration is null', () => {
+    it('does not render TargetWithCheckboxesPopup when actionPendingGreaterRestoration is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingGreaterRestoration={null} />);
       expect(screen.queryByTestId('greater-restoration-popup')).not.toBeInTheDocument();
     });
 
-    it('passes spell name and level to GreaterRestorationPopup', () => {
+    it('passes spell name and level to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -572,7 +572,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('gr-spell-level')).toHaveTextContent('5');
     });
 
-    it('passes creatureTargets to GreaterRestorationPopup', () => {
+    it('passes creatureTargets to TargetWithCheckboxesPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -582,7 +582,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('gr-creature-count')).toHaveTextContent('2');
     });
 
-    it('passes range to GreaterRestorationPopup', () => {
+    it('passes range to TargetWithCheckboxesPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -616,7 +616,7 @@ describe('CharActionSpellPopups', () => {
       expect(actionHandleGreaterRestorationSkip).toHaveBeenCalled();
     });
 
-    it('passes campaignName to GreaterRestorationPopup', () => {
+    it('passes campaignName to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps({ campaignName: 'restoration-test' })}
@@ -627,8 +627,8 @@ describe('CharActionSpellPopups', () => {
     });
   });
 
-  describe('RemoveCursePopup rendering', () => {
-    it('renders RemoveCursePopup when actionPendingRemoveCurse is truthy', () => {
+  describe('TargetWithCheckboxesPopup rendering', () => {
+    it('renders TargetWithCheckboxesPopup when actionPendingRemoveCurse is truthy', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -641,12 +641,12 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('remove-curse-popup')).toBeInTheDocument();
     });
 
-    it('does not render RemoveCursePopup when actionPendingRemoveCurse is null', () => {
+    it('does not render TargetWithCheckboxesPopup when actionPendingRemoveCurse is null', () => {
       render(<CharActionSpellPopups {...createBaseProps()} actionPendingRemoveCurse={null} />);
       expect(screen.queryByTestId('remove-curse-popup')).not.toBeInTheDocument();
     });
 
-    it('passes spell name and level to RemoveCursePopup', () => {
+    it('passes spell name and level to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -657,7 +657,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('rc-spell-level')).toHaveTextContent('3');
     });
 
-    it('passes creatureTargets to RemoveCursePopup', () => {
+    it('passes creatureTargets to TargetWithCheckboxesPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -667,7 +667,7 @@ describe('CharActionSpellPopups', () => {
       expect(screen.getByTestId('rc-creature-count')).toHaveTextContent('1');
     });
 
-    it('passes range to RemoveCursePopup', () => {
+    it('passes range to TargetWithCheckboxesPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps()}
@@ -701,7 +701,7 @@ describe('CharActionSpellPopups', () => {
       expect(actionHandleRemoveCurseSkip).toHaveBeenCalled();
     });
 
-    it('passes campaignName to RemoveCursePopup', () => {
+    it('passes campaignName to MultiTargetCountPopup', () => {
       render(
         <CharActionSpellPopups
           {...createBaseProps({ campaignName: 'curse-test' })}

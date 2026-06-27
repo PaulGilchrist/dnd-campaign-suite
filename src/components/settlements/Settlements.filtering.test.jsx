@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
-vi.mock('../../hooks/management/useSettlementsManagement.js', () => ({
+vi.mock('../../hooks/useEntityManagement.js', () => ({
   default: vi.fn(),
 }));
 
@@ -40,18 +40,18 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - filtering', () => {
   const mockUseSettlements = {
-    settlements: [
+    items: [
       { name: 'Fireport', size: 'town', population: '', tags: 'coastal', services: [], description: 'A town of fire' },
       { name: 'Iceholm', size: 'village', population: '', tags: 'frozen', services: [], description: 'A cold village' },
       { name: 'Goldhaven', size: 'city', population: '', tags: 'trade', services: [], description: 'A wealthy city' },
     ],
     loading: false,
-    saveSettlementAction: vi.fn().mockResolvedValue(undefined),
-    deleteSettlementAction: vi.fn().mockResolvedValue(undefined),
+    saveItems: vi.fn().mockResolvedValue(undefined),
+    deleteItem: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
@@ -69,7 +69,7 @@ describe('Settlements - filtering', () => {
   });
 
   beforeEach(() => {
-    useSettlementsManagement.mockReturnValue(mockUseSettlements);
+    useEntityManagement.mockReturnValue(mockUseSettlements);
   });
 
   it('filters by name case-insensitively', () => {
@@ -103,9 +103,9 @@ describe('Settlements - filtering', () => {
   });
 
   it('combines search and size filter', () => {
-    useSettlementsManagement.mockReturnValue({
+    useEntityManagement.mockReturnValue({
       ...mockUseSettlements,
-      settlements: [
+      items: [
         { name: 'Fireport', size: 'town', population: '', tags: '', services: [], description: 'A town of fire' },
         { name: 'Fire Village', size: 'village', population: '', tags: '', services: [], description: 'A village of fire' },
         { name: 'Iceholm', size: 'village', population: '', tags: '', services: [], description: 'A cold village' },

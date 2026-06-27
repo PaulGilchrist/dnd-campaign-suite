@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
-vi.mock('../../hooks/management/useSettlementsManagement.js', () => ({
+vi.mock('../../hooks/useEntityManagement.js', () => ({
   default: vi.fn(),
 }));
 
@@ -40,14 +40,14 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - save and delete behavior', () => {
   const mockUseSettlements = {
-    settlements: [],
+    items: [],
     loading: false,
-    saveSettlementAction: vi.fn().mockResolvedValue(undefined),
-    deleteSettlementAction: vi.fn().mockResolvedValue(undefined),
+    saveItems: vi.fn().mockResolvedValue(undefined),
+    deleteItem: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('Settlements - save and delete behavior', () => {
   });
 
   beforeEach(() => {
-    useSettlementsManagement.mockReturnValue(mockUseSettlements);
+    useEntityManagement.mockReturnValue(mockUseSettlements);
   });
 
   it('closes modal after successful save', async () => {
@@ -83,9 +83,9 @@ describe('Settlements - save and delete behavior', () => {
   });
 
   it('saves with oldName parameter when editing an existing settlement', async () => {
-    useSettlementsManagement.mockReturnValue({
+    useEntityManagement.mockReturnValue({
       ...mockUseSettlements,
-      settlements: [
+      items: [
         { name: 'Old Name', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
       ],
     });
@@ -133,9 +133,9 @@ describe('Settlements - save and delete behavior', () => {
 
   it('shows delete button disabled during delete', async () => {
     global.window.confirm = vi.fn(() => true);
-    useSettlementsManagement.mockReturnValue({
+    useEntityManagement.mockReturnValue({
       ...mockUseSettlements,
-      settlements: [
+      items: [
         { name: 'Delete Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
       ],
     });
@@ -177,9 +177,9 @@ describe('Settlements - save and delete behavior', () => {
   it('handles delete error without crashing', async () => {
     global.window.confirm = vi.fn(() => true);
     mockUseSettlements.deleteSettlementAction = vi.fn().mockRejectedValue(new Error('Delete failed'));
-    useSettlementsManagement.mockReturnValue({
+    useEntityManagement.mockReturnValue({
       ...mockUseSettlements,
-      settlements: [
+      items: [
         { name: 'Delete Me', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: '' },
       ],
     });

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
-import useFactionsManagement from '../../hooks/management/useFactionsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { loadFactions, saveFactions, deleteFaction } from '../../services/campaign/factionsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Factions.css';
 
@@ -12,8 +13,8 @@ const INFLUENCE_COLORS = {
 };
 
 function Factions({ campaignName, onBack }) {
-  const { factions, loading, loadFactionsList, saveFactionsList, deleteFactionAction } =
-    useFactionsManagement(campaignName);
+  const { items: factions, loading, loadItems: loadFactionsList, saveItems: saveFactionsList, deleteItem: deleteFactionAction } =
+    useEntityManagement(campaignName, { load: loadFactions, save: saveFactions, delete: deleteFaction }, { responseKey: 'factions', loadOnMount: false });
 
   const {
     searchQuery, setSearchQuery, filteredItems: filteredFactions,

@@ -129,8 +129,8 @@ vi.mock('./modals/ElementalAffinityModal.jsx', () => ({
 vi.mock('./modals/FiendishResilienceModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="fiendish-resilience-modal">FiendishResilienceModal</div>; },
 }));
-vi.mock('./modals/racial/BoonOfEnergyResistanceModal.jsx', () => ({
-  default: function TestModal() { return <div data-testid="boon-of-energy-resistance-modal">BoonOfEnergyResistanceModal</div>; },
+vi.mock('./modals/shared/ChoiceListModal.jsx', () => ({
+  ChoiceListModal: function TestModal() { return <div data-testid="choice-list-modal">ChoiceListModal</div>; },
 }));
 vi.mock('./modals/DragonCompanionModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="dragon-companion-modal">DragonCompanionModal</div>; },
@@ -188,24 +188,9 @@ vi.mock('./modals/divine/BastionOfLawModal.jsx', () => ({
 vi.mock('./modals/MoonlightStepResourceModal.jsx', () => ({
   default: function TestModal() { return <div data-testid="moonlight-step-resource-modal">MoonlightStepResourceModal</div>; },
 }));
-vi.mock('./modals/racial/ElfisLineageModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="elfis-lineage-modal"><button data-testid="elfis-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/racial/GnomishLineageModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="gnomish-lineage-modal"><button data-testid="gnomish-close" onClick={onClose}>Close</button></div>;
-  },
-}));
 vi.mock('./modals/FiendishLegacyModal.jsx', () => ({
   default: function TestModal({ onClose }) {
     return <div data-testid="fiendish-legacy-modal"><button data-testid="fiendish-close" onClick={onClose}>Close</button></div>;
-  },
-}));
-vi.mock('./modals/racial/GiantAncestryModal.jsx', () => ({
-  default: function TestModal({ onClose }) {
-    return <div data-testid="giant-ancestry-modal"><button data-testid="giant-close" onClick={onClose}>Close</button></div>;
   },
 }));
 vi.mock('./modals/racial/BreathWeaponShapeModal.jsx', () => ({

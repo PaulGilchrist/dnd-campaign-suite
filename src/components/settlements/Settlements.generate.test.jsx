@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
-vi.mock('../../hooks/management/useSettlementsManagement.js', () => ({
+vi.mock('../../hooks/useEntityManagement.js', () => ({
   default: vi.fn(),
 }));
 
@@ -40,14 +40,14 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - generate settlement', () => {
   const mockUseSettlements = {
-    settlements: [],
+    items: [],
     loading: false,
-    saveSettlementAction: vi.fn().mockResolvedValue(undefined),
-    deleteSettlementAction: vi.fn().mockResolvedValue(undefined),
+    saveItems: vi.fn().mockResolvedValue(undefined),
+    deleteItem: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('Settlements - generate settlement', () => {
   });
 
   beforeEach(() => {
-    useSettlementsManagement.mockReturnValue(mockUseSettlements);
+    useEntityManagement.mockReturnValue(mockUseSettlements);
   });
 
   it('passes existing settlements to the generator', async () => {
@@ -84,9 +84,9 @@ describe('Settlements - generate settlement', () => {
       notes: '',
       threat: 'Bandits',
     });
-    useSettlementsManagement.mockReturnValue({
+    useEntityManagement.mockReturnValue({
       ...mockUseSettlements,
-      settlements: [{ name: 'Existing Town' }],
+      items: [{ name: 'Existing Town' }],
     });
     render(<Settlements campaignName="test" onBack={() => {}} />);
     const genBtn = screen.getByRole('button', { name: /generate settlement/i });

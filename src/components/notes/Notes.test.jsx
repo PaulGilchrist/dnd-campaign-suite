@@ -3,13 +3,13 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Notes from './Notes.jsx';
 
-vi.mock('../../hooks/management/useNotesManagement.js', () => ({
-  default: vi.fn(() => ({
-    notes: [],
+vi.mock('../../hooks/useEntityManagement.js', () => ({
+  useEntityManagement: vi.fn(() => ({
+    items: [],
     loading: false,
-    loadNotesList: vi.fn(),
-    saveNotesList: vi.fn(),
-    deleteNoteAction: vi.fn(),
+    loadItems: vi.fn(),
+    saveItems: vi.fn(),
+    deleteItem: vi.fn(),
   })),
 }));
 
@@ -29,14 +29,14 @@ vi.mock('../common/PreviewToggle.jsx', () => ({
   },
 }));
 
-import useNotesManagement from '../../hooks/management/useNotesManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 const createMockUseNotes = () => ({
-  notes: [],
+  items: [],
   loading: false,
-  loadNotesList: vi.fn(),
-  saveNotesList: vi.fn().mockResolvedValue(undefined),
-  deleteNoteAction: vi.fn().mockResolvedValue(undefined),
+  loadItems: vi.fn(),
+  saveItems: vi.fn().mockResolvedValue(undefined),
+  deleteItem: vi.fn().mockResolvedValue(undefined),
 });
 
 const renderNotes = (props = {}) =>
@@ -55,7 +55,7 @@ describe('Notes', () => {
 
   beforeEach(() => {
     mockUseNotes = createMockUseNotes();
-    useNotesManagement.mockReturnValue(mockUseNotes);
+    useEntityManagement.mockReturnValue(mockUseNotes);
     vi.clearAllMocks();
     vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.spyOn(Date.prototype, 'toISOString').mockReturnValue('2025-01-01T00:00:00.000Z');
@@ -88,7 +88,7 @@ describe('Notes', () => {
     });
 
     it('renders loading state when loading', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
         loading: true,
       });
@@ -99,9 +99,9 @@ describe('Notes', () => {
 
   describe('notes list', () => {
     it('renders notes list when notes exist', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Test note content',
@@ -117,9 +117,9 @@ describe('Notes', () => {
     });
 
     it('shows private lock icon for private notes', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Secret',
@@ -135,9 +135,9 @@ describe('Notes', () => {
     });
 
     it('shows no location for notes without partyLocation', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Test',
@@ -153,9 +153,9 @@ describe('Notes', () => {
     });
 
     it('shows location icon for notes with partyLocation', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Test',
@@ -171,9 +171,9 @@ describe('Notes', () => {
     });
 
     it('truncates long descriptions in list view', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'A'.repeat(200),
@@ -190,9 +190,9 @@ describe('Notes', () => {
     });
 
     it('does not truncate short descriptions', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Short',
@@ -209,9 +209,9 @@ describe('Notes', () => {
     });
 
     it('renders date modified for notes', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Test',
@@ -230,9 +230,9 @@ describe('Notes', () => {
 
   describe('search', () => {
     it('filters notes by search query and shows no results for non-matching query', async () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Fireball is a 3rd level spell',
@@ -258,9 +258,9 @@ describe('Notes', () => {
     });
 
     it('clears search when clear button is clicked', async () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Fireball is a 3rd level spell',
@@ -356,7 +356,7 @@ describe('Notes', () => {
       fireEvent.change(textarea, { target: { value: 'My new note' } });
       const saveBtn = screen.getByRole('button', { name: /save/i });
       fireEvent.click(saveBtn);
-      expect(mockUseNotes.saveNotesList).toHaveBeenCalled();
+      expect(mockUseNotes.saveItems).toHaveBeenCalled();
     });
 
     it('does not save when description is empty', async () => {
@@ -365,7 +365,7 @@ describe('Notes', () => {
       fireEvent.click(modalOpen);
       const saveBtn = screen.getByRole('button', { name: /save/i });
       fireEvent.click(saveBtn);
-      expect(mockUseNotes.saveNotesList).not.toHaveBeenCalled();
+      expect(mockUseNotes.saveItems).not.toHaveBeenCalled();
     });
 
     it('disables save button when description is empty', () => {
@@ -379,9 +379,9 @@ describe('Notes', () => {
 
   describe('editing notes', () => {
     it('opens edit modal when clicking a note', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Edit me',
@@ -399,9 +399,9 @@ describe('Notes', () => {
     });
 
     it('shows delete button when editing a note', () => {
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Delete me',
@@ -428,12 +428,12 @@ describe('Notes', () => {
   });
 
   describe('deleting notes', () => {
-    it('calls deleteNoteAction when delete is confirmed', async () => {
+    it('calls deleteItem when delete is confirmed', async () => {
       global.window.confirm = vi.fn(() => true);
       const deleteMock = createMockUseNotes();
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...deleteMock,
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Delete me',
@@ -449,14 +449,14 @@ describe('Notes', () => {
       fireEvent.click(noteItem);
       const deleteBtn = screen.getByRole('button', { name: 'Delete' });
       fireEvent.click(deleteBtn);
-      expect(deleteMock.deleteNoteAction).toHaveBeenCalledWith('1');
+      expect(deleteMock.deleteItem).toHaveBeenCalledWith('1');
     });
 
     it('does not delete when user cancels confirmation', async () => {
       global.window.confirm = vi.fn(() => false);
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        notes: [
+        items: [
           {
             id: '1',
             description: 'Keep me',
@@ -472,16 +472,16 @@ describe('Notes', () => {
       fireEvent.click(noteItem);
       const deleteBtn = screen.getByRole('button', { name: /delete/i });
       fireEvent.click(deleteBtn);
-      expect(mockUseNotes.deleteNoteAction).not.toHaveBeenCalled();
+      expect(mockUseNotes.deleteItem).not.toHaveBeenCalled();
     });
   });
 
   describe('lifecycle', () => {
     it('loads notes on mount with campaignName', () => {
       const loadNotesListMock = vi.fn();
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        loadNotesList: loadNotesListMock,
+        loadItems: loadNotesListMock,
       });
       renderNotes();
       expect(loadNotesListMock).toHaveBeenCalled();
@@ -489,9 +489,9 @@ describe('Notes', () => {
 
     it('does not load notes without campaignName', () => {
       const loadNotesListMock = vi.fn();
-      useNotesManagement.mockReturnValue({
+      useEntityManagement.mockReturnValue({
         ...createMockUseNotes(),
-        loadNotesList: loadNotesListMock,
+        loadItems: loadNotesListMock,
       });
       renderNotes({ campaignName: null });
       expect(loadNotesListMock).not.toHaveBeenCalled();

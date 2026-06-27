@@ -5,8 +5,8 @@ import NPCs from './NPCs';
 
 const mockUseNPCsManagement = vi.fn();
 
-vi.mock('../../hooks/management/useNPCsManagement.js', () => ({
-  default: (...args) => mockUseNPCsManagement(...args),
+vi.mock('../../hooks/useEntityManagement.js', () => ({
+  useEntityManagement: (...args) => mockUseNPCsManagement(...args),
 }));
 
 vi.mock('./NPCListItem.jsx', () => ({
@@ -84,11 +84,11 @@ function renderWithNPCs(npcs = defaultNPCs) {
   const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'New NPC' } });
   const mockDelete = vi.fn().mockResolvedValue(undefined);
   mockUseNPCsManagement.mockReturnValue({
-    npcs,
+    items: npcs,
     loading: false,
-    loadNPCsList: vi.fn(),
-    saveNPCAction: mockSave,
-    deleteNPCAction: mockDelete,
+    loadItems: vi.fn(),
+    saveItems: mockSave,
+    deleteItem: mockDelete,
   });
   return {
     ...render(<NPCs {...defaultProps} />),
@@ -188,11 +188,11 @@ describe('NPCs', () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const mockDelete = vi.fn().mockRejectedValue(new Error('Delete failed'));
       mockUseNPCsManagement.mockReturnValue({
-        npcs: defaultNPCs,
+        items: defaultNPCs,
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: vi.fn(),
-        deleteNPCAction: mockDelete,
+        loadItems: vi.fn(),
+        saveItems: vi.fn(),
+        deleteItem: mockDelete,
       });
       render(<NPCs {...defaultProps} />);
       vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -211,11 +211,11 @@ describe('NPCs', () => {
   describe('save error handling', () => {
     it('does not close modal when save throws error', async () => {
       mockUseNPCsManagement.mockReturnValue({
-        npcs: [],
+        items: [],
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: vi.fn().mockRejectedValue(new Error('Save failed')),
-        deleteNPCAction: vi.fn(),
+        loadItems: vi.fn(),
+        saveItems: vi.fn().mockRejectedValue(new Error('Save failed')),
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
       fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
@@ -283,11 +283,11 @@ describe('NPCs', () => {
 
     it('does not close modal when delete throws error', async () => {
       mockUseNPCsManagement.mockReturnValue({
-        npcs: defaultNPCs,
+        items: defaultNPCs,
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: vi.fn(),
-        deleteNPCAction: vi.fn().mockRejectedValue(new Error('Delete failed')),
+        loadItems: vi.fn(),
+        saveItems: vi.fn(),
+        deleteItem: vi.fn().mockRejectedValue(new Error('Delete failed')),
       });
       renderWithNPCs();
       vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -308,9 +308,9 @@ describe('NPCs', () => {
       mockUseNPCsManagement.mockReturnValue({
         npcs: [],
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: mockSave,
-        deleteNPCAction: vi.fn(),
+        loadItems: vi.fn(),
+        saveItems: mockSave,
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
       fireEvent.click(screen.getByRole('button', { name: /New NPC/i }));
@@ -327,11 +327,11 @@ describe('NPCs', () => {
     it('saves NPC and adds to initiative when save-and-add clicked', async () => {
       const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin', armorClass: 15 } });
       mockUseNPCsManagement.mockReturnValue({
-        npcs: defaultNPCs,
+        items: defaultNPCs,
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: mockSave,
-        deleteNPCAction: vi.fn(),
+        loadItems: vi.fn(),
+        saveItems: mockSave,
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
       fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
@@ -351,11 +351,11 @@ describe('NPCs', () => {
     it('closes modal after save-and-add to initiative', async () => {
       const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin' } });
       mockUseNPCsManagement.mockReturnValue({
-        npcs: defaultNPCs,
+        items: defaultNPCs,
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: mockSave,
-        deleteNPCAction: vi.fn(),
+        loadItems: vi.fn(),
+        saveItems: mockSave,
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
       fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
@@ -372,11 +372,11 @@ describe('NPCs', () => {
     it('does not close modal when save-and-add throws error', async () => {
       const mockSave = vi.fn().mockRejectedValue(new Error('Save failed'));
       mockUseNPCsManagement.mockReturnValue({
-        npcs: defaultNPCs,
+        items: defaultNPCs,
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: mockSave,
-        deleteNPCAction: vi.fn(),
+        loadItems: vi.fn(),
+        saveItems: mockSave,
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
       fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
@@ -393,11 +393,11 @@ describe('NPCs', () => {
     it('passes campaignName to addNPCToInitiative', async () => {
       const mockSave = vi.fn().mockResolvedValue({ npc: { name: 'Goblin', armorClass: 15 } });
       mockUseNPCsManagement.mockReturnValue({
-        npcs: defaultNPCs,
+        items: defaultNPCs,
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: mockSave,
-        deleteNPCAction: vi.fn(),
+        loadItems: vi.fn(),
+        saveItems: mockSave,
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
       fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
@@ -437,11 +437,11 @@ describe('NPCs', () => {
 
     it('passes disabled=true when saving', async () => {
       mockUseNPCsManagement.mockReturnValue({
-        npcs: defaultNPCs,
+        items: defaultNPCs,
         loading: false,
-        loadNPCsList: vi.fn(),
-        saveNPCAction: vi.fn().mockImplementation(() => new Promise(() => {})),
-        deleteNPCAction: vi.fn(),
+        loadItems: vi.fn(),
+        saveItems: vi.fn().mockImplementation(() => new Promise(() => {})),
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
       fireEvent.click(screen.getByTestId('edit-btn-Goblin'));
@@ -503,9 +503,9 @@ describe('NPCs', () => {
       mockUseNPCsManagement.mockReturnValue({
         npcs: [],
         loading: false,
-        loadNPCsList: mockLoad,
-        saveNPCAction: vi.fn(),
-        deleteNPCAction: vi.fn(),
+        loadItems: mockLoad,
+        saveItems: vi.fn(),
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...defaultProps} />);
       expect(mockLoad).toHaveBeenCalled();
@@ -516,9 +516,9 @@ describe('NPCs', () => {
       mockUseNPCsManagement.mockReturnValue({
         npcs: [],
         loading: false,
-        loadNPCsList: mockLoad,
-        saveNPCAction: vi.fn(),
-        deleteNPCAction: vi.fn(),
+        loadItems: mockLoad,
+        saveItems: vi.fn(),
+        deleteItem: vi.fn(),
       });
       render(<NPCs {...{ ...defaultProps, campaignName: null }} />);
       expect(mockLoad).not.toHaveBeenCalled();

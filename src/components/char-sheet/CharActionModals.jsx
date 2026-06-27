@@ -28,7 +28,6 @@ import BonusActionChoiceModal from './modals/shared/BonusActionChoiceModal.jsx'
 import RevelationInFleshModal from './modals/RevelationInFleshModal.jsx'
 import ElementalAffinityModal from './modals/ElementalAffinityModal.jsx'
 import FiendishResilienceModal from './modals/FiendishResilienceModal.jsx'
-import BoonOfEnergyResistanceModal from './modals/racial/BoonOfEnergyResistanceModal.jsx'
 import DragonCompanionModal from './modals/DragonCompanionModal.jsx'
 import WildMagicDoubleRollModal from './modals/WildMagicDoubleRollModal.jsx'
 import WildMagicTamedModal from './modals/WildMagicTamedModal.jsx'
@@ -36,10 +35,7 @@ import ThirdEyeModal from './modals/arcane/ThirdEyeModal.jsx'
 import SoulstitchSpellsModal from './modals/arcane/SoulstitchSpellsModal.jsx'
 import IllusoryRealityModal from './modals/arcane/IllusoryRealityModal.jsx'
 import CelestialRevelationModal from './modals/CelestialRevelationModal.jsx'
-import ElfisLineageModal from './modals/racial/ElfisLineageModal.jsx'
-import GnomishLineageModal from './modals/racial/GnomishLineageModal.jsx'
 import FiendishLegacyModal from './modals/FiendishLegacyModal.jsx'
-import GiantAncestryModal from './modals/racial/GiantAncestryModal.jsx'
 import BreathWeaponShapeModal from './modals/racial/BreathWeaponShapeModal.jsx'
 import HypnoticPatternShakeModal from './modals/shared/HypnoticPatternShakeModal.jsx'
 import ArcaneWardRestoreModal from './modals/arcane/ArcaneWardRestoreModal.jsx'
@@ -87,7 +83,6 @@ export default function CharActionModals({
     bastionOfLawModal, setBastionOfLawModal,
     elementalAffinityModal, setElementalAffinityModal,
     fiendishResilienceModal, setFiendishResilienceModal,
-    boonOfEnergyResistanceModal, setBoonOfEnergyResistanceModal,
     dragonCompanionModal, setDragonCompanionModal,
     wildMagicDoubleRollModal, setWildMagicDoubleRollModal,
     wildMagicTamedModal, setWildMagicTamedModal,
@@ -95,10 +90,7 @@ export default function CharActionModals({
     soulstitchSpellsModal, setSoulstitchSpellsModal,
     illusoryRealityModal, setIllusoryRealityModal,
     celestialRevelationModal, setCelestialRevelationModal,
-    elfishLineageModal, setElfisLineageModal,
-    gnomishLineageModal, setGnomishLineageModal,
     fiendishLegacyModal, setFiendishLegacyModal,
-    giantAncestryModal, setGiantAncestryModal,
     eyebiteEffectModal, setEyebiteEffectModal,
     breathWeaponShapeModal, setBreathWeaponShapeModal,
     hypnoticPatternShakeModal, setHypnoticPatternShakeModal,
@@ -384,12 +376,6 @@ export default function CharActionModals({
                     onClose={() => setFiendishResilienceModal(null)}
                 />
             )}
-            {boonOfEnergyResistanceModal && (
-                <BoonOfEnergyResistanceModal
-                    {...boonOfEnergyResistanceModal}
-                    onClose={() => setBoonOfEnergyResistanceModal(null)}
-                />
-            )}
             {dragonCompanionModal && (
                 <DragonCompanionModal
                     {...dragonCompanionModal}
@@ -434,28 +420,10 @@ export default function CharActionModals({
                     onClose={() => setCelestialRevelationModal(null)}
                 />
             )}
-            {elfishLineageModal && (
-                <ElfisLineageModal
-                    {...elfishLineageModal}
-                    onClose={() => setElfisLineageModal(null)}
-                />
-            )}
-            {gnomishLineageModal && (
-                <GnomishLineageModal
-                    {...gnomishLineageModal}
-                    onClose={() => setGnomishLineageModal(null)}
-                />
-            )}
             {fiendishLegacyModal && (
                 <FiendishLegacyModal
                     {...fiendishLegacyModal}
                     onClose={() => setFiendishLegacyModal(null)}
-                />
-            )}
-            {giantAncestryModal && (
-                <GiantAncestryModal
-                    {...giantAncestryModal}
-                    onClose={() => setGiantAncestryModal(null)}
                 />
             )}
             {breathWeaponShapeModal && (

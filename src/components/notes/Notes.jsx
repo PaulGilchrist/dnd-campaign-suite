@@ -1,12 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
-import useNotesManagement from '../../hooks/management/useNotesManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { loadNotes, saveNotes, deleteNote } from '../../services/campaign/notesService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Notes.css';
 
 function Notes({ campaignName, characters, isLocalhost, onBack }) {
-  const { notes, loading, loadNotesList, saveNotesList, deleteNoteAction } =
-    useNotesManagement(campaignName);
+  const { items: notes, loading, loadItems: loadNotesList, saveItems: saveNotesList, deleteItem: deleteNoteAction } =
+    useEntityManagement(campaignName, { load: loadNotes, save: saveNotes, delete: deleteNote }, { responseKey: 'notes', loadOnMount: false });
 
   const {
     searchQuery, setSearchQuery, filteredItems: filteredNotes,

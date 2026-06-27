@@ -11,8 +11,14 @@ let factionsReturnValue = {
   deleteFactionAction: vi.fn(),
 };
 
-vi.mock('../../hooks/management/useFactionsManagement.js', () => ({
-  default: () => factionsReturnValue,
+vi.mock('../../hooks/useEntityManagement.js', () => ({
+  useEntityManagement: () => ({
+    items: factionsReturnValue.factions,
+    loading: factionsReturnValue.loading,
+    loadItems: factionsReturnValue.loadFactionsList,
+    saveItems: factionsReturnValue.saveFactionsList,
+    deleteItem: factionsReturnValue.deleteFactionAction,
+  }),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({

@@ -5,8 +5,8 @@ import Quests from './Quests.jsx';
 
 const mockUseQuestsManagement = vi.fn();
 
-vi.mock('../../hooks/management/useQuestsManagement.js', () => ({
-  default: (...args) => mockUseQuestsManagement(...args),
+vi.mock('../../hooks/useEntityManagement.js', () => ({
+  useEntityManagement: (...args) => mockUseQuestsManagement(...args),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({
@@ -29,15 +29,15 @@ const defaultProps = {
   onBack: vi.fn(),
 };
 
-function renderWithQuests(quests, loading = false) {
+function renderWithQuests(items, loading = false) {
   const mockSave = vi.fn().mockResolvedValue(undefined);
   const mockDelete = vi.fn().mockResolvedValue(undefined);
   mockUseQuestsManagement.mockReturnValue({
-    quests,
+    items,
     loading,
-    loadQuestsList: vi.fn(),
-    saveQuestsList: mockSave,
-    deleteQuestAction: mockDelete,
+    loadItems: vi.fn(),
+    saveItems: mockSave,
+    deleteItem: mockDelete,
   });
   return {
     ...render(<Quests {...defaultProps} />),
@@ -59,11 +59,11 @@ describe('Quests', () => {
   describe('rendering and visibility', () => {
     it('returns null when isLocalhost is false', () => {
       mockUseQuestsManagement.mockReturnValue({
-        quests: [],
+        items: [],
         loading: false,
-        loadQuestsList: vi.fn(),
-        saveQuestsList: vi.fn(),
-        deleteQuestAction: vi.fn(),
+        loadItems: vi.fn(),
+        saveItems: vi.fn(),
+        deleteItem: vi.fn(),
       });
       const { container } = render(<Quests {...defaultProps} isLocalhost={false} />);
       expect(container.innerHTML).toBe('');

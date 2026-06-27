@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
-import useQuestsManagement from '../../hooks/management/useQuestsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { loadQuests, saveQuests, deleteQuest } from '../../services/campaign/questsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import './Quests.css';
 
@@ -13,7 +14,7 @@ const STATUS_COLORS = {
 };
 
 function Quests({ campaignName, isLocalhost, onBack }) {
-  const { quests, loading, saveQuestsList, deleteQuestAction } = useQuestsManagement(campaignName);
+  const { items: quests, loading, saveItems: saveQuestsList, deleteItem: deleteQuestAction } = useEntityManagement(campaignName, { load: loadQuests, save: saveQuests, delete: deleteQuest }, { responseKey: 'quests' });
   const {
     searchQuery, setSearchQuery, filteredItems: filteredQuests,
     modalOpen, editingItem: editingQuest, formData, setFormData,

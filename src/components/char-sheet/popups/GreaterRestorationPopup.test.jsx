@@ -30,6 +30,7 @@ const baseSpell = { name: 'Greater Restoration', level: 5 };
 const creatureTargets = ['Goblin', 'Orc', 'Troll'];
 
 function makeProps(overrides = {}) {
+    const campaignName = overrides.campaignName ?? 'test-campaign';
     const conditionMatches = (c, targetCondition) =>
         (typeof c === 'string' ? c.toLowerCase() : '').trim() === (typeof targetCondition === 'string' ? targetCondition.toLowerCase() : '').trim();
 
@@ -38,7 +39,7 @@ function makeProps(overrides = {}) {
         const conditions = getRuntimeValue(targetName, 'activeConditions') || [];
         let csConditions = [];
         try {
-            const cs = await getCombatSummary('test-campaign');
+            const cs = await getCombatSummary(campaignName);
             if (cs) {
                 const creature = cs.creatures?.find(c => utils.getName(c.name) === utils.getName(targetName));
                 if (creature && Array.isArray(creature.conditions)) {
@@ -73,12 +74,13 @@ function makeProps(overrides = {}) {
         return result;
     };
 
+    const range = overrides.range ?? '60 ft';
     return {
         spell: baseSpell,
         _playerStats: {},
         _campaignName: 'test-campaign',
         creatureTargets,
-        range: '60 ft',
+        range,
         onConfirm: vi.fn(),
         onSkip: vi.fn(),
         loadTargetData,
@@ -86,7 +88,7 @@ function makeProps(overrides = {}) {
         title: 'Greater Restoration',
         school: 'Abjuration',
         defaultLevel: 5,
-        description: 'Choose a creature within range and select the effect(s) to remove.',
+        description: `Choose a creature within ${range} and select the effect(s) to remove. This spell can remove one or more of the following from the target: an exhaustion level, the Charmed or Petrified condition, a curse (including attunement to a cursed magic item), any reduction to an ability score, or any reduction to the target's Hit Point maximum.`,
         noItemsMessage: 'No removable effects found on this target',
         confirmLabel: 'Cast Greater Restoration',
         ...overrides,
@@ -142,7 +144,7 @@ describe('TargetWithCheckboxesPopup', () => {
     it('renders the spell description with range', () => {
         render(<TargetWithCheckboxesPopup {...makeProps()} />);
         expect(screen.getByText(/Choose a creature within/)).toBeInTheDocument();
-        expect(screen.getByText('60 ft')).toBeInTheDocument();
+        expect(screen.getByText(/60 ft/)).toBeInTheDocument();
     });
 
     it('renders a health icon in the heading', () => {

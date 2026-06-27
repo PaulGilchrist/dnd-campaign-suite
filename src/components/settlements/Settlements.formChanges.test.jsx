@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
-vi.mock('../../hooks/management/useSettlementsManagement.js', () => ({
+vi.mock('../../hooks/useEntityManagement.js', () => ({
   default: vi.fn(),
 }));
 
@@ -40,14 +40,14 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - form field changes', () => {
   const mockUseSettlements = {
-    settlements: [],
+    items: [],
     loading: false,
-    saveSettlementAction: vi.fn().mockResolvedValue(undefined),
-    deleteSettlementAction: vi.fn().mockResolvedValue(undefined),
+    saveItems: vi.fn().mockResolvedValue(undefined),
+    deleteItem: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
@@ -94,7 +94,7 @@ describe('Settlements - form field changes', () => {
   });
 
   beforeEach(() => {
-    useSettlementsManagement.mockReturnValue(mockUseSettlements);
+    useEntityManagement.mockReturnValue(mockUseSettlements);
   });
 
   it('allows changing the name field', () => {
@@ -149,9 +149,9 @@ describe('Settlements - form field changes', () => {
   });
 
   it('shows threat preview toggle when editing a settlement with threat', () => {
-    useSettlementsManagement.mockReturnValue({
+    useEntityManagement.mockReturnValue({
       ...mockUseSettlements,
-      settlements: [
+      items: [
         { name: 'Threat Town', size: 'village', population: '', tags: '', services: [], description: '', atmosphere: '', government: '', notableNPCs: [], rumors: [], notes: '', threat: 'Bandits' },
       ],
     });

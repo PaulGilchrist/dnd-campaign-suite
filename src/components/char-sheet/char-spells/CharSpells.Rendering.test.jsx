@@ -175,55 +175,25 @@ vi.mock('../popups/MultiTargetPopup.jsx', () => ({
 
 vi.mock('../popups/MultiTargetCountPopup.jsx', () => ({
   default: function MultiTargetCountPopup() {
-    return <div data-testid="aid-target-popup">Aid</div>;
-  },
-}));
-
-vi.mock('../popups/MultiTargetCountPopup.jsx', () => ({
-  default: function MultiTargetCountPopup() {
-    return <div data-testid="heroes-feast-popup">HeroesFeast</div>;
+    return <div data-testid="multi-target-count-popup">MultiTargetCount</div>;
   },
 }));
 
 vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
   default: function TargetWithCheckboxesPopup() {
-    return <div data-testid="greater-restoration-popup">GreaterRestoration</div>;
-  },
-}));
-
-vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
-  default: function TargetWithCheckboxesPopup() {
-    return <div data-testid="lesser-restoration-popup">LesserRestoration</div>;
-  },
-}));
-
-vi.mock('../popups/TargetWithCheckboxesPopup.jsx', () => ({
-  default: function TargetWithCheckboxesPopup() {
-    return <div data-testid="remove-curse-popup">RemoveCurse</div>;
+    return <div data-testid="target-with-checkboxes-popup">TargetWithCheckboxes</div>;
   },
 }));
 
 vi.mock('../popups/SingleTargetPopup.jsx', () => ({
   default: function SingleTargetPopup() {
-    return <div data-testid="mage-armor-popup">MageArmor</div>;
-  },
-}));
-
-vi.mock('../popups/SingleTargetPopup.jsx', () => ({
-  default: function SingleTargetPopup() {
-    return <div data-testid="shield-of-faith-popup">ShieldOfFaith</div>;
+    return <div data-testid="single-target-popup">SingleTarget</div>;
   },
 }));
 
 vi.mock('../popups/TargetWithTypePopup.jsx', () => ({
   default: function TargetWithTypePopup() {
-    return <div data-testid="protection-from-energy-popup">ProtectionFromEnergy</div>;
-  },
-}));
-
-vi.mock('../popups/TargetWithTypePopup.jsx', () => ({
-  default: function TargetWithTypePopup() {
-    return <div data-testid="resistance-popup">Resistance</div>;
+    return <div data-testid="target-with-type-popup">TargetWithType</div>;
   },
 }));
 
@@ -1139,7 +1109,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('aid-target-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('multi-target-count-popup')).toBeInTheDocument();
     });
 
     it('renders the heroes feast popup when heroes feast is pending', () => {
@@ -1195,7 +1165,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('heroes-feast-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('multi-target-count-popup')).toBeInTheDocument();
     });
 
     it('renders the greater restoration popup when pending', () => {
@@ -1248,7 +1218,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('greater-restoration-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('target-with-checkboxes-popup')).toBeInTheDocument();
     });
 
     it('renders the lesser restoration popup when pending', () => {
@@ -1301,7 +1271,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('lesser-restoration-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('target-with-checkboxes-popup')).toBeInTheDocument();
     });
 
     it('renders the remove curse popup when pending', () => {
@@ -1354,7 +1324,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('remove-curse-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('target-with-checkboxes-popup')).toBeInTheDocument();
     });
 
     it('renders the mage armor popup when pending', () => {
@@ -1407,7 +1377,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('mage-armor-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('single-target-popup')).toBeInTheDocument();
     });
 
     it('renders the shield of faith popup when pending', () => {
@@ -1460,7 +1430,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('shield-of-faith-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('single-target-popup')).toBeInTheDocument();
     });
 
     it('renders the protection from energy popup when pending', () => {
@@ -1514,7 +1484,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('protection-from-energy-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('target-with-type-popup')).toBeInTheDocument();
     });
 
     it('renders the resistance popup when pending', () => {
@@ -1568,7 +1538,7 @@ describe('CharSpells rendering', () => {
         />,
       );
 
-      expect(screen.getByTestId('resistance-popup')).toBeInTheDocument();
+      expect(screen.getByTestId('target-with-type-popup')).toBeInTheDocument();
     });
 
     it('does not render any target popup when all pending values are null', () => {
@@ -1618,15 +1588,15 @@ describe('CharSpells rendering', () => {
 
       expect(screen.queryByTestId('metamagic-popup')).not.toBeInTheDocument();
       expect(screen.queryByTestId('multi-target-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('aid-target-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('heroes-feast-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('greater-restoration-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('lesser-restoration-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('remove-curse-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('mage-armor-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('shield-of-faith-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('protection-from-energy-popup')).not.toBeInTheDocument();
-      expect(screen.queryByTestId('resistance-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('multi-target-count-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('multi-target-count-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('target-with-checkboxes-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('target-with-checkboxes-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('target-with-checkboxes-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('single-target-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('single-target-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('target-with-type-popup')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('target-with-type-popup')).not.toBeInTheDocument();
     });
 
     it('does not render spell detail popup when no spell is selected', () => {

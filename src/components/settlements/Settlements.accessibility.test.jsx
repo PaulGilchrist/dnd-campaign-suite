@@ -3,8 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Settlements from './Settlements.jsx';
 
-vi.mock('../../hooks/management/useSettlementsManagement.js', () => ({
-  default: vi.fn(),
+vi.mock('../../hooks/useEntityManagement.js', () => ({
+  useEntityManagement: vi.fn(() => ({
+    items: [],
+    loading: false,
+    loadItems: vi.fn(),
+    saveItems: vi.fn().mockResolvedValue(undefined),
+    deleteItem: vi.fn().mockResolvedValue(undefined),
+  })),
 }));
 
 vi.mock('../common/PreviewToggle.jsx', () => ({
@@ -40,16 +46,16 @@ vi.mock('../../services/campaign/settlementGenerator.js', () => ({
   }),
 }));
 
-import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
 
 describe('Settlements - accessibility and keyboard', () => {
   const mockUseSettlements = {
-    settlements: [
+    items: [
       { name: 'Fireport', size: 'town', population: '1,500 souls', tags: 'coastal', services: [], description: 'A town of fire' },
     ],
     loading: false,
-    saveSettlementAction: vi.fn().mockResolvedValue(undefined),
-    deleteSettlementAction: vi.fn().mockResolvedValue(undefined),
+    saveItems: vi.fn().mockResolvedValue(undefined),
+    deleteItem: vi.fn().mockResolvedValue(undefined),
   };
 
   beforeEach(() => {
@@ -67,7 +73,7 @@ describe('Settlements - accessibility and keyboard', () => {
   });
 
   beforeEach(() => {
-    useSettlementsManagement.mockReturnValue(mockUseSettlements);
+    useEntityManagement.mockReturnValue(mockUseSettlements);
   });
 
   it('opens edit modal when settlement item is activated with Enter', () => {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useCrudList } from '../../hooks/useCrudList.js';
-import useSettlementsManagement from '../../hooks/management/useSettlementsManagement.js';
+import { useEntityManagement } from '../../hooks/useEntityManagement.js';
+import { loadSettlements, saveSettlements, deleteSettlement } from '../../services/campaign/settlementsService.js';
 import PreviewToggle from '../common/PreviewToggle.jsx';
 import { generateSettlement } from '../../services/campaign/settlementGenerator.js';
 import './Settlements.css';
@@ -43,8 +44,8 @@ const SERVICE_TYPE_LABELS = {
 };
 
 function Settlements({ campaignName, onBack }) {
-  const { settlements, loading, saveSettlementAction, deleteSettlementAction } =
-    useSettlementsManagement(campaignName);
+  const { items: settlements, loading, saveItems: saveSettlementAction, deleteItem: deleteSettlementAction } =
+    useEntityManagement(campaignName, { load: loadSettlements, save: saveSettlements, delete: deleteSettlement }, { responseKey: 'settlements', loadOnMount: false });
 
   const {
     searchQuery, setSearchQuery, filteredItems,
