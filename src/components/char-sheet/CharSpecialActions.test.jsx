@@ -74,16 +74,11 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 }));
 
 // Mock fighting styles
-vi.mock('../../services/character/fightingStyles.js', () => ({
-  getFightingStyle: vi.fn((name) => {
-    if (name === 'Great Weapon Fighting') {
-      return { name: 'Great Weapon Fighting', description: 'When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.' };
-    }
-    if (name === 'Protection') {
-      return { name: 'Protection', description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.' };
-    }
-    return null;
-  }),
+vi.mock('../../services/ui/dataLoader.js', () => ({
+  loadFightingStyles: vi.fn(() => Promise.resolve([
+    { name: 'Great Weapon Fighting', description: 'When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.' },
+    { name: 'Protection', description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.' },
+  ])),
 }));
 
 const basePlayerStats = {
@@ -146,23 +141,23 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
   });
 
   describe('fighting styles', () => {
-    it('adds Great Weapon Fighting from fightingStyles when not already present', () => {
+    it('adds Great Weapon Fighting from fightingStyles when not already present', async () => {
       const playerStats = createPlayerStats({
         class: { fightingStyles: ['Great Weapon Fighting'] },
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Great Weapon Fighting/)).toBeInTheDocument();
+      await screen.findByText(/Great Weapon Fighting/);
     });
 
-    it('adds Protection from fightingStyles when not already present', () => {
+    it('adds Protection from fightingStyles when not already present', async () => {
       const playerStats = createPlayerStats({
         class: { fightingStyles: ['Protection'] },
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Protection/)).toBeInTheDocument();
+      await screen.findByText(/Protection/);
     });
 
-    it('does not duplicate a fighting style already in specialActions', () => {
+    it('does not duplicate a fighting style already in specialActions', async () => {
       const playerStats = createPlayerStats({
         specialActions: [
           { name: 'Great Weapon Fighting', description: 'Already added.' },
@@ -170,17 +165,18 @@ describe('CharSpecialActions - Rendering & Filtering', () => {
         class: { fightingStyles: ['Great Weapon Fighting'] },
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
+      await screen.findByText(/Great Weapon Fighting/);
       const elements = screen.getAllByText(/Great Weapon Fighting/);
       expect(elements).toHaveLength(1);
     });
 
-    it('adds only the first matching fighting style when both GWF and Protection are present', () => {
+    it('adds only the first matching fighting style when both GWF and Protection are present', async () => {
       const playerStats = createPlayerStats({
         specialActions: [],
         class: { fightingStyles: ['Great Weapon Fighting', 'Protection'] },
       });
       render(<CharSpecialActions playerStats={playerStats} campaignName="test" />);
-      expect(screen.getByText(/Great Weapon Fighting/)).toBeInTheDocument();
+      await screen.findByText(/Great Weapon Fighting/);
       expect(screen.queryByText(/Protection/)).not.toBeInTheDocument();
     });
 

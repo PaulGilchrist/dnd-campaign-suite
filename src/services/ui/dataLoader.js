@@ -26,15 +26,16 @@
         }
     };
 
-   // Shared cache for version-agnostic data (files in /data/ not /data/2024/)
-    const sharedDataCache = {
-      skills: null,
-       abilityScores: null,
-     passiveSkills: null,
-      equipment: null,
-     monsters: null,
-     magicItems: null
-     };
+    // Shared cache for version-agnostic data (files in /data/ not /data/2024/)
+     const sharedDataCache = {
+       skills: null,
+        abilityScores: null,
+      passiveSkills: null,
+       equipment: null,
+      monsters: null,
+      magicItems: null,
+      fightingStyles: null
+      };
 
 /**
  * Builds the correct file path for a given data type and version
@@ -295,10 +296,10 @@ export async function loadMonsters() {
     return [];
 }
 
-   /**
-        * Fetches magic items data (with caching) - version agnostic
-       * @returns {Promise<object[]>} - Array of magic items data
-       */
+/**
+   * Fetches magic items data (with caching) - version agnostic
+   * @returns {Promise<object[]>} - Array of magic items data
+   */
     export async function loadMagicItems() {
         if (sharedDataCache.magicItems) {
           return sharedDataCache.magicItems;
@@ -307,15 +308,37 @@ export async function loadMonsters() {
         try {
             const response = await fetch('/data/magic-items.json');
              if (response.ok) {
-               const data = await response.json();
-            sharedDataCache.magicItems = data;
-               return data;
+                const data = await response.json();
+             sharedDataCache.magicItems = data;
+                return data;
+                 }
+            } catch (error) {
+               console.error('Error loading magic items:', error);
                 }
-           } catch (error) {
-              console.error('Error loading magic items:', error);
-               }
-        return [];
-      }
+         return [];
+       }
+
+/**
+   * Fetches fighting styles data (with caching) - version agnostic
+   * @returns {Promise<object[]>} - Array of fighting styles data
+   */
+    export async function loadFightingStyles() {
+        if (sharedDataCache.fightingStyles) {
+          return sharedDataCache.fightingStyles;
+        }
+
+        try {
+            const response = await fetch('/data/fighting-styles.json');
+             if (response.ok) {
+                const data = await response.json();
+             sharedDataCache.fightingStyles = data;
+                return data;
+                 }
+            } catch (error) {
+               console.error('Error loading fighting styles:', error);
+                }
+         return [];
+       }
 
 /**
   * Loads spell data for a given spell list key and player stats.
@@ -471,12 +494,13 @@ export function clearDataCache() {
          spells: null,
          maneuvers: null
         };
-   sharedDataCache.skills = null;
-     sharedDataCache.abilityScores = null;
-   sharedDataCache.passiveSkills = null;
-    sharedDataCache.equipment = null;
-  sharedDataCache.monsters = null;
-sharedDataCache.magicItems = null;
+    sharedDataCache.skills = null;
+      sharedDataCache.abilityScores = null;
+    sharedDataCache.passiveSkills = null;
+     sharedDataCache.equipment = null;
+   sharedDataCache.monsters = null;
+ sharedDataCache.magicItems = null;
+sharedDataCache.fightingStyles = null;
   }
 
 

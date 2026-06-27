@@ -119,16 +119,11 @@ vi.mock('../../services/ui/sanitize.js', () => ({
 }));
 
 // Mock fighting styles
-vi.mock('../../services/character/fightingStyles.js', () => ({
-  getFightingStyle: vi.fn((name) => {
-    if (name === 'Great Weapon Fighting') {
-      return { name: 'Great Weapon Fighting', description: 'When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.' };
-    }
-    if (name === 'Protection') {
-      return { name: 'Protection', description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.' };
-    }
-    return null;
-  }),
+vi.mock('../../services/ui/dataLoader.js', () => ({
+  loadFightingStyles: vi.fn(() => Promise.resolve([
+    { name: 'Great Weapon Fighting', description: 'When you roll damage for an attack you make with a Melee weapon that you are holding with two hands, you can treat any 1 or 2 on a damage die as a 3. The weapon must have the Two-Handed or Versatile property to gain this benefit.' },
+    { name: 'Protection', description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.' },
+  ])),
 }));
 
 // Mock the handler functions called by modal confirm callbacks

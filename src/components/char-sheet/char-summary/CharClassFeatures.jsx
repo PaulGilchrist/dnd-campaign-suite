@@ -7,7 +7,7 @@ import { executeHandler } from '../../../services/automation/index.js';
 import { applyPortentChoice } from '../../../services/automation/handlers/class-wizard/portentHandler.js';
 import Popup from '../../common/popup.jsx';
 import WeaponKindMasteryModal from '../modals/WeaponKindMasteryModal.jsx';
-import { getFightingStyle } from '../../../services/character/fightingStyles.js';
+import { loadFightingStyles } from '../../../services/ui/dataLoader.js';
 /* ─── Barbarian ─── */
 const BarbarianFeatures = function BarbarianFeatures({ playerStats, campaignName, onWeaponMasteryClick }) {
     const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
@@ -204,9 +204,21 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
     const hasEnergy = classLevel?.energy && classLevel.energy.required_major === majorName;
     const isBattleMaster = majorName === 'Battle Master';
     const [fightingStylePopup, setFightingStylePopup] = React.useState(null);
+    const [fightingStylesMap, setFightingStylesMap] = React.useState(null);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        loadFightingStyles().then(styles => {
+            if (cancelled) return;
+            const map = {};
+            styles.forEach(s => { map[s.name] = s; });
+            setFightingStylesMap(map);
+        });
+        return () => { cancelled = true; };
+    }, []);
 
     const handleFightingStyleClick = (styleName) => {
-        const style = getFightingStyle(styleName);
+        const style = fightingStylesMap?.[styleName];
         if (style) {
             setFightingStylePopup(`<b>${style.name}</b><br/>${style.description}<br/><span class="dice-roll-hint">click to dismiss</span>`);
         }
@@ -279,9 +291,21 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
     const cha = playerStats.abilities?.find((a) => a.name === 'Charisma');
     const layOnHandsPoolMax = 5 * playerStats.level;
     const [fightingStylePopup, setFightingStylePopup] = React.useState(null);
+    const [fightingStylesMap, setFightingStylesMap] = React.useState(null);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        loadFightingStyles().then(styles => {
+            if (cancelled) return;
+            const map = {};
+            styles.forEach(s => { map[s.name] = s; });
+            setFightingStylesMap(map);
+        });
+        return () => { cancelled = true; };
+    }, []);
 
     const handleFightingStyleClick = (styleName) => {
-        const style = getFightingStyle(styleName);
+        const style = fightingStylesMap?.[styleName];
         if (style) {
             setFightingStylePopup(`<b>${style.name}</b><br/>${style.description}<br/><span class="dice-roll-hint">click to dismiss</span>`);
         }
@@ -312,9 +336,21 @@ const PaladinFeatures = function PaladinFeatures({ playerStats, campaignName }) 
 const RangerFeatures = function RangerFeatures({ playerStats }) {
     const rangerFeatures = getClassFeatures(playerStats);
     const [fightingStylePopup, setFightingStylePopup] = React.useState(null);
+    const [fightingStylesMap, setFightingStylesMap] = React.useState(null);
+
+    React.useEffect(() => {
+        let cancelled = false;
+        loadFightingStyles().then(styles => {
+            if (cancelled) return;
+            const map = {};
+            styles.forEach(s => { map[s.name] = s; });
+            setFightingStylesMap(map);
+        });
+        return () => { cancelled = true; };
+    }, []);
 
     const handleFightingStyleClick = (styleName) => {
-        const style = getFightingStyle(styleName);
+        const style = fightingStylesMap?.[styleName];
         if (style) {
             setFightingStylePopup(`<b>${style.name}</b><br/>${style.description}<br/><span class="dice-roll-hint">click to dismiss</span>`);
         }

@@ -1,8 +1,8 @@
 import { rollExpression, rollExpressionDoubled } from '../../services/dice/diceRoller.js';
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { getCategories } from '../../services/character/featureCategories.js'
 import { renderMarkdownInline } from '../../services/ui/sanitize.js';
-import { getFightingStyle } from '../../services/character/fightingStyles.js';
+import { loadFightingStyles } from '../../services/ui/dataLoader.js';
 import { executeHandler } from '../../services/automation/index.js';
 import { isInteractiveAutomation } from '../../services/combat/automation/automationService.js';
 import TeleportModal from './modals/TeleportModal.jsx';
@@ -28,6 +28,7 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     const [savantModal, setSavantModal] = useState(null);
     const [weaponKindMasteryModal, setWeaponKindMasteryModal] = useState(null);
     const [weaponMasteryChoiceModal, setWeaponMasteryChoiceModal] = useState(null);
+    const [fightingStylesMap, setFightingStylesMap] = useState(null);
     const { setPopupHtml } = useDiceRollPopup();
     const { rollAttack, rollDamage } = useLoggedDiceRoll(playerStats?.name, campaignName, {
         characters,
@@ -82,6 +83,17 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         handleCombatSuperiorityConfirm,
         handleCombatSuperiorityReopenSelection,
     } = useCombatSuperiorityModal(playerStats, campaignName, rollAttack, rollDamage, setPopupHtml);
+
+    useEffect(() => {
+        let cancelled = false;
+        loadFightingStyles().then(styles => {
+            if (cancelled) return;
+            const map = {};
+            styles.forEach(s => { map[s.name] = s; });
+            setFightingStylesMap(map);
+        });
+        return () => { cancelled = true; };
+    }, []);
 
     const handleAutomationClick = useCallback(async (action) => {
         if (cannotAct) return;
@@ -150,14 +162,16 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
     // Build specialActions list immutably
     let specialActions = [...(playerStats.specialActions || [])];
 
-      // Add fighting style special actions
-    if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Great Weapon Fighting') && !specialActions.find((specialAction) => specialAction.name === 'Great Weapon Fighting')) {
-        const style = getFightingStyle('Great Weapon Fighting');
-        if (style) specialActions.push(style);
-     } else if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Protection') && !specialActions.find((specialAction) => specialAction.name === 'Protection')) {
-        const style = getFightingStyle('Protection');
-        if (style) specialActions.push(style);
-        }
+    // Add fighting style special actions
+    if (fightingStylesMap && playerStats.class.fightingStyles) {
+        if (playerStats.class.fightingStyles.includes('Great Weapon Fighting') && !specialActions.find((specialAction) => specialAction.name === 'Great Weapon Fighting')) {
+            const style = fightingStylesMap['Great Weapon Fighting'];
+            if (style) specialActions.push(style);
+         } else if (playerStats.class.fightingStyles.includes('Protection') && !specialActions.find((specialAction) => specialAction.name === 'Protection')) {
+            const style = fightingStylesMap['Protection'];
+            if (style) specialActions.push(style);
+            }
+    }
 
 
     // Get names of features that should not be shown in Special Actions
