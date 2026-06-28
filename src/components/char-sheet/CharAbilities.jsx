@@ -73,13 +73,22 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
              if (conditionEffects?.abilityCheckAdvantage && (!conditionEffects?.abilityCheckAdvantageSkill || conditionEffects.abilityCheckAdvantageSkill === checkName)) {
                forcedMode = forcedMode === 'disadvantage' ? undefined : 'advantage'
              }
-             // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
-             if (!forcedMode && conditionEffects?.abilityCheckAdvantageAbilities) {
-               const abbr = checkName.substring(0, 3).toUpperCase();
-               if (conditionEffects.abilityCheckAdvantageAbilities.includes(abbr)) {
-                 forcedMode = 'advantage'
-               }
-             }
+                // Check per-ability check advantage (e.g., Remarkable Athlete for STR)
+                if (!forcedMode && conditionEffects?.abilityCheckAdvantageAbilities) {
+                  const skillToAbility = {
+                    'ATH': 'STR', 'STR': 'STR', 'Strength': 'STR',
+                    'ACR': 'DEX', 'DEX': 'DEX', 'Sle': 'DEX', 'Ste': 'DEX', 'Dexterity': 'DEX',
+                    'CON': 'CON', 'Constitution': 'CON',
+                    'ARC': 'INT', 'INT': 'INT', 'His': 'INT', 'Inv': 'INT', 'Nat': 'INT', 'Rel': 'INT',
+                    'Animal Handling': 'WIS', 'Ins': 'WIS', 'WIS': 'WIS', 'Med': 'WIS', 'Per': 'WIS', 'Sur': 'WIS',
+                    'Dec': 'CHA', 'Int': 'CHA', 'Perf': 'CHA', 'Pers': 'CHA', 'CHA': 'CHA', 'Charisma': 'CHA',
+                  };
+                  const abbr = checkName.substring(0, 3).toUpperCase();
+                  const abilityForCheck = skillToAbility[checkName] || skillToAbility[abbr];
+                  if (abilityForCheck && conditionEffects.abilityCheckAdvantageAbilities.includes(abilityForCheck)) {
+                    forcedMode = 'advantage'
+                  }
+                }
              // Ray of Enfeeblement: STR-based d20 tests have disadvantage
              if (!forcedMode && conditionEffects?.strCheckDisadvantage) {
                const abbr = checkName.substring(0, 3).toUpperCase();
@@ -122,19 +131,19 @@ function CharAbilities({ allAbilityScores, playerStats, campaignName, exhaustion
               return Object.keys(ctx).length > 0 ? ctx : undefined
          }
 
-      const makeSaveContext = (abilityName) => {
-        const abbr = abilityName.substring(0, 3).toLowerCase()
-        const autoFail = conditionEffects?.autoFailSaves?.includes(abbr)
-        let forcedMode = undefined
-        if (!autoFail && conditionEffects?.saveDisadvantage?.includes(abbr)) {
-          forcedMode = 'disadvantage'
-        }
-         if (!autoFail && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
-          forcedMode = 'advantage'
+       const makeSaveContext = (abilityName) => {
+          const abbr = abilityName.substring(0, 3).toLowerCase()
+          const autoFail = conditionEffects?.autoFailSaves?.includes(abbr)
+          let forcedMode = undefined
+          if (!autoFail && conditionEffects?.saveDisadvantage?.includes(abbr)) {
+            forcedMode = 'disadvantage'
+          }
+           if (!autoFail && !forcedMode && (conditionEffects?.saveAdvantageCount || 0) > 0) {
+            forcedMode = 'advantage'
+             }
+           if (!autoFail && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
+            forcedMode = 'advantage'
            }
-        if (!autoFail && !forcedMode && conditionEffects?.saveAdvantageAbilities?.includes(abilityName.substring(0, 3).toUpperCase())) {
-          forcedMode = 'advantage'
-         }
            if (conditionEffects?.autoReroll) {
              return { forcedMode, autoFail: autoFail || undefined, autoReroll: true, autoRerollCondition: conditionEffects.autoRerollCondition, autoRerollBonus: conditionEffects.autoRerollBonus || null }
            }

@@ -820,14 +820,15 @@ export function createLogAndShow(deps) {
             setRuntimeValue(characterName, 'uncannyMetabolismUsed', false, campaignName);
 
             setPopupHtml({
-                type: 'initiative',
+                type: 'd20',
                 rollType: 'initiative',
                 name: 'Initiative',
-                rolls: [r1],
+                rolls: [r1, r2],
                 bonus: totalBonus,
                 characterName,
                 campaignName,
                 availableSuperiorityManeuvers,
+                forcedMode: context?.forcedMode,
             });
             window.dispatchEvent(new CustomEvent('initiative-rolled', { detail: { characterName: firstName, roll: r1 + totalBonus } }));
         }

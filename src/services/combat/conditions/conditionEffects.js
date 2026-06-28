@@ -93,6 +93,9 @@ function saveModifierApplies(modifier, saveType, abilityName, isRaging = false, 
   if (modifier.condition === 'concentration_breaker') return true;
   if (modifier.condition === 'pfeag_save_advantage') return true;
   if (modifier.condition === 'protection_from_poison_active') return true;
+  if (modifier.condition === 'remarkable_athlete_athletics') {
+    return true;
+  }
   if (modifier.condition && conditionSet.has(modifier.condition)) return true;
   if (modifier.abilities && modifier.abilities.length > 0) {
     if (!abilityName) return true;
@@ -109,15 +112,22 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
       if (mod.effect === 'advantage') {
         if (mod.abilities && mod.abilities.length > 0) {
           // Per-ability check advantage (e.g., Remarkable Athlete for STR)
-          const abbr = abilityName ? abilityName.substring(0, 3).toUpperCase() : null;
-          if (!abbr || mod.abilities.includes(abbr)) {
-            effects.abilityCheckAdvantage = true;
+          if (!abilityName) {
+            // General computation: store abilities list for UI to match against
             effects.abilityCheckAdvantageAbilities = [...new Set([
               ...(effects.abilityCheckAdvantageAbilities || []),
               ...mod.abilities
             ])];
+          } else {
+            // Specific check: only set global advantage if ability matches (or no filter)
+            const abbr = abilityName.substring(0, 3).toUpperCase();
+            if (mod.abilities.includes(abbr)) {
+              console.log('[conditionEffects] SETTING abilityCheckAdvantage for:', abilityName);
+              effects.abilityCheckAdvantage = true;
+            }
           }
         } else {
+          console.log('[conditionEffects] SETTING abilityCheckAdvantage (no abilities filter)');
           effects.abilityCheckAdvantage = true;
         }
       }
@@ -148,25 +158,31 @@ function applySaveModifiers(effects, modifiers, saveType, abilityName, isRaging 
     } else if (mod.target !== 'saving_throw' && mod.target !== 'save' && mod.target !== 'concentration_saving_throws' && mod.target !== 'death_saving_throws') {
       continue;
     }
-    if (mod.effect === 'advantage') {
-      if (mod.abilities && mod.abilities.length > 0 && !abilityName) {
-        effects.saveAdvantageAbilities = [...new Set([
-          ...(effects.saveAdvantageAbilities || []),
-          ...mod.abilities
-        ])];
-      } else if (mod.condition !== 'against_spell') {
-        effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
+    if (mod.target === 'saving_throw' || mod.target === 'save' || mod.target === 'concentration_saving_throws' || mod.target === 'death_saving_throws') {
+      if (mod.effect === 'advantage') {
+        if (mod.abilities && mod.abilities.length > 0 && !abilityName) {
+          // General computation: store abilities list for UI to match against
+          effects.saveAdvantageAbilities = [...new Set([
+            ...(effects.saveAdvantageAbilities || []),
+            ...mod.abilities
+          ])];
+        } else if (mod.condition !== 'against_spell' && mod.target !== 'death_saving_throws') {
+          // Specific save or no abilities filter: increment global count
+          // death_saving_throws is handled separately by DeathSavingThrows.jsx via hasSaveModifier
+          effects.saveAdvantageCount = (effects.saveAdvantageCount || 0) + 1;
+        }
+      } else if (mod.effect === 'disadvantage') {
+        if (mod.abilities && mod.abilities.length > 0 && !abilityName) {
+          effects.saveDisadvantageAbilities = [...new Set([
+            ...(effects.saveDisadvantageAbilities || []),
+            ...mod.abilities
+          ])];
+        } else if (mod.condition !== 'against_spell') {
+          effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
+        }
       }
-    } else if (mod.effect === 'disadvantage') {
-      if (mod.abilities && mod.abilities.length > 0 && !abilityName) {
-        effects.saveDisadvantageAbilities = [...new Set([
-          ...(effects.saveDisadvantageAbilities || []),
-          ...mod.abilities
-        ])];
-      } else if (mod.condition !== 'against_spell') {
-        effects.saveDisadvantageCount = (effects.saveDisadvantageCount || 0) + 1;
-      }
-    } else if (mod.effect === 'reroll') {
+    }
+    if (mod.effect === 'reroll') {
       effects.autoReroll = true;
       effects.autoRerollCondition = mod.condition;
       if (mod.bonusExpression) {
