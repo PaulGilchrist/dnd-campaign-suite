@@ -1,15 +1,16 @@
+// @improved-by-ai
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-
-vi.mock('../../services/dice/diceRoller.js', () => ({
-    rollD20: vi.fn(),
-    rollExpression: vi.fn(),
-}));
 
 vi.mock('../../services/ui/utils.js', () => ({
     default: {
         getName: vi.fn((n) => n || 'Unknown'),
         guid: vi.fn(() => 'test-guid-1234'),
     },
+}));
+
+vi.mock('../../services/dice/diceRoller.js', () => ({
+    rollD20: vi.fn(),
+    rollExpression: vi.fn(),
 }));
 
 vi.mock('../../services/ui/storage.js', () => ({
@@ -103,8 +104,27 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
         autoDamageSourceRef: { current: null },
     };
 
+    const studiedAttackPassives = [
+        {
+            type: 'auto_effect',
+            name: 'Studied Attacks',
+            trigger: 'miss',
+            effect: 'next_attack_advantage',
+            duration: 'until_start_of_next_turn',
+        },
+    ];
+
+    const baseContext = {
+        targetName: 'Goblin',
+        playerStats: {
+            name: 'TestFighter',
+            automation: {
+                passives: studiedAttackPassives,
+            },
+        },
+    };
+
     beforeEach(() => {
-        vi.useFakeTimers();
         vi.clearAllMocks();
         rollD20.mockReturnValue(15);
         getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 20 });
@@ -123,28 +143,18 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
         return createLogAndShow(deps);
     }
 
+    function isTargetEffectsCall(call) {
+        return call[1] === 'targetEffects';
+    }
+
     describe('auto_effect with trigger miss and effect next_attack_advantage', () => {
         it('applies next_attack_advantage effect when attack misses and feature has miss trigger', async () => {
             const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
-                targetName: 'Goblin',
-                playerStats: {
-                    name: 'TestFighter',
-                    automation: {
-                        passives: [
-                            {
-                                type: 'auto_effect',
-                                name: 'Studied Attacks',
-                                trigger: 'miss',
-                                effect: 'next_attack_advantage',
-                                duration: 'until_start_of_next_turn',
-                            },
-                        ],
-                    },
-                },
-            });
+            await fn('Longsword', 0, 'attack', baseContext);
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
+            expect(targetEffectsCalls.length).toBe(1);
+            expect(targetEffectsCalls[0]).toEqual([
                 'test-campaign',
                 'targetEffects',
                 expect.arrayContaining([
@@ -156,128 +166,91 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
                         duration: 'until_start_of_next_turn',
                     }),
                 ]),
-                'test-campaign'
+                'test-campaign',
+            ]);
+        });
+
+        it('uses default duration when not specified on the effect', async () => {
+            const fn = createFn();
+            await fn('Longsword', 0, 'attack', {
+                ...baseContext,
+                playerStats: {
+                    ...baseContext.playerStats,
+                    automation: {
+                        passives: [
+                            {
+                                type: 'auto_effect',
+                                name: 'Studied Attacks',
+                                trigger: 'miss',
+                                effect: 'next_attack_advantage',
+                            },
+                        ],
+                    },
+                },
+            });
+
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
+            expect(targetEffectsCalls.length).toBe(1);
+            expect(targetEffectsCalls[0][2]).toEqual(
+                expect.arrayContaining([
+                    expect.objectContaining({
+                        duration: 'until_start_of_next_turn',
+                    }),
+                ])
             );
         });
 
         it('does not apply effect when attack hits', async () => {
             getTargetFromAttacker.mockReturnValue({ name: 'Goblin', ac: 10 });
             const fn = createFn();
-            await fn('Longsword', 5, 'attack', {
-                targetName: 'Goblin',
-                playerStats: {
-                    name: 'TestFighter',
-                    automation: {
-                        passives: [
-                            {
-                                type: 'auto_effect',
-                                name: 'Studied Attacks',
-                                trigger: 'miss',
-                                effect: 'next_attack_advantage',
-                                duration: 'until_start_of_next_turn',
-                            },
-                        ],
-                    },
-                },
-            });
+            await fn('Longsword', 5, 'attack', baseContext);
 
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects'
-            );
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
             expect(targetEffectsCalls.length).toBe(0);
         });
 
         it('does not apply effect when isAutoMiss is true', async () => {
             const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
-                targetName: 'Goblin',
+            await fn('Longsword', 0, 'attack', {
+                ...baseContext,
                 isAutoMiss: true,
-                playerStats: {
-                    name: 'TestFighter',
-                    automation: {
-                        passives: [
-                            {
-                                type: 'auto_effect',
-                                name: 'Studied Attacks',
-                                trigger: 'miss',
-                                effect: 'next_attack_advantage',
-                                duration: 'until_start_of_next_turn',
-                            },
-                        ],
-                    },
-                },
             });
 
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects'
-            );
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
             expect(targetEffectsCalls.length).toBe(0);
         });
 
         it('does not apply effect when no target', async () => {
             getTargetFromAttacker.mockReturnValue(null);
             const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
+            await fn('Longsword', 0, 'attack', {
+                ...baseContext,
                 targetName: null,
-                playerStats: {
-                    name: 'TestFighter',
-                    automation: {
-                        passives: [
-                            {
-                                type: 'auto_effect',
-                                name: 'Studied Attacks',
-                                trigger: 'miss',
-                                effect: 'next_attack_advantage',
-                                duration: 'until_start_of_next_turn',
-                            },
-                        ],
-                    },
-                },
             });
 
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects'
-            );
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
             expect(targetEffectsCalls.length).toBe(0);
         });
 
-        it('uses default duration when not specified', async () => {
+        it('does not apply effect when playerStats has no automation passives', async () => {
             const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
-                targetName: 'Goblin',
+            await fn('Longsword', 0, 'attack', {
+                ...baseContext,
                 playerStats: {
                     name: 'TestFighter',
-                    automation: {
-                        passives: [
-                            {
-                                type: 'auto_effect',
-                                name: 'Studied Attacks',
-                                trigger: 'miss',
-                                effect: 'next_attack_advantage',
-                            },
-                        ],
-                    },
                 },
             });
 
-            expect(setRuntimeValue).toHaveBeenCalledWith(
-                'test-campaign',
-                'targetEffects',
-                expect.arrayContaining([
-                    expect.objectContaining({
-                        duration: 'until_start_of_next_turn',
-                    }),
-                ]),
-                'test-campaign'
-            );
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
+            expect(targetEffectsCalls.length).toBe(0);
         });
 
         it('does not apply effect for non-miss triggers', async () => {
             const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
-                targetName: 'Goblin',
+            await fn('Longsword', 0, 'attack', {
+                ...baseContext,
                 playerStats: {
-                    name: 'TestFighter',
+                    ...baseContext.playerStats,
                     automation: {
                         passives: [
                             {
@@ -291,18 +264,16 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
                 },
             });
 
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects'
-            );
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
             expect(targetEffectsCalls.length).toBe(0);
         });
 
-        it('does not apply effect for non-next_attack_advantage effects', async () => {
+        it('does not apply effect for non-next_attack_advantage effects on miss', async () => {
             const fn = createFn();
-            await fn('Longsword', 2, 'attack', {
-                targetName: 'Goblin',
+            await fn('Longsword', 0, 'attack', {
+                ...baseContext,
                 playerStats: {
-                    name: 'TestFighter',
+                    ...baseContext.playerStats,
                     automation: {
                         passives: [
                             {
@@ -316,9 +287,7 @@ describe('createLogAndShow - auto_effect miss trigger (Studied Attacks)', () => 
                 },
             });
 
-            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(
-                call => call[1] === 'targetEffects'
-            );
+            const targetEffectsCalls = setRuntimeValue.mock.calls.filter(isTargetEffectsCall);
             expect(targetEffectsCalls.length).toBe(0);
         });
     });

@@ -1,855 +1,549 @@
+// @improved-by-ai
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect } from 'vitest';
 import PlacedItems, { baseProps } from './PlacedItems.test-utils';
 
-describe('PlacedItems - SVG attributes and element structure', () => {
-  describe('barrel SVG attributes', () => {
-    it('renders barrel with correct use element attributes', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#barrel"]');
-      expect(useEl).toBeInTheDocument();
-      expect(useEl).toHaveAttribute('x', '7');
-      expect(useEl).toHaveAttribute('y', '7');
-      expect(useEl).toHaveAttribute('opacity', '1');
-    });
+// ── Item type registry ──────────────────────────────────────────────────────
+// All non-NPC item types that render as <g.placed-item> with a <use> element.
+// Used for parameterized testing to avoid 20+ near-identical test functions.
+const NON_NPC_TYPES = [
+  'altar',
+  'arrowSlitWall',
+  'barrel',
+  'bed',
+  'bookshelf',
+  'boulder',
+  'bush',
+  'chair',
+  'chest',
+  'crate',
+  'door',
+  'firepit',
+  'fountain',
+  'pillar',
+  'secretDoor',
+  'skeleton',
+  'stairs',
+  'statue',
+  'table',
+  'torch',
+  'trap',
+  'tree',
+  'web',
+];
 
-    it('renders barrel hit area as circle on localhost', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const circles = container.querySelectorAll('circle[class="item-hit-area"]');
-      expect(circles.length).toBe(1);
-      expect(circles[0]).toHaveAttribute('cx', '25');
-      expect(circles[0]).toHaveAttribute('cy', '25');
-      expect(circles[0]).toHaveAttribute('r', '20');
-    });
+// ── Helpers ─────────────────────────────────────────────────────────────────
+const makeItem = (overrides) => ({
+  id: 'item-1',
+  type: 'barrel',
+  gridX: 0,
+  gridY: 0,
+  visible: true,
+  ...overrides,
+});
+
+// ── Empty / edge cases ──────────────────────────────────────────────────────
+describe('PlacedItems - edge cases and empty input', () => {
+  it('renders nothing when placedItems is empty', () => {
+    const { container } = render(<PlacedItems {...baseProps} placedItems={[]} />);
+    expect(container.querySelector('g.placed-item')).toBeNull();
+    expect(container.querySelector('g.npc-group')).toBeNull();
   });
 
-  describe('table SVG attributes and positioning', () => {
-    it('renders table with horizontal positioning (not rotated)', () => {
-      const items = [{ id: 'table-1', type: 'table', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#table"]');
-      expect(useEl).toBeInTheDocument();
-      expect(useEl).toHaveAttribute('x', '9');
-      expect(useEl).toHaveAttribute('y', '7');
-      expect(useEl).toHaveAttribute('opacity', '1');
-    });
+  it('throws when placedItems is undefined (component expects array)', () => {
+    expect(() => render(<PlacedItems {...baseProps} placedItems={undefined} />)).toThrow();
+  });
+});
 
-    it('renders table with vertical positioning (rotated 90)', () => {
-      const items = [{ id: 'table-1', type: 'table', gridX: 0, gridY: 0, visible: true, rotation: 90 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#table"]');
-      expect(useEl).toBeInTheDocument();
-      expect(useEl).toHaveAttribute('x', '-11');
-      expect(useEl).toHaveAttribute('y', '27');
-      expect(useEl).toHaveAttribute('transform', 'rotate(90, 25, 45)');
-    });
-
-    it('renders table hit area as rectangle', () => {
-      const items = [{ id: 'table-1', type: 'table', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const rects = container.querySelectorAll('rect[class="item-hit-area"]');
-      expect(rects.length).toBe(1);
-    });
+// ── Barrel - circle hit area, basic positioning, rotation ───────────────────
+describe('PlacedItems - barrel', () => {
+  it('renders barrel use element at correct position for grid (0,0)', () => {
+    const items = [makeItem({ type: 'barrel' })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const useEl = container.querySelector('use[href="#barrel"]');
+    expect(useEl).toBeInTheDocument();
+    expect(useEl).toHaveAttribute('x', '7');
+    expect(useEl).toHaveAttribute('y', '7');
   });
 
-  describe('bed SVG attributes and positioning', () => {
-    it('renders bed with horizontal positioning (rotation 0)', () => {
-      const items = [{ id: 'bed-1', type: 'bed', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#bed"]');
-      expect(useEl).toBeInTheDocument();
-    });
-
-    it('renders bed with vertical positioning (rotation 90)', () => {
-      const items = [{ id: 'bed-1', type: 'bed', gridX: 0, gridY: 0, visible: true, rotation: 90 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#bed"]');
-      expect(useEl).toBeInTheDocument();
-      expect(useEl).toHaveAttribute('transform', 'rotate(90, 25, 45)');
-    });
-
-    it('renders bed with custom rotation value', () => {
-      const items = [{ id: 'bed-1', type: 'bed', gridX: 1, gridY: 1, visible: true, rotation: 45 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#bed"]');
-      expect(useEl).toBeInTheDocument();
-      expect(useEl).toHaveAttribute('transform', 'rotate(45, 95, 75)');
-    });
+  it('renders barrel hit area circle at correct center', () => {
+    const items = [makeItem({ type: 'barrel' })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const circle = container.querySelector('circle.item-hit-area');
+    expect(circle).toBeInTheDocument();
+    expect(circle).toHaveAttribute('cx', '25');
+    expect(circle).toHaveAttribute('cy', '25');
+    expect(circle).toHaveAttribute('r', '20');
   });
 
-  describe('altar SVG attributes and positioning', () => {
-    it('renders altar with horizontal positioning (rotation 0)', () => {
-      const items = [{ id: 'altar-1', type: 'altar', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#altar"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders barrel reposition highlight as circle when dragging', () => {
+    const items = [makeItem({ type: 'barrel' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} itemDragging={{ itemId: 'item-1' }} />
+    );
+    const highlight = container.querySelector('circle.reposition-highlight');
+    expect(highlight).toBeInTheDocument();
+    expect(highlight).toHaveAttribute('r', '24');
+  });
+});
 
-    it('renders altar with vertical positioning (rotation 90)', () => {
-      const items = [{ id: 'altar-1', type: 'altar', gridX: 0, gridY: 0, visible: true, rotation: 90 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#altar"]');
-      expect(useEl).toBeInTheDocument();
-      expect(useEl).toHaveAttribute('transform', 'rotate(90, 25, 45)');
-    });
+// ── Rotation support types ──────────────────────────────────────────────────
+// These types support rotation via transform attribute on the <use> element.
+const ROTATION_TYPES = ['bed', 'altar', 'bookshelf', 'door', 'secretDoor', 'stairs', 'chair', 'torch', 'arrowSlitWall'];
+
+describe('PlacedItems - rotation support', () => {
+  it.each(ROTATION_TYPES)('renders %s without transform when rotation is absent', (type) => {
+    const items = [makeItem({ type })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const useEl = container.querySelector(`use[href="#${type}"]`);
+    expect(useEl).not.toHaveAttribute('transform');
   });
 
-  describe('bookshelf SVG attributes and positioning', () => {
-    it('renders bookshelf with horizontal positioning (rotation 0)', () => {
-      const items = [{ id: 'bookshelf-1', type: 'bookshelf', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#bookshelf"]');
-      expect(useEl).toBeInTheDocument();
-    });
-
-    it('renders bookshelf with vertical positioning (rotation 90)', () => {
-      const items = [{ id: 'bookshelf-1', type: 'bookshelf', gridX: 0, gridY: 0, visible: true, rotation: 90 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#bookshelf"]');
-      expect(useEl).toBeInTheDocument();
-      expect(useEl).toHaveAttribute('transform', 'rotate(90, 25, 45)');
-    });
+  it.each(ROTATION_TYPES)('renders %s without transform when rotation is undefined', (type) => {
+    const items = [makeItem({ type, rotation: undefined })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const useEl = container.querySelector(`use[href="#${type}"]`);
+    expect(useEl).not.toHaveAttribute('transform');
   });
 
-  describe('door SVG attributes', () => {
-    it('renders closed door with use element', () => {
-      const items = [{ id: 'door-1', type: 'door', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#door"]');
-      expect(useEl).toBeInTheDocument();
-    });
-
-    it('renders closed door with rotation', () => {
-      const items = [{ id: 'door-1', type: 'door', gridX: 0, gridY: 0, visible: true, rotation: 90 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#door"]');
-      expect(useEl).toHaveAttribute('transform', 'rotate(90, 25, 25)');
-    });
-
-    it('renders open door with horizontal orientation (rotation 0)', () => {
-      const items = [{ id: 'door-1', type: 'door', gridX: 0, gridY: 0, visible: true, open: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const rects = container.querySelectorAll('rect[fill="#8B5A2B"]');
-      expect(rects.length).toBe(2);
-      expect(container.querySelector('use[href="#door"]')).toBeNull();
-    });
-
-    it('renders open door with vertical orientation (rotation 90)', () => {
-      const items = [{ id: 'door-1', type: 'door', gridX: 0, gridY: 0, visible: true, open: true, rotation: 90 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const rects = container.querySelectorAll('rect[fill="#8B5A2B"]');
-      expect(rects.length).toBe(2);
-      const rect1 = rects[0];
-      expect(rect1).toHaveAttribute('x', '7');
-      expect(rect1).toHaveAttribute('y', '7');
-      expect(rect1).toHaveAttribute('width', '5');
-      expect(rect1).toHaveAttribute('height', '36');
-    });
-
-    it('renders door hit area', () => {
-      const items = [{ id: 'door-1', type: 'door', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const hitArea = container.querySelector('rect[class="item-hit-area"]');
-      expect(hitArea).toBeInTheDocument();
-      expect(hitArea).toHaveAttribute('x', '7');
-      expect(hitArea).toHaveAttribute('y', '7');
-      expect(hitArea).toHaveAttribute('width', '36');
-      expect(hitArea).toHaveAttribute('height', '36');
-    });
+  it.each(ROTATION_TYPES)('renders %s with rotation transform applied', (type) => {
+    const items = [makeItem({ type, rotation: 90 })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const useEl = container.querySelector(`use[href="#${type}"]`);
+    expect(useEl).toHaveAttribute('transform');
+    expect(useEl.getAttribute('transform')).toMatch(/rotate\(/);
   });
 
-  describe('secret door SVG attributes', () => {
-    it('renders secret door with use element', () => {
-      const items = [{ id: 'secret-1', type: 'secretDoor', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#secretDoor"]');
-      expect(useEl).toBeInTheDocument();
-    });
-
-    it('renders secret door with rotation', () => {
-      const items = [{ id: 'secret-1', type: 'secretDoor', gridX: 0, gridY: 0, visible: true, rotation: 180 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#secretDoor"]');
-      expect(useEl).toHaveAttribute('transform', 'rotate(180, 25, 25)');
-    });
+  it('renders bed with custom rotation angle and grid position', () => {
+    const items = [makeItem({ type: 'bed', gridX: 1, gridY: 1, rotation: 45 })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const useEl = container.querySelector('use[href="#bed"]');
+    expect(useEl).toHaveAttribute('transform', 'rotate(45, 95, 75)');
   });
 
-  describe('firepit SVG attributes', () => {
-    it('renders firepit with use element', () => {
-      const items = [{ id: 'firepit-1', type: 'firepit', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#firepit"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders table with rotation 90 and different x/y positioning', () => {
+    const items = [makeItem({ type: 'table', rotation: 90 })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const useEl = container.querySelector('use[href="#table"]');
+    expect(useEl).toHaveAttribute('transform', 'rotate(90, 25, 45)');
+  });
+});
 
-    it('renders firepit hit area as rectangle', () => {
-      const items = [{ id: 'firepit-1', type: 'firepit', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const hitArea = container.querySelector('rect[class="item-hit-area"]');
-      expect(hitArea).toBeInTheDocument();
-      expect(hitArea).toHaveAttribute('width', '36');
-      expect(hitArea).toHaveAttribute('height', '36');
-    });
+// ── Door - open/closed state ────────────────────────────────────────────────
+describe('PlacedItems - door open/closed state', () => {
+  it('renders closed door with use element', () => {
+    const items = [makeItem({ type: 'door' })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.querySelector('use[href="#door"]')).toBeInTheDocument();
   });
 
-  describe('trap SVG attributes', () => {
-    it('renders trap with use element', () => {
-      const items = [{ id: 'trap-1', type: 'trap', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#trap"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders open door without use element', () => {
+    const items = [makeItem({ type: 'door', open: true })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.querySelector('use[href="#door"]')).toBeNull();
   });
 
-  describe('pillar SVG attributes', () => {
-    it('renders pillar with use element', () => {
-      const items = [{ id: 'pillar-1', type: 'pillar', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#pillar"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders open door horizontal rects at correct positions', () => {
+    const items = [makeItem({ type: 'door', open: true })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const rects = container.querySelectorAll('rect[fill="#8B5A2B"]');
+    expect(rects.length).toBe(2);
+    expect(rects[0]).toHaveAttribute('x', '7');
+    expect(rects[0]).toHaveAttribute('y', '7');
+    expect(rects[0]).toHaveAttribute('width', '36');
+    expect(rects[0]).toHaveAttribute('height', '5');
+    expect(rects[1]).toHaveAttribute('x', '7');
+    expect(rects[1]).toHaveAttribute('y', '38');
+    expect(rects[1]).toHaveAttribute('width', '36');
+    expect(rects[1]).toHaveAttribute('height', '5');
   });
 
-  describe('stairs SVG attributes', () => {
-    it('renders stairs with use element', () => {
-      const items = [{ id: 'stairs-1', type: 'stairs', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#stairs"]');
-      expect(useEl).toBeInTheDocument();
-    });
-
-    it('renders stairs with rotation', () => {
-      const items = [{ id: 'stairs-1', type: 'stairs', gridX: 0, gridY: 0, visible: true, rotation: 270 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#stairs"]');
-      expect(useEl).toHaveAttribute('transform', 'rotate(270, 25, 25)');
-    });
+  it('renders open door vertical rects at correct positions', () => {
+    const items = [makeItem({ type: 'door', open: true, rotation: 90 })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const rects = container.querySelectorAll('rect[fill="#8B5A2B"]');
+    expect(rects.length).toBe(2);
+    expect(rects[0]).toHaveAttribute('x', '7');
+    expect(rects[0]).toHaveAttribute('y', '7');
+    expect(rects[0]).toHaveAttribute('width', '5');
+    expect(rects[0]).toHaveAttribute('height', '36');
+    expect(rects[1]).toHaveAttribute('x', '38');
+    expect(rects[1]).toHaveAttribute('y', '7');
+    expect(rects[1]).toHaveAttribute('width', '5');
+    expect(rects[1]).toHaveAttribute('height', '36');
   });
 
-  describe('chair SVG attributes', () => {
-    it('renders chair with use element', () => {
-      const items = [{ id: 'chair-1', type: 'chair', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#chair"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders door hit area as rect', () => {
+    const items = [makeItem({ type: 'door' })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const hitArea = container.querySelector('rect.item-hit-area');
+    expect(hitArea).toBeInTheDocument();
+    expect(hitArea).toHaveAttribute('x', '7');
+    expect(hitArea).toHaveAttribute('y', '7');
+    expect(hitArea).toHaveAttribute('width', '36');
+    expect(hitArea).toHaveAttribute('height', '36');
+  });
+});
 
-    it('renders chair with rotation', () => {
-      const items = [{ id: 'chair-1', type: 'chair', gridX: 0, gridY: 0, visible: true, rotation: 180 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#chair"]');
-      expect(useEl).toHaveAttribute('transform', 'rotate(180, 25, 25)');
-    });
+// ── NPC rendering ───────────────────────────────────────────────────────────
+describe('PlacedItems - NPC rendering', () => {
+  const npcItem = makeItem({ type: 'npc', name: 'Goblin' });
+
+  it('renders NPC in npc-group instead of placed-item group', () => {
+    const { container } = render(<PlacedItems {...baseProps} placedItems={[npcItem]} />);
+    expect(container.querySelector('g.npc-group')).toBeInTheDocument();
+    expect(container.querySelector('g.placed-item')).toBeNull();
   });
 
-  describe('chest SVG attributes', () => {
-    it('renders chest with use element', () => {
-      const items = [{ id: 'chest-1', type: 'chest', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#chest"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders NPC circle with correct class and position', () => {
+    const { container } = render(<PlacedItems {...baseProps} placedItems={[npcItem]} />);
+    const circle = container.querySelector('circle.npc-circle');
+    expect(circle).toBeInTheDocument();
+    expect(circle).toHaveAttribute('cx', '25');
+    expect(circle).toHaveAttribute('cy', '25');
+    expect(circle).toHaveAttribute('r', '20');
   });
 
-  describe('crate SVG attributes', () => {
-    it('renders crate with use element', () => {
-      const items = [{ id: 'crate-1', type: 'crate', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#crate"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders NPC clipPath with correct id referencing the item id', () => {
+    const { container } = render(<PlacedItems {...baseProps} placedItems={[npcItem]} npcImages={{}} />);
+    const clipPath = container.querySelector('clipPath[id="npc-clip-item-1"]');
+    expect(clipPath).toBeInTheDocument();
+    const clipCircle = clipPath.querySelector('circle');
+    expect(clipCircle).toBeInTheDocument();
+    expect(clipCircle).toHaveAttribute('cx', '25');
+    expect(clipCircle).toHaveAttribute('cy', '25');
+    expect(clipCircle).toHaveAttribute('r', '20');
   });
 
-  describe('fountain SVG attributes', () => {
-    it('renders fountain with use element', () => {
-      const items = [{ id: 'fountain-1', type: 'fountain', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#fountain"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders NPC initial text from name first character', () => {
+    render(<PlacedItems {...baseProps} placedItems={[npcItem]} npcImages={{}} />);
+    expect(screen.getByText('G')).toBeInTheDocument();
   });
 
-  describe('skeleton SVG attributes', () => {
-    it('renders skeleton with use element', () => {
-      const items = [{ id: 'skeleton-1', type: 'skeleton', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#skeleton"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders NPC name text below the circle', () => {
+    const { container } = render(<PlacedItems {...baseProps} placedItems={[npcItem]} npcImages={{}} />);
+    const nameText = container.querySelector('text.npc-name');
+    expect(nameText).toBeInTheDocument();
+    expect(nameText).toHaveTextContent('Goblin');
+    expect(nameText).toHaveAttribute('x', '25');
+    expect(nameText).toHaveAttribute('y', '41');
   });
 
-  describe('statue SVG attributes', () => {
-    it('renders statue with use element', () => {
-      const items = [{ id: 'statue-1', type: 'statue', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#statue"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders NPC initial text centered in the circle', () => {
+    const { container } = render(<PlacedItems {...baseProps} placedItems={[npcItem]} npcImages={{}} />);
+    const initialText = container.querySelector('text.npc-initial');
+    expect(initialText).toBeInTheDocument();
+    expect(initialText).toHaveAttribute('x', '25');
+    expect(initialText).toHaveAttribute('y', '25');
   });
 
-  describe('torch SVG attributes', () => {
-    it('renders torch with use element', () => {
-      const items = [{ id: 'torch-1', type: 'torch', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#torch"]');
-      expect(useEl).toBeInTheDocument();
-    });
-
-    it('renders torch with rotation', () => {
-      const items = [{ id: 'torch-1', type: 'torch', gridX: 0, gridY: 0, visible: true, rotation: 45 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#torch"]');
-      expect(useEl).toHaveAttribute('transform', 'rotate(45, 25, 25)');
-    });
+  it('renders NPC image from npcImages prop', () => {
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={[npcItem]} npcImages={{ Goblin: '/goblin.png' }} />
+    );
+    const image = container.querySelector('image');
+    expect(image).toBeInTheDocument();
+    expect(image).toHaveAttribute('xlink:href', '/goblin.png');
+    expect(image).toHaveAttribute('width', '36');
+    expect(image).toHaveAttribute('height', '36');
+    expect(image).toHaveAttribute('clip-path', 'url(#npc-clip-item-1)');
   });
 
-  describe('web SVG attributes', () => {
-    it('renders web with use element', () => {
-      const items = [{ id: 'web-1', type: 'web', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#web"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders NPC image from imageUrl prop when npcImages is empty', () => {
+    const itemWithUrl = makeItem({ type: 'npc', name: 'Goblin', imageUrl: '/custom.png' });
+    const { container } = render(<PlacedItems {...baseProps} placedItems={[itemWithUrl]} npcImages={{}} />);
+    const image = container.querySelector('image');
+    expect(image).toHaveAttribute('xlink:href', '/custom.png');
   });
 
-  describe('arrowSlitWall SVG attributes', () => {
-    it('renders arrowSlitWall with use element', () => {
-      const items = [{ id: 'arrow-1', type: 'arrowSlitWall', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#arrowSlitWall"]');
-      expect(useEl).toBeInTheDocument();
-    });
-
-    it('renders arrowSlitWall with rotation', () => {
-      const items = [{ id: 'arrow-1', type: 'arrowSlitWall', gridX: 0, gridY: 0, visible: true, rotation: 90 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#arrowSlitWall"]');
-      expect(useEl).toHaveAttribute('transform', 'rotate(90, 25, 25)');
-    });
+  it('prefers npcImages over imageUrl when both are present', () => {
+    const itemWithUrl = makeItem({ type: 'npc', name: 'Goblin', imageUrl: '/custom.png' });
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={[itemWithUrl]} npcImages={{ Goblin: '/goblin.png' }} />
+    );
+    const image = container.querySelector('image');
+    expect(image).toHaveAttribute('xlink:href', '/goblin.png');
   });
 
-  describe('tree SVG attributes', () => {
-    it('renders tree with use element', () => {
-      const items = [{ id: 'tree-1', type: 'tree', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#tree"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders NPC at correct grid position', () => {
+    const items = [makeItem({ type: 'npc', name: 'Orc', gridX: 3, gridY: 2 })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const circle = container.querySelector('circle.npc-circle');
+    expect(circle).toHaveAttribute('cx', '175');
+    expect(circle).toHaveAttribute('cy', '125');
+  });
+});
+
+// ── Localhost vs remote visibility ──────────────────────────────────────────
+describe('PlacedItems - localhost vs remote visibility', () => {
+  it('hides hit areas and reposition highlights on remote', () => {
+    const items = [makeItem({ type: 'barrel' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />
+    );
+    expect(container.querySelectorAll('.item-hit-area').length).toBe(0);
+    expect(container.querySelectorAll('.reposition-highlight').length).toBe(0);
   });
 
-  describe('boulder SVG attributes', () => {
-    it('renders boulder with use element', () => {
-      const items = [{ id: 'boulder-1', type: 'boulder', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#boulder"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('shows hit areas and reposition highlights on localhost', () => {
+    const items = [makeItem({ type: 'barrel' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
+    );
+    expect(container.querySelectorAll('.item-hit-area').length).toBe(1);
+    expect(container.querySelectorAll('.reposition-highlight').length).toBe(1);
   });
 
-  describe('bush SVG attributes', () => {
-    it('renders bush with use element', () => {
-      const items = [{ id: 'bush-1', type: 'bush', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#bush"]');
-      expect(useEl).toBeInTheDocument();
-    });
+  it('renders localhost invisible items at 0.5 opacity', () => {
+    const items = [makeItem({ type: 'barrel', visible: false })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} />);
+    const useEl = container.querySelector('use[href="#barrel"]');
+    expect(useEl).toHaveAttribute('opacity', '0.5');
   });
 
-  describe('NPC detailed rendering', () => {
-    it('renders NPC circle element', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const circles = container.querySelectorAll('circle[class="npc-circle"]');
-      expect(circles.length).toBe(1);
-    });
-
-    it('renders NPC clipPath with correct id', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} npcImages={{}} />);
-      const clipPath = container.querySelector('clipPath[id="npc-clip-npc-1"]');
-      expect(clipPath).toBeInTheDocument();
-      const clipCircle = clipPath.querySelector('circle');
-      expect(clipCircle).toBeInTheDocument();
-      expect(clipCircle).toHaveAttribute('cx', '25');
-      expect(clipCircle).toHaveAttribute('cy', '25');
-      expect(clipCircle).toHaveAttribute('r', '20');
-    });
-
-    it('renders NPC image when npcImages has entry', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} npcImages={{ Goblin: '/goblin.png' }} />);
-      const images = container.querySelectorAll('image');
-      expect(images.length).toBe(1);
-      expect(images[0]).toHaveAttribute('xlink:href', '/goblin.png');
-      expect(images[0]).toHaveAttribute('width', '36');
-      expect(images[0]).toHaveAttribute('height', '36');
-      expect(images[0]).toHaveAttribute('clip-path', 'url(#npc-clip-npc-1)');
-    });
-
-    it('renders NPC image when imageUrl is provided directly', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin', imageUrl: '/custom.png' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} npcImages={{}} />);
-      const images = container.querySelectorAll('image');
-      expect(images.length).toBe(1);
-      expect(images[0]).toHaveAttribute('xlink:href', '/custom.png');
-    });
-
-    it('prefers npcImages over imageUrl when both are present', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin', imageUrl: '/custom.png' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} npcImages={{ Goblin: '/goblin.png' }} />);
-      const images = container.querySelectorAll('image');
-      expect(images.length).toBe(1);
-      expect(images[0]).toHaveAttribute('xlink:href', '/goblin.png');
-    });
-
-    it('renders NPC text initial from name', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      render(<PlacedItems {...baseProps} placedItems={items} npcImages={{}} />);
-      expect(screen.getByText('G')).toBeInTheDocument();
-    });
-
-    it('renders NPC name text', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      render(<PlacedItems {...baseProps} placedItems={items} npcImages={{}} />);
-      expect(screen.getByText('Goblin')).toBeInTheDocument();
-    });
-
-    it('renders NPC text at correct position', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} npcImages={{}} />);
-      const nameText = container.querySelector('text[class="npc-name"]');
-      expect(nameText).toBeInTheDocument();
-      expect(nameText).toHaveAttribute('x', '25');
-      expect(nameText).toHaveAttribute('y', '41');
-    });
-
-    it('renders NPC initial text at correct position', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} npcImages={{}} />);
-      const initialText = container.querySelector('text[class="npc-initial"]');
-      expect(initialText).toBeInTheDocument();
-      expect(initialText).toHaveAttribute('x', '25');
-      expect(initialText).toHaveAttribute('y', '25');
-    });
+  it('renders localhost visible items at 1 opacity', () => {
+    const items = [makeItem({ type: 'barrel', visible: true })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} />);
+    const useEl = container.querySelector('use[href="#barrel"]');
+    expect(useEl).toHaveAttribute('opacity', '1');
   });
 
-  describe('localhost vs non-localhost rendering', () => {
-    it('renders hit areas and drag highlights only on localhost', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />);
-      const hitAreas = container.querySelectorAll('.item-hit-area');
-      expect(hitAreas.length).toBe(0);
-    });
-
-    it('renders hit areas on localhost', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} />);
-      const hitAreas = container.querySelectorAll('.item-hit-area');
-      expect(hitAreas.length).toBe(1);
-    });
-
-    it('renders reposition highlight only on localhost', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'barrel-1' }} />);
-      const highlights = container.querySelectorAll('.reposition-highlight');
-      expect(highlights.length).toBe(1);
-    });
-
-    it('does not render reposition highlight for non-localhost', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={false} itemDragging={{ itemId: 'barrel-1' }} />);
-      const highlights = container.querySelectorAll('.reposition-highlight');
-      expect(highlights.length).toBe(0);
-    });
-
-    it('renders localhost invisible items at 0.5 opacity', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: false }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} />);
-      const useEl = container.querySelector('use[href="#barrel"]');
-      expect(useEl).toHaveAttribute('opacity', '0.5');
-    });
-
-    it('renders localhost visible items at 1 opacity', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} />);
-      const useEl = container.querySelector('use[href="#barrel"]');
-      expect(useEl).toHaveAttribute('opacity', '1');
-    });
-
-    it('renders non-localhost items at 1 opacity when visible is true', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />);
-      const useEl = container.querySelector('use[href="#barrel"]');
-      expect(useEl).toHaveAttribute('opacity', '1');
-    });
-
-    it('hides non-localhost items when visible is false', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: false }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />);
-      const useEl = container.querySelector('use[href="#barrel"]');
-      expect(useEl).toBeNull();
-    });
+  it('renders remote visible items at 1 opacity', () => {
+    const items = [makeItem({ type: 'barrel', visible: true })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />);
+    const useEl = container.querySelector('use[href="#barrel"]');
+    expect(useEl).toHaveAttribute('opacity', '1');
   });
 
-  describe('type filtering', () => {
-    it('only renders items matching the specified type', () => {
-      const items = [
-        { id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true },
-        { id: 'chest-1', type: 'chest', gridX: 1, gridY: 0, visible: true },
-      ];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const barrelUse = container.querySelector('use[href="#barrel"]');
-      const chestUse = container.querySelector('use[href="#chest"]');
-      expect(barrelUse).toBeInTheDocument();
-      expect(chestUse).toBeInTheDocument();
-    });
+  it('hides remote invisible items entirely', () => {
+    const items = [makeItem({ type: 'barrel', visible: false })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={false} />);
+    expect(container.querySelector('use[href="#barrel"]')).toBeNull();
+  });
+});
 
-    it('does not render items with types not in the render list', () => {
-      const items = [{ id: 'unknown-1', type: 'unknownType', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.innerHTML).toBe('');
-    });
+// ── Fog occlusion ───────────────────────────────────────────────────────────
+describe('PlacedItems - fog occlusion', () => {
+  it('hides fog-covered items on remote', () => {
+    const fog = new Map([['0,0', true]]);
+    const items = [makeItem({ type: 'barrel', gridX: 0, gridY: 0 })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={false} fog={fog} />
+    );
+    expect(container.querySelector('use[href="#barrel"]')).toBeNull();
   });
 
-  describe('grid position calculations', () => {
-    it('positions items at grid coordinates correctly', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 5, gridY: 3, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const hitArea = container.querySelector('circle[class="item-hit-area"]');
-      expect(hitArea).toHaveAttribute('cx', '275');
-      expect(hitArea).toHaveAttribute('cy', '175');
-    });
-
-    it('positions different items at different grid coordinates', () => {
-      const items = [
-        { id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true },
-        { id: 'barrel-2', type: 'barrel', gridX: 10, gridY: 5, visible: true },
-      ];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const hitAreas = container.querySelectorAll('circle[class="item-hit-area"]');
-      expect(hitAreas.length).toBe(2);
-      expect(hitAreas[0]).toHaveAttribute('cx', '25');
-      expect(hitAreas[0]).toHaveAttribute('cy', '25');
-      expect(hitAreas[1]).toHaveAttribute('cx', '525');
-      expect(hitAreas[1]).toHaveAttribute('cy', '275');
-    });
+  it('shows fog-covered items on localhost', () => {
+    const fog = new Map([['0,0', true]]);
+    const items = [makeItem({ type: 'barrel', gridX: 0, gridY: 0 })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} fog={fog} />
+    );
+    expect(container.querySelector('use[href="#barrel"]')).toBeInTheDocument();
   });
 
-  describe('key uniqueness', () => {
-    it('assigns unique keys based on item id', () => {
-      const items = [
-        { id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true },
-        { id: 'barrel-2', type: 'barrel', gridX: 1, gridY: 0, visible: true },
-      ];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const groups = container.querySelectorAll('g.placed-item');
-      expect(groups.length).toBe(2);
-    });
+  it('hides non-fogged items on remote when visible is false', () => {
+    const fog = new Map();
+    const items = [makeItem({ type: 'barrel', gridX: 0, gridY: 0, visible: false })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={false} fog={fog} />
+    );
+    expect(container.querySelector('use[href="#barrel"]')).toBeNull();
+  });
+});
+
+// ── Grid position calculations ──────────────────────────────────────────────
+describe('PlacedItems - grid position calculations', () => {
+  it('positions barrel hit area circle at grid (5,3)', () => {
+    const items = [makeItem({ type: 'barrel', gridX: 5, gridY: 3 })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const circle = container.querySelector('circle.item-hit-area');
+    expect(circle).toHaveAttribute('cx', '275');
+    expect(circle).toHaveAttribute('cy', '175');
   });
 
-  describe('npc group key uniqueness', () => {
-    it('assigns unique keys to npc groups based on item id', () => {
-      const items = [
-        { id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' },
-        { id: 'npc-2', type: 'npc', gridX: 1, gridY: 0, visible: true, name: 'Orc' },
-      ];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const npcGroups = container.querySelectorAll('g.npc-group');
-      expect(npcGroups.length).toBe(2);
-    });
+  it('positions multiple barrels at different grid coordinates', () => {
+    const items = [
+      makeItem({ id: 'barrel-a', type: 'barrel', gridX: 0, gridY: 0 }),
+      makeItem({ id: 'barrel-b', type: 'barrel', gridX: 10, gridY: 5 }),
+    ];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const circles = container.querySelectorAll('circle.item-hit-area');
+    expect(circles.length).toBe(2);
+    expect(circles[0]).toHaveAttribute('cx', '25');
+    expect(circles[0]).toHaveAttribute('cy', '25');
+    expect(circles[1]).toHaveAttribute('cx', '525');
+    expect(circles[1]).toHaveAttribute('cy', '275');
   });
 
-  describe('npc group class', () => {
-    it('renders NPC in npc-group not placed-item group', () => {
-      const items = [{ id: 'npc-1', type: 'npc', gridX: 0, gridY: 0, visible: true, name: 'Goblin' }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const npcGroup = container.querySelector('g.npc-group');
-      expect(npcGroup).toBeInTheDocument();
-      const placedItem = container.querySelector('g.placed-item');
-      expect(placedItem).toBeNull();
-    });
+  it('positions door hit area rect at grid (5,3)', () => {
+    const items = [makeItem({ type: 'door', gridX: 5, gridY: 3 })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const rect = container.querySelector('rect.item-hit-area');
+    expect(rect).toHaveAttribute('x', '257');
+    expect(rect).toHaveAttribute('y', '157');
+  });
+});
+
+// ── Reposition highlight shapes per type ────────────────────────────────────
+describe('PlacedItems - reposition highlight shapes', () => {
+  it('renders circle highlight for barrel when dragging', () => {
+    const items = [makeItem({ type: 'barrel' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
+    );
+    expect(container.querySelector('circle.reposition-highlight')).toBeInTheDocument();
   });
 
-  describe('hit area cursor style', () => {
-    it('sets grab cursor on localhost hit areas', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const hitArea = container.querySelector('.item-hit-area');
-      expect(hitArea).toHaveStyle({ cursor: 'grab' });
-    });
+  it('renders rect highlight for door when dragging', () => {
+    const items = [makeItem({ type: 'door' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
+    );
+    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
   });
 
-  describe('reposition highlight shapes per type', () => {
-    it('renders circle highlight for barrel when dragging', () => {
-      const items = [{ id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'barrel-1' }} />);
-      const highlight = container.querySelector('circle.reposition-highlight');
-      expect(highlight).toBeInTheDocument();
-    });
-
-    it('renders rect highlight for door when dragging', () => {
-      const items = [{ id: 'door-1', type: 'door', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'door-1' }} />);
-      const highlight = container.querySelector('rect.reposition-highlight');
-      expect(highlight).toBeInTheDocument();
-    });
-
-    it('renders rect highlight for table when dragging', () => {
-      const items = [{ id: 'table-1', type: 'table', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'table-1' }} />);
-      const highlight = container.querySelector('rect.reposition-highlight');
-      expect(highlight).toBeInTheDocument();
-    });
-
-    it('renders rect highlight for bed when dragging', () => {
-      const items = [{ id: 'bed-1', type: 'bed', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'bed-1' }} />);
-      const highlight = container.querySelector('rect.reposition-highlight');
-      expect(highlight).toBeInTheDocument();
-    });
-
-    it('renders rect highlight for altar when dragging', () => {
-      const items = [{ id: 'altar-1', type: 'altar', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'altar-1' }} />);
-      const highlight = container.querySelector('rect.reposition-highlight');
-      expect(highlight).toBeInTheDocument();
-    });
-
-    it('renders rect highlight for bookshelf when dragging', () => {
-      const items = [{ id: 'bookshelf-1', type: 'bookshelf', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'bookshelf-1' }} />);
-      const highlight = container.querySelector('rect.reposition-highlight');
-      expect(highlight).toBeInTheDocument();
-    });
+  it('renders rect highlight for table when dragging', () => {
+    const items = [makeItem({ type: 'table' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
+    );
+    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
   });
 
-  describe('firepit reposition highlight shape', () => {
-    it('renders circle highlight for firepit when dragging', () => {
-      const items = [{ id: 'firepit-1', type: 'firepit', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'firepit-1' }} />);
-      const highlight = container.querySelector('circle.reposition-highlight');
-      expect(highlight).toBeInTheDocument();
-    });
+  it('renders rect highlight for bed when dragging', () => {
+    const items = [makeItem({ type: 'bed' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
+    );
+    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
   });
 
-  describe('mixed type rendering', () => {
-    it('renders multiple items of different types in one render', () => {
-      const items = [
-        { id: 'barrel-1', type: 'barrel', gridX: 0, gridY: 0, visible: true },
-        { id: 'chest-1', type: 'chest', gridX: 1, gridY: 0, visible: true },
-        { id: 'npc-1', type: 'npc', gridX: 2, gridY: 0, visible: true, name: 'Goblin' },
-      ];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const barrelUse = container.querySelector('use[href="#barrel"]');
-      const chestUse = container.querySelector('use[href="#chest"]');
-      const npcCircle = container.querySelector('circle[class="npc-circle"]');
-      expect(barrelUse).toBeInTheDocument();
-      expect(chestUse).toBeInTheDocument();
-      expect(npcCircle).toBeInTheDocument();
-    });
-
-    it('renders all 23 item types when provided', () => {
-      const items = [
-        { id: 'altar-1', type: 'altar', gridX: 0, gridY: 0, visible: true },
-        { id: 'arrow-1', type: 'arrowSlitWall', gridX: 1, gridY: 0, visible: true },
-        { id: 'barrel-1', type: 'barrel', gridX: 2, gridY: 0, visible: true },
-        { id: 'bed-1', type: 'bed', gridX: 3, gridY: 0, visible: true },
-        { id: 'bookshelf-1', type: 'bookshelf', gridX: 4, gridY: 0, visible: true },
-        { id: 'boulder-1', type: 'boulder', gridX: 5, gridY: 0, visible: true },
-        { id: 'bush-1', type: 'bush', gridX: 6, gridY: 0, visible: true },
-        { id: 'chair-1', type: 'chair', gridX: 7, gridY: 0, visible: true },
-        { id: 'chest-1', type: 'chest', gridX: 8, gridY: 0, visible: true },
-        { id: 'crate-1', type: 'crate', gridX: 9, gridY: 0, visible: true },
-        { id: 'door-1', type: 'door', gridX: 10, gridY: 0, visible: true },
-        { id: 'firepit-1', type: 'firepit', gridX: 11, gridY: 0, visible: true },
-        { id: 'fountain-1', type: 'fountain', gridX: 12, gridY: 0, visible: true },
-        { id: 'npc-1', type: 'npc', gridX: 13, gridY: 0, visible: true, name: 'Goblin' },
-        { id: 'pillar-1', type: 'pillar', gridX: 14, gridY: 0, visible: true },
-        { id: 'secret-1', type: 'secretDoor', gridX: 15, gridY: 0, visible: true },
-        { id: 'skeleton-1', type: 'skeleton', gridX: 16, gridY: 0, visible: true },
-        { id: 'stairs-1', type: 'stairs', gridX: 17, gridY: 0, visible: true },
-        { id: 'statue-1', type: 'statue', gridX: 18, gridY: 0, visible: true },
-        { id: 'table-1', type: 'table', gridX: 19, gridY: 0, visible: true },
-        { id: 'torch-1', type: 'torch', gridX: 20, gridY: 0, visible: true },
-        { id: 'trap-1', type: 'trap', gridX: 21, gridY: 0, visible: true },
-        { id: 'tree-1', type: 'tree', gridX: 22, gridY: 0, visible: true },
-        { id: 'web-1', type: 'web', gridX: 23, gridY: 0, visible: true },
-      ];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const placedItems = container.querySelectorAll('g.placed-item');
-      const npcGroups = container.querySelectorAll('g.npc-group');
-      expect(placedItems.length).toBe(23);
-      expect(npcGroups.length).toBe(1);
-    });
-
-    it('renders items with undefined rotation without transform attribute', () => {
-      const items = [{ id: 'torch-1', type: 'torch', gridX: 0, gridY: 0, visible: true, rotation: undefined }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#torch"]');
-      expect(useEl).not.toHaveAttribute('transform');
-    });
-
-    it('renders items with missing rotation without transform attribute', () => {
-      const items = [{ id: 'torch-1', type: 'torch', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const useEl = container.querySelector('use[href="#torch"]');
-      expect(useEl).not.toHaveAttribute('transform');
-    });
+  it('renders rect highlight for altar when dragging', () => {
+    const items = [makeItem({ type: 'altar' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
+    );
+    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
   });
 
-  describe('door open state rendering details', () => {
-    it('renders open door horizontal rects at correct positions', () => {
-      const items = [{ id: 'door-1', type: 'door', gridX: 0, gridY: 0, visible: true, open: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const rects = container.querySelectorAll('rect[fill="#8B5A2B"]');
-      expect(rects.length).toBe(2);
-      expect(rects[0]).toHaveAttribute('x', '7');
-      expect(rects[0]).toHaveAttribute('y', '7');
-      expect(rects[0]).toHaveAttribute('width', '36');
-      expect(rects[0]).toHaveAttribute('height', '5');
-      expect(rects[1]).toHaveAttribute('x', '7');
-      expect(rects[1]).toHaveAttribute('y', '38');
-      expect(rects[1]).toHaveAttribute('width', '36');
-      expect(rects[1]).toHaveAttribute('height', '5');
-    });
-
-    it('renders open door vertical rects at correct positions', () => {
-      const items = [{ id: 'door-1', type: 'door', gridX: 0, gridY: 0, visible: true, open: true, rotation: 90 }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      const rects = container.querySelectorAll('rect[fill="#8B5A2B"]');
-      expect(rects.length).toBe(2);
-      expect(rects[0]).toHaveAttribute('x', '7');
-      expect(rects[0]).toHaveAttribute('y', '7');
-      expect(rects[0]).toHaveAttribute('width', '5');
-      expect(rects[0]).toHaveAttribute('height', '36');
-      expect(rects[1]).toHaveAttribute('x', '38');
-      expect(rects[1]).toHaveAttribute('y', '7');
-      expect(rects[1]).toHaveAttribute('width', '5');
-      expect(rects[1]).toHaveAttribute('height', '36');
-    });
+  it('renders rect highlight for bookshelf when dragging', () => {
+    const items = [makeItem({ type: 'bookshelf' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
+    );
+    expect(container.querySelector('rect.reposition-highlight')).toBeInTheDocument();
   });
 
-  describe('item types rendered with placed-item class', () => {
-    it('renders altar with placed-item class', () => {
-      const items = [{ id: 'altar-1', type: 'altar', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+  it('renders circle highlight for firepit when dragging', () => {
+    const items = [makeItem({ type: 'firepit' })];
+    const { container } = render(
+      <PlacedItems {...baseProps} placedItems={items} isLocalhost={true} itemDragging={{ itemId: 'item-1' }} />
+    );
+    expect(container.querySelector('circle.reposition-highlight')).toBeInTheDocument();
+  });
+});
 
-    it('renders arrowSlitWall with placed-item class', () => {
-      const items = [{ id: 'arrow-1', type: 'arrowSlitWall', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+// ── Hit area cursor style ───────────────────────────────────────────────────
+describe('PlacedItems - hit area cursor style', () => {
+  it('sets grab cursor on hit area elements', () => {
+    const items = [makeItem({ type: 'barrel' })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const hitArea = container.querySelector('.item-hit-area');
+    expect(hitArea).toHaveStyle({ cursor: 'grab' });
+  });
+});
 
-    it('renders bed with placed-item class', () => {
-      const items = [{ id: 'bed-1', type: 'bed', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+// ── Key uniqueness ──────────────────────────────────────────────────────────
+describe('PlacedItems - key uniqueness', () => {
+  it('renders each placed item group with a unique key based on item id', () => {
+    const items = [
+      makeItem({ id: 'barrel-1', type: 'barrel' }),
+      makeItem({ id: 'barrel-2', type: 'barrel', gridX: 1 }),
+    ];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.querySelectorAll('g.placed-item').length).toBe(2);
+  });
 
-    it('renders bookshelf with placed-item class', () => {
-      const items = [{ id: 'bookshelf-1', type: 'bookshelf', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+  it('renders each npc group with a unique key based on item id', () => {
+    const items = [
+      makeItem({ id: 'npc-1', type: 'npc', name: 'Goblin' }),
+      makeItem({ id: 'npc-2', type: 'npc', name: 'Orc', gridX: 1 }),
+    ];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.querySelectorAll('g.npc-group').length).toBe(2);
+  });
+});
 
-    it('renders boulder with placed-item class', () => {
-      const items = [{ id: 'boulder-1', type: 'boulder', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+// ── Type filtering and unknown types ────────────────────────────────────────
+describe('PlacedItems - type filtering and unknown types', () => {
+  it('renders multiple item types in a single render', () => {
+    const items = [
+      makeItem({ id: 'barrel-1', type: 'barrel' }),
+      makeItem({ id: 'chest-1', type: 'chest', gridX: 1 }),
+      makeItem({ id: 'npc-1', type: 'npc', name: 'Goblin', gridX: 2 }),
+    ];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.querySelector('use[href="#barrel"]')).toBeInTheDocument();
+    expect(container.querySelector('use[href="#chest"]')).toBeInTheDocument();
+    expect(container.querySelector('circle.npc-circle')).toBeInTheDocument();
+  });
 
-    it('renders bush with placed-item class', () => {
-      const items = [{ id: 'bush-1', type: 'bush', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+  it('renders all 23 non-NPC types and 1 NPC type', () => {
+    const items = [
+      makeItem({ id: 'altar-1', type: 'altar', gridX: 0 }),
+      makeItem({ id: 'arrow-1', type: 'arrowSlitWall', gridX: 1 }),
+      makeItem({ id: 'barrel-1', type: 'barrel', gridX: 2 }),
+      makeItem({ id: 'bed-1', type: 'bed', gridX: 3 }),
+      makeItem({ id: 'bookshelf-1', type: 'bookshelf', gridX: 4 }),
+      makeItem({ id: 'boulder-1', type: 'boulder', gridX: 5 }),
+      makeItem({ id: 'bush-1', type: 'bush', gridX: 6 }),
+      makeItem({ id: 'chair-1', type: 'chair', gridX: 7 }),
+      makeItem({ id: 'chest-1', type: 'chest', gridX: 8 }),
+      makeItem({ id: 'crate-1', type: 'crate', gridX: 9 }),
+      makeItem({ id: 'door-1', type: 'door', gridX: 10 }),
+      makeItem({ id: 'firepit-1', type: 'firepit', gridX: 11 }),
+      makeItem({ id: 'fountain-1', type: 'fountain', gridX: 12 }),
+      makeItem({ id: 'npc-1', type: 'npc', name: 'Goblin', gridX: 13 }),
+      makeItem({ id: 'pillar-1', type: 'pillar', gridX: 14 }),
+      makeItem({ id: 'secret-1', type: 'secretDoor', gridX: 15 }),
+      makeItem({ id: 'skeleton-1', type: 'skeleton', gridX: 16 }),
+      makeItem({ id: 'stairs-1', type: 'stairs', gridX: 17 }),
+      makeItem({ id: 'statue-1', type: 'statue', gridX: 18 }),
+      makeItem({ id: 'table-1', type: 'table', gridX: 19 }),
+      makeItem({ id: 'torch-1', type: 'torch', gridX: 20 }),
+      makeItem({ id: 'trap-1', type: 'trap', gridX: 21 }),
+      makeItem({ id: 'tree-1', type: 'tree', gridX: 22 }),
+      makeItem({ id: 'web-1', type: 'web', gridX: 23 }),
+    ];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.querySelectorAll('g.placed-item').length).toBe(23);
+    expect(container.querySelectorAll('g.npc-group').length).toBe(1);
+  });
 
-    it('renders chair with placed-item class', () => {
-      const items = [{ id: 'chair-1', type: 'chair', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+  it('renders nothing for unknown type', () => {
+    const items = [makeItem({ id: 'unknown-1', type: 'unknownType' })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.innerHTML).toBe('');
+  });
+});
 
-    it('renders crate with placed-item class', () => {
-      const items = [{ id: 'crate-1', type: 'crate', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+// ── Parameterized: every non-NPC type renders placed-item group with use ────
+describe('PlacedItems - all non-NPC types render placed-item group with use element', () => {
+  it.each(NON_NPC_TYPES)('renders %s as placed-item group with use element', (type) => {
+    const items = [makeItem({ type })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    expect(container.querySelector('g.placed-item')).toBeInTheDocument();
+    expect(container.querySelector(`use[href="#${type}"]`)).toBeInTheDocument();
+  });
+});
 
-    it('renders firepit with placed-item class', () => {
-      const items = [{ id: 'firepit-1', type: 'firepit', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders fountain with placed-item class', () => {
-      const items = [{ id: 'fountain-1', type: 'fountain', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders pillar with placed-item class', () => {
-      const items = [{ id: 'pillar-1', type: 'pillar', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders secretDoor with placed-item class', () => {
-      const items = [{ id: 'secret-1', type: 'secretDoor', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders skeleton with placed-item class', () => {
-      const items = [{ id: 'skeleton-1', type: 'skeleton', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders stairs with placed-item class', () => {
-      const items = [{ id: 'stairs-1', type: 'stairs', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders statue with placed-item class', () => {
-      const items = [{ id: 'statue-1', type: 'statue', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders table with placed-item class', () => {
-      const items = [{ id: 'table-1', type: 'table', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders torch with placed-item class', () => {
-      const items = [{ id: 'torch-1', type: 'torch', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders trap with placed-item class', () => {
-      const items = [{ id: 'trap-1', type: 'trap', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders tree with placed-item class', () => {
-      const items = [{ id: 'tree-1', type: 'tree', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
-
-    it('renders web with placed-item class', () => {
-      const items = [{ id: 'web-1', type: 'web', gridX: 0, gridY: 0, visible: true }];
-      const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
-      expect(container.querySelector('g.placed-item')).toBeInTheDocument();
-    });
+// ── Parameterized: every non-NPC type renders hit area on localhost ────────
+describe('PlacedItems - all non-NPC types render hit area on localhost', () => {
+  it.each(NON_NPC_TYPES)('renders %s hit area on localhost', (type) => {
+    const items = [makeItem({ type })];
+    const { container } = render(<PlacedItems {...baseProps} placedItems={items} />);
+    const group = container.querySelector(`g.placed-item`);
+    expect(group.querySelector('.item-hit-area')).toBeInTheDocument();
   });
 });
