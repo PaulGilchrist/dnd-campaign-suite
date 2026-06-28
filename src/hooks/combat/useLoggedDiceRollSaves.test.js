@@ -431,7 +431,8 @@ describe('createSaves (useLoggedDiceRollSaves)', () => {
                     evasionEffects: [{ saveType: 'DEX', source: 'Evasion' }],
                 },
             }];
-            getRuntimeValue.mockReturnValueOnce(['incapacitated'])
+            getRuntimeValue.mockReturnValueOnce([])
+                .mockReturnValueOnce(['incapacitated'])
                 .mockReturnValueOnce(null);
             rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });
             loadCombatSummary.mockResolvedValue({
@@ -461,7 +462,8 @@ describe('createSaves (useLoggedDiceRollSaves)', () => {
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 }],
             });
-            getRuntimeValue.mockReturnValueOnce(null)
+            getRuntimeValue.mockReturnValueOnce([])
+                .mockReturnValueOnce(null)
                 .mockReturnValueOnce(null)
                 .mockReturnValueOnce(true);
             rollSaveForCreature.mockReturnValue({ success: true, roll: 18, total: 21, bonus: 3 });
@@ -664,7 +666,8 @@ describe('createSaves (useLoggedDiceRollSaves)', () => {
                 creatures: [{ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 }],
             });
             applyDamageToTarget.mockReturnValue({ finalDamage: 5, newHp: 15, damageReduced: true });
-            getRuntimeValue.mockReturnValueOnce(null)
+            getRuntimeValue.mockReturnValueOnce([])
+                .mockReturnValueOnce(null)
                 .mockReturnValueOnce(null)
                 .mockReturnValueOnce(null)
                 .mockReturnValueOnce(20);
@@ -749,7 +752,8 @@ describe('createSaves (useLoggedDiceRollSaves)', () => {
             loadCombatSummary.mockResolvedValue({
                 creatures: [{ name: 'Ally', type: 'player', ac: 16, currentHp: 20, maxHp: 20 }],
             });
-            getRuntimeValue.mockReturnValueOnce(null)
+            getRuntimeValue.mockReturnValueOnce([])
+                .mockReturnValueOnce(null)
                 .mockReturnValueOnce(null)
                 .mockReturnValueOnce(true);
             rollSaveForCreature.mockReturnValue({ success: false, roll: 5, total: 8, bonus: 3 });

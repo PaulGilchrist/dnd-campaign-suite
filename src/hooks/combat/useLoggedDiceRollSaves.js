@@ -95,7 +95,14 @@ export function createSaves(deps) {
         const target = combatSummary?.creatures?.find(c => c.name === pending.targetName);
         if (!target) return;
 
-        const disadvantage = pending.metamagicHeighten || false;
+        let disadvantage = pending.metamagicHeighten || false;
+        const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];
+        const riderEffectIdx = targetEffects.findIndex(te => te.target === pending.targetName && te.effect === 'disadvantage_on_next_save');
+        if (riderEffectIdx !== -1) {
+            disadvantage = true;
+            targetEffects.splice(riderEffectIdx, 1);
+            setRuntimeValue(campaignName, 'targetEffects', targetEffects, campaignName);
+        }
         const targetChar = (charactersRef.current || []).find(c => c.name === pending.targetName);
         const targetSaveModifiers = targetChar?.saveModifiers || targetChar?.computedStats?.saveModifiers || [];
         const advantage = targetSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');

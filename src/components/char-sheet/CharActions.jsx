@@ -311,15 +311,63 @@ const CharActions = React.memo(function CharActions({ playerStats, campaignName,
                     }
                 }
             }
-            // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
-            if (isCrit) {
-                const hasRemarkableAthlete = (playerStats.automation?.passives || []).some(
-                    p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
-                );
-                if (hasRemarkableAthlete) {
-                    setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', true, campaignName);
+                // Remarkable Athlete: after critical hit, enable movement without opportunity attacks
+                if (isCrit) {
+                    const hasRemarkableAthlete = (playerStats.automation?.passives || []).some(
+                        p => p.type === 'auto_effect' && p.effect === 'remarkable_athlete_movement'
+                    );
+                    if (hasRemarkableAthlete) {
+                        setRuntimeValue(playerStats.name, 'remarkableAthleteNoOA', true, campaignName);
+                    }
                 }
-            }
+
+                // Apply attack_rider automations with weapon_attack_hit trigger (e.g. Eldritch Strike)
+                const combatSummary = await loadCombatSummary(campaignName);
+                const currentRound = combatSummary?.round ?? null;
+                const eldritchStrikes = [
+                    ...(playerStats.automation?.actions || []),
+                    ...(playerStats.automation?.passives || []),
+                ].filter(
+                    a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && !a.damageExpression && a.name !== "Stalker's Flurry"
+                );
+                for (const rider of eldritchStrikes) {
+                    const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
+                    const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+                    const isOncePerTurn = rider.oncePerTurn;
+                    if (isOncePerTurn && usedRound === currentRound) continue;
+
+                    const cs = await getCombatContext(campaignName);
+                    const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+                    const targetName = target?.name || null;
+
+                    if (targetName && rider.options?.length > 0) {
+                        const option = rider.options[0];
+                        const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                        const newEffect = {
+                            target: targetName,
+                            source: rider.name,
+                            option: option.name,
+                            effect: option.effect,
+                            value: option.value || null,
+                            noOpportunityAttacks: option.noOpportunityAttacks || false,
+                            duration: 'until_start_of_next_turn',
+                        };
+                        const updatedEffects = [...storedEffects, newEffect];
+                        setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+
+                        if (isOncePerTurn) {
+                            setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
+                        }
+
+                        await addEntry(campaignName, {
+                            type: 'ability_use',
+                            characterName: playerStats.name,
+                            abilityName: rider.name,
+                            description: `${playerStats.name} used ${rider.name} on ${targetName}, imposing Disadvantage on the target's next saving throw.`,
+                            targetName: targetName,
+                        }).catch((e) => { console.error("[CharActions] Eldritch Strike error:", e); });
+                    }
+                }
         },
     });
 

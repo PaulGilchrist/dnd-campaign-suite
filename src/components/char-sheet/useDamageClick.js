@@ -727,39 +727,49 @@ export default function useDamageClick({
         }
 
         // Apply attack_rider automations with weapon_attack_hit trigger (e.g. Eldritch Strike)
-        if (playerStats.automation?.actions) {
-            const eldritchStrikes = playerStats.automation.actions.filter(
-                a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && !a.damageExpression
-            );
-            for (const rider of eldritchStrikes) {
-                const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
-                const currentRound = getCurrentCombatRound();
-                const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
-                if (rider.oncePerTurn && usedRound === currentRound) continue;
+        // These features are routed to passives by the collector, not actions
+        const eldritchStrikes = [
+            ...(playerStats.automation?.actions || []),
+            ...(playerStats.automation?.passives || []),
+        ].filter(
+            a => a.type === 'attack_rider' && a.trigger === 'weapon_attack_hit' && !a.damageExpression && a.name !== "Stalker's Flurry"
+        );
+        for (const rider of eldritchStrikes) {
+            const usedKey = `_${rider.name.replace(/\s+/g, '_')}_usedRound`;
+            const currentRound = getCurrentCombatRound();
+            const usedRound = getRuntimeValue(playerStats.name, usedKey, campaignName);
+            if (rider.oncePerTurn && usedRound === currentRound) continue;
 
-                const cs = await getCombatContext(campaignName);
-                const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
-                const targetName = target?.name || null;
+            const cs = await getCombatContext(campaignName);
+            const target = cs ? getTargetFromAttacker(cs, playerStats.name) : null;
+            const targetName = target?.name || null;
 
-                if (targetName && rider.options?.length > 0) {
-                    const option = rider.options[0];
-                    const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
-                    const newEffect = {
-                        target: targetName,
-                        source: rider.name,
-                        option: option.name,
-                        effect: option.effect,
-                        value: option.value || null,
-                        noOpportunityAttacks: option.noOpportunityAttacks || false,
-                        duration: 'until_start_of_next_turn',
-                    };
-                    const updatedEffects = [...storedEffects, newEffect];
-                    setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
+            if (targetName && rider.options?.length > 0) {
+                const option = rider.options[0];
+                const storedEffects = getRuntimeValue(campaignName, 'targetEffects') || [];
+                const newEffect = {
+                    target: targetName,
+                    source: rider.name,
+                    option: option.name,
+                    effect: option.effect,
+                    value: option.value || null,
+                    noOpportunityAttacks: option.noOpportunityAttacks || false,
+                    duration: 'until_start_of_next_turn',
+                };
+                const updatedEffects = [...storedEffects, newEffect];
+                setRuntimeValue(campaignName, 'targetEffects', updatedEffects, campaignName);
 
-                    if (rider.oncePerTurn) {
-                        setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
-                    }
+                if (rider.oncePerTurn) {
+                    setRuntimeValue(playerStats.name, usedKey, currentRound, campaignName);
                 }
+
+                await addEntry(campaignName, {
+                    type: 'ability_use',
+                    characterName: playerStats.name,
+                    abilityName: rider.name,
+                    description: `${playerStats.name} used ${rider.name} on ${targetName}, imposing Disadvantage on the target's next saving throw.`,
+                    targetName: targetName,
+                }).catch((e) => { console.error("[useDamageClick] Error:", e); });
             }
         }
 

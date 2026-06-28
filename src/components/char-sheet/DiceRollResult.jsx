@@ -209,9 +209,9 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
             {saveResult !== undefined && saveResult !== null && (
               <div className={`dice-roll-save-result ${saveResult.success ? 'save-success' : 'save-failure'}`}>
                 {saveResult.success ? '✓ SAVE SUCCESS' : '✗ SAVE FAILURE'} ({saveResult.total} vs DC {saveDc})
-                {saveResult.bonus !== 0 && (
-                  <span className="dice-roll-save-detail"> (d20 {saveResult.roll} + {saveResult.bonus})</span>
-                )}
+                <span className="dice-roll-save-detail"> (d20 {saveResult.roll} + {saveResult.bonus})</span>
+                {mode === 'disadvantage' && <span className="dice-roll-save-detail"> [Disadvantage]</span>}
+                {mode === 'advantage' && <span className="dice-roll-save-detail"> [Advantage]</span>}
               </div>
             )}
 

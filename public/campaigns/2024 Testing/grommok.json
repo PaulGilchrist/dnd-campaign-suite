@@ -50,7 +50,7 @@
   "class": {
     "name": "Fighter",
     "subclass": {
-      "name": "Champion",
+      "name": "Eldritch Knight",
       "type": ""
     },
     "divineOrder": "",

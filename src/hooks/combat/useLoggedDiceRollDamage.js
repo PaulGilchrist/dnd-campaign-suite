@@ -276,7 +276,16 @@ export function createLogDamageAndShow(deps) {
             ? (getRuntimeValue(target.name, 'hitPoints') ?? 0)
             : target?.maxHp ?? 0;
 
-        const disadvantage = context?.metamagicHeighten || false;
+        let disadvantage = context?.metamagicHeighten || false;
+        if (!disadvantage) {
+            const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];
+            const riderEffectIdx = targetEffects.findIndex(te => te.target === target.name && te.effect === 'disadvantage_on_next_save');
+            if (riderEffectIdx !== -1) {
+                disadvantage = true;
+                targetEffects.splice(riderEffectIdx, 1);
+                setRuntimeValue(campaignName, 'targetEffects', targetEffects, campaignName);
+            }
+        }
         const isSoulstitchProtected = hasSoulstitchProtection(target.name, characterName, campaignName);
         const targetCharacter = (characters || []).find(c => utils.getName(c.name) === target.name);
         const targetSaveModifiers = targetCharacter?.saveModifiers || targetCharacter?.computedStats?.saveModifiers || [];
@@ -478,6 +487,7 @@ export function createLogDamageAndShow(deps) {
             damageApplied: true,
             damageReduced: primaryApplyResult?.damageReduced,
             isCrit,
+            mode: disadvantage ? 'disadvantage' : (advantage ? 'advantage' : 'normal'),
             gwfApplied: gwfDisplayRolls !== gwfBaseRolls,
             gwfOriginalRolls: gwfDisplayRolls !== gwfBaseRolls ? gwfBaseRolls : null,
             gwfDisplayRolls: gwfDisplayRolls,
@@ -500,7 +510,16 @@ export function createLogDamageAndShow(deps) {
         if (context?.metamagicTwinTarget) {
             const twinTarget = combatSummary?.creatures?.find(c => c.name === context.metamagicTwinTarget);
             if (twinTarget && twinTarget.name !== target.name) {
-                const twinDisadvantage = context?.metamagicHeighten || false;
+                let twinDisadvantage = context?.metamagicHeighten || false;
+                if (!twinDisadvantage) {
+                    const targetEffects = getRuntimeValue(campaignName, 'targetEffects', campaignName) || [];
+                    const riderEffectIdx = targetEffects.findIndex(te => te.target === twinTarget.name && te.effect === 'disadvantage_on_next_save');
+                    if (riderEffectIdx !== -1) {
+                        twinDisadvantage = true;
+                        targetEffects.splice(riderEffectIdx, 1);
+                        setRuntimeValue(campaignName, 'targetEffects', targetEffects, campaignName);
+                    }
+                }
                 const twinCharacter = (characters || []).find(c => utils.getName(c.name) === twinTarget.name);
                 const twinSaveModifiers = twinCharacter?.saveModifiers || twinCharacter?.computedStats?.saveModifiers || [];
                 const twinAdvantage = twinSaveModifiers.some(mod => mod.target === 'saving_throw' && mod.effect === 'advantage' && mod.condition === 'against_spell');

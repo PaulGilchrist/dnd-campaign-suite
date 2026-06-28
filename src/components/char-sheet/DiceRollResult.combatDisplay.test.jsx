@@ -424,7 +424,7 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/d20 14 \+ 4/)).toBeInTheDocument();
         });
 
-        it('does not show save roll detail when bonus is zero', () => {
+        it('shows save roll detail even when bonus is zero', () => {
             render(
                 <DiceRollResult
                     name="Fireball"
@@ -435,7 +435,7 @@ describe('DiceRollResult', () => {
                     saveDc={15}
                 />
             );
-            expect(screen.queryByText(/d20 14/)).not.toBeInTheDocument();
+            expect(screen.getByText(/d20 14 \+ 0/)).toBeInTheDocument();
         });
 
         it('does not show save result when saveResult is null', () => {
