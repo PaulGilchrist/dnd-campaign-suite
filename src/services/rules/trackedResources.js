@@ -121,6 +121,8 @@ export function computeTrackedResources(playerStats) {
     const isBattleMaster = majorName === 'Battle Master'
     if (isBattleMaster) {
       maxSD = is2024 ? (classLevel?.superiority_dice || 0) : (playerStats.level >= 15 ? 6 : (playerStats.level >= 7 ? 5 : 4))
+    } else if (playerStats.class.fightingStyles?.includes('Superior Technique')) {
+      maxSD = 1
     }
   }
   resources.superiorityDice = { current: maxSD, max: maxSD }

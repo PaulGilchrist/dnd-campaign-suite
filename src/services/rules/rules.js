@@ -1042,26 +1042,33 @@ const rules = {
                    }
                }
 
-               // Superior Technique fighting style - add Combat Superiority special action
-               if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Superior Technique')) {
-                   const existingSuperiorTechnique = playerStats.specialActions.find(a => a.name === 'Combat Superiority');
-                   if (!existingSuperiorTechnique) {
-                       playerStats.specialActions.push({
-                           name: 'Combat Superiority',
-                           description: 'You learn one maneuver of your choice from the Battle Master. You can use your superiority dice to fuel that maneuver. Use Combat Superiority during combat to deploy a maneuver.',
-                           type: 'combat_superiority',
-                           automation: {
-                               type: 'combat_superiority',
-                               dieExpression: 'superiority_die',
-                               uses_max: 4,
-                               maxOptions: 3,
-                               maxOptionsScaling: { 7: 1, 10: 1, 15: 1 },
-                               hasAutomation: true,
-                           },
-                           hasAutomation: true,
-                       });
-                   }
-               }
+                // Superior Technique fighting style - add Combat Superiority special action
+                if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Superior Technique')) {
+                    const existingSuperiorTechnique = playerStats.specialActions.find(a => a.name === 'Combat Superiority');
+                    if (!existingSuperiorTechnique) {
+                        playerStats.specialActions.push({
+                            name: 'Combat Superiority',
+                            description: 'You learn one maneuver of your choice from the Battle Master. You have one superiority die (d6) to fuel that maneuver. Use Combat Superiority during combat to deploy a maneuver.',
+                            type: 'combat_superiority',
+                            automation: {
+                                type: 'combat_superiority',
+                                dieExpression: '6',
+                                uses_max: 1,
+                                maxOptions: 1,
+                                maxOptionsScaling: {},
+                                hasAutomation: true,
+                            },
+                            hasAutomation: true,
+                        });
+                    }
+                }
+
+             // Sort all action arrays after fighting style additions
+             playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+             playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+             playerStats.reactions = uniqBy(playerStats.reactions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+             playerStats.specialActions = uniqBy(playerStats.specialActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+             playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement, 'name').sort((a, b) => a.name.localeCompare(b.name));
 
              const allFeatures = [
             ...playerStats.actions,
@@ -1332,54 +1339,58 @@ const rules = {
              const knownNames = Array.isArray(maneuverSelection) ? maneuverSelection : [];
              if (knownNames.length > 0) {
                  const maneuvers = await loadManeuvers(playerStats.rules || '2024');
-                 const bonusActionManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'bonus_action');
-                  if (bonusActionManeuvers.length > 0) {
-                      bonusActionManeuvers.forEach(m => {
-                          allFeatures.push({
-                              name: m.name,
-                              description: m.description || '',
-                              automation: {
-                                  type: 'combat_superiority_bonus_action',
-                                  maneuverName: m.name,
-                                  actionType: 'bonus_action',
-                                  effect: m.effect,
-                                  saveType: m.saveType || null,
-                                  saveAbility: m.saveAbility || null,
-                                  conditionInflicted: m.conditionInflicted || null,
-                                  value: m.value || null,
-                                  range: m.range || null,
-                                  damageBonus: m.damageBonus || false,
-                                  dieExpression: m.dieExpression || 'superiority_die',
-                                  hasAutomation: true,
-                              },
-                              hasAutomation: true,
-                          });
-                      });
-                      playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-                  }
+                  const bonusActionManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'bonus_action');
+                   if (bonusActionManeuvers.length > 0) {
+                       bonusActionManeuvers.forEach(m => {
+                           const feature = {
+                               name: m.name,
+                               description: m.description || '',
+                               automation: {
+                                   type: 'combat_superiority_bonus_action',
+                                   maneuverName: m.name,
+                                   actionType: 'bonus_action',
+                                   effect: m.effect,
+                                   saveType: m.saveType || null,
+                                   saveAbility: m.saveAbility || null,
+                                   conditionInflicted: m.conditionInflicted || null,
+                                   value: m.value || null,
+                                   range: m.range || null,
+                                   damageBonus: m.damageBonus || false,
+                                   dieExpression: m.dieExpression || 'superiority_die',
+                                   hasAutomation: true,
+                               },
+                               hasAutomation: true,
+                           };
+                           allFeatures.push(feature);
+                           playerStats.bonusActions.push(feature);
+                       });
+                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                   }
 
-                  const reactionManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'reaction');
-                  if (reactionManeuvers.length > 0) {
-                      reactionManeuvers.forEach(m => {
-                          allFeatures.push({
-                              name: m.name,
-                              description: m.description || '',
-                              automation: {
-                                  type: 'combat_superiority_reaction',
-                                  maneuverName: m.name,
-                                  actionType: 'reaction',
-                                  trigger: m.trigger || null,
-                                  effect: m.effect,
-                                  modifierAbility: m.modifierAbility || null,
-                                  damageBonus: m.damageBonus || false,
-                                  dieExpression: m.dieExpression || 'superiority_die',
-                                  hasAutomation: true,
-                              },
-                              hasAutomation: true,
-                          });
-                      });
-                      playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
-                  }
+                   const reactionManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'reaction');
+                   if (reactionManeuvers.length > 0) {
+                       reactionManeuvers.forEach(m => {
+                           const feature = {
+                               name: m.name,
+                               description: m.description || '',
+                               automation: {
+                                   type: 'combat_superiority_reaction',
+                                   maneuverName: m.name,
+                                   actionType: 'reaction',
+                                   trigger: m.trigger || null,
+                                   effect: m.effect,
+                                   modifierAbility: m.modifierAbility || null,
+                                   damageBonus: m.damageBonus || false,
+                                   dieExpression: m.dieExpression || 'superiority_die',
+                                   hasAutomation: true,
+                               },
+                               hasAutomation: true,
+                           };
+                           allFeatures.push(feature);
+                           playerStats.reactions.push(feature);
+                       });
+                       playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
+                   }
 
                   const grantAttackManeuvers = maneuvers.filter(m => knownNames.includes(m.name) && m.actionType === 'grant_attack');
                   if (grantAttackManeuvers.length > 0) {
@@ -1469,9 +1480,14 @@ const rules = {
                         playerStats.automation = collectAutomationFromFeatures(allFeatures, playerStats);
                     }
                }
-          } catch (_e) {
-             // Maneuver data not available, skip
-         }
+           } catch (_e) {
+              // Maneuver data not available, skip
+          }
+            playerStats.actions = uniqBy(playerStats.actions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.bonusActions = uniqBy(playerStats.bonusActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.reactions = uniqBy(playerStats.reactions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.specialActions = uniqBy(playerStats.specialActions, 'name').sort((a, b) => a.name.localeCompare(b.name));
+            playerStats.characterAdvancement = uniqBy(playerStats.characterAdvancement, 'name').sort((a, b) => a.name.localeCompare(b.name));
             playerStats.saveModifiers = collectSaveModifiers(allFeatures);
         }
 

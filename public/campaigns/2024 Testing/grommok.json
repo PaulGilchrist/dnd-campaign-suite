@@ -55,10 +55,7 @@
     },
     "divineOrder": "",
     "primalOrder": "",
-    "fightingStyles": [
-      "Two-Weapon Fighting",
-      "Unarmed Fighting"
-    ]
+    "fightingStyles": []
   },
   "expertSkills": [],
   "feats": [],
@@ -82,7 +79,10 @@
       "Waterskin"
     ],
     "equipped": [
-      "Plate Armor"
+      "Plate Armor",
+      "Longsword",
+      "Longbow",
+      "Shield"
     ],
     "gold": 10,
     "magicItems": []

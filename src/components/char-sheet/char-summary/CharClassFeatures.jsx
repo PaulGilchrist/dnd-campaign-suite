@@ -230,9 +230,10 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
           ? (playerStats.level >= 17 ? 2 : (playerStats.level >= 2 ? 1 : 0))
           : (classLevel?.class_specific?.action_surges || 0);
 
-    const superiorityDiceMax = !isBattleMaster ? 0 : (playerStats._trackedResources?.superiorityDice?.max || 0);
+    const hasSuperiorityDice = isBattleMaster || playerStats.class.fightingStyles?.includes('Superior Technique');
+    const superiorityDiceMax = !hasSuperiorityDice ? 0 : (playerStats._trackedResources?.superiorityDice?.max || 0);
 
-    const superiorityDieType = !isBattleMaster ? 0 : (playerStats.level >= 18 ? 12 : (playerStats.level >= 10 ? 10 : 8));
+    const superiorityDieType = !hasSuperiorityDice ? 0 : (isBattleMaster ? (playerStats.level >= 18 ? 12 : (playerStats.level >= 10 ? 10 : 8)) : 6);
 
     return (
           <div data-testid="char-class-fighter">
@@ -257,12 +258,12 @@ const FighterFeatures = function FighterFeatures({ playerStats, campaignName, on
                ) : 'N/A'}</div>
                {fightingStylePopup && <Popup html={fightingStylePopup} onClickOrKeyDown={() => setFightingStylePopup(null)} />}
               <TrackedResourceInput label="Second Wind" resourceKey="secondWindUses" playerName={playerStats.name} getMax={() => classLevel?.second_wind || 0} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-              {isBattleMaster && (
-                  <>
-                  <TrackedResourceInput label="Superiority Dice" resourceKey="superiorityDice" playerName={playerStats.name} getMax={() => superiorityDiceMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
-                  <div><b>Superiority Die: </b>d{superiorityDieType}</div>
-                  </>
-               )}
+               {hasSuperiorityDice && (
+                   <>
+                   <TrackedResourceInput label="Superiority Dice" resourceKey="superiorityDice" playerName={playerStats.name} getMax={() => superiorityDiceMax} deps={[playerStats]} campaignName={campaignName} playerStats={playerStats} />
+                   <div><b>Superiority Die: </b>d{superiorityDieType}</div>
+                   </>
+                )}
             <div><b>Weapon Mastery: </b><span className="clickable" onClick={onWeaponMasteryClick}>{classLevel.weapon_mastery}</span></div>
         </div>
       );
