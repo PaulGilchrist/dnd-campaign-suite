@@ -11,7 +11,7 @@ import { sendSavePrompt } from '../../services/combat/conditions/savePromptServi
 import { getAffectedCreatures, processAoeNpcs, sendAoePlayerSaves } from '../../services/rules/combat/aoeService.js';
 import { getRuntimeValue, setRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
-import { hasIgnoreResistance, playerIsImmuneToCondition } from '../../services/combat/automation/automationService.js';
+import { hasIgnoreResistance, playerIsImmuneToCondition, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import {
     readAoeContext,
@@ -288,7 +288,14 @@ export function createLogDamageAndShow(deps) {
             const secondaryDamageType = context.autoDamageSecondaryDamageType;
             const secondaryRollResult = context?.isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
             if (secondaryRollResult) {
-                const secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
+                let secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
+                if (hasGreatWeaponFighting(context?.playerStats)) {
+                    const gwfSecondaryRolls = applyGreatWeaponFightingToDamage(secondaryRollResult.rolls, context?.playerStats);
+                    if (gwfSecondaryRolls !== secondaryRollResult.rolls) {
+                        const gwfSecondaryTotal = gwfSecondaryRolls.reduce((sum, r) => sum + r, 0) + secondaryRollResult.modifier;
+                        secondaryTotal = applyMinDamageAdjustment(gwfSecondaryTotal, gwfSecondaryRolls, context?.playerStats, secondaryDamageType);
+                    }
+                }
                 let secondarySaveResult = saveResult;
                 if (context.saveDc && context.saveType) {
                     const secondaryDisadvantage = context.metamagicHeighten || false;
@@ -845,7 +852,14 @@ export function createLogDamageAndShow(deps) {
                 const secondaryDamageType = context.autoDamageSecondaryDamageType;
                 const secondaryRollResult = context?.isAutoCrit ? rollExpressionDoubled(secondaryFormula) : rollExpression(secondaryFormula);
                 if (secondaryRollResult) {
-                    const secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
+                    let secondaryTotal = applyMinDamageAdjustment(secondaryRollResult.total, secondaryRollResult.rolls, context?.playerStats, secondaryDamageType);
+                    if (hasGreatWeaponFighting(context?.playerStats)) {
+                        const gwfSecondaryRolls = applyGreatWeaponFightingToDamage(secondaryRollResult.rolls, context?.playerStats);
+                        if (gwfSecondaryRolls !== secondaryRollResult.rolls) {
+                            const gwfSecondaryTotal = gwfSecondaryRolls.reduce((sum, r) => sum + r, 0) + secondaryRollResult.modifier;
+                            secondaryTotal = applyMinDamageAdjustment(gwfSecondaryTotal, gwfSecondaryRolls, context?.playerStats, secondaryDamageType);
+                        }
+                    }
                     let secondaryRawDamage = secondaryTotal;
                     const secondaryIgnoreResistance = (context?.playerStats && hasIgnoreResistance(context.playerStats, secondaryDamageType)) || false;
                     const damageSequenceId = `seq_${Date.now()}_${Math.random()}`;
@@ -1191,7 +1205,14 @@ export function createLogDamageAndShow(deps) {
         }
 
         const { saveDc, saveType, damageType, isAutoMiss } = context || {};
-        const adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
+        let adjustedTotal = applyMinDamageAdjustment(total, rolls, context?.playerStats, damageType);
+        if (hasGreatWeaponFighting(context?.playerStats)) {
+            const gwfRolls = applyGreatWeaponFightingToDamage(rolls, context?.playerStats);
+            if (gwfRolls !== rolls) {
+                const gwfTotal = gwfRolls.reduce((sum, r) => sum + r, 0) + modifier;
+                adjustedTotal = applyMinDamageAdjustment(gwfTotal, gwfRolls, context?.playerStats, damageType);
+            }
+        }
 
         if (isMagicMissileImmune(characterName, campaignName) && name && name.toLowerCase() === 'magic missile') {
             await applyMagicMissileShieldImmunity(name, formula, total, rolls, modifier, context);

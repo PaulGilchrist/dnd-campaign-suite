@@ -167,8 +167,14 @@ function CharSpecialActions({ playerStats, campaignName, cannotAct, characters }
         if (playerStats.class.fightingStyles.includes('Great Weapon Fighting') && !specialActions.find((specialAction) => specialAction.name === 'Great Weapon Fighting')) {
             const style = fightingStylesMap['Great Weapon Fighting'];
             if (style) specialActions.push(style);
+         } else if (playerStats.class.fightingStyles.includes('Interception') && !specialActions.find((specialAction) => specialAction.name === 'Interception')) {
+            const style = fightingStylesMap['Interception'];
+            if (style) specialActions.push(style);
          } else if (playerStats.class.fightingStyles.includes('Protection') && !specialActions.find((specialAction) => specialAction.name === 'Protection')) {
             const style = fightingStylesMap['Protection'];
+            if (style) specialActions.push(style);
+         } else if (playerStats.class.fightingStyles.includes('Two-Weapon Fighting') && !specialActions.find((specialAction) => specialAction.name === 'Two-Weapon Fighting')) {
+            const style = fightingStylesMap['Two-Weapon Fighting'];
             if (style) specialActions.push(style);
             }
     }

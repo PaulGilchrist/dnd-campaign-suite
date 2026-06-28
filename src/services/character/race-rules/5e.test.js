@@ -432,6 +432,65 @@ describe('raceRules 5e (direct module)', () => {
       const result = raceRules.getSenses(playerStats);
       expect(result).not.toContainEqual({ name: 'Feral Senses', value: '' });
     });
+
+    it('adds Blindvision 10 ft. when Blind Fighting fighting style is selected', () => {
+      const playerStats = {
+        senses: [],
+        race: { traits: [] },
+        class: {
+          fightingStyles: ['Blind Fighting']
+        }
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result).toContainEqual({ name: 'Blindvision', value: '10 ft.' });
+    });
+
+    it('does not add Blindvision when Blind Fighting is not selected', () => {
+      const playerStats = {
+        senses: [],
+        race: { traits: [] },
+        class: {
+          fightingStyles: ['Dueling']
+        }
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result).not.toContainEqual({ name: 'Blindvision', value: '10 ft.' });
+    });
+
+    it('does not add Blindvision when fightingStyles is empty', () => {
+      const playerStats = {
+        senses: [],
+        race: { traits: [] },
+        class: {
+          fightingStyles: []
+        }
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result).not.toContainEqual({ name: 'Blindvision', value: '10 ft.' });
+    });
+
+    it('does not duplicate Blindvision when already in senses', () => {
+      const playerStats = {
+        senses: [{ name: 'Blindvision', value: '30 ft.' }],
+        race: { traits: [] },
+        class: {
+          fightingStyles: ['Blind Fighting']
+        }
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result.filter((s) => s.name === 'Blindvision').length).toBe(1);
+      expect(result.find((s) => s.name === 'Blindvision').value).toBe('30 ft.');
+    });
+
+    it('handles missing fightingStyles gracefully', () => {
+      const playerStats = {
+        senses: [],
+        race: { traits: [] },
+        class: {}
+      };
+      const result = raceRules.getSenses(playerStats);
+      expect(result).not.toContainEqual({ name: 'Blindvision', value: '10 ft.' });
+    });
   });
 
   describe('getRace', () => {

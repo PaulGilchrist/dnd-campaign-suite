@@ -60,6 +60,8 @@ vi.mock('../../services/rules/spells/postCastRiderService.js', () => ({
 vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: vi.fn(),
     collectWeaponMastery: vi.fn(),
+    hasGreatWeaponFighting: vi.fn(),
+    applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
 }));
 
 vi.mock('./loggedDiceRollUtils.js', () => ({

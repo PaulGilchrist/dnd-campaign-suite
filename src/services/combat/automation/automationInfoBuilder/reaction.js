@@ -245,5 +245,36 @@ export const reactionHandlers = {
             attack: attack || null,
             hasAutomation: true
         }
+    },
+
+    'interception': (feature, playerStats) => {
+        const auto = feature.automation
+        const prof = playerStats.proficiency || 0
+        return {
+            type: 'interception',
+            name: feature.name,
+            trigger: auto.trigger || 'ally_within_5ft_attacked',
+            range: auto.range || '5_ft',
+            damageExpression: auto.damageExpression || '1d10',
+            damageType: auto.damageType || '',
+            damageBonusExpression: auto.damageBonusExpression || 'proficiency_bonus',
+            damageBonus: prof,
+            requiresShield: !!auto.requiresShield,
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
+    },
+
+    'protection': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'protection',
+            name: feature.name,
+            trigger: auto.trigger || 'ally_within_5ft_attacked',
+            range: auto.range || '5_ft',
+            requiresShield: true,
+            casting_time: auto.casting_time || '1 reaction',
+            hasAutomation: true
+        }
     }
 }

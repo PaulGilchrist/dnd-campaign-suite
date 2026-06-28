@@ -350,7 +350,7 @@ describe('rules.getArmorClass', () => {
       expect(ac).toBe(14);
     });
 
-    it('applies Defense fighting style to unarmored AC', () => {
+    it('does not apply Defense fighting style when unarmored', () => {
       const playerStats = {
         class: {
           name: 'Fighter',
@@ -362,7 +362,117 @@ describe('rules.getArmorClass', () => {
 
       const [ac] = rules.getArmorClass(createEquipment(), playerStats);
 
+      expect(ac).toBe(13);
+    });
+
+    it('applies Unarmed Fighting fighting style (+2 AC) when no weapons/shield/armor equipped', () => {
+      const playerStats = {
+        class: {
+          name: 'Fighter',
+          fightingStyles: ['Unarmed Fighting']
+        },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: [] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
       expect(ac).toBe(14);
+    });
+
+    it('does not apply Unarmed Fighting when a weapon is equipped', () => {
+      const playerStats = {
+        class: {
+          name: 'Fighter',
+          fightingStyles: ['Unarmed Fighting']
+        },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: ['Longsword'] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(12);
+    });
+
+    it('does not apply Unarmed Fighting when armor is equipped', () => {
+      const playerStats = {
+        class: {
+          name: 'Fighter',
+          fightingStyles: ['Unarmed Fighting']
+        },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: ['Leather Armor'] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(13);
+    });
+
+    it('does not apply Unarmed Fighting when a shield is equipped', () => {
+      const playerStats = {
+        class: {
+          name: 'Fighter',
+          fightingStyles: ['Unarmed Fighting']
+        },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: ['Shield'] }
+      };
+
+      const equipment = [
+        { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } },
+        { name: 'Shield', equipment_category: 'Armor', armor_category: 'Shield', armor_class: { base: 2 } },
+        { name: 'Longsword', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d8', damage_type: 'Slashing' } }
+      ];
+
+      const [ac] = rules.getArmorClass(equipment, playerStats);
+
+      expect(ac).toBe(14);
+    });
+
+    it('applies Unarmed Fighting with magic weapon prefix', () => {
+      const playerStats = {
+        class: {
+          name: 'Fighter',
+          fightingStyles: ['Unarmed Fighting']
+        },
+        abilities: [{ name: 'Dexterity', bonus: 3 }],
+        inventory: { equipped: [] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(15);
+    });
+
+    it('does not apply Unarmed Fighting when fightingStyles is missing', () => {
+      const playerStats = {
+        class: { name: 'Fighter' },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: [] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(12);
+    });
+
+    it('does not apply Unarmed Fighting in 2024 rules', () => {
+      const playerStats = {
+        rules: '2024',
+        class: {
+          name: 'Fighter',
+          fightingStyles: ['Unarmed Fighting']
+        },
+        abilities: [{ name: 'Dexterity', bonus: 2 }],
+        inventory: { equipped: [], magicItems: [] },
+        automation: { passives: [], specialActions: [], reactions: [], bonusActions: [] }
+      };
+
+      const [ac] = rules.getArmorClass(createEquipment(), playerStats);
+
+      expect(ac).toBe(12);
     });
   });
 

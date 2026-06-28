@@ -26,6 +26,8 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: vi.fn(),
     playerIsImmuneToCondition: vi.fn(),
+    hasGreatWeaponFighting: vi.fn(),
+    applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
 }));
 
 vi.mock('../../services/rules/features/invisibilityService.js', () => ({
@@ -64,7 +66,7 @@ vi.mock('../../services/rules/combat/applyDamage.js', () => ({
 import { rollExpression } from '../../services/dice/diceRoller.js';
 import { getRuntimeValue } from '../runtime/useRuntimeState.js';
 import { loadCombatSummary, getCombatSummary } from '../../services/encounters/combatData.js';
-import { hasIgnoreResistance } from '../../services/combat/automation/automationService.js';
+import { hasIgnoreResistance, hasGreatWeaponFighting, applyGreatWeaponFightingToDamage } from '../../services/combat/automation/automationService.js';
 import { endInvisibilityOnHostileAction } from '../../services/rules/features/invisibilityService.js';
 import { getAffectedCreatures } from '../../services/rules/combat/aoeService.js';
 import {
@@ -86,20 +88,22 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
         pendingSaves: {},
     };
 
-    beforeEach(() => {
-        rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 0 });
-        getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12 }] });
-        getRuntimeValue.mockReturnValue(null);
-        applyMinDamageAdjustment.mockImplementation((d) => d);
-        isMagicMissileImmune.mockReturnValue(false);
-        hasSoulstitchProtection.mockReturnValue(false);
-        hasIgnoreResistance.mockReturnValue(false);
-        endInvisibilityOnHostileAction.mockReturnValue(undefined);
-        computeDamageAfterSave.mockReturnValue(8);
-        rollSaveForCreature.mockReturnValue({ success: true, roll: 15, total: 18, bonus: 3 });
-        applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
-        loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }] });
-    });
+        beforeEach(() => {
+            rollExpression.mockReturnValue({ total: 8, rolls: [5, 3], modifier: 0 });
+            getCombatSummary.mockReturnValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12 }] });
+            getRuntimeValue.mockReturnValue(null);
+            applyMinDamageAdjustment.mockImplementation((d) => d);
+            isMagicMissileImmune.mockReturnValue(false);
+            hasSoulstitchProtection.mockReturnValue(false);
+            hasIgnoreResistance.mockReturnValue(false);
+            hasGreatWeaponFighting.mockReturnValue(false);
+            applyGreatWeaponFightingToDamage.mockImplementation((rolls) => rolls);
+            endInvisibilityOnHostileAction.mockReturnValue(undefined);
+            computeDamageAfterSave.mockReturnValue(8);
+            rollSaveForCreature.mockReturnValue({ success: true, roll: 15, total: 18, bonus: 3 });
+            applyDamageToTarget.mockReturnValue({ finalDamage: 8, newHp: 5, damageReduced: false });
+            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }] });
+        });
 
     function createFn() {
         return createLogDamageAndShow(deps);
@@ -323,6 +327,50 @@ describe('createLogDamageAndShow (useLoggedDiceRollDamage)', () => {
                 playerStats: { automation: { passives: [] } },
             });
             expect(applyMinDamageAdjustment).toHaveBeenCalledWith(8, [1, 1, 3, 3, 3, 3, 3, 3], expect.any(Object), 'fire');
+        });
+    });
+
+    describe('Great Weapon Fighting', () => {
+        it('applies GWF reroll when player has the passive and rolls 1s or 2s', async () => {
+            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }] });
+            hasGreatWeaponFighting.mockReturnValue(true);
+            applyGreatWeaponFightingToDamage.mockReturnValue([3, 3, 4, 5]);
+            const fn = createFn();
+            await fn('Longsword', '4d6', 10, [1, 1, 4, 5], 0, {
+                targetName: 'Goblin',
+                damageType: 'slashing',
+                playerStats: {},
+            });
+            expect(hasGreatWeaponFighting).toHaveBeenCalledWith({});
+            expect(applyGreatWeaponFightingToDamage).toHaveBeenCalledWith([1, 1, 4, 5], {});
+            expect(applyMinDamageAdjustment).toHaveBeenCalledWith(15, [3, 3, 4, 5], {}, 'slashing');
+        });
+
+        it('skips GWF when player does not have the passive', async () => {
+            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }] });
+            hasGreatWeaponFighting.mockReturnValue(false);
+            const fn = createFn();
+            await fn('Longsword', '4d6', 10, [1, 1, 4, 5], 0, {
+                targetName: 'Goblin',
+                damageType: 'slashing',
+                playerStats: {},
+            });
+            expect(hasGreatWeaponFighting).toHaveBeenCalledWith({});
+            expect(applyMinDamageAdjustment).toHaveBeenCalledWith(10, [1, 1, 4, 5], {}, 'slashing');
+        });
+
+        it('skips GWF reroll when no 1s or 2s are rolled', async () => {
+            loadCombatSummary.mockResolvedValue({ creatures: [{ name: 'Goblin', type: 'npc', ac: 12, currentHp: 13, maxHp: 13 }] });
+            hasGreatWeaponFighting.mockReturnValue(true);
+            applyGreatWeaponFightingToDamage.mockReturnValue([3, 4, 5, 6]);
+            const fn = createFn();
+            await fn('Longsword', '4d6', 10, [3, 4, 5, 6], 0, {
+                targetName: 'Goblin',
+                damageType: 'slashing',
+                playerStats: {},
+            });
+            expect(hasGreatWeaponFighting).toHaveBeenCalledWith({});
+            expect(applyMinDamageAdjustment).toHaveBeenCalledWith(18, [3, 4, 5, 6], {}, 'slashing');
         });
     });
 

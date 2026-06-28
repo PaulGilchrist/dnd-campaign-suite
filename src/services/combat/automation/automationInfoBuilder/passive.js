@@ -212,5 +212,16 @@ export const passiveHandlers = {
             casting_time: auto.casting_time || 'passive',
             hasAutomation: true
         }
+    },
+
+    'blessed_warrior': (feature, _playerStats) => {
+        const auto = feature.automation
+        return {
+            type: 'passive_rule',
+            name: feature.name,
+            effect: 'blessed_warrior',
+            bonus: auto.bonus || 2,
+            hasAutomation: true
+        }
     }
 }

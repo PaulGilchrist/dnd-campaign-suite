@@ -228,6 +228,22 @@ export function hasNaturallyStealthy(playerStats) {
     return hasPassiveEffect(playerStats, 'passive_rule', 'naturally_stealthy');
 }
 
+export function hasInterception(playerStats) {
+    return hasPassiveEffect(playerStats, 'passive_rule', 'interception');
+}
+
+export function hasProtection(playerStats) {
+    return hasPassiveEffect(playerStats, 'passive_rule', 'protection');
+}
+
+export function hasThrownWeaponFighting(playerStats) {
+    return hasPassiveEffect(playerStats, 'passive_rule', 'thrown_weapon_fighting');
+}
+
+export function hasBlessedWarrior(playerStats) {
+    return hasPassiveEffect(playerStats, 'passive_rule', 'blessed_warrior');
+}
+
 export function applyGreatWeaponFightingToDamage(rolls, playerStats) {
     if (!hasGreatWeaponFighting(playerStats)) {
         return rolls;

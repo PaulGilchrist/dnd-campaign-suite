@@ -657,6 +657,12 @@ export function collectAutomationFromFeatures(features, playerStats) {
             case 'shadowy_dodge':
                 result.reactions.push(info)
                 break
+            case 'interception':
+                result.reactions.push(info)
+                break
+            case 'protection':
+                result.reactions.push(info)
+                break
             case 'misty_escape':
                 result.reactions.push(info)
                 break

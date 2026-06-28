@@ -477,9 +477,10 @@ describe('attackCalc', () => {
 
   describe('getAttacks', () => {
     const allEquipment = [
-      { name: 'Longsword', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d8', damage_type: 'Slashing' }, range: { normal: 5 } },
+      { name: 'Longsword', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d8', damage_type: 'Slashing' }, range: { normal: 5 }, properties: [] },
       { name: 'Shortbow', equipment_category: 'Weapon', weapon_range: 'Ranged', damage: { damage_dice: '1d6', damage_type: 'Piercing' }, range: { normal: 80 } },
-      { name: 'Dagger', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d4', damage_type: 'Piercing' }, range: { normal: 5 } },
+      { name: 'Dagger', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d4', damage_type: 'Piercing' }, range: { normal: 5 }, properties: ['Light'] },
+      { name: 'Shortsword', equipment_category: 'Weapon', weapon_range: 'Melee', damage: { damage_dice: '1d6', damage_type: 'Piercing' }, range: { normal: 5 }, properties: ['Light', 'Finesse'] },
     ];
 
     const makePlayerStats = (overrides = {}) => ({
@@ -533,6 +534,49 @@ describe('attackCalc', () => {
       expect(result[0].hitBonus).toBe(7);
     });
 
+    it('should apply Blessed Warrior fighting style to melee attacks', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['Longsword'],
+        class: { name: 'Fighter', fightingStyles: ['Blessed Warrior'] },
+      });
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(result[0].hitBonus).toBe(8);
+      expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
+    });
+
+    it('should apply Blessed Warrior fighting style to off-hand melee attacks', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['Shortsword', 'Dagger'],
+        class: { name: 'Fighter', fightingStyles: ['Blessed Warrior'] },
+      });
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(result[0].hitBonus).toBe(8);
+      expect(result[1].hitBonus).toBe(8);
+      expect(result[1].hitBonusFormula).toContain('Blessed Warrior (2)');
+    });
+
+    it('should apply both Blessed Warrior and Dueling to melee attacks', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['Longsword'],
+        class: { name: 'Fighter', fightingStyles: ['Blessed Warrior', 'Dueling'] },
+      });
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(result[0].hitBonus).toBe(8);
+      expect(result[0].damage).toBe('1d8+3+2');
+      expect(result[0].hitBonusFormula).toContain('Blessed Warrior (2)');
+      expect(result[0].damageFormula).toContain('Dueling');
+    });
+
+    it('should not apply Blessed Warrior when not selected', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['Longsword'],
+        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
+      });
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(result[0].hitBonus).toBe(6);
+      expect(result[0].hitBonusFormula).not.toContain('Blessed Warrior');
+    });
+
     it('should apply Dueling fighting style when single melee weapon equipped', () => {
       const playerStats = makePlayerStats({
         equipped: ['Longsword'],
@@ -553,6 +597,17 @@ describe('attackCalc', () => {
       expect(result[1].damage).toBe('1d4');
     });
 
+    it('should not apply Dueling when a ranged weapon is also equipped', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['Longsword', 'Shortbow'],
+        class: { name: 'Fighter', fightingStyles: ['Dueling'] },
+      });
+      const result = getAttacks(allEquipment, [], playerStats);
+      // Dueling requires no other weapons; ranged weapon disqualifies it
+      expect(result.find(a => a.name === 'Longsword').damage).toBe('1d8+3');
+      expect(result.find(a => a.name === 'Shortbow').damage).toBe('1d6+2');
+    });
+
     it('should build off-hand attack when two melee weapons equipped', () => {
       const playerStats = makePlayerStats({
         equipped: ['Longsword', 'Dagger'],
@@ -566,11 +621,30 @@ describe('attackCalc', () => {
 
     it('should apply Two-Weapon Fighting bonus to off-hand damage', () => {
       const playerStats = makePlayerStats({
-        equipped: ['Longsword', 'Dagger'],
+        equipped: ['Shortsword', 'Dagger'],
         class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
       });
       const result = getAttacks(allEquipment, [], playerStats);
       expect(result[1].damage).toBe('1d4+3');
+    });
+
+    it('should not apply Two-Weapon Fighting bonus when main hand is not light', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['Longsword', 'Dagger'],
+        class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
+      });
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(result[1].damage).toBe('1d4');
+    });
+
+    it('should not apply Two-Weapon Fighting bonus when shield is equipped', () => {
+      const playerStats = makePlayerStats({
+        equipped: ['Shortsword', 'Dagger'],
+        class: { name: 'Fighter', fightingStyles: ['Two-Weapon Fighting'] },
+      });
+      playerStats.inventory.equipped = ['Shortsword', 'Dagger', 'Shield'];
+      const result = getAttacks(allEquipment, [], playerStats);
+      expect(result[1].damage).toBe('1d4');
     });
 
     it('should prefer strength over dexterity for melee when strength is higher', () => {

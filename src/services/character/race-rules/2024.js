@@ -177,10 +177,16 @@ const raceRules = {
                  });
              }
 
-         // Elfish Lineage: Drow lineage overrides Darkvision to 120 ft.
-         const campaignName = playerStats.campaignName;
-         const elfisLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_elfishLineageSelection', campaignName);
-         if (elfisLineage === 'Drow') {
+          // Blind Fighting fighting style: grants 10 ft. blindvision
+          const hasBlindFighting = playerStats.class?.fightingStyles && playerStats.class.fightingStyles.includes('Blind Fighting');
+          if (hasBlindFighting && !passiveSenses.some((sense) => sense.name === 'Blindvision')) {
+              passiveSenses.push({ name: 'Blindvision', value: '10 ft.' });
+          }
+
+          // Elfish Lineage: Drow lineage overrides Darkvision to 120 ft.
+          const campaignName = playerStats.campaignName;
+          const elfisLineage = playerStats.race?.lineage || getRuntimeValue(playerStats.name, '_elfishLineageSelection', campaignName);
+          if (elfisLineage === 'Drow') {
              const darkvisionIndex = passiveSenses.findIndex(s => s.name === 'Darkvision');
              if (darkvisionIndex !== -1) {
                  const currentFeet = extractDarkvisionFeet(passiveSenses[darkvisionIndex].value);

@@ -36,7 +36,7 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         }
     }
 
-    // Melee weapons (2024: no fighting style bonuses)
+    // Melee weapons
     const meleeWeaponNames = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Melee');
     if (meleeWeaponNames.length > 0) {
         const bonus = Math.max(strength.bonus, dexterity.bonus);
@@ -44,7 +44,13 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
         const mainHandName = meleeWeaponNames[0];
         const { baseName: mainBaseName } = parseMagicItemName(mainHandName);
         const mainHandWeapon = allEquipment.find(item => item.name === mainBaseName);
+        const fightingStyles2024 = playerStats.class?.fightingStyles != null ? playerStats.class.fightingStyles : [];
+        const hasBlessedWarrior = fightingStyles2024.includes('Blessed Warrior');
+        const hasDruidicWarrior = fightingStyles2024.includes('Druidic Warrior');
         if (mainHandWeapon) {
+            const blessedWarriorHitBonus = hasBlessedWarrior ? 2 : 0;
+            const druidicWarriorDamage = hasDruidicWarrior ? '+2' : '';
+            const druidicWarriorLabel = hasDruidicWarrior ? 'Druidic Warrior (2)' : '';
             attacks.push(buildWeaponAttack({
                 weapon: mainHandWeapon,
                 weaponName: mainHandName,
@@ -53,6 +59,10 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 proficiency,
                 actionType: 'Action',
                 weaponType: 'melee',
+                extraDamage: druidicWarriorDamage,
+                extraDamageLabel: druidicWarriorLabel,
+                extraHitBonus: blessedWarriorHitBonus,
+                extraHitBonusLabel: blessedWarriorHitBonus ? 'Blessed Warrior (2)' : '',
             }));
         }
 

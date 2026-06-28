@@ -26,6 +26,8 @@ vi.mock('../../services/encounters/combatData.js', () => ({
 vi.mock('../../services/combat/automation/automationService.js', () => ({
     hasIgnoreResistance: vi.fn(),
     playerIsImmuneToCondition: vi.fn(),
+    hasGreatWeaponFighting: vi.fn(),
+    applyGreatWeaponFightingToDamage: vi.fn((rolls) => rolls),
 }));
 
 vi.mock('../../services/rules/features/invisibilityService.js', () => ({

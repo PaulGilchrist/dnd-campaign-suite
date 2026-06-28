@@ -220,12 +220,14 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
 
      // Ranged weapon
     const rangedWeapons = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Ranged');
+    const hasThrownWeaponFighting = fightingStyles.includes('Thrown Weapon Fighting');
     if (rangedWeapons.length > 0) {
         const rangedWeaponName = rangedWeapons[0];
         const { baseName } = parseMagicItemName(rangedWeaponName);
         const rangedWeapon = allEquipment.find(item => item.name === baseName);
         if (rangedWeapon) {
             const archeryBonus = fightingStyles.includes('Archery') ? 2 : 0;
+            const thrownProfBonus = hasThrownWeaponFighting && rangedWeapon.properties && rangedWeapon.properties.some(p => p.toLowerCase() === 'thrown') ? proficiency : 0;
             attacks.push(buildWeaponAttack({
                 weapon: rangedWeapon,
                 weaponName: rangedWeaponName,
@@ -233,69 +235,127 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
                 abilityName: 'Dexterity',
                 proficiency,
                 actionType: 'Action',
-                extraHitBonus: archeryBonus,
-                extraHitBonusLabel: archeryBonus ? 'Archery Fighting Style (2)' : '',
+                extraHitBonus: archeryBonus + thrownProfBonus,
+                extraHitBonusLabel: [
+                    archeryBonus ? 'Archery Fighting Style (2)' : '',
+                    thrownProfBonus ? 'Thrown Weapon Fighting (Proficiency)' : ''
+                ].filter(Boolean).join(' + ') || '',
          }));
          }
      }
 
-     // Melee weapons
-    const meleeWeaponNames = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Melee');
-    if (meleeWeaponNames.length > 0) {
-        const bonus = Math.max(strength.bonus, dexterity.bonus);
-        const abilityName = strength.bonus > dexterity.bonus ? 'Strength' : 'Dexterity';
-        const mainHandName = meleeWeaponNames[0];
-        const { baseName: mainBaseName } = parseMagicItemName(mainHandName);
-        const mainHandWeapon = allEquipment.find(item => item.name === mainBaseName);
-        if (mainHandWeapon) {
-            const isDueling = fightingStyles.includes('Dueling') && meleeWeaponNames.length === 1;
+    // Thrown Weapon Fighting: treat short swords as thrown weapons for ranged attacks
+    if (hasThrownWeaponFighting) {
+        const thrownShortSwords = [];
+        for (const equippedName of playerStats.inventory.equipped) {
+            if (!equippedName || typeof equippedName !== 'string') continue;
+            const { baseName } = parseMagicItemName(equippedName);
+            const weapon = allEquipment.find(item => item.name === baseName);
+            if (weapon && weapon.name === 'Short Sword' && weapon.weapon_range === 'Melee') {
+                thrownShortSwords.push({ equippedName, baseName, weapon });
+            }
+        }
+        if (thrownShortSwords.length > 0) {
+            const shortSwordData = thrownShortSwords[0];
+            const { weapon, equippedName } = shortSwordData;
+            const thrownProfBonus = proficiency;
             attacks.push(buildWeaponAttack({
-                weapon: mainHandWeapon,
-                weaponName: mainHandName,
-                abilityBonus: bonus,
-                abilityName,
+                weapon,
+                weaponName: equippedName,
+                abilityBonus: dexterity.bonus,
+                abilityName: 'Dexterity',
                 proficiency,
                 actionType: 'Action',
-                weaponType: 'melee',
-                extraDamage: isDueling ? '+2' : '',
-                extraDamageLabel: isDueling ? 'Dueling Fighting Style (2)' : '',
-             }));
-         }
+                extraHitBonus: thrownProfBonus,
+                extraHitBonusLabel: 'Thrown Weapon Fighting (Proficiency)',
+            }));
+        }
+    }
 
-         // Off-hand weapon
-        if (meleeWeaponNames.length > 1) {
-            const offHandName = meleeWeaponNames[1];
-            const { baseName: offBaseName } = parseMagicItemName(offHandName);
-            const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
-            if (offHandWeapon) {
-                const isTwoWeapon = fightingStyles.includes('Two-Weapon Fighting');
-                let actionType = 'Bonus Action';
-                const isLightWeapon = offHandWeapon.properties && offHandWeapon.properties.some(p => p.toLowerCase() === 'light');
-                if (isLightWeapon && playerStats.campaignName) {
-                    const nickAvailable = collectWeaponMastery(offBaseName, playerStats);
-                    const hasNick = nickAvailable.baseMastery === 'Nick' || (nickAvailable.extraMasteries || []).includes('Nick');
-                    if (hasNick) {
-                        const currentRound = getCurrentCombatRound();
-                        const nickUsedRound = getRuntimeValue(playerStats.name, '_Nick_UsedRound', playerStats.campaignName);
-                        if (nickUsedRound === currentRound) {
-                            actionType = 'Action';
-                        }
-                    }
-                }
-                attacks.push(buildWeaponAttack({
-                    weapon: offHandWeapon,
-                    weaponName: offHandName,
-                    abilityBonus: bonus,
-                    abilityName,
-                    proficiency,
-                    actionType,
-                    weaponType: 'melee',
-                    includeAbilityBonusInDamage: false,
-                    extraDamage: isTwoWeapon ? `+${bonus}` : '',
-                    extraDamageLabel: isTwoWeapon ? `Two-Weapon Fighting Style (${bonus})` : '',
-                 }));
-             }
-         }
+      // Melee weapons
+     const meleeWeaponNames = findEquippedWeapons(allEquipment, playerStats.inventory.equipped, 'Melee');
+     if (meleeWeaponNames.length > 0) {
+         const bonus = Math.max(strength.bonus, dexterity.bonus);
+         const abilityName = strength.bonus > dexterity.bonus ? 'Strength' : 'Dexterity';
+         const mainHandName = meleeWeaponNames[0];
+         const { baseName: mainBaseName } = parseMagicItemName(mainHandName);
+         const mainHandWeapon = allEquipment.find(item => item.name === mainBaseName);
+          const hasBlessedWarrior = fightingStyles.includes('Blessed Warrior');
+          const hasDruidicWarrior = fightingStyles.includes('Druidic Warrior');
+          if (mainHandWeapon) {
+              const isDueling = fightingStyles.includes('Dueling') && meleeWeaponNames.length === 1 && rangedWeapons.length === 0;
+              const blessedWarriorHitBonus = hasBlessedWarrior ? 2 : 0;
+              const druidicWarriorDamage = hasDruidicWarrior ? '+2' : '';
+              const druidicWarriorLabel = hasDruidicWarrior ? 'Druidic Warrior (2)' : '';
+              const combinedExtraDamage = [isDueling ? '+2' : '', druidicWarriorDamage].filter(Boolean).join(' + ');
+              const combinedExtraDamageLabel = [isDueling ? 'Dueling Fighting Style (2)' : '', druidicWarriorLabel].filter(Boolean).join(' + ') || '';
+              attacks.push(buildWeaponAttack({
+                  weapon: mainHandWeapon,
+                  weaponName: mainHandName,
+                  abilityBonus: bonus,
+                  abilityName,
+                  proficiency,
+                  actionType: 'Action',
+                  weaponType: 'melee',
+                  extraDamage: combinedExtraDamage,
+                  extraDamageLabel: combinedExtraDamageLabel,
+                  extraHitBonus: blessedWarriorHitBonus,
+                  extraHitBonusLabel: blessedWarriorHitBonus ? 'Blessed Warrior (2)' : '',
+               }));
+           }
+
+          // Off-hand weapon
+         if (meleeWeaponNames.length > 1) {
+             const offHandName = meleeWeaponNames[1];
+             const { baseName: offBaseName } = parseMagicItemName(offHandName);
+             const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
+             if (offHandWeapon) {
+                 const isTwoWeapon = fightingStyles.includes('Two-Weapon Fighting');
+                 let actionType = 'Bonus Action';
+                 const isLightWeapon = offHandWeapon.properties && offHandWeapon.properties.some(p => p.toLowerCase() === 'light');
+                 if (isLightWeapon && playerStats.campaignName) {
+                     const nickAvailable = collectWeaponMastery(offBaseName, playerStats);
+                     const hasNick = nickAvailable.baseMastery === 'Nick' || (nickAvailable.extraMasteries || []).includes('Nick');
+                     if (hasNick) {
+                         const currentRound = getCurrentCombatRound();
+                         const nickUsedRound = getRuntimeValue(playerStats.name, '_Nick_UsedRound', playerStats.campaignName);
+                         if (nickUsedRound === currentRound) {
+                             actionType = 'Action';
+                         }
+                     }
+                 }
+                 // Two-Weapon Fighting: check both weapons are light and no shield equipped
+                 const mainHandName = meleeWeaponNames[0];
+                 const { baseName: mainBaseName } = parseMagicItemName(mainHandName);
+                 const mainHandWeapon = allEquipment.find(item => item.name === mainBaseName);
+                 const mainHandIsLight = mainHandWeapon && mainHandWeapon.properties && mainHandWeapon.properties.some(p => p.toLowerCase() === 'light');
+                 const equippedItems = playerStats.inventory?.equipped || [];
+                 const hasShield = equippedItems.some(name => {
+                     const parsedName = name.includes('(') ? name.substring(0, name.indexOf('(')).trim() : name;
+                     return parsedName === 'Shield';
+                 });
+                   const appliesTwoWeapon = isTwoWeapon && mainHandIsLight && isLightWeapon && !hasShield;
+                  const blessedWarriorOffHandHitBonus = hasBlessedWarrior ? 2 : 0;
+                  const druidicWarriorOffHandDamage = hasDruidicWarrior ? '+2' : '';
+                  const druidicWarriorOffHandLabel = hasDruidicWarrior ? 'Druidic Warrior (2)' : '';
+                  const combinedOffHandExtraDamage = [appliesTwoWeapon ? `+${bonus}` : '', druidicWarriorOffHandDamage].filter(Boolean).join(' + ');
+                  const combinedOffHandExtraDamageLabel = [appliesTwoWeapon ? `Two-Weapon Fighting Style (${bonus})` : '', druidicWarriorOffHandLabel].filter(Boolean).join(' + ') || '';
+                  attacks.push(buildWeaponAttack({
+                      weapon: offHandWeapon,
+                      weaponName: offHandName,
+                      abilityBonus: bonus,
+                      abilityName,
+                      proficiency,
+                      actionType,
+                      weaponType: 'melee',
+                      includeAbilityBonusInDamage: false,
+                      extraDamage: combinedOffHandExtraDamage,
+                      extraDamageLabel: combinedOffHandExtraDamageLabel,
+                      extraHitBonus: blessedWarriorOffHandHitBonus,
+                      extraHitBonusLabel: blessedWarriorOffHandHitBonus ? 'Blessed Warrior (2)' : '',
+                   }));
+              }
+          }
      }
 
      // Monk unarmed strikes

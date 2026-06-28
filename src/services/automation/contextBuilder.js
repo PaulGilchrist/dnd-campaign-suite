@@ -117,6 +117,13 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             sacredWeaponBonus = chaMod;
         }
 
+        // Blessed Warrior: +2 bonus to attack rolls with melee weapons
+        let blessedWarriorBonus = 0;
+        const hasBlessedWarrior = activeBuffs.some(b => b.effect === 'blessed_warrior');
+        if (hasBlessedWarrior && (attack.weaponType === 'melee' || attack.weaponType === 'unarmed')) {
+            blessedWarriorBonus = 2;
+        }
+
         // Vow of Enmity: Advantage on attack rolls against the vowed creature
         const vowOfEnmityActive = activeBuffs.some(b => b.effect === 'vow_of_enmity');
         if (vowOfEnmityActive && targetName) {
@@ -147,10 +154,11 @@ export function buildAttackContextSync(attack, playerStats, campaignName, condit
             ? `${attack.damage}+${stanceDamageBonus}`
             : attack.damage;
 
-        const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus;
-        const hitBonusFormula = sacredWeaponBonus > 0
-            ? `${attack.hitBonusFormula} + Charisma Bonus (${sacredWeaponBonus})`
-            : attack.hitBonusFormula;
+        const effectiveHitBonus = attack.hitBonus + sacredWeaponBonus + blessedWarriorBonus;
+        const hitBonusFormulaParts = [attack.hitBonusFormula];
+        if (sacredWeaponBonus > 0) hitBonusFormulaParts.push(`Charisma Bonus (${sacredWeaponBonus})`);
+        if (blessedWarriorBonus > 0) hitBonusFormulaParts.push(`Blessed Warrior (${blessedWarriorBonus})`);
+        const hitBonusFormula = hitBonusFormulaParts.join(' + ');
 
         const isMelee = attack.weaponType === 'melee' || attack.weaponType === 'unarmed';
 

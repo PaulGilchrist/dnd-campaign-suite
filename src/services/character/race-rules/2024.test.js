@@ -569,6 +569,65 @@ describe('raceRules 2024 (direct module)', () => {
       // Drow lineage adds Darkvision 120 ft. even when no darkvision trait exists
       expect(result).toContainEqual({ name: 'Darkvision', value: '120 ft.' });
     });
+
+    it('adds Blindvision 10 ft. when Blind Fighting fighting style is selected', () => {
+      const input = {
+        senses: [],
+        race: { traits: [] },
+        class: {
+          fightingStyles: ['Blind Fighting']
+        }
+      };
+      const result = raceRules.getSenses(input);
+      expect(result).toContainEqual({ name: 'Blindvision', value: '10 ft.' });
+    });
+
+    it('does not add Blindvision when Blind Fighting is not selected', () => {
+      const input = {
+        senses: [],
+        race: { traits: [] },
+        class: {
+          fightingStyles: ['Dueling']
+        }
+      };
+      const result = raceRules.getSenses(input);
+      expect(result).not.toContainEqual({ name: 'Blindvision', value: '10 ft.' });
+    });
+
+    it('does not add Blindvision when fightingStyles is empty', () => {
+      const input = {
+        senses: [],
+        race: { traits: [] },
+        class: {
+          fightingStyles: []
+        }
+      };
+      const result = raceRules.getSenses(input);
+      expect(result).not.toContainEqual({ name: 'Blindvision', value: '10 ft.' });
+    });
+
+    it('does not duplicate Blindvision when already in senses', () => {
+      const input = {
+        senses: [{ name: 'Blindvision', value: '30 ft.' }],
+        race: { traits: [] },
+        class: {
+          fightingStyles: ['Blind Fighting']
+        }
+      };
+      const result = raceRules.getSenses(input);
+      expect(result.filter((s) => s.name === 'Blindvision').length).toBe(1);
+      expect(result.find((s) => s.name === 'Blindvision').value).toBe('30 ft.');
+    });
+
+    it('handles missing fightingStyles gracefully', () => {
+      const input = {
+        senses: [],
+        race: { traits: [] },
+        class: {}
+      };
+      const result = raceRules.getSenses(input);
+      expect(result).not.toContainEqual({ name: 'Blindvision', value: '10 ft.' });
+    });
   });
 
   describe('getRace', () => {

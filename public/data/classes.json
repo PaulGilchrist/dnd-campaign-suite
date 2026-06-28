@@ -5858,7 +5858,11 @@
                 "name": "Relentless",
                 "level": 15,
                 "prerequisites": [],
-                "description": "When you roll initiative and have no superiority dice remaining, you regain one superiority die."
+                "description": "When you roll initiative and have no superiority dice remaining, you regain one superiority die.",
+                "automation": {
+                  "type": "passive_rule",
+                  "effect": "relentless"
+                }
               }
             ]
           },

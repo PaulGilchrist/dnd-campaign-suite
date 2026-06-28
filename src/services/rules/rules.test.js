@@ -485,17 +485,20 @@ describe('rules', () => {
       expect(result[0]).toBe(15)
     })
 
-    it('adds defense fighting style bonus for 5e', () => {
+    it('adds defense fighting style bonus for 5e when wearing armor', () => {
+      const equipment = [
+        { name: 'Leather Armor', equipment_category: 'Armor', armor_class: { base: 11, dex_bonus: true, max_bonus: null } }
+      ];
       const stats = {
         rules: '5e',
         abilities: [
           { name: 'Dexterity', bonus: 2 },
         ],
         class: { name: 'Fighter', fightingStyles: ['Defense'] },
-        inventory: { equipped: [] },
+        inventory: { equipped: ['Leather Armor'] },
       }
-      const result = rules.getArmorClass([], stats, {})
-      expect(result[0]).toBe(13)
+      const result = rules.getArmorClass(equipment, stats, {})
+      expect(result[0]).toBe(14)
       expect(result[1]).toContain('Fighting Style Defense (1)')
     })
 

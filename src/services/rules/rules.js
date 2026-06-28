@@ -562,13 +562,35 @@ const rules = {
             contributions.push(`Monk Wisdom Bonus (${wisdom.bonus})`);
          }
 
-         // 5e-specific: Defense fighting style
-        if (!is2024(playerStats, playerSummary)) {
-            if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Defense')) {
-                addedBonus += 1;
-                contributions.push(`Fighting Style Defense (1)`);
-             }
-         }
+          // 5e-specific: Defense fighting style
+          if (!is2024(playerStats, playerSummary)) {
+              if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Defense') && armorName) {
+                  addedBonus += 1;
+                  contributions.push(`Fighting Style Defense (1)`);
+               }
+           }
+
+          // 5e-specific: Unarmed Fighting fighting style - +2 AC when unarmed and not holding anything
+          if (!is2024(playerStats, playerSummary)) {
+              const hasUnarmedFighting = playerStats.class?.fightingStyles && playerStats.class.fightingStyles.includes('Unarmed Fighting');
+              if (hasUnarmedFighting) {
+                  const equippedItems = playerStats.inventory?.equipped || [];
+                  const hasAnyWeapon = equippedItems.some(equipName => {
+                      const { baseName } = parseMagicItemName(equipName);
+                      const item = allEquipment.find(e => e.name === baseName);
+                      return item && item.equipment_category === 'Weapon';
+                  });
+                  const hasShield = equippedItems.some(equipName => {
+                      const { baseName } = parseMagicItemName(equipName);
+                      return baseName === 'Shield';
+                  });
+                  const isUnarmed = !armorName && !hasAnyWeapon && !hasShield;
+                  if (isUnarmed) {
+                      addedBonus += 2;
+                      contributions.push(`Fighting Style Unarmed (2)`);
+                  }
+              }
+          }
 
         let armorClass;
         if (armorName) {
@@ -848,7 +870,151 @@ const rules = {
 
             [playerStats.actions, playerStats.bonusActions, playerStats.reactions, playerStats.specialActions, playerStats.characterAdvancement] = rules.getActions(playerStats, playerSummary);
 
-          const allFeatures = [
+          // 5e-specific: Interception fighting style - add reaction feature
+           if (!is2024(playerStats, playerSummary)) {
+               if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Interception')) {
+                   const existingInterception = playerStats.reactions.find(r => r.name === 'Interception');
+                   if (!existingInterception) {
+                       playerStats.reactions.push({
+                           name: 'Interception',
+                           description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You can then reduce the damage the target takes by 1d10 + your proficiency bonus. You must be holding a shield to use this feature.',
+                           type: 'interception',
+                           automation: {
+                               type: 'interception',
+                               trigger: 'ally_within_5ft_attacked',
+                               range: '5_ft',
+                               damageExpression: '1d10',
+                               damageType: '',
+                               damageBonusExpression: 'proficiency_bonus',
+                               requiresShield: true,
+                               casting_time: '1 reaction',
+                               hasAutomation: true,
+                           },
+                           hasAutomation: true,
+                       });
+                   }
+               }
+
+               // 5e-specific: Protection fighting style - add reaction feature
+               if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Protection')) {
+                   const existingProtection = playerStats.reactions.find(r => r.name === 'Protection');
+                   if (!existingProtection) {
+                       playerStats.reactions.push({
+                           name: 'Protection',
+                           description: 'When a creature you can see attacks a target other than you that is within 5 feet of you, you can use your reaction to impose disadvantage on the attack roll. You must be wielding a shield.',
+                           type: 'protection',
+                           automation: {
+                               type: 'protection',
+                               trigger: 'ally_within_5ft_attacked',
+                               range: '5_ft',
+                               requiresShield: true,
+                               casting_time: '1 reaction',
+                               hasAutomation: true,
+                           },
+                           hasAutomation: true,
+                       });
+                   }
+                }
+            }
+
+            // 5e-specific: Thrown Weapon Fighting fighting style - add passive automation
+            if (!is2024(playerStats, playerSummary)) {
+                if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Thrown Weapon Fighting')) {
+                    const existingThrownWeapon = playerStats.specialActions.find(a => a.name === 'Thrown Weapon Fighting');
+                    if (!existingThrownWeapon) {
+                        playerStats.specialActions.push({
+                            name: 'Thrown Weapon Fighting',
+                            description: 'You can treat any short sword that you hold with one hand as if it had the thrown property, and you can make ranged attacks with a short sword as if you had the light property with it. When you make a ranged attack roll with a thrown weapon, you add your proficiency bonus to the attack roll.',
+                            type: 'thrown_weapon_fighting',
+                            automation: {
+                                type: 'passive_rule',
+                                effect: 'thrown_weapon_fighting',
+                                hasAutomation: true,
+                            },
+                            hasAutomation: true,
+                        });
+                    }
+                }
+            }
+
+             // 5e-specific: Two-Weapon Fighting fighting style - add passive automation
+             if (!is2024(playerStats, playerSummary)) {
+                 if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Two-Weapon Fighting')) {
+                     const existingTwoWeapon = playerStats.specialActions.find(a => a.name === 'Two-Weapon Fighting');
+                     if (!existingTwoWeapon) {
+                         playerStats.specialActions.push({
+                             name: 'Two-Weapon Fighting',
+                             description: 'If you are wielding a light melee weapon that you are holding in one hand, a light melee weapon that you are holding in the other hand, and no armor shields, you can add your ability modifier to the damage of the second attack.',
+                             type: 'two_weapon_fighting',
+                             automation: {
+                                 type: 'passive_rule',
+                                 effect: 'two_weapon_fighting',
+                                 hasAutomation: true,
+                             },
+                             hasAutomation: true,
+                         });
+                     }
+                 }
+             }
+
+              // Blessed Warrior fighting style - add passive automation (+2 melee attack rolls)
+              if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Blessed Warrior')) {
+                  const existingBlessedWarrior = playerStats.specialActions.find(a => a.name === 'Blessed Warrior');
+                  if (!existingBlessedWarrior) {
+                      playerStats.specialActions.push({
+                          name: 'Blessed Warrior',
+                          description: 'You gain a +2 bonus to attack rolls you make with melee weapons.',
+                          type: 'blessed_warrior',
+                          automation: {
+                              type: 'passive_rule',
+                              effect: 'blessed_warrior',
+                              hasAutomation: true,
+                          },
+                          hasAutomation: true,
+                      });
+                  }
+              }
+
+               // Druidic Warrior fighting style - add passive automation (+2 melee damage rolls)
+               if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Druidic Warrior')) {
+                   const existingDruidicWarrior = playerStats.specialActions.find(a => a.name === 'Druidic Warrior');
+                   if (!existingDruidicWarrior) {
+                       playerStats.specialActions.push({
+                           name: 'Druidic Warrior',
+                           description: 'You gain a +2 bonus to damage rolls you make with melee weapons.',
+                           type: 'druidic_warrior',
+                           automation: {
+                               type: 'passive_rule',
+                               effect: 'druidic_warrior',
+                               hasAutomation: true,
+                           },
+                           hasAutomation: true,
+                       });
+                   }
+               }
+
+               // Superior Technique fighting style - add Combat Superiority special action
+               if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Superior Technique')) {
+                   const existingSuperiorTechnique = playerStats.specialActions.find(a => a.name === 'Combat Superiority');
+                   if (!existingSuperiorTechnique) {
+                       playerStats.specialActions.push({
+                           name: 'Combat Superiority',
+                           description: 'You learn one maneuver of your choice from the Battle Master. You can use your superiority dice to fuel that maneuver. Use Combat Superiority during combat to deploy a maneuver.',
+                           type: 'combat_superiority',
+                           automation: {
+                               type: 'combat_superiority',
+                               dieExpression: 'superiority_die',
+                               uses_max: 4,
+                               maxOptions: 3,
+                               maxOptionsScaling: { 7: 1, 10: 1, 15: 1 },
+                               hasAutomation: true,
+                           },
+                           hasAutomation: true,
+                       });
+                   }
+               }
+
+             const allFeatures = [
             ...playerStats.actions,
             ...playerStats.bonusActions,
             ...playerStats.reactions,

@@ -106,6 +106,11 @@ const raceRules = {
          if (feralSensesExists && !passiveSenses.some((sense) => sense.name === 'Feral Senses')) {
              passiveSenses.push({ name: 'Feral Senses', value: '' });
             }
+         // Blind Fighting fighting style: grants 10 ft. blindvision
+         const hasBlindFighting = playerStats.class?.fightingStyles && playerStats.class.fightingStyles.includes('Blind Fighting');
+         if (hasBlindFighting && !passiveSenses.some((sense) => sense.name === 'Blindvision')) {
+             passiveSenses.push({ name: 'Blindvision', value: '10 ft.' });
+            }
          return passiveSenses.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           },
         addTraits: (traits) => categorizeFeatures(traits, featureCategories, { descriptionField: 'description' }),
