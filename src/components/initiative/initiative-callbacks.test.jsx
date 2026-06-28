@@ -176,7 +176,7 @@ describe('Initiative - Callback Integration', () => {
             expect(setRuntimeValue).not.toHaveBeenCalledWith('Goblin', 'currentHitPoints', 5, 'test-campaign');
         });
 
-        it('should log HP change for player', async () => {
+        it('should not log player HP changes from initiative tracker', async () => {
             vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Alice', type: 'player', currentHp: 10 }] });
             await act(async () => { render(<Initiative {...props} />); });
             await waitFor(() => { expect(screen.queryByTestId('creature-card-Alice')).toBeInTheDocument(); });
@@ -186,11 +186,11 @@ describe('Initiative - Callback Integration', () => {
                 fireEvent.change(hpInput, { target: { value: '15' } });
             });
 
-            expect(logHpChange).toHaveBeenCalled();
+            expect(logHpChange).not.toHaveBeenCalled();
         });
 
-        it('should log NPC dead threshold when HP drops to 0', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 }] });
+        it('should not log NPC HP changes from initiative tracker', async () => {
+            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10 }] });
             await act(async () => { render(<Initiative {...props} />); });
             await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
 
@@ -199,10 +199,10 @@ describe('Initiative - Callback Integration', () => {
                 fireEvent.change(hpInput, { target: { value: '0' } });
             });
 
-            expect(logNpcThreshold).toHaveBeenCalledWith('test-campaign', 'Goblin', expect.any(Number), 'dead', 10);
+            expect(logNpcThreshold).not.toHaveBeenCalled();
         });
 
-        it('should log NPC bloodied threshold when HP drops to half', async () => {
+        it('should not log NPC bloodied threshold from initiative tracker', async () => {
             vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', currentHp: 10, maxHp: 10 }] });
             await act(async () => { render(<Initiative {...props} />); });
             await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
@@ -212,10 +212,10 @@ describe('Initiative - Callback Integration', () => {
                 fireEvent.change(hpInput, { target: { value: '5' } });
             });
 
-            expect(logNpcThreshold).toHaveBeenCalledWith('test-campaign', 'Goblin', expect.any(Number), 'bloodied', 10);
+            expect(logNpcThreshold).not.toHaveBeenCalled();
         });
 
-        it('should log NPC recovering threshold when HP recovers from bloodied', async () => {
+        it('should not log NPC recovering threshold from initiative tracker', async () => {
             vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', currentHp: 5, maxHp: 10 }] });
             await act(async () => { render(<Initiative {...props} />); });
             await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
@@ -225,7 +225,7 @@ describe('Initiative - Callback Integration', () => {
                 fireEvent.change(hpInput, { target: { value: '6' } });
             });
 
-            expect(logNpcThreshold).toHaveBeenCalledWith('test-campaign', 'Goblin', expect.any(Number), 'recovering', 10);
+            expect(logNpcThreshold).not.toHaveBeenCalled();
         });
 
         it('should reset death saves when player goes from <=0 to >0 HP', async () => {

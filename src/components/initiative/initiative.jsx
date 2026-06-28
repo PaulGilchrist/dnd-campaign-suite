@@ -45,8 +45,6 @@ import {
     logConditionEvent,
     logConcentrationSave,
     logConditionSave,
-    logHpChange,
-    logNpcThreshold,
 } from '../../services/encounters/combatLoggingService.js'
 import MonsterCardModal from '../encounter/MonsterCardModal.jsx'
 import Subscriber from '../common/Subscriber.jsx'
@@ -446,34 +444,20 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
          const delta = newValue - oldHp
          if (delta === 0) return
 
-         if (isPlayer) {
-            setRuntimeValue(creature.name, 'currentHitPoints', newValue, campaignName)
-            if (oldHp <= 0 && newValue > 0) {
-                setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName)
-                setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName)
-                clearDeathSavePrompt(campaignName, creature.name)
-            }
-             const playerMaxHp = getRuntimeValue(creature.name, 'hitPoints') ?? 0
-             logHpChange(campaignName, creature.name, delta, newValue, playerMaxHp, delta > 0, newValue <= 0)
-         } else {
-             creature.currentHp = newValue
-             const wasBloodied = oldHp > 0 && oldHp <= Math.floor(creature.maxHp / 2)
-             const isBloodied = newValue > 0 && newValue <= Math.floor(creature.maxHp / 2)
-             const wasDead = oldHp <= 0
-             const isDead = newValue <= 0
-
-             let threshold
-             if (!wasDead && isDead) threshold = 'dead'
-             else if (!wasBloodied && isBloodied) threshold = 'bloodied'
-             else if (wasBloodied && !isBloodied && newValue > 0) threshold = 'recovering'
-
-             if (threshold) {
-                 logNpcThreshold(campaignName, creature.name, delta, threshold, creature.maxHp)
+          if (isPlayer) {
+             setRuntimeValue(creature.name, 'currentHitPoints', newValue, campaignName)
+             if (oldHp <= 0 && newValue > 0) {
+                 setRuntimeValue(creature.name, 'deathSaves', [false, false, false], campaignName)
+                 setRuntimeValue(creature.name, 'deathFailures', [false, false, false], campaignName)
+                 clearDeathSavePrompt(campaignName, creature.name)
              }
-         }
-         storage.set('combatSummary', combatSummary, campaignName)
-         setCombatSummary(cloneDeep(combatSummary))
-     }, [combatSummary, campaignName])
+          }
+          else {
+              creature.currentHp = newValue
+          }
+          storage.set('combatSummary', combatSummary, campaignName)
+          setCombatSummary(cloneDeep(combatSummary))
+      }, [combatSummary, campaignName])
 
     const handleClear = () => {
         if (window.confirm('Are you sure you want to clear all combat status?')) {

@@ -56,8 +56,8 @@
     "divineOrder": "",
     "primalOrder": "",
     "fightingStyles": [
-      "Blind Fighting",
-      "Dueling"
+      "Great Weapon Fighting",
+      "Thrown Weapon Fighting"
     ]
   },
   "expertSkills": [],
@@ -84,7 +84,8 @@
     "equipped": [
       "Shield",
       "Plate Armor",
-      "Longsword"
+      "Greatsword",
+      "Javelin"
     ],
     "gold": 10,
     "magicItems": []

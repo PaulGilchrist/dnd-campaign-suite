@@ -159,7 +159,7 @@ describe('CreatureHp', () => {
     });
 
     describe('player creatures', () => {
-        it('should render hp-bar, hp-inline-row, HP label, slash, current input, and max span', () => {
+        it('should render hp-bar, hp-inline-row, HP label, slash, current input, and max span for localhost', () => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             expect(screen.getByTestId('hp-bar')).toBeInTheDocument();
             expect(screen.getByText('HP')).toBeInTheDocument();
@@ -168,13 +168,20 @@ describe('CreatureHp', () => {
             expect(screen.getByText('20')).toBeInTheDocument();
         });
 
+        it('should render readonly HP display for non-localhost player', () => {
+            render(<CreatureHp {...props} isLocalhost={false} />);
+            expect(screen.getByTestId('hp-bar')).toBeInTheDocument();
+            expect(document.querySelector('.hp-inline-input')).not.toBeInTheDocument();
+            expect(screen.getByText('15/20')).toBeInTheDocument();
+        });
+
         it('should not render hp-status span or max input for player', () => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             expect(document.querySelector('.hp-status')).not.toBeInTheDocument();
             expect(document.querySelector('.hp-max-input')).not.toBeInTheDocument();
         });
 
-        it('should display current HP value in input', () => {
+        it('should display current HP value in input for localhost', () => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             const currentInput = document.querySelector('.hp-inline-input');
             expect(currentInput).toHaveValue(15);
@@ -186,14 +193,19 @@ describe('CreatureHp', () => {
             expect(maxVal).toBeInTheDocument();
         });
 
-        it('should call onChange with new value when current HP input changes', () => {
+        it('should call onChange with new value when current HP input changes for localhost', () => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             const currentInput = document.querySelector('.hp-inline-input');
             fireEvent.change(currentInput, { target: { value: '10' } });
             expect(props.onChange).toHaveBeenCalledWith('Alice', 10);
         });
 
-        it('should call onChange with 0 when current HP input is invalid', () => {
+        it('should not call onChange when non-localhost player HP display changes', () => {
+            render(<CreatureHp {...props} isLocalhost={false} />);
+            expect(props.onChange).not.toHaveBeenCalled();
+        });
+
+        it('should call onChange with 0 when current HP input is invalid for localhost', () => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             const currentInput = document.querySelector('.hp-inline-input');
             fireEvent.change(currentInput, { target: { value: 'xyz' } });
@@ -205,7 +217,7 @@ describe('CreatureHp', () => {
             ${'aria-label'} | ${'Alice current HP'}
             ${'min'}        | ${'0'}
             ${'type'}       | ${'number'}
-        `('should set $attribute on player current HP input', ({ attribute, expectedValue }) => {
+        `('should set $attribute on player current HP input for localhost', ({ attribute, expectedValue }) => {
             render(<CreatureHp {...props} isLocalhost={true} />);
             const currentInput = document.querySelector('.hp-inline-input');
             expect(currentInput).toHaveAttribute(attribute, expectedValue);

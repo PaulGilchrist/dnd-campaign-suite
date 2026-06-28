@@ -68,16 +68,22 @@ function CreatureHp({ creature, isLocalhost, onChange }) {
             </div>
             <div className="hp-inline-row">
                 <span className="hp-label">HP</span>
-                <input
-                    className="hp-inline-input"
-                    type="number"
-                    min={0}
-                    value={currentHp}
-                    onChange={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
-                    aria-label={`${creature.name} current HP`}
-                />
-                <span className="hp-sep">/</span>
-                <span className="hp-max-val">{maxHp}</span>
+                {isLocalhost ? (
+                    <>
+                        <input
+                            className="hp-inline-input"
+                            type="number"
+                            min={0}
+                            value={currentHp}
+                            onChange={(e) => onChange(creature.name, parseInt(e.target.value) || 0)}
+                            aria-label={`${creature.name} current HP`}
+                        />
+                        <span className="hp-sep">/</span>
+                        <span className="hp-max-val">{maxHp}</span>
+                    </>
+                ) : (
+                    <span className="hp-max-val">{currentHp}/{maxHp}</span>
+                )}
             </div>
         </div>
     )
