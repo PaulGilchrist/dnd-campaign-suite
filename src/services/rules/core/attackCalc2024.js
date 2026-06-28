@@ -80,11 +80,10 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
             const offHandWeapon = allEquipment.find(item => item.name === offBaseName);
             if (offHandWeapon) {
                 const passives = playerStats.automation?.passives ?? [];
-                const hasCrossbowExpertDualWielding = passives.some(
-                    p => p.effect === 'two_weapon_fighting' && p.name === 'Dual Wielding'
+                const hasTwoWeaponFighting = passives.some(
+                    p => p.effect === 'two_weapon_fighting'
                 );
-                const isLightCrossbow = !!(offHandWeapon.properties && offHandWeapon.properties.some(p => p.toLowerCase() === 'light') && ['Hand Crossbow', 'Light Crossbow'].includes(offHandWeapon.name));
-                const addAbilityToDamage = isLightCrossbow && hasCrossbowExpertDualWielding;
+                const addAbilityToDamage = hasTwoWeaponFighting;
 
                 // Nick mastery: if off-hand weapon is Light and Nick is available, check if Nick was used this turn
                 // If Nick was used, generate the attack as part of the Attack action instead of Bonus Action

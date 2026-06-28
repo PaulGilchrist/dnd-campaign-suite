@@ -1106,21 +1106,24 @@ const rules = {
                       const fightingStyleFeats = feats.filter(f =>
                           f.prerequisites && f.prerequisites.feature === 'Fighting Style'
                       );
-                      fightingStyleFeats.forEach(feat => {
-                          if (playerStats.class.fightingStyles.includes(feat.name) && feat.benefits) {
-                              feat.benefits.forEach(benefit => {
-                                  if (benefit.name === 'Great Weapon Fighting' || benefit.name === 'Damage Die Reroll') {
-                                      allFeatures.push({ name: 'Great Weapon Fighting', description: benefit.description || feat.description || '', automation: { type: 'great_weapon_fighting' }, hasAutomation: true });
-                                  } else if (benefit.automation) {
-                                      const automations = Array.isArray(benefit.automation) ? benefit.automation : [benefit.automation];
-                                      automations.forEach(auto => {
-                                          const info = buildAttackInfo({ ...benefit, automation: auto }, playerStats);
-                                          if (info && (info.type === 'passive_buff' || info.type === 'passive_rule')) {
-                                              allFeatures.push({ name: feat.name, description: feat.description || '', automation: auto, hasAutomation: true });
-                                          }
-                                      });
-                                  }
-                              });
+                       fightingStyleFeats.forEach(feat => {
+                           const normalizedFeatName = feat.name.replace(/[-\s]/g, '');
+                           if (playerStats.class.fightingStyles.some(s => s.replace(/[-\s]/g, '') === normalizedFeatName) && feat.benefits) {
+                               feat.benefits.forEach(benefit => {
+                                   if (benefit.name === 'Great Weapon Fighting' || benefit.name === 'Damage Die Reroll') {
+                                       allFeatures.push({ name: 'Great Weapon Fighting', description: benefit.description || feat.description || '', automation: { type: 'great_weapon_fighting' }, hasAutomation: true });
+                                   } else if (benefit.name && benefit.name.includes('Extra Attack Damage')) {
+                                       allFeatures.push({ name: 'Two Weapon Fighting', description: benefit.description || feat.description || '', automation: { type: 'two_weapon_fighting' }, hasAutomation: true });
+                                   } else if (benefit.automation) {
+                                       const automations = Array.isArray(benefit.automation) ? benefit.automation : [benefit.automation];
+                                       automations.forEach(auto => {
+                                           const info = buildAttackInfo({ ...benefit, automation: auto }, playerStats);
+                                           if (info && (info.type === 'passive_buff' || info.type === 'passive_rule')) {
+                                               allFeatures.push({ name: feat.name, description: feat.description || '', automation: auto, hasAutomation: true });
+                                           }
+                                       });
+                                   }
+                               });
                           }
                       });
                   }

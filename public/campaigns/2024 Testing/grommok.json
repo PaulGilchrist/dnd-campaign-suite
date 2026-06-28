@@ -56,8 +56,8 @@
     "divineOrder": "",
     "primalOrder": "",
     "fightingStyles": [
-      "Great Weapon Fighting",
-      "Thrown Weapon Fighting"
+      "Two-Weapon Fighting",
+      "Unarmed Fighting"
     ]
   },
   "expertSkills": [],
@@ -84,8 +84,8 @@
     "equipped": [
       "Shield",
       "Plate Armor",
-      "Greatsword",
-      "Javelin"
+      "Scimitar",
+      "Scimitar"
     ],
     "gold": 10,
     "magicItems": []
