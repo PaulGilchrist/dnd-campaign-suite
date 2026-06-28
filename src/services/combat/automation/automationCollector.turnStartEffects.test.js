@@ -303,6 +303,7 @@ describe('collectTurnStartEffects', () => {
                 type: 'regenerate_turn_start_heal',
                 name: 'Regeneration',
                 healExpression: '1',
+                bloodiedOnly: false,
                 bodyPartRegrowMinutes: 2,
             })
         })
@@ -317,6 +318,7 @@ describe('collectTurnStartEffects', () => {
                 type: 'regenerate_turn_start_heal',
                 name: 'Greater Regeneration',
                 healExpression: '10',
+                bloodiedOnly: false,
                 bodyPartRegrowMinutes: 5,
             })
         })

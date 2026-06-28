@@ -62,6 +62,7 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
     const setCombatSummaryG = useSSEEqualityGuard(setCombatSummary)
     const [numOfNpc, setNumOfNpc] = React.useState(4)
     const [activeCreatureName, setActiveCreatureName] = React.useState(null)
+    const activeCreatureNameRef = React.useRef(null)
     const setActiveCreatureNameG = useSSEEqualityGuard(setActiveCreatureName)
     const [npcImages, setNpcImages] = React.useState({})
     const [viewingMonster, setViewingMonster] = React.useState(null)
@@ -176,23 +177,25 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         if (!event.key.startsWith(`change-${campaignName}-`)) return
 
         const dataKey = event.key.slice(`change-${campaignName}-`.length)
+        console.log('[initiative] SSE event: dataKey=' + dataKey + ', event.data=' + JSON.stringify(event.data) + ', current state activeCreatureName=' + activeCreatureName)
 
           if (dataKey === 'combatSummary') {
-             const prevRound = combatSummaryRef.current?.round ?? 1
-              combatSummaryRef.current = event.data
-             setCombatSummaryG(event.data)
-             if (event.data.round !== prevRound) {
-                 expireStaleEffects(campaignName)
-                 const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(event.data.activeCreatureName || event.data.creatures?.[0]?.name))
-                 applyTurnStartEffects(event.data.activeCreatureName || event.data.creatures?.[0]?.name, newActiveChar?.computedStats || newActiveChar, campaignName)
-             }
-          } else if (dataKey === 'activeCreatureName') {
-             setActiveCreatureNameG(event.data)
-             expireStaleEffects(campaignName)
-             const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(event.data))
-             applyTurnStartEffects(event.data, newActiveChar?.computedStats || newActiveChar, campaignName)
-         }
-       }, [campaignName, characters, handleOverlayEvent, setCombatSummaryG, setActiveCreatureNameG])
+              const prevRound = combatSummaryRef.current?.round ?? 1
+               combatSummaryRef.current = event.data
+              setCombatSummaryG(event.data)
+              if (event.data.round !== prevRound) {
+                  expireStaleEffects(campaignName)
+              }
+            } else if (dataKey === 'activeCreatureName') {
+              console.log('[initiative] SSE activeCreatureName: event.data=' + event.data + ', local state activeCreatureName=' + activeCreatureName)
+              activeCreatureNameRef.current = event.data
+              setActiveCreatureNameG(event.data)
+              expireStaleEffects(campaignName)
+              const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(event.data))
+              console.log('[initiative] SSE activeCreatureName: applying turn start effects for ' + event.data + ', playerStats=' + (newActiveChar?.name || 'null'))
+              applyTurnStartEffects(event.data, newActiveChar?.computedStats || newActiveChar, campaignName)
+          }
+        }, [campaignName, characters, handleOverlayEvent, setCombatSummaryG, setActiveCreatureNameG, activeCreatureName])
 
     React.useEffect(() => {
         if (!combatSummary) return
@@ -240,24 +243,24 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
       const handleNextCreature = React.useCallback(() => {
           const cs = combatSummaryRef.current
           if (!cs) return
-         const { newActiveName, roundIncrement } = getNextCreatureName(cs, activeCreatureName)
-         if (!roundIncrement) {
-             storage.set('activeCreatureName', newActiveName, campaignName)
-             setActiveCreatureName(newActiveName)
-            } else {
-              cs.round++
-              storage.set('combatSummary', cs, campaignName)
-              setCombatSummary(cloneDeep(cs))
+          const { newActiveName, roundIncrement } = getNextCreatureName(cs, activeCreatureName)
+          console.log('[initiative] handleNextCreature: activeCreatureName=' + activeCreatureName + ', creatures=' + cs.creatures.map(c => c.name).join(', ') + ', round=' + cs.round)
+          console.log('[initiative] handleNextCreature: newActiveName=' + newActiveName + ', roundIncrement=' + roundIncrement)
+          if (!roundIncrement) {
               storage.set('activeCreatureName', newActiveName, campaignName)
               setActiveCreatureName(newActiveName)
-              for (const creature of cs.creatures) {
-                  clearPerRoundMajestyTrackers(creature.name, campaignName)
-              }
-            }
-          expireStaleEffects(campaignName)
-          const newActiveCharacter = characters.find(ch => utils.getName(ch.name) === utils.getName(newActiveName))
-          applyTurnStartEffects(newActiveName, newActiveCharacter?.computedStats || newActiveCharacter, campaignName)
-        }, [activeCreatureName, campaignName, characters])
+             } else {
+               cs.round++
+               storage.set('combatSummary', cs, campaignName)
+               setCombatSummary(cloneDeep(cs))
+               storage.set('activeCreatureName', newActiveName, campaignName)
+               setActiveCreatureName(newActiveName)
+               for (const creature of cs.creatures) {
+                   clearPerRoundMajestyTrackers(creature.name, campaignName)
+               }
+             }
+             expireStaleEffects(campaignName)
+           }, [activeCreatureName, campaignName])
 
     const handlePreviousCreature = React.useCallback(() => {
           if (isPrevDisabled) return
@@ -275,11 +278,9 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 }
               storage.set('activeCreatureName', newActiveName, campaignName)
              setActiveCreatureName(newActiveName)
-           }
-          expireStaleEffects(campaignName)
-          const newActiveChar = characters.find(ch => utils.getName(ch.name) === utils.getName(newActiveName))
-          applyTurnStartEffects(newActiveName, newActiveChar?.computedStats || newActiveChar, campaignName)
-        }, [activeCreatureName, campaignName, isPrevDisabled, characters])
+            }
+             expireStaleEffects(campaignName)
+            }, [activeCreatureName, campaignName, isPrevDisabled])
 
     React.useEffect(() => {
         let cancelled = false
@@ -297,11 +298,15 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 setCombatSummary(merged)
                 combatSummaryRef.current = merged
 
-                const activeName = getActiveCreatureName(campaignName)
-                if (activeName) {
-                    setActiveCreatureName(activeName)
-                } else {
-                    setActiveCreatureName(merged.creatures[0]?.name || null)
+                if (!activeCreatureNameRef.current) {
+                    const activeName = getActiveCreatureName(campaignName)
+                    if (activeName) {
+                        setActiveCreatureName(activeName)
+                        activeCreatureNameRef.current = activeName
+                    } else {
+                        setActiveCreatureName(merged.creatures[0]?.name || null)
+                        activeCreatureNameRef.current = merged.creatures[0]?.name || null
+                    }
                 }
             } else {
                 if (cancelled) return
@@ -313,10 +318,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                 const firstName = creatures[0]?.name
                 storage.set('activeCreatureName', firstName, campaignName)
                 setActiveCreatureName(firstName)
+                activeCreatureNameRef.current = firstName
             }
         })()
         return () => { cancelled = true }
-    }, [characters, campaignName]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [campaignName]) // eslint-disable-line react-hooks/exhaustive-deps
 
     React.useEffect(() => {
         if (!combatSummary || !onNpcsChange) return
@@ -648,10 +654,11 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         <div className='initiative'>
             <Subscriber campaignName={campaignName} handleEvent={handleEvent} />
             {combatSummary ? (
-            <>
-            <h4>Initiative (round {combatSummary.round})</h4>
-            <div className='carousel-container' ref={carouselRef}>
-                {displayCreatures?.map((creature) => {
+             <>
+             <h4>Initiative (round {combatSummary.round})</h4>
+             <div className='carousel-container' ref={carouselRef}>
+             {console.log('[initiative] RENDER: activeCreatureName=' + activeCreatureName + ', round=' + combatSummary.round)}
+                 {displayCreatures?.map((creature) => {
                     const isActive = creature.name === activeCreatureName
                     const character = characters.find(ch => utils.getName(ch.name) === creature.name)
                     const stats = character?.computedStats || character

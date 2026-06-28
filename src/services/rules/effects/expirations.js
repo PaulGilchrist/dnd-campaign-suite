@@ -25,9 +25,14 @@ function ensureArray(value, name) {
 }
 
 export function applyTurnStartEffects(activeName, playerStats, campaignName) {
-    if (!activeName || !playerStats) return;
+    console.log('[expirations] applyTurnStartEffects called: activeName=' + activeName + ', playerStats=' + (playerStats?.name || 'null') + ', campaignName=' + campaignName)
+    if (!activeName || !playerStats) {
+        console.log('[expirations] applyTurnStartEffects: early return - activeName=' + activeName + ', playerStats=' + playerStats)
+        return;
+    }
 
     const turnStartEffects = ensureArray(playerStats.turnStartEffects, 'turnStartEffects');
+    console.log('[expirations] applyTurnStartEffects: turnStartEffects for ' + activeName + ' = ' + JSON.stringify(turnStartEffects.map(e => e.type)))
     for (const effect of turnStartEffects) {
         if (effect.type === 'heroic_inspiration') {
             const currentInspiration = getRuntimeValue(activeName, 'hasInspiration') || false;
@@ -96,6 +101,9 @@ export function applyTurnStartEffects(activeName, playerStats, campaignName) {
         }
         if (effect.type === 'regenerate_turn_start_heal') {
             applyRegenerateTurnStartHeal(activeName, playerStats, effect, campaignName);
+        }
+        if (effect.type === 'survivor_turn_start_heal') {
+            applySurvivorTurnStartHeal(activeName, playerStats, effect, campaignName);
         }
         if (effect.type === 'resistance_clear_turn') {
             setRuntimeValue(activeName, 'resistanceUsedThisTurn', false, campaignName);
@@ -614,6 +622,44 @@ async function applyRegenerateTurnStartHeal(activeName, playerStats, effect, cam
     const newHp = Math.min(maxHp, currentHp + healAmount);
 
     await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
+}
+
+async function applySurvivorTurnStartHeal(activeName, playerStats, effect, campaignName) {
+    console.log('[expirations] applySurvivorTurnStartHeal: activeName=' + activeName + ', effect=' + JSON.stringify(effect))
+    const storedMaxHp = getRuntimeValue(activeName, 'hitPoints', campaignName);
+    const storedCurrentHp = getRuntimeValue(activeName, 'currentHitPoints', campaignName);
+    console.log('[expirations] applySurvivorTurnStartHeal: maxHp=' + storedMaxHp + ', currentHp=' + storedCurrentHp)
+    if (storedMaxHp == null) {
+        console.error(`[expirations] Survivor: hitPoints not found for ${activeName} in ${campaignName}`);
+        throw new Error(`Survivor: hitPoints not found for ${activeName}`);
+    }
+    const maxHp = storedMaxHp;
+    const currentHp = storedCurrentHp ?? storedMaxHp;
+    if (currentHp <= 0) {
+        console.log('[expirations] applySurvivorTurnStartHeal: currentHp <= 0, skipping')
+        return;
+    }
+    const isBloodied = currentHp <= Math.floor(maxHp / 2);
+    console.log('[expirations] applySurvivorTurnStartHeal: isBloodied=' + isBloodied + ', threshold=' + Math.floor(maxHp / 2))
+    if (!isBloodied) {
+        console.log('[expirations] applySurvivorTurnStartHeal: not bloodied, skipping')
+        return;
+    }
+
+    const healAmount = effect.healExpression ? evaluateAutoExpression(effect.healExpression, playerStats) : 5;
+    console.log('[expirations] applySurvivorTurnStartHeal: healAmount=' + healAmount)
+    if (typeof healAmount !== 'number' || isNaN(healAmount) || healAmount <= 0) return;
+
+    const newHp = Math.min(maxHp, currentHp + healAmount);
+    console.log('[expirations] applySurvivorTurnStartHeal: healing ' + activeName + ' from ' + currentHp + ' to ' + newHp)
+    await setRuntimeValue(activeName, 'currentHitPoints', newHp, campaignName);
+    addEntry(campaignName, {
+        type: 'ability_use',
+        characterName: activeName,
+        abilityName: 'Survivor',
+        description: `${activeName} uses Survivor to heal ${healAmount} HP (bloodied)`,
+    }).catch(() => {});
+    console.log('[expirations] applySurvivorTurnStartHeal: logged to party log')
 }
 
 async function applyRegenerateBuffHeal(activeName, playerStats, campaignName) {

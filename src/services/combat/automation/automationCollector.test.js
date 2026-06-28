@@ -1101,4 +1101,27 @@ describe('collectTurnStartEffects', () => {
     expect(types).toContain('umbral_sight')
     expect(types).toContain('elder_champion_regeneration')
   })
+
+  it('collects healing_start_of_turn as survivor_turn_start_heal when bloodiedOnly is true', () => {
+    const features = [{
+      name: 'Survivor',
+      automation: { type: 'healing_start_of_turn', healExpression: '5 + CON modifier', bloodiedOnly: true },
+    }]
+    const result = collectTurnStartEffects(features)
+    expect(result).toHaveLength(1)
+    expect(result[0].type).toBe('survivor_turn_start_heal')
+    expect(result[0].healExpression).toBe('5 + CON modifier')
+    expect(result[0].bloodiedOnly).toBe(true)
+  })
+
+  it('collects healing_start_of_turn as regenerate_turn_start_heal when bloodiedOnly is false', () => {
+    const features = [{
+      name: 'Regenerate',
+      automation: { type: 'healing_start_of_turn', healExpression: '10', bloodiedOnly: false },
+    }]
+    const result = collectTurnStartEffects(features)
+    expect(result).toHaveLength(1)
+    expect(result[0].type).toBe('regenerate_turn_start_heal')
+  })
+
 })

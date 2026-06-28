@@ -194,9 +194,10 @@ export function collectTurnStartEffects(features) {
             }
             if (auto?.type === 'healing_start_of_turn') {
                 effects.push({
-                    type: 'regenerate_turn_start_heal',
+                    type: auto.bloodiedOnly ? 'survivor_turn_start_heal' : 'regenerate_turn_start_heal',
                     name: feature.name,
                     healExpression: auto.healExpression || '1',
+                    bloodiedOnly: auto.bloodiedOnly || false,
                     bodyPartRegrowMinutes: auto.bodyPartRegrowMinutes || 2,
                 })
             }

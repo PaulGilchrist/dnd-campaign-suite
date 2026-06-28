@@ -742,4 +742,137 @@ describe('applyTurnStartEffects — heroism_temp_hp', () => {
   });
 });
 
+describe('applyTurnStartEffects — survivor_turn_start_heal', () => {
+  beforeEach(() => {
+    resetMocks();
+    getRuntimeValue.mockImplementation((_name, prop) => {
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
+  });
 
+  it('heals when bloodied (currentHp <= maxHp/2) and has at least 1 HP', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (name === 'TestCharacter' && prop === 'hitPoints') return 40;
+      if (name === 'TestCharacter' && prop === 'currentHitPoints') return 15;
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
+
+    await applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'survivor_turn_start_heal', healExpression: '5 + CON modifier' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'currentHitPoints',
+      20,
+      'TestCampaign'
+    );
+  });
+
+  it('does not heal when above half HP', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (name === 'TestCharacter' && prop === 'hitPoints') return 40;
+      if (name === 'TestCharacter' && prop === 'currentHitPoints') return 25;
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
+
+    await applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'survivor_turn_start_heal', healExpression: '5 + CON modifier' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('does not heal at 0 HP', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (name === 'TestCharacter' && prop === 'hitPoints') return 40;
+      if (name === 'TestCharacter' && prop === 'currentHitPoints') return 0;
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
+
+    await applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'survivor_turn_start_heal', healExpression: '5 + CON modifier' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('caps healing at max HP when bloodied', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (name === 'TestCharacter' && prop === 'hitPoints') return 20;
+      if (name === 'TestCharacter' && prop === 'currentHitPoints') return 10;
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
+
+    await applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'survivor_turn_start_heal', healExpression: '5 + CON modifier' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'currentHitPoints',
+      15,
+      'TestCampaign'
+    );
+  });
+
+  it('heals correct amount when bloodied at exactly half HP', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (name === 'TestCharacter' && prop === 'hitPoints') return 20;
+      if (name === 'TestCharacter' && prop === 'currentHitPoints') return 10;
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
+
+    await applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'survivor_turn_start_heal', healExpression: '5 + CON modifier' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'currentHitPoints',
+      15,
+      'TestCampaign'
+    );
+  });
+
+  it('does not call setRuntimeValue for non-bloodied character at exactly half HP threshold', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (name === 'TestCharacter' && prop === 'hitPoints') return 20;
+      if (name === 'TestCharacter' && prop === 'currentHitPoints') return 11;
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
+
+    await applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'survivor_turn_start_heal', healExpression: '5 + CON modifier' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).not.toHaveBeenCalled();
+  });
+
+  it('uses default heal amount when no expression provided', async () => {
+    getRuntimeValue.mockImplementation((name, prop) => {
+      if (name === 'TestCharacter' && prop === 'hitPoints') return 40;
+      if (name === 'TestCharacter' && prop === 'currentHitPoints') return 15;
+      if (prop === 'targetEffects') return [];
+      return null;
+    });
+
+    await applyTurnStartEffects('TestCharacter', {
+      turnStartEffects: [{ type: 'survivor_turn_start_heal' }]
+    }, 'TestCampaign');
+
+    expect(setRuntimeValue).toHaveBeenCalledWith(
+      'TestCharacter',
+      'currentHitPoints',
+      20,
+      'TestCampaign'
+    );
+  });
+});

@@ -4982,12 +4982,8 @@
                 "casting_time": "passive"
               },
               {
-                "type": "self_healing",
+                "type": "healing_start_of_turn",
                 "healExpression": "5 + CON modifier",
-                "action": "action",
-                "uses": 1,
-                "usesMax": 1,
-                "recharge": "long_rest",
                 "bloodiedOnly": true
               }
             ]

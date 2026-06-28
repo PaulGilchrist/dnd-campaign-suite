@@ -73,6 +73,7 @@ export function setRuntimeValue(characterKey, propertyName, value, campaignName)
     return;
   }
   store.set(propertyName, value);
+  console.log('[runtime] setRuntimeValue: ' + characterKey + '.' + propertyName + ' = ' + value + ' (was ' + existing + ') campaign=' + campaignName)
 
   const obj = Object.fromEntries(store);
 
