@@ -249,18 +249,18 @@ describe('DiceRollResult', () => {
             expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
         });
 
-        it('shows "AUTO-CRIT" text when isAutoCrit is true', () => {
+        it('shows "Critical Hit!" text when isAutoCrit is true', () => {
             render(
                 <DiceRollResult name="Attack" type="d20" rolls={[5, 3]} bonus={3} isAutoCrit={true} />
             );
-            expect(screen.getByText(/AUTO-CRIT/)).toBeInTheDocument();
+            expect(screen.getByText(/Critical Hit!/)).toBeInTheDocument();
         });
 
-        it('shows "target condition" text when isAutoCrit is true', () => {
+        it('shows "Critical Hit!" with dice doubled text when isAutoCrit is true', () => {
             render(
                 <DiceRollResult name="Attack" type="d20" rolls={[5, 3]} bonus={3} isAutoCrit={true} />
             );
-            expect(screen.getByText(/target condition/)).toBeInTheDocument();
+            expect(screen.getByText(/damage dice doubled/)).toBeInTheDocument();
         });
 
         it('does NOT show "Critical Hit!" when roll is not 20', () => {

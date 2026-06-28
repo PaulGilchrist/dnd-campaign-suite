@@ -147,6 +147,7 @@ export function createLogDamageAndShow(deps) {
                     damageApplied: true,
                     damageReduced: applyResult?.damageReduced,
                     isPotentCantrip: true,
+                    isCrit,
                 });
                 return;
             }
@@ -469,6 +470,7 @@ export function createLogDamageAndShow(deps) {
             finalDamage: primaryApplyResult?.finalDamage ?? finalDamage,
             damageApplied: true,
             damageReduced: primaryApplyResult?.damageReduced,
+            isCrit,
         };
         if (secondaryResult) {
             popupData.secondaryName = secondaryResult.name;
@@ -1092,6 +1094,7 @@ export function createLogDamageAndShow(deps) {
             total,
             adjustedTotal: adjustedTotal,
             elementalAdeptBonus: adjustedTotal > total ? adjustedTotal - total : 0,
+            isCrit,
         };
 
         if (secondaryResult) {

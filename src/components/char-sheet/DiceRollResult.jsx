@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { formatDamageFormula } from '../../services/dice/diceRoller.js';
 import './diceRollResult.css';
 
 function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, formula = '', modifier = 0, total = 0, targetName, targetAc, hit, resistanceNotice, hunterLoreNotice, forcedMode, isAutoMiss, rangeReason, coverReason, isAutoCrit, isCrit, isNatural1, dc, success, dcType, dcSuccess, waitingForPlayerSave, saveDc, saveType, saveResult, finalDamage, damageApplied, targetCurrentHp, damageReduced, damageType, onQuickRoll, autoDamage, coverLevel, coverAcBonus, autoReroll, autoRerollBonus, strSaveReplace, strCheckReplace, strScore, wisCheckReplace, wisCheckMinBonus, reliableTalent, onReroll, tacticalMind, tacticalMindBonus, gloriousDefenseBonus, onCounterAttack, strokeOfLuck, onStrokeOfLuck, defensiveDuelistBonus, baitAndSwitchBonus, isPotentCantrip, luckyAdvantage, luckyDisadvantage, onLuckyAdvantage, onLuckyDisadvantage, secondaryFormula, secondaryRolls, secondaryTotal, secondaryModifier, secondaryDamageType, secondaryFinalDamage, secondarySaveResult, availableSuperiorityManeuvers, onSuperiorityManeuver, onTacticalMind }) {
@@ -35,7 +34,9 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
          finalRoll = safeRolls.reduce((sum, r) => sum + r, 0);
       }
 
-    const isDamageType = rollType === 'damage' || rollType === 'save-damage' || rollType === 'aoe-damage' || rollType === 'overchannel-damage' || rollType === 'graze-damage';
+    const isDamageType = type === 'damage' || rollType === 'damage' || type === 'save-damage' || rollType === 'save-damage' || type === 'aoe-damage' || rollType === 'aoe-damage' || type === 'overchannel-damage' || rollType === 'overchannel-damage' || type === 'graze-damage' || rollType === 'graze-damage';
+
+    const isCritDamage = isDamageType && (isCrit || isAutoCrit);
 
     const originalTotal = isDamageType ? total : (finalRoll + bonus + modifier);
     const displayRoll = strokeResult !== null ? 20 : (rerollResult !== null ? rerollResult.roll : finalRoll);
@@ -46,10 +47,10 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
     const wisDisplayTotal = wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? finalRoll + wisBonus + modifier : displayTotal;
     const reliableTalentTotal = reliableTalent && (rollType === 'check' || rollType === 'skill') && displayRoll <= 9 ? 10 + bonus + modifier : null;
     const finalTotal = reliableTalentTotal !== null ? reliableTalentTotal : (wisCheckReplace && (rollType === 'check' || rollType === 'skill') ? wisDisplayTotal : finalDisplayTotal);
-    const showCrit = isCrit || isAutoCrit || (isD20 && displayRoll === 20) || (strokeResult !== null && isD20);
     const showFumble = isNatural1 && rollType === 'attack';
 
-    const displayFormula = isDamageType && isCrit ? formatDamageFormula(formula, rolls, true) : formula;
+    const critDiceRolls = isCritDamage && rolls ? rolls.map(r => `${r}*2`) : null;
+    const displayFormula = formula;
 
     const handleTacticalMind = async () => {
         const dieResult = Math.floor(Math.random() * 10) + 1;
@@ -114,7 +115,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                   <span className="dice-rolled">
                     {isD20
                         ? (mode === 'normal' ? safeRolls[0] || 0 : finalRoll)
-                        : safeRolls.join(', ')
+                        : (critDiceRolls ? critDiceRolls.join(', ') : safeRolls.join(', '))
                     }
                   </span>
                 )}
@@ -122,7 +123,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                   ` +${20 + bonus + modifier - 20}`
                 ) : rerollResult !== null ? (
                   ` +${rerollResult.total - rerollResult.roll}`
-                ) : (isDamageType && isCrit) ? ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}` : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
+                ) : isCritDamage ? ` +${modifier}${bonusDetail && bonus > 0 ? ' ' + bonusDetail : ''}` : (bonus + modifier) >= 0 && (bonus + modifier) !== 0 ? ` +${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` :
                  (bonus + modifier) < 0 ? ` ${(bonus + modifier)}${bonusDetail ? ' ' + bonusDetail : ''}` : ''}
             </div>
 
@@ -160,7 +161,7 @@ function DiceRollResult({ name, type, rolls, rollType, bonus = 0, bonusDetail, f
                   </div>
               )}
 
-            {showCrit && <div className="dice-roll-crit">{isAutoCrit ? 'AUTO-CRIT (target condition)' : 'Critical Hit!'} — damage dice doubled</div>}
+            {(isCritDamage || isCrit || isAutoCrit || (isD20 && displayRoll === 20) || (strokeResult !== null && isD20)) && <div className="dice-roll-crit">Critical Hit! — damage dice doubled</div>}
             {showFumble && <div className="dice-roll-crit dice-roll-crit-miss">Critical Miss!</div>}
               {targetName && hit !== undefined && !isSaveDamageType && rollType === 'attack' && (
                   <div className={`dice-roll-hit-miss ${hit ? 'hit' : 'miss'}`}>

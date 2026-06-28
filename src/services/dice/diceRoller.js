@@ -144,10 +144,10 @@ function formatDamageFormula(formula, rolls, isCrit) {
   const parsed = parseExpression(formula);
   if (!parsed) return formula;
   const { count, sides, modifier } = parsed;
-  const dicePart = count === 1 ? `d${sides}` : `${count}d${sides}`;
   const rollStr = rolls && rolls.length > 0 ? ` (${rolls.join(', ')})` : '';
   const critSuffix = isCrit ? '*2' : '';
-  let formulaStr = `${dicePart}${critSuffix}`;
+  let formulaStr = `${count}d${sides}`;
+  formulaStr += critSuffix;
   if (modifier > 0) {
     formulaStr += `+${modifier}`;
   } else if (modifier < 0) {

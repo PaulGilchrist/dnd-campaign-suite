@@ -104,3 +104,12 @@ npm run test:coverage                             # Vitest with coverage (v8, ou
 - **Vite proxy config:** In dev, Vite proxies `/api`, `/subscribe`, and `/spell-overlay` to `http://localhost:80` (the Express server). The `/subscribe` proxy has `ws: false` and infinite timeout for SSE.
 - **Per-campaign change data is gitignored:** `public/campaigns/*/data/character-change-data.json`, `public/campaigns/*/data/campaign-log.json`, `logs/`, `coverage/`.
 - **React 19 settings:** ESLint config sets `settings: { react: { version: '19' } }` for the plugin.
+
+## Code Simplicity
+
+- **Single source of truth:** One variable, one concept. If `isCritical` determines whether dice are doubled, use that same variable everywhere that logic is needed — never introduce `isAutoCrit`, `showCrit`, `isCritDamage` as separate flags for the same concept. Consolidate into one derived variable at the top of the function.
+- **No duplication:** If the same check or computation appears in multiple places, extract it. If a new feature requires duplicating logic, that's a signal to refactor the shared logic first.
+- **Simplify, don't accumulate:** Don't add new variables, branches, or display paths for edge cases that don't change the user-facing outcome. "AUTO-CRIT" vs "Critical Hit" are the same event — one label is enough.
+- **Prefer derived state over parallel state:** Compute `isCritDamage = isDamageType && (isCrit || isAutoCrit)` once, use it everywhere. Don't re-check `isCrit || isAutoCrit` scattered across the component.
+- **Remove dead code:** When refactoring, delete the old variables and branches that are no longer used. Don't leave orphaned code "just in case."
+- **Test-driven simplification:** When a test fails after simplification, fix the test or the logic — don't add complexity to make the test pass. The test should reflect the simplified design.
