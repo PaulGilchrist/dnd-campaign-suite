@@ -28,7 +28,6 @@ function CreatureCard({
     onNameChange,
     onHpChange,
     onInitiativeChange,
-    onRollNpcInitiative,
     onTargetChange,
     onRollConditionSave,
     onBreakCondition,
@@ -45,10 +44,6 @@ function CreatureCard({
     const isUnconscious = creature.currentHp <= 0
     const allTargetEffects = useRuntimeValue(campaignName, 'targetEffects') ?? [];
     const myTargetEffects = allTargetEffects.filter(te => te.target === creature.name);
-    const showRollLink = creature.type === 'npc'
-        && creature.initiativeBonus != null
-        && creature.initiativeBonus !== ''
-        && creature.initiativeBonus !== 0
 
     return (
         <div className={`creature-card ${creature.type} ${isActive ? 'active' : ''} ${isUnconscious ? 'creature-unconscious' : ''}`}>
@@ -92,25 +87,13 @@ function CreatureCard({
                 onChange={onHpChange}
             />
             <div className='creature-initiative'>Initiative&nbsp;
-                {showRollLink ? (
-                    <span
-                        className="initiative-roll-link"
-                        onClick={() => onRollNpcInitiative(creature.name)}
-                        role="button"
-                        tabIndex={0}
-                        title={`Roll initiative (d20 + ${creature.initiativeBonus})`}
-                    >
-                        {creature.initiative || <i className="fa-solid fa-dice-d20" />}
-                    </span>
-                ) : (
-                    <input
-                        min="0"
-                        onChange={(event) => onInitiativeChange(creature.name, event.target.value)}
-                        type="number"
-                        value={creature.initiative}
-                        placeholder="Init"
-                    />
-                )}
+                <input
+                    min="0"
+                    onChange={(event) => onInitiativeChange(creature.name, event.target.value)}
+                    type="number"
+                    value={creature.initiative}
+                    placeholder="Init"
+                />
             </div>
             <div className='creature-target'>Target&nbsp;
                 <select

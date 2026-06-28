@@ -89,7 +89,6 @@ describe('CreatureCard', () => {
             onNameChange: vi.fn(),
             onHpChange: vi.fn(),
             onInitiativeChange: vi.fn(),
-            onRollNpcInitiative: vi.fn(),
             onTargetChange: vi.fn(),
             onRollConditionSave: vi.fn(),
             onBreakCondition: vi.fn(),
@@ -292,57 +291,17 @@ describe('CreatureCard', () => {
             expect(props.onInitiativeChange).toHaveBeenCalledWith('Alice', '20');
         });
 
-        it('should show roll link for NPC with initiativeBonus', () => {
+        it('should show initiative input for NPC', () => {
             render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            expect(document.querySelector('.initiative-roll-link')).toBeInTheDocument();
-        });
-
-        it('should show dice icon when NPC has no initiative value', () => {
-            const npcNoInit = { ...defaultNpcCreature, initiative: null, initiativeBonus: 2 };
-            render(<CreatureCard {...props} creature={npcNoInit} />);
-            expect(screen.queryByTitle('Roll initiative (d20 + 2)')).toBeInTheDocument();
+            const initiativeInput = document.querySelector('.creature-initiative input[type="number"]');
+            expect(initiativeInput).toBeInTheDocument();
         });
 
         it('should show initiative value when NPC has one', () => {
-            const npcWithInit = { ...defaultNpcCreature, initiative: 12, initiativeBonus: 2 };
+            const npcWithInit = { ...defaultNpcCreature, initiative: 12 };
             render(<CreatureCard {...props} creature={npcWithInit} />);
-            expect(screen.getByText('12')).toBeInTheDocument();
-        });
-
-        it('should call onRollNpcInitiative when roll link is clicked', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const rollLink = document.querySelector('.initiative-roll-link');
-            fireEvent.click(rollLink);
-            expect(props.onRollNpcInitiative).toHaveBeenCalledWith('Goblin');
-        });
-
-        it('should show roll link tooltip with initiative bonus', () => {
-            render(<CreatureCard {...props} creature={defaultNpcCreature} />);
-            const rollLink = document.querySelector('.initiative-roll-link');
-            expect(rollLink.getAttribute('title')).toBe('Roll initiative (d20 + 2)');
-        });
-
-        it.each`
-            initiativeBonus | expectRollLink
-            ${null}         | ${false}
-            ${0}            | ${false}
-            ${''}           | ${false}
-            ${2}            | ${true}
-        `('should $expectRollLink roll link when initiativeBonus is $initiativeBonus', ({ initiativeBonus, expectRollLink }) => {
-            const npc = { ...defaultNpcCreature, initiativeBonus };
-            render(<CreatureCard {...props} creature={npc} />);
-            if (expectRollLink) {
-                expect(document.querySelector('.initiative-roll-link')).toBeInTheDocument();
-            } else {
-                expect(document.querySelector('.initiative-roll-link')).not.toBeInTheDocument();
-            }
-        });
-
-        it('should show initiative input for NPC when initiativeBonus is null', () => {
-            const npcNullBonus = { ...defaultNpcCreature, initiativeBonus: null };
-            render(<CreatureCard {...props} creature={npcNullBonus} />);
             const initiativeInput = document.querySelector('.creature-initiative input[type="number"]');
-            expect(initiativeInput).toBeInTheDocument();
+            expect(initiativeInput).toHaveValue(12);
         });
     });
 

@@ -4,11 +4,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Initiative from './initiative.jsx';
 import { loadCombatSummary, getCombatSummary, getActiveCreatureName } from '../../services/encounters/combatData.js';
 import { getRuntimeValue, setRuntimeValue } from '../../hooks/runtime/useRuntimeState.js';
-import { removeNpc, renameNpc, setTarget, rollNpcInitiative, setInitiative } from '../../services/encounters/initiativeService.js';
+import { removeNpc, renameNpc, setTarget, setInitiative } from '../../services/encounters/initiativeService.js';
 import { getMonsterImageUrl, getMonsterData } from '../../services/npcs/monsterUtils.js';
 import { clearDeathSavePrompt } from '../../services/combat/conditions/savePromptService.js';
 import { expireStaleEffects } from '../../services/rules/effects/expirations.js';
-import { logInitiativeRoll, logHpChange, logNpcThreshold } from '../../services/encounters/combatLoggingService.js';
+import { logHpChange, logNpcThreshold } from '../../services/encounters/combatLoggingService.js';
 
 vi.mock('../../hooks/runtime/useSSEEqualityGuard.js', () => ({ default: (setter) => setter }));
 vi.mock('../../services/ui/utils.js', () => ({ default: { getName: (name) => name } }));
@@ -90,7 +90,7 @@ vi.mock('../encounter/MonsterCardModal.jsx', () => ({ default: () => <div data-t
 vi.mock('../common/Subscriber.jsx', () => ({ default: () => <div data-testid="subscriber" /> }));
 vi.mock('../common/Popup.jsx', () => ({ default: ({ children, onClickOrKeyDown }) => (<div data-testid="popup-overlay" onClick={onClickOrKeyDown}><div data-testid="popup-modal">{children}</div></div>) }));
 vi.mock('../char-sheet/DiceRollResult.jsx', () => ({ default: ({ name }) => <div data-testid="dice-roll-result">{name}</div> }));
-vi.mock('./CreatureCard.jsx', () => ({ default: ({ creature, isActive, isLocalhost, onHpChange, onInitiativeChange, onRollNpcInitiative, onTargetChange, onRollConditionSave, onBreakCondition, onOpenConditionPicker, onRollConcentrationSave, onBreakConcentration, onOpenConcentrationPicker, onRemoveNpc, onNpcClick, onNameChange, allCreatures, overlays }) => (
+vi.mock('./CreatureCard.jsx', () => ({ default: ({ creature, isActive, isLocalhost, onHpChange, onInitiativeChange, onTargetChange, onRollConditionSave, onBreakCondition, onOpenConditionPicker, onRollConcentrationSave, onBreakConcentration, onOpenConcentrationPicker, onRemoveNpc, onNpcClick, onNameChange, allCreatures, overlays }) => (
     <div data-testid={`creature-card-${creature.name}`} className={`creature-card ${creature.type} ${isActive ? 'active' : ''}`}>
         <span>{creature.name}</span>
         <input data-testid={`hp-input-${creature.name}`} type="number" value={creature.currentHp ?? 0} onChange={(e) => onHpChange(creature.name, parseInt(e.target.value) || 0)} />
@@ -117,9 +117,6 @@ vi.mock('./CreatureCard.jsx', () => ({ default: ({ creature, isActive, isLocalho
         ) : null}
         {creature.type === 'npc' && isLocalhost && (
             <button data-testid={`npc-remove-${creature.name}`} onClick={() => onRemoveNpc(creature.name)} type="button" title="Remove NPC">X</button>
-        )}
-        {creature.type === 'npc' && (
-            <span data-testid={`npc-roll-${creature.name}`} onClick={() => onRollNpcInitiative(creature.name)} role="button" title={`Roll initiative (d20 + ${creature.initiativeBonus || 0})`}>Roll</span>
         )}
         {creature.type === 'npc' && (
             <span data-testid={`npc-click-${creature.name}`} onClick={() => onNpcClick(creature)}>Avatar</span>
@@ -327,22 +324,6 @@ describe('Initiative - Callback Integration', () => {
             });
 
             expect(setTarget).toHaveBeenCalled();
-        });
-    });
-
-    describe('handleRollNpcInitiative', () => {
-        it('should roll initiative when NPC roll link is clicked', async () => {
-            vi.mocked(loadCombatSummary).mockResolvedValue({ round: 1, creatures: [{ name: 'Goblin', type: 'npc', initiativeBonus: 2 }] });
-            await act(async () => { render(<Initiative {...props} />); });
-            await waitFor(() => { expect(screen.queryByTestId('creature-card-Goblin')).toBeInTheDocument(); });
-
-            await act(async () => {
-                const rollLink = screen.getByTestId('npc-roll-Goblin');
-                fireEvent.click(rollLink);
-            });
-
-            expect(rollNpcInitiative).toHaveBeenCalled();
-            expect(logInitiativeRoll).toHaveBeenCalled();
         });
     });
 

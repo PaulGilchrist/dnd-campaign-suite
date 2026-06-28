@@ -21,7 +21,6 @@ import {
     getPreviousCreatureName,
     isPreviousDisabled,
     setInitiative,
-    rollNpcInitiative,
     renameNpc,
     setTarget,
     clearCombat,
@@ -41,7 +40,6 @@ import {
     buildConcentrationPopup,
 } from '../../services/combat/concentration/concentrationService.js'
 import {
-    logInitiativeRoll,
     logConditionEvent,
     logConcentrationSave,
     logConditionSave,
@@ -505,15 +503,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
         setCombatSummary(cloneDeep(combatSummary))
     }
 
-    const handleRollNpcInitiative = (creatureName) => {
-        if (!combatSummary) return
-        const result = rollNpcInitiative(combatSummary, creatureName)
-        if (!result) return
-        storage.set('combatSummary', combatSummary, campaignName)
-        setCombatSummary(cloneDeep(combatSummary))
-        logInitiativeRoll(campaignName, creatureName, result.roll, result.bonus)
-    }
-
     const handleNpcClick = async (creature) => {
         if (!isLocalhost) return
         const npc = campaignNpcs.find(n => n.name?.toLowerCase() === creature.name?.toLowerCase())
@@ -688,7 +677,6 @@ function Initiative({ characters, campaignName, onNpcsChange, isLocalhost, mapNa
                             onNameChange={handleNameChange}
                             onHpChange={handleCreatureHpChange}
                             onInitiativeChange={handleInitiativeChange}
-                            onRollNpcInitiative={handleRollNpcInitiative}
                             onTargetChange={handleTargetChange}
                             onRollConditionSave={handleRollConditionSave}
                             onBreakCondition={handleAutoBreakCondition}
