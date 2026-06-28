@@ -707,10 +707,16 @@ describe('attackCalc', () => {
       expect(spellAttacks[0].hitBonus).toBe(7);
     });
 
-    it('should return empty array when no weapons or spells', () => {
+    it('should return unarmed strike when no weapons or spells', () => {
       const playerStats = makePlayerStats({ equipped: [] });
       const result = getAttacks(allEquipment, [], playerStats);
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
+      expect(result[0].damage).toBe('1d4+3');
+      expect(result[0].hitBonus).toBe(6);
+      expect(result[0].range).toBe(5);
+      expect(result[0].type).toBe('Action');
+      expect(result[0].weaponType).toBe('unarmed');
     });
 
     it('should build both ranged and melee attacks when both equipped', () => {
@@ -724,10 +730,11 @@ describe('attackCalc', () => {
       expect(result.find(a => a.name === 'Longsword')).toBeDefined();
     });
 
-    it('should return empty when equipped list contains only non-weapons', () => {
+    it('should return unarmed strike when equipped list contains only non-weapons', () => {
       const playerStats = makePlayerStats({ equipped: ['Shield', 'Leather Armor'] });
       const result = getAttacks(allEquipment, [], playerStats);
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('should handle missing fightingStyles gracefully', () => {

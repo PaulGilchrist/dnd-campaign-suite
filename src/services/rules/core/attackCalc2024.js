@@ -321,5 +321,37 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
     const starryArrow = buildStarryFormLuminousArrow(playerStats);
     if (starryArrow) attacks.push(starryArrow);
 
+    // Fallback unarmed strike when no weapons are equipped
+    if (attacks.length === 0) {
+        const str = playerStats.abilities?.find(a => a.name === 'Strength');
+        const strMod = str?.bonus || 0;
+        attacks.push({
+            name: 'Unarmed Strike',
+            damage: `1d4+${strMod}`,
+            damageType: 'Bludgeoning',
+            damageFormula: `Damage Formula = Unarmed Strike (1d4) + Strength Bonus (${strMod})`,
+            hitBonus: strMod + proficiency,
+            hitBonusFormula: `To Hit Bonus Formula = Strength Bonus (${strMod}) + Proficiency (${proficiency})`,
+            range: 5,
+            type: 'Action',
+            weaponType: 'unarmed',
+        });
+        // Two-Weapon Fighting: add bonus action unarmed strike
+        const hasTwoWeapon = fightingStyles2024.includes('Two-Weapon Fighting');
+        if (hasTwoWeapon) {
+            attacks.push({
+                name: 'Unarmed Strike',
+                damage: `1d4+${strMod}`,
+                damageType: 'Bludgeoning',
+                damageFormula: `Damage Formula = Unarmed Strike (1d4) + Strength Bonus (${strMod})`,
+                hitBonus: strMod + proficiency,
+                hitBonusFormula: `To Hit Bonus Formula = Strength Bonus (${strMod}) + Proficiency (${proficiency})`,
+                range: 5,
+                type: 'Bonus Action',
+                weaponType: 'unarmed',
+            });
+        }
+    }
+
     return attacks;
 }

@@ -395,7 +395,7 @@ describe('rules.getArmorClass', () => {
       expect(ac).toBe(12);
     });
 
-    it('does not apply Unarmed Fighting when armor is equipped', () => {
+    it('applies Unarmed Fighting with armor equipped', () => {
       const playerStats = {
         class: {
           name: 'Fighter',
@@ -407,7 +407,7 @@ describe('rules.getArmorClass', () => {
 
       const [ac] = rules.getArmorClass(createEquipment(), playerStats);
 
-      expect(ac).toBe(13);
+      expect(ac).toBe(15);
     });
 
     it('does not apply Unarmed Fighting when a shield is equipped', () => {
@@ -458,7 +458,7 @@ describe('rules.getArmorClass', () => {
       expect(ac).toBe(12);
     });
 
-    it('does not apply Unarmed Fighting in 2024 rules', () => {
+    it('applies Unarmed Fighting in 2024 rules', () => {
       const playerStats = {
         rules: '2024',
         class: {
@@ -472,7 +472,7 @@ describe('rules.getArmorClass', () => {
 
       const [ac] = rules.getArmorClass(createEquipment(), playerStats);
 
-      expect(ac).toBe(12);
+      expect(ac).toBe(14);
     });
   });
 

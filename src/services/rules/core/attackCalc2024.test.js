@@ -105,17 +105,19 @@ describe('attackCalc2024', () => {
   });
 
   describe('getAttacks', () => {
-    it('returns an empty array when the character has no weapons, spells, or special features', () => {
+    it('returns unarmed strike when the character has no weapons, spells, or special features', () => {
       findEquippedWeaponsStub.mockReturnValue([]);
 
       const result = getAttacks([], [], defaultPlayerStats());
 
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
-    it('returns an empty array when allEquipment and allSpells are empty and no class features apply', () => {
+    it('returns unarmed strike when allEquipment and allSpells are empty and no class features apply', () => {
       const result = getAttacks([], [], defaultPlayerStats());
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('selects Dexterity for ranged weapon attacks', () => {
@@ -375,7 +377,8 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks([], [], defaultPlayerStats({ class: { name: 'Fighter' } }));
 
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('adds spell attacks when spellAbilities are present', () => {
@@ -414,7 +417,8 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks([], [], playerStats);
 
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('computes proficiency correctly at level 9', () => {
@@ -599,7 +603,8 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks([], [], playerStats);
 
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('adds Soulknife Psychic Blade attacks for Rogue level 3+', () => {
@@ -642,7 +647,8 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks([], [], playerStats);
 
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('does not add Soulknife attacks for non-Rogue classes', () => {
@@ -655,7 +661,8 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks([], [], playerStats);
 
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('adds Swift Quiver attacks when concentration is active', async () => {
@@ -725,8 +732,9 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks(allEquipment, [], playerStats);
 
-      // No Swift Quiver, no weapons found via findEquippedWeapons, so empty
-      expect(result).toEqual([]);
+      // No Swift Quiver, no weapons found via findEquippedWeapons, so fallback unarmed strike
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('adds Starry Form Archer attack when the buff is active', () => {
@@ -783,7 +791,8 @@ describe('attackCalc2024', () => {
 
       const result = getAttacks([], [], playerStats);
 
-      expect(result).toEqual([]);
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe('Unarmed Strike');
     });
 
     it('combines multiple attack sources into one result array', () => {

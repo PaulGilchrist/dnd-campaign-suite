@@ -562,35 +562,33 @@ const rules = {
             contributions.push(`Monk Wisdom Bonus (${wisdom.bonus})`);
          }
 
-          // 5e-specific: Defense fighting style
-          if (!is2024(playerStats, playerSummary)) {
-              if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Defense') && armorName) {
-                  addedBonus += 1;
-                  contributions.push(`Fighting Style Defense (1)`);
-               }
-           }
+           // 5e-specific: Defense fighting style
+           if (!is2024(playerStats, playerSummary)) {
+               if (playerStats.class.fightingStyles && playerStats.class.fightingStyles.includes('Defense') && armorName) {
+                   addedBonus += 1;
+                   contributions.push(`Fighting Style Defense (1)`);
+                }
+            }
 
-          // 5e-specific: Unarmed Fighting fighting style - +2 AC when unarmed and not holding anything
-          if (!is2024(playerStats, playerSummary)) {
-              const hasUnarmedFighting = playerStats.class?.fightingStyles && playerStats.class.fightingStyles.includes('Unarmed Fighting');
-              if (hasUnarmedFighting) {
-                  const equippedItems = playerStats.inventory?.equipped || [];
-                  const hasAnyWeapon = equippedItems.some(equipName => {
-                      const { baseName } = parseMagicItemName(equipName);
-                      const item = allEquipment.find(e => e.name === baseName);
-                      return item && item.equipment_category === 'Weapon';
-                  });
-                  const hasShield = equippedItems.some(equipName => {
-                      const { baseName } = parseMagicItemName(equipName);
-                      return baseName === 'Shield';
-                  });
-                  const isUnarmed = !armorName && !hasAnyWeapon && !hasShield;
-                  if (isUnarmed) {
-                      addedBonus += 2;
-                      contributions.push(`Fighting Style Unarmed (2)`);
-                  }
-              }
-          }
+            // Unarmed Fighting fighting style - +2 AC when unarmed and not holding anything in both hands
+            const hasUnarmedFighting = playerStats.class?.fightingStyles && playerStats.class.fightingStyles.includes('Unarmed Fighting');
+            if (hasUnarmedFighting) {
+                const equippedItems = playerStats.inventory?.equipped || [];
+                const hasAnyWeapon = equippedItems.some(equipName => {
+                    const { baseName } = parseMagicItemName(equipName);
+                    const item = allEquipment.find(e => e.name === baseName);
+                    return item && item.equipment_category === 'Weapon';
+                });
+                const hasShield = equippedItems.some(equipName => {
+                    const { baseName } = parseMagicItemName(equipName);
+                    return baseName === 'Shield';
+                });
+                const isUnarmed = !hasAnyWeapon && !hasShield;
+                if (isUnarmed) {
+                    addedBonus += 2;
+                    contributions.push(`Fighting Style Unarmed (2)`);
+                }
+            }
 
         let armorClass;
         if (armorName) {

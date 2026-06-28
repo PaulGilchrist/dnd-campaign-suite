@@ -372,17 +372,48 @@ export function getAttacks(allEquipment, allSpells, playerStats) {
           }
      }
 
-     // Monk unarmed strikes
-    if (playerStats.class?.name === 'Monk') {
-        const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
-        const martialArts = classLevel?.class_specific?.martial_arts;
-        if (martialArts) {
-            const diceStr = `${martialArts.dice_count}d${martialArts.dice_value}`;
-            attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }));
-         }
-     }
+      // Monk unarmed strikes
+     if (playerStats.class?.name === 'Monk') {
+         const classLevel = playerStats.class?.class_levels?.[playerStats.level - 1];
+         const martialArts = classLevel?.class_specific?.martial_arts;
+         if (martialArts) {
+             const diceStr = `${martialArts.dice_count}d${martialArts.dice_value}`;
+             attacks.push(...buildMonkAttacks({ diceStr, dexterityBonus: dexterity.bonus, proficiency }));
+          }
+      }
 
-      // Spell attacks
+      // Fallback unarmed strike when no weapons are equipped
+     if (attacks.length === 0) {
+         const strMod = strength?.bonus || 0;
+         attacks.push({
+             name: 'Unarmed Strike',
+             damage: `1d4+${strMod}`,
+             damageType: 'Bludgeoning',
+             damageFormula: `Damage Formula = Unarmed Strike (1d4) + Strength Bonus (${strMod})`,
+             hitBonus: strMod + proficiency,
+             hitBonusFormula: `To Hit Bonus Formula = Strength Bonus (${strMod}) + Proficiency (${proficiency})`,
+             range: 5,
+             type: 'Action',
+             weaponType: 'unarmed',
+         });
+         // Two-Weapon Fighting: add bonus action unarmed strike when wielding two light weapons
+         const hasTwoWeapon = fightingStyles.includes('Two-Weapon Fighting');
+         if (hasTwoWeapon) {
+             attacks.push({
+                 name: 'Unarmed Strike',
+                 damage: `1d4+${strMod}`,
+                 damageType: 'Bludgeoning',
+                 damageFormula: `Damage Formula = Unarmed Strike (1d4) + Strength Bonus (${strMod})`,
+                 hitBonus: strMod + proficiency,
+                 hitBonusFormula: `To Hit Bonus Formula = Strength Bonus (${strMod}) + Proficiency (${proficiency})`,
+                 range: 5,
+                 type: 'Bonus Action',
+                 weaponType: 'unarmed',
+             });
+         }
+      }
+
+       // Spell attacks
      if (playerStats.spellAbilities) {
          attacks.push(...buildSpellAttacks(playerStats.spellAbilities.spells, allSpells, playerStats.spellAbilities, playerStats.level));
       }
